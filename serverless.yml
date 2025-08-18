@@ -1,6 +1,6 @@
-service: core-api
+service: api
 
-frameworkVersion: '3'
+frameworkVersion: "3"
 
 custom:
   env: ${opt:stage, 'dev'}
@@ -39,7 +39,7 @@ provider:
           Action:
             - ses:SendEmail
             - ses:SendRawEmail
-          Resource: '*'
+          Resource: "*"
         - Effect: Allow
           Action:
             - sqs:*
@@ -50,7 +50,7 @@ provider:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
-          Resource: '*'
+          Resource: "*"
         - Effect: Allow
           Action:
             - execute-api:ManageConnections
@@ -148,21 +148,21 @@ plugins:
 resources:
   Resources:
     GatewayResponseDefault4XX:
-      Type: 'AWS::ApiGateway::GatewayResponse'
+      Type: "AWS::ApiGateway::GatewayResponse"
       Properties:
         ResponseParameters:
           gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
           gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
         ResponseType: DEFAULT_4XX
         RestApiId:
-          Ref: 'ApiGatewayRestApi'
-    
+          Ref: "ApiGatewayRestApi"
+
     GatewayResponseDefault5XX:
-      Type: 'AWS::ApiGateway::GatewayResponse'
+      Type: "AWS::ApiGateway::GatewayResponse"
       Properties:
         ResponseParameters:
           gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
           gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
         ResponseType: DEFAULT_5XX
         RestApiId:
-          Ref: 'ApiGatewayRestApi'
+          Ref: "ApiGatewayRestApi"

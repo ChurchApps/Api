@@ -1,5 +1,5 @@
 {
-  "name": "core-api-layer",
+  "name": "api-layer",
   "version": "1.0.0",
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.862.0",
