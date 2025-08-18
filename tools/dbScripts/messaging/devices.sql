@@ -1,0 +1,20 @@
+CREATE TABLE `devices` (
+  `id` char(11) NOT NULL,
+  `appName` varchar(20) DEFAULT NULL,
+  `deviceId` varchar(45) DEFAULT NULL,
+  `churchId` char(11) DEFAULT NULL,
+  `personId` char(11) DEFAULT NULL,
+  `fcmToken` varchar(255) DEFAULT NULL,
+  `label` varchar(45) DEFAULT NULL,
+  `registrationDate` datetime DEFAULT NULL,
+  `lastActiveDate` datetime DEFAULT NULL,
+  `deviceInfo` text,
+  `admId` varchar(255) DEFAULT NULL,
+  `pairingCode` varchar(45) DEFAULT NULL,
+  `ipAddress` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `appName_deviceId` (`appName`,`deviceId`),
+  KEY `personId_lastActiveDate` (`personId`, `lastActiveDate`),
+  KEY `fcmToken` (`fcmToken`),
+  KEY `pairingCode` (`pairingCode`)
+) ENGINE=InnoDB;

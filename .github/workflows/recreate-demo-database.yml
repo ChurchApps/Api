@@ -1,0 +1,75 @@
+name: Recreate Demo Database
+
+on:
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  cleanup:
+    name: Recreate Demo Database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: "true"
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Recreate All Module Databases
+        run: |
+          # Define all modules in correct initialization order
+          MODULES=("membership" "attendance" "content" "giving" "messaging" "doing")
+          
+          echo "🚀 Starting recreation of demo databases for all modules..."
+          echo "📋 Module order: ${MODULES[*]}"
+          
+          # Create base .env file
+          echo "APP_ENV=Demo" > .env
+          
+          # Process each module
+          for MODULE in "${MODULES[@]}"; do
+            echo ""
+            echo "🔧 Processing $MODULE module..."
+            
+            # Get module-specific connection string from Parameter Store
+            PARAM_NAME="/demo/${MODULE}Api/connectionString"
+            echo "   📡 Fetching connection string from $PARAM_NAME"
+            
+            if CONNECTION_STRING=$(aws ssm get-parameter --name "$PARAM_NAME" --with-decryption --query "Parameter.Value" --output text 2>/dev/null); then
+              echo "   ✅ Connection string retrieved for $MODULE"
+              
+              # Extract database details from connection string
+              DB_NAME=$(echo $CONNECTION_STRING | sed -n 's/.*\/\/[^:]*:[^@]*@[^:]*:[0-9]*\/\([^?]*\).*/\1/p')
+              DB_HOST=$(echo $CONNECTION_STRING | sed -n 's/.*@\([^:]*\):[0-9]*\/.*/\1/p')
+              DB_USER=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/\([^:]*\):.*/\1/p')
+              DB_PASS=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
+              
+              echo "   🗑️ Dropping and recreating database: $DB_NAME"
+              mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`; CREATE DATABASE \`${DB_NAME}\`;"
+              
+              # Add connection string to .env for this module
+              echo "CONNECTION_STRING_${MODULE^^}=$CONNECTION_STRING" >> .env
+              
+              echo "   🔧 Initializing $MODULE database schema and demo data..."
+              npm run initdb:$MODULE
+              
+              echo "   ✅ $MODULE module completed successfully"
+            else
+              echo "   ⚠️ No connection string found for $MODULE, skipping..."
+            fi
+          done
+          
+          echo ""
+          echo "🎉 All module databases have been recreated successfully!"

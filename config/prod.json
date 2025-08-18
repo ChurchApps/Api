@@ -1,0 +1,65 @@
+{
+  "environment": "prod",
+  "apiUrl": "https://api.example.com",
+  "appUrl": "https://app.example.com",
+  "accountsUrl": "https://accounts.example.com",
+  "deliveryProvider": "aws",
+  "contentRoot": "https://api.example.com/content/",
+  "fileStore": "s3",
+  "s3Bucket": "prod-churchapps-content",
+  "databases": {
+    "membership": {
+      "host": "${ssm:/prod/db/host}",
+      "user": "${ssm:/prod/db/user}",
+      "password": "${ssm:/prod/db/password}",
+      "database": "prod_membership",
+      "connectionLimit": 50
+    },
+    "attendance": {
+      "host": "${ssm:/prod/db/host}",
+      "user": "${ssm:/prod/db/user}",
+      "password": "${ssm:/prod/db/password}",
+      "database": "prod_attendance",
+      "connectionLimit": 50
+    },
+    "content": {
+      "host": "${ssm:/prod/db/host}",
+      "user": "${ssm:/prod/db/user}",
+      "password": "${ssm:/prod/db/password}",
+      "database": "prod_content",
+      "connectionLimit": 50
+    },
+    "giving": {
+      "host": "${ssm:/prod/db/host}",
+      "user": "${ssm:/prod/db/user}",
+      "password": "${ssm:/prod/db/password}",
+      "database": "prod_giving",
+      "connectionLimit": 50
+    },
+    "messaging": {
+      "host": "${ssm:/prod/db/host}",
+      "user": "${ssm:/prod/db/user}",
+      "password": "${ssm:/prod/db/password}",
+      "database": "prod_messaging",
+      "connectionLimit": 50
+    },
+    "doing": {
+      "host": "${ssm:/prod/db/host}",
+      "user": "${ssm:/prod/db/user}",
+      "password": "${ssm:/prod/db/password}",
+      "database": "prod_doing",
+      "connectionLimit": 50
+    }
+  },
+  "jwt": {
+    "secret": "${ssm:/prod/jwt/secret}",
+    "expiration": 172800
+  },
+  "websocket": {
+    "url": "wss://ws.example.com"
+  },
+  "logging": {
+    "level": "warn",
+    "cloudWatch": true
+  }
+}

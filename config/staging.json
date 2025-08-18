@@ -1,0 +1,65 @@
+{
+  "environment": "staging",
+  "apiUrl": "https://staging-api.example.com",
+  "appUrl": "https://staging.example.com",
+  "accountsUrl": "https://staging-accounts.example.com",
+  "deliveryProvider": "aws",
+  "contentRoot": "https://staging-api.example.com/content/",
+  "fileStore": "s3",
+  "s3Bucket": "staging-churchapps-content",
+  "databases": {
+    "membership": {
+      "host": "${ssm:/staging/db/host}",
+      "user": "${ssm:/staging/db/user}",
+      "password": "${ssm:/staging/db/password}",
+      "database": "staging_membership",
+      "connectionLimit": 20
+    },
+    "attendance": {
+      "host": "${ssm:/staging/db/host}",
+      "user": "${ssm:/staging/db/user}",
+      "password": "${ssm:/staging/db/password}",
+      "database": "staging_attendance",
+      "connectionLimit": 20
+    },
+    "content": {
+      "host": "${ssm:/staging/db/host}",
+      "user": "${ssm:/staging/db/user}",
+      "password": "${ssm:/staging/db/password}",
+      "database": "staging_content",
+      "connectionLimit": 20
+    },
+    "giving": {
+      "host": "${ssm:/staging/db/host}",
+      "user": "${ssm:/staging/db/user}",
+      "password": "${ssm:/staging/db/password}",
+      "database": "staging_giving",
+      "connectionLimit": 20
+    },
+    "messaging": {
+      "host": "${ssm:/staging/db/host}",
+      "user": "${ssm:/staging/db/user}",
+      "password": "${ssm:/staging/db/password}",
+      "database": "staging_messaging",
+      "connectionLimit": 20
+    },
+    "doing": {
+      "host": "${ssm:/staging/db/host}",
+      "user": "${ssm:/staging/db/user}",
+      "password": "${ssm:/staging/db/password}",
+      "database": "staging_doing",
+      "connectionLimit": 20
+    }
+  },
+  "jwt": {
+    "secret": "${ssm:/staging/jwt/secret}",
+    "expiration": 172800
+  },
+  "websocket": {
+    "url": "wss://staging-ws.example.com"
+  },
+  "logging": {
+    "level": "info",
+    "cloudWatch": true
+  }
+}

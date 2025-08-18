@@ -1,0 +1,191 @@
+name: Deploy Production
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: 'Type "DEPLOY TO PRODUCTION" to confirm deployment'
+        required: true
+        type: string
+
+env:
+  SERVERLESS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+
+jobs:
+  validate-input:
+    name: Validate Production Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_production }}" != "DEPLOY TO PRODUCTION" ]; then
+            echo "❌ Production deployment not confirmed. Please type exactly: DEPLOY TO PRODUCTION"
+            exit 1
+          fi
+          echo "✅ Production deployment confirmed"
+
+  pre-deployment-checks:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    needs: [validate-input]
+    if: always() && (needs.validate-input.result == 'success' || github.event_name == 'release')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run comprehensive tests
+        run: |
+          npm run lint:check
+          npm run tsc
+          echo "All pre-deployment checks passed"
+
+      - name: Security audit
+        run: |
+          npm audit --audit-level=high
+          echo "Security audit completed"
+
+      - name: Build verification
+        run: |
+          npm run build
+          npm run build-layer
+          echo "Build verification completed"
+
+  deploy:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    environment: production
+    needs: [pre-deployment-checks]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Prepare Lambda Layer
+        run: npm run build-layer
+
+      - name: Create deployment backup point
+        run: |
+          echo "Creating backup point for production deployment..."
+          # Get current deployment info before deploying
+          npx serverless info --stage prod > deployment-backup.txt || echo "No existing deployment found"
+
+      - name: Deploy Core APIs to Production
+        run: |
+          echo "🚀 Starting production deployment..."
+          npx serverless deploy --stage prod --verbose --force
+          echo "✅ Production deployment completed"
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying production deployment..."
+          npx serverless info --stage prod
+
+      - name: Post-deployment verification
+        run: |
+          # Wait for deployment to stabilize
+          sleep 30
+
+          echo "Running post-deployment health checks..."
+          # Test core endpoints
+          curl -f https://api.churchapps.org/health
+          echo "Production health check passed"
+
+      - name: Package deployment artifacts
+        run: |
+          npx serverless package --stage prod
+          ls -R .serverless
+
+  smoke-tests:
+    name: Production Smoke Tests
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment to stabilize
+        run: sleep 60
+
+      - name: Run production smoke tests
+        env:
+          PROD_API_URL: https://api.churchapps.org
+        run: |
+          echo "🧪 Running production smoke tests..."
+
+          # Test health endpoint
+          echo "Testing health endpoint..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" $PROD_API_URL/health)
+          if [ $response -eq 200 ]; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed with status: $response"
+            exit 1
+          fi
+
+          # Test core module endpoints (read-only operations)
+          echo "Testing core endpoints..."
+          curl -f $PROD_API_URL/membership/churches > /dev/null
+          curl -f $PROD_API_URL/attendance/campuses > /dev/null
+          curl -f $PROD_API_URL/content/pages > /dev/null
+          curl -f $PROD_API_URL/giving/funds > /dev/null
+          curl -f $PROD_API_URL/messaging/conversations > /dev/null
+          curl -f $PROD_API_URL/doing/tasks > /dev/null
+
+          echo "✅ All smoke tests passed"
+
+  rollback-plan:
+    name: Prepare Rollback Plan
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Create rollback instructions
+        run: |
+          echo "🔄 Production deployment failed. Rollback instructions:"
+          echo "1. Check AWS CloudWatch logs for errors"
+          echo "2. If needed, deploy previous stable version"
+          echo "3. Monitor application metrics"
+          echo "4. Notify team of rollback completion"

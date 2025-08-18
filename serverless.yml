@@ -1,0 +1,168 @@
+service: core-api
+
+frameworkVersion: '3'
+
+custom:
+  env: ${opt:stage, 'dev'}
+  serverless-offline:
+    httpPort: 8084
+    websocketPort: 8087
+    lambdaPort: 8085
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: ${opt:stage, 'dev'}
+  region: us-east-2
+  memorySize: 1024
+  timeout: 30
+  environment:
+    STAGE: ${self:custom.env}
+    ENVIRONMENT: ${self:custom.env}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:*
+          Resource:
+            - arn:aws:s3:::${self:custom.env}-churchapps-*
+            - arn:aws:s3:::${self:custom.env}-churchapps-*/*
+        - Effect: Allow
+          Action:
+            - ssm:GetParameter
+            - ssm:GetParameters
+            - ssm:GetParametersByPath
+          Resource:
+            - arn:aws:ssm:${aws:region}:${aws:accountId}:parameter/${self:custom.env}/*
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - sqs:*
+          Resource:
+            - arn:aws:sqs:${aws:region}:${aws:accountId}:${self:custom.env}-*
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource:
+            - arn:aws:execute-api:${aws:region}:${aws:accountId}:*/@connections/*
+
+package:
+  individually: false
+  patterns:
+    - "config/**"
+    - "dist/**"
+    - "lambda.js"
+    - "package.json"
+    - "!node_modules/**"
+    - "!src/**"
+    - "!tools/**"
+    - "!package-lock.json"
+    - "!tsconfig.json"
+    - "!.env"
+    - "!.git/**"
+    - "!.gitignore"
+    - "!README.md"
+    - "!serverless.yml"
+    - "!layer/**"
+
+layers:
+  dependencies:
+    path: layer
+    name: ${self:service}-dependencies-${self:custom.env}
+    description: Dependencies layer for ${self:service}
+    compatibleRuntimes:
+      - nodejs20.x
+    retain: false
+
+functions:
+  web:
+    handler: lambda.web
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+    memorySize: 512
+    timeout: 30
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /api/{proxy+}
+          method: ANY
+          cors: true
+
+  socket:
+    handler: lambda.socket
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+    memorySize: 1024
+    timeout: 30
+    events:
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+      - websocket:
+          route: $default
+
+  timer15Min:
+    handler: lambda.timer15Min
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+    memorySize: 256
+    timeout: 300
+    events:
+      - schedule:
+          rate: rate(30 minutes)
+          enabled: true
+
+  timerMidnight:
+    handler: lambda.timerMidnight
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+    memorySize: 256
+    timeout: 300
+    events:
+      - schedule:
+          rate: cron(0 5 * * ? *)
+          enabled: true
+
+plugins:
+  - serverless-offline
+
+resources:
+  Resources:
+    GatewayResponseDefault4XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_4XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
+    
+    GatewayResponseDefault5XX:
+      Type: 'AWS::ApiGateway::GatewayResponse'
+      Properties:
+        ResponseParameters:
+          gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+          gatewayresponse.header.Access-Control-Allow-Headers: "'*'"
+        ResponseType: DEFAULT_5XX
+        RestApiId:
+          Ref: 'ApiGatewayRestApi'
