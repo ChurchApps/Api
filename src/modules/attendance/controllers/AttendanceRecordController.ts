@@ -8,10 +8,9 @@ export class AttendanceRecordController extends AttendanceBaseController {
   @httpGet("/tree")
   public async tree(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getAttendanceRepositories();
-      const data = await repos.attendance.loadTree(au.churchId);
+      const data = await this.repositories.attendance.loadTree(au.churchId);
       const dataArray = (data as any)?.rows || data || [];
-      return repos.attendance.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.attendance.convertAllToModel(au.churchId, dataArray);
     });
   }
 
@@ -20,12 +19,11 @@ export class AttendanceRecordController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.viewSummary)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const campusId = req.query.campusId === undefined ? "" : req.query.campusId.toString();
         const serviceId = req.query.serviceId === undefined ? "" : req.query.serviceId.toString();
         const serviceTimeId = req.query.serviceTimeId === undefined ? "" : req.query.serviceTimeId.toString();
         const groupId = req.query.groupId === undefined ? "" : req.query.groupId.toString();
-        const data = await repos.attendance.loadTrend(au.churchId, campusId, serviceId, serviceTimeId, groupId);
+        const data = await this.repositories.attendance.loadTrend(au.churchId, campusId, serviceId, serviceTimeId, groupId);
         return data;
       }
     });
@@ -36,10 +34,9 @@ export class AttendanceRecordController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const serviceId = req.query.serviceId === undefined ? "" : req.query.serviceId.toString();
         const week = req.query.week === undefined ? new Date() : Date.parse(req.query.week.toString());
-        const data = await repos.attendance.loadGroups(au.churchId, serviceId, new Date(week));
+        const data = await this.repositories.attendance.loadGroups(au.churchId, serviceId, new Date(week));
         return data;
       }
     });
@@ -50,7 +47,6 @@ export class AttendanceRecordController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         let result = null;
         const campusId = req.query.campusId === undefined ? "" : req.query.campusId.toString();
         const serviceId = req.query.serviceId === undefined ? "" : req.query.serviceId.toString();
@@ -60,15 +56,15 @@ export class AttendanceRecordController extends AttendanceBaseController {
         const endDate = req.query.endDate !== undefined && new Date(req.query.endDate.toString());
 
         if (campusId !== "") {
-          result = await repos.attendance.loadByCampusId(au.churchId, campusId, startDate, endDate);
+          result = await this.repositories.attendance.loadByCampusId(au.churchId, campusId, startDate, endDate);
         } else if (serviceId !== "") {
-          result = await repos.attendance.loadByServiceId(au.churchId, serviceId, startDate, endDate);
+          result = await this.repositories.attendance.loadByServiceId(au.churchId, serviceId, startDate, endDate);
         } else if (serviceTimeId !== "") {
-          result = await repos.attendance.loadByServiceTimeId(au.churchId, serviceTimeId, startDate, endDate);
+          result = await this.repositories.attendance.loadByServiceTimeId(au.churchId, serviceTimeId, startDate, endDate);
         } else if (groupId !== "") {
-          result = await repos.attendance.loadByGroupId(au.churchId, groupId, startDate, endDate);
+          result = await this.repositories.attendance.loadByGroupId(au.churchId, groupId, startDate, endDate);
         } else {
-          result = await repos.visit.loadAllByDate(au.churchId, startDate, endDate);
+          result = await this.repositories.visit.loadAllByDate(au.churchId, startDate, endDate);
         }
 
         return result;
@@ -85,13 +81,11 @@ export class AttendanceRecordController extends AttendanceBaseController {
       if (personId !== "") {
         if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
         else {
-          const repos = await this.getAttendanceRepositories();
-          result = await repos.attendance.loadForPerson(au.churchId, personId);
+          result = await this.repositories.attendance.loadForPerson(au.churchId, personId);
         }
       }
-      const repos = await this.getAttendanceRepositories();
       const resultArray = (result as any)?.rows || result || [];
-      return repos.attendance.convertAllToModel(au.churchId, resultArray);
+      return this.repositories.attendance.convertAllToModel(au.churchId, resultArray);
     });
   }
 }

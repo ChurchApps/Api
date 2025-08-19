@@ -13,23 +13,21 @@ export class GroupServiceTimeController extends AttendanceBaseController {
     res: express.Response
   ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getAttendanceRepositories();
-      const data = await repos.groupServiceTime.load(au.churchId, id);
+      const data = await this.repositories.groupServiceTime.load(au.churchId, id);
       const dataArray = (data as any)?.rows || data || [];
-      return repos.groupServiceTime.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.groupServiceTime.convertAllToModel(au.churchId, dataArray);
     });
   }
 
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getAttendanceRepositories();
       let result = null;
       if (req.query.groupId !== undefined)
-        result = await repos.groupServiceTime.loadWithServiceNames(au.churchId, req.query.groupId.toString());
-      else result = await repos.groupServiceTime.loadAll(au.churchId);
+        result = await this.repositories.groupServiceTime.loadWithServiceNames(au.churchId, req.query.groupId.toString());
+      else result = await this.repositories.groupServiceTime.loadAll(au.churchId);
       const resultArray = (result as any)?.rows || result || [];
-      return repos.groupServiceTime.convertAllToModel(au.churchId, resultArray);
+      return this.repositories.groupServiceTime.convertAllToModel(au.churchId, resultArray);
     });
   }
 
@@ -38,14 +36,13 @@ export class GroupServiceTimeController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const promises: Promise<GroupServiceTime>[] = [];
         req.body.forEach((groupservicetime) => {
           groupservicetime.churchId = au.churchId;
-          promises.push(repos.groupServiceTime.save(groupservicetime));
+          promises.push(this.repositories.groupServiceTime.save(groupservicetime));
         });
         const result = await Promise.all(promises);
-        return repos.groupServiceTime.convertAllToModel(au.churchId, result);
+        return this.repositories.groupServiceTime.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -59,8 +56,7 @@ export class GroupServiceTimeController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
-        await repos.groupServiceTime.delete(au.churchId, id);
+        await this.repositories.groupServiceTime.delete(au.churchId, id);
         return this.json({});
       }
     });

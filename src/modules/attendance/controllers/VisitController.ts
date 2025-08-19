@@ -18,8 +18,7 @@ export class VisitController extends AttendanceBaseController {
     const cached: string = VisitController.cachedSessionIds[key];
     if (cached !== undefined) result = cached;
     else {
-      const repos = await this.getAttendanceRepositories();
-      let session: Session = await repos.session.loadByGroupServiceTimeDate(
+      let session: Session = await this.repositories.session.loadByGroupServiceTimeDate(
         churchId,
         groupId,
         serviceTimeId,
@@ -27,7 +26,7 @@ export class VisitController extends AttendanceBaseController {
       );
       if (session === null) {
         session = { churchId, groupId, serviceTimeId, sessionDate: currentDate };
-        session = await repos.session.save(session);
+        session = await this.repositories.session.save(session);
       }
       VisitController.cachedSessionIds[key] = session.id;
       result = session.id;
@@ -41,7 +40,6 @@ export class VisitController extends AttendanceBaseController {
       if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin))
         return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const result: Visit[] = [];
         const serviceId = req.query.serviceId.toString();
         const peopleIdList = req.query.peopleIds.toString().split(",");
@@ -51,29 +49,29 @@ export class VisitController extends AttendanceBaseController {
         const peopleIds: string[] = [];
         peopleIdList?.forEach((id) => peopleIds.push(id));
 
-        const lastDate = await repos.visit.loadLastLoggedDate(au.churchId, serviceId, peopleIds);
+        const lastDate = await this.repositories.visit.loadLastLoggedDate(au.churchId, serviceId, peopleIds);
 
         const visits: Visit[] =
           peopleIds.length === 0
             ? []
-            : repos.visit.convertAllToModel(
+            : this.repositories.visit.convertAllToModel(
                 au.churchId,
-                (await repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds)) as any
+                (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds)) as any
               );
 
         const visitIds: string[] = [];
         if (visits.length > 0) {
           visits?.forEach((v) => visitIds.push(v.id));
-          const visitSessions: VisitSession[] = repos.visitSession.convertAllToModel(
+          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(
             au.churchId,
-            (await repos.visitSession.loadByVisitIds(au.churchId, visitIds)) as any
+            (await this.repositories.visitSession.loadByVisitIds(au.churchId, visitIds)) as any
           );
           if (visitSessions.length > 0) {
             const sessionIds: string[] = [];
             visitSessions.forEach((vs) => sessionIds.push(vs.sessionId));
-            const sessions: Session[] = repos.session.convertAllToModel(
+            const sessions: Session[] = this.repositories.session.convertAllToModel(
               au.churchId,
-              (await repos.session.loadByIds(au.churchId, sessionIds)) as any
+              (await this.repositories.session.loadByIds(au.churchId, sessionIds)) as any
             );
             visits?.forEach((v) => {
               v.visitSessions = [];
@@ -112,7 +110,6 @@ export class VisitController extends AttendanceBaseController {
       if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin))
         return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const deleteVisitIds: string[] = [];
         const deleteVisitSessionIds: string[] = [];
 
@@ -145,15 +142,15 @@ export class VisitController extends AttendanceBaseController {
         const existingVisits: Visit[] =
           peopleIds.length === 0
             ? []
-            : repos.visit.convertAllToModel(
+            : this.repositories.visit.convertAllToModel(
                 au.churchId,
-                (await repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any
+                (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any
               );
         if (existingVisits.length > 0) {
           existingVisits.forEach((v) => existingVisitIds.push(v.id));
-          const visitSessions: VisitSession[] = repos.visitSession.convertAllToModel(
+          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(
             au.churchId,
-            (await repos.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any
+            (await this.repositories.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any
           );
           this.populateDeleteIds(existingVisits, submittedVisits, visitSessions, deleteVisitIds, deleteVisitSessionIds);
         }
@@ -161,10 +158,10 @@ export class VisitController extends AttendanceBaseController {
         const promises: Promise<any>[] = [];
         await this.getSavePromises(submittedVisits, promises);
         deleteVisitIds.forEach((visitId) => {
-          promises.push(repos.visit.delete(au.churchId, visitId));
+          promises.push(this.repositories.visit.delete(au.churchId, visitId));
         });
         deleteVisitSessionIds.forEach((visitSessionId) => {
-          promises.push(repos.visitSession.delete(au.churchId, visitSessionId));
+          promises.push(this.repositories.visitSession.delete(au.churchId, visitSessionId));
         });
 
         await Promise.all(promises);
@@ -182,8 +179,7 @@ export class VisitController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
-        return repos.visit.convertToModel(au.churchId, await repos.visit.load(au.churchId, id));
+        return this.repositories.visit.convertToModel(au.churchId, await this.repositories.visit.load(au.churchId, id));
       }
     });
   }
@@ -193,12 +189,11 @@ export class VisitController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         let result = null;
         if (req.query.personId !== undefined)
-          result = await repos.visit.loadForPerson(au.churchId, req.query.personId.toString());
-        else result = await repos.visit.loadAll(au.churchId);
-        return repos.visit.convertAllToModel(au.churchId, result as any);
+          result = await this.repositories.visit.loadForPerson(au.churchId, req.query.personId.toString());
+        else result = await this.repositories.visit.loadAll(au.churchId);
+        return this.repositories.visit.convertAllToModel(au.churchId, result as any);
       }
     });
   }
@@ -208,14 +203,13 @@ export class VisitController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const promises: Promise<Visit>[] = [];
         req.body.forEach((visit) => {
           visit.churchId = au.churchId;
-          promises.push(repos.visit.save(visit));
+          promises.push(this.repositories.visit.save(visit));
         });
         const result = await Promise.all(promises);
-        return repos.visit.convertAllToModel(au.churchId, result);
+        return this.repositories.visit.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -229,8 +223,7 @@ export class VisitController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
-        await repos.visit.delete(au.churchId, id);
+        await this.repositories.visit.delete(au.churchId, id);
         return this.json({});
       }
     });
@@ -255,14 +248,13 @@ export class VisitController extends AttendanceBaseController {
   }
 
   private async getSavePromises(submittedVisits: Visit[], promises: Promise<any>[]) {
-    const repos = await this.getAttendanceRepositories();
     submittedVisits.forEach((submittedVisit) => {
       promises.push(
-        repos.visit.save(submittedVisit).then(async (sv) => {
+        this.repositories.visit.save(submittedVisit).then(async (sv) => {
           const sessionPromises: Promise<VisitSession>[] = [];
           sv.visitSessions.forEach((vs) => {
             vs.visitId = sv.id;
-            sessionPromises.push(repos.visitSession.save(vs));
+            sessionPromises.push(this.repositories.visitSession.save(vs));
           });
           await Promise.all(sessionPromises);
         })

@@ -15,8 +15,7 @@ export class SessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
-        return repos.session.convertToModel(au.churchId, await repos.session.load(au.churchId, id));
+        return this.repositories.session.convertToModel(au.churchId, await this.repositories.session.load(au.churchId, id));
       }
     });
   }
@@ -26,14 +25,13 @@ export class SessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         let result;
-        if (req.query.groupId === undefined) result = await repos.session.loadAll(au.churchId);
+        if (req.query.groupId === undefined) result = await this.repositories.session.loadAll(au.churchId);
         else {
           const groupId = req.query.groupId.toString();
-          result = await repos.session.loadByGroupIdWithNames(au.churchId, groupId);
+          result = await this.repositories.session.loadByGroupIdWithNames(au.churchId, groupId);
         }
-        return repos.session.convertAllToModel(au.churchId, result as any);
+        return this.repositories.session.convertAllToModel(au.churchId, result as any);
       }
     });
   }
@@ -43,14 +41,13 @@ export class SessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const promises: Promise<Session>[] = [];
         req.body.forEach((session) => {
           session.churchId = au.churchId;
-          promises.push(repos.session.save(session));
+          promises.push(this.repositories.session.save(session));
         });
         const result = await Promise.all(promises);
-        return repos.session.convertAllToModel(au.churchId, result);
+        return this.repositories.session.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -64,8 +61,7 @@ export class SessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
-        await repos.session.delete(au.churchId, id);
+        await this.repositories.session.delete(au.churchId, id);
         return this.json({});
       }
     });
