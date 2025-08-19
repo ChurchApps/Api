@@ -287,38 +287,39 @@ export class PersonController extends MembershipBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const repos = await this.getMembershipRepositories();
       if (au.personId !== id && !au.checkAccess(Permissions.people.view)) {
         if (id === "all") {
-          return this.repositories.person.convertAllToBasicModel(
+          return repos.person.convertAllToBasicModel(
             au.churchId,
-            (await this.repositories.person.loadAll(au.churchId)) as any[]
+            (await repos.person.loadAll(au.churchId)) as any[]
           );
         } else {
-          const data = await this.repositories.person.load(au.churchId, id);
+          const data = await repos.person.load(au.churchId, id);
           if (!data) return null;
-          const result = this.repositories.person.convertToModel(au.churchId, data, false);
-          return this.repositories.person.convertToPreferenceModel(
+          const result = repos.person.convertToModel(au.churchId, data, false);
+          return repos.person.convertToPreferenceModel(
             au.churchId,
-            await this.checkVisibilityPref(id, au, result)
+            await this.checkVisibilityPref(id, au, result, repos)
           );
           // return result;
         }
       } else {
         if (id === "all") {
-          return this.repositories.person.convertAllToModel(
+          return repos.person.convertAllToModel(
             au.churchId,
-            (await this.repositories.person.loadAll(au.churchId)) as any[],
+            (await repos.person.loadAll(au.churchId)) as any[],
             false
           );
         } else {
-          const data = await this.repositories.person.load(au.churchId, id);
+          const data = await repos.person.load(au.churchId, id);
           if (!data) return null;
-          const result = this.repositories.person.convertToModel(
+          const result = repos.person.convertToModel(
             au.churchId,
             data,
             au.checkAccess(Permissions.people.edit)
           );
-          await this.appendFormSubmissions(au.churchId, result);
+          await this.appendFormSubmissions(au.churchId, result, repos);
           return result;
         }
       }
@@ -567,10 +568,11 @@ export class PersonController extends MembershipBaseController {
     return false;
   }
 
-  private async checkVisibilityPref(personId: string, au: AuthenticatedUser, person: Person) {
+  private async checkVisibilityPref(personId: string, au: AuthenticatedUser, person: Person, repos: MembershipRepositories) {
     const personPref: { address: string; phone: string; email: string } = await this.getPreferences(
       au.churchId,
-      personId
+      personId,
+      repos
     );
     const p = { ...person };
 
@@ -580,7 +582,7 @@ export class PersonController extends MembershipBaseController {
     } else if (personPref.address === "members" && !(await this.isMember(au.membershipStatus))) {
       p.contactInfo.address1 = undefined; // hide from non-members
     } else if (personPref.address === "groups") {
-      const isInGroup = await this.checkGroupMembership(au, personId);
+      const isInGroup = await this.checkGroupMembership(au, personId, repos);
       p.contactInfo.address1 = isInGroup ? person.contactInfo.address1 : undefined; // show only if in the same group
     }
 
@@ -594,7 +596,7 @@ export class PersonController extends MembershipBaseController {
       p.contactInfo.homePhone = undefined;
       p.contactInfo.workPhone = undefined;
     } else if (personPref.phone === "groups") {
-      const isInGroup = await this.checkGroupMembership(au, personId);
+      const isInGroup = await this.checkGroupMembership(au, personId, repos);
       p.contactInfo.mobilePhone = isInGroup ? person.contactInfo.mobilePhone : undefined;
       p.contactInfo.homePhone = isInGroup ? person.contactInfo.homePhone : undefined;
       p.contactInfo.workPhone = isInGroup ? person.contactInfo.workPhone : undefined;
@@ -606,15 +608,15 @@ export class PersonController extends MembershipBaseController {
     } else if (personPref.email === "members" && !(await this.isMember(au.membershipStatus))) {
       p.contactInfo.email = undefined;
     } else if (personPref.email === "groups") {
-      const isInGroup = await this.checkGroupMembership(au, personId);
+      const isInGroup = await this.checkGroupMembership(au, personId, repos);
       p.contactInfo.email = isInGroup ? person.contactInfo.email : undefined;
     }
 
     return p;
   }
 
-  private async getPreferences(churchId: string, personId: string) {
-    const personPreferences: VisibilityPreference = await this.repositories.visibilityPreference.loadForPerson(
+  private async getPreferences(churchId: string, personId: string, repos: MembershipRepositories) {
+    const personPreferences: VisibilityPreference = await repos.visibilityPreference.loadForPerson(
       churchId,
       personId
     );
@@ -625,9 +627,9 @@ export class PersonController extends MembershipBaseController {
     };
 
     if (!personPreferences?.address || !personPreferences?.phoneNumber || !personPreferences?.email) {
-      const churchSettings = this.repositories.setting.convertAllToModel(
+      const churchSettings = repos.setting.convertAllToModel(
         churchId,
-        (await this.repositories.setting.loadPublicSettings(churchId)) as any[]
+        (await repos.setting.loadPublicSettings(churchId)) as any[]
       );
       const publicSettings: any = {};
       churchSettings?.forEach((s: any) => {
@@ -655,9 +657,9 @@ export class PersonController extends MembershipBaseController {
   }
 
   // Helper method to check if the user is in at least one group with the person
-  private async checkGroupMembership(au: AuthenticatedUser, personId: string): Promise<boolean> {
-    const groups = (await this.repositories.groupMember.loadForPerson(au.churchId, au.personId)) as any[];
-    const personGroups = (await this.repositories.groupMember.loadForPerson(au.churchId, personId)) as any[];
+  private async checkGroupMembership(au: AuthenticatedUser, personId: string, repos: MembershipRepositories): Promise<boolean> {
+    const groups = (await repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[];
+    const personGroups = (await repos.groupMember.loadForPerson(au.churchId, personId)) as any[];
     return (groups as any[])?.some((group: any) =>
       (personGroups as any[]).some((personGroup: any) => personGroup.groupId === group.groupId)
     );
