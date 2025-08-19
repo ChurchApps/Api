@@ -5,7 +5,7 @@ import { ApiBibleHelper } from "../helpers/ApiBibleHelper";
 import { BibleTranslation, BibleVerseText } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 
-@controller("/bibles")
+@controller("/content/bibles")
 export class BibleController extends ContentBaseController {
   noCache: string[] = [
     "a81b73293d3080c9-01", // AMP

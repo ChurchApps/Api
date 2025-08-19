@@ -3,7 +3,7 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController";
 import { Condition } from "../models";
 
-@controller("/conditions")
+@controller("/doing/conditions")
 export class ConditionController extends DoingBaseController {
   @httpGet("/:id")
   public async get(

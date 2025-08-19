@@ -6,7 +6,7 @@ import { Permissions } from "../helpers";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TreeHelper } from "../helpers/TreeHelper";
 
-@controller("/elements")
+@controller("/content/elements")
 export class ElementController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

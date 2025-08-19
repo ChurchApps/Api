@@ -5,7 +5,7 @@ import { TreeHelper } from "../helpers/TreeHelper";
 import { Element, Page, Section } from "../models";
 import { ContentBaseController } from "./ContentBaseController";
 
-@controller("/pages")
+@controller("/content/pages")
 export class PageController2 extends ContentBaseController {
   @httpGet("/:churchId/tree")
   public async getTree(

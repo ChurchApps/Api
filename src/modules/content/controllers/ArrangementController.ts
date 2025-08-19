@@ -4,7 +4,7 @@ import { Arrangement } from "../models";
 import { ContentBaseController } from "./ContentBaseController";
 import { Permissions } from "../helpers";
 
-@controller("/arrangements")
+@controller("/content/arrangements")
 export class ArrangementController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

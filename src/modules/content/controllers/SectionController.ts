@@ -5,7 +5,7 @@ import { Section } from "../models";
 import { Permissions } from "../helpers";
 import { TreeHelper } from "../helpers/TreeHelper";
 
-@controller("/sections")
+@controller("/content/sections")
 export class SectionController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

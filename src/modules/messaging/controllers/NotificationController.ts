@@ -4,7 +4,7 @@ import { MessagingBaseController } from "./MessagingBaseController";
 import { Notification } from "../models";
 import { NotificationHelper } from "../helpers/NotificationHelper";
 
-@controller("/notifications")
+@controller("/messaging/notifications")
 export class NotificationController extends MessagingBaseController {
   @httpGet("/:churchId/person/:personId")
   public async loadByPerson(

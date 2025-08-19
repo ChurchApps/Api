@@ -4,7 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { GroupMember } from "../models";
 import { Permissions } from "../helpers";
 
-@controller("/groupmembers")
+@controller("/membership/groupmembers")
 export class GroupMemberController extends MembershipBaseController {
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

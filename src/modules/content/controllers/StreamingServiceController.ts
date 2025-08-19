@@ -7,7 +7,7 @@ import { Permissions } from "../../../shared/helpers";
 import { EncryptionHelper, DateHelper } from "@churchapps/apihelper";
 import { Environment } from "../helpers";
 
-@controller("/streamingServices")
+@controller("/content/streamingServices")
 export class StreamingServiceController extends ContentBaseController {
   @httpGet("/:id/hostChat")
   public async getHostChatRoom(

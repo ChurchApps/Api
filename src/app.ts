@@ -73,7 +73,7 @@ export const createApp = async () => {
 
     // Handle body parsing - different strategies for Lambda vs local development
     const isLambdaEnvironment = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
-    
+
     if (isLambdaEnvironment) {
       // Lambda-specific body parsing for @codegenie/serverless-express
       app.use((req, res, next) => {
@@ -280,7 +280,7 @@ async function loadModuleBindings(container: Container) {
 // Handle process termination
 process.on("SIGINT", async () => {
   console.log("SIGINT received, shutting down gracefully...");
-  
+
   // Close WebSocket server
   try {
     const { SocketHelper } = await import("./modules/messaging/helpers/SocketHelper");
@@ -288,7 +288,7 @@ process.on("SIGINT", async () => {
   } catch (error) {
     console.warn("Failed to shutdown WebSocket server:", error.message);
   }
-  
+
   // Close database connections
   await ConnectionManager.closeAll();
   process.exit(0);

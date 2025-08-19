@@ -4,7 +4,7 @@ import { StreamingConfigHelper, SubDomainHelper } from "../helpers";
 import { ContentBaseController } from "./ContentBaseController";
 import { Link } from "../models";
 
-@controller("/preview")
+@controller("/content/preview")
 export class PreviewController extends ContentBaseController {
   @httpGet("/data/:key")
   public async loadData(@requestParam("key") key: string): Promise<any> {

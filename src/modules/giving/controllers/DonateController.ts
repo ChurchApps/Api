@@ -9,7 +9,7 @@ import { Environment } from "../../../shared/helpers/Environment";
 import Axios from "axios";
 import dayjs from "dayjs";
 
-@controller("/donate")
+@controller("/giving/donate")
 export class DonateController extends GivingBaseController {
   @httpPost("/log")
   public async log(

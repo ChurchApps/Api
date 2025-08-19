@@ -3,7 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { MemberPermission } from "../models";
 
-@controller("/memberpermissions")
+@controller("/membership/memberpermissions")
 export class MemberPermissionController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(

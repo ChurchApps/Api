@@ -6,7 +6,7 @@ import { Permissions } from "../../../shared/helpers";
 import { Environment } from "../helpers";
 import { FileStorageHelper } from "@churchapps/apihelper";
 
-@controller("/playlists")
+@controller("/content/playlists")
 export class PlaylistController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

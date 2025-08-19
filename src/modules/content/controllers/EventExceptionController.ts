@@ -4,7 +4,7 @@ import { ContentBaseController } from "./ContentBaseController";
 import { EventException } from "../models";
 import { Permissions } from "../helpers";
 
-@controller("/eventExceptions")
+@controller("/content/eventExceptions")
 export class EventExceptionController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

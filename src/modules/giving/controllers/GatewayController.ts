@@ -14,7 +14,7 @@ import { StripeHelper } from "../../../shared/helpers/StripeHelper";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
-@controller("/gateways")
+@controller("/giving/gateways")
 export class GatewayController extends GivingBaseController {
   @httpGet("/churchId/:churchId")
   public async getForChurch(

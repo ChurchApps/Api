@@ -5,7 +5,7 @@ import { Message } from "../models";
 import { DeliveryHelper } from "../helpers/DeliveryHelper";
 import { NotificationHelper } from "../helpers/NotificationHelper";
 
-@controller("/messages")
+@controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {
   @httpGet("/:churchId/:conversationId")
   public async loadForConversation(

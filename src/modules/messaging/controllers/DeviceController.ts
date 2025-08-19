@@ -3,7 +3,7 @@ import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController";
 import { Device } from "../models";
 
-@controller("/devices")
+@controller("/messaging/devices")
 export class DeviceController extends MessagingBaseController {
   @httpGet("/:churchId")
   public async loadByChurch(

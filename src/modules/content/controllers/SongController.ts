@@ -5,7 +5,7 @@ import { ContentBaseController } from "./ContentBaseController";
 import { Permissions } from "../helpers";
 import { FreeShowSong, SongHelper } from "../helpers/SongHelper";
 
-@controller("/songs")
+@controller("/content/songs")
 export class SongController extends ContentBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

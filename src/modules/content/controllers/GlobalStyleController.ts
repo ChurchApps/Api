@@ -4,7 +4,7 @@ import { Permissions } from "../helpers";
 import { ContentBaseController } from "./ContentBaseController";
 import { GlobalStyle } from "../models";
 
-@controller("/globalStyles")
+@controller("/content/globalStyles")
 export class GlobalStyleController extends ContentBaseController {
   defaultStyle: GlobalStyle = {
     fonts: JSON.stringify({ body: "Roboto", heading: "Roboto" }),

@@ -5,7 +5,7 @@ import { AuthenticatedUser } from "../auth";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { Permissions, IPermission } from "../helpers";
 
-@controller("/roles")
+@controller("/membership/roles")
 export class RoleController extends MembershipBaseController {
   @httpGet("/church/:churchId")
   public async loadByChurchId(

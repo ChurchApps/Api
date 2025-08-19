@@ -4,7 +4,7 @@ import { Permissions } from "../helpers";
 import { ContentBaseController } from "./ContentBaseController";
 import { Link } from "../models";
 
-@controller("/links")
+@controller("/content/links")
 export class LinkController extends ContentBaseController {
   // Anonymous access
   @httpGet("/church/:churchId")

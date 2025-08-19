@@ -4,7 +4,7 @@ import { ContentBaseController } from "./ContentBaseController";
 import Pexels from "pexels";
 import { Environment } from "../helpers";
 
-@controller("/stock")
+@controller("/content/stock")
 export class StockController extends ContentBaseController {
   @httpPost("/search")
   public async getUploadUrl(req: express.Request<{}, {}, { term: string }>, res: express.Response): Promise<any> {

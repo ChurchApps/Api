@@ -5,7 +5,7 @@ import { Group } from "../models";
 import { Permissions } from "../helpers";
 import { ArrayHelper, SlugHelper } from "@churchapps/apihelper";
 
-@controller("/groups")
+@controller("/membership/groups")
 export class GroupController extends MembershipBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

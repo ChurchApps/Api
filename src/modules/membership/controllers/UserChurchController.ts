@@ -3,7 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { UserChurch } from "../models";
 
-@controller("/userchurch")
+@controller("/membership/userchurch")
 export class UserChurchController extends MembershipBaseController {
   @httpPatch("/:userId")
   public async update(

@@ -4,7 +4,7 @@ import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversi
 import { Environment, Permissions } from "../helpers";
 import { ContentBaseController } from "./ContentBaseController";
 
-@controller("/gallery")
+@controller("/content/gallery")
 export class GalleryController extends ContentBaseController {
   @httpGet("/stock/:folder")
   public async getStock(

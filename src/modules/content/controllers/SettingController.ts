@@ -5,7 +5,7 @@ import { ContentBaseController } from "./ContentBaseController";
 import { Permissions, Environment } from "../helpers";
 import { FileStorageHelper } from "@churchapps/apihelper";
 
-@controller("/settings")
+@controller("/content/settings")
 export class ContentSettingController extends ContentBaseController {
   @httpGet("/my")
   public async my(req: express.Request, res: express.Response): Promise<any> {

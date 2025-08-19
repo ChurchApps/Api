@@ -5,7 +5,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController";
 import { VisitSession, Visit, Session, ServiceTime } from "../models";
 import { Permissions, Environment } from "../../../shared/helpers";
 
-@controller("/visitsessions")
+@controller("/attendance/visitsessions")
 export class VisitSessionController extends AttendanceBaseController {
   @httpPost("/log")
   public async log(req: express.Request<{}, {}, Visit>, res: express.Response): Promise<unknown> {

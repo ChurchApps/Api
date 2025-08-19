@@ -3,7 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { VisibilityPreference } from "../models";
 
-@controller("/visibilityPreferences")
+@controller("/membership/visibilityPreferences")
 export class VisibilityPreferenceController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, VisibilityPreference[]>, res: express.Response): Promise<any> {

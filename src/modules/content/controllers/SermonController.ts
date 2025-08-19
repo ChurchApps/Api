@@ -6,7 +6,7 @@ import { Permissions } from "../../../shared/helpers/Permissions";
 import { YouTubeHelper, Environment, VimeoHelper, OpenAiHelper } from "../helpers";
 import { FileStorageHelper } from "@churchapps/apihelper";
 
-@controller("/sermons")
+@controller("/content/sermons")
 export class SermonController extends ContentBaseController {
   // @httpGet("/subtitles/:id")
   // public async getSubtitles(

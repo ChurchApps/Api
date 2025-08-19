@@ -5,7 +5,7 @@ import { SongDetail } from "../models";
 import { PraiseChartsHelper } from "../helpers/PraiseChartsHelper";
 import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper";
 
-@controller("/songDetails")
+@controller("/content/songDetails")
 export class SongDetailsController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

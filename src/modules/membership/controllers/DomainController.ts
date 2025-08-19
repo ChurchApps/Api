@@ -4,7 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { Domain } from "../models";
 import { CaddyHelper, Environment, Permissions } from "../helpers";
 
-@controller("/domains")
+@controller("/membership/domains")
 export class DomainController extends MembershipBaseController {
   @httpGet("/caddy")
   public async caddy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

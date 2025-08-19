@@ -4,7 +4,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController";
 import { ServiceTime, GroupServiceTime } from "../models";
 import { Permissions } from "../../../shared/helpers";
 
-@controller("/servicetimes")
+@controller("/attendance/servicetimes")
 export class ServiceTimeController extends AttendanceBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {

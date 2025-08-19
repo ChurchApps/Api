@@ -3,7 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { Question } from "../models";
 
-@controller("/questions")
+@controller("/membership/questions")
 export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/up")
   public async moveQuestionUp(

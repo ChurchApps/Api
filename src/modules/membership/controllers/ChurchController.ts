@@ -37,7 +37,7 @@ const churchRegisterValidation = [
   body("country").notEmpty().withMessage("Enter a country")
 ];
 
-@controller("/churches")
+@controller("/membership/churches")
 export class ChurchController extends MembershipBaseController {
   @httpGet("/all")
   public async loadAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
@@ -65,12 +65,12 @@ export class ChurchController extends MembershipBaseController {
             // decode unicode characters '\uXXXX'
 
             JSON.parse(
-              "\"" +
-              req.body.name
-                .toString()
-                // prepare unicode characters '\uXXXX' for decoding
-                .replace(/%u/g, "\\u") +
-              "\""
+              '"' +
+                req.body.name
+                  .toString()
+                  // prepare unicode characters '\uXXXX' for decoding
+                  .replace(/%u/g, "\\u") +
+                '"'
             )
           ),
           false
@@ -97,12 +97,12 @@ export class ChurchController extends MembershipBaseController {
           decodeURIComponent(
             // decode unicode characters '\uXXXX'
             JSON.parse(
-              "\"" +
-              req.query.name
-                .toString()
-                // prepare unicode characters '\uXXXX' for decoding
-                .replace(/%u/g, "\\u") +
-              "\""
+              '"' +
+                req.query.name
+                  .toString()
+                  // prepare unicode characters '\uXXXX' for decoding
+                  .replace(/%u/g, "\\u") +
+                '"'
             )
           ),
           false

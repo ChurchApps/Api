@@ -7,7 +7,7 @@ import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
 import { Environment, Permissions, PersonHelper } from "../helpers";
 import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
 
-@controller("/people")
+@controller("/membership/people")
 export class PersonController extends MembershipBaseController {
   @httpPost("/apiEmails")
   public async apiEmails(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {

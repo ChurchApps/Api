@@ -3,7 +3,7 @@ import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController";
 import { Permissions } from "../../../shared/helpers";
 
-@controller("/attendancerecords")
+@controller("/attendance/attendancerecords")
 export class AttendanceRecordController extends AttendanceBaseController {
   @httpGet("/tree")
   public async tree(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {

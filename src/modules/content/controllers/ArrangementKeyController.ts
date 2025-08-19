@@ -4,7 +4,7 @@ import { Arrangement, ArrangementKey, Song, SongDetail } from "../models";
 import { ContentBaseController } from "./ContentBaseController";
 import { Permissions } from "../helpers";
 
-@controller("/arrangementKeys")
+@controller("/content/arrangementKeys")
 export class ArrangementKeyController extends ContentBaseController {
   @httpGet("/presenter/:churchId/:id")
   public async getForPresenter(

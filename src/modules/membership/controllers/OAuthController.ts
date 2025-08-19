@@ -5,7 +5,7 @@ import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken } from "../models";
 import { Permissions, UniqueIdHelper } from "../helpers";
 import { AuthenticatedUser } from "../auth";
 
-@controller("/oauth")
+@controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {
   @httpPost("/authorize")
   public async authorize(

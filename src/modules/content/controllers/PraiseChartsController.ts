@@ -7,7 +7,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { AwsHelper } from "@churchapps/apihelper";
 
-@controller("/praiseCharts")
+@controller("/content/praiseCharts")
 export class PraiseChartsController extends ContentBaseController {
   @httpGet("/raw/:id")
   public async raw(

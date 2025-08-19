@@ -4,7 +4,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController";
 import { GroupServiceTime } from "../models";
 import { Permissions } from "../../../shared/helpers";
 
-@controller("/groupservicetimes")
+@controller("/attendance/groupservicetimes")
 export class GroupServiceTimeController extends AttendanceBaseController {
   @httpGet("/:id")
   public async get(

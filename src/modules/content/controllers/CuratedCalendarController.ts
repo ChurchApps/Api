@@ -4,7 +4,7 @@ import { ContentBaseController } from "./ContentBaseController";
 import { CuratedCalendar } from "../models";
 import { Permissions } from "../helpers";
 
-@controller("/curatedCalendars")
+@controller("/content/curatedCalendars")
 export class CuratedCalendarController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

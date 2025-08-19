@@ -8,7 +8,7 @@ interface IdCache {
   [name: string]: string;
 }
 
-@controller("/visits")
+@controller("/attendance/visits")
 export class VisitController extends AttendanceBaseController {
   static cachedSessionIds: IdCache = {};
 

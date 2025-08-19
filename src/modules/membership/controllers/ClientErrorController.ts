@@ -3,7 +3,7 @@ import express from "express";
 import { ClientError } from "../models";
 import { MembershipBaseController } from "./MembershipBaseController";
 
-@controller("/clientErrors")
+@controller("/membership/clientErrors")
 export class ClientErrorController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, ClientError[]>, res: express.Response): Promise<any> {

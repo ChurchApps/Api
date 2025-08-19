@@ -4,7 +4,7 @@ import { MessagingBaseController } from "./MessagingBaseController";
 import { Conversation } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 
-@controller("/conversations")
+@controller("/messaging/conversations")
 export class ConversationController extends MessagingBaseController {
   private async appendMessages(conversations: Conversation[], churchId: string) {
     if (conversations?.length > 0) {

@@ -4,7 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { Household } from "../models";
 import { Permissions } from "../helpers";
 
-@controller("/households")
+@controller("/membership/households")
 export class HouseholdController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(

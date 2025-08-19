@@ -4,7 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { OpenAiHelper, Permissions, PersonHelper } from "../helpers";
 
-@controller("/query")
+@controller("/membership/query")
 export class QueryController extends MembershipBaseController {
   @httpPost("/members")
   public async queryMembers(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {

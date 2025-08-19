@@ -4,7 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { Form, MemberPermission } from "../models";
 import { Permissions } from "../helpers";
 
-@controller("/forms")
+@controller("/membership/forms")
 export class FormController extends MembershipBaseController {
   @httpGet("/archived")
   public async getArchived(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

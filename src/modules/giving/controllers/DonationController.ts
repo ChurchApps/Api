@@ -6,7 +6,7 @@ import { Permissions } from "../../../shared/helpers/Permissions";
 import { EmailHelper } from "@churchapps/apihelper";
 import path from "path";
 
-@controller("/donations")
+@controller("/giving/donations")
 export class DonationController extends GivingBaseController {
   @httpGet("/testEmail")
   public async testEmail(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

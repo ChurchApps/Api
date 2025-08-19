@@ -3,7 +3,7 @@ import express from "express";
 import { ContentBaseController } from "./ContentBaseController";
 import { PollyHelper } from "../helpers/PollyHelper";
 
-@controller("/support")
+@controller("/content/support")
 export class SupportController extends ContentBaseController {
   @httpPost("/createAudio")
   public async post(req: express.Request<{}, {}, { ssml: string }>, res: express.Response): Promise<any> {

@@ -4,7 +4,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController";
 import { Campus } from "../models";
 import { Permissions } from "../../../shared/helpers";
 
-@controller("/campuses")
+@controller("/attendance/campuses")
 export class CampusController extends AttendanceBaseController {
   @httpGet("/:id")
   public async get(

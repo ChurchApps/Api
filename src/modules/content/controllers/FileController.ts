@@ -6,7 +6,7 @@ import { Permissions } from "../../../shared/helpers";
 import { AwsHelper, FileStorageHelper } from "@churchapps/apihelper";
 import { Environment } from "../helpers";
 
-@controller("/files")
+@controller("/content/files")
 export class FileController extends ContentBaseController {
   @httpGet("/:id")
   public async get(

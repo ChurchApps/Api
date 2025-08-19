@@ -4,7 +4,7 @@ import { Setting } from "../models";
 import { Permissions, FileStorageHelper, Environment } from "../helpers";
 import { MembershipBaseController } from "./MembershipBaseController";
 
-@controller("/settings")
+@controller("/membership/settings")
 export class MembershipSettingController extends MembershipBaseController {
   @httpGet("/")
   public async get(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

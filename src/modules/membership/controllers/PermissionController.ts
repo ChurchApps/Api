@@ -3,7 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { permissionsList } from "../helpers";
 
-@controller("/permissions")
+@controller("/membership/permissions")
 export class PermissionController extends MembershipBaseController {
   @httpGet("/")
   public async loadAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {

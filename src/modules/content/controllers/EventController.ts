@@ -5,7 +5,7 @@ import { ContentBaseController } from "./ContentBaseController";
 import { Event, EventException } from "../models";
 import { Permissions } from "../helpers";
 
-@controller("/events")
+@controller("/content/events")
 export class EventController extends ContentBaseController {
   @httpGet("/timeline/group/:groupId")
   public async getPostsForGroup(

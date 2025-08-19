@@ -3,7 +3,7 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController";
 import { Assignment } from "../models";
 
-@controller("/assignments")
+@controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
   @httpGet("/my")
   public async getMy(

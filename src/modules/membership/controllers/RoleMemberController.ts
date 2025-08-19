@@ -6,7 +6,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { Permissions } from "../helpers";
 import { IPermission } from "@churchapps/apihelper";
 
-@controller("/rolemembers")
+@controller("/membership/rolemembers")
 export class RoleMemberController extends MembershipBaseController {
   @httpGet("/roles/:id")
   public async loadByRole(

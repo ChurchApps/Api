@@ -4,7 +4,7 @@ import { MessagingBaseController } from "./MessagingBaseController";
 import { Connection } from "../models";
 import { DeliveryHelper } from "../helpers/DeliveryHelper";
 
-@controller("/connections")
+@controller("/messaging/connections")
 export class ConnectionController extends MessagingBaseController {
   private async updateAnonName(connection: Connection) {
     if (connection.displayName === "Anonymous ") {

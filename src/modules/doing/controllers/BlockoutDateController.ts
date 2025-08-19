@@ -3,7 +3,7 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController";
 import { BlockoutDate } from "../models";
 
-@controller("/blockoutDates")
+@controller("/doing/blockoutDates")
 export class BlockoutDateController extends DoingBaseController {
   @httpGet("/ids")
   public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {

@@ -4,7 +4,7 @@ import { DoingBaseController } from "./DoingBaseController";
 import { Automation } from "../models";
 import { AutomationHelper } from "../helpers/AutomationHelper";
 
-@controller("/automations")
+@controller("/doing/automations")
 export class AutomationController extends DoingBaseController {
   @httpGet("/check")
   public async tempCheck(

@@ -4,7 +4,7 @@ import { GivingBaseController } from "./GivingBaseController";
 import { Fund } from "../models";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
-@controller("/funds")
+@controller("/giving/funds")
 export class FundController extends GivingBaseController {
   @httpGet("/:id")
   public async get(
