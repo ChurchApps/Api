@@ -23,7 +23,7 @@ export class GivingRepositories {
   public customer: CustomerRepository;
   public eventLog: EventLogRepository;
   public subscription: SubscriptionRepository;
-  public subscriptionFund: SubscriptionFundsRepository;
+  public subscriptionFunds: SubscriptionFundsRepository;
 
   constructor() {
     this.donationBatch = new DonationBatchRepository();
@@ -34,6 +34,6 @@ export class GivingRepositories {
     this.customer = new CustomerRepository();
     this.eventLog = new EventLogRepository();
     this.subscription = new SubscriptionRepository();
-    this.subscriptionFund = new SubscriptionFundsRepository();
+    this.subscriptionFunds = new SubscriptionFundsRepository();
   }
 }

@@ -104,7 +104,7 @@ export class DeviceRepository {
     return result;
   }
 
-  public loadForPerson(personId: string) {
-    return DB.query("SELECT * FROM devices WHERE personId=?", [personId]);
+  public loadForPerson(churchId: string, personId: string) {
+    return DB.query("SELECT * FROM devices WHERE churchId=? AND personId=?", [churchId, personId]);
   }
 }

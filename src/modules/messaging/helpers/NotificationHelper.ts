@@ -137,7 +137,7 @@ export class NotificationHelper {
     }
 
     // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(personId)) as any[];
+    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
       try {
@@ -184,7 +184,7 @@ export class NotificationHelper {
     }
 
     // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(personId)) as any[];
+    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
       try {
@@ -235,7 +235,7 @@ export class NotificationHelper {
     }
 
     // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(personId)) as any[];
+    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
       try {
