@@ -21,9 +21,9 @@ export class FormController extends MembershipBaseController {
         );
         const nonMemberForms = au.checkAccess(Permissions.forms.edit)
           ? await this.repositories.form.convertAllToModel(
-              au.churchId,
-              (await this.repositories.form.loadNonMemberArchivedForms(au.churchId)) as any[]
-            )
+            au.churchId,
+            (await this.repositories.form.loadNonMemberArchivedForms(au.churchId)) as any[]
+          )
           : [];
         return [...memberForms, ...nonMemberForms];
       }
@@ -75,9 +75,9 @@ export class FormController extends MembershipBaseController {
         );
         const nonMemberForms = au.checkAccess(Permissions.forms.edit)
           ? await this.repositories.form.convertAllToModel(
-              au.churchId,
-              (await this.repositories.form.loadNonMemberForms(au.churchId)) as any[]
-            )
+            au.churchId,
+            (await this.repositories.form.loadNonMemberForms(au.churchId)) as any[]
+          )
           : [];
         return [...memberForms, ...nonMemberForms];
       }
