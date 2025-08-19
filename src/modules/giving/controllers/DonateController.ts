@@ -30,8 +30,7 @@ export class DonateController extends GivingBaseController {
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "Missing churchId parameter" }, 400);
 
-      const repos = await this.getGivingRepositories();
-      const gateways = (await repos.gateway.loadAll(churchId)) as any[];
+      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
       if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
 
       const secretKey = EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
@@ -44,10 +43,10 @@ export class DonateController extends GivingBaseController {
       const eventData = stripeEvent.data.object as any; // https://github.com/stripe/stripe-node/issues/758
       const subscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
       if (stripeEvent.type === "charge.succeeded" && subscriptionEvent) return this.json({}, 200); // Ignore charge.succeeded from subscription events in place of invoice.paid for access to subscription id
-      const existingEvent = await repos.eventLog.load(churchId, stripeEvent.id);
-      if (!existingEvent) await StripeHelper.logEvent(churchId, stripeEvent, eventData, repos);
+      const existingEvent = await this.repositories.eventLog.load(churchId, stripeEvent.id);
+      if (!existingEvent) await StripeHelper.logEvent(churchId, stripeEvent, eventData, this.repositories);
       if (!existingEvent && (stripeEvent.type === "charge.succeeded" || stripeEvent.type === "invoice.paid"))
-        await StripeHelper.logDonation(secretKey, churchId, eventData, repos);
+        await StripeHelper.logDonation(secretKey, churchId, eventData, this.repositories);
       return this.json({}, 200);
     });
   }
@@ -118,13 +117,12 @@ export class DonateController extends GivingBaseController {
         interval,
         metadata: { notes }
       };
-      const repos = await this.getGivingRepositories();
-      const gateways = (await repos.gateway.loadAll(churchId)) as any[];
+      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
       paymentData.productId = (gateways as any[])[0].productId;
 
       const stripeSubscription = await StripeHelper.createSubscription(secretKey, paymentData);
       const subscription: Subscription = { id: stripeSubscription.id, churchId, personId: person.id, customerId };
-      await repos.subscription.save(subscription);
+      await this.repositories.subscription.save(subscription);
 
       const promises: Promise<SubscriptionFund>[] = [];
       funds.forEach((fund: FundDonation) => {
@@ -134,7 +132,7 @@ export class DonateController extends GivingBaseController {
           fundId: fund.id,
           amount: fund.amount
         };
-        promises.push(repos.subscriptionFund.save(subscriptionFund));
+        promises.push(this.repositories.subscriptionFunds.save(subscriptionFund));
       });
       await Promise.all(promises);
       await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
@@ -266,10 +264,9 @@ export class DonateController extends GivingBaseController {
   };
 
   private logDonation = async (donationData: Donation, fundData: FundDonation[]) => {
-    const repos = await this.getGivingRepositories();
-    const batch: DonationBatch = await repos.donationBatch.getOrCreateCurrent(donationData.churchId as string);
+    const batch: DonationBatch = await this.repositories.donationBatch.getOrCreateCurrent(donationData.churchId as string);
     donationData.batchId = batch.id;
-    const donation = await repos.donation.save(donationData);
+    const donation = await this.repositories.donation.save(donationData);
     const promises: Promise<FundDonation>[] = [];
     fundData.forEach((fund: FundDonation) => {
       const fundDonation: FundDonation = {
@@ -278,14 +275,13 @@ export class DonateController extends GivingBaseController {
         donationId: donation.id,
         fundId: fund.id
       };
-      promises.push(repos.fundDonation.save(fundDonation));
+      promises.push(this.repositories.fundDonation.save(fundDonation));
     });
     return await Promise.all(promises);
   };
 
   private loadPrivateKey = async (churchId: string) => {
-    const repos = await this.getGivingRepositories();
-    const gateways = (await repos.gateway.loadAll(churchId)) as any[];
+    const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
     return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
   };
 

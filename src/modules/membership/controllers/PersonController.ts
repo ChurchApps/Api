@@ -287,39 +287,38 @@ export class PersonController extends MembershipBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = this.repositories;
       if (au.personId !== id && !au.checkAccess(Permissions.people.view)) {
         if (id === "all") {
-          return repos.person.convertAllToBasicModel(
+          return this.repositories.person.convertAllToBasicModel(
             au.churchId,
-            (await repos.person.loadAll(au.churchId)) as any[]
+            (await this.repositories.person.loadAll(au.churchId)) as any[]
           );
         } else {
-          const data = await repos.person.load(au.churchId, id);
+          const data = await this.repositories.person.load(au.churchId, id);
           if (!data) return null;
-          const result = repos.person.convertToModel(au.churchId, data, false);
-          return repos.person.convertToPreferenceModel(
+          const result = this.repositories.person.convertToModel(au.churchId, data, false);
+          return this.repositories.person.convertToPreferenceModel(
             au.churchId,
-            await this.checkVisibilityPref(id, au, result, repos)
+            await this.checkVisibilityPref(id, au, result, this.repositories)
           );
           // return result;
         }
       } else {
         if (id === "all") {
-          return repos.person.convertAllToModel(
+          return this.repositories.person.convertAllToModel(
             au.churchId,
-            (await repos.person.loadAll(au.churchId)) as any[],
+            (await this.repositories.person.loadAll(au.churchId)) as any[],
             false
           );
         } else {
-          const data = await repos.person.load(au.churchId, id);
+          const data = await this.repositories.person.load(au.churchId, id);
           if (!data) return null;
-          const result = repos.person.convertToModel(
+          const result = this.repositories.person.convertToModel(
             au.churchId,
             data,
             au.checkAccess(Permissions.people.edit)
           );
-          await this.appendFormSubmissions(au.churchId, result, repos);
+          await this.appendFormSubmissions(au.churchId, result, this.repositories);
           return result;
         }
       }
@@ -352,15 +351,14 @@ export class PersonController extends MembershipBaseController {
       if (au.personId !== id && !au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus)))
         return this.json({}, 401);
       else {
-        const repos = this.repositories;
-        const data = await repos.person.load(au.churchId, id);
+        const data = await this.repositories.person.load(au.churchId, id);
         if (!data) return null;
-        const result = repos.person.convertToModel(
+        const result = this.repositories.person.convertToModel(
           au.churchId,
           data,
           au.checkAccess(Permissions.people.edit)
         );
-        await this.appendFormSubmissions(au.churchId, result, repos);
+        await this.appendFormSubmissions(au.churchId, result, this.repositories);
         return result;
       }
     });

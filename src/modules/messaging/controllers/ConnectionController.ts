@@ -8,8 +8,7 @@ import { DeliveryHelper } from "../helpers/DeliveryHelper";
 export class ConnectionController extends MessagingBaseController {
   private async updateAnonName(connection: Connection) {
     if (connection.displayName === "Anonymous ") {
-      const repos = await this.getMessagingRepositories();
-      const connections: Connection[] = await repos.connection.loadForConversation(
+      const connections: Connection[] = await this.repositories.connection.loadForConversation(
         connection.churchId,
         connection.conversationId
       );
@@ -37,9 +36,8 @@ export class ConnectionController extends MessagingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.connection.loadForConversation(churchId, conversationId);
-      const connections = repos.connection.convertAllToModel(data);
+      const data = await this.repositories.connection.loadForConversation(churchId, conversationId);
+      const connections = this.repositories.connection.convertAllToModel(data);
       return connections;
     });
   }
@@ -47,8 +45,7 @@ export class ConnectionController extends MessagingBaseController {
   @httpPost("/tmpSendAlert")
   public async sendAlert(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
-      const connections = await repos.connection.loadForNotification(
+      const connections = await this.repositories.connection.loadForNotification(
         req.body.churchId,
         req.body.personId
       );
@@ -65,7 +62,6 @@ export class ConnectionController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Connection[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
       console.log(`🔵 ConnectionController.save - Received ${req.body.length} connections to save`);
       console.log("🔵 Connection data:", JSON.stringify(req.body, null, 2));
 
@@ -76,7 +72,7 @@ export class ConnectionController extends MessagingBaseController {
 
         console.log(`🔵 About to save connection: ${JSON.stringify(connection)}`);
         promises.push(
-          repos.connection
+          this.repositories.connection
             .save(connection)
             .then(async (c) => {
               console.log("✅ Successfully saved connection to database:", JSON.stringify(c));
@@ -93,7 +89,7 @@ export class ConnectionController extends MessagingBaseController {
       }
 
       const savedConnections = await Promise.all(promises);
-      const result = repos.connection.convertAllToModel(savedConnections);
+      const result = this.repositories.connection.convertAllToModel(savedConnections);
       console.log(`🎯 ConnectionController.save - Returning ${result.length} saved connections`);
       console.log("🎯 Final result:", JSON.stringify(result, null, 2));
 
@@ -107,19 +103,18 @@ export class ConnectionController extends MessagingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
-      const connections = await repos.connection.loadBySocketId(req.body.socketId);
+      const connections = await this.repositories.connection.loadBySocketId(req.body.socketId);
       const promises: Promise<Connection>[] = [];
       connections.forEach((connection: Connection) => {
         connection.displayName = req.body.name;
         promises.push(
-          repos.connection.save(connection).then(async (c) => {
+          this.repositories.connection.save(connection).then(async (c) => {
             await DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
             return c;
           })
         );
       });
-      return repos.connection.convertAllToModel(await Promise.all(promises));
+      return this.repositories.connection.convertAllToModel(await Promise.all(promises));
     });
   }
 }

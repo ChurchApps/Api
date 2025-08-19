@@ -13,18 +13,16 @@ export class CampusController extends AttendanceBaseController {
     res: express.Response
   ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getAttendanceRepositories();
-      return repos.campus.convertToModel(au.churchId, await repos.campus.load(au.churchId, id));
+      return this.repositories.campus.convertToModel(au.churchId, await this.repositories.campus.load(au.churchId, id));
     });
   }
 
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getAttendanceRepositories();
-      const data = await repos.campus.loadAll(au.churchId);
+      const data = await this.repositories.campus.loadAll(au.churchId);
       const dataArray = (data as any)?.rows || data || [];
-      return repos.campus.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.campus.convertAllToModel(au.churchId, dataArray);
     });
   }
 
@@ -33,14 +31,13 @@ export class CampusController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
         const promises: Promise<Campus>[] = [];
         req.body.forEach((campus) => {
           campus.churchId = au.churchId;
-          promises.push(repos.campus.save(campus));
+          promises.push(this.repositories.campus.save(campus));
         });
         const result = await Promise.all(promises);
-        return repos.campus.convertAllToModel(au.churchId, result);
+        return this.repositories.campus.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -54,8 +51,7 @@ export class CampusController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       else {
-        const repos = await this.getAttendanceRepositories();
-        await repos.campus.delete(au.churchId, id);
+        await this.repositories.campus.delete(au.churchId, id);
         return this.json({});
       }
     });

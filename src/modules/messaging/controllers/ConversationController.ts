@@ -16,8 +16,7 @@ export class ConversationController extends MessagingBaseController {
       }) as any;
 
       if (postIds.length > 0) {
-        const repos = await this.getMessagingRepositories();
-        const posts = await repos.message.loadByIds(churchId, postIds);
+        const posts = await this.repositories.message.loadByIds(churchId, postIds);
         conversations.forEach((c: any) => {
           if (c.firstPostId) {
             const message = ArrayHelper.getOne(posts, "id", c.firstPostId);
@@ -39,9 +38,8 @@ export class ConversationController extends MessagingBaseController {
   @httpGet("/timeline/ids")
   public async getTimelineByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
       const ids = req.query.ids.toString().split(",");
-      const result = (await repos.conversation.loadByIds(au.churchId, ids)) as Conversation[];
+      const result = (await this.repositories.conversation.loadByIds(au.churchId, ids)) as Conversation[];
       await this.appendMessages(result, au.churchId);
       return result;
     }) as any;
@@ -56,9 +54,8 @@ export class ConversationController extends MessagingBaseController {
     res: express.Response
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.conversation.loadForContent(churchId, contentType, contentId);
-      return repos.conversation.convertAllToModel(data as any[]);
+      const data = await this.repositories.conversation.loadForContent(churchId, contentType, contentId);
+      return this.repositories.conversation.convertAllToModel(data as any[]);
     }) as any;
   }
 
@@ -70,23 +67,21 @@ export class ConversationController extends MessagingBaseController {
     res: express.Response
   ): Promise<Conversation> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.conversation.loadById(churchId, id);
-      return repos.conversation.convertToModel(data);
+      const data = await this.repositories.conversation.loadById(churchId, id);
+      return this.repositories.conversation.convertToModel(data);
     }) as any;
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Conversation[]>, res: express.Response): Promise<Conversation[]> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
       const promises: Promise<Conversation>[] = [];
       req.body.forEach((conversation) => {
         conversation.churchId = au.churchId;
-        promises.push(repos.conversation.save(conversation));
+        promises.push(this.repositories.conversation.save(conversation));
       }) as any;
       const result = await Promise.all(promises);
-      return repos.conversation.convertAllToModel(result);
+      return this.repositories.conversation.convertAllToModel(result);
     }) as any;
   }
 
@@ -98,8 +93,7 @@ export class ConversationController extends MessagingBaseController {
     res: express.Response
   ): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
-      await repos.conversation.delete(au.churchId, id);
+      await this.repositories.conversation.delete(au.churchId, id);
     }) as any;
   }
 }

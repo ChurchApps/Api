@@ -12,8 +12,7 @@ export class ConditionController extends DoingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
-      return await repositories.condition.load(au.churchId, id);
+      return await this.repositories.condition.load(au.churchId, id);
     });
   }
 
@@ -24,19 +23,17 @@ export class ConditionController extends DoingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
-      return await repositories.condition.loadForAutomation(au.churchId, automationId);
+      return await this.repositories.condition.loadForAutomation(au.churchId, automationId);
     });
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Condition[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
       const promises: Promise<Condition>[] = [];
       req.body.forEach((condition) => {
         condition.churchId = au.churchId;
-        promises.push(repositories.condition.save(condition));
+        promises.push(this.repositories.condition.save(condition));
       });
       const result = await Promise.all(promises);
       return result;
@@ -50,8 +47,7 @@ export class ConditionController extends DoingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
-      await repositories.condition.delete(au.churchId, id);
+      await this.repositories.condition.delete(au.churchId, id);
       return {};
     });
   }

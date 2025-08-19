@@ -12,9 +12,8 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.device.loadByChurchId(au.churchId);
-      return repos.device.convertAllToModel(data as any[]);
+      const data = await this.repositories.device.loadByChurchId(au.churchId);
+      return this.repositories.device.convertAllToModel(data as any[]);
     }) as any;
   }
 
@@ -26,9 +25,8 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.device.loadByPersonId(au.churchId, personId);
-      return repos.device.convertAllToModel(data as any[]);
+      const data = await this.repositories.device.loadByPersonId(au.churchId, personId);
+      return this.repositories.device.convertAllToModel(data as any[]);
     }) as any;
   }
 
@@ -40,24 +38,22 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<Device> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.device.loadById(au.churchId, id);
-      return repos.device.convertToModel(data);
+      const data = await this.repositories.device.loadById(au.churchId, id);
+      return this.repositories.device.convertToModel(data);
     }) as any;
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Device[]>, res: express.Response): Promise<Device[]> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
       const promises: Promise<Device>[] = [];
       req.body.forEach((device) => {
         device.lastActiveDate = new Date();
         if (!device.registrationDate) device.registrationDate = new Date();
-        promises.push(repos.device.save(device));
+        promises.push(this.repositories.device.save(device));
       }) as any;
       const result = await Promise.all(promises);
-      return repos.device.convertAllToModel(result as any[]);
+      return this.repositories.device.convertAllToModel(result as any[]);
     }) as any;
   }
 
@@ -69,8 +65,7 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
-      await repos.device.delete(au.churchId, id);
+      await this.repositories.device.delete(au.churchId, id);
     }) as any;
   }
 }

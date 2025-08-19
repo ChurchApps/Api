@@ -12,8 +12,7 @@ export class ConjunctionController extends DoingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
-      return await repositories.conjunction.load(au.churchId, id);
+      return await this.repositories.conjunction.load(au.churchId, id);
     });
   }
 
@@ -24,19 +23,17 @@ export class ConjunctionController extends DoingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
-      return await repositories.conjunction.loadForAutomation(au.churchId, automationId);
+      return await this.repositories.conjunction.loadForAutomation(au.churchId, automationId);
     });
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Conjunction[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
       const promises: Promise<Conjunction>[] = [];
       req.body.forEach((conjunction) => {
         conjunction.churchId = au.churchId;
-        promises.push(repositories.conjunction.save(conjunction));
+        promises.push(this.repositories.conjunction.save(conjunction));
       });
       const result = await Promise.all(promises);
       return result;
@@ -50,8 +47,7 @@ export class ConjunctionController extends DoingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repositories = await this.getDoingRepositories();
-      await repositories.conjunction.delete(au.churchId, id);
+      await this.repositories.conjunction.delete(au.churchId, id);
       return {};
     });
   }

@@ -15,9 +15,8 @@ export class MessageController extends MessagingBaseController {
     res: express.Response
   ): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.message.loadForConversation(churchId, conversationId);
-      return repos.message.convertAllToModel(data as any[]);
+      const data = await this.repositories.message.loadForConversation(churchId, conversationId);
+      return this.repositories.message.convertAllToModel(data as any[]);
     }) as any;
   }
 
@@ -29,26 +28,24 @@ export class MessageController extends MessagingBaseController {
     res: express.Response
   ): Promise<Message> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
-      const data = await repos.message.loadById(churchId, id);
-      return repos.message.convertToModel(data);
+      const data = await this.repositories.message.loadById(churchId, id);
+      return this.repositories.message.convertToModel(data);
     }) as any;
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
-      const repos = await this.getMessagingRepositories();
       const promises: Promise<Message>[] = [];
       req.body.forEach((message) => {
         promises.push(
-          repos.message.save(message).then(async (savedMessage) => {
-            const conversation = await repos.conversation.loadById(
+          this.repositories.message.save(message).then(async (savedMessage) => {
+            const conversation = await this.repositories.conversation.loadById(
               message.churchId,
               message.conversationId
             );
-            const conv = repos.conversation.convertToModel(conversation);
-            await repos.conversation.updateStats(message.conversationId);
+            const conv = this.repositories.conversation.convertToModel(conversation);
+            await this.repositories.conversation.updateStats(message.conversationId);
 
             // Send real-time updates
             await DeliveryHelper.sendConversationMessages({
@@ -66,7 +63,7 @@ export class MessageController extends MessagingBaseController {
         );
       }) as any;
       const result = await Promise.all(promises);
-      return repos.message.convertAllToModel(result as any[]);
+      return this.repositories.message.convertAllToModel(result as any[]);
     }) as any;
   }
 
@@ -78,10 +75,9 @@ export class MessageController extends MessagingBaseController {
     res: express.Response
   ): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMessagingRepositories();
-      const message = await repos.message.loadById(au.churchId, id);
+      const message = await this.repositories.message.loadById(au.churchId, id);
       if (message) {
-        await repos.message.delete(au.churchId, id);
+        await this.repositories.message.delete(au.churchId, id);
 
         // Send real-time delete notification
         await DeliveryHelper.sendConversationMessages({
