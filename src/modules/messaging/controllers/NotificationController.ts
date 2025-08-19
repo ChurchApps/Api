@@ -14,10 +14,10 @@ export class NotificationController extends MessagingBaseController {
     res: express.Response
   ): Promise<Notification[]> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.notification.loadByPersonId(au.churchId, personId);
-      return this.messagingRepositories.notification.convertAllToModel(data as any[]);
-    });
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.notification.loadByPersonId(au.churchId, personId);
+      return repos.notification.convertAllToModel(data as any[]);
+    }) as any;
   }
 
   @httpGet("/:churchId/:id")
@@ -28,24 +28,24 @@ export class NotificationController extends MessagingBaseController {
     res: express.Response
   ): Promise<Notification> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.notification.loadById(au.churchId, id);
-      return this.messagingRepositories.notification.convertToModel(data);
-    });
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.notification.loadById(au.churchId, id);
+      return repos.notification.convertToModel(data);
+    }) as any;
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Notification[]>, res: express.Response): Promise<Notification[]> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
+      const repos = await this.getMessagingRepositories();
       const promises: Promise<Notification>[] = [];
       req.body.forEach((notification) => {
         notification.churchId = au.churchId;
-        promises.push(this.messagingRepositories.notification.save(notification));
-      });
+        promises.push(repos.notification.save(notification));
+      }) as any;
       const result = await Promise.all(promises);
-      return this.messagingRepositories.notification.convertAllToModel(result as any[]);
-    });
+      return repos.notification.convertAllToModel(result as any[]);
+    }) as any;
   }
 
   @httpPost("/markRead/:churchId/:personId")
@@ -56,19 +56,19 @@ export class NotificationController extends MessagingBaseController {
     res: express.Response
   ): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      await this.messagingRepositories.notification.markRead(au.churchId, personId);
-    });
+      const repos = await this.getMessagingRepositories();
+      await repos.notification.markRead(au.churchId, personId);
+    }) as any;
   }
 
   @httpPost("/sendTest")
   public async sendTestNotification(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
+      const repos = await this.getMessagingRepositories();
       const { personId, title } = req.body;
       const method = await NotificationHelper.notifyUser(au.churchId, personId, title || "Test Notification");
       return { method, success: true };
-    });
+    }) as any;
   }
 
   @httpDelete("/:churchId/:id")
@@ -79,8 +79,8 @@ export class NotificationController extends MessagingBaseController {
     res: express.Response
   ): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      await this.messagingRepositories.notification.delete(au.churchId, id);
-    });
+      const repos = await this.getMessagingRepositories();
+      await repos.notification.delete(au.churchId, id);
+    }) as any;
   }
 }

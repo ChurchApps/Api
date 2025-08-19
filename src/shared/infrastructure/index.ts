@@ -6,5 +6,5 @@
 export { ConnectionManager } from "./ConnectionManager";
 export { RepositoryManager } from "./RepositoryManager";
 export { CustomAuthProvider } from "./CustomAuthProvider";
-export { BaseController, ModuleBaseController } from "./BaseController";
+export { BaseController } from "./BaseController";
 export { DB, MultiDatabasePool } from "./DB";

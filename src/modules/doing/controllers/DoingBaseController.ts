@@ -1,15 +1,17 @@
-import { ModuleBaseController } from "../../../shared/infrastructure/BaseController";
+import { BaseController } from "../../../shared/infrastructure/BaseController";
 import { DoingRepositories } from "../repositories";
 
-export class DoingBaseController extends ModuleBaseController<DoingRepositories> {
+export class DoingBaseController extends BaseController {
+  public repositories: DoingRepositories;
+
   constructor() {
     super("doing");
   }
 
-  /**
-   * Get doing repositories with proper type safety
-   */
   protected async getDoingRepositories(): Promise<DoingRepositories> {
-    return await this.getModuleRepositories();
+    if (!this.repositories) {
+      this.repositories = await this.getRepositories<DoingRepositories>();
+    }
+    return this.repositories;
   }
 }

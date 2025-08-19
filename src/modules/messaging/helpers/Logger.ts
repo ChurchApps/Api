@@ -24,7 +24,7 @@ export class Logger {
     if (this.logs.length > 0) {
       const logData = this.logs.join("\n");
       try {
-        LoggingHelper.getCurrent().error(`[messaging] batch-logs: ${logData}`);
+        throw new Error(`[messaging] batch-logs: ${logData}`);
       } catch (error) {
         console.error("Failed to flush logs:", error);
       }

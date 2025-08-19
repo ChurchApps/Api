@@ -67,8 +67,7 @@ export class DeliveryHelper {
         return false;
       }
     } catch (e) {
-      LoggingHelper.getCurrent().error(`[${connection.churchId}] DeliveryHelper.sendLocal: ${e}`);
-      return false;
+      throw new Error(`[${connection.churchId}] DeliveryHelper.sendLocal: ${e}`);
     }
   };
 
@@ -85,8 +84,7 @@ export class DeliveryHelper {
       await gwManagement.send(command);
       return true;
     } catch (e) {
-      LoggingHelper.getCurrent().error(`[${connection.churchId}] DeliveryHelper.sendAws: ${e}`);
-      return false;
+      throw new Error(`[${connection.churchId}] DeliveryHelper.sendAws: ${e}`);
     }
   };
 

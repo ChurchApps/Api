@@ -15,10 +15,10 @@ export class MessageController extends MessagingBaseController {
     res: express.Response
   ): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.message.loadForConversation(churchId, conversationId);
-      return this.messagingRepositories.message.convertAllToModel(data as any[]);
-    });
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.message.loadForConversation(churchId, conversationId);
+      return repos.message.convertAllToModel(data as any[]);
+    }) as any;
   }
 
   @httpGet("/:churchId/:id")
@@ -29,26 +29,26 @@ export class MessageController extends MessagingBaseController {
     res: express.Response
   ): Promise<Message> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.message.loadById(churchId, id);
-      return this.messagingRepositories.message.convertToModel(data);
-    });
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.message.loadById(churchId, id);
+      return repos.message.convertToModel(data);
+    }) as any;
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
+      const repos = await this.getMessagingRepositories();
       const promises: Promise<Message>[] = [];
       req.body.forEach((message) => {
         promises.push(
-          this.messagingRepositories.message.save(message).then(async (savedMessage) => {
-            const conversation = await this.messagingRepositories.conversation.loadById(
+          repos.message.save(message).then(async (savedMessage) => {
+            const conversation = await repos.conversation.loadById(
               message.churchId,
               message.conversationId
             );
-            const conv = this.messagingRepositories.conversation.convertToModel(conversation);
-            await this.messagingRepositories.conversation.updateStats(message.conversationId);
+            const conv = repos.conversation.convertToModel(conversation);
+            await repos.conversation.updateStats(message.conversationId);
 
             // Send real-time updates
             await DeliveryHelper.sendConversationMessages({
@@ -56,7 +56,7 @@ export class MessageController extends MessagingBaseController {
               conversationId: message.conversationId,
               action: "message",
               data: savedMessage
-            });
+            }) as any;
 
             // Handle notifications
             await NotificationHelper.checkShouldNotify(conv, savedMessage, message.personId || "anonymous");
@@ -64,10 +64,10 @@ export class MessageController extends MessagingBaseController {
             return savedMessage;
           })
         );
-      });
+      }) as any;
       const result = await Promise.all(promises);
-      return this.messagingRepositories.message.convertAllToModel(result as any[]);
-    });
+      return repos.message.convertAllToModel(result as any[]);
+    }) as any;
   }
 
   @httpDelete("/:churchId/:id")
@@ -78,10 +78,10 @@ export class MessageController extends MessagingBaseController {
     res: express.Response
   ): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      const message = await this.messagingRepositories.message.loadById(au.churchId, id);
+      const repos = await this.getMessagingRepositories();
+      const message = await repos.message.loadById(au.churchId, id);
       if (message) {
-        await this.messagingRepositories.message.delete(au.churchId, id);
+        await repos.message.delete(au.churchId, id);
 
         // Send real-time delete notification
         await DeliveryHelper.sendConversationMessages({
@@ -89,8 +89,8 @@ export class MessageController extends MessagingBaseController {
           conversationId: message.conversationId,
           action: "deleteMessage",
           data: { id }
-        });
+        }) as any;
       }
-    });
+    }) as any;
   }
 }

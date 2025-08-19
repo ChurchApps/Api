@@ -1,27 +1,26 @@
-import { ModuleBaseController } from "../../../shared/infrastructure/BaseController";
+import { BaseController } from "../../../shared/infrastructure/BaseController";
 import { MembershipRepositories } from "../repositories";
 import { Permissions } from "../helpers";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 
-export class MembershipBaseController extends ModuleBaseController<MembershipRepositories> {
+export class MembershipBaseController extends BaseController {
+  public repositories: MembershipRepositories;
+
   constructor() {
     super("membership");
   }
 
-  /**
-   * Get membership repositories with proper type safety
-   */
   protected async getMembershipRepositories(): Promise<MembershipRepositories> {
-    return await this.getModuleRepositories();
+    if (!this.repositories) {
+      this.repositories = await this.getRepositories<MembershipRepositories>();
+    }
+    return this.repositories;
   }
 
-  /**
-   * Override the base formAccess method with membership-specific logic
-   */
   public async formAccess(au: AuthenticatedUser, formId: string, access?: string): Promise<boolean> {
     if (au.checkAccess(Permissions.forms.admin)) return true;
     if (!formId) return false;
-
+    
     const repos = await this.getMembershipRepositories();
     const formData = (await repos.form.loadWithMemberPermissions(au.churchId, formId, au.personId)) as any;
     if (formData?.contentType === "form")

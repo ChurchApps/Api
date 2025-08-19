@@ -12,10 +12,10 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.device.loadByChurchId(au.churchId);
-      return this.messagingRepositories.device.convertAllToModel(data as any[]);
-    });
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.device.loadByChurchId(au.churchId);
+      return repos.device.convertAllToModel(data as any[]);
+    }) as any;
   }
 
   @httpGet("/:churchId/person/:personId")
@@ -26,10 +26,10 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.device.loadByPersonId(au.churchId, personId);
-      return this.messagingRepositories.device.convertAllToModel(data as any[]);
-    });
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.device.loadByPersonId(au.churchId, personId);
+      return repos.device.convertAllToModel(data as any[]);
+    }) as any;
   }
 
   @httpGet("/:churchId/:id")
@@ -40,25 +40,25 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<Device> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.device.loadById(au.churchId, id);
-      return this.messagingRepositories.device.convertToModel(data);
-    });
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.device.loadById(au.churchId, id);
+      return repos.device.convertToModel(data);
+    }) as any;
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Device[]>, res: express.Response): Promise<Device[]> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
+      const repos = await this.getMessagingRepositories();
       const promises: Promise<Device>[] = [];
       req.body.forEach((device) => {
         device.lastActiveDate = new Date();
         if (!device.registrationDate) device.registrationDate = new Date();
-        promises.push(this.messagingRepositories.device.save(device));
-      });
+        promises.push(repos.device.save(device));
+      }) as any;
       const result = await Promise.all(promises);
-      return this.messagingRepositories.device.convertAllToModel(result as any[]);
-    });
+      return repos.device.convertAllToModel(result as any[]);
+    }) as any;
   }
 
   @httpDelete("/:churchId/:id")
@@ -69,8 +69,8 @@ export class DeviceController extends MessagingBaseController {
     res: express.Response
   ): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.initializeRepositories();
-      await this.messagingRepositories.device.delete(au.churchId, id);
-    });
+      const repos = await this.getMessagingRepositories();
+      await repos.device.delete(au.churchId, id);
+    }) as any;
   }
 }

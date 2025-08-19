@@ -8,7 +8,8 @@ import { DeliveryHelper } from "../helpers/DeliveryHelper";
 export class ConnectionController extends MessagingBaseController {
   private async updateAnonName(connection: Connection) {
     if (connection.displayName === "Anonymous ") {
-      const connections: Connection[] = await this.messagingRepositories.connection.loadForConversation(
+      const repos = await this.getMessagingRepositories();
+      const connections: Connection[] = await repos.connection.loadForConversation(
         connection.churchId,
         connection.conversationId
       );
@@ -36,9 +37,9 @@ export class ConnectionController extends MessagingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
-      const data = await this.messagingRepositories.connection.loadForConversation(churchId, conversationId);
-      const connections = this.messagingRepositories.connection.convertAllToModel(data);
+      const repos = await this.getMessagingRepositories();
+      const data = await repos.connection.loadForConversation(churchId, conversationId);
+      const connections = repos.connection.convertAllToModel(data);
       return connections;
     });
   }
@@ -46,8 +47,8 @@ export class ConnectionController extends MessagingBaseController {
   @httpPost("/tmpSendAlert")
   public async sendAlert(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
-      const connections = await this.messagingRepositories.connection.loadForNotification(
+      const repos = await this.getMessagingRepositories();
+      const connections = await repos.connection.loadForNotification(
         req.body.churchId,
         req.body.personId
       );
@@ -64,7 +65,7 @@ export class ConnectionController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Connection[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
+      const repos = await this.getMessagingRepositories();
       console.log(`🔵 ConnectionController.save - Received ${req.body.length} connections to save`);
       console.log("🔵 Connection data:", JSON.stringify(req.body, null, 2));
 
@@ -75,7 +76,7 @@ export class ConnectionController extends MessagingBaseController {
 
         console.log(`🔵 About to save connection: ${JSON.stringify(connection)}`);
         promises.push(
-          this.messagingRepositories.connection
+          repos.connection
             .save(connection)
             .then(async (c) => {
               console.log("✅ Successfully saved connection to database:", JSON.stringify(c));
@@ -92,7 +93,7 @@ export class ConnectionController extends MessagingBaseController {
       }
 
       const savedConnections = await Promise.all(promises);
-      const result = this.messagingRepositories.connection.convertAllToModel(savedConnections);
+      const result = repos.connection.convertAllToModel(savedConnections);
       console.log(`🎯 ConnectionController.save - Returning ${result.length} saved connections`);
       console.log("🎯 Final result:", JSON.stringify(result, null, 2));
 
@@ -106,19 +107,19 @@ export class ConnectionController extends MessagingBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      await this.initializeRepositories();
-      const connections = await this.messagingRepositories.connection.loadBySocketId(req.body.socketId);
+      const repos = await this.getMessagingRepositories();
+      const connections = await repos.connection.loadBySocketId(req.body.socketId);
       const promises: Promise<Connection>[] = [];
       connections.forEach((connection: Connection) => {
         connection.displayName = req.body.name;
         promises.push(
-          this.messagingRepositories.connection.save(connection).then(async (c) => {
+          repos.connection.save(connection).then(async (c) => {
             await DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
             return c;
           })
         );
       });
-      return this.messagingRepositories.connection.convertAllToModel(await Promise.all(promises));
+      return repos.connection.convertAllToModel(await Promise.all(promises));
     });
   }
 }

@@ -2,6 +2,7 @@ import { controller, httpPost, httpGet, interfaces, requestParam, httpDelete } f
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { Person, Household, SearchCondition, Group, VisibilityPreference } from "../models";
+import { MembershipRepositories } from "../repositories";
 import { FormSubmission, Form } from "../models";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
 import { Environment, Permissions, PersonHelper } from "../helpers";
@@ -345,23 +346,20 @@ export class PersonController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (au.personId !== id && !au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus)))
         return this.json({}, 401);
       else {
-        const data = await this.repositories.person.load(au.churchId, id);
+        const repos = await this.getMembershipRepositories();
+        const data = await repos.person.load(au.churchId, id);
         if (!data) return null;
-        const result = this.repositories.person.convertToModel(
+        const result = repos.person.convertToModel(
           au.churchId,
           data,
           au.checkAccess(Permissions.people.edit)
         );
-        await this.appendFormSubmissions(au.churchId, result);
+        await this.appendFormSubmissions(au.churchId, result, repos);
         return result;
       }
     });
@@ -527,19 +525,19 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
-  private async appendFormSubmissions(churchId: string, person: Person) {
-    const submissions: FormSubmission[] = this.repositories.formSubmission.convertAllToModel(
+  private async appendFormSubmissions(churchId: string, person: Person, repos: MembershipRepositories) {
+    const submissions: FormSubmission[] = repos.formSubmission.convertAllToModel(
       churchId,
-      (await this.repositories.formSubmission.loadForContent(churchId, "person", person.id)) as any[]
+      (await repos.formSubmission.loadForContent(churchId, "person", person.id)) as any[]
     );
     if (submissions.length > 0) {
       const formIds: string[] = [];
       submissions.forEach((s) => {
         if (formIds.indexOf(s.formId) === -1) formIds.push(s.formId);
       });
-      const forms: Form[] = this.repositories.form.convertAllToModel(
+      const forms: Form[] = repos.form.convertAllToModel(
         churchId,
-        (await this.repositories.form.loadByIds(churchId, formIds)) as any[]
+        (await repos.form.loadByIds(churchId, formIds)) as any[]
       );
 
       person.formSubmissions = [];
