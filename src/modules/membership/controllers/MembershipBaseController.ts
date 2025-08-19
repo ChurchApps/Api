@@ -1,11 +1,9 @@
-import { BaseController } from "../../../shared/infrastructure/BaseController";
+import { ModuleBaseController } from "../../../shared/infrastructure/BaseController";
 import { MembershipRepositories } from "../repositories";
 import { Permissions } from "../helpers";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 
-export class MembershipBaseController extends BaseController {
-  protected repositories?: MembershipRepositories;
-
+export class MembershipBaseController extends ModuleBaseController<MembershipRepositories> {
   constructor() {
     super("membership");
   }
@@ -14,10 +12,7 @@ export class MembershipBaseController extends BaseController {
    * Get membership repositories with proper type safety
    */
   protected async getMembershipRepositories(): Promise<MembershipRepositories> {
-    if (!this.repositories) {
-      this.repositories = await super.getRepositories<MembershipRepositories>();
-    }
-    return this.repositories;
+    return await this.getModuleRepositories();
   }
 
   /**

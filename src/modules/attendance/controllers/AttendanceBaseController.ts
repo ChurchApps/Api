@@ -1,9 +1,7 @@
-import { BaseController } from "../../../shared/infrastructure/BaseController";
+import { ModuleBaseController } from "../../../shared/infrastructure/BaseController";
 import { AttendanceRepositories } from "../repositories";
 
-export class AttendanceBaseController extends BaseController {
-  protected repositories?: AttendanceRepositories;
-
+export class AttendanceBaseController extends ModuleBaseController<AttendanceRepositories> {
   constructor() {
     super("attendance");
   }
@@ -12,9 +10,6 @@ export class AttendanceBaseController extends BaseController {
    * Get attendance repositories with proper type safety
    */
   protected async getAttendanceRepositories(): Promise<AttendanceRepositories> {
-    if (!this.repositories) {
-      this.repositories = await super.getRepositories<AttendanceRepositories>();
-    }
-    return this.repositories;
+    return await this.getModuleRepositories();
   }
 }

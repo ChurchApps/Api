@@ -109,7 +109,12 @@ export class Environment extends EnvironmentBase {
     this.encryptionKey = process.env.ENCRYPTION_KEY || "";
     this.appName = data.appName || "API";
     this.corsOrigin = process.env.CORS_ORIGIN || data.corsOrigin || "*";
-    this.jwtSecret = process.env.JWT_SECRET || data.jwtSecret || this.encryptionKey || "default-secret";
+    this.jwtSecret =
+      process.env.JWT_SECRET ||
+      (await AwsHelper.readParameter(`/${environment}/jwtSecret`)) ||
+      data.jwtSecret ||
+      this.encryptionKey ||
+      "default-secret";
 
     // Initialize module-specific configs
     this.initializeModuleConfigs(data);

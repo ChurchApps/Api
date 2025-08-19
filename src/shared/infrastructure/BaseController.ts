@@ -254,10 +254,22 @@ export abstract class BaseController extends CustomBaseController {
 
 /**
  * Module-specific base controllers can extend this
- * Example: MembershipBaseController extends BaseController
+ * Generic base controller for modules with type-safe repository access
  */
-export abstract class ModuleBaseController extends BaseController {
+export abstract class ModuleBaseController<T> extends BaseController {
+  protected repositories?: T;
+
   constructor(moduleName: string) {
     super(moduleName);
+  }
+
+  /**
+   * Get repositories for this module with proper type safety
+   */
+  protected async getModuleRepositories(): Promise<T> {
+    if (!this.repositories) {
+      this.repositories = await super.getRepositories<T>();
+    }
+    return this.repositories;
   }
 }

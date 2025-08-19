@@ -1,9 +1,7 @@
-import { BaseController } from "../../../shared/infrastructure/BaseController";
+import { ModuleBaseController } from "../../../shared/infrastructure/BaseController";
 import { GivingRepositories } from "../repositories";
 
-export class GivingBaseController extends BaseController {
-  protected repositories?: GivingRepositories;
-
+export class GivingBaseController extends ModuleBaseController<GivingRepositories> {
   constructor() {
     super("giving");
   }
@@ -12,9 +10,6 @@ export class GivingBaseController extends BaseController {
    * Get giving repositories with proper type safety
    */
   protected async getGivingRepositories(): Promise<GivingRepositories> {
-    if (!this.repositories) {
-      this.repositories = await super.getRepositories<GivingRepositories>();
-    }
-    return this.repositories;
+    return await this.getModuleRepositories();
   }
 }
