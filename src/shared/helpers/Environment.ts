@@ -135,6 +135,10 @@ export class Environment extends EnvironmentBase {
     // Load from environment variables (connection strings)
     const modules = ["membership", "attendance", "content", "giving", "messaging", "doing"];
 
+    console.log(`🔍 Initializing database connections for environment: ${this.currentEnvironment}`);
+    console.log(`🔍 AWS Lambda Function: ${process.env.AWS_LAMBDA_FUNCTION_NAME}`);
+    console.log(`🔍 AWS Execution Env: ${process.env.AWS_EXECUTION_ENV}`);
+
     // Special case: DoingApi needs access to membership database
     if (process.env.DOING_MEMBERSHIP_CONNECTION_STRING) {
       try {
@@ -150,20 +154,30 @@ export class Environment extends EnvironmentBase {
     const isAwsEnvironment = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
     const environment = this.currentEnvironment || process.env.STAGE || process.env.ENVIRONMENT || "dev";
 
+    console.log(`🔍 Is AWS Environment: ${isAwsEnvironment}`);
+    console.log(`🔍 Using environment: ${environment}`);
+
     for (const moduleName of modules) {
       const envVarName = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
       let connectionString = process.env[envVarName];
+
+      console.log(`🔍 Checking ${moduleName} module:`);
+      console.log(`  - Environment variable ${envVarName}: ${connectionString ? 'FOUND' : 'NOT FOUND'}`);
 
       // If not in environment variable and we're in AWS, try Parameter Store
       if (!connectionString && isAwsEnvironment) {
         try {
           const paramName = `/${environment}/${moduleName}Api/connectionString`;
+          console.log(`  - Attempting to read Parameter Store: ${paramName}`);
           connectionString = await AwsHelper.readParameter(paramName);
           if (connectionString) {
             console.log(`✅ Loaded ${moduleName} connection string from Parameter Store: ${paramName}`);
+          } else {
+            console.log(`⚠️ Parameter Store returned empty/null for ${paramName}`);
           }
         } catch (error) {
-          console.log(`⚠️ No Parameter Store value for ${moduleName}: ${error.message}`);
+          console.error(`❌ Parameter Store error for ${moduleName}: ${error.message}`);
+          console.error(`❌ Full error:`, error);
         }
       }
 
@@ -176,8 +190,13 @@ export class Environment extends EnvironmentBase {
           console.error(`❌ Failed to parse connection string for ${moduleName}: ${error}`);
           throw new Error(`Invalid database connection string for ${moduleName}: ${error}`);
         }
+      } else {
+        console.log(`⚠️ No connection string found for ${moduleName} module`);
       }
     }
+
+    // Log final state
+    console.log(`🔍 Final database connections loaded: ${Array.from(this.dbConnections.keys()).join(', ')}`);
 
     // Fallback to config file format (legacy support)
     if (config.databases) {
