@@ -36,23 +36,18 @@ export class MembershipSettingController extends MembershipBaseController {
   }
 
   @httpGet("/public/:churchId")
-  public async publicRoute(
-    @requestParam("churchId") churchId: string,
-    req: express.Request,
-    res: express.Response
-  ): Promise<any> {
-    try {
-      const publicSettings = await this.repositories.setting.loadPublicSettings(churchId);
-      const settings = this.repositories.setting.convertAllToModel(churchId, publicSettings as any[]);
-      const result: any = {};
-      settings.forEach((s) => {
-        result[s.keyName] = s.value;
-      });
-      return this.json(result, 200);
-    } catch (e) {
-      this.logger.error(e);
-      return this.internalServerError(e);
-    }
+  public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+    console.log("MADE IT");
+
+    const publicSettings = await this.repositories.setting.loadPublicSettings(churchId);
+    console.log("PUBLIC SETTINGS", publicSettings);
+    const settings = this.repositories.setting.convertAllToModel(churchId, publicSettings as any[]);
+    console.log("CONVERTED SETTINGS", settings);
+    const result: any = {};
+    settings.forEach((s) => {
+      result[s.keyName] = s.value;
+    });
+    return this.json(result, 200);
   }
 
   private async saveSetting(setting: Setting) {

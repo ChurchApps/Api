@@ -29,6 +29,7 @@ export class SettingRepository {
   }
 
   public loadPublicSettings(churchId: string) {
+    console.log("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
     return DB.query("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
   }
 

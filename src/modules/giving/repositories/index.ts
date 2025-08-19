@@ -8,3 +8,4 @@ export { EventLogRepository } from "./EventLogRepository";
 export { SubscriptionRepository } from "./SubscriptionRepository";
 export { SubscriptionFundsRepository } from "./SubscriptionFundsRepository";
 export { GivingRepositories } from "./GivingRepositories";
+export { Repositories } from "./Repositories";

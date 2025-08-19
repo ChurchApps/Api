@@ -12,3 +12,4 @@ export { TaskRepository } from "./TaskRepository";
 export { TimeRepository } from "./TimeRepository";
 export { MembershipRepository } from "./MembershipRepository";
 export { DoingRepositories } from "./DoingRepositories";
+export { Repositories } from "./Repositories";

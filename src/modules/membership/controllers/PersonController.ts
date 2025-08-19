@@ -287,7 +287,7 @@ export class PersonController extends MembershipBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const repos = await this.getMembershipRepositories();
+      const repos = this.repositories;
       if (au.personId !== id && !au.checkAccess(Permissions.people.view)) {
         if (id === "all") {
           return repos.person.convertAllToBasicModel(
@@ -352,7 +352,7 @@ export class PersonController extends MembershipBaseController {
       if (au.personId !== id && !au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus)))
         return this.json({}, 401);
       else {
-        const repos = await this.getMembershipRepositories();
+        const repos = this.repositories;
         const data = await repos.person.load(au.churchId, id);
         if (!data) return null;
         const result = repos.person.convertToModel(

@@ -76,8 +76,7 @@ export class UserController extends MembershipBaseController {
   @httpPost("/login")
   public async login(req: express.Request<{}, {}, LoginRequest>, res: express.Response): Promise<any> {
     try {
-      // Initialize repositories
-      const repositories = await this.getMembershipRepositories();
+      const repositories = this.repositories;
 
       let user: User = null;
       if (req.body.jwt !== undefined && req.body.jwt !== "") {
@@ -124,8 +123,7 @@ export class UserController extends MembershipBaseController {
   }
 
   private async getUserChurches(id: string): Promise<LoginUserChurch[]> {
-    // Initialize repositories
-    const repositories = await this.getMembershipRepositories();
+    const repositories = this.repositories;
 
     // Load user churches via Roles
     const roleUserChurches = await repositories.rolePermission.loadForUser(id, true); // Set to true so churches[0] is always a real church.  Not sre why it was false before.  If we need to change this make it a param on the login request

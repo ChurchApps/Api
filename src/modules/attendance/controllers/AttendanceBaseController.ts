@@ -1,17 +1,11 @@
-import { BaseController } from "../../../shared/infrastructure/BaseController";
-import { AttendanceRepositories } from "../repositories";
+import { CustomBaseController } from "@churchapps/apihelper";
+import { Repositories } from "../repositories";
 
-export class AttendanceBaseController extends BaseController {
-  public repositories: AttendanceRepositories;
+export class AttendanceBaseController extends CustomBaseController {
+  public repositories: Repositories;
 
   constructor() {
-    super("attendance");
-  }
-
-  protected async getAttendanceRepositories(): Promise<AttendanceRepositories> {
-    if (!this.repositories) {
-      this.repositories = await this.getRepositories<AttendanceRepositories>();
-    }
-    return this.repositories;
+    super();
+    this.repositories = Repositories.getCurrent();
   }
 }

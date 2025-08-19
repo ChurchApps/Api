@@ -31,3 +31,4 @@ export { ArrangementRepository } from "./ArrangementRepository";
 export { ArrangementKeyRepository } from "./ArrangementKeyRepository";
 
 export { ContentRepositories } from "./ContentRepositories";
+export { Repositories } from "./Repositories";
