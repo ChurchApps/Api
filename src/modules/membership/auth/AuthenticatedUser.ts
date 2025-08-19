@@ -20,7 +20,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
         id: user.id,
         jwt: AuthenticatedUser.getUserJwt(user)
       },
-      churches: userChurches
+      userChurches: userChurches
     };
     return result;
     // }

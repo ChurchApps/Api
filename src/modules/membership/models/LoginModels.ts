@@ -10,7 +10,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   user: any;
-  churches: LoginUserChurch[];
+  userChurches: LoginUserChurch[];
   token?: string;
   errors?: string[];
 }

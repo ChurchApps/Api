@@ -441,7 +441,7 @@ export class ChurchController extends MembershipBaseController {
       const user = await this.repositories.user.load(au.id);
 
       const data = await AuthenticatedUser.login([userChurch], user);
-      return this.json(data.churches[0], 200);
+      return this.json(data.userChurches[0], 200);
     });
   }
 

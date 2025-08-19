@@ -162,7 +162,7 @@ export class Environment extends EnvironmentBase {
       let connectionString = process.env[envVarName];
 
       console.log(`🔍 Checking ${moduleName} module:`);
-      console.log(`  - Environment variable ${envVarName}: ${connectionString ? 'FOUND' : 'NOT FOUND'}`);
+      console.log(`  - Environment variable ${envVarName}: ${connectionString ? "FOUND" : "NOT FOUND"}`);
 
       // If not in environment variable and we're in AWS, try Parameter Store
       if (!connectionString && isAwsEnvironment) {
@@ -177,7 +177,7 @@ export class Environment extends EnvironmentBase {
           }
         } catch (error) {
           console.error(`❌ Parameter Store error for ${moduleName}: ${error.message}`);
-          console.error(`❌ Full error:`, error);
+          console.error("❌ Full error:", error);
         }
       }
 
@@ -196,7 +196,7 @@ export class Environment extends EnvironmentBase {
     }
 
     // Log final state
-    console.log(`🔍 Final database connections loaded: ${Array.from(this.dbConnections.keys()).join(', ')}`);
+    console.log(`🔍 Final database connections loaded: ${Array.from(this.dbConnections.keys()).join(", ")}`);
 
     // Fallback to config file format (legacy support)
     if (config.databases) {
