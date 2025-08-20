@@ -3,13 +3,5 @@
   "apiUrl": "https://staging-api.example.com",
   "deliveryProvider": "aws",
   "contentRoot": "https://staging-api.example.com/content/",
-  "fileStore": "s3",
-  "s3Bucket": "staging-churchapps-content",
-  "jwt": {
-    "secret": "${ssm:/staging/jwt/secret}",
-    "expiration": 172800
-  },
-  "websocket": {
-    "url": "wss://staging-ws.example.com"
-  }
+  "fileStore": "s3"
 }

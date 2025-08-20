@@ -3,14 +3,5 @@
   "apiUrl": "http://localhost:8084",
   "deliveryProvider": "local",
   "contentRoot": "http://localhost:8084/content/",
-  "fileStore": "memory",
-  "s3Bucket": "",
-  "jwt": {
-    "secret": "test-jwt-secret",
-    "expiration": 3600
-  },
-  "websocket": {
-    "port": 8088,
-    "url": "ws://localhost:8088"
-  }
+  "fileStore": "memory"
 }

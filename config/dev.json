@@ -1,17 +1,7 @@
 {
   "environment": "dev",
-  "port": 8081,
   "apiUrl": "http://localhost:8084",
   "deliveryProvider": "local",
   "contentRoot": "http://localhost:8084/content/",
-  "fileStore": "disk",
-  "s3Bucket": "",
-  "jwt": {
-    "secret": "jwt-secret-dev",
-    "expiration": 172800
-  },
-  "websocket": {
-    "port": 8087,
-    "url": "ws://localhost:8087"
-  }
+  "fileStore": "disk"
 }

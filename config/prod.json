@@ -3,13 +3,5 @@
   "apiUrl": "https://api.example.com",
   "deliveryProvider": "aws",
   "contentRoot": "https://api.example.com/content/",
-  "fileStore": "s3",
-  "s3Bucket": "prod-churchapps-content",
-  "jwt": {
-    "secret": "${ssm:/prod/jwt/secret}",
-    "expiration": 172800
-  },
-  "websocket": {
-    "url": "wss://ws.example.com"
-  }
+  "fileStore": "s3"
 }
