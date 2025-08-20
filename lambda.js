@@ -19,11 +19,7 @@ const initializeEnvironment = async () => {
     await Environment.init(stage);
     console.log('Environment initialized, connection strings loaded');
     
-    // Initialize multi-database pools
-    console.log('🔌 Initializing database pools...');
-    const { MultiDatabasePool } = require('./dist/shared/infrastructure/DB');
-    await MultiDatabasePool.initializeAllPools();
-    console.log('✅ Database pools initialized');
+    // Pools now auto-initialize on first use
   }
 };
 

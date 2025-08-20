@@ -10,8 +10,7 @@ const initEnv = async () => {
   if (!Environment.currentEnvironment) {
     await Environment.init(process.env.ENVIRONMENT || "dev");
 
-    // Initialize database pools
-    await MultiDatabasePool.initializeAllPools();
+    // Pools now auto-initialize on first use
 
     // Initialize messaging helpers within the messaging module context
     await DB.runWithContext("messaging", async () => {

@@ -20,11 +20,7 @@ export const createApp = async () => {
   await Environment.init(environment);
   console.log("✅ Environment initialized");
 
-  // Initialize multi-database pools
-  console.log("🔌 Initializing database pools...");
-  const { MultiDatabasePool } = await import("./shared/infrastructure/DB");
-  await MultiDatabasePool.initializeAllPools();
-  console.log("✅ Database pools initialized");
+  // Pools now auto-initialize on first use
 
   // Create Inversify container
   console.log("📦 Creating Inversify container...");
