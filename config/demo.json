@@ -1,0 +1,65 @@
+{
+  "environment": "demo",
+  "apiUrl": "https://demo-api.example.com",
+  "appUrl": "https://demo.example.com",
+  "accountsUrl": "https://demo-accounts.example.com",
+  "deliveryProvider": "aws",
+  "contentRoot": "https://demo-api.example.com/content/",
+  "fileStore": "s3",
+  "s3Bucket": "demo-churchapps-content",
+  "databases": {
+    "membership": {
+      "host": "${ssm:/demo/db/host}",
+      "user": "${ssm:/demo/db/user}",
+      "password": "${ssm:/demo/db/password}",
+      "database": "demo_membership",
+      "connectionLimit": 20
+    },
+    "attendance": {
+      "host": "${ssm:/demo/db/host}",
+      "user": "${ssm:/demo/db/user}",
+      "password": "${ssm:/demo/db/password}",
+      "database": "demo_attendance",
+      "connectionLimit": 20
+    },
+    "content": {
+      "host": "${ssm:/demo/db/host}",
+      "user": "${ssm:/demo/db/user}",
+      "password": "${ssm:/demo/db/password}",
+      "database": "demo_content",
+      "connectionLimit": 20
+    },
+    "giving": {
+      "host": "${ssm:/demo/db/host}",
+      "user": "${ssm:/demo/db/user}",
+      "password": "${ssm:/demo/db/password}",
+      "database": "demo_giving",
+      "connectionLimit": 20
+    },
+    "messaging": {
+      "host": "${ssm:/demo/db/host}",
+      "user": "${ssm:/demo/db/user}",
+      "password": "${ssm:/demo/db/password}",
+      "database": "demo_messaging",
+      "connectionLimit": 20
+    },
+    "doing": {
+      "host": "${ssm:/demo/db/host}",
+      "user": "${ssm:/demo/db/user}",
+      "password": "${ssm:/demo/db/password}",
+      "database": "demo_doing",
+      "connectionLimit": 20
+    }
+  },
+  "jwt": {
+    "secret": "${ssm:/demo/jwt/secret}",
+    "expiration": 172800
+  },
+  "websocket": {
+    "url": "wss://demo-ws.example.com"
+  },
+  "logging": {
+    "level": "info",
+    "cloudWatch": true
+  }
+}
