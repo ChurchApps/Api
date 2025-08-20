@@ -202,22 +202,6 @@ export class Environment extends EnvironmentBase {
 
     // Log final state
     console.log(`🔍 Final database connections loaded: ${Array.from(this.dbConnections.keys()).join(", ")}`);
-
-    // Fallback to config file format (legacy support)
-    if (config.databases) {
-      for (const [moduleName, dbConfig] of Object.entries(config.databases)) {
-        // Only use config file if no environment variable was set
-        if (!this.dbConnections.has(moduleName)) {
-          this.dbConnections.set(moduleName, dbConfig);
-          console.log(`✅ Loaded ${moduleName} database config from config file`);
-        }
-      }
-    } else {
-      // Fallback for very old legacy config format
-      if (config.database && !this.dbConnections.has("membership")) {
-        this.dbConnections.set("membership", config.database);
-      }
-    }
   }
 
   private static async initializeAppConfigs(config: any, environment: string) {

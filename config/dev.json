@@ -2,62 +2,10 @@
   "environment": "dev",
   "port": 8081,
   "apiUrl": "http://localhost:8084",
-  "appUrl": "http://localhost:3000",
-  "accountsUrl": "http://localhost:3001",
   "deliveryProvider": "local",
   "contentRoot": "http://localhost:8084/content/",
   "fileStore": "disk",
   "s3Bucket": "",
-  "databases": {
-    "membership": {
-      "host": "localhost",
-      "port": 3306,
-      "user": "root",
-      "password": "",
-      "database": "membership",
-      "connectionLimit": 10
-    },
-    "attendance": {
-      "host": "localhost",
-      "port": 3306,
-      "user": "root",
-      "password": "",
-      "database": "attendance",
-      "connectionLimit": 10
-    },
-    "content": {
-      "host": "localhost",
-      "port": 3306,
-      "user": "root",
-      "password": "",
-      "database": "content",
-      "connectionLimit": 10
-    },
-    "giving": {
-      "host": "localhost",
-      "port": 3306,
-      "user": "root",
-      "password": "",
-      "database": "giving",
-      "connectionLimit": 10
-    },
-    "messaging": {
-      "host": "localhost",
-      "port": 3306,
-      "user": "root",
-      "password": "",
-      "database": "messaging",
-      "connectionLimit": 10
-    },
-    "doing": {
-      "host": "localhost",
-      "port": 3306,
-      "user": "root",
-      "password": "",
-      "database": "doing",
-      "connectionLimit": 10
-    }
-  },
   "jwt": {
     "secret": "jwt-secret-dev",
     "expiration": 172800
@@ -65,9 +13,5 @@
   "websocket": {
     "port": 8087,
     "url": "ws://localhost:8087"
-  },
-  "logging": {
-    "level": "debug",
-    "cloudWatch": false
   }
 }

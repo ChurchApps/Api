@@ -1,56 +1,10 @@
 {
   "environment": "test",
   "apiUrl": "http://localhost:8084",
-  "appUrl": "http://localhost:3000",
-  "accountsUrl": "http://localhost:3001",
   "deliveryProvider": "local",
   "contentRoot": "http://localhost:8084/content/",
   "fileStore": "memory",
   "s3Bucket": "",
-  "databases": {
-    "membership": {
-      "host": "localhost",
-      "user": "root",
-      "password": "",
-      "database": "test_membership",
-      "connectionLimit": 5
-    },
-    "attendance": {
-      "host": "localhost",
-      "user": "root",
-      "password": "",
-      "database": "test_attendance",
-      "connectionLimit": 5
-    },
-    "content": {
-      "host": "localhost",
-      "user": "root",
-      "password": "",
-      "database": "test_content",
-      "connectionLimit": 5
-    },
-    "giving": {
-      "host": "localhost",
-      "user": "root",
-      "password": "",
-      "database": "test_giving",
-      "connectionLimit": 5
-    },
-    "messaging": {
-      "host": "localhost",
-      "user": "root",
-      "password": "",
-      "database": "test_messaging",
-      "connectionLimit": 5
-    },
-    "doing": {
-      "host": "localhost",
-      "user": "root",
-      "password": "",
-      "database": "test_doing",
-      "connectionLimit": 5
-    }
-  },
   "jwt": {
     "secret": "test-jwt-secret",
     "expiration": 3600
@@ -58,9 +12,5 @@
   "websocket": {
     "port": 8088,
     "url": "ws://localhost:8088"
-  },
-  "logging": {
-    "level": "error",
-    "cloudWatch": false
   }
 }
