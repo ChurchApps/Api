@@ -7,7 +7,7 @@ const startServer = async () => {
     console.log("🚀 Starting API modular monolith...");
 
     const app = await createApp();
-    const port = Environment.port || process.env.PORT || 8084;
+    const port = Environment.port;
 
     const server = app.listen(port, () => {
       console.log("");

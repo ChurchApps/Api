@@ -15,7 +15,7 @@ export const createApp = async () => {
   console.log("🚀 Starting createApp...");
 
   // Initialize environment configuration
-  const environment = process.env.ENVIRONMENT || process.env.STAGE || "dev";
+  const environment = process.env.ENVIRONMENT || "dev";
   console.log(`📋 Initializing environment: ${environment}`);
   await Environment.init(environment);
   console.log("✅ Environment initialized");

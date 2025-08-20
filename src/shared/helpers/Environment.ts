@@ -102,7 +102,7 @@ export class Environment extends EnvironmentBase {
     this.socketUrl = process.env.SOCKET_URL || process.env.WEBSOCKET_URL;
 
     // Legacy environment variable support
-    this.appEnv = process.env.APP_ENV || process.env.API_ENV || environment;
+    this.appEnv = environment;
     this.apiEnv = this.appEnv;
     this.serverPort = this.port;
     this.socketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT) : 8087;
@@ -152,7 +152,7 @@ export class Environment extends EnvironmentBase {
 
     // In Lambda/AWS environment, also try to load from Parameter Store
     const isAwsEnvironment = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
-    const environment = this.currentEnvironment || process.env.STAGE || process.env.ENVIRONMENT || "dev";
+    const environment = this.currentEnvironment || process.env.ENVIRONMENT || "dev";
 
     console.log(`🔍 Is AWS Environment: ${isAwsEnvironment}`);
     console.log(`🔍 Using environment: ${environment}`);

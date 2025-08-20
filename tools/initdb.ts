@@ -32,7 +32,7 @@ const moduleDefinitions = {
         ]
       },
       {
-        name: "People", 
+        name: "People",
         tables: [
           { title: "Households", file: "households.sql" },
           { title: "People", file: "people.sql" },
@@ -190,6 +190,9 @@ const moduleDefinitions = {
           { title: "Blocked IPs", file: "blockedIps.sql" },
           { title: "Cleanup Procedure", file: "cleanup.sql" },
           { title: "Update Conversation Stats", file: "updateConversationStats.sql" },
+          { title: "Cleanup", file: "cleanup.sql" },
+          { title: "Delete For Church", file: "deleteForChurch.sql" },
+          { title: "Update Conversation Stats", file: "updateConversationStats.sql" },
         ]
       }
     ],
@@ -256,19 +259,19 @@ async function initializeDatabases(options: InitOptions = {}) {
     }
 
     console.log('🚀 Initializing Core API databases...');
-    
+
     // Get modules in order
     const orderedModules = Object.entries(moduleDefinitions)
-      .sort(([,a], [,b]) => a.order - b.order)
+      .sort(([, a], [, b]) => a.order - b.order)
       .map(([name]) => name);
-    
+
     console.log(`📋 Module order: ${orderedModules.join(' → ')}`);
-    
+
     for (const moduleName of orderedModules) {
       console.log(`\n🔧 Initializing ${moduleName} database...`);
       await initializeModuleDatabase(moduleName, options);
     }
-    
+
     console.log('\n✅ All databases initialized successfully!');
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
@@ -299,7 +302,7 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
     await MultiDatabasePool.initializePool(moduleName, dbConfig);
 
     const scriptsPath = path.join(__dirname, 'dbScripts', moduleName);
-    
+
     if (!fs.existsSync(scriptsPath)) {
       console.log(`⚠️  No database scripts found for ${moduleName} at ${scriptsPath}, skipping...`);
       return;
@@ -322,32 +325,32 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
   }
 }
 
-async function initializeSection(moduleName: string, sectionName: string, tables: {title: string, file: string}[], scriptsPath: string) {
+async function initializeSection(moduleName: string, sectionName: string, tables: { title: string, file: string }[], scriptsPath: string) {
   if (tables.length === 0) {
     console.log(`   ⏭️  ${sectionName} section is empty, skipping...`);
     return;
   }
 
   console.log(`   📂 SECTION: ${sectionName}`);
-  
+
   for (const table of tables) {
     const filePath = path.join(scriptsPath, table.file);
-    
+
     if (!fs.existsSync(filePath)) {
       console.log(`   ⚠️  ${table.title}: File ${table.file} not found, skipping...`);
       continue;
     }
 
     console.log(`   📄 ${table.title}: ${table.file}`);
-    
+
     const sql = fs.readFileSync(filePath, 'utf8');
-    
+
     // Skip empty files or placeholder content
     if (sql.includes('-- This file will be populated') || sql.trim().length < 50) {
       console.log(`   ⏭️  Skipping placeholder file: ${table.file}`);
       continue;
     }
-    
+
     // Split SQL file by statements and handle various SQL delimiters
     const statements = splitSqlStatements(sql);
 
@@ -366,24 +369,24 @@ async function initializeSection(moduleName: string, sectionName: string, tables
   }
 }
 
-async function initializeDemoData(moduleName: string, demoTables: {title: string, file: string}[], scriptsPath: string) {
+async function initializeDemoData(moduleName: string, demoTables: { title: string, file: string }[], scriptsPath: string) {
   if (demoTables.length === 0) {
     console.log(`   ⚠️  No demo data configured for ${moduleName}, skipping...`);
     return;
   }
 
   console.log(`   🎭 DEMO DATA`);
-  
+
   for (const table of demoTables) {
     const filePath = path.join(scriptsPath, table.file);
-    
+
     if (!fs.existsSync(filePath)) {
       console.log(`   ⚠️  ${table.title}: File ${table.file} not found, skipping...`);
       continue;
     }
 
     console.log(`   📄 ${table.title}: ${table.file}`);
-    
+
     const sql = fs.readFileSync(filePath, 'utf8');
     const statements = splitSqlStatements(sql);
 
@@ -404,7 +407,7 @@ async function initializeDemoData(moduleName: string, demoTables: {title: string
 
 async function ensureDatabaseExists(moduleName: string, dbConfig: any) {
   const mysql = require('mysql2/promise');
-  
+
   // Connect without specifying database to create it if needed
   const connection = await mysql.createConnection({
     host: dbConfig.host,
@@ -430,56 +433,56 @@ function splitSqlStatements(sql: string): string[] {
   const statements: string[] = [];
   let current = '';
   let inDelimiter = false;
-  
+
   const lines = sql.split('\n');
   for (const line of lines) {
     const trimmedLine = line.trim();
-    
+
     // Skip comments
     if (trimmedLine.startsWith('--') || trimmedLine.startsWith('/*') || trimmedLine === '') {
       continue;
     }
-    
+
     current += line + '\n';
-    
+
     // Check for delimiter changes
     if (trimmedLine.includes('DELIMITER $$')) {
       inDelimiter = true;
       continue;
     }
-    
+
     if (trimmedLine.includes('DELIMITER ;')) {
       inDelimiter = false;
       continue;
     }
-    
+
     // End of statement
-    if ((!inDelimiter && trimmedLine.endsWith(';')) || 
-        (inDelimiter && trimmedLine.includes('$$'))) {
+    if ((!inDelimiter && trimmedLine.endsWith(';')) ||
+      (inDelimiter && trimmedLine.includes('$$'))) {
       if (current.trim()) {
         statements.push(current.trim());
         current = '';
       }
     }
   }
-  
+
   // Add any remaining content
   if (current.trim()) {
     statements.push(current.trim());
   }
-  
+
   return statements.filter(stmt => stmt.length > 0);
 }
 
 async function resetDatabases(options: InitOptions = {}) {
   console.log('⚠️  WARNING: This will drop and recreate all databases!');
   console.log('   This action cannot be undone.');
-  
+
   // Get modules in order
   const orderedModules = Object.entries(moduleDefinitions)
-    .sort(([,a], [,b]) => a.order - b.order)
+    .sort(([, a], [, b]) => a.order - b.order)
     .map(([name]) => name);
-  
+
   for (const moduleName of orderedModules) {
     const dbConfig = Environment.getDatabaseConfig(moduleName);
     if (!dbConfig) {
@@ -489,17 +492,17 @@ async function resetDatabases(options: InitOptions = {}) {
 
     console.log(`\n🗑️  Resetting ${moduleName} database...`);
     await resetModuleDatabase(moduleName, dbConfig);
-    
+
     console.log(`🔧 Re-initializing ${moduleName} database...`);
     await initializeModuleDatabase(moduleName, options);
   }
-  
+
   console.log('\n🔥 Database reset completed!');
 }
 
 async function resetModuleDatabase(moduleName: string, dbConfig: any) {
   const mysql = require('mysql2/promise');
-  
+
   const connection = await mysql.createConnection({
     host: dbConfig.host,
     user: dbConfig.user,
@@ -510,10 +513,10 @@ async function resetModuleDatabase(moduleName: string, dbConfig: any) {
   try {
     console.log(`   🗑️  Dropping database '${dbConfig.database}'...`);
     await connection.execute(`DROP DATABASE IF EXISTS \`${dbConfig.database}\``);
-    
+
     console.log(`   🏗️  Creating database '${dbConfig.database}'...`);
     await connection.execute(`CREATE DATABASE \`${dbConfig.database}\``);
-    
+
     console.log(`   ✅ ${moduleName} database reset completed`);
   } catch (error) {
     console.error(`   ❌ Failed to reset ${moduleName} database:`, error);

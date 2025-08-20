@@ -8,7 +8,7 @@ import { MessagingRepositories } from "../modules/messaging/repositories";
 
 const initEnv = async () => {
   if (!Environment.currentEnvironment) {
-    await Environment.init(process.env.STAGE || "dev");
+    await Environment.init(process.env.ENVIRONMENT || "dev");
 
     // Initialize database pools
     await MultiDatabasePool.initializeAllPools();
