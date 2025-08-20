@@ -44,6 +44,26 @@ export class NotificationRepository {
     await DB.query(sql, params);
   }
 
+  public async markAllRead(churchId: string, personId: string) {
+    const sql = "UPDATE notifications SET isNew=0 WHERE churchId=? AND personId=?;";
+    const params = [churchId, personId];
+    await DB.query(sql, params);
+  }
+
+  public loadForPerson(churchId: string, personId: string) {
+    return DB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? AND isNew=1 ORDER BY timeSent DESC", [
+      churchId,
+      personId
+    ]);
+  }
+
+  public loadNewCounts(churchId: string, personId: string) {
+    return DB.queryOne("SELECT COUNT(*) as count FROM notifications WHERE churchId=? AND personId=? AND isNew=1", [
+      churchId,
+      personId
+    ]);
+  }
+
   public save(notification: Notification) {
     return notification.id ? this.update(notification) : this.create(notification);
   }

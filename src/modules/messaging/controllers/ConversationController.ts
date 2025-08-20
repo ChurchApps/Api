@@ -1,8 +1,8 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController";
-import { Conversation } from "../models";
-import { ArrayHelper } from "@churchapps/apihelper";
+import { Conversation, Message } from "../models";
+import { ArrayHelper, EncryptionHelper } from "@churchapps/apihelper";
 
 @controller("/messaging/conversations")
 export class ConversationController extends MessagingBaseController {
@@ -85,6 +85,119 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
+  @httpGet("/posts/group/:groupId")
+  public async getPostsForGroup(
+    @requestParam("groupId") groupId: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      const result = await this.repositories.conversation.loadPosts(au.churchId, [groupId]);
+      await this.appendMessages(result, au.churchId);
+      return result;
+    }) as any;
+  }
+
+  @httpGet("/posts")
+  public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      const result = await this.repositories.conversation.loadPosts(au.churchId, au.groupIds || []);
+      await this.appendMessages(result, au.churchId);
+      return result;
+    }) as any;
+  }
+
+  @httpPost("/start")
+  public async start(
+    req: express.Request<
+      {},
+      {},
+      { groupId: string; contentType: string; contentId: string; title: string; comment: string }
+    >,
+    res: express.Response
+  ): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      const c: Conversation = {
+        churchId: au.churchId,
+        contentType: req.body.contentType,
+        contentId: req.body.contentId,
+        title: req.body.title,
+        dateCreated: new Date(),
+        visibility: "public",
+        allowAnonymousPosts: false,
+        groupId: req.body.groupId
+      };
+      const conversation = await this.repositories.conversation.save(c);
+
+      const m: Message = {
+        churchId: au.churchId,
+        conversationId: conversation.id,
+        personId: au.personId,
+        displayName: au.firstName + " " + au.lastName,
+        timeSent: new Date(),
+        content: req.body.comment,
+        messageType: "comment"
+      };
+      await this.repositories.message.save(m);
+
+      this.repositories.conversation.updateStats(conversation.id);
+
+      return conversation;
+    }) as any;
+  }
+
+  @httpGet("/current/:churchId/:contentType/:contentId")
+  public async current(
+    @requestParam("churchId") churchId: string,
+    @requestParam("contentType") contentType: string,
+    @requestParam("contentId") contentId: string,
+    req: express.Request<{}, {}, {}>,
+    res: express.Response
+  ): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await this.getOrCreate(churchId, contentType, contentId, "public", true);
+    }) as any;
+  }
+
+  @httpGet("/:contentType/:contentId")
+  public async forContent(
+    @requestParam("contentType") contentType: string,
+    @requestParam("contentId") contentId: string,
+    req: express.Request<{}, {}, []>,
+    res: express.Response
+  ): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const conversations = (await this.repositories.conversation.loadForContent(
+        au.churchId,
+        contentType,
+        contentId
+      )) as Conversation[];
+      const messageIds: string[] = [];
+      conversations.forEach((c) => {
+        if (messageIds.indexOf(c.firstPostId) === -1) messageIds.push(c.firstPostId);
+        if (messageIds.indexOf(c.lastPostId) === -1) messageIds.push(c.lastPostId);
+      });
+      if (messageIds.length > 0) {
+        const allMessages = await this.repositories.message.loadByIds(au.churchId, messageIds);
+        conversations.forEach((c) => {
+          c.messages = [];
+          let msg = ArrayHelper.getOne(allMessages, "id", c.firstPostId);
+          if (msg) c.messages.push(msg);
+          if (c.lastPostId !== c.firstPostId) {
+            msg = ArrayHelper.getOne(allMessages, "id", c.lastPostId);
+            if (msg) c.messages.push(msg);
+          }
+        });
+      }
+
+      for (let i = conversations.length - 1; i >= 0; i--) {
+        if (conversations[i].messages.length === 0) conversations.splice(i, 1);
+      }
+
+      return conversations;
+    }) as any;
+  }
+
   @httpDelete("/:churchId/:id")
   public async delete(
     @requestParam("churchId") churchId: string,
@@ -95,5 +208,29 @@ export class ConversationController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.conversation.delete(au.churchId, id);
     }) as any;
+  }
+
+  private async getOrCreate(
+    churchId: string,
+    contentType: string,
+    contentId: string,
+    visibility: string,
+    allowAnonymousPosts: boolean
+  ) {
+    const CONTENT_ID = contentId.length > 11 ? EncryptionHelper.decrypt(contentId.toString()) : contentId;
+    let result: Conversation = await this.repositories.conversation.loadCurrent(churchId, contentType, CONTENT_ID);
+    if (result === null) {
+      result = {
+        contentId: CONTENT_ID,
+        contentType,
+        dateCreated: new Date(),
+        title: contentType + " #" + CONTENT_ID,
+        churchId,
+        visibility,
+        allowAnonymousPosts
+      };
+      result = await this.repositories.conversation.save(result);
+    }
+    return result;
   }
 }

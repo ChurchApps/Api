@@ -66,6 +66,57 @@ export class NotificationController extends MessagingBaseController {
     }) as any;
   }
 
+  @httpGet("/unreadCount")
+  public async loadMyUnread(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const existing = await this.repositories.notification.loadNewCounts(au.churchId, au.personId);
+      return existing || {};
+    }) as any;
+  }
+
+  @httpGet("/my")
+  public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const existing = await this.repositories.notification.loadForPerson(au.churchId, au.personId);
+      await this.repositories.notification.markAllRead(au.churchId, au.personId);
+      return existing || {};
+    }) as any;
+  }
+
+  @httpPost("/create")
+  public async create(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      return await NotificationHelper.createNotifications(
+        req.body.peopleIds,
+        au.churchId,
+        req.body.contentType,
+        req.body.contentId,
+        req.body.message,
+        req.body?.link
+      );
+    }) as any;
+  }
+
+  @httpPost("/ping")
+  public async ping(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await NotificationHelper.createNotifications(
+        [req.body.personId],
+        req.body.churchId,
+        req.body.contentType,
+        req.body.contentId,
+        req.body.message
+      );
+    }) as any;
+  }
+
+  @httpGet("/tmpEmail")
+  public async tmpEmail(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await NotificationHelper.sendEmailNotifications("daily");
+    }) as any;
+  }
+
   @httpDelete("/:churchId/:id")
   public async delete(
     @requestParam("churchId") churchId: string,
