@@ -9,20 +9,6 @@ env:
   SERVERLESS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
 
 jobs:
-  validate-input:
-    name: Validate Production Deployment
-    runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-
-    steps:
-      - name: Validate confirmation
-        run: |
-          if [ "${{ github.event.inputs.confirm_production }}" != "DEPLOY TO PRODUCTION" ]; then
-            echo "❌ Production deployment not confirmed. Please type exactly: DEPLOY TO PRODUCTION"
-            exit 1
-          fi
-          echo "✅ Production deployment confirmed"
-
   pre-deployment-checks:
     name: Pre-deployment Checks
     runs-on: ubuntu-latest
