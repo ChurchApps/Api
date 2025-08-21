@@ -58,14 +58,14 @@ jobs:
         continue-on-error: true
 
       - name: Deploy Core APIs to Prod
-        run: npx serverless deploy --stage Prod --verbose
+        run: npx serverless deploy --stage prod --verbose
 
       - name: Verify deployment
         run: |
           echo "Deployment completed for Prod environment"
-          npx serverless info --stage Prod
+          npx serverless info --stage prod
 
       - name: Package deployment artifacts
         run: |
-          npx serverless package --stage Prod
+          npx serverless package --stage prod
           ls -R .serverless
