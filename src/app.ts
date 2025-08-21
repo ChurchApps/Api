@@ -10,6 +10,7 @@ import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
 import { ConnectionManager } from "./shared/infrastructure/ConnectionManager";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes";
+import { AwsHelper } from "@churchapps/apihelper";
 
 export const createApp = async () => {
   console.log("🚀 Starting createApp...");
@@ -150,6 +151,56 @@ export const createApp = async () => {
         environment: Environment.currentEnvironment,
         modules: ["attendance", "content", "doing", "giving", "membership", "messaging"]
       });
+    });
+
+    // TEMPORARY DEBUG: Content API Parameter Store debug route
+    app.get("/debug/content-db-config", async (req, res) => {
+      try {
+        const environment = (Environment.currentEnvironment || "prod").toLowerCase();
+        const paramName = `/${environment}/contentApi/connectionString`;
+        
+        console.log("🔍 DEBUG: Reading Parameter Store value...");
+        console.log(`🔍 DEBUG: Parameter path: ${paramName}`);
+        
+        let paramValue = null;
+        let error = null;
+        
+        try {
+          paramValue = await AwsHelper.readParameter(paramName);
+        } catch (err) {
+          error = err.message;
+        }
+        
+        const envVar = process.env.CONTENT_CONNECTION_STRING;
+        const dbConfig = Environment.getDatabaseConfig("content");
+        
+        res.json({
+          debug: "TEMPORARY ROUTE - REMOVE AFTER DEBUGGING",
+          timestamp: new Date().toISOString(),
+          environment: environment,
+          parameterStore: {
+            path: paramName,
+            value: paramValue ? "VALUE FOUND (hidden for security)" : "NULL/EMPTY",
+            actualValue: paramValue, // WARNING: Shows actual value
+            error: error
+          },
+          environmentVariable: {
+            name: "CONTENT_CONNECTION_STRING",
+            value: envVar ? "VALUE FOUND (hidden for security)" : "NULL/EMPTY",
+            actualValue: envVar // WARNING: Shows actual value
+          },
+          databaseConfig: {
+            loaded: dbConfig ? "YES" : "NO",
+            config: dbConfig
+          },
+          allLoadedModules: Array.from(Environment.dbConnections.keys())
+        });
+      } catch (err) {
+        res.status(500).json({
+          error: "Debug route failed",
+          message: err.message
+        });
+      }
     });
 
     // API documentation endpoint
