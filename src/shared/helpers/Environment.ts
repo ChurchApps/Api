@@ -109,7 +109,7 @@ export class Environment extends EnvironmentBase {
     this.encryptionKey = process.env.ENCRYPTION_KEY || "";
     this.appName = data.appName || "API";
     this.corsOrigin = process.env.CORS_ORIGIN || "*";
-    this.jwtSecret = process.env.JWT_SECRET || (await AwsHelper.readParameter(`/${environment}/jwtSecret`));
+    this.jwtSecret = process.env.JWT_SECRET || (await AwsHelper.readParameter(`/${environment.toLowerCase()}/jwtSecret`));
 
     // Initialize module-specific configs
     this.initializeModuleConfigs(data);
@@ -152,7 +152,7 @@ export class Environment extends EnvironmentBase {
 
     // In Lambda/AWS environment, also try to load from Parameter Store
     const isAwsEnvironment = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
-    const environment = this.currentEnvironment || process.env.ENVIRONMENT || "dev";
+    const environment = (this.currentEnvironment || process.env.ENVIRONMENT || "dev").toLowerCase();
 
     console.log(`🔍 Is AWS Environment: ${isAwsEnvironment}`);
     console.log(`🔍 Using environment: ${environment}`);
@@ -200,6 +200,9 @@ export class Environment extends EnvironmentBase {
   }
 
   private static async initializeAppConfigs(config: any, environment: string) {
+    // Convert environment to lowercase for consistent Parameter Store paths
+    const envLower = environment.toLowerCase();
+    
     // WebSocket configuration
     this.websocketUrl = process.env.SOCKET_URL || process.env.WEBSOCKET_URL;
     this.websocketPort = process.env.SOCKET_PORT
@@ -222,33 +225,33 @@ export class Environment extends EnvironmentBase {
     this.mailSystem = process.env.MAIL_SYSTEM || "";
 
     // AWS Parameter Store values (async)
-    this.hubspotKey = process.env.HUBSPOT_KEY || (await AwsHelper.readParameter(`/${environment}/hubspotKey`));
-    this.caddyHost = process.env.CADDY_HOST || (await AwsHelper.readParameter(`/${environment}/caddyHost`));
-    this.caddyPort = process.env.CADDY_PORT || (await AwsHelper.readParameter(`/${environment}/caddyPort`));
+    this.hubspotKey = process.env.HUBSPOT_KEY || (await AwsHelper.readParameter(`/${envLower}/hubspotKey`));
+    this.caddyHost = process.env.CADDY_HOST || (await AwsHelper.readParameter(`/${envLower}/caddyHost`));
+    this.caddyPort = process.env.CADDY_PORT || (await AwsHelper.readParameter(`/${envLower}/caddyPort`));
 
     // Content API specific
     this.youTubeApiKey =
-      process.env.YOUTUBE_API_KEY || (await AwsHelper.readParameter(`/${environment}/youTubeApiKey`));
-    this.pexelsKey = process.env.PEXELS_KEY || (await AwsHelper.readParameter(`/${environment}/pexelsKey`));
-    this.vimeoToken = process.env.VIMEO_TOKEN || (await AwsHelper.readParameter(`/${environment}/vimeoToken`));
-    this.apiBibleKey = process.env.API_BIBLE_KEY || (await AwsHelper.readParameter(`/${environment}/apiBibleKey`));
+      process.env.YOUTUBE_API_KEY || (await AwsHelper.readParameter(`/${envLower}/youTubeApiKey`));
+    this.pexelsKey = process.env.PEXELS_KEY || (await AwsHelper.readParameter(`/${envLower}/pexelsKey`));
+    this.vimeoToken = process.env.VIMEO_TOKEN || (await AwsHelper.readParameter(`/${envLower}/vimeoToken`));
+    this.apiBibleKey = process.env.API_BIBLE_KEY || (await AwsHelper.readParameter(`/${envLower}/apiBibleKey`));
     this.praiseChartsConsumerKey =
       process.env.PRAISECHARTS_CONSUMER_KEY ||
-      (await AwsHelper.readParameter(`/${environment}/praiseChartsConsumerKey`));
+      (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerKey`));
     this.praiseChartsConsumerSecret =
       process.env.PRAISECHARTS_CONSUMER_SECRET ||
-      (await AwsHelper.readParameter(`/${environment}/praiseChartsConsumerSecret`));
+      (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerSecret`));
 
     // Giving API specific
     this.googleRecaptchaSecretKey =
       process.env.GOOGLE_RECAPTCHA_SECRET_KEY ||
-      (await AwsHelper.readParameter(`/${environment}/recaptcha-secret-key`));
+      (await AwsHelper.readParameter(`/${envLower}/recaptcha-secret-key`));
 
     // AI provider configuration (shared)
     this.aiProvider = process.env.AI_PROVIDER || "openrouter";
     this.openRouterApiKey =
-      process.env.OPENROUTER_API_KEY || (await AwsHelper.readParameter(`/${environment}/openRouterApiKey`));
-    this.openAiApiKey = process.env.OPENAI_API_KEY || (await AwsHelper.readParameter(`/${environment}/openAiApiKey`));
+      process.env.OPENROUTER_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openRouterApiKey`));
+    this.openAiApiKey = process.env.OPENAI_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openAiApiKey`));
   }
 
   static getDatabaseConfig(moduleName: string): any {
