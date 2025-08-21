@@ -52,20 +52,20 @@ jobs:
       - name: Prepare Lambda Layer
         run: npm run build-layer
 
-      - name: Run security checksI
+      - name: Run security checks
         run: |
           npm audit --audit-level=moderate
         continue-on-error: true
 
       - name: Deploy Core APIs to Prod
-        run: npx serverless deploy --stage prod --verbose
+        run: npx serverless deploy --stage Prod --verbose
 
       - name: Verify deployment
         run: |
           echo "Deployment completed for Prod environment"
-          npx serverless info --stage prod
+          npx serverless info --stage Prod
 
       - name: Package deployment artifacts
         run: |
-          npx serverless package --stage prod
+          npx serverless package --stage Prod
           ls -R .serverless
