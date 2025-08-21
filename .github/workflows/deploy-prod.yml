@@ -52,7 +52,7 @@ jobs:
       - name: Prepare Lambda Layer
         run: npm run build-layer
 
-      - name: Run security checks
+      - name: Run security checksI
         run: |
           npm audit --audit-level=moderate
         continue-on-error: true
