@@ -80,6 +80,20 @@ export class FundDonationRepository {
     );
   }
 
+  public loadByFundName(churchId: string, fundName: string) {
+    return DB.query(
+      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId INNER JOIN funds f ON f.id=fd.fundId WHERE fd.churchId=? AND f.name LIKE ? ORDER by d.donationDate desc;",
+      [churchId, `%${fundName}%`]
+    );
+  }
+
+  public loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date) {
+    return DB.query(
+      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId INNER JOIN funds f ON f.id=fd.fundId WHERE fd.churchId=? AND f.name LIKE ? AND d.donationDate BETWEEN ? AND ? ORDER by d.donationDate desc;",
+      [churchId, `%${fundName}%`, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]
+    );
+  }
+
   public convertToModel(churchId: string, data: any) {
     const result: FundDonation = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount };
     if (data.batchId !== undefined) {
