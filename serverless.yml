@@ -8,6 +8,13 @@ custom:
     httpPort: 8084
     websocketPort: 8087
     lambdaPort: 8085
+  vpcSettings:
+    prod:
+      securityGroupIds:
+        - sg-052314a1eec2f2567
+      subnetIds:
+        - subnet-01a6b61d749d10c46
+    current: ${self:custom.vpcSettings.${self:custom.env}, self:custom.vpcSettings.prod}
 
 provider:
   name: aws
@@ -20,42 +27,7 @@ provider:
     STAGE: ${self:custom.env}
     ENVIRONMENT: ${self:custom.env}
   iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - s3:*
-          Resource:
-            - arn:aws:s3:::${self:custom.env}-churchapps-*
-            - arn:aws:s3:::${self:custom.env}-churchapps-*/*
-        - Effect: Allow
-          Action:
-            - ssm:GetParameter
-            - ssm:GetParameters
-            - ssm:GetParametersByPath
-          Resource:
-            - arn:aws:ssm:${aws:region}:${aws:accountId}:parameter/${self:custom.env}/*
-        - Effect: Allow
-          Action:
-            - ses:SendEmail
-            - ses:SendRawEmail
-          Resource: "*"
-        - Effect: Allow
-          Action:
-            - sqs:*
-          Resource:
-            - arn:aws:sqs:${aws:region}:${aws:accountId}:${self:custom.env}-*
-        - Effect: Allow
-          Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-          Resource: "*"
-        - Effect: Allow
-          Action:
-            - execute-api:ManageConnections
-          Resource:
-            - arn:aws:execute-api:${aws:region}:${aws:accountId}:*/@connections/*
+    role: arn:aws:iam::428019619026:role/ChurchAppsRole
 
 package:
   individually: false
@@ -92,6 +64,7 @@ functions:
       - { Ref: DependenciesLambdaLayer }
     memorySize: 512
     timeout: 30
+    vpc: ${self:custom.vpcSettings.current}
     events:
       - http:
           path: /
@@ -112,6 +85,7 @@ functions:
       - { Ref: DependenciesLambdaLayer }
     memorySize: 1024
     timeout: 30
+    vpc: ${self:custom.vpcSettings.current}
     events:
       - websocket:
           route: $connect
@@ -126,6 +100,7 @@ functions:
       - { Ref: DependenciesLambdaLayer }
     memorySize: 256
     timeout: 300
+    vpc: ${self:custom.vpcSettings.current}
     events:
       - schedule:
           rate: rate(30 minutes)
@@ -137,6 +112,7 @@ functions:
       - { Ref: DependenciesLambdaLayer }
     memorySize: 256
     timeout: 300
+    vpc: ${self:custom.vpcSettings.current}
     events:
       - schedule:
           rate: cron(0 5 * * ? *)
