@@ -100,7 +100,8 @@ export class UserController extends MembershipBaseController {
         userChurches.forEach((uc) => churchesOnly.push(uc.church));
         await ChurchHelper.appendLogos(churchesOnly);
         userChurches.forEach((uc) => {
-          uc.church.settings = ArrayHelper.getOne(churchesOnly, "id", uc.church.id).settings;
+          const foundChurch = ArrayHelper.getOne(churchesOnly, "id", uc.church.id);
+          uc.church.settings = foundChurch?.settings || [];
         });
 
         const result = await AuthenticatedUser.login(userChurches, user);
@@ -481,4 +482,5 @@ export class UserController extends MembershipBaseController {
       return res.status(500).json({ error: error.message });
     }
   }
+
 }

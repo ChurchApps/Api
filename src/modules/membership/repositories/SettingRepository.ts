@@ -34,10 +34,15 @@ export class SettingRepository {
   }
 
   public loadMulipleChurches(keyNames: string[], churchIds: string[]) {
-    return DB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId IN (?) AND public=1", [
-      keyNames,
-      churchIds
-    ]);
+    if (!keyNames.length || !churchIds.length) return Promise.resolve([]);
+
+    const keyNamePlaceholders = keyNames.map(() => "?").join(",");
+    const churchIdPlaceholders = churchIds.map(() => "?").join(",");
+
+    const sql = `SELECT * FROM settings WHERE keyName IN (${keyNamePlaceholders}) AND churchId IN (${churchIdPlaceholders}) AND public=1`;
+    const params = [...keyNames, ...churchIds];
+
+    return DB.query(sql, params);
   }
 
   public convertToModel(churchId: string, data: any) {
