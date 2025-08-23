@@ -459,16 +459,18 @@ export class UserController extends MembershipBaseController {
         modules: {}
       };
 
-      // Get all module connection strings
+      // Get all module connection strings using exact same logic as Environment class
       const modules = ["membership", "attendance", "content", "giving", "messaging", "doing"];
-      
-      for (const module of modules) {
-        const envVarName = `${module.toUpperCase()}_CONNECTION_STRING`;
+      const environment = Environment.currentEnvironment;
+
+      for (const moduleName of modules) {
+        const envVarName = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
         const connectionString = process.env[envVarName];
-        
-        connectionInfo.modules[module] = {
+        const paramName = `/${environment}/${moduleName}Api/connectionString`;
+
+        connectionInfo.modules[moduleName] = {
           environmentVariable: envVarName,
-          parameterStorePath: `/lcs-api/${Environment.currentEnvironment}/${module}-db`,
+          parameterStorePath: paramName,
           connectionString: connectionString || "NOT_FOUND",
           hasConnection: !!connectionString
         };
