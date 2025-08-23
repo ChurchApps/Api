@@ -1,4 +1,4 @@
-import { controller, httpDelete, httpPost, interfaces } from "inversify-express-utils";
+import { controller, httpDelete, httpPost, httpGet, interfaces } from "inversify-express-utils";
 import express from "express";
 import bcrypt from "bcryptjs";
 import { body, oneOf, validationResult } from "express-validator";
@@ -448,5 +448,35 @@ export class UserController extends MembershipBaseController {
       await this.repositories.roleMember.deleteUser(au.id);
       return this.json({});
     });
+  }
+
+  @httpGet("/debug/connections")
+  public async debugConnections(req: express.Request, res: express.Response): Promise<any> {
+    try {
+      const connectionInfo = {
+        environment: Environment.currentEnvironment,
+        stage: process.env.STAGE,
+        modules: {}
+      };
+
+      // Get all module connection strings
+      const modules = ["membership", "attendance", "content", "giving", "messaging", "doing"];
+      
+      for (const module of modules) {
+        const envVarName = `${module.toUpperCase()}_CONNECTION_STRING`;
+        const connectionString = process.env[envVarName];
+        
+        connectionInfo.modules[module] = {
+          environmentVariable: envVarName,
+          parameterStorePath: `/lcs-api/${Environment.currentEnvironment}/${module}-db`,
+          connectionString: connectionString || "NOT_FOUND",
+          hasConnection: !!connectionString
+        };
+      }
+
+      return res.json(connectionInfo);
+    } catch (error) {
+      return res.status(500).json({ error: error.message });
+    }
   }
 }
