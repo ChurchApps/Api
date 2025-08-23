@@ -18,7 +18,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { EmailHelper, UserHelper, UniqueIdHelper, Environment } from "../helpers";
 import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers";
-import { ArrayHelper } from "@churchapps/apihelper";
+import { ApiHelper, ArrayHelper } from "@churchapps/apihelper";
 
 const emailPasswordValidation = [
   body("email")
@@ -465,7 +465,7 @@ export class UserController extends MembershipBaseController {
 
       for (const moduleName of modules) {
         const envVarName = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
-        const connectionString = process.env[envVarName];
+        const connectionString = Environment.dbConnections.get(moduleName);
         const paramName = `/${environment}/${moduleName}Api/connectionString`;
 
         connectionInfo.modules[moduleName] = {
