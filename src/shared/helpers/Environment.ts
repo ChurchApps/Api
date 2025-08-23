@@ -71,6 +71,7 @@ export class Environment extends EnvironmentBase {
   static jwtSecret: string;
 
   static async init(environment: string) {
+    environment = environment.toLowerCase();
     let file = "dev.json";
     if (environment === "demo") file = "demo.json";
     if (environment === "staging") file = "staging.json";
@@ -202,7 +203,7 @@ export class Environment extends EnvironmentBase {
   private static async initializeAppConfigs(config: any, environment: string) {
     // Convert environment to lowercase for consistent Parameter Store paths
     const envLower = environment.toLowerCase();
-    
+
     // WebSocket configuration
     this.websocketUrl = process.env.SOCKET_URL || process.env.WEBSOCKET_URL;
     this.websocketPort = process.env.SOCKET_PORT
