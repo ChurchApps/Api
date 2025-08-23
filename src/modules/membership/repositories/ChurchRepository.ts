@@ -17,7 +17,7 @@ export class ChurchRepository {
   public search(name: string, includeArchived: boolean) {
     let query = "SELECT * FROM churches WHERE name like ?";
     const params = ["%" + name.replace(" ", "%") + "%"];
-    if (!includeArchived) query += "AND archivedDate IS NULL";
+    if (!includeArchived) query += " AND archivedDate IS NULL";
     query += " ORDER BY name";
     if (name) query += " LIMIT 50";
     else query += " LIMIT 10";
