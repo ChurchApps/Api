@@ -13,6 +13,31 @@ export class FundDonationController extends GivingBaseController {
     });
   }
 
+  // TODO: This is a temporary endpoint for the basic report. It will be moved to the default get.
+  @httpGet("/basic")
+  public async getBasic(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      let result;
+      const startDate = new Date(req.query.startDate.toString());
+      const endDate = new Date(req.query.endDate.toString());
+      if (req.query.fundName !== undefined) {
+        if (req.query.startDate === undefined)
+          result = await this.repositories.fundDonation.loadByFundName(au.churchId, req.query.fundName.toString());
+        else {
+          result = await this.repositories.fundDonation.loadByFundNameDate(
+            au.churchId,
+            req.query.fundName.toString(),
+            startDate,
+            endDate
+          );
+        }
+      } else {
+        result = await this.repositories.fundDonation.loadAllByDate(au.churchId, startDate, endDate);
+      }
+      return this.repositories.fundDonation.convertAllToModel(au.churchId, result as any[]);
+    });
+  }
+
   @httpGet("/:id")
   public async get(
     @requestParam("id") id: string,
