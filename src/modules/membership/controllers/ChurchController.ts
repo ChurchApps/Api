@@ -476,7 +476,6 @@ export class ChurchController extends MembershipBaseController {
     (everyonePermission as any[]).forEach((row: any) => {
       if (result === null) {
         result = {
-          id: row.churchId,
           church: { id: row.churchId, subDomain: row.subDomain, name: row.churchName },
           person: {
             id: "",
@@ -500,7 +499,6 @@ export class ChurchController extends MembershipBaseController {
     if (result === null) {
       const church: Church = await this.repositories.church.loadById(churchId);
       result = {
-        id: church.id,
         church: { id: church.id, subDomain: church.subDomain, name: church.name },
         person: {
           id: "",

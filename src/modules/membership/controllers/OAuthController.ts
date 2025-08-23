@@ -82,7 +82,6 @@ export class OAuthController extends MembershipBaseController {
         const user = (await this.repositories.user.load(userChurch.userId)) as any;
         const church = (await this.repositories.church.loadById(userChurch.churchId)) as any;
         const loginUserChurch: LoginUserChurch = {
-          id: church.id,
           church: { id: church.id, name: church.churchName, subDomain: church.subDomain },
           person: {
             id: userChurch.personId,
@@ -125,7 +124,6 @@ export class OAuthController extends MembershipBaseController {
         const user = (await this.repositories.user.load(userChurch.userId)) as any;
         const church = (await this.repositories.church.loadById(userChurch.churchId)) as any;
         const loginUserChurch: LoginUserChurch = {
-          id: church.id,
           church: { id: church.id, name: church.churchName, subDomain: church.subDomain },
           person: {
             id: userChurch.personId,

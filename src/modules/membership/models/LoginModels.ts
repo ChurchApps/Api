@@ -16,26 +16,26 @@ export interface LoginResponse {
 }
 
 export interface LoginUserChurch {
-  id: string;
   church: {
     id: string;
     name: string;
     subDomain?: string;
-    address?: string;
-    settings?: any;
     archivedDate?: Date;
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+    settings?: any[];
   };
   person?: {
     id: string;
-    name: {
+    membershipStatus?: string;
+    name?: {
       first: string;
       last: string;
     };
-    contactInfo?: {
-      email: string;
-    };
-    photoUrl?: string;
-    membershipStatus?: string;
   };
   groups?: Array<{ id: string; [key: string]: any }>;
   apis?: any[];

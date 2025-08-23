@@ -57,12 +57,21 @@ export class ChurchRepository {
     rows.forEach((row: any) => {
       const apis: Api[] = [];
       const addChurch = {
-        id: row.id,
-        church: { id: row.id, name: row.churchName, subDomain: row.subDomain },
+        church: { 
+          id: row.id, 
+          name: row.name, 
+          subDomain: row.subDomain,
+          archivedDate: row.archivedDate,
+          address1: row.address1,
+          address2: row.address2,
+          city: row.city,
+          state: row.state,
+          zip: row.zip,
+          country: row.country
+        },
         person: {
           id: row.personId,
-          membershipStatus: row.membershipStatus,
-          name: { first: row.firstName || "", last: row.lastName || "" }
+          membershipStatus: row.membershipStatus
         },
         apis
       };
