@@ -32,9 +32,65 @@ export class MultiDatabasePool {
     return pool;
   }
 
+  /**
+   * Expands arrays in SQL IN clauses
+   * Converts: SELECT * FROM table WHERE id IN (?) with params [churchId, [1,2,3]]
+   * To: SELECT * FROM table WHERE id IN (?,?,?) with params [churchId, 1, 2, 3]
+   */
+  private static expandArrayParams(sql: string, params?: any[]): { sql: string; params: any[] } {
+    if (!params || params.length === 0) {
+      return { sql, params: params || [] };
+    }
+
+    let expandedSql = sql;
+    const expandedParams: any[] = [];
+
+    // Find all ? placeholders in the SQL
+    const placeholders = expandedSql.match(/\?/g) || [];
+    let placeholderIndex = 0;
+    let sqlOffset = 0;
+
+    for (let i = 0; i < params.length && placeholderIndex < placeholders.length; i++) {
+      const param = params[i];
+
+      if (Array.isArray(param) && param.length > 0) {
+        // Find the position of the current placeholder
+        const placeholderPos = expandedSql.indexOf("?", sqlOffset);
+        if (placeholderPos === -1) break;
+
+        // Create the replacement placeholders
+        const placeholderReplacements = param.map(() => "?").join(",");
+
+        // Replace this specific placeholder
+        expandedSql = expandedSql.substring(0, placeholderPos) +
+          placeholderReplacements +
+          expandedSql.substring(placeholderPos + 1);
+
+        // Update the offset for the next search
+        sqlOffset = placeholderPos + placeholderReplacements.length;
+
+        // Add all array elements to params
+        expandedParams.push(...param);
+      } else {
+        // Non-array parameter, just add it
+        expandedParams.push(param);
+
+        // Update offset to skip past this placeholder
+        const placeholderPos = expandedSql.indexOf("?", sqlOffset);
+        if (placeholderPos !== -1) {
+          sqlOffset = placeholderPos + 1;
+        }
+      }
+      placeholderIndex++;
+    }
+
+    return { sql: expandedSql, params: expandedParams };
+  }
+
   static async query(moduleName: string, sql: string, params?: any[]): Promise<any> {
     const pool = this.getPool(moduleName);
-    const [rows] = await pool.execute(sql, params || []);
+    const { sql: expandedSql, params: expandedParams } = this.expandArrayParams(sql, params);
+    const [rows] = await pool.execute(expandedSql, expandedParams);
     return rows;
   }
 
