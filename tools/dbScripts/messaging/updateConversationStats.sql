@@ -1,3 +1,6 @@
+DROP PROCEDURE IF EXISTS `updateConversationStats`;
+
+DELIMITER $$
 CREATE PROCEDURE `updateConversationStats`(convId  char(11))
 BEGIN
 	UPDATE conversations 
@@ -6,3 +9,4 @@ BEGIN
 	lastPostId=(SELECT id FROM messages where churchId=conversations.churchId and conversationId=conversations.id ORDER BY timeSent DESC LIMIT 1)
 	WHERE id=convId;
 END$$
+DELIMITER ;

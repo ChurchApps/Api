@@ -298,8 +298,8 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
     // Ensure the database exists
     await ensureDatabaseExists(moduleName, dbConfig);
 
-    // Initialize the database pool for this module
-    await MultiDatabasePool.initializePool(moduleName, dbConfig);
+    // Get the database pool for this module (creates it if it doesn't exist)
+    MultiDatabasePool.getPool(moduleName);
 
     const scriptsPath = path.join(__dirname, 'dbScripts', moduleName);
 
@@ -358,7 +358,17 @@ async function initializeSection(moduleName: string, sectionName: string, tables
       const cleanStatement = statement.trim();
       if (cleanStatement && !cleanStatement.startsWith('--')) {
         try {
-          await MultiDatabasePool.query(moduleName, cleanStatement);
+          // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
+          const upperStatement = cleanStatement.toUpperCase();
+          if (upperStatement.startsWith('CREATE PROCEDURE') || 
+              upperStatement.startsWith('CREATE FUNCTION') ||
+              upperStatement.startsWith('DROP PROCEDURE') ||
+              upperStatement.startsWith('DROP FUNCTION') ||
+              upperStatement.includes('CREATE DEFINER')) {
+            await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
+          } else {
+            await MultiDatabasePool.query(moduleName, cleanStatement);
+          }
         } catch (error) {
           console.error(`   ❌ Failed to execute statement in ${table.file}:`, error);
           console.error(`   Statement: ${cleanStatement.substring(0, 100)}...`);
@@ -394,7 +404,17 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
       const cleanStatement = statement.trim();
       if (cleanStatement && !cleanStatement.startsWith('--')) {
         try {
-          await MultiDatabasePool.query(moduleName, cleanStatement);
+          // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
+          const upperStatement = cleanStatement.toUpperCase();
+          if (upperStatement.startsWith('CREATE PROCEDURE') || 
+              upperStatement.startsWith('CREATE FUNCTION') ||
+              upperStatement.startsWith('DROP PROCEDURE') ||
+              upperStatement.startsWith('DROP FUNCTION') ||
+              upperStatement.includes('CREATE DEFINER')) {
+            await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
+          } else {
+            await MultiDatabasePool.query(moduleName, cleanStatement);
+          }
         } catch (error) {
           console.error(`   ❌ Failed to execute statement in ${table.file}:`, error);
           console.error(`   Statement: ${cleanStatement.substring(0, 100)}...`);
@@ -429,39 +449,64 @@ async function ensureDatabaseExists(moduleName: string, dbConfig: any) {
 }
 
 function splitSqlStatements(sql: string): string[] {
-  // Handle both ; and $$ delimiters for procedures/functions
+  // Simply split on semicolon at end of line, but handle procedures specially
   const statements: string[] = [];
-  let current = '';
-  let inDelimiter = false;
-
   const lines = sql.split('\n');
+  let current = '';
+  let inProcedure = false;
+  let procedureContent = '';
+
   for (const line of lines) {
-    const trimmedLine = line.trim();
+    const trimmedLine = line.trim().toUpperCase();
+    const originalLine = line;
 
-    // Skip comments
-    if (trimmedLine.startsWith('--') || trimmedLine.startsWith('/*') || trimmedLine === '') {
+    // Skip empty lines and comments
+    if (line.trim() === '' || line.trim().startsWith('--') || line.trim().startsWith('/*')) {
       continue;
     }
 
-    current += line + '\n';
-
-    // Check for delimiter changes
-    if (trimmedLine.includes('DELIMITER $$')) {
-      inDelimiter = true;
+    // Check for stored procedure/function start
+    if (trimmedLine.startsWith('CREATE PROCEDURE') || 
+        trimmedLine.startsWith('CREATE FUNCTION') ||
+        trimmedLine.startsWith('CREATE DEFINER')) {
+      inProcedure = true;
+      procedureContent = originalLine + '\n';
       continue;
     }
 
-    if (trimmedLine.includes('DELIMITER ;')) {
-      inDelimiter = false;
+    // Handle DROP statements separately
+    if (trimmedLine.startsWith('DROP PROCEDURE') || 
+        trimmedLine.startsWith('DROP FUNCTION')) {
+      statements.push(originalLine);
       continue;
     }
 
-    // End of statement
-    if ((!inDelimiter && trimmedLine.endsWith(';')) ||
-      (inDelimiter && trimmedLine.includes('$$'))) {
-      if (current.trim()) {
-        statements.push(current.trim());
-        current = '';
+    // Skip DELIMITER statements - they're MySQL client commands, not SQL
+    if (trimmedLine.startsWith('DELIMITER')) {
+      continue;
+    }
+
+    if (inProcedure) {
+      procedureContent += originalLine + '\n';
+      // Check for end of procedure (END$$ or END;)
+      if (trimmedLine === 'END$$' || trimmedLine === 'END' || trimmedLine === 'END;') {
+        // Remove the $$ suffix if present
+        let cleanProc = procedureContent.trim();
+        if (cleanProc.endsWith('$$')) {
+          cleanProc = cleanProc.substring(0, cleanProc.length - 2);
+        }
+        statements.push(cleanProc);
+        procedureContent = '';
+        inProcedure = false;
+      }
+    } else {
+      current += originalLine + '\n';
+      // Normal statement ends with semicolon
+      if (originalLine.trim().endsWith(';')) {
+        if (current.trim()) {
+          statements.push(current.trim());
+          current = '';
+        }
       }
     }
   }
@@ -469,6 +514,9 @@ function splitSqlStatements(sql: string): string[] {
   // Add any remaining content
   if (current.trim()) {
     statements.push(current.trim());
+  }
+  if (procedureContent.trim()) {
+    statements.push(procedureContent.trim());
   }
 
   return statements.filter(stmt => stmt.length > 0);

@@ -43,6 +43,12 @@ export class MultiDatabasePool {
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   }
 
+  static async executeDDL(moduleName: string, sql: string): Promise<any> {
+    const pool = this.getPool(moduleName);
+    const [result] = await pool.query(sql);
+    return result;
+  }
+
   static async closeAll(): Promise<void> {
     for (const pool of this.pools.values()) {
       await pool.end();

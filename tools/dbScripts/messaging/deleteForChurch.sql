@@ -1,5 +1,7 @@
+DROP PROCEDURE IF EXISTS `deleteForChurch`;
+
 DELIMITER $$
-CREATE DEFINER=`admin`@`%` PROCEDURE `deleteForChurch`(IN pChurchId char(11))
+CREATE PROCEDURE `deleteForChurch`(IN pChurchId char(11))
 BEGIN
 	DELETE FROM connections where churchId=pChurchId;
     DELETE FROM conversations where churchId=pChurchId;
