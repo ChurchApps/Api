@@ -2,6 +2,14 @@
   "environment": "demo",
   "apiUrl": "https://demo-api.example.com",
   "deliveryProvider": "aws",
-  "contentRoot": "https://demo-api.example.com/content/",
-  "fileStore": "s3"
+  "appName": "API",
+  "contentRoot": "https://democontent.churchapps.org",
+  "emailOnRegistration": false,
+  "fileStore": "s3",
+  "mailSystem": "SES",
+  "s3Bucket": "demo-churchapps-content",
+  "supportEmail": "support@churchapps.org",
+  "chumsRoot": "https://chumsdemo.churchapps.org",
+  "messagingApi": "https://api.demo.churchapps.org/messaging",
+  "aiProvider": "openrouter"
 }

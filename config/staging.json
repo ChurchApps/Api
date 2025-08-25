@@ -2,6 +2,14 @@
   "environment": "staging",
   "apiUrl": "https://staging-api.example.com",
   "deliveryProvider": "aws",
-  "contentRoot": "https://staging-api.example.com/content/",
-  "fileStore": "s3"
+  "appName": "API",
+  "contentRoot": "https://content.staging.churchapps.org",
+  "emailOnRegistration": false,
+  "fileStore": "s3",
+  "mailSystem": "SES",
+  "s3Bucket": "staging-churchapps-content",
+  "supportEmail": "support@churchapps.org",
+  "chumsRoot": "https://app.staging.chums.org",
+  "messagingApi": "https://api.staging.churchapps.org/messaging",
+  "aiProvider": "openrouter"
 }

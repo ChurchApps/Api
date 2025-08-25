@@ -2,6 +2,14 @@
   "environment": "dev",
   "apiUrl": "http://localhost:8084",
   "deliveryProvider": "local",
+  "appName": "API",
   "contentRoot": "http://localhost:8084/content/",
-  "fileStore": "disk"
+  "emailOnRegistration": false,
+  "fileStore": "disk",
+  "mailSystem": "",
+  "s3Bucket": "",
+  "supportEmail": "support@churchapps.org",
+  "chumsRoot": "https://app.staging.chums.org",
+  "messagingApi": "https://api.staging.churchapps.org/messaging",
+  "aiProvider": "openrouter"
 }

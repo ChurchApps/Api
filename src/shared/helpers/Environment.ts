@@ -210,16 +210,16 @@ export class Environment extends EnvironmentBase {
 
     // File storage configuration
     this.fileStore = process.env.FILE_STORE || config.fileStore;
-    this.s3Bucket = process.env.AWS_S3_BUCKET || "";
+    this.s3Bucket = process.env.AWS_S3_BUCKET || config.s3Bucket || "";
     this.contentRoot = process.env.CONTENT_ROOT || config.contentRoot;
     this.deliveryProvider = process.env.DELIVERY_PROVIDER || config.deliveryProvider;
 
     // Membership API specific
     this.jwtExpiration = "2 days";
-    this.emailOnRegistration = process.env.EMAIL_ON_REGISTRATION === "true";
-    this.supportEmail = process.env.SUPPORT_EMAIL || "support@churchapps.org";
-    this.chumsRoot = process.env.CHUMS_ROOT || "https://app.staging.chums.org";
-    this.mailSystem = process.env.MAIL_SYSTEM || "";
+    this.emailOnRegistration = process.env.EMAIL_ON_REGISTRATION === "true" || config.emailOnRegistration === true;
+    this.supportEmail = process.env.SUPPORT_EMAIL || config.supportEmail || "support@churchapps.org";
+    this.chumsRoot = process.env.CHUMS_ROOT || config.chumsRoot || "https://app.staging.chums.org";
+    this.mailSystem = process.env.MAIL_SYSTEM || config.mailSystem || "";
 
     // AWS Parameter Store values (async)
     this.hubspotKey = process.env.HUBSPOT_KEY || (await AwsHelper.readParameter(`/${envLower}/hubspotKey`));
@@ -238,7 +238,7 @@ export class Environment extends EnvironmentBase {
     this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || (await AwsHelper.readParameter(`/${envLower}/recaptcha-secret-key`));
 
     // AI provider configuration (shared)
-    this.aiProvider = process.env.AI_PROVIDER || "openrouter";
+    this.aiProvider = process.env.AI_PROVIDER || config.aiProvider || "openrouter";
     this.openRouterApiKey = process.env.OPENROUTER_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openRouterApiKey`));
     this.openAiApiKey = process.env.OPENAI_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openAiApiKey`));
   }
