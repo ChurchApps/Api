@@ -10,7 +10,6 @@ import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
 import { ConnectionManager } from "./shared/infrastructure/ConnectionManager";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes";
-import { AwsHelper } from "@churchapps/apihelper";
 
 export const createApp = async () => {
   console.log("🚀 Starting createApp...");

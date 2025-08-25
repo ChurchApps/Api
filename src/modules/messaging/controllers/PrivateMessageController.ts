@@ -1,4 +1,4 @@
-import { controller, httpGet, httpPost, interfaces, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController";
 import { PrivateMessage } from "../models";

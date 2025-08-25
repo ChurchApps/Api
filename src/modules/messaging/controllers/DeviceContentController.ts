@@ -1,4 +1,4 @@
-import { controller, httpPost, requestParam, httpDelete, interfaces, httpGet } from "inversify-express-utils";
+import { controller, httpPost, requestParam, httpDelete, httpGet } from "inversify-express-utils";
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController";
 import { DeviceContent } from "../models";

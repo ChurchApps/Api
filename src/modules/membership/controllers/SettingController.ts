@@ -1,4 +1,4 @@
-import { controller, httpPost, httpGet, interfaces, requestParam } from "inversify-express-utils";
+import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { Setting } from "../models";
 import { Permissions, FileStorageHelper, Environment } from "../helpers";

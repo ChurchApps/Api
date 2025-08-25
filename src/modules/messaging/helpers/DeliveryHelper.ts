@@ -5,7 +5,6 @@ import { Connection } from "../models";
 import { AttendanceInterface } from "./Interfaces";
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk/client-apigatewaymanagementapi";
 import { SocketHelper } from "./SocketHelper";
-import { LoggingHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment";
 
 export class DeliveryHelper {

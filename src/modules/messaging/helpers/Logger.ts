@@ -1,5 +1,3 @@
-import { LoggingHelper } from "@churchapps/apihelper";
-
 export class Logger {
   private logs: string[] = [];
 

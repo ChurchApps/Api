@@ -1,4 +1,4 @@
-import { controller, httpPost, interfaces } from "inversify-express-utils";
+import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import Stripe from "stripe";
 import { GivingBaseController } from "./GivingBaseController";

@@ -1,7 +1,7 @@
 import { ScheduledEvent, Context } from "aws-lambda";
 
 import { Environment } from "../shared/helpers/Environment";
-import { MultiDatabasePool, DB } from "../shared/infrastructure/DB";
+import { DB } from "../shared/infrastructure/DB";
 
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper";
 import { Repositories } from "../modules/messaging/repositories";

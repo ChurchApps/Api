@@ -1,4 +1,4 @@
-import { controller, httpPost, httpGet, interfaces, requestParam, httpDelete, httpPatch } from "inversify-express-utils";
+import { controller, httpPost, httpGet, requestParam, httpDelete, httpPatch } from "inversify-express-utils";
 import express from "express";
 import { GivingBaseController } from "./GivingBaseController";
 import { Gateway } from "../models";

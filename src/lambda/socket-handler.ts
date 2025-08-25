@@ -2,7 +2,7 @@ import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
 
 import { Environment } from "../shared/helpers/Environment";
-import { MultiDatabasePool, DB } from "../shared/infrastructure/DB";
+import { DB } from "../shared/infrastructure/DB";
 
 import { Logger } from "../modules/messaging/helpers/Logger";
 import { SocketHelper } from "../modules/messaging/helpers/SocketHelper";

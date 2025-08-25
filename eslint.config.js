@@ -1,6 +1,7 @@
 const tsParser = require("@typescript-eslint/parser");
 const tsPlugin = require("@typescript-eslint/eslint-plugin");
 const importPlugin = require("eslint-plugin-import");
+const unusedImportsPlugin = require("eslint-plugin-unused-imports");
 
 module.exports = [
   {
@@ -17,25 +18,34 @@ module.exports = [
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
-      import: importPlugin
+      import: importPlugin,
+      "unused-imports": unusedImportsPlugin
     },
     rules: {
-      // TypeScript-specific rules (matching MembershipApi)
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
+      // Unused imports and variables (auto-fixable)
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "error",
         {
-          argsIgnorePattern: "^_|^req$|^res$|^au$|^ex$|^e$|^bind$|^next$",
+          vars: "all",
           varsIgnorePattern: "^_|^start$|^result$|^app$|^interfaces$",
+          args: "after-used",
+          argsIgnorePattern: "^_|^req$|^res$|^au$|^ex$|^e$|^bind$|^next$|^report$|^config$",
+          caughtErrors: "all",
           caughtErrorsIgnorePattern: "^_"
         }
       ],
+      
+      // TypeScript-specific rules (matching MembershipApi)
+      "@typescript-eslint/no-unused-vars": "off", // Turn off in favor of unused-imports plugin
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/no-require-imports": "error",
       "@typescript-eslint/no-inferrable-types": "off",
-
+      
       // General rules (matching MembershipApi)
       "prefer-const": "error",
+      "no-unused-vars": "off", // Turn off base rule since we use unused-imports plugin
 
       // Code style (enforced by Prettier, but useful for linting)
       semi: ["error", "always"],

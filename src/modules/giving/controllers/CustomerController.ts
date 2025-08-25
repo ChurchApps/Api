@@ -1,4 +1,4 @@
-import { controller, httpGet, interfaces, requestParam, httpDelete } from "inversify-express-utils";
+import { controller, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { GivingBaseController } from "./GivingBaseController";
 import { Permissions } from "../../../shared/helpers/Permissions";

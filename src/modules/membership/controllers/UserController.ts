@@ -1,4 +1,4 @@
-import { controller, httpDelete, httpPost, httpGet, interfaces } from "inversify-express-utils";
+import { controller, httpDelete, httpPost } from "inversify-express-utils";
 import express from "express";
 import bcrypt from "bcryptjs";
 import { body, oneOf, validationResult } from "express-validator";
