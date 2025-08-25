@@ -7,11 +7,7 @@ import { AutomationHelper } from "../helpers/AutomationHelper";
 @controller("/doing/automations")
 export class AutomationController extends DoingBaseController {
   @httpGet("/check")
-  public async tempCheck(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async tempCheck(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       await AutomationHelper.checkAll();
       return { success: true };
@@ -19,11 +15,7 @@ export class AutomationController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.automation.load(au.churchId, id);
     });
@@ -50,11 +42,7 @@ export class AutomationController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.automation.delete(au.churchId, id);
       return {};

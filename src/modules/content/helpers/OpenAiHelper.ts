@@ -93,8 +93,7 @@ export class OpenAiHelper {
   }
 
   public static async generateSocialMediaPosts(notes: string) {
-    const prompt =
-      `You are a church social media manager. I want you to create three posts that will be used the week after this sermon to remind people what was discussed, prompt them to apply it this week and engage with the post.
+    const prompt = `You are a church social media manager. I want you to create three posts that will be used the week after this sermon to remind people what was discussed, prompt them to apply it this week and engage with the post.
       These are posts that will be shared after the sermon.  Do not hype an upcoming sermon.
 
         For each idea, return an object with the following format:

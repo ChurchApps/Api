@@ -1,42 +1,28 @@
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
 import { Conversation, Device, Message, PrivateMessage, Notification, NotificationPreference } from "../models";
-import { MessagingRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import { DeliveryHelper } from "./DeliveryHelper";
 import { ExpoPushHelper } from "./ExpoPushHelper";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment";
 
 export class NotificationHelper {
-  private static repositories: MessagingRepositories;
+  private static repositories: Repositories;
 
-  static init(repositories: MessagingRepositories) {
+  static init(repositories: Repositories) {
     NotificationHelper.repositories = repositories;
   }
 
-  static checkShouldNotify = async (
-    conversation: Conversation,
-    message: Message,
-    senderPersonId: string,
-    _title?: string
-  ) => {
+  static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string) => {
     switch (conversation.contentType) {
       case "streamingLive":
         // don't send notifications for live stream chat room.
         break;
       case "privateMessage": {
-        const pm: PrivateMessage = await NotificationHelper.repositories.privateMessage.loadByConversationId(
-          conversation.churchId,
-          conversation.id
-        );
+        const pm: PrivateMessage = await NotificationHelper.repositories.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
         await NotificationHelper.repositories.privateMessage.save(pm);
-        const _method = await this.notifyUserForPrivateMessage(
-          message.churchId,
-          pm.notifyPersonId,
-          message.displayName,
-          message.content,
-          conversation.id
-        );
+        const _method = await this.notifyUserForPrivateMessage(message.churchId, pm.notifyPersonId, message.displayName, message.content, conversation.id);
         if (_method) {
           pm.deliveryMethod = _method;
           await NotificationHelper.repositories.privateMessage.save(pm);
@@ -44,36 +30,20 @@ export class NotificationHelper {
         break;
       }
       default: {
-        const allMessages: Message[] = await NotificationHelper.repositories.message.loadForConversation(
-          conversation.churchId,
-          conversation.id
-        );
+        const allMessages: Message[] = await NotificationHelper.repositories.message.loadForConversation(conversation.churchId, conversation.id);
         const peopleIds = ArrayHelper.getIds(allMessages, "personId");
         if (peopleIds.length > 1) {
           for (let i = peopleIds.length - 1; i >= 0; i--) {
             if (peopleIds[i] === senderPersonId) peopleIds.splice(i, 1);
           }
-          await this.createNotifications(
-            peopleIds,
-            conversation.churchId,
-            conversation.contentType,
-            conversation.contentId,
-            "New message: " + conversation.title
-          );
+          await this.createNotifications(peopleIds, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + conversation.title);
         }
         break;
       }
     }
   };
 
-  static createNotifications = async (
-    peopleIds: string[],
-    churchId: string,
-    contentType: string,
-    contentId: string,
-    message: string,
-    link?: string
-  ) => {
+  static createNotifications = async (peopleIds: string[], churchId: string, contentType: string, contentId: string, message: string, link?: string) => {
     const notifications: Notification[] = [];
     peopleIds.forEach((personId: string) => {
       const notification: Notification = {
@@ -90,11 +60,7 @@ export class NotificationHelper {
     });
 
     // don't notify people a second time about the same type of event.
-    const existing = (await NotificationHelper.repositories.notification.loadExistingUnread(
-      notifications[0].churchId,
-      notifications[0].contentType,
-      notifications[0].contentId
-    )) as any[];
+    const existing = (await NotificationHelper.repositories.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[];
     for (let i = notifications.length - 1; i >= 0; i--) {
       if (ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) notifications.splice(i, 1);
     }
@@ -102,12 +68,7 @@ export class NotificationHelper {
       const promises: Promise<Notification>[] = [];
       notifications.forEach((n) => {
         const promise = NotificationHelper.repositories.notification.save(n).then(async (notification) => {
-          const method = await NotificationHelper.notifyUserForGeneralNotification(
-            n.churchId,
-            n.personId,
-            n.message,
-            notification.id
-          );
+          const method = await NotificationHelper.notifyUserForGeneralNotification(n.churchId, n.personId, n.message, notification.id);
           notification.deliveryMethod = method;
           await NotificationHelper.repositories.notification.save(notification);
           return notification;
@@ -142,11 +103,7 @@ export class NotificationHelper {
     if (devices.length > 0) {
       try {
         // Filter out any invalid tokens and get unique tokens
-        const expoPushTokens = [
-          ...new Set(
-            devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken["))
-          )
-        ];
+        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
 
         if (expoPushTokens.length > 0) {
           // Send notifications in bulk for efficiency
@@ -162,13 +119,7 @@ export class NotificationHelper {
     return method;
   };
 
-  static notifyUserForPrivateMessage = async (
-    churchId: string,
-    personId: string,
-    senderName: string,
-    messageContent: string,
-    conversationId: string
-  ) => {
+  static notifyUserForPrivateMessage = async (churchId: string, personId: string, senderName: string, messageContent: string, conversationId: string) => {
     let method = "";
 
     // Handle web socket notifications
@@ -189,21 +140,11 @@ export class NotificationHelper {
     if (devices.length > 0) {
       try {
         // Filter out any invalid tokens and get unique tokens
-        const expoPushTokens = [
-          ...new Set(
-            devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken["))
-          )
-        ];
+        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
 
         if (expoPushTokens.length > 0) {
           const title = `New Message from ${senderName}`;
-          await ExpoPushHelper.sendBulkTypedMessages(
-            expoPushTokens,
-            title,
-            messageContent,
-            "privateMessage",
-            conversationId
-          );
+          await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, messageContent, "privateMessage", conversationId);
           method = "push";
         }
       } catch (_error) {
@@ -214,12 +155,7 @@ export class NotificationHelper {
     return method;
   };
 
-  static notifyUserForGeneralNotification = async (
-    churchId: string,
-    personId: string,
-    notificationMessage: string,
-    notificationId: string
-  ) => {
+  static notifyUserForGeneralNotification = async (churchId: string, personId: string, notificationMessage: string, notificationId: string) => {
     let method = "";
 
     // Handle web socket notifications
@@ -240,11 +176,7 @@ export class NotificationHelper {
     if (devices.length > 0) {
       try {
         // Filter out any invalid tokens and get unique tokens
-        const expoPushTokens = [
-          ...new Set(
-            devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken["))
-          )
-        ];
+        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
 
         if (expoPushTokens.length > 0) {
           // Extract title from notification message or use default
@@ -257,13 +189,7 @@ export class NotificationHelper {
             title = notificationMessage;
           }
 
-          await ExpoPushHelper.sendBulkTypedMessages(
-            expoPushTokens,
-            title,
-            notificationMessage,
-            "notification",
-            notificationId
-          );
+          await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, notificationMessage, "notification", notificationId);
           method = "push";
         }
       } catch (_error) {
@@ -276,19 +202,14 @@ export class NotificationHelper {
 
   static sendEmailNotifications = async (frequency: string) => {
     let promises: Promise<any>[] = [];
-    const allNotifications: Notification[] =
-      (await NotificationHelper.repositories.notification.loadUndelivered()) as any[];
+    const allNotifications: Notification[] = (await NotificationHelper.repositories.notification.loadUndelivered()) as any[];
     const allPMs: PrivateMessage[] = (await NotificationHelper.repositories.privateMessage.loadUndelivered()) as any[];
     // Removed excessive logging - only log significant batch operations
     if (allNotifications.length === 0 && allPMs.length === 0) return;
 
-    const peopleIds = ArrayHelper.getIds(allNotifications, "personId").concat(
-      ArrayHelper.getIds(allPMs, "notifyPersonId")
-    );
+    const peopleIds = ArrayHelper.getIds(allNotifications, "personId").concat(ArrayHelper.getIds(allPMs, "notifyPersonId"));
 
-    const notificationPrefs = (await NotificationHelper.repositories.notificationPreference.loadByPersonIds(
-      peopleIds
-    )) as any[];
+    const notificationPrefs = (await NotificationHelper.repositories.notificationPreference.loadByPersonIds(peopleIds)) as any[];
     const todoPrefs: NotificationPreference[] = [];
     peopleIds.forEach(async (personId) => {
       // Removed per-person logging to reduce CloudWatch noise
@@ -346,11 +267,7 @@ export class NotificationHelper {
     return result.data;
   };
 
-  static sendEmailNotification = async (
-    email: string,
-    notifications: Notification[],
-    privateMessages: PrivateMessage[]
-  ) => {
+  static sendEmailNotification = async (email: string, notifications: Notification[], privateMessages: PrivateMessage[]) => {
     let title = notifications.length + " New Notifications";
     let content = "";
     if (notifications.length === 1 && privateMessages.length === 0) {
@@ -363,9 +280,7 @@ export class NotificationHelper {
           <h4>${match[1]}</h4>
           ${
             notifications[0].link
-              ? "<a href='" +
-                notifications[0].link +
-                "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
+              ? "<a href='" + notifications[0].link + "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
               : ""
           }
           <p>Please log in and confirm</p>
@@ -376,15 +291,7 @@ export class NotificationHelper {
       }
     } else if (notifications.length === 0 && privateMessages.length === 1) title = "New Private Message";
 
-    await EmailHelper.sendTemplatedEmail(
-      "support@churchapps.org",
-      email,
-      "CHUMS",
-      "https://chums.org",
-      title,
-      content,
-      "ChurchEmailTemplate.html"
-    );
+    await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "CHUMS", "https://chums.org", title, content, "ChurchEmailTemplate.html");
     const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "email");
     await Promise.all(promises);
   };

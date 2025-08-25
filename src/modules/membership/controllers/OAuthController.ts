@@ -8,14 +8,7 @@ import { AuthenticatedUser } from "../auth";
 @controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {
   @httpPost("/authorize")
-  public async authorize(
-    req: express.Request<
-      {},
-      {},
-      { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string }
-    >,
-    res: express.Response
-  ): Promise<any> {
+  public async authorize(req: express.Request<{}, {}, { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { client_id, redirect_uri, response_type, scope, state } = req.body;
 
@@ -167,11 +160,7 @@ export class OAuthController extends MembershipBaseController {
   }
 
   @httpGet("/clients/clientId/:clientId")
-  public async getClientByClientId(
-    @requestParam("clientId") clientId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getClientByClientId(@requestParam("clientId") clientId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const result = (await this.repositories.oAuthClient.loadByClientId(clientId)) as any;
       result.clientSecret = null;
@@ -180,11 +169,7 @@ export class OAuthController extends MembershipBaseController {
   }
 
   @httpGet("/clients/:id")
-  public async getClient(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       return await this.repositories.oAuthClient.load(id);
@@ -200,11 +185,7 @@ export class OAuthController extends MembershipBaseController {
   }
 
   @httpDelete("/clients/:id")
-  public async deleteClient(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async deleteClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       await this.repositories.oAuthClient.delete(id);

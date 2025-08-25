@@ -8,18 +8,10 @@ import { EncryptionHelper } from "@churchapps/apihelper";
 @controller("/giving/subscriptions")
 export class SubscriptionController extends GivingBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
-      else
-        return this.repositories.customer.convertToModel(
-          au.churchId,
-          await this.repositories.customer.load(au.churchId, id)
-        );
+      else return this.repositories.customer.convertToModel(au.churchId, await this.repositories.customer.load(au.churchId, id));
     });
   }
 
@@ -27,11 +19,7 @@ export class SubscriptionController extends GivingBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
-      else
-        return this.repositories.customer.convertAllToModel(
-          au.churchId,
-          (await this.repositories.customer.loadAll(au.churchId)) as any[]
-        );
+      else return this.repositories.customer.convertAllToModel(au.churchId, (await this.repositories.customer.loadAll(au.churchId)) as any[]);
     });
   }
 
@@ -42,9 +30,7 @@ export class SubscriptionController extends GivingBaseController {
       let permission = au.checkAccess(Permissions.donations.edit);
       const promises: Promise<any>[] = [];
       req.body.forEach(async (subscription) => {
-        permission =
-          permission ||
-          ((await this.repositories.subscription.load(au.churchId, subscription.id)) as any).personId === au.personId;
+        permission = permission || ((await this.repositories.subscription.load(au.churchId, subscription.id)) as any).personId === au.personId;
         if (permission) promises.push(StripeHelper.updateSubscription(secretKey, subscription));
       });
       return await Promise.all(promises);
@@ -52,17 +38,10 @@ export class SubscriptionController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const secretKey = await this.loadPrivateKey(au.churchId);
-      const permission =
-        secretKey &&
-        (au.checkAccess(Permissions.donations.edit) ||
-          ((await this.repositories.subscription.load(au.churchId, id)) as any).personId === au.personId);
+      const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || ((await this.repositories.subscription.load(au.churchId, id)) as any).personId === au.personId);
       if (!permission) return this.json(null, 401);
       else {
         const promises: Promise<any>[] = [];

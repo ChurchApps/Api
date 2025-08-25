@@ -36,10 +36,7 @@ export class SessionRepository {
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return DB.query(
-      "SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");",
-      [churchId].concat(ids)
-    );
+    return DB.query("SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");", [churchId].concat(ids));
   }
 
   public loadAll(churchId: string) {
@@ -48,10 +45,7 @@ export class SessionRepository {
 
   public loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
     const sessDate = DateHelper.toMysqlDate(sessionDate);
-    return DB.queryOne(
-      "SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;",
-      [churchId, groupId, serviceTimeId, sessDate]
-    );
+    return DB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
   }
 
   public loadByGroupIdWithNames(churchId: string, groupId: string) {

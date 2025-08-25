@@ -18,11 +18,7 @@ export class ServiceTimeController extends AttendanceBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return this.repositories.serviceTime.convertToModel(au.churchId, await this.repositories.serviceTime.load(au.churchId, id));
     });
@@ -33,8 +29,7 @@ export class ServiceTimeController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       // return await this.repositories.serviceTime.loadAll(au.churchId);
       let data = null;
-      if (req.query.serviceId !== undefined)
-        data = await this.repositories.serviceTime.loadNamesByServiceId(au.churchId, req.query.serviceId.toString());
+      if (req.query.serviceId !== undefined) data = await this.repositories.serviceTime.loadNamesByServiceId(au.churchId, req.query.serviceId.toString());
       else data = await this.repositories.serviceTime.loadNamesWithCampusService(au.churchId);
       const result: ServiceTime[] = this.repositories.serviceTime.convertAllToModel(au.churchId, data as any);
       if (result.length > 0 && this.include(req, "groups")) await this.appendGroups(au.churchId, result);
@@ -59,11 +54,7 @@ export class ServiceTimeController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       else {
@@ -78,10 +69,7 @@ export class ServiceTimeController extends AttendanceBaseController {
     times.forEach((t) => {
       timeIds.push(t.id);
     });
-    const allGroupServiceTimes: GroupServiceTime[] = (await this.repositories.groupServiceTime.loadByServiceTimeIds(
-      churchId,
-      timeIds
-    )) as any;
+    const allGroupServiceTimes: GroupServiceTime[] = (await this.repositories.groupServiceTime.loadByServiceTimeIds(churchId, timeIds)) as any;
     const allGroupIds: string[] = [];
     if (allGroupServiceTimes) {
       allGroupServiceTimes.forEach((gst) => {

@@ -17,32 +17,32 @@ export class RepositoryManager {
 
     switch (moduleName) {
       case "attendance":
-        const { AttendanceRepositories } = await import("../../modules/attendance");
-        return new AttendanceRepositories();
+        const { Repositories: AttendanceRepos } = await import("../../modules/attendance");
+        return AttendanceRepos.getCurrent();
 
       case "content":
-        const { ContentRepositories } = await import("../../modules/content");
-        return new ContentRepositories();
+        const { Repositories: ContentRepos } = await import("../../modules/content");
+        return ContentRepos.getCurrent();
 
       case "doing":
-        const { DoingRepositories } = await import("../../modules/doing");
-        return new DoingRepositories();
+        const { Repositories: DoingRepos } = await import("../../modules/doing");
+        return DoingRepos.getCurrent();
 
       case "giving":
-        const { GivingRepositories } = await import("../../modules/giving");
-        return new GivingRepositories();
+        const { Repositories: GivingRepos } = await import("../../modules/giving");
+        return GivingRepos.getCurrent();
 
       case "membership":
-        const { MembershipRepositories } = await import("../../modules/membership");
-        return new MembershipRepositories();
+        const { Repositories: MembershipRepos } = await import("../../modules/membership");
+        return MembershipRepos.getCurrent();
 
       case "messaging":
-        const { MessagingRepositories } = await import("../../modules/messaging");
-        return new MessagingRepositories();
+        const { Repositories: MessagingRepos } = await import("../../modules/messaging");
+        return MessagingRepos.getCurrent();
 
       case "reporting":
-        const { ReportingRepositories } = await import("../../modules/reporting");
-        return new ReportingRepositories();
+        const { Repositories: ReportingRepos } = await import("../../modules/reporting");
+        return ReportingRepos.getCurrent();
 
       default:
         throw new Error(`Unknown module: ${moduleName}`);

@@ -24,10 +24,7 @@ export class BlockedIpController extends MessagingBaseController {
   }
 
   @httpPost("/clear")
-  public async clear(
-    req: express.Request<{}, {}, { serviceId: string; churchId: string }[]>,
-    res: express.Response
-  ): Promise<any> {
+  public async clear(req: express.Request<{}, {}, { serviceId: string; churchId: string }[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       for (const { serviceId, churchId } of req.body) {
         const ips = await this.repositories.blockedIp.loadByServiceId(churchId, serviceId);

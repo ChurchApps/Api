@@ -16,8 +16,7 @@ export class StripeHelper {
 
   static createSubscription = async (secretKey: string, donationData: any) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    const { customer, metadata, productId, interval, amount, payment_method_id, type, billing_cycle_anchor } =
-      donationData;
+    const { customer, metadata, productId, interval, amount, payment_method_id, type, billing_cycle_anchor } = donationData;
     const subscriptionData: any = {
       customer,
       metadata,
@@ -34,8 +33,7 @@ export class StripeHelper {
       proration_behavior: "none"
     };
     // billing_cycle_anchor: (billing_cycle_anchor && billing_cycle_anchor > new Date().getTime()) ? billing_cycle_anchor / 1000 : "now",
-    if (billing_cycle_anchor && billing_cycle_anchor > new Date().getTime())
-      subscriptionData.billing_cycle_anchor = billing_cycle_anchor / 1000;
+    if (billing_cycle_anchor && billing_cycle_anchor > new Date().getTime()) subscriptionData.billing_cycle_anchor = billing_cycle_anchor / 1000;
     if (type === "card") subscriptionData.default_payment_method = payment_method_id;
     if (type === "bank") subscriptionData.default_source = payment_method_id;
     return await stripe.subscriptions.create(subscriptionData);
@@ -169,9 +167,7 @@ export class StripeHelper {
   }
 
   static async getPaymentDetails(secretKey: string, eventData: any) {
-    const { payment_method_details } = eventData.payment_method_details
-      ? eventData
-      : await this.getCharge(secretKey, eventData.charge);
+    const { payment_method_details } = eventData.payment_method_details ? eventData : await this.getCharge(secretKey, eventData.charge);
     const methodTypes: any = { ach_debit: "ACH Debit", card: "Card" };
     const paymentType = payment_method_details.type;
     return { method: methodTypes[paymentType], methodDetails: payment_method_details[paymentType].last4 };
@@ -183,8 +179,7 @@ export class StripeHelper {
   static async logEvent(churchId: string, stripeEvent: any, eventData: any, givingRepositories: any) {
     const { billing_reason, status, failure_message, outcome, created, customer } = eventData;
     let message = billing_reason + " " + status;
-    if (!billing_reason)
-      message = failure_message ? failure_message + " " + outcome.seller_message : outcome.seller_message;
+    if (!billing_reason) message = failure_message ? failure_message + " " + outcome.seller_message : outcome.seller_message;
     const eventLog: EventLog = {
       id: stripeEvent.id,
       churchId,
@@ -214,9 +209,7 @@ export class StripeHelper {
       donationDate: new Date(eventData.created * 1000),
       notes: eventData?.metadata?.notes
     };
-    const funds = eventData.metadata.funds
-      ? JSON.parse(eventData.metadata.funds)
-      : await givingRepositories.subscriptionFund.loadForSubscriptionLog(churchId, eventData.subscription);
+    const funds = eventData.metadata.funds ? JSON.parse(eventData.metadata.funds) : await givingRepositories.subscriptionFund.loadForSubscriptionLog(churchId, eventData.subscription);
     const donation: Donation = await givingRepositories.donation.save(donationData);
     const promises: Promise<FundDonation>[] = [];
     funds.forEach((fund: FundDonation) => {

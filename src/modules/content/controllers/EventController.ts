@@ -8,11 +8,7 @@ import { Permissions } from "../helpers";
 @controller("/content/events")
 export class EventController extends ContentBaseController {
   @httpGet("/timeline/group/:groupId")
-  public async getPostsForGroup(
-    @requestParam("groupId") groupId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
       return await this.repositories.event.loadTimelineGroup(au.churchId, groupId, eventIds);
@@ -32,16 +28,10 @@ export class EventController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       let newEvents: any[] = [];
       if (req.query.groupId) {
-        const groupEvents = await this.repositories.event.loadForGroup(
-          req.query.churchId.toString(),
-          req.query.groupId.toString()
-        );
+        const groupEvents = await this.repositories.event.loadForGroup(req.query.churchId.toString(), req.query.groupId.toString());
         if (groupEvents && groupEvents.length > 0) newEvents = this.populateEventsForICS(groupEvents);
       } else if (req.query.curatedCalendarId) {
-        const curatedEvents = await this.repositories.curatedEvent.loadForEvents(
-          req.query.curatedCalendarId.toString(),
-          req.query.churchId.toString()
-        );
+        const curatedEvents = await this.repositories.curatedEvent.loadForEvents(req.query.curatedCalendarId.toString(), req.query.churchId.toString());
         if (curatedEvents && curatedEvents.length > 0) newEvents = this.populateEventsForICS(curatedEvents);
       }
       const { error, value } = ics.createEvents(newEvents);
@@ -57,11 +47,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/group/:groupId")
-  public async getForGroup(
-    @requestParam("groupId") groupId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repositories.event.loadForGroup(au.churchId, groupId);
       await this.addExceptionDates(result);
@@ -70,12 +56,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/public/group/:churchId/:groupId")
-  public async getPublicForGroup(
-    @requestParam("churchId") churchId: string,
-    @requestParam("groupId") groupId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getPublicForGroup(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const result = await this.repositories.event.loadPublicForGroup(churchId, groupId);
       await this.addExceptionDates(result);
@@ -84,11 +65,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.event.load(au.churchId, id);
     });
@@ -111,11 +88,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

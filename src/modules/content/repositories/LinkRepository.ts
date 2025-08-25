@@ -36,21 +36,8 @@ export class LinkRepository {
 
   private async create(link: Link) {
     link.id = UniqueIdHelper.shortId();
-    const query =
-      "INSERT INTO links (id, churchId, category, url, linkType, linkData, photo, icon, text, sort, parentId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      link.id,
-      link.churchId,
-      link.category,
-      link.url,
-      link.linkType,
-      link.linkData,
-      link.photo,
-      link.icon,
-      link.text,
-      link.sort,
-      link.parentId
-    ];
+    const query = "INSERT INTO links (id, churchId, category, url, linkType, linkData, photo, icon, text, sort, parentId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [link.id, link.churchId, link.category, link.url, link.linkType, link.linkData, link.photo, link.icon, link.text, link.sort, link.parentId];
     await TypedDB.query(query, params);
     return link;
   }
@@ -60,20 +47,8 @@ export class LinkRepository {
   }
 
   private async update(link: Link) {
-    const sql =
-      "UPDATE links SET category=?, url=?, linkType=?, linkData=?, photo=?, icon=?, text=?, sort=?, parentId=? WHERE id=?;";
-    const params = [
-      link.category,
-      link.url,
-      link.linkType,
-      link.linkData,
-      link.photo,
-      link.icon,
-      link.text,
-      link.sort,
-      link.parentId,
-      link.id
-    ];
+    const sql = "UPDATE links SET category=?, url=?, linkType=?, linkData=?, photo=?, icon=?, text=?, sort=?, parentId=? WHERE id=?;";
+    const params = [link.category, link.url, link.linkType, link.linkData, link.photo, link.icon, link.text, link.sort, link.parentId, link.id];
     await TypedDB.query(sql, params);
     return link;
   }

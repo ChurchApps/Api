@@ -12,24 +12,14 @@ export class GroupServiceTimeRepository {
   private async create(groupServiceTime: GroupServiceTime) {
     groupServiceTime.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO groupServiceTimes (id, churchId, groupId, serviceTimeId) VALUES (?, ?, ?, ?);";
-    const params = [
-      groupServiceTime.id,
-      groupServiceTime.churchId,
-      groupServiceTime.groupId,
-      groupServiceTime.serviceTimeId
-    ];
+    const params = [groupServiceTime.id, groupServiceTime.churchId, groupServiceTime.groupId, groupServiceTime.serviceTimeId];
     await DB.query(sql, params);
     return groupServiceTime;
   }
 
   private async update(groupServiceTime: GroupServiceTime) {
     const sql = "UPDATE groupServiceTimes SET groupId=?, serviceTimeId=? WHERE id=? and churchId=?";
-    const params = [
-      groupServiceTime.groupId,
-      groupServiceTime.serviceTimeId,
-      groupServiceTime.id,
-      groupServiceTime.churchId
-    ];
+    const params = [groupServiceTime.groupId, groupServiceTime.serviceTimeId, groupServiceTime.id, groupServiceTime.churchId];
     await DB.query(sql, params);
     return groupServiceTime;
   }
@@ -58,15 +48,13 @@ export class GroupServiceTimeRepository {
   }
 
   public loadByServiceTimeIds(churchId: string, serviceTimeIds: string[]) {
-    const sql =
-      "SELECT * FROM groupServiceTimes WHERE churchId=? AND serviceTimeId IN (" + serviceTimeIds.join(",") + ")";
+    const sql = "SELECT * FROM groupServiceTimes WHERE churchId=? AND serviceTimeId IN (" + serviceTimeIds.join(",") + ")";
     return DB.query(sql, [churchId]);
   }
 
   public convertToModel(churchId: string, data: any) {
     const result: GroupServiceTime = { id: data.id, groupId: data.groupId, serviceTimeId: data.serviceTimeId };
-    if (data.serviceTimeName !== undefined)
-      result.serviceTime = { id: result.serviceTimeId, name: data.serviceTimeName };
+    if (data.serviceTimeName !== undefined) result.serviceTime = { id: result.serviceTimeId, name: data.serviceTimeName };
     return result;
   }
 

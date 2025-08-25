@@ -16,15 +16,7 @@ import {
   OAuthCodeRepository,
   OAuthClientRepository
 } from ".";
-import {
-  UserRepository,
-  ChurchRepository,
-  RoleRepository,
-  RoleMemberRepository,
-  RolePermissionRepository,
-  UserChurchRepository,
-  AccessLogRepository
-} from ".";
+import { UserRepository, ChurchRepository, RoleRepository, RoleMemberRepository, RolePermissionRepository, UserChurchRepository, AccessLogRepository } from ".";
 
 export class Repositories {
   public groupMember: GroupMemberRepository;

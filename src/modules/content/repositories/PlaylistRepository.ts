@@ -10,16 +10,8 @@ export class PlaylistRepository {
   private async create(playlist: Playlist) {
     playlist.id = UniqueIdHelper.shortId();
     const publishDate = DateHelper.toMysqlDate(playlist.publishDate);
-    const sql =
-      "INSERT INTO playlists (id, churchId, title, description, publishDate, thumbnail) VALUES (?, ?, ?, ?, ?, ?);";
-    const params = [
-      playlist.id,
-      playlist.churchId,
-      playlist.title,
-      playlist.description,
-      publishDate,
-      playlist.thumbnail
-    ];
+    const sql = "INSERT INTO playlists (id, churchId, title, description, publishDate, thumbnail) VALUES (?, ?, ?, ?, ?, ?);";
+    const params = [playlist.id, playlist.churchId, playlist.title, playlist.description, publishDate, playlist.thumbnail];
     await TypedDB.query(sql, params);
     return playlist;
   }
@@ -27,14 +19,7 @@ export class PlaylistRepository {
   private async update(playlist: Playlist) {
     const publishDate = DateHelper.toMysqlDate(playlist.publishDate);
     const sql = "UPDATE playlists SET title=?, description=?, publishDate=?, thumbnail=? WHERE id=? and churchId=?;";
-    const params = [
-      playlist.title,
-      playlist.description,
-      publishDate,
-      playlist.thumbnail,
-      playlist.id,
-      playlist.churchId
-    ];
+    const params = [playlist.title, playlist.description, publishDate, playlist.thumbnail, playlist.id, playlist.churchId];
     await TypedDB.query(sql, params);
     return playlist;
   }

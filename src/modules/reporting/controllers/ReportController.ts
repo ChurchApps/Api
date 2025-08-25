@@ -9,21 +9,20 @@ import { ReportResultHelper, RunReportHelper } from "../helpers";
 
 @controller("/reports")
 export class ReportController extends ReportingBaseController {
-  
   @httpGet("/groupAttendanceDownload/run")
   public async groupAttDownload(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const reportPath = path.join(process.cwd(), "reports", "groupAttendanceDownload.json");
-      
+
       if (!fs.existsSync(reportPath)) {
         return this.json({ error: "Report not found" }, 404);
       }
-      
+
       const contents = fs.readFileSync(reportPath, "utf8");
       const report: Report = JSON.parse(contents);
 
       if (!this.checkPermissions(report, au)) return this.json({ error: "Insufficient permissions" }, 401);
-      
+
       this.populateRootParameters(report, au, req);
       await RunReportHelper.runAllQueries(report);
 
@@ -33,18 +32,14 @@ export class ReportController extends ReportingBaseController {
   }
 
   @httpGet("/:keyName")
-  public async get(
-    @requestParam("keyName") keyName: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
       const reportPath = path.join(process.cwd(), "reports", `${keyName}.json`);
-      
+
       if (!fs.existsSync(reportPath)) {
         return this.json({ error: "Report not found" }, 404);
       }
-      
+
       const contents = fs.readFileSync(reportPath, "utf8");
       const report: Report = JSON.parse(contents);
       return this.json(report);
@@ -52,23 +47,19 @@ export class ReportController extends ReportingBaseController {
   }
 
   @httpGet("/:keyName/run")
-  public async run(
-    @requestParam("keyName") keyName: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async run(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const reportPath = path.join(process.cwd(), "reports", `${keyName}.json`);
-      
+
       if (!fs.existsSync(reportPath)) {
         return this.json({ error: "Report not found" }, 404);
       }
-      
+
       const contents = fs.readFileSync(reportPath, "utf8");
       const report: Report = JSON.parse(contents);
 
       if (!this.checkPermissions(report, au)) return this.json({ error: "Insufficient permissions" }, 401);
-      
+
       this.populateRootParameters(report, au, req);
       await RunReportHelper.runAllQueries(report);
 
@@ -79,7 +70,7 @@ export class ReportController extends ReportingBaseController {
 
   private checkPermissions(report: Report, au: AuthenticatedUser) {
     if (!report.permissions || report.permissions.length === 0) return true;
-    
+
     let result = true;
     report.permissions.forEach((rpg) => {
       const groupResult = this.checkGroup(rpg.requireOne, au);
@@ -90,7 +81,7 @@ export class ReportController extends ReportingBaseController {
 
   private checkGroup(pa: Permission[], au: AuthenticatedUser) {
     if (!pa || pa.length === 0) return true;
-    
+
     let result = false;
     pa.forEach((p) => {
       const ip: IPermission = { action: p.action, contentType: p.contentType, apiName: p.api };
@@ -152,10 +143,7 @@ export class ReportController extends ReportingBaseController {
         serviceArray?.forEach((ser) => {
           const serId = ser?.value.split("//")[0];
           const serTimeId = ser?.value.split("//")[1];
-          const getValue = attendance.filter(
-            (a: any) =>
-              a.groupId === g.id && a.personId === person.id && a.serviceId === serId && a.serviceTimeId === serTimeId
-          );
+          const getValue = attendance.filter((a: any) => a.groupId === g.id && a.personId === person.id && a.serviceId === serId && a.serviceTimeId === serTimeId);
           if (getValue.length > 0) {
             attendanceStatus[ser.name] = "present";
           } else {

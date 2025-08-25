@@ -10,30 +10,15 @@ export class GlobalStyleRepository {
 
   public async create(globalStyle: GlobalStyle) {
     globalStyle.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO globalStyles (id, churchId, fonts, palette, customCss, customJS) VALUES (?, ?, ?, ?, ?, ?);";
-    const params = [
-      globalStyle.id,
-      globalStyle.churchId,
-      globalStyle.fonts,
-      globalStyle.palette,
-      globalStyle.customCss,
-      globalStyle.customJS
-    ];
+    const sql = "INSERT INTO globalStyles (id, churchId, fonts, palette, customCss, customJS) VALUES (?, ?, ?, ?, ?, ?);";
+    const params = [globalStyle.id, globalStyle.churchId, globalStyle.fonts, globalStyle.palette, globalStyle.customCss, globalStyle.customJS];
     await TypedDB.query(sql, params);
     return globalStyle;
   }
 
   public async update(globalStyle: GlobalStyle) {
     const sql = "UPDATE globalStyles SET fonts=?, palette=?, customCss=?, customJS=? WHERE id=? AND churchId=?";
-    const params = [
-      globalStyle.fonts,
-      globalStyle.palette,
-      globalStyle.customCss,
-      globalStyle.customJS,
-      globalStyle.id,
-      globalStyle.churchId
-    ];
+    const params = [globalStyle.fonts, globalStyle.palette, globalStyle.customCss, globalStyle.customJS, globalStyle.id, globalStyle.churchId];
     await TypedDB.query(sql, params);
     return globalStyle;
   }

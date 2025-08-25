@@ -20,33 +20,15 @@ export class ArrangementRepository {
   private async create(arrangement: Arrangement) {
     arrangement.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO arrangements (id, churchId, songId, songDetailId, name, lyrics, freeShowId) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      arrangement.id,
-      arrangement.churchId,
-      arrangement.songId,
-      arrangement.songDetailId,
-      arrangement.name,
-      arrangement.lyrics,
-      arrangement.freeShowId
-    ];
+    const sql = "INSERT INTO arrangements (id, churchId, songId, songDetailId, name, lyrics, freeShowId) VALUES (?, ?, ?, ?, ?, ?, ?);";
+    const params = [arrangement.id, arrangement.churchId, arrangement.songId, arrangement.songDetailId, arrangement.name, arrangement.lyrics, arrangement.freeShowId];
     await TypedDB.query(sql, params);
     return arrangement;
   }
 
   private async update(arrangement: Arrangement) {
-    const sql =
-      "UPDATE arrangements SET songId=?, songDetailId=?, name=?, lyrics=?, freeShowId=? WHERE id=? and churchId=?";
-    const params = [
-      arrangement.songId,
-      arrangement.songDetailId,
-      arrangement.name,
-      arrangement.lyrics,
-      arrangement.freeShowId,
-      arrangement.id,
-      arrangement.churchId
-    ];
+    const sql = "UPDATE arrangements SET songId=?, songDetailId=?, name=?, lyrics=?, freeShowId=? WHERE id=? and churchId=?";
+    const params = [arrangement.songId, arrangement.songDetailId, arrangement.name, arrangement.lyrics, arrangement.freeShowId, arrangement.id, arrangement.churchId];
     await TypedDB.query(sql, params);
     return arrangement;
   }
@@ -60,16 +42,11 @@ export class ArrangementRepository {
   }
 
   public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM arrangements WHERE id=? AND churchId=?;", [
-      id,
-      churchId
-    ]) as Promise<Arrangement | null>;
+    return TypedDB.queryOne("SELECT * FROM arrangements WHERE id=? AND churchId=?;", [id, churchId]) as Promise<Arrangement | null>;
   }
 
   public loadBySongId(churchId: string, songId: string) {
-    return TypedDB.query("SELECT * FROM arrangements where churchId=? and songId=?;", [churchId, songId]) as Promise<
-      Arrangement[]
-    >;
+    return TypedDB.query("SELECT * FROM arrangements where churchId=? and songId=?;", [churchId, songId]) as Promise<Arrangement[]>;
   }
 
   public loadBySongDetailId(churchId: string, songDetailId: string) {

@@ -6,7 +6,7 @@ import { MultiDatabasePool, DB } from "../shared/infrastructure/DB";
 
 import { Logger } from "../modules/messaging/helpers/Logger";
 import { SocketHelper } from "../modules/messaging/helpers/SocketHelper";
-import { MessagingRepositories } from "../modules/messaging/repositories";
+import { Repositories } from "../modules/messaging/repositories";
 
 let gwManagement: ApiGatewayManagementApiClient;
 
@@ -79,7 +79,7 @@ async function handleDisconnect(event: APIGatewayProxyEvent, _context: Context):
   }
 
   try {
-    const _repositories = new MessagingRepositories();
+    const _repositories = Repositories.getCurrent();
     await SocketHelper.handleDisconnect(connectionId);
 
     console.log(`Connection disconnected: ${connectionId}`);

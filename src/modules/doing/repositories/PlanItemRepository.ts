@@ -12,41 +12,15 @@ export class PlanItemRepository {
   private async create(planItem: PlanItem) {
     planItem.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO planItems (id, churchId, planId, parentId, sort, itemType, relatedId, label, description, seconds, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      planItem.id,
-      planItem.churchId,
-      planItem.planId,
-      planItem.parentId,
-      planItem.sort,
-      planItem.itemType,
-      planItem.relatedId,
-      planItem.label,
-      planItem.description,
-      planItem.seconds,
-      planItem.link
-    ];
+    const sql = "INSERT INTO planItems (id, churchId, planId, parentId, sort, itemType, relatedId, label, description, seconds, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [planItem.id, planItem.churchId, planItem.planId, planItem.parentId, planItem.sort, planItem.itemType, planItem.relatedId, planItem.label, planItem.description, planItem.seconds, planItem.link];
     await DB.query(sql, params);
     return planItem;
   }
 
   private async update(planItem: PlanItem) {
-    const sql =
-      "UPDATE planItems SET planId=?, parentId=?, sort=?, itemType=?, relatedId=?, label=?, description=?, seconds=?, link=? WHERE id=? and churchId=?";
-    const params = [
-      planItem.planId,
-      planItem.parentId,
-      planItem.sort,
-      planItem.itemType,
-      planItem.relatedId,
-      planItem.label,
-      planItem.description,
-      planItem.seconds,
-      planItem.link,
-      planItem.id,
-      planItem.churchId
-    ];
+    const sql = "UPDATE planItems SET planId=?, parentId=?, sort=?, itemType=?, relatedId=?, label=?, description=?, seconds=?, link=? WHERE id=? and churchId=?";
+    const params = [planItem.planId, planItem.parentId, planItem.sort, planItem.itemType, planItem.relatedId, planItem.label, planItem.description, planItem.seconds, planItem.link, planItem.id, planItem.churchId];
     await DB.query(sql, params);
     return planItem;
   }

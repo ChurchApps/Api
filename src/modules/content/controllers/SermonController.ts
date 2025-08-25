@@ -24,11 +24,7 @@ export class SermonController extends ContentBaseController {
   // }
 
   @httpGet("/public/freeshowSample")
-  public async getFreeShow(
-    @requestParam("churchId") churchId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getFreeShow(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       const result = {
         id: "freeshow",
@@ -55,11 +51,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/public/tvWrapper/:churchId")
-  public async getTvWrapper(
-    @requestParam("churchId") churchId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getTvWrapper(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       const result = {
         treeLabels: ["Content Type"],
@@ -94,12 +86,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/public/tvFeed/:churchId/:sermonId")
-  public async getSermonTvFeed(
-    @requestParam("churchId") churchId: string,
-    @requestParam("sermonId") sermonId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getSermonTvFeed(@requestParam("churchId") churchId: string, @requestParam("sermonId") sermonId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const sermon = await this.repositories.sermon.loadById(sermonId, churchId);
 
@@ -130,11 +117,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/public/tvFeed/:churchId")
-  public async getTvFeed(
-    @requestParam("churchId") churchId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getTvFeed(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const playlists: Playlist[] = await this.repositories.playlist.loadPublicAll(churchId);
       const sermons = await this.repositories.sermon.loadPublicAll(churchId);
@@ -240,33 +223,21 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/youtubeImport/:channelId")
-  public async youtubeImport(
-    @requestParam("channelId") channelId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async youtubeImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await YouTubeHelper.getVideosFromChannel(au.churchId, channelId);
     });
   }
 
   @httpGet("/vimeoImport/:channelId")
-  public async vimeoImport(
-    @requestParam("channelId") channelId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async vimeoImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await VimeoHelper.getVideosFromChannel(au.churchId, channelId);
     });
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.sermon.loadById(id, au.churchId);
     });
@@ -280,11 +251,7 @@ export class SermonController extends ContentBaseController {
   }
 
   @httpGet("/public/:churchId")
-  public async loadPublicAll(
-    @requestParam("churchId") churchId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repositories.sermon.loadPublicAll(churchId);
     });

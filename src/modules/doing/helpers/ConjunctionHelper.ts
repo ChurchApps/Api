@@ -1,16 +1,13 @@
-import { DoingRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import { Automation, Condition, Conjunction } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { ConditionHelper } from "./ConditionHelper";
 
 export class ConjunctionHelper {
-  public static async getPeopleIds(automation: Automation, repositories?: DoingRepositories) {
-    const repos = repositories || new DoingRepositories();
+  public static async getPeopleIds(automation: Automation, repositories?: Repositories) {
+    const repos = repositories || Repositories.getCurrent();
     const conjunctions = await repos.conjunction.loadForAutomation(automation.churchId || "", automation.id || "");
-    let conditions = (await repos.condition.loadForAutomation(
-      automation.churchId || "",
-      automation.id || ""
-    )) as Condition[];
+    let conditions = (await repos.condition.loadForAutomation(automation.churchId || "", automation.id || "")) as Condition[];
     conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions, repos);
     const tree = this.buildTree(conjunctions as Conjunction[], conditions);
     const peopleIds = this.getPeopleFromTree(tree);

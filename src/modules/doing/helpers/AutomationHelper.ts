@@ -1,10 +1,10 @@
-import { DoingRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import { Action, Automation, Task } from "../models";
 import { ConjunctionHelper } from "./ConjunctionHelper";
 
 export class AutomationHelper {
-  public static async checkAll(repositories?: DoingRepositories) {
-    const repos = repositories || new DoingRepositories();
+  public static async checkAll(repositories?: Repositories) {
+    const repos = repositories || Repositories.getCurrent();
     const automations: Automation[] = (await repos.automation.loadAllChurches()) as Automation[];
     if (automations.length > 0) {
       for (const a of automations) {
@@ -17,19 +17,13 @@ export class AutomationHelper {
     }
   }
 
-  public static async check(automation: Automation, repositories?: DoingRepositories) {
-    const repos = repositories || new DoingRepositories();
+  public static async check(automation: Automation, repositories?: Repositories) {
+    const repos = repositories || Repositories.getCurrent();
     const triggeredPeopleIds = await ConjunctionHelper.getPeopleIds(automation, repos);
     // if * load all peopele
 
     if (triggeredPeopleIds.length > 0) {
-      const existingTasks: Task[] = await repos.task.loadByAutomationIdContent(
-        automation.churchId || "",
-        automation.id || "",
-        automation.recurs || "",
-        "person",
-        triggeredPeopleIds
-      );
+      const existingTasks: Task[] = await repos.task.loadByAutomationIdContent(automation.churchId || "", automation.id || "", automation.recurs || "", "person", triggeredPeopleIds);
       for (const t of existingTasks) {
         const idx = triggeredPeopleIds.indexOf(t.associatedWithId || "");
         if (idx > -1) triggeredPeopleIds.splice(idx, 1);
@@ -37,14 +31,8 @@ export class AutomationHelper {
     }
 
     if (triggeredPeopleIds.length > 0) {
-      const actions: Action[] = (await repos.action.loadForAutomation(
-        automation.churchId || "",
-        automation.id || ""
-      )) as Action[];
-      const people: { id: string; displayName: string }[] = (await repos.membership.loadPeople(
-        automation.churchId || "",
-        triggeredPeopleIds
-      )) as { id: string; displayName: string }[];
+      const actions: Action[] = (await repos.action.loadForAutomation(automation.churchId || "", automation.id || "")) as Action[];
+      const people: { id: string; displayName: string }[] = (await repos.membership.loadPeople(automation.churchId || "", triggeredPeopleIds)) as { id: string; displayName: string }[];
       for (const action of actions) {
         if (action.actionType === "task") {
           await this.createTasks(automation, people, JSON.parse(action.actionData || "{}"), repos);
@@ -53,13 +41,8 @@ export class AutomationHelper {
     }
   }
 
-  public static async createTasks(
-    automation: Automation,
-    people: { id: string; displayName: string }[],
-    details: { assignedToType?: string; assignedToId?: string; assignedToLabel?: string; title?: string },
-    repositories?: DoingRepositories
-  ) {
-    const repos = repositories || new DoingRepositories();
+  public static async createTasks(automation: Automation, people: { id: string; displayName: string }[], details: { assignedToType?: string; assignedToId?: string; assignedToLabel?: string; title?: string }, repositories?: Repositories) {
+    const repos = repositories || Repositories.getCurrent();
     const result: Task[] = [];
     for (const p of people) {
       const task: Task = {

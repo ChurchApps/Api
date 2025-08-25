@@ -218,18 +218,7 @@ export type Environment = "dev" | "demo" | "staging" | "prod";
 
 export type PermissionAction = "view" | "edit" | "delete" | "admin" | "create";
 
-export type ContentType =
-  | "People"
-  | "Groups"
-  | "Households"
-  | "Attendance"
-  | "Donations"
-  | "Content"
-  | "Settings"
-  | "Forms"
-  | "Plans"
-  | "Messaging"
-  | "Doing";
+export type ContentType = "People" | "Groups" | "Households" | "Attendance" | "Donations" | "Content" | "Settings" | "Forms" | "Plans" | "Messaging" | "Doing";
 
 // Utility type for making properties optional
 export type Partial<T> = {

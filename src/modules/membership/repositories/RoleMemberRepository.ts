@@ -9,8 +9,7 @@ export class RoleMemberRepository {
 
   private async create(roleMember: RoleMember) {
     roleMember.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded, addedBy) VALUES (?, ?, ?, ?, NOW(), ?);";
+    const sql = "INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded, addedBy) VALUES (?, ?, ?, ?, NOW(), ?);";
     const params = [roleMember.id, roleMember.churchId, roleMember.roleId, roleMember.userId, roleMember.addedBy];
     await DB.query(sql, params);
     return roleMember;
@@ -18,23 +17,13 @@ export class RoleMemberRepository {
 
   private async update(roleMember: RoleMember) {
     const sql = "UPDATE roleMembers SET roleId=?, userId=?, dateAdded=?, addedBy=? WHERE id=? AND churchId=?";
-    const params = [
-      roleMember.roleId,
-      roleMember.userId,
-      roleMember.dateAdded,
-      roleMember.addedBy,
-      roleMember.id,
-      roleMember.churchId
-    ];
+    const params = [roleMember.roleId, roleMember.userId, roleMember.dateAdded, roleMember.addedBy, roleMember.id, roleMember.churchId];
     await DB.query(sql, params);
     return roleMember;
   }
 
   public loadByRoleId(roleId: string, churchId: string): Promise<RoleMember[]> {
-    return DB.query(
-      "SELECT rm.*, uc.personId FROM roleMembers rm LEFT JOIN userChurches uc ON rm.userId=uc.userId AND rm.churchId=uc.churchId WHERE roleId=? AND rm.churchId=? ORDER BY rm.dateAdded;",
-      [roleId, churchId]
-    ) as Promise<RoleMember[]>;
+    return DB.query("SELECT rm.*, uc.personId FROM roleMembers rm LEFT JOIN userChurches uc ON rm.userId=uc.userId AND rm.churchId=uc.churchId WHERE roleId=? AND rm.churchId=? ORDER BY rm.dateAdded;", [roleId, churchId]) as Promise<RoleMember[]>;
   }
 
   public loadById(id: string, churchId: string): Promise<RoleMember> {

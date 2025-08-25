@@ -1,6 +1,6 @@
 import { PayloadInterface } from "./Interfaces";
 import WebSocket from "ws";
-import { MessagingRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import { Connection } from "../models";
 import { AttendanceInterface } from "./Interfaces";
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk/client-apigatewaymanagementapi";
@@ -9,16 +9,14 @@ import { LoggingHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment";
 
 export class DeliveryHelper {
-  private static repositories: MessagingRepositories;
+  private static repositories: Repositories;
 
-  static init(repositories: MessagingRepositories) {
+  static init(repositories: Repositories) {
     DeliveryHelper.repositories = repositories;
   }
 
   static sendConversationMessages = async (payload: PayloadInterface) => {
-    const connections = DeliveryHelper.repositories.connection.convertAllToModel(
-      await DeliveryHelper.repositories.connection.loadForConversation(payload.churchId, payload.conversationId)
-    );
+    const connections = DeliveryHelper.repositories.connection.convertAllToModel(await DeliveryHelper.repositories.connection.loadForConversation(payload.churchId, payload.conversationId));
     const deliveryCount = await this.sendMessages(connections, payload);
     if (deliveryCount !== connections.length) DeliveryHelper.sendAttendance(payload.churchId, payload.conversationId);
   };

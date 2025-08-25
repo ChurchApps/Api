@@ -27,15 +27,11 @@ export class ChurchRepository {
   }
 
   public loadContainingSubDomain(subDomain: string) {
-    return DB.query("SELECT * FROM churches WHERE subDomain like ? and archivedDate IS NULL;", [
-      subDomain + "%"
-    ]) as Promise<Church[]>;
+    return DB.query("SELECT * FROM churches WHERE subDomain like ? and archivedDate IS NULL;", [subDomain + "%"]) as Promise<Church[]>;
   }
 
   public loadBySubDomain(subDomain: string) {
-    return DB.queryOne("SELECT * FROM churches WHERE subDomain=? and archivedDate IS NULL;", [
-      subDomain
-    ]) as Promise<Church>;
+    return DB.queryOne("SELECT * FROM churches WHERE subDomain=? and archivedDate IS NULL;", [subDomain]) as Promise<Church>;
   }
 
   public loadById(id: string) {
@@ -47,19 +43,15 @@ export class ChurchRepository {
   }
 
   public async loadForUser(userId: string) {
-    const sql =
-      "select c.*, uc.personId, p.membershipStatus from userChurches uc " +
-      " inner join churches c on c.id=uc.churchId and c.archivedDate IS NULL" +
-      " LEFT JOIN people p on p.id=uc.personId" +
-      " where uc.userId=?";
+    const sql = "select c.*, uc.personId, p.membershipStatus from userChurches uc " + " inner join churches c on c.id=uc.churchId and c.archivedDate IS NULL" + " LEFT JOIN people p on p.id=uc.personId" + " where uc.userId=?";
     const rows = (await DB.query(sql, [userId])) as any[];
     const result: LoginUserChurch[] = [];
     rows.forEach((row: any) => {
       const apis: Api[] = [];
       const addChurch = {
-        church: { 
-          id: row.id, 
-          name: row.name, 
+        church: {
+          id: row.id,
+          name: row.name,
           subDomain: row.subDomain,
           archivedDate: row.archivedDate,
           address1: row.address1,
@@ -81,10 +73,7 @@ export class ChurchRepository {
   }
 
   public async getAbandoned(noMonths = 6) {
-    const sql =
-      "SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL " +
-      noMonths +
-      " MONTH);";
+    const sql = "SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL " + noMonths + " MONTH);";
     const rows = await DB.query(sql, []);
     return rows;
   }
@@ -103,43 +92,15 @@ export class ChurchRepository {
 
   private async create(church: Church) {
     church.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO churches (id, name, subDomain, registrationDate, address1, address2, city, state, zip, country, archivedDate, latitude, longitude) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      church.id,
-      church.name,
-      church.subDomain,
-      church.address1,
-      church.address2,
-      church.city,
-      church.state,
-      church.zip,
-      church.country,
-      church.archivedDate,
-      church.latitude,
-      church.longitude
-    ];
+    const sql = "INSERT INTO churches (id, name, subDomain, registrationDate, address1, address2, city, state, zip, country, archivedDate, latitude, longitude) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [church.id, church.name, church.subDomain, church.address1, church.address2, church.city, church.state, church.zip, church.country, church.archivedDate, church.latitude, church.longitude];
     await DB.query(sql, params);
     return church;
   }
 
   private async update(church: Church) {
-    const sql =
-      "UPDATE churches SET name=?, subDomain=?, address1=?, address2=?, city=?, state=?, zip=?, country=?, archivedDate=?, latitude=?, longitude=? WHERE id=?;";
-    const params = [
-      church.name,
-      church.subDomain,
-      church.address1,
-      church.address2,
-      church.city,
-      church.state,
-      church.zip,
-      church.country,
-      church.archivedDate,
-      church.latitude,
-      church.longitude,
-      church.id
-    ];
+    const sql = "UPDATE churches SET name=?, subDomain=?, address1=?, address2=?, city=?, state=?, zip=?, country=?, archivedDate=?, latitude=?, longitude=? WHERE id=?;";
+    const params = [church.name, church.subDomain, church.address1, church.address2, church.city, church.state, church.zip, church.country, church.archivedDate, church.latitude, church.longitude, church.id];
     await DB.query(sql, params);
     return church;
   }

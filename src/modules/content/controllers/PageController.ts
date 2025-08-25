@@ -8,20 +8,14 @@ import { ContentBaseController } from "./ContentBaseController";
 @controller("/content/pages")
 export class PageController2 extends ContentBaseController {
   @httpGet("/:churchId/tree")
-  public async getTree(
-    @requestParam("churchId") churchId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getTree(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       let url = req.query.url as string;
       if (url && url[0] !== "/") {
         url = "/" + url;
       }
       const id = req.query.id as string;
-      const page = id
-        ? await this.repositories.page.load(churchId, id)
-        : await this.repositories.page.loadByUrl(churchId, url);
+      const page = id ? await this.repositories.page.load(churchId, id) : await this.repositories.page.loadByUrl(churchId, url);
 
       let result: Page = {};
       if (page?.id !== undefined) {
@@ -39,11 +33,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.page.load(au.churchId, id);
     });
@@ -57,11 +47,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpPost("/duplicate/:id")
-  public async duplicate(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -94,10 +80,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpPost("/temp/ai")
-  public async ai(
-    req: express.Request<{}, {}, { page: Page; sections: Section[]; elements: Element[] }>,
-    res: express.Response
-  ): Promise<any> {
+  public async ai(req: express.Request<{}, {}, { page: Page; sections: Section[]; elements: Element[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -132,11 +115,7 @@ export class PageController2 extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

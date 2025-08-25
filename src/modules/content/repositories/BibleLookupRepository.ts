@@ -20,24 +20,15 @@ export class BibleLookupRepository {
   private async create(lookup: BibleLookup) {
     lookup.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO bibleLookups (id, translationKey, lookupTime, ipAddress, startVerseKey, endVerseKey) VALUES (?, ?, now(), ?, ?, ?);";
+    const sql = "INSERT INTO bibleLookups (id, translationKey, lookupTime, ipAddress, startVerseKey, endVerseKey) VALUES (?, ?, now(), ?, ?, ?);";
     const params = [lookup.id, lookup.translationKey, lookup.ipAddress, lookup.startVerseKey, lookup.endVerseKey];
     await TypedDB.query(sql, params);
     return lookup;
   }
 
   private async update(lookup: BibleLookup) {
-    const sql =
-      "UPDATE bibleLookups SET translationKey=?, lookupTime=?, ipAddress=?, startVerseKey=?, endVerseKey=? WHERE id=?";
-    const params = [
-      lookup.translationKey,
-      lookup.lookupTime,
-      lookup.ipAddress,
-      lookup.startVerseKey,
-      lookup.endVerseKey,
-      lookup.id
-    ];
+    const sql = "UPDATE bibleLookups SET translationKey=?, lookupTime=?, ipAddress=?, startVerseKey=?, endVerseKey=? WHERE id=?";
+    const params = [lookup.translationKey, lookup.lookupTime, lookup.ipAddress, lookup.startVerseKey, lookup.endVerseKey, lookup.id];
     await TypedDB.query(sql, params);
     return lookup;
   }

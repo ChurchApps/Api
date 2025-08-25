@@ -6,11 +6,7 @@ import { UserChurch } from "../models";
 @controller("/membership/userchurch")
 export class UserChurchController extends MembershipBaseController {
   @httpPatch("/:userId")
-  public async update(
-    @requestParam("userId") userId: string,
-    req: express.Request,
-    res: express.Response
-  ): Promise<any> {
+  public async update(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       const { churchId, appName } = req.body;
       await this.repositories.accessLog.create({ appName: appName || "", churchId, userId });
@@ -40,8 +36,7 @@ export class UserChurchController extends MembershipBaseController {
       let result: any = {};
       if (record) {
         const userChurchRecord = record as UserChurch;
-        if (userChurchRecord.userId !== userId)
-          return this.json({ message: "User already has a linked person record" }, 400);
+        if (userChurchRecord.userId !== userId) return this.json({ message: "User already has a linked person record" }, 400);
       } else {
         const userChurch: UserChurch = {
           userId,
@@ -56,11 +51,7 @@ export class UserChurchController extends MembershipBaseController {
   }
 
   @httpGet("/userid/:userId")
-  public async getByUserId(
-    @requestParam("userId") userId: string,
-    req: express.Request,
-    res: express.Response
-  ): Promise<any> {
+  public async getByUserId(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async ({ churchId }) => {
       const record = await this.repositories.userChurch.loadByUserId(userId, churchId);
       return this.repositories.userChurch.convertToModel(record);
@@ -68,13 +59,7 @@ export class UserChurchController extends MembershipBaseController {
   }
 
   @httpDelete("/record/:userId/:churchId/:personId")
-  public async deleteRecord(
-    @requestParam("userId") userId: string,
-    @requestParam("churchId") churchId: string,
-    @requestParam("personId") personId: string,
-    req: express.Request,
-    res: express.Response
-  ): Promise<any> {
+  public async deleteRecord(@requestParam("userId") userId: string, @requestParam("churchId") churchId: string, @requestParam("personId") personId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.userChurch.deleteRecord(userId, churchId, personId);
       return this.json({});

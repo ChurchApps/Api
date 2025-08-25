@@ -20,8 +20,7 @@ export class BibleTranslationRepository {
   private async create(translation: BibleTranslation) {
     translation.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO bibleTranslations (id, abbreviation, name, nameLocal, description, source, sourceKey, language, countries, copyright, attributionRequired, attributionString) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const sql = "INSERT INTO bibleTranslations (id, abbreviation, name, nameLocal, description, source, sourceKey, language, countries, copyright, attributionRequired, attributionString) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
       translation.id,
       translation.abbreviation,
@@ -41,8 +40,7 @@ export class BibleTranslationRepository {
   }
 
   private async update(translation: BibleTranslation) {
-    const sql =
-      "UPDATE bibleTranslations SET abbreviation=?, name=?, nameLocal=?, description=?, source=?, sourceKey=?, language=?, countries=?, copyright=?, attributionRequired=?, attributionString=? WHERE id=?";
+    const sql = "UPDATE bibleTranslations SET abbreviation=?, name=?, nameLocal=?, description=?, source=?, sourceKey=?, language=?, countries=?, copyright=?, attributionRequired=?, attributionString=? WHERE id=?";
     const params = [
       translation.abbreviation,
       translation.name,

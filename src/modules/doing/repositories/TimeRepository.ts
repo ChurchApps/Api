@@ -11,8 +11,7 @@ export class TimeRepository {
 
   private async create(time: Time) {
     time.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO times (id, churchId, planId, displayName, startTime, endTime, teams) VALUES (?, ?, ?, ?, ?, ?, ?);";
+    const sql = "INSERT INTO times (id, churchId, planId, displayName, startTime, endTime, teams) VALUES (?, ?, ?, ?, ?, ?, ?);";
     const params = [time.id, time.churchId, time.planId, time.displayName, time.startTime, time.endTime, time.teams];
     await DB.query(sql, params);
     return time;

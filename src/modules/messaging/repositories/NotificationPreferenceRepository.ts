@@ -25,29 +25,15 @@ export class NotificationPreferenceRepository {
 
   private async create(notificationPreference: NotificationPreference): Promise<NotificationPreference> {
     notificationPreference.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO notificationPreferences (id, churchId, personId, allowPush, emailFrequency) VALUES (?, ?, ?, ?, ?);";
-    const params = [
-      notificationPreference.id,
-      notificationPreference.churchId,
-      notificationPreference.personId,
-      notificationPreference.allowPush,
-      notificationPreference.emailFrequency
-    ];
+    const sql = "INSERT INTO notificationPreferences (id, churchId, personId, allowPush, emailFrequency) VALUES (?, ?, ?, ?, ?);";
+    const params = [notificationPreference.id, notificationPreference.churchId, notificationPreference.personId, notificationPreference.allowPush, notificationPreference.emailFrequency];
     await DB.query(sql, params);
     return notificationPreference;
   }
 
   private async update(notificationPreference: NotificationPreference) {
-    const sql =
-      "UPDATE notificationPreferences SET personId=?, allowPush=?, emailFrequency=? WHERE id=? AND churchId=?;";
-    const params = [
-      notificationPreference.personId,
-      notificationPreference.allowPush,
-      notificationPreference.emailFrequency,
-      notificationPreference.id,
-      notificationPreference.churchId
-    ];
+    const sql = "UPDATE notificationPreferences SET personId=?, allowPush=?, emailFrequency=? WHERE id=? AND churchId=?;";
+    const params = [notificationPreference.personId, notificationPreference.allowPush, notificationPreference.emailFrequency, notificationPreference.id, notificationPreference.churchId];
     await DB.query(sql, params);
     return notificationPreference;
   }

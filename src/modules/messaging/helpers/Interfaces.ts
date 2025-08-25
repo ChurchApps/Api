@@ -1,17 +1,6 @@
 import WebSocket from "ws";
 
-export type PayloadAction =
-  | "message"
-  | "deleteMessage"
-  | "callout"
-  | "attendance"
-  | "prayerRequest"
-  | "socketId"
-  | "privateMessage"
-  | "privateRoomAdded"
-  | "videoChatInvite"
-  | "notification"
-  | "blockedIp";
+export type PayloadAction = "message" | "deleteMessage" | "callout" | "attendance" | "prayerRequest" | "socketId" | "privateMessage" | "privateRoomAdded" | "videoChatInvite" | "notification" | "blockedIp";
 
 export interface PayloadInterface {
   churchId: string;

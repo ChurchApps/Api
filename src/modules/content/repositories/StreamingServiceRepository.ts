@@ -10,45 +10,16 @@ export class StreamingServiceRepository {
   private async create(service: StreamingService) {
     service.id = UniqueIdHelper.shortId();
     const serviceTime = DateHelper.toMysqlDate(service.serviceTime);
-    const sql =
-      "INSERT INTO streamingServices (id, churchId, serviceTime, earlyStart, chatBefore, chatAfter, provider, providerKey, videoUrl, timezoneOffset, recurring, label, sermonId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      service.id,
-      service.churchId,
-      serviceTime,
-      service.earlyStart,
-      service.chatBefore,
-      service.chatAfter,
-      service.provider,
-      service.providerKey,
-      service.videoUrl,
-      service.timezoneOffset,
-      service.recurring,
-      service.label,
-      service.sermonId
-    ];
+    const sql = "INSERT INTO streamingServices (id, churchId, serviceTime, earlyStart, chatBefore, chatAfter, provider, providerKey, videoUrl, timezoneOffset, recurring, label, sermonId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [service.id, service.churchId, serviceTime, service.earlyStart, service.chatBefore, service.chatAfter, service.provider, service.providerKey, service.videoUrl, service.timezoneOffset, service.recurring, service.label, service.sermonId];
     await TypedDB.query(sql, params);
     return service;
   }
 
   private async update(service: StreamingService) {
     const serviceTime = DateHelper.toMysqlDate(service.serviceTime);
-    const sql =
-      "UPDATE streamingServices SET serviceTime=?, earlyStart=?, chatBefore=?, chatAfter=?, provider=?, providerKey=?, videoUrl=?, timezoneOffset=?, recurring=?, label=?, sermonId=? WHERE id=?;";
-    const params = [
-      serviceTime,
-      service.earlyStart,
-      service.chatBefore,
-      service.chatAfter,
-      service.provider,
-      service.providerKey,
-      service.videoUrl,
-      service.timezoneOffset,
-      service.recurring,
-      service.label,
-      service.sermonId,
-      service.id
-    ];
+    const sql = "UPDATE streamingServices SET serviceTime=?, earlyStart=?, chatBefore=?, chatAfter=?, provider=?, providerKey=?, videoUrl=?, timezoneOffset=?, recurring=?, label=?, sermonId=? WHERE id=?;";
+    const params = [serviceTime, service.earlyStart, service.chatBefore, service.chatAfter, service.provider, service.providerKey, service.videoUrl, service.timezoneOffset, service.recurring, service.label, service.sermonId, service.id];
     await TypedDB.query(sql, params);
     return service;
   }

@@ -5,14 +5,7 @@
 
 // Explicit exports to avoid naming conflicts
 export { Environment } from "./helpers/Environment";
-export {
-  Permissions,
-  permissionsList,
-  type IPermission,
-  type ApiName,
-  type DisplaySection,
-  type Actions
-} from "./helpers/Permissions";
+export { Permissions, permissionsList, type IPermission, type ApiName, type DisplaySection, type Actions } from "./helpers/Permissions";
 export { UniqueIdHelper } from "./helpers/UniqueIdHelper";
 export { DateHelper } from "./helpers/DateHelper";
 export { ValidationHelper } from "./helpers/ValidationHelper";

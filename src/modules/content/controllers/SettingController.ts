@@ -10,10 +10,7 @@ export class ContentSettingController extends ContentBaseController {
   @httpGet("/my")
   public async my(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.setting.convertAllToModel(
-        au.churchId,
-        await this.repositories.setting.loadUser(au.churchId, au.id)
-      );
+      return this.repositories.setting.convertAllToModel(au.churchId, await this.repositories.setting.loadUser(au.churchId, au.id));
     });
   }
 
@@ -22,10 +19,7 @@ export class ContentSettingController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
-        return this.repositories.setting.convertAllToModel(
-          au.churchId,
-          await this.repositories.setting.loadAll(au.churchId)
-        );
+        return this.repositories.setting.convertAllToModel(au.churchId, await this.repositories.setting.loadAll(au.churchId));
       }
     });
   }
@@ -64,10 +58,7 @@ export class ContentSettingController extends ContentBaseController {
   public async publicRoute(@requestParam("churchId") churchId: string): Promise<any> {
     console.log("made it");
     //try {
-    const settings = this.repositories.setting.convertAllToModel(
-      churchId,
-      await this.repositories.setting.loadPublicSettings(churchId)
-    );
+    const settings = this.repositories.setting.convertAllToModel(churchId, await this.repositories.setting.loadPublicSettings(churchId));
     console.log("Setting count", settings.length);
     const result: any = {};
     settings.forEach((s) => {
@@ -88,11 +79,7 @@ export class ContentSettingController extends ContentBaseController {
         const playlistId = req.query?.playlistId ? req.query.playlistId.toString() : "";
         const channelId = req.query?.channelId ? req.query.channelId.toString() : "";
         const type = req.query?.type ? req.query.type.toString() : "";
-        let result = await this.repositories.setting.loadByKeyNames(au.churchId, [
-          "youtubeChannelId",
-          "vimeoChannelId",
-          "autoImportSermons"
-        ]);
+        let result = await this.repositories.setting.loadByKeyNames(au.churchId, ["youtubeChannelId", "vimeoChannelId", "autoImportSermons"]);
         result = result.filter((r: any) => r.value !== ""); // remove rows with empty value
         if (playlistId && channelId) {
           const filteredData = this.repositories.setting.getImports(result, type, playlistId, channelId);

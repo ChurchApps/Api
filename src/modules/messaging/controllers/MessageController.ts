@@ -8,12 +8,7 @@ import { NotificationHelper } from "../helpers/NotificationHelper";
 @controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {
   @httpGet("/:churchId/:conversationId")
-  public async loadForConversation(
-    @requestParam("churchId") churchId: string,
-    @requestParam("conversationId") conversationId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<Message[]> {
+  public async loadForConversation(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repositories.message.loadForConversation(churchId, conversationId);
       return this.repositories.message.convertAllToModel(data as any[]);
@@ -21,12 +16,7 @@ export class MessageController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(
-    @requestParam("churchId") churchId: string,
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<Message> {
+  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repositories.message.loadById(churchId, id);
       return this.repositories.message.convertToModel(data);
@@ -40,20 +30,17 @@ export class MessageController extends MessagingBaseController {
       req.body.forEach((message) => {
         promises.push(
           this.repositories.message.save(message).then(async (savedMessage) => {
-            const conversation = await this.repositories.conversation.loadById(
-              message.churchId,
-              message.conversationId
-            );
+            const conversation = await this.repositories.conversation.loadById(message.churchId, message.conversationId);
             const conv = this.repositories.conversation.convertToModel(conversation);
             await this.repositories.conversation.updateStats(message.conversationId);
 
             // Send real-time updates
-            await DeliveryHelper.sendConversationMessages({
+            (await DeliveryHelper.sendConversationMessages({
               churchId: message.churchId,
               conversationId: message.conversationId,
               action: "message",
               data: savedMessage
-            }) as any;
+            })) as any;
 
             // Handle notifications
             await NotificationHelper.checkShouldNotify(conv, savedMessage, message.personId || "anonymous");
@@ -68,24 +55,19 @@ export class MessageController extends MessagingBaseController {
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(
-    @requestParam("churchId") churchId: string,
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<void> {
+  public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       const message = await this.repositories.message.loadById(au.churchId, id);
       if (message) {
         await this.repositories.message.delete(au.churchId, id);
 
         // Send real-time delete notification
-        await DeliveryHelper.sendConversationMessages({
+        (await DeliveryHelper.sendConversationMessages({
           churchId: au.churchId,
           conversationId: message.conversationId,
           action: "deleteMessage",
           data: { id }
-        }) as any;
+        })) as any;
       }
     }) as any;
   }

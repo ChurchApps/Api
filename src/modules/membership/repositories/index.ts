@@ -25,6 +25,3 @@ export { ClientErrorRepository } from "./ClientErrorRepository";
 export { OAuthTokenRepository } from "./OAuthTokenRepository";
 export { OAuthCodeRepository } from "./OAuthCodeRepository";
 export { OAuthClientRepository } from "./OAuthClientRepository";
-
-// New repository collection for the modular monolith pattern
-export { MembershipRepositories } from "./MembershipRepositories";

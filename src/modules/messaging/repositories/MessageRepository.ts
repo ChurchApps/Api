@@ -14,10 +14,7 @@ export class MessageRepository {
   }
 
   public async loadForConversation(churchId: string, conversationId: string) {
-    const result: any = await DB.query(
-      "SELECT * FROM messages WHERE churchId=? AND conversationId=? ORDER BY timeSent",
-      [churchId, conversationId]
-    );
+    const result: any = await DB.query("SELECT * FROM messages WHERE churchId=? AND conversationId=? ORDER BY timeSent", [churchId, conversationId]);
     return result.rows || result || [];
   }
 
@@ -31,31 +28,15 @@ export class MessageRepository {
 
   private async create(message: Message) {
     message.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO messages (id, churchId, conversationId, personId, displayName, timeSent, messageType, content) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?);";
-    const params = [
-      message.id,
-      message.churchId,
-      message.conversationId,
-      message.personId,
-      message.displayName,
-      message.messageType,
-      message.content
-    ];
+    const sql = "INSERT INTO messages (id, churchId, conversationId, personId, displayName, timeSent, messageType, content) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?);";
+    const params = [message.id, message.churchId, message.conversationId, message.personId, message.displayName, message.messageType, message.content];
     await DB.query(sql, params);
     return message;
   }
 
   private async update(message: Message) {
     const sql = "UPDATE messages SET personId=?, displayName=?, content=?, timeUpdated=? WHERE id=? AND churchId=?;";
-    const params = [
-      message.personId,
-      message.displayName,
-      message.content,
-      message.timeUpdated,
-      message.id,
-      message.churchId
-    ];
+    const params = [message.personId, message.displayName, message.content, message.timeUpdated, message.id, message.churchId];
     await DB.query(sql, params);
     return message;
   }

@@ -1,12 +1,12 @@
 import { Setting, SongDetail, SongDetailLink } from "../models";
 import OAuth from "oauth";
 import { Environment } from "../../../shared/helpers/Environment";
-import { ContentRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import https from "https";
 
 export class PraiseChartsHelper {
   static async loadUserTokens(au: any) {
-    const settings: Setting[] = await ContentRepositories.getCurrent().setting.loadUser(au.churchId, au.id);
+    const settings: Setting[] = await Repositories.getCurrent().setting.loadUser(au.churchId, au.id);
     const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
     const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;
     return { token, secret };
@@ -15,15 +15,7 @@ export class PraiseChartsHelper {
   static getOAuth(returnUrl?: string) {
     const requestTokenUrl = "https://api.praisecharts.com/oauth/request_token";
     const accessTokenUrl = "https://api.praisecharts.com/oauth/access_token";
-    const oauth = new OAuth.OAuth(
-      requestTokenUrl,
-      accessTokenUrl,
-      Environment.praiseChartsConsumerKey,
-      Environment.praiseChartsConsumerSecret,
-      "1.0A",
-      returnUrl || "https://churchapps.org/",
-      "HMAC-SHA1"
-    );
+    const oauth = new OAuth.OAuth(requestTokenUrl, accessTokenUrl, Environment.praiseChartsConsumerKey, Environment.praiseChartsConsumerSecret, "1.0A", returnUrl || "https://churchapps.org/", "HMAC-SHA1");
     return oauth;
   }
 
@@ -41,11 +33,7 @@ export class PraiseChartsHelper {
     return `https://api.praisecharts.com/oauth/authorize?oauth_token=${oauthToken}`;
   }
 
-  static getAccessToken(
-    oauthToken: string,
-    oauthTokenSecret: string,
-    oauthVerifier: string
-  ): Promise<{ accessToken: string; accessTokenSecret: string }> {
+  static getAccessToken(oauthToken: string, oauthTokenSecret: string, oauthVerifier: string): Promise<{ accessToken: string; accessTokenSecret: string }> {
     return new Promise((resolve, reject) => {
       const oauth = this.getOAuth("http://localhost:3101/pingback");
       oauth.getOAuthAccessToken(oauthToken, oauthTokenSecret, oauthVerifier, (err, accessToken, accessTokenSecret) => {
@@ -77,12 +65,7 @@ export class PraiseChartsHelper {
   }
 
   static async search(query: string) {
-    const includes =
-      "&arr_includes[]=id" +
-      "&arr_includes[]=details.title" +
-      "&arr_includes[]=details.artists.names" +
-      "&arr_includes[]=details.album.title" +
-      "&arr_includes[]=details.album.images.md.url";
+    const includes = "&arr_includes[]=id" + "&arr_includes[]=details.title" + "&arr_includes[]=details.artists.names" + "&arr_includes[]=details.album.title" + "&arr_includes[]=details.album.images.md.url";
     const url = `https://api.praisecharts.com/v1.0/catalog/search?q=${encodeURIComponent(query)}${includes}`;
     const response = await fetch(url);
     if (response.ok) {
@@ -211,8 +194,7 @@ export class PraiseChartsHelper {
     }
     if (item.details.external_urls) {
       const externalUrls = item.details.external_urls;
-      if (externalUrls.youtube)
-        result.push({ service: "YouTube", id: externalUrls.youtube.split("=")[1], url: externalUrls.youtube });
+      if (externalUrls.youtube) result.push({ service: "YouTube", id: externalUrls.youtube.split("=")[1], url: externalUrls.youtube });
     }
     return result;
   }
@@ -256,13 +238,7 @@ export class PraiseChartsHelper {
     return (matchCount / searchWords.length) * 100;
   }
 
-  static async findBestMatch(
-    title?: string,
-    artist?: string,
-    lyrics?: string,
-    ccliNumber?: string,
-    geniusId?: string
-  ): Promise<SongDetail | null> {
+  static async findBestMatch(title?: string, artist?: string, lyrics?: string, ccliNumber?: string, geniusId?: string): Promise<SongDetail | null> {
     try {
       // First try CCLI number if provided
       if (ccliNumber) {
@@ -329,9 +305,7 @@ export class PraiseChartsHelper {
 
   static getArtistBestMatch(arrangements: any, artist: string) {
     let bestMatch = arrangements[0];
-    let bestScore = bestMatch.details?.artists?.names
-      ? this.calculateMatchScore(artist, bestMatch.details?.artists?.names || "")
-      : 0;
+    let bestScore = bestMatch.details?.artists?.names ? this.calculateMatchScore(artist, bestMatch.details?.artists?.names || "") : 0;
 
     for (let i = 1; i < arrangements.length; i++) {
       const currentItem = arrangements[i];

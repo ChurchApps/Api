@@ -206,11 +206,7 @@ export class Environment extends EnvironmentBase {
 
     // WebSocket configuration
     this.websocketUrl = process.env.SOCKET_URL || process.env.WEBSOCKET_URL;
-    this.websocketPort = process.env.SOCKET_PORT
-      ? parseInt(process.env.SOCKET_PORT)
-      : process.env.WEBSOCKET_PORT
-        ? parseInt(process.env.WEBSOCKET_PORT)
-        : 8087;
+    this.websocketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT) : 8087;
 
     // File storage configuration
     this.fileStore = process.env.FILE_STORE || config.fileStore;
@@ -231,27 +227,19 @@ export class Environment extends EnvironmentBase {
     this.caddyPort = process.env.CADDY_PORT || (await AwsHelper.readParameter(`/${envLower}/caddyPort`));
 
     // Content API specific
-    this.youTubeApiKey =
-      process.env.YOUTUBE_API_KEY || (await AwsHelper.readParameter(`/${envLower}/youTubeApiKey`));
+    this.youTubeApiKey = process.env.YOUTUBE_API_KEY || (await AwsHelper.readParameter(`/${envLower}/youTubeApiKey`));
     this.pexelsKey = process.env.PEXELS_KEY || (await AwsHelper.readParameter(`/${envLower}/pexelsKey`));
     this.vimeoToken = process.env.VIMEO_TOKEN || (await AwsHelper.readParameter(`/${envLower}/vimeoToken`));
     this.apiBibleKey = process.env.API_BIBLE_KEY || (await AwsHelper.readParameter(`/${envLower}/apiBibleKey`));
-    this.praiseChartsConsumerKey =
-      process.env.PRAISECHARTS_CONSUMER_KEY ||
-      (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerKey`));
-    this.praiseChartsConsumerSecret =
-      process.env.PRAISECHARTS_CONSUMER_SECRET ||
-      (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerSecret`));
+    this.praiseChartsConsumerKey = process.env.PRAISECHARTS_CONSUMER_KEY || (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerKey`));
+    this.praiseChartsConsumerSecret = process.env.PRAISECHARTS_CONSUMER_SECRET || (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerSecret`));
 
     // Giving API specific
-    this.googleRecaptchaSecretKey =
-      process.env.GOOGLE_RECAPTCHA_SECRET_KEY ||
-      (await AwsHelper.readParameter(`/${envLower}/recaptcha-secret-key`));
+    this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || (await AwsHelper.readParameter(`/${envLower}/recaptcha-secret-key`));
 
     // AI provider configuration (shared)
     this.aiProvider = process.env.AI_PROVIDER || "openrouter";
-    this.openRouterApiKey =
-      process.env.OPENROUTER_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openRouterApiKey`));
+    this.openRouterApiKey = process.env.OPENROUTER_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openRouterApiKey`));
     this.openAiApiKey = process.env.OPENAI_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openAiApiKey`));
   }
 

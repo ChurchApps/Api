@@ -10,12 +10,7 @@ export class TaskController extends DoingBaseController {
   @httpGet("/timeline")
   public async getTimeline(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const taskIds =
-        typeof req.query.taskIds === "string"
-          ? req.query.taskIds.split(",")
-          : req.query.taskIds
-            ? [String(req.query.taskIds)]
-            : [];
+      const taskIds = typeof req.query.taskIds === "string" ? req.query.taskIds.split(",") : req.query.taskIds ? [String(req.query.taskIds)] : [];
       return await this.repositories.task.loadTimeline(au.churchId, au.personId, taskIds);
     });
   }
@@ -28,22 +23,14 @@ export class TaskController extends DoingBaseController {
   }
 
   @httpGet("/directoryUpdate/:personId")
-  public async getPersonDirectoryUpdate(
-    @requestParam("personId") personId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getPersonDirectoryUpdate(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.task.loadForDirectoryUpdate(au.churchId, personId);
     });
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.task.load(au.churchId, id);
     });
@@ -57,10 +44,7 @@ export class TaskController extends DoingBaseController {
   }
 
   @httpPost("/loadForGroups")
-  public async loadForGroups(
-    req: express.Request<{}, {}, { groupIds: string[]; status: string }>,
-    res: express.Response
-  ): Promise<any> {
+  public async loadForGroups(req: express.Request<{}, {}, { groupIds: string[]; status: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.task.loadForGroups(au.churchId, req.body.groupIds, req.body.status);
     });

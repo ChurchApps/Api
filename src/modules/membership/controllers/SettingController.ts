@@ -11,10 +11,7 @@ export class MembershipSettingController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
-        return this.repositories.setting.convertAllToModel(
-          au.churchId,
-          (await this.repositories.setting.loadAll(au.churchId)) as any[]
-        );
+        return this.repositories.setting.convertAllToModel(au.churchId, (await this.repositories.setting.loadAll(au.churchId)) as any[]);
       }
     });
   }

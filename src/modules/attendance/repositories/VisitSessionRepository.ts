@@ -38,20 +38,11 @@ export class VisitSessionRepository {
   }
 
   public loadByVisitIdSessionId(churchId: string, visitId: string, sessionId: string) {
-    return DB.queryOne("SELECT * FROM visitSessions WHERE churchId=? AND visitId=? AND sessionId=? LIMIT 1;", [
-      churchId,
-      visitId,
-      sessionId
-    ]);
+    return DB.queryOne("SELECT * FROM visitSessions WHERE churchId=? AND visitId=? AND sessionId=? LIMIT 1;", [churchId, visitId, sessionId]);
   }
 
   public loadByVisitIds(churchId: string, visitIds: string[]) {
-    return DB.query(
-      "SELECT * FROM visitSessions WHERE churchId=? AND visitId IN (" +
-        ArrayHelper.fillArray("?", visitIds.length).join(", ") +
-        ");",
-      [churchId].concat(visitIds)
-    );
+    return DB.query("SELECT * FROM visitSessions WHERE churchId=? AND visitId IN (" + ArrayHelper.fillArray("?", visitIds.length).join(", ") + ");", [churchId].concat(visitIds));
   }
 
   public loadByVisitId(churchId: string, visitId: string) {
@@ -69,11 +60,7 @@ export class VisitSessionRepository {
   }
 
   public loadForSession(churchId: string, sessionId: string) {
-    const sql =
-      "SELECT vs.*, v.personId FROM" +
-      " visitSessions vs" +
-      " INNER JOIN visits v on v.id = vs.visitId" +
-      " WHERE vs.churchId=? AND vs.sessionId = ?";
+    const sql = "SELECT vs.*, v.personId FROM" + " visitSessions vs" + " INNER JOIN visits v on v.id = vs.visitId" + " WHERE vs.churchId=? AND vs.sessionId = ?";
     return DB.query(sql, [churchId, sessionId]);
   }
 

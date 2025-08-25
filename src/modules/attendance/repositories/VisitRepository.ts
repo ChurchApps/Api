@@ -14,18 +14,8 @@ export class VisitRepository {
     visit.id = UniqueIdHelper.shortId();
     const visitDate = DateHelper.toMysqlDate(visit.visitDate);
     const checkinTime = DateHelper.toMysqlDate(visit.checkinTime);
-    const sql =
-      "INSERT INTO visits (id, churchId, personId, serviceId, groupId, visitDate, checkinTime, addedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      visit.id,
-      visit.churchId,
-      visit.personId,
-      visit.serviceId,
-      visit.groupId,
-      visitDate,
-      checkinTime,
-      visit.addedBy
-    ];
+    const sql = "INSERT INTO visits (id, churchId, personId, serviceId, groupId, visitDate, checkinTime, addedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [visit.id, visit.churchId, visit.personId, visit.serviceId, visit.groupId, visitDate, checkinTime, visit.addedBy];
     await DB.query(sql, params);
     return visit;
   }
@@ -33,18 +23,8 @@ export class VisitRepository {
   private async update(visit: Visit) {
     const visitDate = DateHelper.toMysqlDate(visit.visitDate);
     const checkinTime = DateHelper.toMysqlDate(visit.checkinTime);
-    const sql =
-      "UPDATE visits SET personId=?, serviceId=?, groupId=?, visitDate=?, checkinTime=?, addedBy=? WHERE id=? and churchId=?";
-    const params = [
-      visit.personId,
-      visit.serviceId,
-      visit.groupId,
-      visitDate,
-      checkinTime,
-      visit.addedBy,
-      visit.id,
-      visit.churchId
-    ];
+    const sql = "UPDATE visits SET personId=?, serviceId=?, groupId=?, visitDate=?, checkinTime=?, addedBy=? WHERE id=? and churchId=?";
+    const params = [visit.personId, visit.serviceId, visit.groupId, visitDate, checkinTime, visit.addedBy, visit.id, visit.churchId];
     await DB.query(sql, params);
     return visit;
   }
@@ -62,11 +42,7 @@ export class VisitRepository {
   }
 
   public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    return DB.query("SELECT * FROM visits WHERE churchId=? AND visitDate BETWEEN ? AND ?;", [
-      churchId,
-      DateHelper.toMysqlDate(startDate),
-      DateHelper.toMysqlDate(endDate)
-    ]);
+    return DB.query("SELECT * FROM visits WHERE churchId=? AND visitDate BETWEEN ? AND ?;", [churchId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]);
   }
 
   public loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
@@ -81,10 +57,7 @@ export class VisitRepository {
 
   public loadByServiceDatePeopleIds(churchId: string, serviceId: string, visitDate: Date, peopleIds: string[]) {
     const vsDate = DateHelper.toMysqlDate(visitDate);
-    const sql =
-      "SELECT * FROM visits WHERE churchId=? AND serviceId = ? AND visitDate = ? AND personId IN (" +
-      ArrayHelper.fillArray("?", peopleIds.length).join(", ") +
-      ")";
+    const sql = "SELECT * FROM visits WHERE churchId=? AND serviceId = ? AND visitDate = ? AND personId IN (" + ArrayHelper.fillArray("?", peopleIds.length).join(", ") + ")";
     const params = [churchId, serviceId, vsDate].concat(peopleIds);
     return DB.query(sql, params);
   }
@@ -93,10 +66,7 @@ export class VisitRepository {
     let result = new Date();
     result.setHours(0, 0, 0, 0);
 
-    const sql =
-      "SELECT max(visitDate) as visitDate FROM visits WHERE churchId=? AND serviceId = ? AND personId IN (" +
-      ArrayHelper.fillArray("?", peopleIds.length).join(", ") +
-      ")";
+    const sql = "SELECT max(visitDate) as visitDate FROM visits WHERE churchId=? AND serviceId = ? AND personId IN (" + ArrayHelper.fillArray("?", peopleIds.length).join(", ") + ")";
     const params = [churchId, serviceId].concat(peopleIds);
     const data: any = await DB.queryOne(sql, params);
 

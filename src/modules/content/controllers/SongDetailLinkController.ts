@@ -7,22 +7,14 @@ import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper";
 @controller("/content/songDetailLinks")
 export class SongDetailLinkController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       return await this.repositories.songDetailLink.load(id);
     });
   }
 
   @httpGet("/songDetail/:songDetailId")
-  public async getForSongDetail(
-    @requestParam("songDetailId") songDetailId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getForSongDetail(@requestParam("songDetailId") songDetailId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       return await this.repositories.songDetailLink.loadForSongDetail(songDetailId);
     });

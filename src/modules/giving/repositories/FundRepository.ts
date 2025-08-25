@@ -6,9 +6,7 @@ import { Fund } from "../models";
 @injectable()
 export class FundRepository {
   public async getOrCreateGeneral(churchId: string) {
-    const data = await DB.queryOne("SELECT * FROM funds WHERE churchId=? AND name='(General Fund)' AND removed=0;", [
-      churchId
-    ]);
+    const data = await DB.queryOne("SELECT * FROM funds WHERE churchId=? AND name='(General Fund)' AND removed=0;", [churchId]);
 
     if (data !== null) return this.convertToModel(churchId, data);
     else {

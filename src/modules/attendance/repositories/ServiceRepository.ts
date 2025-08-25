@@ -37,18 +37,11 @@ export class ServiceRepository {
   }
 
   public loadWithCampus(churchId: string) {
-    return DB.query(
-      "SELECT s.*, c.name as campusName FROM services s INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=? AND s.removed=0 and c.removed=0 ORDER BY c.name, s.name",
-      [churchId]
-    );
+    return DB.query("SELECT s.*, c.name as campusName FROM services s INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=? AND s.removed=0 and c.removed=0 ORDER BY c.name, s.name", [churchId]);
   }
 
   public searchByCampus(churchId: string, campusId: string) {
-    return DB.query("SELECT * FROM services WHERE churchId=? AND (?=0 OR CampusId=?) AND removed=0 ORDER by name;", [
-      churchId,
-      campusId,
-      campusId
-    ]);
+    return DB.query("SELECT * FROM services WHERE churchId=? AND (?=0 OR CampusId=?) AND removed=0 ORDER by name;", [churchId, campusId, campusId]);
   }
 
   public convertToModel(churchId: string, data: any) {

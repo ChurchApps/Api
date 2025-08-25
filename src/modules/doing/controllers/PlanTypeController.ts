@@ -16,11 +16,7 @@ export class PlanTypeController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.planType.load(au.churchId, id);
     });
@@ -34,11 +30,7 @@ export class PlanTypeController extends DoingBaseController {
   }
 
   @httpGet("/ministryId/:ministryId")
-  public async getByMinistryId(
-    @requestParam("ministryId") ministryId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getByMinistryId(@requestParam("ministryId") ministryId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.planType.loadByMinistryId(au.churchId, ministryId);
     });
@@ -50,7 +42,7 @@ export class PlanTypeController extends DoingBaseController {
       if (!req.body || !Array.isArray(req.body)) {
         return this.json({ error: "Request body must be an array of PlanType objects" });
       }
-      
+
       const promises: Promise<PlanType>[] = [];
       req.body.forEach((planType) => {
         planType.churchId = au.churchId;
@@ -62,11 +54,7 @@ export class PlanTypeController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.planType.delete(au.churchId, id);
       return {};

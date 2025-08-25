@@ -8,11 +8,7 @@ import { Permissions } from "../../../shared/helpers/Permissions";
 @controller("/giving/paymentmethods")
 export class PaymentMethodController extends GivingBaseController {
   @httpGet("/personid/:id")
-  public async getPersonPaymentMethods(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const secretKey = await this.loadPrivateKey(au.churchId);
       const permission = secretKey && (au.checkAccess(Permissions.donations.view) || id === au.personId);
@@ -108,13 +104,7 @@ export class PaymentMethodController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const secretKey = await this.loadPrivateKey(au.churchId);
       const { paymentMethodId, customerId, amountData } = req.body;
-      const permission =
-        secretKey &&
-        (au.checkAccess(Permissions.donations.edit) ||
-          (await this.repositories.customer.convertToModel(
-            au.churchId,
-            await this.repositories.customer.load(au.churchId, customerId)
-          ).personId) === au.personId);
+      const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || (await this.repositories.customer.convertToModel(au.churchId, await this.repositories.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
         try {
@@ -127,21 +117,10 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpDelete("/:id/:customerid")
-  public async delete(
-    @requestParam("id") id: string,
-    @requestParam("customerid") customerId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const secretKey = await this.loadPrivateKey(au.churchId);
-      const permission =
-        secretKey &&
-        (au.checkAccess(Permissions.donations.edit) ||
-          (await this.repositories.customer.convertToModel(
-            au.churchId,
-            await this.repositories.customer.load(au.churchId, customerId)
-          ).personId) === au.personId);
+      const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || (await this.repositories.customer.convertToModel(au.churchId, await this.repositories.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
         const paymentType = id.substring(0, 2);

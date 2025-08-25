@@ -1,14 +1,4 @@
-import {
-  BlockedIpRepository,
-  ConnectionRepository,
-  ConversationRepository,
-  DeviceRepository,
-  DeviceContentRepository,
-  MessageRepository,
-  NotificationRepository,
-  NotificationPreferenceRepository,
-  PrivateMessageRepository
-} from ".";
+import { BlockedIpRepository, ConnectionRepository, ConversationRepository, DeviceRepository, DeviceContentRepository, MessageRepository, NotificationRepository, NotificationPreferenceRepository, PrivateMessageRepository } from ".";
 
 export class Repositories {
   public blockedIp: BlockedIpRepository;

@@ -97,115 +97,69 @@ export class TaskRepository {
     return DB.queryOne("SELECT * FROM tasks WHERE id=? AND churchId=? order by taskNumber;", [id, churchId]);
   }
 
-  public async loadByAutomationIdContent(
-    churchId: string,
-    automationId: string,
-    recurs: string,
-    associatedWithType: string,
-    associatedWithIds: string[]
-  ) {
+  public async loadByAutomationIdContent(churchId: string, automationId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
     let result: any[] = [];
     switch (recurs) {
       case "yearly":
-        result = (await this.loadByAutomationIdContentYearly(
-          churchId,
-          automationId,
-          associatedWithType,
-          associatedWithIds
-        )) as any[];
+        result = (await this.loadByAutomationIdContentYearly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
         break;
       case "monthly":
-        result = (await this.loadByAutomationIdContentMonthly(
-          churchId,
-          automationId,
-          associatedWithType,
-          associatedWithIds
-        )) as any[];
+        result = (await this.loadByAutomationIdContentMonthly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
         break;
       default:
-        result = (await this.loadByAutomationIdContentNoRepeat(
-          churchId,
-          automationId,
-          associatedWithType,
-          associatedWithIds
-        )) as any[];
+        result = (await this.loadByAutomationIdContentNoRepeat(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
         break;
     }
     return result;
   }
 
-  private async loadByAutomationIdContentNoRepeat(
-    churchId: string,
-    automationId: string,
-    associatedWithType: string,
-    associatedWithIds: string[]
-  ) {
-    const result = await DB.query(
-      "SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) order by taskNumber;",
-      [churchId, automationId, associatedWithType, associatedWithIds]
-    );
+  private async loadByAutomationIdContentNoRepeat(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
+    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) order by taskNumber;", [churchId, automationId, associatedWithType, associatedWithIds]);
     return result;
   }
 
-  private async loadByAutomationIdContentYearly(
-    churchId: string,
-    automationId: string,
-    associatedWithType: string,
-    associatedWithIds: string[]
-  ) {
+  private async loadByAutomationIdContentYearly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
     const threshold = new Date();
     threshold.setFullYear(threshold.getFullYear() - 1);
-    const result = await DB.query(
-      "SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;",
-      [churchId, automationId, associatedWithType, associatedWithIds, threshold]
-    );
+    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
+      churchId,
+      automationId,
+      associatedWithType,
+      associatedWithIds,
+      threshold
+    ]);
     return result;
   }
 
-  private async loadByAutomationIdContentMonthly(
-    churchId: string,
-    automationId: string,
-    associatedWithType: string,
-    associatedWithIds: string[]
-  ) {
+  private async loadByAutomationIdContentMonthly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
     const threshold = new Date();
     threshold.setMonth(threshold.getMonth() - 1);
-    const result = await DB.query(
-      "SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;",
-      [churchId, automationId, associatedWithType, associatedWithIds, threshold]
-    );
+    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
+      churchId,
+      automationId,
+      associatedWithType,
+      associatedWithIds,
+      threshold
+    ]);
     return result;
   }
 
   private async loadNextTaskNumber(churchId: string) {
-    const result = await DB.queryOne(
-      "select max(ifnull(taskNumber, 0)) + 1 as taskNumber from tasks where churchId=?",
-      [churchId]
-    );
+    const result = await DB.queryOne("select max(ifnull(taskNumber, 0)) + 1 as taskNumber from tasks where churchId=?", [churchId]);
     return (result as any).taskNumber;
   }
 
   public loadForPerson(churchId: string, personId: string, status: string) {
-    return DB.query(
-      "SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='person' AND assignedToId=?) OR (createdByType='person' AND createdById=?)) and status=? order by taskNumber;",
-      [churchId, personId, personId, status]
-    );
+    return DB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='person' AND assignedToId=?) OR (createdByType='person' AND createdById=?)) and status=? order by taskNumber;", [churchId, personId, personId, status]);
   }
 
   public async loadForGroups(churchId: string, groupIds: string[], status: string) {
     if (groupIds.length === 0) return [];
-    else
-      return DB.query(
-        "SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;",
-        [churchId, groupIds, groupIds, status]
-      );
+    else return DB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;", [churchId, groupIds, groupIds, status]);
   }
 
   public async loadForDirectoryUpdate(churchId: string, personId: string) {
-    return DB.query(
-      "SELECT * FROM tasks WHERE taskType='directoryUpdate' AND status='Open' AND churchId=? AND associatedWithId=?;",
-      [churchId, personId]
-    );
+    return DB.query("SELECT * FROM tasks WHERE taskType='directoryUpdate' AND status='Open' AND churchId=? AND associatedWithId=?;", [churchId, personId]);
   }
 
   public loadAll(churchId: string) {

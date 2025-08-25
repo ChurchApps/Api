@@ -7,11 +7,7 @@ import { Permissions } from "../../../shared/helpers";
 @controller("/attendance/campuses")
 export class CampusController extends AttendanceBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return this.repositories.campus.convertToModel(au.churchId, await this.repositories.campus.load(au.churchId, id));
     });
@@ -43,11 +39,7 @@ export class CampusController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       else {

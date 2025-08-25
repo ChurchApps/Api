@@ -7,11 +7,7 @@ import { Permissions } from "../../../shared/helpers";
 @controller("/attendance/groupservicetimes")
 export class GroupServiceTimeController extends AttendanceBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.groupServiceTime.load(au.churchId, id);
       const dataArray = (data as any)?.rows || data || [];
@@ -23,8 +19,7 @@ export class GroupServiceTimeController extends AttendanceBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       let result = null;
-      if (req.query.groupId !== undefined)
-        result = await this.repositories.groupServiceTime.loadWithServiceNames(au.churchId, req.query.groupId.toString());
+      if (req.query.groupId !== undefined) result = await this.repositories.groupServiceTime.loadWithServiceNames(au.churchId, req.query.groupId.toString());
       else result = await this.repositories.groupServiceTime.loadAll(au.churchId);
       const resultArray = (result as any)?.rows || result || [];
       return this.repositories.groupServiceTime.convertAllToModel(au.churchId, resultArray);
@@ -48,11 +43,7 @@ export class GroupServiceTimeController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
       else {

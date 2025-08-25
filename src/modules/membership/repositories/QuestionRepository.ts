@@ -11,41 +11,15 @@ export class QuestionRepository {
 
   private async create(question: Question) {
     question.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO questions (id, churchId, formId, parentId, title, description, fieldType, placeholder, sort, required, choices, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);";
-    const params = [
-      question.id,
-      question.churchId,
-      question.formId,
-      question.parentId,
-      question.title,
-      question.description,
-      question.fieldType,
-      question.placeholder,
-      question.sort,
-      question.required,
-      JSON.stringify(question.choices)
-    ];
+    const sql = "INSERT INTO questions (id, churchId, formId, parentId, title, description, fieldType, placeholder, sort, required, choices, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);";
+    const params = [question.id, question.churchId, question.formId, question.parentId, question.title, question.description, question.fieldType, question.placeholder, question.sort, question.required, JSON.stringify(question.choices)];
     await DB.query(sql, params);
     return question;
   }
 
   private async update(question: Question) {
-    const sql =
-      "UPDATE questions SET formId=?, parentId=?, title=?, description=?, fieldType=?, placeholder=?, sort=?, required=?, choices=? WHERE id=? and churchId=?";
-    const params = [
-      question.formId,
-      question.parentId,
-      question.title,
-      question.description,
-      question.fieldType,
-      question.placeholder,
-      question.sort,
-      question.required,
-      JSON.stringify(question.choices),
-      question.id,
-      question.churchId
-    ];
+    const sql = "UPDATE questions SET formId=?, parentId=?, title=?, description=?, fieldType=?, placeholder=?, sort=?, required=?, choices=? WHERE id=? and churchId=?";
+    const params = [question.formId, question.parentId, question.title, question.description, question.fieldType, question.placeholder, question.sort, question.required, JSON.stringify(question.choices), question.id, question.churchId];
     await DB.query(sql, params);
     return question;
   }
@@ -55,14 +29,8 @@ export class QuestionRepository {
       formId: string;
       sort: number;
     };
-    const result = await DB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort>?;", [
-      question.formId,
-      +question.sort
-    ]);
-    return DB.query("UPDATE questions SET sort=CONCAT('d', sort), removed=1 WHERE id=? AND churchId=?;", [
-      id,
-      churchId
-    ]);
+    const result = await DB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort>?;", [question.formId, +question.sort]);
+    return DB.query("UPDATE questions SET sort=CONCAT('d', sort), removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public load(churchId: string, id: string) {
@@ -74,10 +42,7 @@ export class QuestionRepository {
   }
 
   public loadForForm(churchId: string, formId: string) {
-    return DB.query("SELECT * FROM questions WHERE churchId=? AND formId=? AND removed=0 ORDER BY sort;", [
-      churchId,
-      formId
-    ]);
+    return DB.query("SELECT * FROM questions WHERE churchId=? AND formId=? AND removed=0 ORDER BY sort;", [churchId, formId]);
   }
 
   public loadForUnrestrictedForm(formId: string) {
@@ -89,10 +54,7 @@ export class QuestionRepository {
       formId: string;
       sort: number;
     };
-    let result = await DB.query("UPDATE questions SET sort=sort+1 WHERE formId=? AND sort=?;", [
-      question.formId,
-      +question.sort - 1
-    ]);
+    let result = await DB.query("UPDATE questions SET sort=sort+1 WHERE formId=? AND sort=?;", [question.formId, +question.sort - 1]);
     result = await DB.query("UPDATE questions SET sort=sort-1 WHERE id=?;", [id]);
   }
 
@@ -101,10 +63,7 @@ export class QuestionRepository {
       formId: string;
       sort: number;
     };
-    let result = await DB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort=?;", [
-      question.formId,
-      +question.sort + 1
-    ]);
+    let result = await DB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort=?;", [question.formId, +question.sort + 1]);
     result = await DB.query("UPDATE questions SET sort=sort+1 WHERE id=?;", [id]);
   }
 

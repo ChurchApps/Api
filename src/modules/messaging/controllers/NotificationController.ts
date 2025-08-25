@@ -7,12 +7,7 @@ import { NotificationHelper } from "../helpers/NotificationHelper";
 @controller("/messaging/notifications")
 export class NotificationController extends MessagingBaseController {
   @httpGet("/:churchId/person/:personId")
-  public async loadByPerson(
-    @requestParam("churchId") churchId: string,
-    @requestParam("personId") personId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<Notification[]> {
+  public async loadByPerson(@requestParam("churchId") churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification[]> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.notification.loadByPersonId(au.churchId, personId);
       return this.repositories.notification.convertAllToModel(data as any[]);
@@ -20,12 +15,7 @@ export class NotificationController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(
-    @requestParam("churchId") churchId: string,
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<Notification> {
+  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.notification.loadById(au.churchId, id);
       return this.repositories.notification.convertToModel(data);
@@ -46,12 +36,7 @@ export class NotificationController extends MessagingBaseController {
   }
 
   @httpPost("/markRead/:churchId/:personId")
-  public async markRead(
-    @requestParam("churchId") churchId: string,
-    @requestParam("personId") personId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<void> {
+  public async markRead(@requestParam("churchId") churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.notification.markRead(au.churchId, personId);
     }) as any;
@@ -86,27 +71,14 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/create")
   public async create(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return await NotificationHelper.createNotifications(
-        req.body.peopleIds,
-        au.churchId,
-        req.body.contentType,
-        req.body.contentId,
-        req.body.message,
-        req.body?.link
-      );
+      return await NotificationHelper.createNotifications(req.body.peopleIds, au.churchId, req.body.contentType, req.body.contentId, req.body.message, req.body?.link);
     }) as any;
   }
 
   @httpPost("/ping")
   public async ping(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await NotificationHelper.createNotifications(
-        [req.body.personId],
-        req.body.churchId,
-        req.body.contentType,
-        req.body.contentId,
-        req.body.message
-      );
+      return await NotificationHelper.createNotifications([req.body.personId], req.body.churchId, req.body.contentType, req.body.contentId, req.body.message);
     }) as any;
   }
 
@@ -118,12 +90,7 @@ export class NotificationController extends MessagingBaseController {
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(
-    @requestParam("churchId") churchId: string,
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<void> {
+  public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.notification.delete(au.churchId, id);
     }) as any;

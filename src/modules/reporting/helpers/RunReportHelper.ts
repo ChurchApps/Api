@@ -1,6 +1,6 @@
 import { ArrayHelper } from "@churchapps/apihelper";
 import { Parameter, Query, Report } from "../models";
-import { ReportingRepositories } from "../repositories/ReportingRepositories";
+import { Repositories } from "../repositories/Repositories";
 import { RepositoryManager } from "../../../shared/infrastructure";
 
 export class RunReportHelper {
@@ -58,8 +58,8 @@ export class RunReportHelper {
     storedSql.match(/:[A-Za-z0-9]{1,99}/g)?.forEach((m) => {
       sql = sql.replace(m, "?");
     });
-    
-    const repos = await RepositoryManager.getRepositories<ReportingRepositories>("reporting");
+
+    const repos = await RepositoryManager.getRepositories<Repositories>("reporting");
     query.value = await repos.report.run(query.db, sql, parameters);
   }
 }

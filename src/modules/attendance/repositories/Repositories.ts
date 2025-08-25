@@ -1,13 +1,4 @@
-import {
-  AttendanceRepository,
-  CampusRepository,
-  GroupServiceTimeRepository,
-  ServiceRepository,
-  ServiceTimeRepository,
-  SessionRepository,
-  VisitRepository,
-  VisitSessionRepository
-} from ".";
+import { AttendanceRepository, CampusRepository, GroupServiceTimeRepository, ServiceRepository, ServiceTimeRepository, SessionRepository, VisitRepository, VisitSessionRepository } from ".";
 
 export class Repositories {
   public attendance: AttendanceRepository;

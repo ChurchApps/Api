@@ -6,22 +6,14 @@ import { Conjunction } from "../models";
 @controller("/doing/conjunctions")
 export class ConjunctionController extends DoingBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.conjunction.load(au.churchId, id);
     });
   }
 
   @httpGet("/automation/:id")
-  public async getForAutomation(
-    @requestParam("id") automationId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getForAutomation(@requestParam("id") automationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.conjunction.loadForAutomation(au.churchId, automationId);
     });
@@ -41,11 +33,7 @@ export class ConjunctionController extends DoingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.conjunction.delete(au.churchId, id);
       return {};

@@ -3,13 +3,7 @@ import { Link } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 
 export class StreamingConfigHelper {
-  static generateJson = (
-    churchId: string,
-    tabs: Link[],
-    links: Link[],
-    services: StreamingService[],
-    sermons: Sermon[]
-  ) => {
+  static generateJson = (churchId: string, tabs: Link[], links: Link[], services: StreamingService[], sermons: Sermon[]) => {
     const result: any = {};
     result.churchId = churchId;
     result.buttons = [];

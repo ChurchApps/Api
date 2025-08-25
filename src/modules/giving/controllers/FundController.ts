@@ -7,11 +7,7 @@ import { Permissions } from "../../../shared/helpers/Permissions";
 @controller("/giving/funds")
 export class FundController extends GivingBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
       else {
@@ -21,11 +17,7 @@ export class FundController extends GivingBaseController {
   }
 
   @httpGet("/churchId/:churchId")
-  public async getForChurch(
-    @requestParam("churchId") churchId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return this.repositories.fund.convertAllToModel(churchId, (await this.repositories.fund.loadAll(churchId)) as any[]);
     });
@@ -55,11 +47,7 @@ export class FundController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json([], 401);
       else {

@@ -6,5 +6,4 @@ export { ServiceTimeRepository } from "./ServiceTimeRepository";
 export { SessionRepository } from "./SessionRepository";
 export { VisitRepository } from "./VisitRepository";
 export { VisitSessionRepository } from "./VisitSessionRepository";
-export { AttendanceRepositories } from "./AttendanceRepositories";
 export { Repositories } from "./Repositories";

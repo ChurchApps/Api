@@ -8,10 +8,7 @@ export class PrivateMessageRepository {
   }
 
   public loadByPersonId(churchId: string, personId: string) {
-    return DB.query(
-      "SELECT pm.*, c.title FROM privateMessages pm INNER JOIN conversations c on c.id=pm.conversationId WHERE pm.churchId=? AND (pm.fromPersonId=? OR pm.toPersonId=?) ORDER BY c.dateCreated DESC",
-      [churchId, personId, personId]
-    );
+    return DB.query("SELECT pm.*, c.title FROM privateMessages pm INNER JOIN conversations c on c.id=pm.conversationId WHERE pm.churchId=? AND (pm.fromPersonId=? OR pm.toPersonId=?) ORDER BY c.dateCreated DESC", [churchId, personId, personId]);
   }
 
   public loadByChurchId(churchId: string) {
@@ -28,33 +25,15 @@ export class PrivateMessageRepository {
 
   private async create(privateMessage: PrivateMessage): Promise<PrivateMessage> {
     privateMessage.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO privateMessages (id, churchId, fromPersonId, toPersonId, conversationId, notifyPersonId, deliveryMethod) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      privateMessage.id,
-      privateMessage.churchId,
-      privateMessage.fromPersonId,
-      privateMessage.toPersonId,
-      privateMessage.conversationId,
-      privateMessage.notifyPersonId,
-      privateMessage.deliveryMethod
-    ];
+    const sql = "INSERT INTO privateMessages (id, churchId, fromPersonId, toPersonId, conversationId, notifyPersonId, deliveryMethod) VALUES (?, ?, ?, ?, ?, ?, ?);";
+    const params = [privateMessage.id, privateMessage.churchId, privateMessage.fromPersonId, privateMessage.toPersonId, privateMessage.conversationId, privateMessage.notifyPersonId, privateMessage.deliveryMethod];
     await DB.query(sql, params);
     return privateMessage;
   }
 
   private async update(privateMessage: PrivateMessage) {
-    const sql =
-      "UPDATE privateMessages SET fromPersonId=?, toPersonId=?, conversationId=?, notifyPersonId=?, deliveryMethod=? WHERE id=? AND churchId=?;";
-    const params = [
-      privateMessage.fromPersonId,
-      privateMessage.toPersonId,
-      privateMessage.conversationId,
-      privateMessage.notifyPersonId,
-      privateMessage.deliveryMethod,
-      privateMessage.id,
-      privateMessage.churchId
-    ];
+    const sql = "UPDATE privateMessages SET fromPersonId=?, toPersonId=?, conversationId=?, notifyPersonId=?, deliveryMethod=? WHERE id=? AND churchId=?;";
+    const params = [privateMessage.fromPersonId, privateMessage.toPersonId, privateMessage.conversationId, privateMessage.notifyPersonId, privateMessage.deliveryMethod, privateMessage.id, privateMessage.churchId];
     await DB.query(sql, params);
     return privateMessage;
   }
@@ -79,10 +58,7 @@ export class PrivateMessageRepository {
   }
 
   public loadByConversationId(churchId: string, conversationId: string) {
-    return DB.queryOne("SELECT * FROM privateMessages WHERE churchId=? AND conversationId=?", [
-      churchId,
-      conversationId
-    ]);
+    return DB.queryOne("SELECT * FROM privateMessages WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
   }
 
   public loadUndelivered() {

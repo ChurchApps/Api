@@ -127,10 +127,7 @@ export class PersonRepository {
   }
 
   public loadMembers(churchId: string) {
-    return DB.query(
-      "SELECT * FROM people WHERE churchId=? AND removed=0 and membershipStatus in ('Member', 'Staff');",
-      [churchId]
-    );
+    return DB.query("SELECT * FROM people WHERE churchId=? AND removed=0 and membershipStatus in ('Member', 'Staff');", [churchId]);
   }
 
   public loadAll(churchId: string) {
@@ -139,12 +136,7 @@ export class PersonRepository {
 
   public loadRecent(churchId: string, filterOptedOut?: boolean) {
     const filter = filterOptedOut ? " AND (optedOut = FALSE OR optedOut IS NULL)" : "";
-    return DB.query(
-      "SELECT * FROM (SELECT * FROM people WHERE churchId=? AND removed=0" +
-        filter +
-        " order by id desc limit 25) people ORDER BY lastName, firstName;",
-      [churchId]
-    );
+    return DB.query("SELECT * FROM (SELECT * FROM people WHERE churchId=? AND removed=0" + filter + " order by id desc limit 25) people ORDER BY lastName, firstName;", [churchId]);
   }
 
   public loadByHousehold(churchId: string, householdId: string) {
@@ -153,39 +145,27 @@ export class PersonRepository {
 
   public search(churchId: string, term: string, filterOptedOut?: boolean) {
     const filter = filterOptedOut ? " AND (optedOut = FALSE OR optedOut IS NULL)" : "";
-    return DB.query(
-      "SELECT * FROM people WHERE churchId=? AND concat(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,'')) LIKE ? AND removed=0" +
-        filter +
-        " LIMIT 100;",
-      [churchId, "%" + term.replace(" ", "%") + "%"]
-    );
+    return DB.query("SELECT * FROM people WHERE churchId=? AND concat(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,'')) LIKE ? AND removed=0" + filter + " LIMIT 100;", [
+      churchId,
+      "%" + term.replace(" ", "%") + "%"
+    ]);
   }
 
   public searchPhone(churchId: string, phonestring: string) {
     const phoneSearch = "%" + phonestring.replace(/ |-/g, "%") + "%";
-    return DB.query(
-      "SELECT * FROM people WHERE churchId=? AND (REPLACE(REPLACE(HomePhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(WorkPhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(MobilePhone,'-',''), ' ', '') LIKE ?) AND removed=0 LIMIT 100;",
-      [churchId, phoneSearch, phoneSearch, phoneSearch]
-    );
-  }
-
-  public searchEmail(churchId: string, email: string) {
-    return DB.query("SELECT * FROM people WHERE churchId=? AND email like ? AND removed=0 LIMIT 100;", [
+    return DB.query("SELECT * FROM people WHERE churchId=? AND (REPLACE(REPLACE(HomePhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(WorkPhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(MobilePhone,'-',''), ' ', '') LIKE ?) AND removed=0 LIMIT 100;", [
       churchId,
-      "%" + email + "%"
+      phoneSearch,
+      phoneSearch,
+      phoneSearch
     ]);
   }
 
-  public loadAttendees(
-    churchId: string,
-    campusId: string,
-    serviceId: string,
-    serviceTimeId: string,
-    categoryName: string,
-    groupId: string,
-    startDate: Date,
-    endDate: Date
-  ) {
+  public searchEmail(churchId: string, email: string) {
+    return DB.query("SELECT * FROM people WHERE churchId=? AND email like ? AND removed=0 LIMIT 100;", [churchId, "%" + email + "%"]);
+  }
+
+  public loadAttendees(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, categoryName: string, groupId: string, startDate: Date, endDate: Date) {
     const params = [];
     params.push(churchId);
     params.push(startDate);

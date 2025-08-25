@@ -9,18 +9,10 @@ import axios from "axios";
 @controller("/membership/formsubmissions")
 export class FormSubmissionController extends MembershipBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit))
-        return this.json({}, 401);
-      const result: FormSubmission = this.repositories.formSubmission.convertToModel(
-        au.churchId,
-        await this.repositories.formSubmission.load(au.churchId, id)
-      );
+      if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
+      const result: FormSubmission = this.repositories.formSubmission.convertToModel(au.churchId, await this.repositories.formSubmission.load(au.churchId, id));
       if (this.include(req, "form")) await this.appendForm(au.churchId, result);
       if (this.include(req, "questions")) await this.appendQuestions(au.churchId, result);
       if (this.include(req, "answers")) await this.appendAnswers(au.churchId, result);
@@ -31,18 +23,11 @@ export class FormSubmissionController extends MembershipBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit))
-        return this.json({}, 401);
+      if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
         let result = null;
-        if (req.query.personId !== undefined)
-          result = await this.repositories.formSubmission.loadForContent(
-            au.churchId,
-            "person",
-            req.query.personId.toString()
-          );
-        else if (req.query.formId !== undefined)
-          result = await this.repositories.formSubmission.loadByFormId(au.churchId, req.query.formId.toString());
+        if (req.query.personId !== undefined) result = await this.repositories.formSubmission.loadForContent(au.churchId, "person", req.query.personId.toString());
+        else if (req.query.formId !== undefined) result = await this.repositories.formSubmission.loadByFormId(au.churchId, req.query.formId.toString());
         else result = await this.repositories.formSubmission.loadAll(au.churchId);
         return this.repositories.formSubmission.convertAllToModel(au.churchId, result);
       }
@@ -50,18 +35,11 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   @httpGet("/formId/:formId")
-  public async getByFormId(
-    @requestParam("formId") formId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getByFormId(@requestParam("formId") formId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.formAccess(au, formId)) return this.json([], 401);
       else {
-        const formSubmissions = await this.repositories.formSubmission.convertAllToModel(
-          au.churchId,
-          (await this.repositories.formSubmission.loadByFormId(au.churchId, formId)) as any[]
-        );
+        const formSubmissions = await this.repositories.formSubmission.convertAllToModel(au.churchId, (await this.repositories.formSubmission.loadByFormId(au.churchId, formId)) as any[]);
         const promises: Promise<FormSubmission>[] = [];
         formSubmissions.forEach((formSubmission: FormSubmission) => {
           promises.push(this.appendForm(au.churchId, formSubmission));
@@ -131,33 +109,15 @@ export class FormSubmissionController extends MembershipBaseController {
           formSubmission.questions.forEach((q) => {
             formSubmission.answers.forEach((a) => {
               if (q.id === a.questionId) {
-                contentRows.push(
-                  "<tr><th style=\"font-size: 16px\" width=\"30%\">" +
-                  q.title +
-                  "</th><td style=\"font-size: 15px\">" +
-                  a.value +
-                  "</td></tr>"
-                );
+                contentRows.push('<tr><th style="font-size: 16px" width="30%">' + q.title + '</th><td style="font-size: 15px">' + a.value + "</td></tr>");
               }
             });
           });
 
-          const contents =
-            "<table role=\"presentation\" style=\"text-align: left;\" cellspacing=\"8\" width=\"80%\"><tablebody>" +
-            contentRows.join(" ") +
-            "</tablebody></table>";
+          const contents = '<table role="presentation" style="text-align: left;" cellspacing="8" width="80%"><tablebody>' + contentRows.join(" ") + "</tablebody></table>";
           const promises: Promise<any>[] = [];
           (people as any[]).forEach((p: Person) => {
-            promises.push(
-              EmailHelper.sendTemplatedEmail(
-                Environment.supportEmail,
-                p.email,
-                church.name,
-                Environment.chumsRoot,
-                "New Submissions for " + form.name,
-                contents
-              )
-            );
+            promises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, p.email, church.name, Environment.chumsRoot, "New Submissions for " + form.name, contents));
           });
           promises.push(this.sendNotifications(churchId, form, ids));
           await Promise.all(promises);
@@ -180,14 +140,9 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit))
-        return this.json({}, 401);
+      if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
         await this.repositories.answer.deleteForSubmission(au.churchId, id);
         await new Promise((resolve) => setTimeout(resolve, 500)); // I think it takes a split second for the FK restraints to see the answers were deleted sometimes and the delete below fails.

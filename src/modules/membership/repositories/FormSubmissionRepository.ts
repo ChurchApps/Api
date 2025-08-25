@@ -13,19 +13,8 @@ export class FormSubmissionRepository {
     const submissionDate = DateHelper.toMysqlDate(formSubmission.submissionDate);
     const revisionDate = DateHelper.toMysqlDate(formSubmission.revisionDate);
     formSubmission.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO formSubmissions (id, churchId, formId, contentType, contentId, submissionDate, submittedBy, revisionDate, revisedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      formSubmission.id,
-      formSubmission.churchId,
-      formSubmission.formId,
-      formSubmission.contentType,
-      formSubmission.contentId,
-      submissionDate,
-      formSubmission.submittedBy,
-      revisionDate,
-      formSubmission.revisedBy
-    ];
+    const sql = "INSERT INTO formSubmissions (id, churchId, formId, contentType, contentId, submissionDate, submittedBy, revisionDate, revisedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [formSubmission.id, formSubmission.churchId, formSubmission.formId, formSubmission.contentType, formSubmission.contentId, submissionDate, formSubmission.submittedBy, revisionDate, formSubmission.revisedBy];
     await DB.query(sql, params);
     return formSubmission;
   }
@@ -52,11 +41,7 @@ export class FormSubmissionRepository {
   }
 
   public loadForContent(churchId: string, contentType: string, contentId: string) {
-    return DB.query("SELECT * FROM formSubmissions WHERE churchId=? AND contentType=? AND contentId=?;", [
-      churchId,
-      contentType,
-      contentId
-    ]);
+    return DB.query("SELECT * FROM formSubmissions WHERE churchId=? AND contentType=? AND contentId=?;", [churchId, contentType, contentId]);
   }
 
   public loadByFormId(churchId: string, formId: string) {

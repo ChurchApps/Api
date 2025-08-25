@@ -10,33 +10,15 @@ export class RolePermissionRepository {
 
   private async create(rolePermission: RolePermission) {
     rolePermission.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, contentId, action) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      rolePermission.id,
-      rolePermission.churchId,
-      rolePermission.roleId,
-      rolePermission.apiName,
-      rolePermission.contentType,
-      rolePermission.contentId,
-      rolePermission.action
-    ];
+    const sql = "INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, contentId, action) VALUES (?, ?, ?, ?, ?, ?, ?);";
+    const params = [rolePermission.id, rolePermission.churchId, rolePermission.roleId, rolePermission.apiName, rolePermission.contentType, rolePermission.contentId, rolePermission.action];
     await DB.query(sql, params);
     return rolePermission;
   }
 
   private async update(rolePermission: RolePermission) {
-    const sql =
-      "UPDATE rolePermissions SET roleId=?, apiName=?, contentType=?, contentId=?, action=? WHERE id=? AND churchId=?";
-    const params = [
-      rolePermission.roleId,
-      rolePermission.apiName,
-      rolePermission.contentType,
-      rolePermission.contentId,
-      rolePermission.action,
-      rolePermission.id,
-      rolePermission.churchId
-    ];
+    const sql = "UPDATE rolePermissions SET roleId=?, apiName=?, contentType=?, contentId=?, action=? WHERE id=? AND churchId=?";
+    const params = [rolePermission.roleId, rolePermission.apiName, rolePermission.contentType, rolePermission.contentId, rolePermission.action, rolePermission.id, rolePermission.churchId];
     await DB.query(sql, params);
     return rolePermission;
   }
@@ -133,9 +115,9 @@ export class RolePermissionRepository {
     data.forEach((row: any) => {
       if (result === null) {
         result = {
-          church: { 
-            id: row.churchId, 
-            subDomain: row.subDomain, 
+          church: {
+            id: row.churchId,
+            subDomain: row.subDomain,
             name: row.churchName,
             archivedDate: row.archivedDate,
             address1: row.address1,
@@ -200,9 +182,9 @@ export class RolePermissionRepository {
     data.forEach((row: any) => {
       if (result === null) {
         result = {
-          church: { 
-            id: row.churchId, 
-            subDomain: row.subDomain, 
+          church: {
+            id: row.churchId,
+            subDomain: row.subDomain,
             name: row.churchName,
             archivedDate: row.archivedDate,
             address1: row.address1,
@@ -253,9 +235,7 @@ export class RolePermissionRepository {
   }
 
   public loadByRoleId(churchId: string, roleId: string): Promise<RolePermission[]> {
-    return DB.query("SELECT * FROM rolePermissions WHERE churchId=? AND roleId=?", [churchId, roleId]) as Promise<
-      RolePermission[]
-    >;
+    return DB.query("SELECT * FROM rolePermissions WHERE churchId=? AND roleId=?", [churchId, roleId]) as Promise<RolePermission[]>;
   }
 
   // permissions applied to all the members of church

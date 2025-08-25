@@ -20,29 +20,15 @@ export class ArrangementKeyRepository {
   private async create(arrangementKey: ArrangementKey) {
     arrangementKey.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO arrangementKeys (id, churchId, arrangementId, keySignature, shortDescription) VALUES (?, ?, ?, ?, ?);";
-    const params = [
-      arrangementKey.id,
-      arrangementKey.churchId,
-      arrangementKey.arrangementId,
-      arrangementKey.keySignature,
-      arrangementKey.shortDescription
-    ];
+    const sql = "INSERT INTO arrangementKeys (id, churchId, arrangementId, keySignature, shortDescription) VALUES (?, ?, ?, ?, ?);";
+    const params = [arrangementKey.id, arrangementKey.churchId, arrangementKey.arrangementId, arrangementKey.keySignature, arrangementKey.shortDescription];
     await TypedDB.query(sql, params);
     return arrangementKey;
   }
 
   private async update(arrangementKey: ArrangementKey) {
-    const sql =
-      "UPDATE arrangementKeys SET arrangementId=?, keySignature=?, shortDescription=? WHERE id=? and churchId=?";
-    const params = [
-      arrangementKey.arrangementId,
-      arrangementKey.keySignature,
-      arrangementKey.shortDescription,
-      arrangementKey.id,
-      arrangementKey.churchId
-    ];
+    const sql = "UPDATE arrangementKeys SET arrangementId=?, keySignature=?, shortDescription=? WHERE id=? and churchId=?";
+    const params = [arrangementKey.arrangementId, arrangementKey.keySignature, arrangementKey.shortDescription, arrangementKey.id, arrangementKey.churchId];
     await TypedDB.query(sql, params);
     return arrangementKey;
   }
@@ -52,10 +38,7 @@ export class ArrangementKeyRepository {
   }
 
   public deleteForArrangement(churchId: string, arrangementId: string) {
-    return TypedDB.query("DELETE FROM arrangementKeys WHERE churchId=? and arrangementId=?;", [
-      churchId,
-      arrangementId
-    ]);
+    return TypedDB.query("DELETE FROM arrangementKeys WHERE churchId=? and arrangementId=?;", [churchId, arrangementId]);
   }
 
   public loadAll(churchId: string) {
@@ -67,9 +50,6 @@ export class ArrangementKeyRepository {
   }
 
   public loadByArrangementId(churchId: string, arrangementId: string) {
-    return TypedDB.query("SELECT * FROM arrangementKeys where churchId=? and arrangementId=?;", [
-      churchId,
-      arrangementId
-    ]);
+    return TypedDB.query("SELECT * FROM arrangementKeys where churchId=? and arrangementId=?;", [churchId, arrangementId]);
   }
 }

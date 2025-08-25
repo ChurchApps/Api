@@ -24,11 +24,7 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.plan.load(au.churchId, id);
     });
@@ -42,11 +38,7 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpGet("/types/:planTypeId")
-  public async getByPlanTypeId(
-    @requestParam("planTypeId") planTypeId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getByPlanTypeId(@requestParam("planTypeId") planTypeId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.plan.loadByPlanTypeId(au.churchId, planTypeId);
     });
@@ -60,11 +52,7 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/autofill/:id")
-  public async autofill(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, { teams: { positionId: string; personIds: string[] }[] }>,
-    res: express.Response
-  ): Promise<any> {
+  public async autofill(@requestParam("id") id: string, req: express.Request<{}, {}, { teams: { positionId: string; personIds: string[] }[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const plan = await this.repositories.plan.load(au.churchId, id);
       const positions: Position[] = (await this.repositories.position.loadByPlanId(au.churchId, id)) as Position[];
@@ -79,11 +67,7 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/copy/:id")
-  public async copy(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, Plan>,
-    res: express.Response
-  ): Promise<any> {
+  public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const oldPlan = (await this.repositories.plan.load(au.churchId, id)) as Plan;
       const times: Time[] = (await this.repositories.time.loadByPlanId(au.churchId, id)) as Time[];
@@ -99,16 +83,8 @@ export class PlanController extends DoingBaseController {
       times.forEach((time) => {
         time.id = null as any;
         time.planId = plan.id;
-        time.startTime = this.adjustTime(
-          time.startTime || new Date(),
-          plan.serviceDate || new Date(),
-          oldPlan.serviceDate || new Date()
-        );
-        time.endTime = this.adjustTime(
-          time.endTime || new Date(),
-          plan.serviceDate || new Date(),
-          oldPlan.serviceDate || new Date()
-        );
+        time.startTime = this.adjustTime(time.startTime || new Date(), plan.serviceDate || new Date(), oldPlan.serviceDate || new Date());
+        time.endTime = this.adjustTime(time.endTime || new Date(), plan.serviceDate || new Date(), oldPlan.serviceDate || new Date());
         promises.push(this.repositories.time.save(time));
       });
       positions.forEach((position) => {
@@ -154,7 +130,7 @@ export class PlanController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       // Handle both single plan object and array of plans
       const plans = Array.isArray(req.body) ? req.body : [req.body];
-      
+
       const promises: Promise<Plan>[] = [];
       plans.forEach((plan) => {
         plan.churchId = au.churchId;
@@ -164,18 +140,14 @@ export class PlanController extends DoingBaseController {
         promises.push(this.repositories.plan.save(plan));
       });
       const result = await Promise.all(promises);
-      
+
       // Return single object if input was single object, array if input was array
       return Array.isArray(req.body) ? result : result[0];
     });
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.time.deleteByPlanId(au.churchId, id);
       await this.repositories.assignment.deleteByPlanId(au.churchId, id);

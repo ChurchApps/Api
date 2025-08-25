@@ -5,8 +5,7 @@ import { ViewerInterface } from "../helpers/Interfaces";
 
 export class ConnectionRepository {
   public async loadAttendance(churchId: string, conversationId: string) {
-    const sql =
-      "SELECT id, displayName, ipAddress FROM connections WHERE churchId=? AND conversationId=? ORDER BY displayName;";
+    const sql = "SELECT id, displayName, ipAddress FROM connections WHERE churchId=? AND conversationId=? ORDER BY displayName;";
     const result: any = await DB.query(sql, [churchId, conversationId]);
     const data: ViewerInterface[] = result.rows || result || [];
     data.forEach((d: ViewerInterface) => {
@@ -21,18 +20,12 @@ export class ConnectionRepository {
   }
 
   public async loadForConversation(churchId: string, conversationId: string) {
-    const result: any = await DB.query("SELECT * FROM connections WHERE churchId=? AND conversationId=?", [
-      churchId,
-      conversationId
-    ]);
+    const result: any = await DB.query("SELECT * FROM connections WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
     return result.rows || result || [];
   }
 
   public async loadForNotification(churchId: string, personId: string) {
-    const result: any = await DB.query(
-      "SELECT * FROM connections WHERE churchId=? AND personId=? and conversationId='alerts'",
-      [churchId, personId]
-    );
+    const result: any = await DB.query("SELECT * FROM connections WHERE churchId=? AND personId=? and conversationId='alerts'", [churchId, personId]);
     return result.rows || result || [];
   }
 
@@ -62,17 +55,8 @@ export class ConnectionRepository {
   private async create(connection: Connection): Promise<Connection> {
     connection.id = UniqueIdHelper.shortId();
     await this.deleteExisting(connection.churchId, connection.conversationId, connection.socketId, connection.id);
-    const sql =
-      "INSERT INTO connections (id, churchId, conversationId, personId, displayName, timeJoined, socketId, ipAddress) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?);";
-    const params = [
-      connection.id,
-      connection.churchId,
-      connection.conversationId,
-      connection.personId,
-      connection.displayName,
-      connection.socketId,
-      connection.ipAddress
-    ];
+    const sql = "INSERT INTO connections (id, churchId, conversationId, personId, displayName, timeJoined, socketId, ipAddress) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?);";
+    const params = [connection.id, connection.churchId, connection.conversationId, connection.personId, connection.displayName, connection.socketId, connection.ipAddress];
     await DB.query(sql, params);
     return connection;
   }

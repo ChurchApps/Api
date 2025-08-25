@@ -12,8 +12,7 @@ export class SectionRepository {
   public async create(section: Section) {
     if (!section.id) section.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const sql = "INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
       section.id,
       section.churchId,
@@ -35,8 +34,7 @@ export class SectionRepository {
   }
 
   private async update(section: Section) {
-    const sql =
-      "UPDATE sections SET pageId=?, blockId=?, zone=?, background=?, textColor=?, headingColor=?, linkColor=?, sort=?, targetBlockId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
+    const sql = "UPDATE sections SET pageId=?, blockId=?, zone=?, background=?, textColor=?, headingColor=?, linkColor=?, sort=?, targetBlockId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
     const params = [
       section.pageId,
       section.blockId,
@@ -94,24 +92,14 @@ export class SectionRepository {
   }
 
   public loadForBlocks(churchId: string, blockIds: string[]) {
-    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND blockId IN (?) order by sort;", [
-      churchId,
-      blockIds
-    ]);
+    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND blockId IN (?) order by sort;", [churchId, blockIds]);
   }
 
   public loadForPage(churchId: string, pageId: string) {
-    return TypedDB.query(
-      "SELECT * FROM sections WHERE churchId=? AND (pageId=? or (pageId IS NULL and blockId IS NULL)) order by sort;",
-      [churchId, pageId]
-    );
+    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND (pageId=? or (pageId IS NULL and blockId IS NULL)) order by sort;", [churchId, pageId]);
   }
 
   public loadForZone(churchId: string, pageId: string, zone: string) {
-    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND pageId=? AND zone=? order by sort;", [
-      churchId,
-      pageId,
-      zone
-    ]);
+    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND pageId=? AND zone=? order by sort;", [churchId, pageId, zone]);
   }
 }

@@ -30,8 +30,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     const permList: string[] = [];
     api.permissions?.forEach((p) => {
       let permString = p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
-      if (p.apiName)
-        permString = p.apiName + "_" + p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
+      if (p.apiName) permString = p.apiName + "_" + p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
       permList.push(permString);
     });
 
@@ -83,11 +82,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
   }
 
   public static getUserJwt(user: User) {
-    return jwt.sign(
-      { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName },
-      Environment.jwtSecret,
-      { expiresIn: "180 days" }
-    );
+    return jwt.sign({ id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName }, Environment.jwtSecret, { expiresIn: "180 days" });
   }
 
   public static setJwt(allUserChurches: LoginUserChurch[], user: User) {

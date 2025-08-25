@@ -7,11 +7,7 @@ import { ContentBaseController } from "./ContentBaseController";
 @controller("/content/gallery")
 export class GalleryController extends ContentBaseController {
   @httpGet("/stock/:folder")
-  public async getStock(
-    @requestParam("folder") folder: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getStock(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const files = await FileStorageHelper.list("stockPhotos/" + folder);
       return { images: files };
@@ -19,11 +15,7 @@ export class GalleryController extends ContentBaseController {
   }
 
   @httpGet("/:folder")
-  public async getAll(
-    @requestParam("folder") folder: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getAll(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -34,10 +26,7 @@ export class GalleryController extends ContentBaseController {
   }
 
   @httpPost("/requestUpload")
-  public async getUploadUrl(
-    req: express.Request<{}, {}, { folder: string; fileName: string }>,
-    res: express.Response
-  ): Promise<any> {
+  public async getUploadUrl(req: express.Request<{}, {}, { folder: string; fileName: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       console.log("User Is", au.firstName);
       console.log("Permissions", au.permissions);
@@ -53,12 +42,7 @@ export class GalleryController extends ContentBaseController {
   }
 
   @httpDelete("/:folder/:image")
-  public async delete(
-    @requestParam("folder") folder: string,
-    @requestParam("image") image: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("folder") folder: string, @requestParam("image") image: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

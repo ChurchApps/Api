@@ -15,31 +15,20 @@ export class SubscriptionFundsRepository {
 
   private async create(subscriptionFund: SubscriptionFund) {
     subscriptionFund.id = UniqueIdHelper.shortId();
-    return DB.query(
-      "INSERT INTO subscriptionFunds (id, churchId, subscriptionId, fundId, amount) VALUES (?, ?, ?, ?, ?);",
-      [
-        subscriptionFund.id,
-        subscriptionFund.churchId,
-        subscriptionFund.subscriptionId,
-        subscriptionFund.fundId,
-        subscriptionFund.amount
-      ]
-    ).then(() => {
+    return DB.query("INSERT INTO subscriptionFunds (id, churchId, subscriptionId, fundId, amount) VALUES (?, ?, ?, ?, ?);", [
+      subscriptionFund.id,
+      subscriptionFund.churchId,
+      subscriptionFund.subscriptionId,
+      subscriptionFund.fundId,
+      subscriptionFund.amount
+    ]).then(() => {
       return subscriptionFund;
     });
   }
 
   private async update(subscriptionFund: SubscriptionFund) {
-    const sql =
-      "UPDATE subscriptionFunds SET churchId=?, subscriptionId=?, fundId=?, amount=? WHERE id=? and churchId=?";
-    const params = [
-      subscriptionFund.churchId,
-      subscriptionFund.subscriptionId,
-      subscriptionFund.fundId,
-      subscriptionFund.amount,
-      subscriptionFund.id,
-      subscriptionFund.churchId
-    ];
+    const sql = "UPDATE subscriptionFunds SET churchId=?, subscriptionId=?, fundId=?, amount=? WHERE id=? and churchId=?";
+    const params = [subscriptionFund.churchId, subscriptionFund.subscriptionId, subscriptionFund.fundId, subscriptionFund.amount, subscriptionFund.id, subscriptionFund.churchId];
     await DB.query(sql, params);
     return subscriptionFund;
   }
@@ -57,20 +46,14 @@ export class SubscriptionFundsRepository {
   }
 
   public loadBySubscriptionId(churchId: string, subscriptionId: string) {
-    const sql =
-      "SELECT subscriptionFunds.*, funds.name FROM subscriptionFunds" +
-      " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" +
-      " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
+    const sql = "SELECT subscriptionFunds.*, funds.name FROM subscriptionFunds" + " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" + " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
     return DB.query(sql, [churchId, subscriptionId]);
   }
 
   // If the fund gets deleted for a recurring donation, the donations will go to '(General Fund)'
   public async loadForSubscriptionLog(churchId: string, subscriptionId: string) {
     let result;
-    const sql =
-      "SELECT subscriptionFunds.*, funds.name, funds.removed FROM subscriptionFunds" +
-      " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" +
-      " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
+    const sql = "SELECT subscriptionFunds.*, funds.name, funds.removed FROM subscriptionFunds" + " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" + " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
     const subscriptionFund = await DB.query(sql, [churchId, subscriptionId]);
     if (subscriptionFund && subscriptionFund[0].removed === false) {
       const { removed: _removed, ...sf } = (subscriptionFund as any)[0];

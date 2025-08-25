@@ -10,11 +10,7 @@ import { Environment } from "../helpers";
 @controller("/content/streamingServices")
 export class StreamingServiceController extends ContentBaseController {
   @httpGet("/:id/hostChat")
-  public async getHostChatRoom(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getHostChatRoom(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       let room = "";
       if (au.checkAccess(Permissions.chat.host)) room = EncryptionHelper.encrypt(id);
@@ -33,9 +29,7 @@ export class StreamingServiceController extends ContentBaseController {
           if (!s.recurring) {
             promises.push(this.repositories.streamingService.delete(s.id, s.churchId));
             // remove blocked Ips
-            promises.push(
-              axios.post(Environment.messagingApi + "/blockedIps/clear", [{ serviceId: s.id, churchId: s.churchId }])
-            );
+            promises.push(axios.post(Environment.messagingApi + "/blockedIps/clear", [{ serviceId: s.id, churchId: s.churchId }]));
             allServices.splice(index, 1);
           } else {
             s.serviceTime.setDate(s.serviceTime.getDate() + 7);

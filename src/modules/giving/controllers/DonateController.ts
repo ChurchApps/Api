@@ -12,10 +12,7 @@ import dayjs from "dayjs";
 @controller("/giving/donate")
 export class DonateController extends GivingBaseController {
   @httpPost("/log")
-  public async log(
-    req: express.Request<{}, {}, { donation: Donation; fundData: { id: string; amount: number } }>,
-    res: express.Response
-  ): Promise<any> {
+  public async log(req: express.Request<{}, {}, { donation: Donation; fundData: { id: string; amount: number } }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const secretKey = await this.loadPrivateKey(req.body.donation.churchId as string);
       const { donation, fundData } = req.body;
@@ -45,8 +42,7 @@ export class DonateController extends GivingBaseController {
       if (stripeEvent.type === "charge.succeeded" && subscriptionEvent) return this.json({}, 200); // Ignore charge.succeeded from subscription events in place of invoice.paid for access to subscription id
       const existingEvent = await this.repositories.eventLog.load(churchId, stripeEvent.id);
       if (!existingEvent) await StripeHelper.logEvent(churchId, stripeEvent, eventData, this.repositories);
-      if (!existingEvent && (stripeEvent.type === "charge.succeeded" || stripeEvent.type === "invoice.paid"))
-        await StripeHelper.logDonation(secretKey, churchId, eventData, this.repositories);
+      if (!existingEvent && (stripeEvent.type === "charge.succeeded" || stripeEvent.type === "invoice.paid")) await StripeHelper.logDonation(secretKey, churchId, eventData, this.repositories);
       return this.json({}, 200);
     });
   }
@@ -73,15 +69,7 @@ export class DonateController extends GivingBaseController {
       }
       if (donationData.type === "bank") paymentData.source = donationData.id;
       const stripeDonation = await StripeHelper.donate(secretKey, paymentData);
-      await this.sendEmails(
-        donationData.person.email,
-        donationData?.church,
-        donationData.funds,
-        donationData?.amount,
-        donationData?.interval,
-        donationData?.billing_cycle_anchor,
-        "one-time"
-      );
+      await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
       return stripeDonation;
     });
   }
@@ -89,19 +77,7 @@ export class DonateController extends GivingBaseController {
   @httpPost("/subscribe")
   public async subscribe(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const {
-        id,
-        amount,
-        customerId,
-        type,
-        billing_cycle_anchor,
-        proration_behavior,
-        interval,
-        funds,
-        person,
-        notes,
-        churchId: CHURCH_ID
-      } = req.body;
+      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID } = req.body;
       const churchId = au.churchId || CHURCH_ID;
       const secretKey = await this.loadPrivateKey(churchId);
       if (secretKey === "") return this.json({}, 401);
@@ -141,15 +117,11 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/fee")
-  public async calculateFee(
-    req: express.Request<{}, {}, { type: string; amount: number }>,
-    res: express.Response
-  ): Promise<any> {
+  public async calculateFee(req: express.Request<{}, {}, { type: string; amount: number }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const { type, amount } = req.body;
       const { churchId } = req.query;
-      if (type === "creditCard")
-        return { calculatedFee: await this.getCreditCardFees(amount, churchId?.toString() as string) };
+      if (type === "creditCard") return { calculatedFee: await this.getCreditCardFees(amount, churchId?.toString() as string) };
       else if (type === "ach") return { calculatedFee: await this.getACHFees(amount, churchId?.toString() as string) };
       else return { calculatedFee: 0 };
     });
@@ -175,16 +147,13 @@ export class DonateController extends GivingBaseController {
           `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`
         );
       } else {
-        contentRows.push(
-          `<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`
-        );
+        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`);
       }
     });
 
     const transactionFee = amount! - totalFundAmount;
 
-    const domain =
-      Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
+    const domain = Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
 
     const title = `${church?.logo ? `<img src="${church.logo}" alt="Logo: " style="width: 100%" /> ` : ""}${church.name}`;
 
@@ -252,15 +221,7 @@ export class DonateController extends GivingBaseController {
 
     const contents = donationType === "recurring" ? recurringDonationContent : oneTimeDonationContent;
 
-    await EmailHelper.sendTemplatedEmail(
-      Environment.supportEmail,
-      to,
-      title,
-      church.churchURL as string,
-      "Thank You For Donating",
-      contents,
-      "ChurchEmailTemplate.html"
-    );
+    await EmailHelper.sendTemplatedEmail(Environment.supportEmail, to, title, church.churchURL as string, "Thank You For Donating", contents, "ChurchEmailTemplate.html");
   };
 
   private logDonation = async (donationData: Donation, fundData: FundDonation[]) => {
@@ -292,10 +253,8 @@ export class DonateController extends GivingBaseController {
       const response = await Axios.get(Environment.membershipApi + "/settings/public/" + churchId);
       const data = response.data;
 
-      if (data?.flatRateCC && data.flatRateCC !== null && data.flatRateCC !== undefined && data.flatRateCC !== "")
-        customFixedFee = +data.flatRateCC;
-      if (data?.transFeeCC && data.transFeeCC !== null && data.transFeeCC !== undefined && data.transFeeCC !== "")
-        customPercentFee = +data.transFeeCC / 100;
+      if (data?.flatRateCC && data.flatRateCC !== null && data.flatRateCC !== undefined && data.flatRateCC !== "") customFixedFee = +data.flatRateCC;
+      if (data?.transFeeCC && data.transFeeCC !== null && data.transFeeCC !== undefined && data.transFeeCC !== "") customPercentFee = +data.transFeeCC / 100;
     }
     const fixedFee = customFixedFee ?? 0.3; // default to $0.30 if not provided
     const fixedPercent = customPercentFee ?? 0.029; // default to 2.9% if not provided
@@ -310,15 +269,8 @@ export class DonateController extends GivingBaseController {
       const response = await Axios.get(Environment.membershipApi + "/settings/public/" + churchId);
       const data = response.data;
 
-      if (data?.flatRateACH && data.flatRateACH !== null && data.flatRateACH !== undefined && data.flatRateACH !== "")
-        customPercentFee = +data.flatRateACH / 100;
-      if (
-        data?.hardLimitACH &&
-        data.hardLimitACH !== null &&
-        data.hardLimitACH !== undefined &&
-        data.hardLimitACH !== ""
-      )
-        customMaxFee = +data.hardLimitACH;
+      if (data?.flatRateACH && data.flatRateACH !== null && data.flatRateACH !== undefined && data.flatRateACH !== "") customPercentFee = +data.flatRateACH / 100;
+      if (data?.hardLimitACH && data.hardLimitACH !== null && data.hardLimitACH !== undefined && data.hardLimitACH !== "") customMaxFee = +data.hardLimitACH;
     }
 
     const fixedPercent = customPercentFee ?? 0.008; // default to 0.8% if not provided
@@ -334,9 +286,7 @@ export class DonateController extends GivingBaseController {
       try {
         // detecting if its a bot or a human
         const { token } = req.body;
-        const response = await Axios.post(
-          `https://www.google.com/recaptcha/api/siteverify?secret=${Environment.googleRecaptchaSecretKey}&response=${token}`
-        );
+        const response = await Axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${Environment.googleRecaptchaSecretKey}&response=${token}`);
         const data = response.data;
 
         if (!data.success) {
@@ -349,9 +299,7 @@ export class DonateController extends GivingBaseController {
         }
 
         // if its a custom domain, verify the domain exist in the DB
-        const domainData = await Axios.get(
-          `${Environment.membershipApi}/domains/public/lookup/${data.hostname.replace(".localhost", "")}`
-        );
+        const domainData = await Axios.get(`${Environment.membershipApi}/domains/public/lookup/${data.hostname.replace(".localhost", "")}`);
         const domain: any = await domainData.data;
 
         if (domain) {

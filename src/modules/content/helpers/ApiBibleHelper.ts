@@ -17,15 +17,7 @@ export class ApiBibleHelper {
   static async getCopyright(translationKey: string) {
     const books = await ApiBibleHelper.getBooks(translationKey);
     const verseKey = books[0].keyName + ".1.1";
-    const url =
-      this.baseUrl +
-      "/bibles/" +
-      translationKey +
-      "/verses/" +
-      verseKey +
-      "-" +
-      verseKey +
-      "?content-type=json&include-titles=false&include-verse-numbers=false";
+    const url = this.baseUrl + "/bibles/" + translationKey + "/verses/" + verseKey + "-" + verseKey + "?content-type=json&include-titles=false&include-verse-numbers=false";
     const data = await this.getContent(url);
     return data.data.copyright;
   }
@@ -118,15 +110,7 @@ export class ApiBibleHelper {
   }
 
   static async getVerseText(translationKey: string, startVerseKey: string, endVerseKey: string) {
-    const url =
-      this.baseUrl +
-      "/bibles/" +
-      translationKey +
-      "/verses/" +
-      startVerseKey +
-      "-" +
-      endVerseKey +
-      "?content-type=json&include-titles=false&include-verse-numbers=false";
+    const url = this.baseUrl + "/bibles/" + translationKey + "/verses/" + startVerseKey + "-" + endVerseKey + "?content-type=json&include-titles=false&include-verse-numbers=false";
     const data = await this.getContent(url);
     const result: BibleVerseText[] = [];
     data.data.content.forEach((c: any) => {

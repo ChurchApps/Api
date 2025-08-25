@@ -6,11 +6,7 @@ import { DeviceContent } from "../models";
 @controller("/messaging/devicecontents")
 export class DeviceContentController extends MessagingBaseController {
   @httpGet("/deviceId/:deviceId")
-  public async getUnique(
-    @requestParam("deviceId") deviceId: string,
-    req: express.Request<{}, {}, {}>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async getUnique(@requestParam("deviceId") deviceId: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const deviceContent = await this.repositories.deviceContent.loadByDeviceId(au.churchId, deviceId);
       return deviceContent;
@@ -31,11 +27,7 @@ export class DeviceContentController extends MessagingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.deviceContent.delete(au.churchId, id);
       return this.json({});

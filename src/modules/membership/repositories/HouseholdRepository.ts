@@ -25,10 +25,7 @@ export class HouseholdRepository {
   }
 
   public deleteUnused(churchId: string) {
-    return DB.query(
-      "DELETE FROM households WHERE churchId=? AND id not in (SELECT householdId FROM people WHERE churchId=? AND householdId IS NOT NULL group by householdId)",
-      [churchId, churchId]
-    );
+    return DB.query("DELETE FROM households WHERE churchId=? AND id not in (SELECT householdId FROM people WHERE churchId=? AND householdId IS NOT NULL group by householdId)", [churchId, churchId]);
   }
 
   public delete(churchId: string, id: string) {

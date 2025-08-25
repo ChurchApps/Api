@@ -7,22 +7,14 @@ import { Permissions } from "../helpers";
 @controller("/content/arrangements")
 export class ArrangementController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.arrangement.load(au.churchId, id);
     });
   }
 
   @httpGet("/song/:songId")
-  public async getBySong(
-    @requestParam("songId") songId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getBySong(@requestParam("songId") songId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -32,11 +24,7 @@ export class ArrangementController extends ContentBaseController {
   }
 
   @httpGet("/songDetail/:songDetailId")
-  public async getBySongDetail(
-    @requestParam("songDetailId") songDetailId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getBySongDetail(@requestParam("songDetailId") songDetailId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -89,10 +77,7 @@ export class ArrangementController extends ContentBaseController {
   }
 
   @httpPost("/freeShow/missing")
-  public async getMissingFreeShowArrangements(
-    req: express.Request<{}, {}, { freeShowIds: string[] }>,
-    res: express.Response
-  ): Promise<any> {
+  public async getMissingFreeShowArrangements(req: express.Request<{}, {}, { freeShowIds: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { freeShowIds } = req.body;
       if (!freeShowIds || !Array.isArray(freeShowIds)) {
@@ -100,9 +85,7 @@ export class ArrangementController extends ContentBaseController {
       }
 
       const existingArrangements = await this.repositories.arrangement.loadAll(au.churchId);
-      const existingFreeShowIds = existingArrangements
-        .map((a: Arrangement) => a.freeShowId)
-        .filter((id: string | undefined) => id);
+      const existingFreeShowIds = existingArrangements.map((a: Arrangement) => a.freeShowId).filter((id: string | undefined) => id);
 
       // Return array of IDs that don't exist in Chums
       const missingIds = freeShowIds.filter((id) => !existingFreeShowIds.includes(id));

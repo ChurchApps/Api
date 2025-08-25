@@ -32,9 +32,7 @@ export class DatabaseUrlParser {
     const match = cleanUrl.match(urlPattern);
 
     if (!match) {
-      throw new Error(
-        `Invalid MySQL connection string format: ${url}. Expected format: mysql://user:password@host:port/database`
-      );
+      throw new Error(`Invalid MySQL connection string format: ${url}. Expected format: mysql://user:password@host:port/database`);
     }
 
     const [, user, password, host, portStr, database] = match;

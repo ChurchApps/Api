@@ -21,11 +21,7 @@ export class GlobalStyleController extends ContentBaseController {
 
   // Anonymous access
   @httpGet("/church/:churchId")
-  public async loadAnon(
-    @requestParam("churchId") churchId: string,
-    req: express.Request,
-    res: express.Response
-  ): Promise<any> {
+  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const result = await this.repositories.globalStyle.loadForChurch(churchId);
       return result || this.defaultStyle;

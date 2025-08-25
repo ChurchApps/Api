@@ -1,8 +1,5 @@
 // import Hubspot from "@hubspot/api-client";
-import {
-  AssociationSpecAssociationCategoryEnum,
-  PublicObjectSearchRequest
-} from "@hubspot/api-client/lib/codegen/crm/companies";
+import { AssociationSpecAssociationCategoryEnum, PublicObjectSearchRequest } from "@hubspot/api-client/lib/codegen/crm/companies";
 import { Environment } from ".";
 import { AssociationTypes } from "@hubspot/api-client";
 
@@ -23,19 +20,7 @@ export class HubspotHelper {
     return response.results[0];
   };
 
-  static register = async (
-    churchId: string,
-    companyName: string,
-    firstName: string,
-    lastName: string,
-    address: string,
-    city: string,
-    state: string,
-    zip: string,
-    country: string,
-    email: string,
-    initialApp: string
-  ) => {
+  static register = async (churchId: string, companyName: string, firstName: string, lastName: string, address: string, city: string, state: string, zip: string, country: string, email: string, initialApp: string) => {
     if (Environment.hubspotKey) {
       const client = this.getClient();
 
@@ -67,23 +52,14 @@ export class HubspotHelper {
         }
       };
 
-      const [companyResponse, contactResponse] = await Promise.all([
-        client.crm.companies.basicApi.create(company),
-        client.crm.contacts.basicApi.create(contact)
-      ]);
+      const [companyResponse, contactResponse] = await Promise.all([client.crm.companies.basicApi.create(company), client.crm.contacts.basicApi.create(contact)]);
 
-      await client.crm.associations.v4.basicApi.create(
-        "companies",
-        companyResponse.id,
-        "contacts",
-        contactResponse.id,
-        [
-          {
-            associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined,
-            associationTypeId: AssociationTypes.companyToContact
-          }
-        ]
-      );
+      await client.crm.associations.v4.basicApi.create("companies", companyResponse.id, "contacts", contactResponse.id, [
+        {
+          associationCategory: AssociationSpecAssociationCategoryEnum.HubspotDefined,
+          associationTypeId: AssociationTypes.companyToContact
+        }
+      ]);
     }
   };
 

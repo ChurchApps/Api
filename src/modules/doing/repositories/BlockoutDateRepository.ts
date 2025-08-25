@@ -13,26 +13,14 @@ export class BlockoutDateRepository {
     blockoutDate.id = UniqueIdHelper.shortId();
 
     const sql = "INSERT INTO blockoutDates (id, churchId, personId, startDate, endDate) VALUES (?, ?, ?, ?, ?);";
-    const params = [
-      blockoutDate.id,
-      blockoutDate.churchId,
-      blockoutDate.personId,
-      blockoutDate.startDate,
-      blockoutDate.endDate
-    ];
+    const params = [blockoutDate.id, blockoutDate.churchId, blockoutDate.personId, blockoutDate.startDate, blockoutDate.endDate];
     await DB.query(sql, params);
     return blockoutDate;
   }
 
   private async update(blockoutDate: BlockoutDate) {
     const sql = "UPDATE blockoutDates SET personId=?, startDate=?, endDate=? WHERE id=? and churchId=?";
-    const params = [
-      blockoutDate.personId,
-      blockoutDate.startDate,
-      blockoutDate.endDate,
-      blockoutDate.id,
-      blockoutDate.churchId
-    ];
+    const params = [blockoutDate.personId, blockoutDate.startDate, blockoutDate.endDate, blockoutDate.id, blockoutDate.churchId];
     await DB.query(sql, params);
     return blockoutDate;
   }

@@ -55,11 +55,7 @@ export class DonationController extends GivingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       else {
@@ -77,8 +73,7 @@ export class DonationController extends GivingBaseController {
       if (!au.checkAccess(Permissions.donations.view) && personId !== au.personId) return this.json({}, 401);
       else {
         let result;
-        if (req.query.batchId !== undefined)
-          result = await this.repositories.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
+        if (req.query.batchId !== undefined) result = await this.repositories.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
         else if (personId) result = await this.repositories.donation.loadByPersonId(au.churchId, personId);
         else result = await this.repositories.donation.loadAll(au.churchId);
         return this.repositories.donation.convertAllToModel(au.churchId, result as any[] as any[]);
@@ -103,11 +98,7 @@ export class DonationController extends GivingBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       else {

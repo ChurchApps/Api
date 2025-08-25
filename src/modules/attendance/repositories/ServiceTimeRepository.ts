@@ -51,11 +51,7 @@ export class ServiceTimeRepository {
   }
 
   public loadByChurchCampusService(churchId: string, campusId: string, serviceId: string) {
-    const sql =
-      "SELECT st.*" +
-      " FROM serviceTimes st" +
-      " LEFT OUTER JOIN services s on s.id=st.serviceId" +
-      " WHERE st.churchId = ? AND (?=0 OR st.serviceId=?) AND (? = 0 OR s.campusId = ?) AND st.removed=0";
+    const sql = "SELECT st.*" + " FROM serviceTimes st" + " LEFT OUTER JOIN services s on s.id=st.serviceId" + " WHERE st.churchId = ? AND (?=0 OR st.serviceId=?) AND (? = 0 OR s.campusId = ?) AND st.removed=0";
     return DB.query(sql, [churchId, serviceId, serviceId, campusId, campusId]);
   }
 

@@ -30,13 +30,7 @@ export class QueryController extends MembershipBaseController {
                 peopleData.forEach((p) => {
                   p.yearsMarried = PersonHelper.getAge(p.anniversaryDate);
                 });
-                peopleData = ArrayHelper.getAllOperator(
-                  peopleData,
-                  "yearsMarried",
-                  resp.value,
-                  resp.operator,
-                  "number"
-                );
+                peopleData = ArrayHelper.getAllOperator(peopleData, "yearsMarried", resp.value, resp.operator, "number");
                 break;
               case "birthMonth":
                 peopleData.forEach((p) => {
@@ -48,13 +42,7 @@ export class QueryController extends MembershipBaseController {
                 peopleData.forEach((p) => {
                   p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversaryMonth);
                 });
-                peopleData = ArrayHelper.getAllOperator(
-                  peopleData,
-                  "anniversaryMonth",
-                  resp.value,
-                  resp.operator,
-                  "number"
-                );
+                peopleData = ArrayHelper.getAllOperator(peopleData, "anniversaryMonth", resp.value, resp.operator, "number");
                 break;
               // case "phone"
               default:
@@ -62,11 +50,7 @@ export class QueryController extends MembershipBaseController {
                 break;
             }
           });
-          const result = this.repositories.person.convertAllToModel(
-            au.churchId,
-            peopleData,
-            au.checkAccess(Permissions.people.edit)
-          );
+          const result = this.repositories.person.convertAllToModel(au.churchId, peopleData, au.checkAccess(Permissions.people.edit));
           return result;
         } else {
           return { error: "No valid response from AI service" };

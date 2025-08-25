@@ -6,9 +6,7 @@ import { DonationBatch } from "../models";
 @injectable()
 export class DonationBatchRepository {
   public async getOrCreateCurrent(churchId: string) {
-    const data = await DB.queryOne("SELECT * FROM donationBatches WHERE churchId=? ORDER by batchDate DESC LIMIT 1;", [
-      churchId
-    ]);
+    const data = await DB.queryOne("SELECT * FROM donationBatches WHERE churchId=? ORDER by batchDate DESC LIMIT 1;", [churchId]);
     if (data !== null) return this.convertToModel(churchId, data);
     else {
       const batch: DonationBatch = { churchId, name: "Online Donation", batchDate: new Date() };

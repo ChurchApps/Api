@@ -7,12 +7,7 @@ import { Permissions } from "../helpers";
 @controller("/content/arrangementKeys")
 export class ArrangementKeyController extends ContentBaseController {
   @httpGet("/presenter/:churchId/:id")
-  public async getForPresenter(
-    @requestParam("churchId") churchId: string,
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getForPresenter(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const arrangementKey: ArrangementKey = await this.repositories.arrangementKey.load(churchId, id);
       const arrangement: Arrangement = await this.repositories.arrangement.load(churchId, arrangementKey.arrangementId);
@@ -29,22 +24,14 @@ export class ArrangementKeyController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.arrangementKey.load(au.churchId, id);
     });
   }
 
   @httpGet("/arrangement/:arrangementId")
-  public async getBySong(
-    @requestParam("arrangementId") arrangementId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getBySong(@requestParam("arrangementId") arrangementId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

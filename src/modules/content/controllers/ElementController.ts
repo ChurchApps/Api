@@ -9,30 +9,19 @@ import { TreeHelper } from "../helpers/TreeHelper";
 @controller("/content/elements")
 export class ElementController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.element.load(au.churchId, id);
     });
   }
 
   @httpPost("/duplicate/:id")
-  public async duplicate(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const element = await this.repositories.element.load(au.churchId, id);
-        const allElements: Element[] = await this.repositories.element.loadForSection(
-          element.churchId,
-          element.sectionId
-        );
+        const allElements: Element[] = await this.repositories.element.loadForSection(element.churchId, element.sectionId);
         TreeHelper.getChildElements(element, allElements);
         const result = await TreeHelper.duplicateElement(element, element.sectionId, element.parentId);
         return result;
@@ -52,18 +41,8 @@ export class ElementController extends ContentBaseController {
         });
         const result = await Promise.all(promises);
         if (req.body.length > 0) {
-          if (req.body[0].blockId)
-            await this.repositories.element.updateSortForBlock(
-              req.body[0].churchId,
-              req.body[0].blockId,
-              req.body[0].parentId
-            );
-          else
-            await this.repositories.element.updateSort(
-              req.body[0].churchId,
-              req.body[0].sectionId,
-              req.body[0].parentId
-            );
+          if (req.body[0].blockId) await this.repositories.element.updateSortForBlock(req.body[0].churchId, req.body[0].blockId, req.body[0].parentId);
+          else await this.repositories.element.updateSort(req.body[0].churchId, req.body[0].sectionId, req.body[0].parentId);
         }
         await this.checkRows(result);
         await this.checkSlides(result);
@@ -73,11 +52,7 @@ export class ElementController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -96,10 +71,7 @@ export class ElementController extends ContentBaseController {
         for (let i = 0; i < slidesNumber; i++) {
           slides.push(i);
         }
-        const allElements: Element[] = await this.repositories.element.loadForSection(
-          element.churchId,
-          element.sectionId
-        );
+        const allElements: Element[] = await this.repositories.element.loadForSection(element.churchId, element.sectionId);
         const children = ArrayHelper.getAll(allElements, "parentId", element.id);
         await this.checkSlide(element, children, slides);
       }
@@ -126,8 +98,7 @@ export class ElementController extends ContentBaseController {
 
     // Delete slides
     if (children.length > slides.length) {
-      for (let i = slides.length; i < children.length; i++)
-        await this.repositories.element.delete(children[i].churchId, children[i].id);
+      for (let i = slides.length; i < children.length; i++) await this.repositories.element.delete(children[i].churchId, children[i].id);
     }
   }
 
@@ -144,27 +115,17 @@ export class ElementController extends ContentBaseController {
         element.answers.mobileOrder?.split(",").forEach((c: string) => mobileOrder.push(parseInt(c, 0)));
         if (mobileOrder.length !== cols.length) element.answers.mobileOrder = [];
 
-        const allElements: Element[] = await this.repositories.element.loadForSection(
-          element.churchId,
-          element.sectionId
-        );
+        const allElements: Element[] = await this.repositories.element.loadForSection(element.churchId, element.sectionId);
         const children = ArrayHelper.getAll(allElements, "parentId", element.id);
         await this.checkRow(element, children, cols, mobileSizes, mobileOrder);
       }
     }
   }
 
-  private async checkRow(
-    row: Element,
-    children: Element[],
-    cols: number[],
-    mobileSizes: number[],
-    mobileOrder: number[]
-  ) {
+  private async checkRow(row: Element, children: Element[], cols: number[], mobileSizes: number[], mobileOrder: number[]) {
     // Delete existing columns that should no longer exist
     if (children.length > cols.length) {
-      for (let i = cols.length; i < children.length; i++)
-        await this.repositories.element.delete(children[i].churchId, children[i].id);
+      for (let i = cols.length; i < children.length; i++) await this.repositories.element.delete(children[i].churchId, children[i].id);
     }
 
     // Update existing column sizes
@@ -176,21 +137,13 @@ export class ElementController extends ContentBaseController {
         children[i].sort = i + 1;
         shouldSave = true;
       }
-      if (
-        (children[i].answers.mobileSize && mobileSizes.length < i) ||
-        (!children[i].answers.mobileSize && mobileSizes.length >= i) ||
-        children[i].answers.mobileSize !== mobileSizes[i]
-      ) {
+      if ((children[i].answers.mobileSize && mobileSizes.length < i) || (!children[i].answers.mobileSize && mobileSizes.length >= i) || children[i].answers.mobileSize !== mobileSizes[i]) {
         if (!children[i].answers.mobileSize) children[i].answers.mobileSize = [];
         if (mobileSizes.length < i) delete children[i].answers.mobileSize;
         else children[i].answers.mobileSize = mobileSizes[i];
         shouldSave = true;
       }
-      if (
-        (children[i].answers.mobileOrder && mobileOrder.length < i) ||
-        (!children[i].answers.mobileOrder && mobileOrder.length >= i) ||
-        children[i].answers.mobileOrder !== mobileOrder[i]
-      ) {
+      if ((children[i].answers.mobileOrder && mobileOrder.length < i) || (!children[i].answers.mobileOrder && mobileOrder.length >= i) || children[i].answers.mobileOrder !== mobileOrder[i]) {
         if (!children[i].answers.mobileOrder) children[i].answers.mobileOrder = [];
         if (mobileOrder.length < i) delete children[i].answers.mobileOrder;
         else children[i].answers.mobileOrder = mobileOrder[i];

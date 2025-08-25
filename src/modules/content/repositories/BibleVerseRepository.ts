@@ -42,9 +42,6 @@ export class BibleVerseRepository {
   }
 
   public loadAll(translationKey: string, chapterKey: string) {
-    return TypedDB.query("SELECT * FROM bibleVerses WHERE translationKey=? and chapterKey=? order by number;", [
-      translationKey,
-      chapterKey
-    ]);
+    return TypedDB.query("SELECT * FROM bibleVerses WHERE translationKey=? and chapterKey=? order by number;", [translationKey, chapterKey]);
   }
 }

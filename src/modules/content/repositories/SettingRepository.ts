@@ -27,15 +27,7 @@ export class SettingRepository {
 
   private async update(setting: Setting) {
     const sql = "UPDATE settings SET churchId=?, userId=?, keyName=?, value=?, public=? WHERE id=? AND churchId=?";
-    const params = [
-      setting.churchId,
-      setting.userId,
-      setting.keyName,
-      setting.value,
-      setting.public,
-      setting.id,
-      setting.churchId
-    ];
+    const params = [setting.churchId, setting.userId, setting.keyName, setting.value, setting.public, setting.id, setting.churchId];
     await TypedDB.query(sql, params);
     return setting;
   }
@@ -61,17 +53,11 @@ export class SettingRepository {
   }
 
   public loadMulipleChurches(keyNames: string[], churchIds: string[]) {
-    return TypedDB.query(
-      "SELECT * FROM settings WHERE keyName in (?) AND churchId IN (?) AND public=1 and userId is null",
-      [keyNames, churchIds]
-    );
+    return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId IN (?) AND public=1 and userId is null", [keyNames, churchIds]);
   }
 
   public loadByKeyNames(churchId: string, keyNames: string[]) {
-    return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId=? and userId is null;", [
-      keyNames,
-      churchId
-    ]);
+    return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId=? and userId is null;", [keyNames, churchId]);
   }
 
   public convertToModel(churchId: string, data: any) {

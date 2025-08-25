@@ -57,17 +57,13 @@ export class RoleHelper {
       { apiName: "MembershipApi", contentType: "Forms", action: "Admin" }
     ]);*/
 
-    const roleId: string = await this.createRole("Domain Admins", [
-      { apiName: "MembershipApi", contentType: "Domain", action: "Admin" }
-    ]);
+    const roleId: string = await this.createRole("Domain Admins", [{ apiName: "MembershipApi", contentType: "Domain", action: "Admin" }]);
 
     await this.createRoleMember(roleId);
   }
 
   private async createAllMembersRole() {
-    const roleId: string = await this.createRole("All Members", [
-      { apiName: "MembershipApi", contentType: "People", action: "View Members" }
-    ]);
+    const roleId: string = await this.createRole("All Members", [{ apiName: "MembershipApi", contentType: "People", action: "View Members" }]);
 
     await this.createRoleMember(roleId);
   }
@@ -150,9 +146,7 @@ export class RoleHelper {
   }
 
   private async createStreamingHostRole() {
-    const roleId: string = await this.createRole("Streaming Hosts", [
-      { apiName: "ContentApi", contentType: "Chat", action: "Host" }
-    ]);
+    const roleId: string = await this.createRole("Streaming Hosts", [{ apiName: "ContentApi", contentType: "Chat", action: "Host" }]);
 
     await this.createRoleMember(roleId);
   }

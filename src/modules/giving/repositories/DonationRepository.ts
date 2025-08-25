@@ -13,38 +13,16 @@ export class DonationRepository {
   private async create(donation: Donation) {
     donation.id = UniqueIdHelper.shortId();
     const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
-    const sql =
-      "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      donation.id,
-      donation.churchId,
-      donation.batchId,
-      donation.personId,
-      donationDate,
-      donation.amount,
-      donation.method,
-      donation.methodDetails,
-      donation.notes
-    ];
+    const sql = "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes];
     await DB.query(sql, params);
     return donation;
   }
 
   private async update(donation: Donation) {
     const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
-    const sql =
-      "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, method=?, methodDetails=?, notes=? WHERE id=? and churchId=?";
-    const params = [
-      donation.batchId,
-      donation.personId,
-      donationDate,
-      donation.amount,
-      donation.method,
-      donation.methodDetails,
-      donation.notes,
-      donation.id,
-      donation.churchId
-    ];
+    const sql = "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, method=?, methodDetails=?, notes=? WHERE id=? and churchId=?";
+    const params = [donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, donation.id, donation.churchId];
     await DB.query(sql, params);
     return donation;
   }
@@ -66,17 +44,11 @@ export class DonationRepository {
   }
 
   public loadByBatchId(churchId: string, batchId: string) {
-    return DB.query("SELECT d.* FROM donations d WHERE d.churchId=? AND d.batchId=? ORDER BY d.donationDate DESC;", [
-      churchId,
-      batchId
-    ]);
+    return DB.query("SELECT d.* FROM donations d WHERE d.churchId=? AND d.batchId=? ORDER BY d.donationDate DESC;", [churchId, batchId]);
   }
 
   public loadByMethodDetails(churchId: string, method: string, methodDetails: string) {
-    return DB.queryOne(
-      "SELECT d.* FROM donations d WHERE d.churchId=? AND d.method=? AND d.methodDetails=? ORDER BY d.donationDate DESC;",
-      [churchId, method, methodDetails]
-    );
+    return DB.queryOne("SELECT d.* FROM donations d WHERE d.churchId=? AND d.method=? AND d.methodDetails=? ORDER BY d.donationDate DESC;", [churchId, method, methodDetails]);
   }
 
   public loadByPersonId(churchId: string, personId: string) {

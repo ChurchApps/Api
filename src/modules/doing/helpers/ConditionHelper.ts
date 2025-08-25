@@ -1,16 +1,16 @@
-import { DoingRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import { Condition } from "../models";
 
 export class ConditionHelper {
-  public static async getPeopleIdsMatchingConditions(conditions: Condition[], repositories?: DoingRepositories) {
+  public static async getPeopleIdsMatchingConditions(conditions: Condition[], repositories?: Repositories) {
     const promises: Promise<Condition>[] = [];
     conditions.forEach((c) => promises.push(ConditionHelper.getPeopleIdsMatchingCondition(c, repositories)));
     const result = await Promise.all(promises);
     return result;
   }
 
-  private static async getPeopleIdsMatchingCondition(condition: Condition, repositories?: DoingRepositories) {
-    const repos = repositories || new DoingRepositories();
+  private static async getPeopleIdsMatchingCondition(condition: Condition, repositories?: Repositories) {
+    const repos = repositories || Repositories.getCurrent();
     condition.matchingIds = [];
     switch (condition.field) {
       case "today":
@@ -46,11 +46,7 @@ export class ConditionHelper {
             break;
           }
           default:
-            result = ConditionHelper.evalDate(
-              new Date(),
-              condition.operator || "",
-              new Date(condition.value || new Date())
-            );
+            result = ConditionHelper.evalDate(new Date(), condition.operator || "", new Date(condition.value || new Date()));
             break;
         }
         break;

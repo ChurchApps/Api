@@ -8,22 +8,14 @@ import { TreeHelper } from "../helpers/TreeHelper";
 @controller("/content/sections")
 export class SectionController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.section.load(au.churchId, id);
     });
   }
 
   @httpPost("/duplicate/:id")
-  public async duplicate(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -54,8 +46,7 @@ export class SectionController extends ContentBaseController {
         });
         const result = await Promise.all(promises);
         if (req.body.length > 0) {
-          if (req.body[0].blockId)
-            await this.repositories.section.updateSortForBlock(req.body[0].churchId, req.body[0].blockId);
+          if (req.body[0].blockId) await this.repositories.section.updateSortForBlock(req.body[0].churchId, req.body[0].blockId);
           else await this.repositories.section.updateSort(req.body[0].churchId, req.body[0].pageId, req.body[0].zone);
         }
         TreeHelper.populateAnswers(result);
@@ -65,11 +56,7 @@ export class SectionController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

@@ -59,15 +59,7 @@ export class CaddyHelper {
 
   private static getRewrite(host: string, dial: string) {
     const dialKey = dial.replace(".b1.church:443", "");
-    const hostKey = host
-      .replace("https://", "")
-      .replace("http://", "")
-      .replace("www.", "")
-      .replace(".com", "")
-      .replace(".org", "")
-      .replace(".net", "")
-      .replace(".church", "")
-      .replace("/", "");
+    const hostKey = host.replace("https://", "").replace("http://", "").replace("www.", "").replace(".com", "").replace(".org", "").replace(".net", "").replace(".church", "").replace("/", "");
 
     if (hostKey === dialKey || dialKey.indexOf(":") !== -1) return {};
     else

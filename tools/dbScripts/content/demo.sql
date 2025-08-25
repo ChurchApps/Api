@@ -280,7 +280,7 @@ BEGIN
     INSERT INTO blocks (id, churchId, blockType, name) VALUES
     -- Header and Footer Blocks
     ('BLK00000001', 'CHU00000001', 'header', 'Main Header'),
-    ('BLK00000002', 'CHU00000001', 'footer', 'Main Footer'),
+    ('BLK00000002', 'CHU00000001', 'footerBlock', 'Main Footer'),
     ('BLK00000003', 'CHU00000001', 'navigation', 'Main Navigation'),
 
     -- Reusable Content Blocks

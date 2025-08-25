@@ -9,11 +9,7 @@ import { FileStorageHelper } from "@churchapps/apihelper";
 @controller("/content/playlists")
 export class PlaylistController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.playlist.loadById(id, au.churchId);
     });
@@ -27,11 +23,7 @@ export class PlaylistController extends ContentBaseController {
   }
 
   @httpGet("/public/:churchId")
-  public async loadPublicAll(
-    @requestParam("churchId") churchId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repositories.playlist.loadPublicAll(churchId);
     });

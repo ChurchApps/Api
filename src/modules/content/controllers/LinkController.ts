@@ -8,11 +8,7 @@ import { Link } from "../models";
 export class LinkController extends ContentBaseController {
   // Anonymous access
   @httpGet("/church/:churchId")
-  public async loadAnon(
-    @requestParam("churchId") churchId: string,
-    req: express.Request,
-    res: express.Response
-  ): Promise<any> {
+  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const category = req.query.category.toString();
       if (category === undefined) return await this.repositories.link.loadAll(churchId);
@@ -21,11 +17,7 @@ export class LinkController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.link.load(au.churchId, id);
     });

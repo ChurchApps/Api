@@ -6,22 +6,14 @@ import { Question } from "../models";
 @controller("/membership/questions")
 export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/up")
-  public async moveQuestionUp(
-    @requestParam("id") id: string,
-    req: express.Request,
-    res: express.Response
-  ): Promise<any> {
+  public async moveQuestionUp(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.question.moveQuestionUp(id);
     });
   }
 
   @httpGet("/sort/:id/down")
-  public async moveQuestionDown(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async moveQuestionDown(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repositories.question.moveQuestionDown(id);
     });
@@ -32,28 +24,16 @@ export class QuestionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!formId) return this.json({}, 401);
-      else
-        return this.repositories.question.convertAllToModel(
-          "",
-          (await this.repositories.question.loadForUnrestrictedForm(formId)) as any[]
-        );
+      else return this.repositories.question.convertAllToModel("", (await this.repositories.question.loadForUnrestrictedForm(formId)) as any[]);
     });
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!this.formAccess(au, formId, "view")) return this.json({}, 401);
-      else
-        return this.repositories.question.convertToModel(
-          au.churchId,
-          await this.repositories.question.load(au.churchId, id)
-        );
+      else return this.repositories.question.convertToModel(au.churchId, await this.repositories.question.load(au.churchId, id));
     });
   }
 
@@ -62,11 +42,7 @@ export class QuestionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!this.formAccess(au, formId, "view")) return this.json({}, 401);
-      else
-        return this.repositories.question.convertAllToModel(
-          au.churchId,
-          (await this.repositories.question.loadForForm(au.churchId, formId)) as any[]
-        );
+      else return this.repositories.question.convertAllToModel(au.churchId, (await this.repositories.question.loadForForm(au.churchId, formId)) as any[]);
     });
   }
 
@@ -78,10 +54,7 @@ export class QuestionController extends MembershipBaseController {
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
         if (this.formAccess(au, question.formId)) {
-          const availableQuestions = (await this.repositories.question.loadForForm(
-            au.churchId,
-            question.formId
-          )) as any[];
+          const availableQuestions = (await this.repositories.question.loadForForm(au.churchId, question.formId)) as any[];
           const maxValue = Math.max(...(availableQuestions as any[]).map((q: any) => q.sort));
           const addBy = i + 1;
           const sort = availableQuestions.length > 0 ? maxValue + addBy : 1;
@@ -96,11 +69,7 @@ export class QuestionController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!this.formAccess(au, formId)) return this.json({}, 401);

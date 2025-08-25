@@ -10,22 +10,14 @@ import { AwsHelper } from "@churchapps/apihelper";
 @controller("/content/praiseCharts")
 export class PraiseChartsController extends ContentBaseController {
   @httpGet("/raw/:id")
-  public async raw(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async raw(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       return PraiseChartsHelper.loadRaw(id);
     });
   }
 
   @httpGet("/hasAccount")
-  public async hasPraiseChartsAccount(
-    @requestParam("id") _id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async hasPraiseChartsAccount(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { token } = await PraiseChartsHelper.loadUserTokens(au);
       if (token) return { hasAccount: true };
@@ -43,17 +35,11 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/products/:id")
-  public async products(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async products(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { token, secret } = await PraiseChartsHelper.loadUserTokens(au);
       const keys = req.query.keys ? req.query.keys.toString().split(",") : [];
-      const data = token
-        ? await PraiseChartsHelper.loadSongFromLibrary(id, keys, token, secret)
-        : await PraiseChartsHelper.loadSongFromCatalog(id, keys);
+      const data = token ? await PraiseChartsHelper.loadSongFromLibrary(id, keys, token, secret) : await PraiseChartsHelper.loadSongFromCatalog(id, keys);
       let products = [];
       if (data.in_library?.items?.length > 0) products = data.in_library?.items[0].products;
       else if (data.other_results?.items?.length > 0) products = data.other_results?.items[0].products;
@@ -63,11 +49,7 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/arrangement/raw/:id")
-  public async arrangement(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async arrangement(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { token, secret } = await PraiseChartsHelper.loadUserTokens(au);
       const keys = req.query.keys ? req.query.keys.toString().split(",") : [];
@@ -97,12 +79,7 @@ export class PraiseChartsController extends ContentBaseController {
       const settings: Setting[] = await this.repositories.setting.loadUser(au.churchId, au.id);
       const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
       const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;
-      const fileBuffer: any = await PraiseChartsHelper.download(
-        req.query.skus.toString().split(","),
-        req.query.keys.toString().split(","),
-        token,
-        secret
-      );
+      const fileBuffer: any = await PraiseChartsHelper.download(req.query.skus.toString().split(","), req.query.keys.toString().split(","), token, secret);
 
       let fileName = "praisecharts.pdf";
       if (req.query.file_name) {
@@ -119,9 +96,7 @@ export class PraiseChartsController extends ContentBaseController {
       // Ensure the file buffer is properly handled for both PDF and ZIP
       const buffer = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer);
 
-      const redirectUrl = process.env.SERVER_PORT
-        ? await PraiseChartsController.saveLocalFile(fileName, buffer)
-        : await PraiseChartsController.saveS3File(fileName, mimeType, buffer);
+      const redirectUrl = process.env.SERVER_PORT ? await PraiseChartsController.saveLocalFile(fileName, buffer) : await PraiseChartsController.saveS3File(fileName, mimeType, buffer);
 
       return { redirectUrl };
     });

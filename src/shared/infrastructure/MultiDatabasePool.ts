@@ -10,7 +10,7 @@ export class MultiDatabasePool {
 
   static getPool(moduleName: string): mysql.Pool {
     let pool = this.pools.get(moduleName);
-    
+
     if (!pool) {
       const dbConfig = Environment.getDatabaseConfig(moduleName);
       if (!dbConfig) {

@@ -1,14 +1,4 @@
-import {
-  DonationBatchRepository,
-  DonationRepository,
-  FundDonationRepository,
-  FundRepository,
-  GatewayRepository,
-  CustomerRepository,
-  EventLogRepository,
-  SubscriptionRepository,
-  SubscriptionFundsRepository
-} from ".";
+import { DonationBatchRepository, DonationRepository, FundDonationRepository, FundRepository, GatewayRepository, CustomerRepository, EventLogRepository, SubscriptionRepository, SubscriptionFundsRepository } from ".";
 
 export class Repositories {
   public donationBatch: DonationBatchRepository;

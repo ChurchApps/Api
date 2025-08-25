@@ -8,11 +8,7 @@ import { Permissions, IPermission } from "../helpers";
 @controller("/membership/rolepermissions")
 export class RolePermissionController extends MembershipBaseController {
   @httpGet("/roles/:id")
-  public async loadByRole(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async loadByRole(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
       else {
@@ -33,11 +29,7 @@ export class RolePermissionController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async deletePermission(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async deletePermission(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
       else {

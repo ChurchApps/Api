@@ -9,11 +9,7 @@ import { IPermission } from "@churchapps/apihelper";
 @controller("/membership/rolemembers")
 export class RoleMemberController extends MembershipBaseController {
   @httpGet("/roles/:id")
-  public async loadByRole(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async loadByRole(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const members = await this.repositories.roleMember.loadByRoleId(id, au.churchId);
       const hasAccess = await this.checkAccess(members, Permissions.roles.view, au);
@@ -52,8 +48,7 @@ export class RoleMemberController extends MembershipBaseController {
         for (const member of members) {
           member.churchId = au.churchId;
           if (member.addedBy === undefined || member.addedBy === null) member.addedBy = au.id;
-          if (member.userId === undefined || member.userId === null || member.userId === "")
-            member.userId = await this.getUserId(member.user);
+          if (member.userId === undefined || member.userId === null || member.userId === "") member.userId = await this.getUserId(member.user);
           promises.push(this.repositories.roleMember.save(member));
         }
         members = await Promise.all(promises);
@@ -75,11 +70,7 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const member = await this.repositories.roleMember.loadById(id, au.churchId);
       const hasAccess = await this.checkAccess([member], Permissions.roles.view, au);
@@ -92,12 +83,7 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpDelete("/self/:churchId/:userId")
-  public async deleteSelf(
-    @requestParam("churchId") churchId: string,
-    @requestParam("userId") userId: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async deleteSelf(@requestParam("churchId") churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.roleMember.deleteSelf(churchId, userId);
       return this.json([], 200);

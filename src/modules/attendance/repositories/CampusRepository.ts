@@ -11,34 +11,15 @@ export class CampusRepository {
 
   private async create(campus: Campus) {
     campus.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO campuses (id, churchId, name, address1, address2, city, state, zip, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0);";
-    const params = [
-      campus.id,
-      campus.churchId,
-      campus.name,
-      campus.address1,
-      campus.address2,
-      campus.city,
-      campus.state,
-      campus.zip
-    ];
+    const sql = "INSERT INTO campuses (id, churchId, name, address1, address2, city, state, zip, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0);";
+    const params = [campus.id, campus.churchId, campus.name, campus.address1, campus.address2, campus.city, campus.state, campus.zip];
     await DB.query(sql, params);
     return campus;
   }
 
   private async update(campus: Campus) {
     const sql = "UPDATE campuses SET name=?, address1=?, address2=?, city=?, state=?, zip=? WHERE id=? and churchId=?";
-    const params = [
-      campus.name,
-      campus.address1,
-      campus.address2,
-      campus.city,
-      campus.state,
-      campus.zip,
-      campus.id,
-      campus.churchId
-    ];
+    const params = [campus.name, campus.address1, campus.address2, campus.city, campus.state, campus.zip, campus.id, campus.churchId];
     await DB.query(sql, params);
     return campus;
   }

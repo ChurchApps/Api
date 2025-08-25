@@ -1,7 +1,7 @@
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import WebSocket from "ws";
 import { PayloadInterface, SocketConnectionInterface } from "./Interfaces";
-import { MessagingRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import { Connection } from "../models";
 import { DeliveryHelper } from "./DeliveryHelper";
 import { Environment } from "../../../shared/helpers/Environment";
@@ -9,9 +9,9 @@ import { Environment } from "../../../shared/helpers/Environment";
 export class SocketHelper {
   private static wss: WebSocket.Server = null;
   private static connections: SocketConnectionInterface[] = [];
-  private static repositories: MessagingRepositories;
+  private static repositories: Repositories;
 
-  static init = (repositories: MessagingRepositories) => {
+  static init = (repositories: Repositories) => {
     SocketHelper.repositories = repositories;
     const port = Environment.websocketPort;
     console.log(`SocketHelper: Initializing with port ${port}, deliveryProvider: ${Environment.deliveryProvider}`);

@@ -10,39 +10,15 @@ export class ElementRepository {
   public async create(element: Element) {
     if (!element.id) element.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO elements (id, churchId, sectionId, blockId, elementType, sort, parentId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      element.id,
-      element.churchId,
-      element.sectionId,
-      element.blockId,
-      element.elementType,
-      element.sort,
-      element.parentId,
-      element.answersJSON,
-      element.stylesJSON,
-      element.animationsJSON
-    ];
+    const sql = "INSERT INTO elements (id, churchId, sectionId, blockId, elementType, sort, parentId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [element.id, element.churchId, element.sectionId, element.blockId, element.elementType, element.sort, element.parentId, element.answersJSON, element.stylesJSON, element.animationsJSON];
     await TypedDB.query(sql, params);
     return element;
   }
 
   private async update(element: Element) {
-    const sql =
-      "UPDATE elements SET sectionId=?, blockId=?, elementType=?, sort=?, parentId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
-    const params = [
-      element.sectionId,
-      element.blockId,
-      element.elementType,
-      element.sort,
-      element.parentId,
-      element.answersJSON,
-      element.stylesJSON,
-      element.animationsJSON,
-      element.id,
-      element.churchId
-    ];
+    const sql = "UPDATE elements SET sectionId=?, blockId=?, elementType=?, sort=?, parentId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
+    const params = [element.sectionId, element.blockId, element.elementType, element.sort, element.parentId, element.answersJSON, element.stylesJSON, element.animationsJSON, element.id, element.churchId];
     await TypedDB.query(sql, params);
     return element;
   }
@@ -91,10 +67,7 @@ export class ElementRepository {
   }
 
   public loadForSection(churchId: string, sectionId: string) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND sectionId=? order by sort;", [
-      churchId,
-      sectionId
-    ]);
+    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND sectionId=? order by sort;", [churchId, sectionId]);
   }
 
   public loadForBlock(churchId: string, blockId: string) {
@@ -102,10 +75,7 @@ export class ElementRepository {
   }
 
   public loadForBlocks(churchId: string, blockIds: string[]) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND blockId IN (?) order by sort;", [
-      churchId,
-      blockIds
-    ]);
+    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND blockId IN (?) order by sort;", [churchId, blockIds]);
   }
 
   /*
@@ -128,12 +98,7 @@ export class ElementRepository {
   }
 */
   public loadForPage(churchId: string, pageId: string) {
-    const sql =
-      "SELECT e.* " +
-      " FROM elements e" +
-      " INNER JOIN sections s on s.id=e.sectionId" +
-      " WHERE (s.pageId=? OR (s.pageId IS NULL and s.blockId IS NULL)) AND e.churchId=?" +
-      " ORDER BY sort;";
+    const sql = "SELECT e.* " + " FROM elements e" + " INNER JOIN sections s on s.id=e.sectionId" + " WHERE (s.pageId=? OR (s.pageId IS NULL and s.blockId IS NULL)) AND e.churchId=?" + " ORDER BY sort;";
     return TypedDB.query(sql, [pageId, churchId]);
   }
 }

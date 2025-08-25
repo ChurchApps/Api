@@ -100,10 +100,7 @@ export class YouTubeHelper {
         duration: 0,
         permanentUrl: false,
         playlistId: "",
-        videoUrl:
-          "https://www.youtube.com/embed/" +
-          item.id.videoId +
-          "?autoplay=1&controls=0&showinfo=0&rel=0&modestbranding=1&disablekb=1"
+        videoUrl: "https://www.youtube.com/embed/" + item.id.videoId + "?autoplay=1&controls=0&showinfo=0&rel=0&modestbranding=1&disablekb=1"
       };
       sermons.push(sermon);
     }

@@ -5,13 +5,7 @@ import { Permissions } from "../../../shared/helpers";
 import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 
 export class PersonHelper extends BasePersonHelper {
-  public static async getPerson(
-    churchId: string,
-    email: string,
-    firstName: string,
-    lastName: string,
-    canEdit: boolean
-  ) {
+  public static async getPerson(churchId: string, email: string, firstName: string, lastName: string, canEdit: boolean) {
     const data: Person[] = (await Repositories.getCurrent().person.searchEmail(churchId, email)) as Person[];
     if (data.length === 0) {
       const household: Household = { churchId, name: lastName };
@@ -41,28 +35,10 @@ export class PersonHelper extends BasePersonHelper {
       let person: Person = null;
       if (au.personId) {
         const d = await Repositories.getCurrent().person.load(au.churchId, au.personId);
-        if (d === null)
-          person = await this.getPerson(
-            churchId,
-            au.email,
-            au.firstName,
-            au.lastName,
-            au.checkAccess(Permissions.people.edit)
-          );
-        else
-          person = Repositories.getCurrent().person.convertToModel(
-            au.churchId,
-            d,
-            au.checkAccess(Permissions.people.edit)
-          );
+        if (d === null) person = await this.getPerson(churchId, au.email, au.firstName, au.lastName, au.checkAccess(Permissions.people.edit));
+        else person = Repositories.getCurrent().person.convertToModel(au.churchId, d, au.checkAccess(Permissions.people.edit));
       } else {
-        person = await this.getPerson(
-          churchId,
-          au.email,
-          au.firstName,
-          au.lastName,
-          au.checkAccess(Permissions.people.edit)
-        );
+        person = await this.getPerson(churchId, au.email, au.firstName, au.lastName, au.checkAccess(Permissions.people.edit));
       }
 
       const userChurch: UserChurch = {

@@ -335,13 +335,4 @@ export type ContentType =
   | "Doing"
   | "Admin";
 
-export type Actions =
-  | "Admin"
-  | "Edit"
-  | "View"
-  | "Edit Self"
-  | "View Members"
-  | "View Summary"
-  | "Checkin"
-  | "Host"
-  | "Edit Settings";
+export type Actions = "Admin" | "Edit" | "View" | "Edit Self" | "View Members" | "View Summary" | "Checkin" | "Host" | "Edit Settings";

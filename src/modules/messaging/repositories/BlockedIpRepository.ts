@@ -13,18 +13,12 @@ export class BlockedIpRepository {
   }
 
   public async loadByServiceId(churchId: string, serviceId: string) {
-    const result: any = await DB.query("SELECT * FROM blockedIps WHERE churchId=? AND serviceId=?;", [
-      churchId,
-      serviceId
-    ]);
+    const result: any = await DB.query("SELECT * FROM blockedIps WHERE churchId=? AND serviceId=?;", [churchId, serviceId]);
     return result.rows || result || [];
   }
 
   public async save(blockedIp: BlockedIp) {
-    const result: any = await DB.query(
-      "SELECT id FROM blockedIps WHERE churchId=? AND conversationId=? AND ipAddress=?;",
-      [blockedIp.churchId, blockedIp.conversationId, blockedIp.ipAddress]
-    );
+    const result: any = await DB.query("SELECT id FROM blockedIps WHERE churchId=? AND conversationId=? AND ipAddress=?;", [blockedIp.churchId, blockedIp.conversationId, blockedIp.ipAddress]);
     const existingIp = result.rows || result || [];
     return existingIp[0]?.id ? this.deleteExisting(existingIp[0].id) : this.create(blockedIp);
   }
@@ -32,13 +26,7 @@ export class BlockedIpRepository {
   private async create(blockedIp: BlockedIp): Promise<BlockedIp> {
     blockedIp.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO blockedIps (id, churchId, conversationId, serviceId, ipAddress) VALUES (?, ?, ?, ?, ?);";
-    const params = [
-      blockedIp.id,
-      blockedIp.churchId,
-      blockedIp.conversationId,
-      blockedIp.serviceId,
-      blockedIp.ipAddress
-    ];
+    const params = [blockedIp.id, blockedIp.churchId, blockedIp.conversationId, blockedIp.serviceId, blockedIp.ipAddress];
     await DB.query(sql, params);
     return blockedIp;
   }

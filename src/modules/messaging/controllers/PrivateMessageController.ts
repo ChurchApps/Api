@@ -34,10 +34,7 @@ export class PrivateMessageController extends MessagingBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const privateMessages: PrivateMessage[] = await this.repositories.privateMessage.loadByPersonId(
-        au.churchId,
-        au.personId
-      );
+      const privateMessages: PrivateMessage[] = await this.repositories.privateMessage.loadByPersonId(au.churchId, au.personId);
       const messageIds: string[] = [];
       privateMessages.forEach((pm) => {
         if (pm.conversation.lastPostId && messageIds.indexOf(pm.conversation.lastPostId) === -1) {
@@ -68,11 +65,7 @@ export class PrivateMessageController extends MessagingBaseController {
   }
 
   @httpGet("/existing/:personId")
-  public async getExisting(
-    @requestParam("personId") personId: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async getExisting(@requestParam("personId") personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       // TODO: Implement loadExisting functionality to find existing conversation between two people
       // const existing = await this.repositories.privateMessage.loadExisting(au.churchId, au.personId, personId);
@@ -82,11 +75,7 @@ export class PrivateMessageController extends MessagingBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = (await this.repositories.privateMessage.loadById(au.churchId, id)) as any;
       if (result.notifyPersonId === au.personId) {

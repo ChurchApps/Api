@@ -2,17 +2,7 @@ import { controller, httpDelete, httpPost, httpGet, interfaces } from "inversify
 import express from "express";
 import bcrypt from "bcryptjs";
 import { body, oneOf, validationResult } from "express-validator";
-import {
-  LoginRequest,
-  User,
-  ResetPasswordRequest,
-  LoadCreateUserRequest,
-  RegisterUserRequest,
-  Church,
-  EmailPassword,
-  NewPasswordRequest,
-  LoginUserChurch
-} from "../models";
+import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch } from "../models";
 import { AuthenticatedUser } from "../auth";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { EmailHelper, UserHelper, UniqueIdHelper, Environment } from "../helpers";
@@ -20,24 +10,12 @@ import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers";
 import { ArrayHelper } from "@churchapps/apihelper";
 
-const emailPasswordValidation = [
-  body("email")
-    .isEmail()
-    .trim()
-    .normalizeEmail({ gmail_remove_dots: false })
-    .withMessage("enter a valid email address"),
-  body("password").isLength({ min: 6 }).withMessage("must be at least 6 chars long")
-];
+const emailPasswordValidation = [body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("password").isLength({ min: 6 }).withMessage("must be at least 6 chars long")];
 
 const loadOrCreateValidation = [
   oneOf([
     [
-      body("userEmail")
-        .exists()
-        .isEmail()
-        .withMessage("enter a valid email address")
-        .trim()
-        .normalizeEmail({ gmail_remove_dots: false }),
+      body("userEmail").exists().isEmail().withMessage("enter a valid email address").trim().normalizeEmail({ gmail_remove_dots: false }),
       body("firstName").exists().withMessage("enter first name").not().isEmpty().trim().escape(),
       body("lastName").exists().withMessage("enter last name").not().isEmpty().trim().escape()
     ],
@@ -48,28 +26,16 @@ const loadOrCreateValidation = [
 const registerValidation = [
   oneOf([
     [
-      body("email")
-        .exists()
-        .isEmail()
-        .withMessage("enter a valid email address")
-        .trim()
-        .normalizeEmail({ gmail_remove_dots: false }),
+      body("email").exists().isEmail().withMessage("enter a valid email address").trim().normalizeEmail({ gmail_remove_dots: false }),
       body("firstName").exists().withMessage("enter first name").not().isEmpty().trim().escape(),
       body("lastName").exists().withMessage("enter last name").not().isEmpty().trim().escape()
     ]
   ])
 ];
 
-const setDisplayNameValidation = [
-  body("userId").optional().isString(),
-  body("firstName").exists().withMessage("enter first name").not().isEmpty().trim().escape(),
-  body("lastName").exists().withMessage("enter last name").not().isEmpty().trim().escape()
-];
+const setDisplayNameValidation = [body("userId").optional().isString(), body("firstName").exists().withMessage("enter first name").not().isEmpty().trim().escape(), body("lastName").exists().withMessage("enter last name").not().isEmpty().trim().escape()];
 
-const updateEmailValidation = [
-  body("userId").optional().isString(),
-  body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address")
-];
+const updateEmailValidation = [body("userId").optional().isString(), body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address")];
 
 @controller("/membership/users")
 export class UserController extends MembershipBaseController {
@@ -223,12 +189,7 @@ export class UserController extends MembershipBaseController {
         user.password = bcrypt.hashSync(tempPassword, 10);
         user.authGuid = v4();
         user = await this.repositories.user.save(user);
-        await UserHelper.sendWelcomeEmail(
-          user.email,
-          `/login?auth=${user.authGuid}&timestamp=${timestamp}`,
-          null,
-          null
-        );
+        await UserHelper.sendWelcomeEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, null, null);
       }
       user.password = null;
       return this.json(user, 200);
@@ -254,31 +215,11 @@ export class UserController extends MembershipBaseController {
 
         try {
           const timestamp = Date.now();
-          await UserHelper.sendWelcomeEmail(
-            register.email,
-            `/login?auth=${user.authGuid}&timestamp=${timestamp}`,
-            register.appName,
-            register.appUrl
-          );
+          await UserHelper.sendWelcomeEmail(register.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, register.appName, register.appUrl);
 
           if (Environment.emailOnRegistration) {
-            const emailBody =
-              "Name: " +
-              register.firstName +
-              " " +
-              register.lastName +
-              "<br/>Email: " +
-              register.email +
-              "<br/>App: " +
-              register.appName;
-            await EmailHelper.sendTemplatedEmail(
-              Environment.supportEmail,
-              Environment.supportEmail,
-              register.appName,
-              register.appUrl,
-              "New User Registration",
-              emailBody
-            );
+            const emailBody = "Name: " + register.firstName + " " + register.lastName + "<br/>Email: " + register.email + "<br/>App: " + register.appName;
+            await EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody);
           }
         } catch (err) {
           return this.json({ errors: [err.toString()] });
@@ -320,14 +261,7 @@ export class UserController extends MembershipBaseController {
     }
   }
 
-  @httpPost(
-    "/forgot",
-    body("userEmail")
-      .exists()
-      .trim()
-      .normalizeEmail({ gmail_remove_dots: false })
-      .withMessage("enter a valid email address")
-  )
+  @httpPost("/forgot", body("userEmail").exists().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"))
   public async forgotPassword(req: express.Request<{}, {}, ResetPasswordRequest>, res: express.Response): Promise<any> {
     try {
       const errors = validationResult(req);
@@ -342,14 +276,7 @@ export class UserController extends MembershipBaseController {
         const promises = [];
         const timestamp = Date.now();
         promises.push(this.repositories.user.save(user));
-        promises.push(
-          UserHelper.sendForgotEmail(
-            user.email,
-            `/login?auth=${user.authGuid}&timestamp=${timestamp}`,
-            req.body.appName,
-            req.body.appUrl
-          )
-        );
+        promises.push(UserHelper.sendForgotEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, req.body.appName, req.body.appUrl));
         await Promise.all(promises);
         return this.json({ emailed: true }, 200);
       }
@@ -363,10 +290,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/setDisplayName", ...setDisplayNameValidation)
-  public async setDisplayName(
-    req: express.Request<{}, {}, { firstName: string; lastName: string; userId?: string }>,
-    res: express.Response
-  ): Promise<any> {
+  public async setDisplayName(req: express.Request<{}, {}, { firstName: string; lastName: string; userId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -385,10 +309,7 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/updateEmail", ...updateEmailValidation)
-  public async updateEmail(
-    req: express.Request<{}, {}, { email: string; userId?: string }>,
-    res: express.Response
-  ): Promise<any> {
+  public async updateEmail(req: express.Request<{}, {}, { email: string; userId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const workingUserId = req.body.userId || au.id;
       const errors = validationResult(req);
@@ -411,19 +332,13 @@ export class UserController extends MembershipBaseController {
   }
 
   @httpPost("/updateOptedOut")
-  public async updateOptedOut(
-    req: express.Request<{}, {}, { personId: string; optedOut: boolean }>,
-    res: express.Response
-  ): Promise<any> {
+  public async updateOptedOut(req: express.Request<{}, {}, { personId: string; optedOut: boolean }>, res: express.Response): Promise<any> {
     this.repositories.person.updateOptedOut(req.body.personId, req.body.optedOut);
     return this.json({}, 200);
   }
 
   @httpPost("/updatePassword", body("newPassword").isLength({ min: 6 }).withMessage("must be at least 6 chars long"))
-  public async updatePassword(
-    req: express.Request<{}, {}, { newPassword: string }>,
-    res: express.Response
-  ): Promise<any> {
+  public async updatePassword(req: express.Request<{}, {}, { newPassword: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -450,5 +365,4 @@ export class UserController extends MembershipBaseController {
       return this.json({});
     });
   }
-
 }

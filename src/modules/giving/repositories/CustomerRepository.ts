@@ -9,11 +9,7 @@ export class CustomerRepository {
   }
 
   private async create(customer: Customer) {
-    return DB.query("INSERT INTO customers (id, churchId, personId) VALUES (?, ?, ?);", [
-      customer.id,
-      customer.churchId,
-      customer.personId
-    ]).then(() => {
+    return DB.query("INSERT INTO customers (id, churchId, personId) VALUES (?, ?, ?);", [customer.id, customer.churchId, customer.personId]).then(() => {
       return customer;
     });
   }

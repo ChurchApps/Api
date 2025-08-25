@@ -11,31 +11,15 @@ export class VisibilityPreferenceRepository {
 
   private async create(preference: VisibilityPreference) {
     preference.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO visibilityPreferences (id, churchId, personId, address, phoneNumber, email) VALUES (?, ?, ?, ?, ?, ?);";
-    const params = [
-      preference.id,
-      preference.churchId,
-      preference.personId,
-      preference.address,
-      preference.phoneNumber,
-      preference.email
-    ];
+    const sql = "INSERT INTO visibilityPreferences (id, churchId, personId, address, phoneNumber, email) VALUES (?, ?, ?, ?, ?, ?);";
+    const params = [preference.id, preference.churchId, preference.personId, preference.address, preference.phoneNumber, preference.email];
     await DB.query(sql, params);
     return preference;
   }
 
   private async update(preference: VisibilityPreference) {
-    const sql =
-      "UPDATE visibilityPreferences SET personId=?, address=?, phoneNumber=?, email=? WHERE id=? AND churchId=?;";
-    const params = [
-      preference.personId,
-      preference.address,
-      preference.phoneNumber,
-      preference.email,
-      preference.id,
-      preference.churchId
-    ];
+    const sql = "UPDATE visibilityPreferences SET personId=?, address=?, phoneNumber=?, email=? WHERE id=? AND churchId=?;";
+    const params = [preference.personId, preference.address, preference.phoneNumber, preference.email, preference.id, preference.churchId];
     await DB.query(sql, params);
     return preference;
   }

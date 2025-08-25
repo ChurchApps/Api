@@ -13,26 +13,14 @@ export class ConjunctionRepository {
     conjunction.id = UniqueIdHelper.shortId();
 
     const sql = "INSERT INTO conjunctions (id, churchId, automationId, parentId, groupType) VALUES (?, ?, ?, ?, ?);";
-    const params = [
-      conjunction.id,
-      conjunction.churchId,
-      conjunction.automationId,
-      conjunction.parentId,
-      conjunction.groupType
-    ];
+    const params = [conjunction.id, conjunction.churchId, conjunction.automationId, conjunction.parentId, conjunction.groupType];
     await DB.query(sql, params);
     return conjunction;
   }
 
   private async update(conjunction: Conjunction) {
     const sql = "UPDATE conjunctions SET automationId=?, parentId=?, groupType=? WHERE id=? and churchId=?";
-    const params = [
-      conjunction.automationId,
-      conjunction.parentId,
-      conjunction.groupType,
-      conjunction.id,
-      conjunction.churchId
-    ];
+    const params = [conjunction.automationId, conjunction.parentId, conjunction.groupType, conjunction.id, conjunction.churchId];
     await DB.query(sql, params);
     return conjunction;
   }

@@ -30,26 +30,14 @@ export class DeviceContentRepository {
   private async create(deviceContent: DeviceContent): Promise<DeviceContent> {
     deviceContent.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO deviceContent (id, churchId, deviceId, contentType, contentId) VALUES (?, ?, ?, ?, ?);";
-    const params = [
-      deviceContent.id,
-      deviceContent.churchId,
-      deviceContent.deviceId,
-      deviceContent.contentType,
-      deviceContent.contentId
-    ];
+    const params = [deviceContent.id, deviceContent.churchId, deviceContent.deviceId, deviceContent.contentType, deviceContent.contentId];
     await DB.query(sql, params);
     return deviceContent;
   }
 
   private async update(deviceContent: DeviceContent) {
     const sql = "UPDATE deviceContent SET deviceId=?, contentType=?, contentId=? WHERE id=? AND churchId=?;";
-    const params = [
-      deviceContent.deviceId,
-      deviceContent.contentType,
-      deviceContent.contentId,
-      deviceContent.id,
-      deviceContent.churchId
-    ];
+    const params = [deviceContent.deviceId, deviceContent.contentType, deviceContent.contentId, deviceContent.id, deviceContent.churchId];
     await DB.query(sql, params);
     return deviceContent;
   }

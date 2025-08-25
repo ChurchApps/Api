@@ -20,8 +20,7 @@ export class BibleBookRepository {
   private async create(book: BibleBook) {
     book.id = UniqueIdHelper.shortId();
 
-    const sql =
-      "INSERT INTO bibleBooks (id, translationKey, keyName, abbreviation, name, sort) VALUES (?, ?, ?, ?, ?, ?);";
+    const sql = "INSERT INTO bibleBooks (id, translationKey, keyName, abbreviation, name, sort) VALUES (?, ?, ?, ?, ?, ?);";
     const params = [book.id, book.translationKey, book.keyName, book.abbreviation, book.name, book.sort];
     await TypedDB.query(sql, params);
     return book;

@@ -1,4 +1,4 @@
-import { DoingRepositories } from "../repositories";
+import { Repositories } from "../repositories";
 import { Position, Assignment, BlockoutDate } from "../models";
 
 interface NeededPosition {
@@ -8,15 +8,8 @@ interface NeededPosition {
 }
 
 export class PlanHelper {
-  static async autofill(
-    positions: Position[],
-    assignments: Assignment[],
-    blockoutDates: BlockoutDate[],
-    teams: { positionId: string; personIds: string[] }[],
-    lastServed: { personId: string; serviceDate: Date }[],
-    repositories?: DoingRepositories
-  ) {
-    const repos = repositories || new DoingRepositories();
+  static async autofill(positions: Position[], assignments: Assignment[], blockoutDates: BlockoutDate[], teams: { positionId: string; personIds: string[] }[], lastServed: { personId: string; serviceDate: Date }[], repositories?: Repositories) {
+    const repos = repositories || Repositories.getCurrent();
     const unavailablePeople = blockoutDates.map((b) => b.personId) || [];
     assignments.forEach((a) => {
       if (unavailablePeople.indexOf(a.personId) === -1) unavailablePeople.push(a.personId);
@@ -26,10 +19,7 @@ export class PlanHelper {
     positions.forEach((p) => {
       const assignedCount = assignments.filter((a) => a.positionId === p.id).length;
       if ((p.count || 0) > assignedCount) {
-        const availablePeople =
-          teams
-            .find((t) => t.positionId === p.id)
-            ?.personIds.filter((personId) => unavailablePeople.indexOf(personId) === -1) || [];
+        const availablePeople = teams.find((t) => t.positionId === p.id)?.personIds.filter((personId) => unavailablePeople.indexOf(personId) === -1) || [];
         neededPositions.push({ position: p, needed: (p.count || 0) - assignedCount, availablePeople });
       }
     });
@@ -49,9 +39,7 @@ export class PlanHelper {
   static assignPeople(neededPositions: NeededPosition[]) {
     const result: Assignment[] = [];
 
-    const needed = neededPositions.sort(
-      (a, b) => b.needed - b.availablePeople.length - (a.needed - a.availablePeople.length)
-    );
+    const needed = neededPositions.sort((a, b) => b.needed - b.availablePeople.length - (a.needed - a.availablePeople.length));
     needed.forEach((n) => {
       while (n.needed > 0 && n.availablePeople.length > 0) {
         const personId = n.availablePeople.shift();

@@ -46,13 +46,7 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:contentType/:contentId")
-  public async loadByContent(
-    @requestParam("churchId") churchId: string,
-    @requestParam("contentType") contentType: string,
-    @requestParam("contentId") contentId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<Conversation[]> {
+  public async loadByContent(@requestParam("churchId") churchId: string, @requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
       const data = await this.repositories.conversation.loadForContent(churchId, contentType, contentId);
       return this.repositories.conversation.convertAllToModel(data as any[]);
@@ -60,12 +54,7 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(
-    @requestParam("churchId") churchId: string,
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<Conversation> {
+  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repositories.conversation.loadById(churchId, id);
       return this.repositories.conversation.convertToModel(data);
@@ -86,11 +75,7 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpGet("/posts/group/:groupId")
-  public async getPostsForGroup(
-    @requestParam("groupId") groupId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repositories.conversation.loadPosts(au.churchId, [groupId]);
       await this.appendMessages(result, au.churchId);
@@ -108,14 +93,7 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpPost("/start")
-  public async start(
-    req: express.Request<
-      {},
-      {},
-      { groupId: string; contentType: string; contentId: string; title: string; comment: string }
-    >,
-    res: express.Response
-  ): Promise<unknown> {
+  public async start(req: express.Request<{}, {}, { groupId: string; contentType: string; contentId: string; title: string; comment: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const c: Conversation = {
         churchId: au.churchId,
@@ -147,31 +125,16 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpGet("/current/:churchId/:contentType/:contentId")
-  public async current(
-    @requestParam("churchId") churchId: string,
-    @requestParam("contentType") contentType: string,
-    @requestParam("contentId") contentId: string,
-    req: express.Request<{}, {}, {}>,
-    res: express.Response
-  ): Promise<any> {
+  public async current(@requestParam("churchId") churchId: string, @requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.getOrCreate(churchId, contentType, contentId, "public", true);
     }) as any;
   }
 
   @httpGet("/:contentType/:contentId")
-  public async forContent(
-    @requestParam("contentType") contentType: string,
-    @requestParam("contentId") contentId: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async forContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const conversations = (await this.repositories.conversation.loadForContent(
-        au.churchId,
-        contentType,
-        contentId
-      )) as Conversation[];
+      const conversations = (await this.repositories.conversation.loadForContent(au.churchId, contentType, contentId)) as Conversation[];
       const messageIds: string[] = [];
       conversations.forEach((c) => {
         if (messageIds.indexOf(c.firstPostId) === -1) messageIds.push(c.firstPostId);
@@ -199,24 +162,13 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(
-    @requestParam("churchId") churchId: string,
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<void> {
+  public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repositories.conversation.delete(au.churchId, id);
     }) as any;
   }
 
-  private async getOrCreate(
-    churchId: string,
-    contentType: string,
-    contentId: string,
-    visibility: string,
-    allowAnonymousPosts: boolean
-  ) {
+  private async getOrCreate(churchId: string, contentType: string, contentId: string, visibility: string, allowAnonymousPosts: boolean) {
     const CONTENT_ID = contentId.length > 11 ? EncryptionHelper.decrypt(contentId.toString()) : contentId;
     let result: Conversation = await this.repositories.conversation.loadCurrent(churchId, contentType, CONTENT_ID);
     if (result === null) {

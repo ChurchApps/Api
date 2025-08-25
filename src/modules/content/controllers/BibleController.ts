@@ -16,11 +16,7 @@ export class BibleController extends ContentBaseController {
   ];
 
   @httpGet("/:translationKey/search")
-  public async search(
-    @requestParam("translationKey") translationKey: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async search(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const query = req.query.query as string;
       const result = await ApiBibleHelper.search(translationKey, query);
@@ -52,11 +48,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/updateCopyright")
-  public async updateCopyright(
-    @requestParam("translationKey") translationKey: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async updateCopyright(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const copyright = await ApiBibleHelper.getCopyright(translationKey);
       const bible = await this.repositories.bibleTranslation.loadBySourceKey("api.bible", translationKey);
@@ -67,11 +59,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/books")
-  public async getBooks(
-    @requestParam("translationKey") translationKey: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getBooks(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repositories.bibleBook.loadAll(translationKey);
       if (result.length === 0) {
@@ -83,12 +71,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/:bookKey/chapters")
-  public async getChapters(
-    @requestParam("translationKey") translationKey: string,
-    @requestParam("bookKey") bookKey: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getChapters(@requestParam("translationKey") translationKey: string, @requestParam("bookKey") bookKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repositories.bibleChapter.loadAll(translationKey, bookKey);
       if (result.length === 0) {
@@ -100,12 +83,7 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/chapters/:chapterKey/verses")
-  public async getVerses(
-    @requestParam("translationKey") translationKey: string,
-    @requestParam("chapterKey") chapterKey: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<any> {
+  public async getVerses(@requestParam("translationKey") translationKey: string, @requestParam("chapterKey") chapterKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repositories.bibleVerse.loadAll(translationKey, chapterKey);
       if (result.length === 0) {
@@ -130,8 +108,7 @@ export class BibleController extends ContentBaseController {
       const ipAddress = (req.headers["x-forwarded-for"] || req.socket.remoteAddress).toString().split(",")[0];
       this.logLookup(ipAddress, translationKey, startVerseKey, endVerseKey);
 
-      if (canCache)
-        result = await this.repositories.bibleVerseText.loadRange(translationKey, startVerseKey, endVerseKey);
+      if (canCache) result = await this.repositories.bibleVerseText.loadRange(translationKey, startVerseKey, endVerseKey);
       if (result.length === 0) {
         result = await ApiBibleHelper.getVerseText(translationKey, startVerseKey, endVerseKey);
         if (canCache) {

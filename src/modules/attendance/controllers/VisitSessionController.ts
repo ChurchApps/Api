@@ -36,8 +36,7 @@ export class VisitSessionController extends AttendanceBaseController {
           newVisit = true;
         }
         let existingSession: VisitSession = null;
-        if (!newVisit)
-          existingSession = await this.repositories.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
+        if (!newVisit) existingSession = await this.repositories.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
         if (existingSession == null) {
           const vs: VisitSession = { churchId: au.churchId, sessionId, visitId: visit.id };
           await this.repositories.visitSession.save(vs);
@@ -48,11 +47,7 @@ export class VisitSessionController extends AttendanceBaseController {
   }
 
   @httpGet("/download/:sessionId")
-  public async download(
-    @requestParam("sessionId") sessionId: string,
-    req: express.Request<{}, {}, any>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async download(@requestParam("sessionId") sessionId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json([], 401);
       else {
@@ -65,8 +60,7 @@ export class VisitSessionController extends AttendanceBaseController {
           status: "present" | "absent";
         }[] = [];
         const apiUrl = Environment.membershipApi;
-        const visitSessions: VisitSession[] =
-          ((await this.repositories.visitSession.loadForSession(au.churchId, sessionId)) as VisitSession[]) || [];
+        const visitSessions: VisitSession[] = ((await this.repositories.visitSession.loadForSession(au.churchId, sessionId)) as VisitSession[]) || [];
         const session: Session = await this.repositories.session.load(au.churchId, sessionId);
 
         if (visitSessions.length > 0) {
@@ -94,11 +88,7 @@ export class VisitSessionController extends AttendanceBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json([], 401);
       else {
@@ -139,11 +129,7 @@ export class VisitSessionController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
@@ -154,11 +140,7 @@ export class VisitSessionController extends AttendanceBaseController {
   }
 
   @httpDelete("/")
-  public async deleteSessionPerson(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async deleteSessionPerson(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
@@ -168,8 +150,7 @@ export class VisitSessionController extends AttendanceBaseController {
         if (visit !== null) {
           const existingSession = await this.repositories.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
           if (existingSession !== null) await this.repositories.visitSession.delete(au.churchId, (existingSession as any).id);
-          const visitSessions: VisitSession[] =
-            ((await this.repositories.visitSession.loadByVisitId(au.churchId, visit.id)) as VisitSession[]) || [];
+          const visitSessions: VisitSession[] = ((await this.repositories.visitSession.loadByVisitId(au.churchId, visit.id)) as VisitSession[]) || [];
           if (visitSessions.length === 0) await this.repositories.visit.delete(au.churchId, visit.id);
         }
         return this.json({});

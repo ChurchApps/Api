@@ -8,10 +8,7 @@ import { DeliveryHelper } from "../helpers/DeliveryHelper";
 export class ConnectionController extends MessagingBaseController {
   private async updateAnonName(connection: Connection) {
     if (connection.displayName === "Anonymous ") {
-      const connections: Connection[] = await this.repositories.connection.loadForConversation(
-        connection.churchId,
-        connection.conversationId
-      );
+      const connections: Connection[] = await this.repositories.connection.loadForConversation(connection.churchId, connection.conversationId);
       const anonConnections = connections.filter((c) => c.displayName.includes("Anonymous"));
       if (anonConnections.length > 0) {
         const displayNames = anonConnections.map((c) => c.displayName);
@@ -29,12 +26,7 @@ export class ConnectionController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:conversationId")
-  public async load(
-    @requestParam("churchId") churchId: string,
-    @requestParam("conversationId") conversationId: string,
-    req: express.Request<{}, {}, []>,
-    res: express.Response
-  ): Promise<any> {
+  public async load(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repositories.connection.loadForConversation(churchId, conversationId);
       const connections = this.repositories.connection.convertAllToModel(data);
@@ -45,10 +37,7 @@ export class ConnectionController extends MessagingBaseController {
   @httpPost("/tmpSendAlert")
   public async sendAlert(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const connections = await this.repositories.connection.loadForNotification(
-        req.body.churchId,
-        req.body.personId
-      );
+      const connections = await this.repositories.connection.loadForNotification(req.body.churchId, req.body.personId);
       const deliveryCount = await DeliveryHelper.sendMessages(connections, {
         churchId: req.body.churchId,
         conversationId: "alert",
@@ -98,10 +87,7 @@ export class ConnectionController extends MessagingBaseController {
   }
 
   @httpPost("/setName")
-  public async setName(
-    req: express.Request<{}, {}, { socketId: string; name: string }>,
-    res: express.Response
-  ): Promise<any> {
+  public async setName(req: express.Request<{}, {}, { socketId: string; name: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const connections = await this.repositories.connection.loadBySocketId(req.body.socketId);
       const promises: Promise<Connection>[] = [];

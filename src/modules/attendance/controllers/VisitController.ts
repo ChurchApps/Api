@@ -18,12 +18,7 @@ export class VisitController extends AttendanceBaseController {
     const cached: string = VisitController.cachedSessionIds[key];
     if (cached !== undefined) result = cached;
     else {
-      let session: Session = await this.repositories.session.loadByGroupServiceTimeDate(
-        churchId,
-        groupId,
-        serviceTimeId,
-        currentDate
-      );
+      let session: Session = await this.repositories.session.loadByGroupServiceTimeDate(churchId, groupId, serviceTimeId, currentDate);
       if (session === null) {
         session = { churchId, groupId, serviceTimeId, sessionDate: currentDate };
         session = await this.repositories.session.save(session);
@@ -37,8 +32,7 @@ export class VisitController extends AttendanceBaseController {
   @httpGet("/checkin")
   public async getCheckin(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin))
-        return this.json({}, 401);
+      if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
       else {
         const result: Visit[] = [];
         const serviceId = req.query.serviceId.toString();
@@ -51,28 +45,16 @@ export class VisitController extends AttendanceBaseController {
 
         const lastDate = await this.repositories.visit.loadLastLoggedDate(au.churchId, serviceId, peopleIds);
 
-        const visits: Visit[] =
-          peopleIds.length === 0
-            ? []
-            : this.repositories.visit.convertAllToModel(
-                au.churchId,
-                (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds)) as any
-              );
+        const visits: Visit[] = peopleIds.length === 0 ? [] : this.repositories.visit.convertAllToModel(au.churchId, (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds)) as any);
 
         const visitIds: string[] = [];
         if (visits.length > 0) {
           visits?.forEach((v) => visitIds.push(v.id));
-          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(
-            au.churchId,
-            (await this.repositories.visitSession.loadByVisitIds(au.churchId, visitIds)) as any
-          );
+          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(au.churchId, (await this.repositories.visitSession.loadByVisitIds(au.churchId, visitIds)) as any);
           if (visitSessions.length > 0) {
             const sessionIds: string[] = [];
             visitSessions.forEach((vs) => sessionIds.push(vs.sessionId));
-            const sessions: Session[] = this.repositories.session.convertAllToModel(
-              au.churchId,
-              (await this.repositories.session.loadByIds(au.churchId, sessionIds)) as any
-            );
+            const sessions: Session[] = this.repositories.session.convertAllToModel(au.churchId, (await this.repositories.session.loadByIds(au.churchId, sessionIds)) as any);
             visits?.forEach((v) => {
               v.visitSessions = [];
               visitSessions?.forEach((vs) => {
@@ -107,8 +89,7 @@ export class VisitController extends AttendanceBaseController {
   @httpPost("/checkin")
   public async postCheckin(req: express.Request<{}, {}, Visit[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin))
-        return this.json({}, 401);
+      if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
       else {
         const deleteVisitIds: string[] = [];
         const deleteVisitSessionIds: string[] = [];
@@ -128,30 +109,16 @@ export class VisitController extends AttendanceBaseController {
           sv.checkinTime = new Date();
           sv.addedBy = au.id;
           sv.visitSessions.forEach(async (vs) => {
-            vs.sessionId = await this.getSessionId(
-              au.churchId,
-              vs.session.serviceTimeId,
-              vs.session.groupId,
-              currentDate
-            );
+            vs.sessionId = await this.getSessionId(au.churchId, vs.session.serviceTimeId, vs.session.groupId, currentDate);
             vs.churchId = au.churchId;
           });
         });
 
         const existingVisitIds: string[] = [];
-        const existingVisits: Visit[] =
-          peopleIds.length === 0
-            ? []
-            : this.repositories.visit.convertAllToModel(
-                au.churchId,
-                (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any
-              );
+        const existingVisits: Visit[] = peopleIds.length === 0 ? [] : this.repositories.visit.convertAllToModel(au.churchId, (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any);
         if (existingVisits.length > 0) {
           existingVisits.forEach((v) => existingVisitIds.push(v.id));
-          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(
-            au.churchId,
-            (await this.repositories.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any
-          );
+          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(au.churchId, (await this.repositories.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any);
           this.populateDeleteIds(existingVisits, submittedVisits, visitSessions, deleteVisitIds, deleteVisitSessionIds);
         }
 
@@ -171,11 +138,7 @@ export class VisitController extends AttendanceBaseController {
   }
 
   @httpGet("/:id")
-  public async get(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
@@ -190,8 +153,7 @@ export class VisitController extends AttendanceBaseController {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
         let result = null;
-        if (req.query.personId !== undefined)
-          result = await this.repositories.visit.loadForPerson(au.churchId, req.query.personId.toString());
+        if (req.query.personId !== undefined) result = await this.repositories.visit.loadForPerson(au.churchId, req.query.personId.toString());
         else result = await this.repositories.visit.loadAll(au.churchId);
         return this.repositories.visit.convertAllToModel(au.churchId, result as any);
       }
@@ -215,11 +177,7 @@ export class VisitController extends AttendanceBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(
-    @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<unknown> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
@@ -229,13 +187,7 @@ export class VisitController extends AttendanceBaseController {
     });
   }
 
-  private populateDeleteIds(
-    existingVisits: Visit[],
-    submittedVisits: Visit[],
-    visitSessions: VisitSession[],
-    deleteVisitIds: string[],
-    deleteVisitSessionIds: string[]
-  ) {
+  private populateDeleteIds(existingVisits: Visit[], submittedVisits: Visit[], visitSessions: VisitSession[], deleteVisitIds: string[], deleteVisitSessionIds: string[]) {
     existingVisits.forEach((existingVisit) => {
       existingVisit.visitSessions = [];
       visitSessions.forEach((vs) => {
