@@ -297,6 +297,22 @@ export const permissionsList: IPermission[] = [
     action: "Host",
     displaySection: "Content",
     displayAction: "Host Chat"
+  },
+
+  // Lessons API permissions
+  {
+    apiName: "LessonsApi",
+    section: "Schedules",
+    action: "Edit",
+    displaySection: "Lessons",
+    displayAction: "Edit Schedules"
+  },
+  {
+    apiName: "LessonsApi",
+    section: "Content",
+    action: "Edit",
+    displaySection: "Lessons",
+    displayAction: "Edit Content"
   }
 ];
 
@@ -308,9 +324,9 @@ export interface IPermission {
   displayAction: string;
 }
 
-export type ApiName = "MembershipApi" | "GivingApi" | "AttendanceApi" | "MessagingApi" | "DoingApi" | "ContentApi";
+export type ApiName = "MembershipApi" | "GivingApi" | "AttendanceApi" | "MessagingApi" | "DoingApi" | "ContentApi" | "LessonsApi";
 
-export type DisplaySection = "People and Groups" | "Donations" | "Attendance" | "Forms and Plans" | "Content";
+export type DisplaySection = "People and Groups" | "Donations" | "Attendance" | "Forms and Plans" | "Content" | "Lessons";
 
 export type ContentType =
   | "Roles"
@@ -333,6 +349,7 @@ export type ContentType =
   | "Server"
   | "Messaging"
   | "Doing"
-  | "Admin";
+  | "Admin"
+  | "Schedules";
 
 export type Actions = "Admin" | "Edit" | "View" | "Edit Self" | "View Members" | "View Summary" | "Checkin" | "Host" | "Edit Settings";
