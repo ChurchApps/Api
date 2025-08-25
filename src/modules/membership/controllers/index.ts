@@ -24,3 +24,4 @@ export { ClientErrorController } from "./ClientErrorController";
 export { QueryController } from "./QueryController";
 
 export { OAuthController } from "./OAuthController";
+export { DebugController } from "./DebugController";

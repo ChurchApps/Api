@@ -233,42 +233,44 @@ export const createApp = async () => {
 async function loadModuleBindings(container: Container) {
   try {
     console.log("Loading module controllers and bindings...");
+    const startTime = Date.now();
 
-    // Load all module controllers which will self-register via decorators
+    // Load all module controllers in parallel for faster startup
     // The @controller decorators automatically register with the container
+    const moduleImports = [
+      { name: "Membership", import: import("./modules/membership/controllers") },
+      { name: "Attendance", import: import("./modules/attendance/controllers") },
+      { name: "Content", import: import("./modules/content/controllers") },
+      { name: "Doing", import: import("./modules/doing/controllers") },
+      { name: "Giving", import: import("./modules/giving/controllers") },
+      { name: "Messaging", import: import("./modules/messaging/controllers") },
+      { name: "Reporting", import: import("./modules/reporting/controllers") }
+    ];
 
-    // Import membership module controllers with proper prefix
-    await import("./modules/membership/controllers");
-    console.log("✓ Membership controllers loaded");
+    // Execute all imports in parallel
+    const results = await Promise.allSettled(moduleImports.map(m => m.import));
 
-    // Import attendance module controllers
-    await import("./modules/attendance/controllers");
-    console.log("✓ Attendance controllers loaded");
+    // Report on each module's loading status
+    results.forEach((result, index) => {
+      const moduleName = moduleImports[index].name;
+      if (result.status === "fulfilled") {
+        console.log(`✓ ${moduleName} controllers loaded`);
+      } else {
+        console.error(`✗ Failed to load ${moduleName} controllers:`, result.reason);
+      }
+    });
 
-    // Import content module controllers
-    await import("./modules/content/controllers");
-    console.log("✓ Content controllers loaded");
-
-    // Import doing module controllers
-    await import("./modules/doing/controllers");
-    console.log("✓ Doing controllers loaded");
-
-    // Import giving module controllers
-    await import("./modules/giving/controllers");
-    console.log("✓ Giving controllers loaded");
-
-    // Import messaging module controllers
-    await import("./modules/messaging/controllers");
-    console.log("✓ Messaging controllers loaded");
-
-    // Import reporting module controllers
-    await import("./modules/reporting/controllers");
-    console.log("✓ Reporting controllers loaded");
+    // Check if any modules failed to load
+    const failedModules = results.filter(r => r.status === "rejected");
+    if (failedModules.length > 0) {
+      console.warn(`⚠️ ${failedModules.length} module(s) failed to load, but continuing...`);
+    }
 
     // Set up repository manager as singleton
     container.bind<RepositoryManager>("RepositoryManager").toConstantValue(RepositoryManager);
 
-    console.log("All module bindings loaded successfully");
+    const loadTime = Date.now() - startTime;
+    console.log(`All module bindings loaded in ${loadTime}ms`);
   } catch (error) {
     console.error("Failed to load module bindings:", error);
     throw error;
