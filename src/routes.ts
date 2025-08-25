@@ -19,7 +19,8 @@ export const MODULE_ROUTES = {
   content: "/content",
   doing: "/doing",
   giving: "/giving",
-  messaging: "/messaging"
+  messaging: "/messaging",
+  reporting: "/reporting"
 } as const;
 
 /**

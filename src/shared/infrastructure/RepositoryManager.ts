@@ -40,6 +40,10 @@ export class RepositoryManager {
         const { MessagingRepositories } = await import("../../modules/messaging");
         return new MessagingRepositories();
 
+      case "reporting":
+        const { ReportingRepositories } = await import("../../modules/reporting");
+        return new ReportingRepositories();
+
       default:
         throw new Error(`Unknown module: ${moduleName}`);
     }

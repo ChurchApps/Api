@@ -18,7 +18,7 @@ import { MembershipBaseController } from "./MembershipBaseController";
 import { EmailHelper, UserHelper, UniqueIdHelper, Environment } from "../helpers";
 import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers";
-import { ApiHelper, ArrayHelper } from "@churchapps/apihelper";
+import { ArrayHelper } from "@churchapps/apihelper";
 
 const emailPasswordValidation = [
   body("email")
@@ -449,38 +449,6 @@ export class UserController extends MembershipBaseController {
       await this.repositories.roleMember.deleteUser(au.id);
       return this.json({});
     });
-  }
-
-  @httpGet("/debug/connections")
-  public async debugConnections(req: express.Request, res: express.Response): Promise<any> {
-    try {
-      const connectionInfo = {
-        environment: Environment.currentEnvironment,
-        stage: process.env.STAGE,
-        modules: {}
-      };
-
-      // Get all module connection strings using exact same logic as Environment class
-      const modules = ["membership", "attendance", "content", "giving", "messaging", "doing"];
-      const environment = Environment.currentEnvironment;
-
-      for (const moduleName of modules) {
-        const envVarName = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
-        const connectionString = Environment.dbConnections.get(moduleName);
-        const paramName = `/${environment}/${moduleName}Api/connectionString`;
-
-        connectionInfo.modules[moduleName] = {
-          environmentVariable: envVarName,
-          parameterStorePath: paramName,
-          connectionString: connectionString || "NOT_FOUND",
-          hasConnection: !!connectionString
-        };
-      }
-
-      return res.json(connectionInfo);
-    } catch (error) {
-      return res.status(500).json({ error: error.message });
-    }
   }
 
 }

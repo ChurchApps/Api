@@ -262,6 +262,10 @@ async function loadModuleBindings(container: Container) {
     await import("./modules/messaging/controllers");
     console.log("✓ Messaging controllers loaded");
 
+    // Import reporting module controllers
+    await import("./modules/reporting/controllers");
+    console.log("✓ Reporting controllers loaded");
+
     // Set up repository manager as singleton
     container.bind<RepositoryManager>("RepositoryManager").toConstantValue(RepositoryManager);
 

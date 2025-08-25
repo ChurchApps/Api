@@ -134,7 +134,7 @@ export class Environment extends EnvironmentBase {
 
   private static async initializeDatabaseConnections(config: any) {
     // Load from environment variables (connection strings)
-    const modules = ["membership", "attendance", "content", "giving", "messaging", "doing"];
+    const modules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
 
     console.log(`🔍 Initializing database connections for environment: ${this.currentEnvironment}`);
     console.log(`🔍 AWS Lambda Function: ${process.env.AWS_LAMBDA_FUNCTION_NAME}`);
