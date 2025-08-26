@@ -62,7 +62,7 @@ jobs:
               mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`; CREATE DATABASE \`${DB_NAME}\`;"
               
               # Add connection string to .env for this module
-              echo "CONNECTION_STRING_${MODULE^^}=$CONNECTION_STRING" >> .env
+              echo "${MODULE^^}_CONNECTION_STRING=$CONNECTION_STRING" >> .env
               
               echo "   🔧 Initializing $MODULE database schema and demo data..."
               npm run initdb:$MODULE
