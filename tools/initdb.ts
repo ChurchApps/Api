@@ -461,7 +461,7 @@ async function ensureDatabaseExists(moduleName: string, dbConfig: any) {
 function splitSqlStatements(sql: string): string[] {
   // Simply split on semicolon at end of line, but handle procedures specially
   const statements: string[] = [];
-  const lines = sql.split('\\n');
+  const lines = sql.split('\n');
   let current = '';
   let inProcedure = false;
   let procedureContent = '';
@@ -476,17 +476,17 @@ function splitSqlStatements(sql: string): string[] {
     }
 
     // Check for stored procedure/function start
-    if (trimmedLine.startsWith('CREATE PROCEDURE') ||
-      trimmedLine.startsWith('CREATE FUNCTION') ||
-      trimmedLine.startsWith('CREATE DEFINER')) {
+    if (trimmedLine.startsWith('CREATE PROCEDURE') || 
+        trimmedLine.startsWith('CREATE FUNCTION') ||
+        trimmedLine.startsWith('CREATE DEFINER')) {
       inProcedure = true;
-      procedureContent = originalLine + '\\n';
+      procedureContent = originalLine + '\n';
       continue;
     }
 
     // Handle DROP statements separately
-    if (trimmedLine.startsWith('DROP PROCEDURE') ||
-      trimmedLine.startsWith('DROP FUNCTION')) {
+    if (trimmedLine.startsWith('DROP PROCEDURE') || 
+        trimmedLine.startsWith('DROP FUNCTION')) {
       statements.push(originalLine);
       continue;
     }
@@ -497,20 +497,25 @@ function splitSqlStatements(sql: string): string[] {
     }
 
     if (inProcedure) {
-      procedureContent += originalLine + '\\n';
-      // Check for end of procedure (END$$ or END// or END;)
-      if (trimmedLine === 'END$$' || trimmedLine === 'END//' || trimmedLine === 'END' || trimmedLine === 'END;') {
-        // Remove the $$ or // suffix if present
+      procedureContent += originalLine + '\n';
+      // Check for end of procedure - handle various formats
+      // END$$ or END // or END; or just END followed by delimiter
+      if (trimmedLine === 'END' || 
+          trimmedLine === 'END;' || 
+          trimmedLine === 'END$$' || 
+          trimmedLine === 'END//' || 
+          trimmedLine.match(/^END\s*\/\//) || 
+          trimmedLine.match(/^END\s*\$\$/)) {
+        // Remove any delimiter suffix ($$, //, or whitespace followed by these)
         let cleanProc = procedureContent.trim();
-        if (cleanProc.endsWith('$$') || cleanProc.endsWith('//')) {
-          cleanProc = cleanProc.substring(0, cleanProc.length - 2);
-        }
+        // Remove $$ or // at the end, including any spaces before them
+        cleanProc = cleanProc.replace(/\s*(\/\/|\$\$)\s*$/, '');
         statements.push(cleanProc);
         procedureContent = '';
         inProcedure = false;
       }
     } else {
-      current += originalLine + '\\n';
+      current += originalLine + '\n';
       // Normal statement ends with semicolon
       if (originalLine.trim().endsWith(';')) {
         if (current.trim()) {
