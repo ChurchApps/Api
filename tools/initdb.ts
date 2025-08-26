@@ -323,7 +323,7 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
       for (const section of moduleConfig.sections) {
         await initializeSection(moduleName, section.name, section.tables, scriptsPath);
       }
-      
+
       // Run demo data after schema
       await initializeDemoData(moduleName, moduleConfig.demoTables, scriptsPath);
     }
@@ -370,11 +370,11 @@ async function initializeSection(moduleName: string, sectionName: string, tables
         try {
           // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
           const upperStatement = cleanStatement.toUpperCase();
-          if (upperStatement.startsWith('CREATE PROCEDURE') || 
-              upperStatement.startsWith('CREATE FUNCTION') ||
-              upperStatement.startsWith('DROP PROCEDURE') ||
-              upperStatement.startsWith('DROP FUNCTION') ||
-              upperStatement.includes('CREATE DEFINER')) {
+          if (upperStatement.startsWith('CREATE PROCEDURE') ||
+            upperStatement.startsWith('CREATE FUNCTION') ||
+            upperStatement.startsWith('DROP PROCEDURE') ||
+            upperStatement.startsWith('DROP FUNCTION') ||
+            upperStatement.includes('CREATE DEFINER')) {
             await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
           } else {
             await MultiDatabasePool.query(moduleName, cleanStatement);
@@ -416,11 +416,11 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
         try {
           // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
           const upperStatement = cleanStatement.toUpperCase();
-          if (upperStatement.startsWith('CREATE PROCEDURE') || 
-              upperStatement.startsWith('CREATE FUNCTION') ||
-              upperStatement.startsWith('DROP PROCEDURE') ||
-              upperStatement.startsWith('DROP FUNCTION') ||
-              upperStatement.includes('CREATE DEFINER')) {
+          if (upperStatement.startsWith('CREATE PROCEDURE') ||
+            upperStatement.startsWith('CREATE FUNCTION') ||
+            upperStatement.startsWith('DROP PROCEDURE') ||
+            upperStatement.startsWith('DROP FUNCTION') ||
+            upperStatement.includes('CREATE DEFINER')) {
             await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
           } else {
             await MultiDatabasePool.query(moduleName, cleanStatement);
@@ -461,7 +461,7 @@ async function ensureDatabaseExists(moduleName: string, dbConfig: any) {
 function splitSqlStatements(sql: string): string[] {
   // Simply split on semicolon at end of line, but handle procedures specially
   const statements: string[] = [];
-  const lines = sql.split('\n');
+  const lines = sql.split('\\n');
   let current = '';
   let inProcedure = false;
   let procedureContent = '';
@@ -476,17 +476,17 @@ function splitSqlStatements(sql: string): string[] {
     }
 
     // Check for stored procedure/function start
-    if (trimmedLine.startsWith('CREATE PROCEDURE') || 
-        trimmedLine.startsWith('CREATE FUNCTION') ||
-        trimmedLine.startsWith('CREATE DEFINER')) {
+    if (trimmedLine.startsWith('CREATE PROCEDURE') ||
+      trimmedLine.startsWith('CREATE FUNCTION') ||
+      trimmedLine.startsWith('CREATE DEFINER')) {
       inProcedure = true;
-      procedureContent = originalLine + '\n';
+      procedureContent = originalLine + '\\n';
       continue;
     }
 
     // Handle DROP statements separately
-    if (trimmedLine.startsWith('DROP PROCEDURE') || 
-        trimmedLine.startsWith('DROP FUNCTION')) {
+    if (trimmedLine.startsWith('DROP PROCEDURE') ||
+      trimmedLine.startsWith('DROP FUNCTION')) {
       statements.push(originalLine);
       continue;
     }
@@ -497,12 +497,12 @@ function splitSqlStatements(sql: string): string[] {
     }
 
     if (inProcedure) {
-      procedureContent += originalLine + '\n';
-      // Check for end of procedure (END$$ or END;)
-      if (trimmedLine === 'END$$' || trimmedLine === 'END' || trimmedLine === 'END;') {
-        // Remove the $$ suffix if present
+      procedureContent += originalLine + '\\n';
+      // Check for end of procedure (END$$ or END// or END;)
+      if (trimmedLine === 'END$$' || trimmedLine === 'END//' || trimmedLine === 'END' || trimmedLine === 'END;') {
+        // Remove the $$ or // suffix if present
         let cleanProc = procedureContent.trim();
-        if (cleanProc.endsWith('$$')) {
+        if (cleanProc.endsWith('$$') || cleanProc.endsWith('//')) {
           cleanProc = cleanProc.substring(0, cleanProc.length - 2);
         }
         statements.push(cleanProc);
@@ -510,7 +510,7 @@ function splitSqlStatements(sql: string): string[] {
         inProcedure = false;
       }
     } else {
-      current += originalLine + '\n';
+      current += originalLine + '\\n';
       // Normal statement ends with semicolon
       if (originalLine.trim().endsWith(';')) {
         if (current.trim()) {
