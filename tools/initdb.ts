@@ -238,6 +238,7 @@ interface InitOptions {
   reset?: boolean;
   environment?: string;
   demoOnly?: boolean;
+  schemaOnly?: boolean;
 }
 
 async function initializeDatabases(options: InitOptions = {}) {
@@ -278,6 +279,7 @@ async function initializeDatabases(options: InitOptions = {}) {
     process.exit(1);
   } finally {
     await ConnectionManager.closeAll();
+    await MultiDatabasePool.closeAll();
   }
 }
 
@@ -311,11 +313,19 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
     if (options.demoOnly) {
       // Only run demo data
       await initializeDemoData(moduleName, moduleConfig.demoTables, scriptsPath);
-    } else {
-      // Run schema sections
+    } else if (options.schemaOnly) {
+      // Only run schema sections, skip demo data
       for (const section of moduleConfig.sections) {
         await initializeSection(moduleName, section.name, section.tables, scriptsPath);
       }
+    } else {
+      // Run schema sections and demo data (default behavior)
+      for (const section of moduleConfig.sections) {
+        await initializeSection(moduleName, section.name, section.tables, scriptsPath);
+      }
+      
+      // Run demo data after schema
+      await initializeDemoData(moduleName, moduleConfig.demoTables, scriptsPath);
     }
 
     console.log(`   ✅ ${moduleName} database initialized successfully`);
@@ -587,6 +597,8 @@ function parseArguments(): InitOptions {
       options.environment = arg.split('=')[1];
     } else if (arg === '--demo-only') {
       options.demoOnly = true;
+    } else if (arg === '--schema-only') {
+      options.schemaOnly = true;
     }
   }
 

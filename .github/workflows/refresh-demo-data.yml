@@ -1,11 +1,13 @@
-name: Recreate Demo Database
+name: Repopulate Demo Data
 
 on:
+  schedule:
+    - cron: "0 2 * * *" # Runs at 2 AM UTC every day
   workflow_dispatch: # Allows manual triggering
 
 jobs:
-  cleanup:
-    name: Recreate Demo Database
+  repopulate:
+    name: Repopulate Demo Data
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,12 +29,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.STAGING_AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-2
 
-      - name: Recreate All Module Databases
+      - name: Truncate and Repopulate Demo Data
         run: |
           # Define all modules in correct initialization order
           MODULES=("membership" "attendance" "content" "giving" "messaging" "doing")
           
-          echo "🚀 Starting recreation of demo databases for all modules..."
+          echo "🚀 Truncating and repopulating demo data for all modules..."
           echo "📋 Module order: ${MODULES[*]}"
           
           # Create base .env file
@@ -56,14 +58,19 @@ jobs:
               DB_USER=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/\([^:]*\):.*/\1/p')
               DB_PASS=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
               
-              echo "   🗑️ Dropping and recreating database: $DB_NAME"
-              mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`; CREATE DATABASE \`${DB_NAME}\`;"
+              echo "   🧹 Truncating data tables in database: $DB_NAME"
+              # Truncate all tables instead of dropping the database
+              mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "
+                USE \`${DB_NAME}\`;
+                SET FOREIGN_KEY_CHECKS=0;
+                SHOW TABLES;" | tail -n +2 | xargs -I {} mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "USE \`${DB_NAME}\`; TRUNCATE TABLE \`{}\`;"
+              mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "USE \`${DB_NAME}\`; SET FOREIGN_KEY_CHECKS=1;"
               
               # Add connection string to .env for this module
               echo "${MODULE^^}_CONNECTION_STRING=$CONNECTION_STRING" >> .env
               
-              echo "   🔧 Initializing $MODULE database schema and demo data..."
-              npm run initdb:$MODULE
+              echo "   📄 Populating $MODULE demo data only..."
+              npm run populateDemo:$MODULE
               
               echo "   ✅ $MODULE module completed successfully"
             else
@@ -72,4 +79,4 @@ jobs:
           done
           
           echo ""
-          echo "🎉 All module databases have been recreated successfully!"
+          echo "🎉 All demo data has been repopulated successfully!"
