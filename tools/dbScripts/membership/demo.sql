@@ -1,7 +1,7 @@
 DROP PROCEDURE IF EXISTS resetDemoData;
 
 -- Create stored procedure to reset demo data
-DELIMITER //
+DELIMITER $$
 CREATE PROCEDURE resetDemoData()
 BEGIN
 
@@ -496,7 +496,7 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 ('GME00000119', 'CHU00000001', 'GRP0000000b', 'PER00000057', '2024-01-01', 0), -- Amanda Thomas
 ('GME00000120', 'CHU00000001', 'GRP0000000b', 'PER00000082', '2024-01-01', 0); -- Demo User
 
-END //
+END $$
 DELIMITER ;
 
 -- Execute the stored procedure to populate demo data
@@ -504,8 +504,8 @@ CALL resetDemoData();
 
 DROP PROCEDURE IF EXISTS resetAllDemoData;
 
--- Create stored procedure to reset demo data across all API databases
-DELIMITER //
+-- Create stored procedure to reset demo data across all API databases  
+DELIMITER $$
 CREATE PROCEDURE resetAllDemoData()
 BEGIN
     -- Reset demo data for MembershipApi
@@ -526,5 +526,5 @@ BEGIN
     -- Reset demo data for DoingApi
     CALL doing.resetDemoData();
     
-END //
+END $$
 DELIMITER ;
