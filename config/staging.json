@@ -1,6 +1,6 @@
 {
   "environment": "staging",
-  "apiUrl": "https://staging-api.example.com",
+  "apiUrl": "https://api.staging.churchapps.org",
   "deliveryProvider": "aws",
   "appName": "API",
   "contentRoot": "https://content.staging.churchapps.org",

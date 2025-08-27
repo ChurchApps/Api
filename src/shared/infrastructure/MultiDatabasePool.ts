@@ -41,6 +41,21 @@ export class MultiDatabasePool {
   }
 
   /**
+   * Sanitizes parameters by converting undefined to null
+   * This prevents "Bind parameters must not contain undefined" errors
+   */
+  private static sanitizeParams(params?: any[]): any[] {
+    if (!params) return [];
+    return params.map((param) => {
+      if (param === undefined) return null;
+      if (Array.isArray(param)) {
+        return param.map((item) => (item === undefined ? null : item));
+      }
+      return param;
+    });
+  }
+
+  /**
    * Expands arrays in SQL IN clauses
    * Converts: SELECT * FROM table WHERE id IN (?) with params [churchId, [1,2,3]]
    * To: SELECT * FROM table WHERE id IN (?,?,?) with params [churchId, 1, 2, 3]
@@ -70,9 +85,7 @@ export class MultiDatabasePool {
         const placeholderReplacements = param.map(() => "?").join(",");
 
         // Replace this specific placeholder
-        expandedSql = expandedSql.substring(0, placeholderPos) +
-          placeholderReplacements +
-          expandedSql.substring(placeholderPos + 1);
+        expandedSql = expandedSql.substring(0, placeholderPos) + placeholderReplacements + expandedSql.substring(placeholderPos + 1);
 
         // Update the offset for the next search
         sqlOffset = placeholderPos + placeholderReplacements.length;
@@ -97,7 +110,8 @@ export class MultiDatabasePool {
 
   static async query(moduleName: string, sql: string, params?: any[]): Promise<any> {
     const pool = this.getPool(moduleName);
-    const { sql: expandedSql, params: expandedParams } = this.expandArrayParams(sql, params);
+    const sanitizedParams = this.sanitizeParams(params);
+    const { sql: expandedSql, params: expandedParams } = this.expandArrayParams(sql, sanitizedParams);
     const [rows] = await pool.execute(expandedSql, expandedParams);
     return rows;
   }

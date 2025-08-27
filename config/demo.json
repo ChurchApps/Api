@@ -1,6 +1,6 @@
 {
   "environment": "demo",
-  "apiUrl": "https://demo-api.example.com",
+  "apiUrl": "https://api.demo.churchapps.org",
   "deliveryProvider": "aws",
   "appName": "API",
   "contentRoot": "https://democontent.churchapps.org",

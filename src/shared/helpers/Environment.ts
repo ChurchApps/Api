@@ -124,12 +124,12 @@ export class Environment extends EnvironmentBase {
 
   private static initializeModuleConfigs(config: any) {
     // These can be overridden in monolith for internal calls
-    this.membershipApi = config.membershipApi || config.apiUrl;
-    this.attendanceApi = config.attendanceApi || config.apiUrl;
-    this.contentApi = config.contentApi || config.apiUrl;
-    this.givingApi = config.givingApi || config.apiUrl;
-    this.messagingApi = config.messagingApi || config.apiUrl;
-    this.doingApi = config.doingApi || config.apiUrl;
+    this.membershipApi = config.membershipApi || config.apiUrl + "/membership";
+    this.attendanceApi = config.attendanceApi || config.apiUrl + "/attendance";
+    this.contentApi = config.contentApi || config.apiUrl + "/content";
+    this.givingApi = config.givingApi || config.apiUrl + "/giving";
+    this.messagingApi = config.messagingApi || config.apiUrl + "/messaging";
+    this.doingApi = config.doingApi || config.apiUrl + "/doing";
   }
 
   private static async initializeDatabaseConnections(config: any) {

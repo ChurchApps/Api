@@ -248,7 +248,7 @@ async function loadModuleBindings(container: Container) {
     ];
 
     // Execute all imports in parallel
-    const results = await Promise.allSettled(moduleImports.map(m => m.import));
+    const results = await Promise.allSettled(moduleImports.map((m) => m.import));
 
     // Report on each module's loading status
     results.forEach((result, index) => {
@@ -261,7 +261,7 @@ async function loadModuleBindings(container: Container) {
     });
 
     // Check if any modules failed to load
-    const failedModules = results.filter(r => r.status === "rejected");
+    const failedModules = results.filter((r) => r.status === "rejected");
     if (failedModules.length > 0) {
       console.warn(`⚠️ ${failedModules.length} module(s) failed to load, but continuing...`);
     }
