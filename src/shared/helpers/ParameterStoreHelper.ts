@@ -303,7 +303,7 @@ export class ParameterStoreHelper {
     console.log(`🔄 Batch loading ${Object.keys(parameterMap).length} configuration parameters from Parameter Store...`);
 
     const envLower = environment.toLowerCase();
-    const paramNames = Object.entries(parameterMap).map(([key, paramPath]) => `/${envLower}/${paramPath}`);
+    const paramNames = Object.entries(parameterMap).map(([_key, paramPath]) => `/${envLower}/${paramPath}`);
 
     const batchResults = await this.readParametersBatch(paramNames, 2, 500); // Fewer retries for config params
 
