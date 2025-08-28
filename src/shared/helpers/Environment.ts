@@ -4,27 +4,6 @@ import { AwsHelper, EnvironmentBase } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser";
 import { ParameterStoreHelper } from "./ParameterStoreHelper";
 
-// Try to load dotenv for local development
-try {
-  const dotenv = require('dotenv');
-  // Look for .env file in project root
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (fs.existsSync(envPath)) {
-    const result = dotenv.config({ path: envPath });
-    if (result.error) {
-      console.warn('⚠️ Warning: Failed to load .env file:', result.error.message);
-    } else {
-      console.log('✅ Loaded .env file for local development');
-    }
-  } else if (!process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.AWS_EXECUTION_ENV) {
-    console.log('📝 No .env file found (this is normal for production environments)');
-  }
-} catch (error) {
-  // dotenv is optional - only warn if we're not in Lambda
-  if (!process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.AWS_EXECUTION_ENV) {
-    console.log('📝 dotenv package not available (this is normal for production builds)');
-  }
-}
 
 export class Environment extends EnvironmentBase {
   // Current environment and server configuration
