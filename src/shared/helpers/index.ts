@@ -4,6 +4,7 @@
  */
 
 export { Environment } from "./Environment";
+export { ParameterStoreHelper } from "./ParameterStoreHelper";
 export { Permissions, permissionsList, type IPermission, type ApiName, type DisplaySection, type ContentType, type Actions } from "./Permissions";
 export { UniqueIdHelper } from "./UniqueIdHelper";
 export { DateHelper } from "./DateHelper";

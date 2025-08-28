@@ -15,6 +15,30 @@ custom:
       subnetIds:
         - subnet-01a6b61d749d10c46
     current: ${self:custom.vpcSettings.${self:custom.env}, self:custom.vpcSettings.prod}
+  # Critical database connections - fallback to Parameter Store if not available
+  databaseConnections:
+    prod:
+      MEMBERSHIP_CONNECTION_STRING: ${ssm:/prod/membershipApi/connectionString, ''}
+      ATTENDANCE_CONNECTION_STRING: ${ssm:/prod/attendanceApi/connectionString, ''}
+      CONTENT_CONNECTION_STRING: ${ssm:/prod/contentApi/connectionString, ''}
+      GIVING_CONNECTION_STRING: ${ssm:/prod/givingApi/connectionString, ''}
+      MESSAGING_CONNECTION_STRING: ${ssm:/prod/messagingApi/connectionString, ''}
+      DOING_CONNECTION_STRING: ${ssm:/prod/doingApi/connectionString, ''}
+    staging:
+      MEMBERSHIP_CONNECTION_STRING: ${ssm:/staging/membershipApi/connectionString, ''}
+      ATTENDANCE_CONNECTION_STRING: ${ssm:/staging/attendanceApi/connectionString, ''}
+      CONTENT_CONNECTION_STRING: ${ssm:/staging/contentApi/connectionString, ''}
+      GIVING_CONNECTION_STRING: ${ssm:/staging/givingApi/connectionString, ''}
+      MESSAGING_CONNECTION_STRING: ${ssm:/staging/messagingApi/connectionString, ''}
+      DOING_CONNECTION_STRING: ${ssm:/staging/doingApi/connectionString, ''}
+    demo:
+      MEMBERSHIP_CONNECTION_STRING: ${ssm:/demo/membershipApi/connectionString, ''}
+      ATTENDANCE_CONNECTION_STRING: ${ssm:/demo/attendanceApi/connectionString, ''}
+      CONTENT_CONNECTION_STRING: ${ssm:/demo/contentApi/connectionString, ''}
+      GIVING_CONNECTION_STRING: ${ssm:/demo/givingApi/connectionString, ''}
+      MESSAGING_CONNECTION_STRING: ${ssm:/demo/messagingApi/connectionString, ''}
+      DOING_CONNECTION_STRING: ${ssm:/demo/doingApi/connectionString, ''}
+    current: ${self:custom.databaseConnections.${self:custom.env}, {}}
 
 provider:
   name: aws
@@ -26,6 +50,13 @@ provider:
   environment:
     STAGE: ${self:custom.env}
     ENVIRONMENT: ${self:custom.env}
+    # Database connection strings from Parameter Store for faster cold starts
+    MEMBERSHIP_CONNECTION_STRING: ${self:custom.databaseConnections.current.MEMBERSHIP_CONNECTION_STRING, ''}
+    ATTENDANCE_CONNECTION_STRING: ${self:custom.databaseConnections.current.ATTENDANCE_CONNECTION_STRING, ''}
+    CONTENT_CONNECTION_STRING: ${self:custom.databaseConnections.current.CONTENT_CONNECTION_STRING, ''}
+    GIVING_CONNECTION_STRING: ${self:custom.databaseConnections.current.GIVING_CONNECTION_STRING, ''}
+    MESSAGING_CONNECTION_STRING: ${self:custom.databaseConnections.current.MESSAGING_CONNECTION_STRING, ''}
+    DOING_CONNECTION_STRING: ${self:custom.databaseConnections.current.DOING_CONNECTION_STRING, ''}
   iam:
     role: arn:aws:iam::428019619026:role/ChurchAppsRole
 

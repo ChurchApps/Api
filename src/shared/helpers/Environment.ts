@@ -2,6 +2,29 @@ import fs from "fs";
 import path from "path";
 import { AwsHelper, EnvironmentBase } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser";
+import { ParameterStoreHelper } from "./ParameterStoreHelper";
+
+// Try to load dotenv for local development
+try {
+  const dotenv = require('dotenv');
+  // Look for .env file in project root
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath)) {
+    const result = dotenv.config({ path: envPath });
+    if (result.error) {
+      console.warn('⚠️ Warning: Failed to load .env file:', result.error.message);
+    } else {
+      console.log('✅ Loaded .env file for local development');
+    }
+  } else if (!process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.AWS_EXECUTION_ENV) {
+    console.log('📝 No .env file found (this is normal for production environments)');
+  }
+} catch (error) {
+  // dotenv is optional - only warn if we're not in Lambda
+  if (!process.env.AWS_LAMBDA_FUNCTION_NAME && !process.env.AWS_EXECUTION_ENV) {
+    console.log('📝 dotenv package not available (this is normal for production builds)');
+  }
+}
 
 export class Environment extends EnvironmentBase {
   // Current environment and server configuration
@@ -133,7 +156,6 @@ export class Environment extends EnvironmentBase {
   }
 
   private static async initializeDatabaseConnections(config: any) {
-    // Load from environment variables (connection strings)
     const modules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
 
     console.log(`🔍 Initializing database connections for environment: ${this.currentEnvironment}`);
@@ -151,59 +173,60 @@ export class Environment extends EnvironmentBase {
       }
     }
 
-    // In Lambda/AWS environment, also try to load from Parameter Store
     const isAwsEnvironment = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
     const environment = (this.currentEnvironment || process.env.ENVIRONMENT || "dev").toLowerCase();
 
     console.log(`🔍 Is AWS Environment: ${isAwsEnvironment}`);
     console.log(`🔍 Using environment: ${environment}`);
 
-    for (const moduleName of modules) {
-      const envVarName = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
-      let connectionString = process.env[envVarName];
+    // Load all database connections in parallel with retry logic
+    const connectionResults = await ParameterStoreHelper.loadDatabaseConnectionsParallel(
+      modules,
+      environment,
+      !!isAwsEnvironment
+    );
 
-      console.log(`🔍 Checking ${moduleName} module:`);
-      console.log(`  - Environment variable ${envVarName}: ${connectionString ? "FOUND" : "NOT FOUND"}`);
+    // Process results and set up database connections
+    const successfulConnections: string[] = [];
+    const failedConnections: string[] = [];
 
-      // If not in environment variable and we're in AWS, try Parameter Store
-      if (!connectionString && isAwsEnvironment) {
+    for (const result of connectionResults) {
+      if (result.connectionString) {
         try {
-          const paramName = `/${environment}/${moduleName}Api/connectionString`;
-          console.log(`  - Attempting to read Parameter Store: ${paramName}`);
-          connectionString = await AwsHelper.readParameter(paramName);
-          if (connectionString) {
-            console.log(`✅ Loaded ${moduleName} connection string from Parameter Store: ${paramName}`);
-          } else {
-            console.log(`⚠️ Parameter Store returned empty/null for ${paramName}`);
-          }
+          const dbConfig = DatabaseUrlParser.parseConnectionString(result.connectionString);
+          this.dbConnections.set(result.moduleName, dbConfig);
+          console.log(`✅ Loaded ${result.moduleName} database config (source: ${result.source})`);
+          successfulConnections.push(result.moduleName);
         } catch (error) {
-          console.error(`❌ Parameter Store error for ${moduleName}: ${error.message}`);
-          console.error("❌ Full error:", error);
-        }
-      }
-
-      if (connectionString) {
-        try {
-          const dbConfig = DatabaseUrlParser.parseConnectionString(connectionString);
-          this.dbConnections.set(moduleName, dbConfig);
-          console.log(`✅ Loaded ${moduleName} database config`);
-        } catch (error) {
-          console.error(`❌ Failed to parse connection string for ${moduleName}: ${error}`);
-          throw new Error(`Invalid database connection string for ${moduleName}: ${error}`);
+          console.error(`❌ Failed to parse connection string for ${result.moduleName}: ${error}`);
+          failedConnections.push(result.moduleName);
+          // Don't throw here - allow other modules to continue working
         }
       } else {
-        console.log(`⚠️ No connection string found for ${moduleName} module`);
+        console.log(`⚠️ No connection string found for ${result.moduleName} module`);
+        failedConnections.push(result.moduleName);
+        if (result.error) {
+          console.error(`❌ Error details for ${result.moduleName}:`, result.error.message);
+        }
       }
     }
 
-    // Log final state
-    console.log(`🔍 Final database connections loaded: ${Array.from(this.dbConnections.keys()).join(", ")}`);
+    // Log final state with more detail
+    console.log("🔍 Database connections summary:");
+    console.log(`  - Successful (${successfulConnections.length}): ${successfulConnections.join(", ")}`);
+    if (failedConnections.length > 0) {
+      console.log(`  - Failed (${failedConnections.length}): ${failedConnections.join(", ")}`);
+    }
+
+    // Only throw if critical modules failed (membership is always critical)
+    const criticalModules = ["membership"];
+    const failedCritical = criticalModules.filter(module => failedConnections.includes(module));
+    if (failedCritical.length > 0) {
+      throw new Error(`Critical database modules failed to load: ${failedCritical.join(", ")}`);
+    }
   }
 
   private static async initializeAppConfigs(config: any, environment: string) {
-    // Convert environment to lowercase for consistent Parameter Store paths
-    const envLower = environment.toLowerCase();
-
     // WebSocket configuration
     this.websocketUrl = process.env.SOCKET_URL || process.env.WEBSOCKET_URL;
     this.websocketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT) : 8087;
@@ -221,30 +244,65 @@ export class Environment extends EnvironmentBase {
     this.chumsRoot = process.env.CHUMS_ROOT || config.chumsRoot || "https://app.staging.chums.org";
     this.mailSystem = process.env.MAIL_SYSTEM || config.mailSystem || "";
 
-    // AWS Parameter Store values (async)
-    this.hubspotKey = process.env.HUBSPOT_KEY || (await AwsHelper.readParameter(`/${envLower}/hubspotKey`));
-    this.caddyHost = process.env.CADDY_HOST || (await AwsHelper.readParameter(`/${envLower}/caddyHost`));
-    this.caddyPort = process.env.CADDY_PORT || (await AwsHelper.readParameter(`/${envLower}/caddyPort`));
-
-    // Content API specific
-    this.youTubeApiKey = process.env.YOUTUBE_API_KEY || (await AwsHelper.readParameter(`/${envLower}/youTubeApiKey`));
-    this.pexelsKey = process.env.PEXELS_KEY || (await AwsHelper.readParameter(`/${envLower}/pexelsKey`));
-    this.vimeoToken = process.env.VIMEO_TOKEN || (await AwsHelper.readParameter(`/${envLower}/vimeoToken`));
-    this.apiBibleKey = process.env.API_BIBLE_KEY || (await AwsHelper.readParameter(`/${envLower}/apiBibleKey`));
-    this.praiseChartsConsumerKey = process.env.PRAISECHARTS_CONSUMER_KEY || (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerKey`));
-    this.praiseChartsConsumerSecret = process.env.PRAISECHARTS_CONSUMER_SECRET || (await AwsHelper.readParameter(`/${envLower}/praiseChartsConsumerSecret`));
-
-    // Giving API specific
-    this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || (await AwsHelper.readParameter(`/${envLower}/recaptcha-secret-key`));
-
     // AI provider configuration (shared)
     this.aiProvider = process.env.AI_PROVIDER || config.aiProvider || "openrouter";
-    this.openRouterApiKey = process.env.OPENROUTER_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openRouterApiKey`));
-    this.openAiApiKey = process.env.OPENAI_API_KEY || (await AwsHelper.readParameter(`/${envLower}/openAiApiKey`));
+
+    // Load Parameter Store values in parallel with retry logic
+    console.log("🔄 Loading configuration parameters in parallel...");
+    const parameterMap = {
+      hubspotKey: "hubspotKey",
+      caddyHost: "caddyHost",
+      caddyPort: "caddyPort",
+      youTubeApiKey: "youTubeApiKey",
+      pexelsKey: "pexelsKey",
+      vimeoToken: "vimeoToken",
+      apiBibleKey: "apiBibleKey",
+      praiseChartsConsumerKey: "praiseChartsConsumerKey",
+      praiseChartsConsumerSecret: "praiseChartsConsumerSecret",
+      googleRecaptchaSecretKey: "recaptcha-secret-key",
+      openRouterApiKey: "openRouterApiKey",
+      openAiApiKey: "openAiApiKey"
+    };
+
+    const parameterValues = await ParameterStoreHelper.loadConfigParametersParallel(parameterMap, environment);
+
+    // Set values with fallback to environment variables
+    this.hubspotKey = process.env.HUBSPOT_KEY || parameterValues.hubspotKey || "";
+    this.caddyHost = process.env.CADDY_HOST || parameterValues.caddyHost || "";
+    this.caddyPort = process.env.CADDY_PORT || parameterValues.caddyPort || "";
+    this.youTubeApiKey = process.env.YOUTUBE_API_KEY || parameterValues.youTubeApiKey || "";
+    this.pexelsKey = process.env.PEXELS_KEY || parameterValues.pexelsKey || "";
+    this.vimeoToken = process.env.VIMEO_TOKEN || parameterValues.vimeoToken || "";
+    this.apiBibleKey = process.env.API_BIBLE_KEY || parameterValues.apiBibleKey || "";
+    this.praiseChartsConsumerKey = process.env.PRAISECHARTS_CONSUMER_KEY || parameterValues.praiseChartsConsumerKey || "";
+    this.praiseChartsConsumerSecret = process.env.PRAISECHARTS_CONSUMER_SECRET || parameterValues.praiseChartsConsumerSecret || "";
+    this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || parameterValues.googleRecaptchaSecretKey || "";
+    this.openRouterApiKey = process.env.OPENROUTER_API_KEY || parameterValues.openRouterApiKey || "";
+    this.openAiApiKey = process.env.OPENAI_API_KEY || parameterValues.openAiApiKey || "";
+
+    console.log("✅ Configuration parameters loaded successfully");
   }
 
   static getDatabaseConfig(moduleName: string): any {
-    return this.dbConnections.get(moduleName);
+    const config = this.dbConnections.get(moduleName);
+    if (!config) {
+      console.warn(`⚠️ Database config for ${moduleName} not available`);
+      // In production, you might want to implement lazy loading here
+      // or return a default configuration
+    }
+    return config;
+  }
+
+  static getConnectionStatus(): { loaded: string[], missing: string[], total: number } {
+    const expectedModules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
+    const loadedModules = Array.from(this.dbConnections.keys()).filter(key => !key.includes("-"));
+    const missing = expectedModules.filter(m => !loadedModules.includes(m));
+
+    return {
+      loaded: loadedModules,
+      missing,
+      total: expectedModules.length
+    };
   }
 
   static getAllDatabaseConfigs(): Map<string, any> {

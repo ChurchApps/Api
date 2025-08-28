@@ -242,6 +242,7 @@ async function loadModuleBindings(container: Container) {
     // Load all module controllers in parallel for faster startup
     // The @controller decorators automatically register with the container
     const moduleImports = [
+      { name: "Shared", import: import("./shared/controllers/HealthController") },
       { name: "Membership", import: import("./modules/membership/controllers") },
       { name: "Attendance", import: import("./modules/attendance/controllers") },
       { name: "Content", import: import("./modules/content/controllers") },
