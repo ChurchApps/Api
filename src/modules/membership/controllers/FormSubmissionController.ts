@@ -62,31 +62,34 @@ export class FormSubmissionController extends MembershipBaseController {
           const { formId } = formSubmission;
           let { churchId } = formSubmission;
 
-          if (!churchId && au) churchId = au.churchId;
           const formAccess = await this.repositories.form.access(formId);
-          const form = formAccess && this.repositories.form.convertToModel(churchId, formAccess);
+          const form = formAccess && this.repositories.form.convertToModel(formAccess.churchId, formAccess);
 
           if (!form) {
             results.push({ error: `Form with id ${formId} not found` });
-          } else if (form.restricted && !this.formAccess(au, formId)) {
-            results.push({ error: `You're not allowed to submit ${form.name}` });
           } else {
-            formSubmission.churchId = churchId;
-            const savedSubmissions = await this.repositories.formSubmission.save(formSubmission);
+            if (!churchId) churchId = form.churchId;
+            if (!churchId && au) churchId = au.churchId;
+            if (form.restricted && !this.formAccess(au, formId)) {
+              results.push({ error: `You're not allowed to submit ${form.name}` });
+            } else {
+              formSubmission.churchId = churchId;
+              const savedSubmissions = await this.repositories.formSubmission.save(formSubmission);
 
-            const answerPromises: Promise<Answer>[] = [];
-            formSubmission?.answers?.forEach((answer) => {
-              if (!answer.churchId) answer.churchId = churchId;
-              answer.formSubmissionId = savedSubmissions.id;
-              answerPromises.push(this.repositories.answer.save(answer));
-            });
-            if (answerPromises.length > 0) {
-              await Promise.all(answerPromises);
+              const answerPromises: Promise<Answer>[] = [];
+              formSubmission?.answers?.forEach((answer) => {
+                if (!answer.churchId) answer.churchId = churchId;
+                answer.formSubmissionId = savedSubmissions.id;
+                answerPromises.push(this.repositories.answer.save(answer));
+              });
+              if (answerPromises.length > 0) {
+                await Promise.all(answerPromises);
+              }
+
+              results.push(savedSubmissions);
+
+              await this.sendEmails(formSubmission, form, churchId);
             }
-
-            results.push(savedSubmissions);
-
-            await this.sendEmails(formSubmission, form, churchId);
           }
         }
 
