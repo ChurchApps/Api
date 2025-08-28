@@ -143,19 +143,72 @@ export class ParameterStoreHelper {
   }
 
   /**
-   * Legacy single parameter method - now uses batch internally for consistency
+   * Read a single parameter with retry logic using GetParameter (not GetParameters)
    */
   static async readParameterWithRetry(
     paramName: string,
     maxRetries: number = this.MAX_RETRIES,
     baseDelay: number = this.BASE_DELAY_MS
   ): Promise<string | null> {
-    const results = await this.readParametersBatch([paramName], maxRetries, baseDelay);
-    return results[paramName] || null;
+    const { GetParameterCommand, SSMClient } = await import("@aws-sdk/client-ssm");
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`  - Reading parameter ${paramName} (attempt ${attempt}/${maxRetries})`);
+
+        const ssmClient = new SSMClient({ region: process.env.AWS_REGION || "us-east-2" });
+        const command = new GetParameterCommand({
+          Name: paramName,
+          WithDecryption: true
+        });
+
+        const response = await Promise.race([
+          ssmClient.send(command),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Parameter Store timeout")), this.TIMEOUT_MS)
+          )
+        ]);
+
+        if (response.Parameter && response.Parameter.Value) {
+          console.log(`✅ Successfully read parameter: ${paramName}`);
+          return response.Parameter.Value;
+        } else {
+          console.log(`⚠️ Parameter ${paramName} exists but has no value`);
+          return null;
+        }
+      } catch (error) {
+        const isLastAttempt = attempt === maxRetries;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Check for parameter not found
+        if (errorMessage.includes("ParameterNotFound")) {
+          console.error(`⚠️ Parameter ${paramName} does not exist in Parameter Store`);
+          return null;
+        }
+
+        // Check for IAM permissions error
+        if (errorMessage.includes("is not authorized to perform: ssm:GetParameter")) {
+          console.error(`🔐 IAM PERMISSIONS ERROR for ${paramName}: The Lambda execution role needs ssm:GetParameter permission`);
+        }
+
+        console.error(`❌ Parameter Store attempt ${attempt} failed for ${paramName}: ${errorMessage}`);
+
+        if (isLastAttempt) {
+          return null;
+        }
+
+        // Exponential backoff with jitter
+        const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
+        console.log(`  - Retrying in ${Math.round(delay)}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    return null;
   }
 
   /**
-   * Loads multiple database connection strings in parallel
+   * Loads multiple database connection strings in parallel using individual Parameter Store calls
    */
   static async loadDatabaseConnectionsParallel(
     modules: string[],
@@ -169,15 +222,14 @@ export class ParameterStoreHelper {
       console.log("🏠 Local development mode detected - loading from .env file");
     }
 
-    console.log("🔄 Loading all database connections from Parameter Store (no environment variable fallback)");
-
     const parameterPromises = modules.map(async (moduleName): Promise<ParameterLoadResult> => {
-      console.log(`🔍 Processing ${moduleName} module: Will load from Parameter Store`);
+      console.log(`🔍 Processing ${moduleName} module`);
 
       // For local development, try to load from .env using a different pattern
       if (isLocalDev) {
         // Try alternative .env naming patterns
         const altEnvVarNames = [
+          `${moduleName.toUpperCase()}_CONNECTION_STRING`,
           `${moduleName.toUpperCase()}_DB_CONNECTION_STRING`,
           `${moduleName.toUpperCase()}_DATABASE_URL`,
           `DB_${moduleName.toUpperCase()}_CONNECTION_STRING`
@@ -205,15 +257,41 @@ export class ParameterStoreHelper {
         };
       }
 
-      // AWS environment - always use Parameter Store (no environment variable fallback)
+      // AWS environment - use individual Parameter Store reads
       if (isAwsEnvironment) {
-        console.log(`🔄 ${moduleName}: Will load from Parameter Store`);
-        return {
-          moduleName,
-          connectionString: null, // Will be filled by batch operation
-          error: null,
-          source: "parameter-store" // Optimistic - will be updated after batch
-        };
+        const paramName = `/${environment}/${moduleName}Api/connectionString`;
+        console.log(`🔄 ${moduleName}: Reading from Parameter Store: ${paramName}`);
+
+        try {
+          const connectionString = await this.readParameterWithRetry(paramName);
+
+          if (connectionString) {
+            console.log(`✅ ${moduleName}: Successfully loaded from Parameter Store`);
+            return {
+              moduleName,
+              connectionString,
+              error: null,
+              source: "parameter-store"
+            };
+          } else {
+            console.log(`❌ ${moduleName}: Parameter Store returned empty/null`);
+            return {
+              moduleName,
+              connectionString: null,
+              error: new Error(`Parameter Store returned empty/null for ${paramName}`),
+              source: "failed"
+            };
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`❌ ${moduleName}: Failed to read from Parameter Store: ${errorMessage}`);
+          return {
+            moduleName,
+            connectionString: null,
+            error: error instanceof Error ? error : new Error(errorMessage),
+            source: "failed"
+          };
+        }
       }
 
       console.log(`❌ ${moduleName}: Not AWS environment and not local dev`);
@@ -226,7 +304,7 @@ export class ParameterStoreHelper {
     });
 
     const results = await Promise.allSettled(parameterPromises);
-    const initialResults = results.map((result, index) => {
+    return results.map((result, index) => {
       if (result.status === "fulfilled") {
         return result.value;
       } else {
@@ -238,45 +316,6 @@ export class ParameterStoreHelper {
         };
       }
     });
-
-    // Batch load Parameter Store values for modules that need them
-    if (isAwsEnvironment && !isLocalDev) {
-      const needParameterStore = initialResults.filter(r => r.source === "parameter-store" && !r.connectionString);
-
-      if (needParameterStore.length > 0) {
-        console.log(`🔄 Batch loading ${needParameterStore.length} connection strings from Parameter Store...`);
-        console.log(`🔍 Modules needing Parameter Store: ${needParameterStore.map(r => r.moduleName).join(", ")}`);
-
-        const paramNames = needParameterStore.map(r => `/${environment}/${r.moduleName}Api/connectionString`);
-        console.log(`🔍 Parameter names to fetch: ${paramNames.join(", ")}`);
-
-        const batchResults = await this.readParametersBatch(paramNames);
-        console.log(`🔍 Batch results keys: ${Object.keys(batchResults).join(", ")}`);
-        console.log(`🔍 Batch results with values: ${Object.entries(batchResults).filter(([_k, v]) => v).map(([k]) => k).join(", ")}`);
-
-        // Update results with batch-loaded values
-        needParameterStore.forEach(result => {
-          const paramName = `/${environment}/${result.moduleName}Api/connectionString`;
-          const connectionString = batchResults[paramName];
-
-          console.log(`🔍 Processing ${result.moduleName}: paramName=${paramName}, found=${!!connectionString}`);
-
-          if (connectionString) {
-            result.connectionString = connectionString;
-            result.source = "parameter-store";
-            console.log(`✅ ${result.moduleName}: Loaded from batch Parameter Store`);
-          } else {
-            result.source = "failed";
-            result.error = new Error(`Parameter Store returned empty/null for ${paramName}`);
-            console.log(`❌ ${result.moduleName}: Parameter Store returned empty/null for ${paramName}`);
-          }
-        });
-      } else {
-        console.log("ℹ️ No modules need Parameter Store loading");
-      }
-    }
-
-    return initialResults;
   }
 
   /**
