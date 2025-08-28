@@ -22,6 +22,10 @@ export class Environment extends EnvironmentBase {
   // Database connections per module
   static dbConnections: Map<string, any> = new Map();
 
+  // Debug: Track initialization calls
+  private static _initializationCount = 0;
+  private static _mapInstanceId = Math.random().toString(36).substr(2, 9);
+
   // Membership API specific
   static jwtExpiration: string;
   static emailOnRegistration: boolean;
@@ -73,11 +77,17 @@ export class Environment extends EnvironmentBase {
   static jwtSecret: string;
 
   static async init(environment: string) {
+    this._initializationCount++;
+    console.log(`🚀 Environment.init() called with environment: ${environment} (call #${this._initializationCount})`);
+    console.log(`🔍 Map instance ID: ${this._mapInstanceId}`);
+    console.log(`🔍 dbConnections Map reference at start: ${this.dbConnections}`);
+    console.log(`🔍 dbConnections size at start: ${this.dbConnections.size}`);
     environment = environment.toLowerCase();
     let file = "dev.json";
     if (environment === "demo") file = "demo.json";
     if (environment === "staging") file = "staging.json";
     if (environment === "prod") file = "prod.json";
+    console.log(`📄 Loading config file: ${file}`);
 
     // In Lambda, __dirname is /var/task/dist/src/shared/helpers
     // Config files are at /var/task/config
@@ -122,6 +132,13 @@ export class Environment extends EnvironmentBase {
 
     // Initialize app configurations
     await this.initializeAppConfigs(data, environment);
+
+    // Debug: Log final database connection state
+    console.log(`🔍 Environment.init() complete. Database connections loaded: ${Array.from(this.dbConnections.keys()).join(", ")}`);
+    console.log(`🔍 Total connections: ${this.dbConnections.size}`);
+    console.log(`🔍 Map instance ID at end: ${this._mapInstanceId}`);
+    console.log(`🔍 dbConnections Map reference at end: ${this.dbConnections}`);
+    console.log(`🔍 Environment.currentEnvironment set to: ${this.currentEnvironment}`);
   }
 
   private static initializeModuleConfigs(config: any) {
@@ -136,6 +153,7 @@ export class Environment extends EnvironmentBase {
 
   private static async initializeDatabaseConnections(config: any) {
     const modules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
+    console.log(`🔍 Attempting to initialize database connections for modules: ${modules.join(", ")}`);
 
     console.log(`🔍 Initializing database connections for environment: ${this.currentEnvironment}`);
     console.log(`🔍 AWS Lambda Function: ${process.env.AWS_LAMBDA_FUNCTION_NAME}`);
@@ -173,7 +191,12 @@ export class Environment extends EnvironmentBase {
       if (result.connectionString) {
         try {
           const dbConfig = DatabaseUrlParser.parseConnectionString(result.connectionString);
+          console.log(`🔍 About to set ${result.moduleName} in dbConnections Map`);
+          console.log(`🔍 Map reference before set: ${this.dbConnections}`);
+          console.log(`🔍 Map size before set: ${this.dbConnections.size}`);
           this.dbConnections.set(result.moduleName, dbConfig);
+          console.log(`🔍 Map size after set: ${this.dbConnections.size}`);
+          console.log(`🔍 Can retrieve ${result.moduleName}: ${!!this.dbConnections.get(result.moduleName)}`);
           console.log(`✅ Loaded ${result.moduleName} database config (source: ${result.source})`);
           successfulConnections.push(result.moduleName);
         } catch (error) {
@@ -195,6 +218,15 @@ export class Environment extends EnvironmentBase {
     console.log(`  - Successful (${successfulConnections.length}): ${successfulConnections.join(", ")}`);
     if (failedConnections.length > 0) {
       console.log(`  - Failed (${failedConnections.length}): ${failedConnections.join(", ")}`);
+    }
+
+    // Log detailed results per module
+    console.log("🔍 Detailed module results:");
+    for (const result of connectionResults) {
+      console.log(`  - ${result.moduleName}: ${result.source} (${result.connectionString ? "SUCCESS" : "FAILED"})`);
+      if (result.error) {
+        console.log(`    Error: ${result.error.message}`);
+      }
     }
 
     // Only throw if critical modules failed (membership is always critical)
@@ -263,11 +295,20 @@ export class Environment extends EnvironmentBase {
   }
 
   static getDatabaseConfig(moduleName: string): any {
+    console.log(`🔍 getDatabaseConfig() called for module: ${moduleName}`);
+    console.log(`🔍 Available connections: ${Array.from(this.dbConnections.keys()).join(", ")}`);
+    console.log(`🔍 Total connections available: ${this.dbConnections.size}`);
+    console.log(`🔍 Environment.currentEnvironment: ${this.currentEnvironment}`);
+    console.log(`🔍 dbConnections Map is same instance: ${this.dbConnections === Environment.dbConnections}`);
+    console.log("🔍 Call stack:", new Error().stack?.split("\n").slice(1, 4).join("\n"));
+
     const config = this.dbConnections.get(moduleName);
     if (!config) {
       console.warn(`⚠️ Database config for ${moduleName} not available`);
-      // In production, you might want to implement lazy loading here
-      // or return a default configuration
+      console.warn("⚠️ dbConnections Map contents:", Array.from(this.dbConnections.entries()));
+      console.warn("⚠️ dbConnections Map reference:", this.dbConnections);
+    } else {
+      console.log(`✅ Found database config for ${moduleName}`);
     }
     return config;
   }

@@ -86,12 +86,17 @@ export class ParameterStoreHelper {
 
         // Set found parameters
         if (response.Parameters) {
+          console.log(`🔍 AWS returned ${response.Parameters.length} parameters`);
           response.Parameters.forEach(param => {
             if (param.Name && param.Value) {
               results[param.Name] = param.Value;
-              console.log(`✅ Loaded parameter from batch: ${param.Name}`);
+              console.log(`✅ Loaded parameter from batch: ${param.Name} = ${param.Value.substring(0, 20)}...`);
+            } else {
+              console.log(`⚠️ Parameter missing name or value: Name=${param.Name}, hasValue=${!!param.Value}`);
             }
           });
+        } else {
+          console.log("⚠️ AWS response.Parameters is null or undefined");
         }
 
         // Log missing parameters
@@ -160,10 +165,14 @@ export class ParameterStoreHelper {
       const envVarName = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
       const connectionString = process.env[envVarName];
 
-      console.log(`🔍 Checking ${moduleName} module:`);
+      console.log(`🔍 Processing ${moduleName} module:`);
       console.log(`  - Environment variable ${envVarName}: ${connectionString ? "FOUND" : "NOT FOUND"}`);
+      if (connectionString) {
+        console.log(`  - Connection string preview: ${connectionString.substring(0, 20)}...`);
+      }
 
       if (connectionString) {
+        console.log(`✅ ${moduleName}: Using environment variable`);
         return {
           moduleName,
           connectionString,
@@ -205,6 +214,7 @@ export class ParameterStoreHelper {
 
       // Mark for batch Parameter Store loading if needed
       if (!connectionString && isAwsEnvironment) {
+        console.log(`🔄 ${moduleName}: Marked for Parameter Store batch loading`);
         return {
           moduleName,
           connectionString: null, // Will be filled by batch operation
@@ -213,6 +223,7 @@ export class ParameterStoreHelper {
         };
       }
 
+      console.log(`❌ ${moduleName}: No connection string found`);
       return {
         moduleName,
         connectionString: null,
@@ -241,25 +252,34 @@ export class ParameterStoreHelper {
 
       if (needParameterStore.length > 0) {
         console.log(`🔄 Batch loading ${needParameterStore.length} connection strings from Parameter Store...`);
+        console.log(`🔍 Modules needing Parameter Store: ${needParameterStore.map(r => r.moduleName).join(", ")}`);
 
         const paramNames = needParameterStore.map(r => `/${environment}/${r.moduleName}Api/connectionString`);
+        console.log(`🔍 Parameter names to fetch: ${paramNames.join(", ")}`);
+
         const batchResults = await this.readParametersBatch(paramNames);
+        console.log(`🔍 Batch results keys: ${Object.keys(batchResults).join(", ")}`);
+        console.log(`🔍 Batch results with values: ${Object.entries(batchResults).filter(([k, v]) => v).map(([k]) => k).join(", ")}`);
 
         // Update results with batch-loaded values
         needParameterStore.forEach(result => {
           const paramName = `/${environment}/${result.moduleName}Api/connectionString`;
           const connectionString = batchResults[paramName];
 
+          console.log(`🔍 Processing ${result.moduleName}: paramName=${paramName}, found=${!!connectionString}`);
+
           if (connectionString) {
             result.connectionString = connectionString;
             result.source = "parameter-store";
-            console.log(`✅ Loaded ${result.moduleName} connection string from batch Parameter Store`);
+            console.log(`✅ ${result.moduleName}: Loaded from batch Parameter Store`);
           } else {
             result.source = "failed";
             result.error = new Error(`Parameter Store returned empty/null for ${paramName}`);
-            console.log(`⚠️ Parameter Store returned empty/null for ${paramName}`);
+            console.log(`❌ ${result.moduleName}: Parameter Store returned empty/null for ${paramName}`);
           }
         });
+      } else {
+        console.log("ℹ️ No modules need Parameter Store loading");
       }
     }
 

@@ -16,12 +16,19 @@ export const createApp = async () => {
 
   // Initialize environment configuration (only if not already initialized)
   const environment = process.env.ENVIRONMENT || "dev";
+  console.log(`🔍 Environment class reference: ${Environment}`);
+  console.log(`🔍 Environment.currentEnvironment: ${Environment.currentEnvironment}`);
+  console.log(`🔍 Environment.dbConnections size: ${Environment.dbConnections?.size || 0}`);
+
   if (!Environment.currentEnvironment) {
     console.log(`📋 Initializing environment: ${environment}`);
     await Environment.init(environment);
     console.log("✅ Environment initialized");
+    console.log(`🔍 After init - Environment.currentEnvironment: ${Environment.currentEnvironment}`);
+    console.log(`🔍 After init - dbConnections size: ${Environment.dbConnections?.size || 0}`);
   } else {
     console.log(`✅ Environment already initialized: ${Environment.currentEnvironment}`);
+    console.log(`🔍 Already initialized - dbConnections size: ${Environment.dbConnections?.size || 0}`);
   }
 
   // Pools now auto-initialize on first use

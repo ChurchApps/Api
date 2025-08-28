@@ -76,6 +76,7 @@ functions:
       GIVING_CONNECTION_STRING: ${ssm:/${self:custom.env}/givingApi/connectionString, ''}
       MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.env}/messagingApi/connectionString, ''}
       DOING_CONNECTION_STRING: ${ssm:/${self:custom.env}/doingApi/connectionString, ''}
+      REPORTING_CONNECTION_STRING: ${ssm:/${self:custom.env}/reportingApi/connectionString, ''}
     events:
       - http:
           path: /
