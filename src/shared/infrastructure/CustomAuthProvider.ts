@@ -17,6 +17,11 @@ export class CustomAuthProvider extends BaseAuthProvider {
    * Override to use consolidated environment configuration
    */
   protected getJwtSecret(): string {
+    if (!Environment.jwtSecret) {
+      console.error("🔴 CRITICAL: Environment.jwtSecret is not set when getJwtSecret() was called");
+      console.error("🔴 This indicates a race condition during initialization");
+      throw new Error("JWT secret not available - Environment may not be fully initialized");
+    }
     return Environment.jwtSecret;
   }
 

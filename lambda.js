@@ -87,10 +87,12 @@ const web = async function(event, context) {
       };
     }
     
+    // Ensure environment is initialized before creating the app
     await initializeEnvironment();
     
     // Initialize the handler only once
     if (!cachedHandler) {
+      console.log('Creating Express app with fully initialized environment...');
       const app = await createApp();
       console.log('Express app created');
       

@@ -14,11 +14,15 @@ import { configureModuleRoutes, moduleRoutingLogger } from "./routes";
 export const createApp = async () => {
   console.log("🚀 Starting createApp...");
 
-  // Initialize environment configuration
+  // Initialize environment configuration (only if not already initialized)
   const environment = process.env.ENVIRONMENT || "dev";
-  console.log(`📋 Initializing environment: ${environment}`);
-  await Environment.init(environment);
-  console.log("✅ Environment initialized");
+  if (!Environment.currentEnvironment) {
+    console.log(`📋 Initializing environment: ${environment}`);
+    await Environment.init(environment);
+    console.log("✅ Environment initialized");
+  } else {
+    console.log(`✅ Environment already initialized: ${Environment.currentEnvironment}`);
+  }
 
   // Pools now auto-initialize on first use
 
