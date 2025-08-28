@@ -40,6 +40,7 @@ export class FormSubmissionController extends MembershipBaseController {
       if (!this.formAccess(au, formId)) return this.json([], 401);
       else {
         const formSubmissions = await this.repositories.formSubmission.convertAllToModel(au.churchId, (await this.repositories.formSubmission.loadByFormId(au.churchId, formId)) as any[]);
+        console.log("Form Submissions", formSubmissions.length);
         const promises: Promise<FormSubmission>[] = [];
         formSubmissions.forEach((formSubmission: FormSubmission) => {
           promises.push(this.appendForm(au.churchId, formSubmission));

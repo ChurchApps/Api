@@ -33,7 +33,10 @@ export class MemberPermissionController extends MembershipBaseController {
   public async getMyPermissions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.formAccess(au, id)) return this.json({}, 401);
-      else return this.repositories.memberPermission.convertToModel(au.churchId, await this.repositories.memberPermission.loadMyByForm(au.churchId, id, au.personId));
+      else {
+        const permission = await this.repositories.memberPermission.loadMyByForm(au.churchId, id, au.personId);
+        return permission ? this.repositories.memberPermission.convertToModel(au.churchId, permission) : null;
+      }
     });
   }
 

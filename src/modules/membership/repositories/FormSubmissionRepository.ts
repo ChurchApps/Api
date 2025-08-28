@@ -63,6 +63,7 @@ export class FormSubmissionRepository {
   }
 
   public convertAllToModel(churchId: string, data: any[]) {
+    console.log("Converting Form Submissions", data.length);
     const result: FormSubmission[] = [];
     data.forEach((d) => result.push(this.convertToModel(churchId, d)));
     return result;
