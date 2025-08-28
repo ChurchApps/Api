@@ -259,7 +259,7 @@ export class ParameterStoreHelper {
 
         const batchResults = await this.readParametersBatch(paramNames);
         console.log(`🔍 Batch results keys: ${Object.keys(batchResults).join(", ")}`);
-        console.log(`🔍 Batch results with values: ${Object.entries(batchResults).filter(([k, v]) => v).map(([k]) => k).join(", ")}`);
+        console.log(`🔍 Batch results with values: ${Object.entries(batchResults).filter(([_k, v]) => v).map(([k]) => k).join(", ")}`);
 
         // Update results with batch-loaded values
         needParameterStore.forEach(result => {
