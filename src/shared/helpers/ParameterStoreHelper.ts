@@ -110,6 +110,14 @@ export class ParameterStoreHelper {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`❌ Parameter Store batch attempt ${attempt} failed: ${errorMessage}`);
 
+        // Check if it's an IAM permissions error
+        if (errorMessage.includes("is not authorized to perform: ssm:GetParameters")) {
+          console.error("🔐 IAM PERMISSIONS ERROR: The Lambda execution role needs ssm:GetParameters permission");
+          console.error("🔧 Add this permission to your Lambda execution role:");
+          console.error("   Action: ssm:GetParameters");
+          console.error("   Resource: arn:aws:ssm:*:*:parameter/prod/*");
+        }
+
         if (isLastAttempt) {
           // Return null for all parameters on final failure
           const results: Record<string, string | null> = {};
@@ -161,25 +169,10 @@ export class ParameterStoreHelper {
       console.log("🏠 Local development mode detected - loading from .env file");
     }
 
+    console.log("🔄 Loading all database connections from Parameter Store (no environment variable fallback)");
+
     const parameterPromises = modules.map(async (moduleName): Promise<ParameterLoadResult> => {
-      const envVarName = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
-      const connectionString = process.env[envVarName];
-
-      console.log(`🔍 Processing ${moduleName} module:`);
-      console.log(`  - Environment variable ${envVarName}: ${connectionString ? "FOUND" : "NOT FOUND"}`);
-      if (connectionString) {
-        console.log(`  - Connection string preview: ${connectionString.substring(0, 20)}...`);
-      }
-
-      if (connectionString) {
-        console.log(`✅ ${moduleName}: Using environment variable`);
-        return {
-          moduleName,
-          connectionString,
-          error: null,
-          source: "environment"
-        };
-      }
+      console.log(`🔍 Processing ${moduleName} module: Will load from Parameter Store`);
 
       // For local development, try to load from .env using a different pattern
       if (isLocalDev) {
@@ -193,7 +186,7 @@ export class ParameterStoreHelper {
         for (const altEnvVar of altEnvVarNames) {
           const altConnectionString = process.env[altEnvVar];
           if (altConnectionString) {
-            console.log(`  - Found alternative env var ${altEnvVar}: FOUND`);
+            console.log(`✅ ${moduleName}: Found in .env as ${altEnvVar}`);
             return {
               moduleName,
               connectionString: altConnectionString,
@@ -203,7 +196,7 @@ export class ParameterStoreHelper {
           }
         }
 
-        console.log(`  - Local development: No connection string found in .env for ${moduleName}`);
+        console.log(`❌ ${moduleName}: No connection string found in .env`);
         return {
           moduleName,
           connectionString: null,
@@ -212,9 +205,9 @@ export class ParameterStoreHelper {
         };
       }
 
-      // Mark for batch Parameter Store loading if needed
-      if (!connectionString && isAwsEnvironment) {
-        console.log(`🔄 ${moduleName}: Marked for Parameter Store batch loading`);
+      // AWS environment - always use Parameter Store (no environment variable fallback)
+      if (isAwsEnvironment) {
+        console.log(`🔄 ${moduleName}: Will load from Parameter Store`);
         return {
           moduleName,
           connectionString: null, // Will be filled by batch operation
@@ -223,7 +216,7 @@ export class ParameterStoreHelper {
         };
       }
 
-      console.log(`❌ ${moduleName}: No connection string found`);
+      console.log(`❌ ${moduleName}: Not AWS environment and not local dev`);
       return {
         moduleName,
         connectionString: null,

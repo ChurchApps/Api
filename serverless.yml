@@ -68,15 +68,7 @@ functions:
     timeout: 30
     vpc: ${self:custom.vpcSettings.current}
     environment:
-      # Load critical database connections from Parameter Store for faster cold starts
-      # These will be used as fallbacks before Parameter Store batch calls
-      MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.env}/membershipApi/connectionString, ''}
-      ATTENDANCE_CONNECTION_STRING: ${ssm:/${self:custom.env}/attendanceApi/connectionString, ''}
-      CONTENT_CONNECTION_STRING: ${ssm:/${self:custom.env}/contentApi/connectionString, ''}
-      GIVING_CONNECTION_STRING: ${ssm:/${self:custom.env}/givingApi/connectionString, ''}
-      MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.env}/messagingApi/connectionString, ''}
-      DOING_CONNECTION_STRING: ${ssm:/${self:custom.env}/doingApi/connectionString, ''}
-      REPORTING_CONNECTION_STRING: ${ssm:/${self:custom.env}/reportingApi/connectionString, ''}
+      # Database connections loaded at runtime from Parameter Store
     events:
       - http:
           path: /
