@@ -20,7 +20,7 @@ export class ParameterStoreHelper {
     const isLambda = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
     const isServerlessOffline = process.env.IS_OFFLINE === "true";
     const hasNodeEnv = process.env.NODE_ENV === "development";
-    const hasDevScript = process.argv.some(arg => arg.includes("ts-node-dev") || arg.includes("ts-node"));
+    const hasDevScript = process.argv.some((arg) => arg.includes("ts-node-dev") || arg.includes("ts-node"));
 
     return !isLambda && (isServerlessOffline || hasNodeEnv || hasDevScript);
   }
@@ -28,11 +28,7 @@ export class ParameterStoreHelper {
   /**
    * Loads multiple parameters in a single batch operation with retry logic
    */
-  static async readParametersBatch(
-    paramNames: string[],
-    maxRetries: number = this.MAX_RETRIES,
-    baseDelay: number = this.BASE_DELAY_MS
-  ): Promise<Record<string, string | null>> {
+  static async readParametersBatch(paramNames: string[], maxRetries: number = this.MAX_RETRIES, baseDelay: number = this.BASE_DELAY_MS): Promise<Record<string, string | null>> {
     if (paramNames.length === 0) {
       return {};
     }
@@ -54,11 +50,7 @@ export class ParameterStoreHelper {
   /**
    * Internal method to read a single batch of parameters (≤10 parameters)
    */
-  private static async readParametersBatchInternal(
-    paramNames: string[],
-    maxRetries: number,
-    baseDelay: number
-  ): Promise<Record<string, string | null>> {
+  private static async readParametersBatchInternal(paramNames: string[], maxRetries: number, baseDelay: number): Promise<Record<string, string | null>> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`  - Batch reading ${paramNames.length} parameters (attempt ${attempt}/${maxRetries}): [${paramNames.join(", ")}]`);
@@ -72,22 +64,22 @@ export class ParameterStoreHelper {
 
         const response = await Promise.race([
           ssmClient.send(command),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Parameter Store batch timeout")), this.TIMEOUT_MS * 2) // Longer timeout for batch
+          new Promise<never>(
+            (_, reject) => setTimeout(() => reject(new Error("Parameter Store batch timeout")), this.TIMEOUT_MS * 2) // Longer timeout for batch
           )
         ]);
 
         const results: Record<string, string | null> = {};
 
         // Initialize all requested parameters as null
-        paramNames.forEach(name => {
+        paramNames.forEach((name) => {
           results[name] = null;
         });
 
         // Set found parameters
         if (response.Parameters) {
           console.log(`🔍 AWS returned ${response.Parameters.length} parameters`);
-          response.Parameters.forEach(param => {
+          response.Parameters.forEach((param) => {
             if (param.Name && param.Value) {
               results[param.Name] = param.Value;
               console.log(`✅ Loaded parameter from batch: ${param.Name} = ${param.Value.substring(0, 20)}...`);
@@ -121,7 +113,7 @@ export class ParameterStoreHelper {
         if (isLastAttempt) {
           // Return null for all parameters on final failure
           const results: Record<string, string | null> = {};
-          paramNames.forEach(name => {
+          paramNames.forEach((name) => {
             results[name] = null;
           });
           return results;
@@ -130,13 +122,13 @@ export class ParameterStoreHelper {
         // Exponential backoff with jitter
         const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
         console.log(`  - Retrying batch in ${Math.round(delay)}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
     // Fallback return (should never reach here)
     const results: Record<string, string | null> = {};
-    paramNames.forEach(name => {
+    paramNames.forEach((name) => {
       results[name] = null;
     });
     return results;
@@ -145,11 +137,7 @@ export class ParameterStoreHelper {
   /**
    * Read a single parameter with retry logic using GetParameter (not GetParameters)
    */
-  static async readParameterWithRetry(
-    paramName: string,
-    maxRetries: number = this.MAX_RETRIES,
-    baseDelay: number = this.BASE_DELAY_MS
-  ): Promise<string | null> {
+  static async readParameterWithRetry(paramName: string, maxRetries: number = this.MAX_RETRIES, baseDelay: number = this.BASE_DELAY_MS): Promise<string | null> {
     const { GetParameterCommand, SSMClient } = await import("@aws-sdk/client-ssm");
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -162,12 +150,7 @@ export class ParameterStoreHelper {
           WithDecryption: true
         });
 
-        const response = await Promise.race([
-          ssmClient.send(command),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Parameter Store timeout")), this.TIMEOUT_MS)
-          )
-        ]);
+        const response = await Promise.race([ssmClient.send(command), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Parameter Store timeout")), this.TIMEOUT_MS))]);
 
         if (response.Parameter && response.Parameter.Value) {
           console.log(`✅ Successfully read parameter: ${paramName}`);
@@ -200,7 +183,7 @@ export class ParameterStoreHelper {
         // Exponential backoff with jitter
         const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
         console.log(`  - Retrying in ${Math.round(delay)}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
@@ -210,11 +193,7 @@ export class ParameterStoreHelper {
   /**
    * Loads multiple database connection strings in parallel using individual Parameter Store calls
    */
-  static async loadDatabaseConnectionsParallel(
-    modules: string[],
-    environment: string,
-    isAwsEnvironment: boolean
-  ): Promise<ParameterLoadResult[]> {
+  static async loadDatabaseConnectionsParallel(modules: string[], environment: string, isAwsEnvironment: boolean): Promise<ParameterLoadResult[]> {
     console.log(`🔄 Loading ${modules.length} database connections in parallel...`);
     const isLocalDev = this.isLocalDevelopment();
 
@@ -228,12 +207,7 @@ export class ParameterStoreHelper {
       // For local development, try to load from .env using a different pattern
       if (isLocalDev) {
         // Try alternative .env naming patterns
-        const altEnvVarNames = [
-          `${moduleName.toUpperCase()}_CONNECTION_STRING`,
-          `${moduleName.toUpperCase()}_DB_CONNECTION_STRING`,
-          `${moduleName.toUpperCase()}_DATABASE_URL`,
-          `DB_${moduleName.toUpperCase()}_CONNECTION_STRING`
-        ];
+        const altEnvVarNames = [`${moduleName.toUpperCase()}_CONNECTION_STRING`, `${moduleName.toUpperCase()}_DB_CONNECTION_STRING`, `${moduleName.toUpperCase()}_DATABASE_URL`, `DB_${moduleName.toUpperCase()}_CONNECTION_STRING`];
 
         for (const altEnvVar of altEnvVarNames) {
           const altConnectionString = process.env[altEnvVar];
@@ -321,10 +295,7 @@ export class ParameterStoreHelper {
   /**
    * Loads configuration parameters in parallel with retry logic
    */
-  static async loadConfigParametersParallel(
-    parameterMap: Record<string, string>,
-    environment: string
-  ): Promise<Record<string, string | null>> {
+  static async loadConfigParametersParallel(parameterMap: Record<string, string>, environment: string): Promise<Record<string, string | null>> {
     const isLocalDev = this.isLocalDevelopment();
 
     if (isLocalDev) {

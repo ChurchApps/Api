@@ -10,27 +10,29 @@ export class ConversationController extends MessagingBaseController {
     if (conversations?.length > 0) {
       const postIds: string[] = [];
       conversations.forEach((c: Conversation) => {
-        if (c.firstPostId && postIds.indexOf(c.firstPostId) === -1) postIds.push(c.firstPostId);
-        if (c.lastPostId && postIds.indexOf(c.lastPostId) === -1) postIds.push(c.lastPostId);
-        c.messages = [];
+        if (c && c.firstPostId && postIds.indexOf(c.firstPostId) === -1) postIds.push(c.firstPostId);
+        if (c && c.lastPostId && postIds.indexOf(c.lastPostId) === -1) postIds.push(c.lastPostId);
+        if (c) c.messages = [];
       }) as any;
 
       if (postIds.length > 0) {
         const posts = await this.repositories.message.loadByIds(churchId, postIds);
         conversations.forEach((c: any) => {
-          if (c.firstPostId) {
+          if (c && c.firstPostId) {
             const message = ArrayHelper.getOne(posts, "id", c.firstPostId);
             if (message) c.messages.push(message);
           }
-          if (c.lastPostId && c.lastPostId !== c.firstPostId) {
+          if (c && c.lastPostId && c.lastPostId !== c.firstPostId) {
             const message = ArrayHelper.getOne(posts, "id", c.lastPostId);
             if (message) c.messages.push(message);
           }
         }) as any;
       }
       conversations.forEach((c: Conversation) => {
-        c.firstPostId = undefined;
-        c.lastPostId = undefined;
+        if (c) {
+          c.firstPostId = undefined;
+          c.lastPostId = undefined;
+        }
       }) as any;
     }
   }
@@ -40,8 +42,10 @@ export class ConversationController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const ids = req.query.ids.toString().split(",");
       const result = (await this.repositories.conversation.loadByIds(au.churchId, ids)) as Conversation[];
-      await this.appendMessages(result, au.churchId);
-      return result;
+      if (result && Array.isArray(result)) {
+        await this.appendMessages(result, au.churchId);
+      }
+      return result || [];
     }) as any;
   }
 
@@ -78,8 +82,10 @@ export class ConversationController extends MessagingBaseController {
   public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repositories.conversation.loadPosts(au.churchId, [groupId]);
-      await this.appendMessages(result, au.churchId);
-      return result;
+      if (result && Array.isArray(result)) {
+        await this.appendMessages(result, au.churchId);
+      }
+      return result || [];
     }) as any;
   }
 
@@ -87,8 +93,10 @@ export class ConversationController extends MessagingBaseController {
   public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repositories.conversation.loadPosts(au.churchId, au.groupIds || []);
-      await this.appendMessages(result, au.churchId);
-      return result;
+      if (result && Array.isArray(result)) {
+        await this.appendMessages(result, au.churchId);
+      }
+      return result || [];
     }) as any;
   }
 

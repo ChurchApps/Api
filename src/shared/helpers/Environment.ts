@@ -4,7 +4,6 @@ import { AwsHelper, EnvironmentBase } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser";
 import { ParameterStoreHelper } from "./ParameterStoreHelper";
 
-
 export class Environment extends EnvironmentBase {
   // Current environment and server configuration
   static currentEnvironment: string;
@@ -177,11 +176,7 @@ export class Environment extends EnvironmentBase {
     console.log(`🔍 Using environment: ${environment}`);
 
     // Load all database connections in parallel with retry logic
-    const connectionResults = await ParameterStoreHelper.loadDatabaseConnectionsParallel(
-      modules,
-      environment,
-      !!isAwsEnvironment
-    );
+    const connectionResults = await ParameterStoreHelper.loadDatabaseConnectionsParallel(modules, environment, !!isAwsEnvironment);
 
     // Process results and set up database connections
     const successfulConnections: string[] = [];
@@ -231,7 +226,7 @@ export class Environment extends EnvironmentBase {
 
     // Only throw if critical modules failed (membership is always critical)
     const criticalModules = ["membership"];
-    const failedCritical = criticalModules.filter(module => failedConnections.includes(module));
+    const failedCritical = criticalModules.filter((module) => failedConnections.includes(module));
     if (failedCritical.length > 0) {
       throw new Error(`Critical database modules failed to load: ${failedCritical.join(", ")}`);
     }
@@ -313,10 +308,10 @@ export class Environment extends EnvironmentBase {
     return config;
   }
 
-  static getConnectionStatus(): { loaded: string[], missing: string[], total: number } {
+  static getConnectionStatus(): { loaded: string[]; missing: string[]; total: number } {
     const expectedModules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
-    const loadedModules = Array.from(this.dbConnections.keys()).filter(key => !key.includes("-"));
-    const missing = expectedModules.filter(m => !loadedModules.includes(m));
+    const loadedModules = Array.from(this.dbConnections.keys()).filter((key) => !key.includes("-"));
+    const missing = expectedModules.filter((m) => !loadedModules.includes(m));
 
     return {
       loaded: loadedModules,
