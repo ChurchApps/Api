@@ -42,12 +42,12 @@ export class ChurchController extends MembershipBaseController {
             // decode unicode characters '\uXXXX'
 
             JSON.parse(
-              "\"" +
-              req.body.name
-                .toString()
-                // prepare unicode characters '\uXXXX' for decoding
-                .replace(/%u/g, "\\u") +
-              "\""
+              '"' +
+                req.body.name
+                  .toString()
+                  // prepare unicode characters '\uXXXX' for decoding
+                  .replace(/%u/g, "\\u") +
+                '"'
             )
           ),
           false
@@ -74,12 +74,12 @@ export class ChurchController extends MembershipBaseController {
           decodeURIComponent(
             // decode unicode characters '\uXXXX'
             JSON.parse(
-              "\"" +
-              req.query.name
-                .toString()
-                // prepare unicode characters '\uXXXX' for decoding
-                .replace(/%u/g, "\\u") +
-              "\""
+              '"' +
+                req.query.name
+                  .toString()
+                  // prepare unicode characters '\uXXXX' for decoding
+                  .replace(/%u/g, "\\u") +
+                '"'
             )
           ),
           false
@@ -309,8 +309,7 @@ export class ChurchController extends MembershipBaseController {
         return res.status(400).json({ errors: validationErrors.array() });
       }
 
-      const requestData = req.body;
-      let church = requestData.church;
+      let church = req.body;
       church.subDomain = await ChurchHelper.selectSubDomain(church.name);
 
       const errors = await this.validateRegister(church, au);
@@ -325,11 +324,11 @@ export class ChurchController extends MembershipBaseController {
         await instance.init(); // Setup roles and permissions
 
         if (Environment.emailOnRegistration) {
-          await EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, requestData.appName, null, "New Church Registration", "<h2>" + church.name + "</h2><h3>App: " + (requestData.appName || "unknown") + "</h3>");
+          await EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, church.appName, null, "New Church Registration", "<h2>" + church.name + "</h2><h3>App: " + (church.appName || "unknown") + "</h3>");
         }
 
         try {
-          if (Environment.hubspotKey) await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, requestData.appName);
+          if (Environment.hubspotKey) await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, church.appName);
         } catch (_ex) {
           // Hubspot registration failed - continuing without error
         }

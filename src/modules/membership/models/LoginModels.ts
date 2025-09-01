@@ -1,4 +1,5 @@
 // Login-related models
+import { Church } from "./Church";
 
 export interface LoginRequest {
   email: string;
@@ -95,23 +96,7 @@ export interface RegistrationRequest {
   subDomain?: string;
 }
 
-export interface RegisterChurchRequest {
-  appName: string;
-  appUrl: string;
-  church: {
-    name: string;
-    address1?: string;
-    address2?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-    country?: string;
-    subDomain?: string;
-  };
-  user: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-  };
+export interface RegisterChurchRequest extends Church {
+  appName?: string;
+  appUrl?: string;
 }
