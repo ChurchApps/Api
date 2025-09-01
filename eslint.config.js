@@ -49,8 +49,9 @@ module.exports = [
 
       // Code style (enforced by Prettier, but useful for linting)
       semi: ["error", "always"],
-      quotes: ["error", "double"],
+      quotes: ["error", "double", { "avoidEscape": false }],
       "comma-dangle": ["error", "never"],
+      "max-len": ["off"],
 
       // Module separation rules for monolith
       "import/no-restricted-paths": [
