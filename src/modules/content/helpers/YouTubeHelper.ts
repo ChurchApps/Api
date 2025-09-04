@@ -5,7 +5,10 @@ import { Environment } from "../../../shared/helpers/Environment";
 
 export class YouTubeHelper {
   public static async getSermon(sermonId: string) {
+    console.log(`🔍 YouTubeHelper.getSermon() - Environment.youTubeApiKey value: "${Environment.youTubeApiKey}"`);
+    console.log(`🔍 YouTubeHelper.getSermon() - Environment.currentEnvironment: "${Environment.currentEnvironment}"`);
     const url = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails%2C+snippet&id=${sermonId}&key=${Environment.youTubeApiKey}`;
+    console.log(url);
     const result = { title: "", thumbnail: "", description: "", duration: 0, publishDate: new Date() };
     const json: any = (await axios.get(url)).data;
     if (json.items?.length > 0) {

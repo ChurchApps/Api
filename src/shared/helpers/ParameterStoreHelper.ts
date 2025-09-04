@@ -16,13 +16,25 @@ export class ParameterStoreHelper {
    * Checks if we're running in local development mode
    */
   private static isLocalDevelopment(): boolean {
-    // Check for npm run dev or local development indicators
+    // If we're in Lambda or any AWS execution environment, definitely not local
     const isLambda = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
+    if (isLambda) {
+      return false;
+    }
+    
+    // Check for explicit local development indicators
     const isServerlessOffline = process.env.IS_OFFLINE === "true";
     const hasNodeEnv = process.env.NODE_ENV === "development";
     const hasDevScript = process.argv.some((arg) => arg.includes("ts-node-dev") || arg.includes("ts-node"));
-
-    return !isLambda && (isServerlessOffline || hasNodeEnv || hasDevScript);
+    
+    // Only check for local connection strings if we're definitely not in AWS
+    // and if they look like local database URLs (containing localhost or 127.0.0.1)
+    const membershipConn = process.env.MEMBERSHIP_CONNECTION_STRING || "";
+    const contentConn = process.env.CONTENT_CONNECTION_STRING || "";
+    const hasLocalDbConnections = (membershipConn.includes("localhost") || membershipConn.includes("127.0.0.1")) ||
+                                   (contentConn.includes("localhost") || contentConn.includes("127.0.0.1"));
+    
+    return isServerlessOffline || hasNodeEnv || hasDevScript || hasLocalDbConnections;
   }
 
   /**
@@ -327,6 +339,7 @@ export class ParameterStoreHelper {
 
     const envLower = environment.toLowerCase();
     const paramNames = Object.entries(parameterMap).map(([_key, paramPath]) => `/${envLower}/${paramPath}`);
+    console.log(`🔍 Parameter Store paths being requested: ${paramNames.join(", ")}`);
 
     const batchResults = await this.readParametersBatch(paramNames, 2, 500); // Fewer retries for config params
 
