@@ -7,7 +7,7 @@ import path from "path";
 import { ArrayHelper, AuthenticatedUser, IPermission } from "@churchapps/apihelper";
 import { ReportResultHelper, RunReportHelper } from "../helpers";
 
-@controller("/reports")
+@controller("/reporting/reports")
 export class ReportController extends ReportingBaseController {
   @httpGet("/groupAttendanceDownload/run")
   public async groupAttDownload(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
