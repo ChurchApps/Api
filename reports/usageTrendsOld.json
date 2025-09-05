@@ -1,0 +1,95 @@
+{
+  "keyName": "usageTrends",
+  "displayName": "Usage Trends",
+  "description": "A list of logins and churches over time.",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "membership",
+      "sqlLines": [
+        "select concat(DATE_FORMAT(loginTime, '%y'), '-', month(loginTime)) as month, count(distinct(al.churchId)) as churches, count(distinct(al.userId)) as users",
+        "from accessLogs al",
+        "inner join churches c on c.id=al.churchId and c.registrationDate<DATE_ADD(al.loginTime, INTERVAL -1 MONTH)",
+        "inner join users u on u.id=al.userId and u.registrationDate<DATE_ADD(al.loginTime, INTERVAL -1 MONTH)",
+        "where (:appName='' OR al.appName=:appName) and loginTime>DATE_ADD(NOW(), INTERVAL -1 YEAR)",
+        "group by DATE_FORMAT(loginTime, '%y'), month(al.loginTime)",
+        "order by DATE_FORMAT(loginTime, '%y'), month(al.loginTime)"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "appName",
+      "displayName": "Application",
+      "source": "dropdown",
+      "sourceKey": "provided",
+      "options": [
+        {
+          "text": "Any",
+          "value": ""
+        },
+        {
+          "text": "B1.church",
+          "value": "B1"
+        },
+        {
+          "text": "CHUMS",
+          "value": "CHUMS"
+        },
+        {
+          "text": "Lessons.church",
+          "value": "Lessons.church"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "barChart",
+      "columns": [
+        {
+          "header": "Month",
+          "value": "month",
+          "formatter": "string"
+        }, 
+        {
+          "header": "Active Churches",
+          "value": "churches",
+          "formatter": "number"
+        }
+      ]
+    },
+    {
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Month",
+          "value": "month",
+          "formatter": "string"
+        },
+        {
+          "header": "Active Churches",
+          "value": "churches",
+          "formatter": "number"
+        },
+        {
+          "header": "Active Users",
+          "value": "users",
+          "formatter": "number"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "MembershipApi",
+          "contentType": "Server",
+          "action": "Admin"
+        }
+      ]
+    }
+  ]
+}

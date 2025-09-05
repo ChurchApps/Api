@@ -1,0 +1,60 @@
+{
+  "keyName": "birthdays",
+  "displayName": "Birthdays by Month",
+  "description": "All people with a birthday this month.",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "membership",
+      "sqlLines": [
+        "SELECT concat(:month, '/', dayofmonth(p.birthDate)) birthDay, p.displayName",
+        "FROM people p",
+        "LEFT JOIN groupMembers gm on gm.personId=p.id",
+        "WHERE p.churchId=:churchId",
+        "AND (:groupId = '' OR gm.groupId=:groupId)",
+        "AND p.birthDate IS NOT NULL",
+        "AND month(p.birthDate) = :month",
+        "GROUP BY p.birthDate, p.displayName",
+        "ORDER BY dayofmonth(p.birthDate)"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "month",
+      "displayName": "Month",
+      "source": "dropdown",
+      "sourceKey": "month"
+    },
+    {
+      "keyName": "groupId",
+      "displayName": "Group",
+      "source": "dropdown",
+      "sourceKey": "group"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Birthday",
+          "value": "birthDay",
+          "formatter": "string"
+        },
+        {
+          "header": "Name",
+          "value": "displayName",
+          "formatter": "string"
+        }
+      ]
+    }
+  ],
+  "permissions": []
+}

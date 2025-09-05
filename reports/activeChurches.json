@@ -1,0 +1,88 @@
+{
+  "keyName": "activeChurches",
+  "displayName": "Active Churches",
+  "description": "A list of churches active in each app.",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "membership",
+      "sqlLines": [
+        "select c.id, c.name, c.city, c.state, max(al.loginTime) as lastLogin",
+        "from accessLogs al",
+        "inner join churches c on c.id=al.churchId",
+        "where al.loginTime>:startDate",
+        "and al.appName=:appName",
+        "group by c.id, c.name, c.city, c.state",
+        "order by c.name"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "startDate",
+      "displayName": "Start Date",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "lastYear"
+    },
+    {
+      "keyName": "appName",
+      "displayName": "Application",
+      "source": "dropdown",
+      "sourceKey": "provided",
+      "options": [
+        {
+          "text": "CHUMS",
+          "value": "Chums"
+        },
+        {
+          "text": "Lessons.church",
+          "value": "Lessons.church"
+        },
+        {
+          "text": "B1",
+          "value": "B1"
+        }
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Church",
+          "value": "name",
+          "formatter": "string"
+        },
+        {
+          "header": "City",
+          "value": "city",
+          "formatter": "string"
+        },
+        {
+          "header": "State",
+          "value": "state",
+          "formatter": "string"
+        },
+        {
+          "header": "Last Login",
+          "value": "lastLogin",
+          "formatter": "date"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "MembershipApi",
+          "contentType": "Server",
+          "action": "Admin"
+        }
+      ]
+    }
+  ]
+}
