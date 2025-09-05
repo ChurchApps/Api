@@ -1,0 +1,115 @@
+{
+  "keyName": "attendanceTrend",
+  "displayName": "Attendance Trend",
+  "description": "Total counts of how many people attended each week.",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "groups",
+      "db": "membership",
+      "sqlLines": [
+        "SELECT id from groups WHERE churchId=:churchId AND removed=0 AND trackAttendance=1 AND id=COALESCE(NULLIF(:groupId,''), id)"
+      ]
+    },
+    {
+      "depth": 1,
+      "keyName": "main",
+      "db": "attendance",
+      "sqlLines": [
+        "SELECT STR_TO_DATE(concat(year(v.visitDate), ' ', week(v.visitDate, 0), ' Sunday'), '%X %V %W') AS week, count(distinct(v.id)) as visits",
+        "FROM visits v",
+        "LEFT JOIN visitSessions vs on vs.visitId=v.id",
+        "LEFT JOIN sessions s on s.id = vs.sessionId",
+        "LEFT JOIN groupServiceTimes gst on gst.groupId = s.groupId",
+        "LEFT JOIN serviceTimes st on st.id = gst.serviceTimeId",
+        "LEFT JOIN services ser on ser.id = st.serviceId",
+        "WHERE v.churchId=:churchId",
+        "AND (:groupId='' OR s.groupId IN (:groupIds))",
+        "AND (:serviceTimeId='' OR st.id = :serviceTimeId)",
+        "AND (:serviceId='' OR ser.id = :serviceId)",
+        "AND (:campusId='' OR ser.campusId = :campusId)",
+        "GROUP BY year(v.visitDate), week(v.visitDate, 0), STR_TO_DATE(concat(year(v.visitDate), ' ', week(v.visitDate, 0), ' Sunday'), '%X %V %W')",
+        "ORDER BY year(v.visitDate), week(v.visitDate, 0);"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "campusId",
+      "displayName": "Campus",
+      "source": "dropdown",
+      "sourceKey": "campus"
+    },
+    {
+      "keyName": "serviceId",
+      "displayName": "Service",
+      "source": "dropdown",
+      "sourceKey": "service"
+    },
+    {
+      "keyName": "serviceTimeId",
+      "displayName": "Service Time",
+      "source": "dropdown",
+      "sourceKey": "serviceTime"
+    },
+    {
+      "keyName": "groupId",
+      "displayName": "Group",
+      "source": "dropdown",
+      "sourceKey": "group"
+    },
+    {
+      "keyName": "groupIds",
+      "source": "query",
+      "sourceKey": "groups.id"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "barChart",
+      "columns": [
+        {
+          "header": "Week",
+          "value": "week",
+          "formatter": "date"
+        },
+        {
+          "header": "Visits",
+          "value": "visits",
+          "formatter": "number"
+        }
+      ]
+    },
+    {
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Week",
+          "value": "week",
+          "formatter": "date"
+        },
+        {
+          "header": "Visits",
+          "value": "visits",
+          "formatter": "number"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "AttendanceApi",
+          "contentType": "Attendance",
+          "action": "View"
+        }
+      ]
+    }
+  ]
+}

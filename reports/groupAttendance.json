@@ -1,0 +1,120 @@
+{
+  "keyName": "groupAttendance",
+  "displayName": "Group Attendance",
+  "description": "Total counts of how many people attended each week.",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "attendance",
+      "sqlLines": [
+        "SELECT ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId",
+        " FROM visits v",
+        " INNER JOIN visitSessions vs on vs.churchId=v.churchId AND vs.visitId=v.id",
+        " INNER JOIN sessions s on s.id=vs.sessionId",
+        " INNER JOIN serviceTimes st on st.id=s.serviceTimeId",
+        " INNER JOIN services ser on ser.id=st.serviceId",
+        " WHERE v.churchId=:churchId",
+        " AND :serviceId IN (0, ser.id) ",
+        " AND s.sessionDate BETWEEN :week AND DATE_ADD(:week, INTERVAL 7 DAY)",
+        " ORDER by ser.name, st.name"
+      ]
+    },
+    {
+      "depth": 1,
+      "keyName": "people",
+      "db": "membership",
+      "sqlLines": [
+        "SELECT id, displayName from people where churchId=:churchId and id in (:peopleIds)"
+      ],
+      "joinConditions": [
+        {
+          "parent": "personId",
+          "child": "id"
+        }
+      ]
+    },
+    {
+      "depth": 1,
+      "keyName": "groups",
+      "db": "membership",
+      "sqlLines": [
+        "SELECT id, name as groupName from groups where churchId=:churchId"
+      ],
+      "joinConditions": [
+        {
+          "parent": "groupId",
+          "child": "id"
+        }
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "campusId",
+      "displayName": "Campus",
+      "source": "dropdown",
+      "sourceKey": "campus"
+    },
+    {
+      "keyName": "serviceId",
+      "displayName": "Service",
+      "source": "dropdown",
+      "sourceKey": "service"
+    },
+    {
+      "keyName": "week",
+      "displayName": "Week",
+      "source": "date",
+      "sourceKey": "week",
+      "defaultValue": "lastSunday"
+    },
+    {
+      "keyName": "peopleIds",
+      "source": "query",
+      "sourceKey": "main.personId"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "tree",
+      "groupings": [
+        1,
+        1
+      ],
+      "columns": [
+        {
+          "header": "Service Time",
+          "value": "serviceTimeName",
+          "formatter": "string"
+        },
+        {
+          "header": "Group",
+          "value": "groups.groupName",
+          "formatter": "string"
+        },
+        {
+          "header": "Person",
+          "value": "people.displayName",
+          "formatter": "string"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "AttendanceApi",
+          "contentType": "Attendance",
+          "action": "View"
+        }
+      ]
+    }
+  ]
+}
