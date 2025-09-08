@@ -12,7 +12,7 @@ export class ElementController extends ContentBaseController {
   public async convertMarkdownToHtml(req: express.Request, res: express.Response): Promise<any> {
     const { MarkdownPreviewLight } = await import("../../../shared/helpers/MarkdownPreviewLight");
     const { TypedDB } = await import("../helpers");
-    
+
     const results = {
       processed: 0,
       errors: 0,
@@ -28,18 +28,18 @@ export class ElementController extends ContentBaseController {
     try {
       // Direct query using TypedDB (the context should be available since we're in the content module)
       const elementsQuery = `
-        SELECT * FROM elements 
+        SELECT * FROM elements
         WHERE elementType IN (${elementTypes.map(() => "?").join(",")})
         ORDER BY churchId, id
         LIMIT 100
       `;
-      
-      results.details.push(`Processing ALL churches for element types: ${elementTypes.join(', ')}`);
+
+      results.details.push(`Processing ALL churches for element types: ${elementTypes.join(", ")}`);
       results.details.push(`Querying with parameters: ${JSON.stringify(elementTypes)}`);
-      
+
       const elements: Element[] = await TypedDB.query(elementsQuery, elementTypes);
       results.details.push(`Query executed successfully, found ${elements?.length || 0} elements`);
-      
+
       if (!elements || elements.length === 0) {
         results.details.push(`No elements found for types: ${elementTypes.join(", ")}`);
         return res.json({
@@ -84,7 +84,7 @@ export class ElementController extends ContentBaseController {
             }
 
             const convertedAnswers = this.convertAnswersMarkdownToHtml(answers, element.elementType!, MarkdownPreviewLight);
-            
+
             element.answersJSON = JSON.stringify(convertedAnswers);
             await this.repositories.element.save(element);
 
@@ -122,11 +122,11 @@ export class ElementController extends ContentBaseController {
       });
 
     } catch (error) {
-      console.error('Convert markdown endpoint error:', error);
+      console.error("Convert markdown endpoint error:", error);
       results.errors++;
       const errorMessage = error instanceof Error ? error.message : String(error);
       results.details.push(`Fatal error during conversion: ${errorMessage}`);
-      
+
       return res.status(500).json({
         success: false,
         totalElements: results.totalElements,

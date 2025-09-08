@@ -13,7 +13,7 @@ export function MarkdownPreviewLight({ value: markdownString = "" }: Props) {
     if (matches && matches.length > 0) {
       let classes = matches.join(" ");
       classes = classes.replace(/\./g, "");
-      result = ' class="' + classes + '"';
+      result = " class=\"" + classes + "\"";
     }
     const targetRegex = /:target="([^"]+)"/g;
     const targets = targetRegex.exec(extra);
@@ -30,7 +30,7 @@ export function MarkdownPreviewLight({ value: markdownString = "" }: Props) {
     const regex = /\[([^\]]+)\]\(([^)]+)\)\{([^\}]+)\}/g;
     const convertedText = markdownString.replace(regex, (match, text, url, extra) => {
       if (!match) return text;
-      let result = '<a href="' + url + '"';
+      let result = "<a href=\"" + url + "\"";
       result += getTargetAndClasses(extra);
       result += ">" + text + "</a>";
       return result;

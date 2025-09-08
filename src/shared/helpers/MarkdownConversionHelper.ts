@@ -47,33 +47,33 @@ export class MarkdownConversionHelper {
       // Load all elements of specified types - for all churches if churchId is empty
       let elementsQuery: string;
       let params: any[];
-      
+
       if (!churchId || churchId.trim() === "") {
         // Process all churches
         elementsQuery = `
-          SELECT * FROM elements 
+          SELECT * FROM elements
           WHERE elementType IN (${elementTypes.map(() => "?").join(",")})
           ORDER BY churchId, id
         `;
         params = [...elementTypes];
-        results.details.push(`Processing ALL churches for element types: ${elementTypes.join(', ')}`);
+        results.details.push(`Processing ALL churches for element types: ${elementTypes.join(", ")}`);
       } else {
         // Process specific church
         elementsQuery = `
-          SELECT * FROM elements 
+          SELECT * FROM elements
           WHERE churchId = ? AND elementType IN (${elementTypes.map(() => "?").join(",")})
           ORDER BY id
         `;
         params = [churchId, ...elementTypes];
-        results.details.push(`Processing church ${churchId} for element types: ${elementTypes.join(', ')}`);
+        results.details.push(`Processing church ${churchId} for element types: ${elementTypes.join(", ")}`);
       }
 
-      console.log('MarkdownConversionHelper: About to execute query with params:', params);
+      console.log("MarkdownConversionHelper: About to execute query with params:", params);
       results.details.push(`Executing query with ${params.length} parameters: ${JSON.stringify(params)}`);
 
       const elements: Element[] = await DB.query(elementsQuery, params);
-      
-      console.log('MarkdownConversionHelper: Query executed, found elements:', elements?.length || 0);
+
+      console.log("MarkdownConversionHelper: Query executed, found elements:", elements?.length || 0);
 
       if (!elements || elements.length === 0) {
         const scope = !churchId || churchId.trim() === "" ? "all churches" : `church ${churchId}`;
@@ -163,7 +163,7 @@ export class MarkdownConversionHelper {
       results.errors++;
       const errorMessage = error instanceof Error ? `${error.message}\nStack: ${error.stack}` : String(error);
       results.details.push(`Fatal error during conversion: ${errorMessage}`);
-      console.error('MarkdownConversionHelper fatal error:', error);
+      console.error("MarkdownConversionHelper fatal error:", error);
     }
 
     return results;
