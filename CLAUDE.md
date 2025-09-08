@@ -9,7 +9,7 @@ This is a **modular monolith** for a church management system that consolidates 
 - **MembershipApi** - Authentication, users, churches, permissions, and form builder
 - **AttendanceApi** - Attendance tracking and reporting with campus/service hierarchy  
 - **ContentApi** - Content management, sermons, media, and external API integrations
-- **GivingApi** - Donation processing and financial management with Stripe integration
+- **GivingApi** - Donation processing and financial management with Stripe and PayPal integration
 - **MessagingApi** - Real-time messaging, notifications, and WebSocket management
 - **DoingApi** - Task automation and workflow management
 
@@ -130,8 +130,11 @@ npm run serverless-local             # Test serverless functions locally (port 8
 - Connection state persistence in database
 
 **GivingApi** - Payment processing:
-- Stripe integration for donations and subscriptions
+- Multi-gateway support: Stripe and PayPal integrations
+- One-time and recurring donations for both payment providers
 - Fund allocation and batch processing
+- Automatic fee calculation per payment provider
+- Webhook handling for both Stripe and PayPal events
 
 **DoingApi** - Automation engine:
 - Condition-based automation triggers
@@ -210,3 +213,59 @@ const apiKey = Environment.youTubeApiKey;
 - ESLint + Prettier for code formatting (auto-fix enabled)
 - TypeScript strict mode with `--noEmitOnError false` for builds
 - Database integration tests use separate test databases per module
+
+## PayPal Integration Setup
+
+The GivingApi now supports both Stripe and PayPal as payment gateways. Here's how to configure PayPal:
+
+### Database Configuration
+
+PayPal gateways are configured in the `Gateway` table with these fields:
+- `provider`: "paypal" 
+- `publicKey`: PayPal Client ID (encrypted)
+- `privateKey`: PayPal Client Secret (encrypted)
+- `webhookKey`: PayPal Webhook ID (encrypted)
+- `productId`: Not used for PayPal (can be null)
+
+### PayPal Developer Setup
+
+1. Create a PayPal Developer account at https://developer.paypal.com
+2. Create a new application to get Client ID and Client Secret
+3. Set up webhooks for the following events:
+   - `PAYMENT.CAPTURE.COMPLETED`
+   - `BILLING.SUBSCRIPTION.ACTIVATED`
+   - `BILLING.SUBSCRIPTION.CANCELLED`
+
+### Environment Variables
+
+No additional environment variables are required. PayPal credentials are stored encrypted in the Gateway table.
+
+### API Endpoints
+
+All existing donation endpoints support PayPal by specifying `provider: "paypal"` in the request body:
+- `/donate/charge` - One-time PayPal donations
+- `/donate/subscribe` - PayPal recurring donations
+- `/donate/webhook/paypal?churchId={id}` - PayPal webhook handler
+
+### Frontend Integration
+
+Use the new `MultiGatewayDonationForm` component from `@churchapps/apphelper` which supports both Stripe and PayPal:
+
+```typescript
+import { MultiGatewayDonationForm } from "@churchapps/apphelper";
+
+<MultiGatewayDonationForm
+  person={person}
+  customerId={customerId}
+  paymentMethods={paymentMethods} // Include both Stripe and PayPal methods
+  paymentGateways={gateways}     // Gateway configuration
+  donationSuccess={handleSuccess}
+  church={church}
+/>
+```
+
+### Fee Calculation
+
+PayPal fees are calculated automatically:
+- Default: 2.9% + $0.30 for domestic transactions
+- Configurable via church settings: `transFeePayPal` and `flatRatePayPal`

@@ -8,6 +8,202 @@ import { TreeHelper } from "../helpers/TreeHelper";
 
 @controller("/content/elements")
 export class ElementController extends ContentBaseController {
+  @httpGet("/convert-markdown")
+  public async convertMarkdownToHtml(req: express.Request, res: express.Response): Promise<any> {
+    const { MarkdownPreviewLight } = await import("../../../shared/helpers/MarkdownPreviewLight");
+    const { TypedDB } = await import("../helpers");
+    
+    const results = {
+      processed: 0,
+      errors: 0,
+      totalElements: 0,
+      remaining: 0,
+      details: [] as string[],
+      batchResults: [] as Array<{ batchNumber: number; processed: number; errors: number; remaining: number }>
+    };
+
+    const elementTypes = ["text", "textWithPhoto", "card", "faq", "table"];
+    const batchSize = 20;
+
+    try {
+      // Direct query using TypedDB (the context should be available since we're in the content module)
+      const elementsQuery = `
+        SELECT * FROM elements 
+        WHERE elementType IN (${elementTypes.map(() => "?").join(",")})
+        ORDER BY churchId, id
+        LIMIT 100
+      `;
+      
+      results.details.push(`Processing ALL churches for element types: ${elementTypes.join(', ')}`);
+      results.details.push(`Querying with parameters: ${JSON.stringify(elementTypes)}`);
+      
+      const elements: Element[] = await TypedDB.query(elementsQuery, elementTypes);
+      results.details.push(`Query executed successfully, found ${elements?.length || 0} elements`);
+      
+      if (!elements || elements.length === 0) {
+        results.details.push(`No elements found for types: ${elementTypes.join(", ")}`);
+        return res.json({
+          success: true,
+          totalElements: results.totalElements,
+          processed: results.processed,
+          errors: results.errors,
+          remaining: results.remaining,
+          batchResults: results.batchResults,
+          details: results.details,
+          message: "No elements found to convert"
+        });
+      }
+
+      results.totalElements = elements.length;
+      results.remaining = elements.length;
+      results.details.push(`Found ${elements.length} elements to process in batches of ${batchSize}`);
+
+      // Process elements in batches
+      for (let batchStart = 0; batchStart < elements.length; batchStart += batchSize) {
+        const batchEnd = Math.min(batchStart + batchSize, elements.length);
+        const batch = elements.slice(batchStart, batchEnd);
+        const batchNumber = Math.floor(batchStart / batchSize) + 1;
+
+        let batchProcessed = 0;
+        let batchErrors = 0;
+
+        results.details.push(`Processing batch ${batchNumber} (elements ${batchStart + 1}-${batchEnd})`);
+
+        for (const element of batch) {
+          try {
+            let answers: any = {};
+            if (element.answersJSON) {
+              answers = JSON.parse(element.answersJSON);
+            }
+
+            const hasContentToConvert = this.hasMarkdownContent(answers, element.elementType!);
+
+            if (!hasContentToConvert) {
+              results.details.push(`Element ${element.id} (${element.elementType}) has no markdown content to convert`);
+              continue;
+            }
+
+            const convertedAnswers = this.convertAnswersMarkdownToHtml(answers, element.elementType!, MarkdownPreviewLight);
+            
+            element.answersJSON = JSON.stringify(convertedAnswers);
+            await this.repositories.element.save(element);
+
+            batchProcessed++;
+            results.processed++;
+            results.details.push(`✓ Converted element ${element.id} (${element.elementType})`);
+          } catch (elementError) {
+            batchErrors++;
+            results.errors++;
+            const errorMessage = elementError instanceof Error ? elementError.message : String(elementError);
+            results.details.push(`Error processing element ${element.id}: ${errorMessage}`);
+          }
+        }
+
+        results.remaining = elements.length - (batchStart + batch.length);
+        results.batchResults.push({
+          batchNumber,
+          processed: batchProcessed,
+          errors: batchErrors,
+          remaining: results.remaining
+        });
+
+        results.details.push(`Batch ${batchNumber} completed: ${batchProcessed} processed, ${batchErrors} errors, ${results.remaining} remaining`);
+      }
+
+      return res.json({
+        success: true,
+        totalElements: results.totalElements,
+        processed: results.processed,
+        errors: results.errors,
+        remaining: results.remaining,
+        batchResults: results.batchResults,
+        details: results.details,
+        message: `Conversion completed. Total: ${results.totalElements}, Processed: ${results.processed}, Errors: ${results.errors}`
+      });
+
+    } catch (error) {
+      console.error('Convert markdown endpoint error:', error);
+      results.errors++;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      results.details.push(`Fatal error during conversion: ${errorMessage}`);
+      
+      return res.status(500).json({
+        success: false,
+        totalElements: results.totalElements,
+        processed: results.processed,
+        errors: results.errors,
+        remaining: results.remaining,
+        batchResults: results.batchResults,
+        details: results.details,
+        error: errorMessage,
+        message: "Failed to convert markdown to HTML"
+      });
+    }
+  }
+
+  private hasMarkdownContent(answers: any, elementType: string): boolean {
+    if (!answers) return false;
+
+    switch (elementType) {
+      case "text":
+        return !!(answers.text && typeof answers.text === "string" && answers.text.trim().length > 0);
+      case "textWithPhoto":
+        return !!(answers.text && typeof answers.text === "string" && answers.text.trim().length > 0);
+      case "card":
+        return !!(answers.description && typeof answers.description === "string" && answers.description.trim().length > 0);
+      case "faq":
+        return !!(answers.answer && typeof answers.answer === "string" && answers.answer.trim().length > 0);
+      case "table":
+        return !!(answers.data && Array.isArray(answers.data) && answers.data.length > 0);
+      default:
+        return false;
+    }
+  }
+
+  private convertAnswersMarkdownToHtml(answers: any, elementType: string, MarkdownPreviewLight: any): any {
+    const convertedAnswers = { ...answers };
+
+    switch (elementType) {
+      case "text":
+        if (convertedAnswers.text) {
+          convertedAnswers.text = MarkdownPreviewLight({ value: convertedAnswers.text });
+        }
+        break;
+      case "textWithPhoto":
+        if (convertedAnswers.text) {
+          convertedAnswers.text = MarkdownPreviewLight({ value: convertedAnswers.text });
+        }
+        break;
+      case "card":
+        if (convertedAnswers.description) {
+          convertedAnswers.description = MarkdownPreviewLight({ value: convertedAnswers.description });
+        }
+        break;
+      case "faq":
+        if (convertedAnswers.answer) {
+          convertedAnswers.answer = MarkdownPreviewLight({ value: convertedAnswers.answer });
+        }
+        break;
+      case "table":
+        if (convertedAnswers.data && Array.isArray(convertedAnswers.data)) {
+          convertedAnswers.data = convertedAnswers.data.map((row: any[]) => {
+            if (Array.isArray(row)) {
+              return row.map((cell) => {
+                if (typeof cell === "string" && cell.trim().length > 0) {
+                  return MarkdownPreviewLight({ value: cell });
+                }
+                return cell;
+              });
+            }
+            return row;
+          });
+        }
+        break;
+    }
+
+    return convertedAnswers;
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

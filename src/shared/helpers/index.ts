@@ -10,3 +10,4 @@ export { UniqueIdHelper } from "./UniqueIdHelper";
 export { DateHelper } from "./DateHelper";
 export { ValidationHelper } from "./ValidationHelper";
 export { StripeHelper } from "./StripeHelper";
+export { MarkdownConversionHelper } from "./MarkdownConversionHelper";
