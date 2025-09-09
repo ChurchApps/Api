@@ -1,9 +1,9 @@
 export { GivingBaseController } from "./GivingBaseController";
+export { DonationBatchController } from "./DonationBatchController";
 export { DonationController } from "./DonationController";
 export { FundController } from "./FundController";
 export { DonateController } from "./DonateController";
 export { GatewayController } from "./GatewayController";
-export { DonationBatchController } from "./DonationBatchController";
 export { FundDonationController } from "./FundDonationController";
 export { PaymentMethodController } from "./PaymentMethodController";
 export { CustomerController } from "./CustomerController";
