@@ -64,7 +64,7 @@ functions:
     handler: lambda.web
     layers:
       - { Ref: DependenciesLambdaLayer }
-    memorySize: 512
+    memorySize: 1024
     timeout: 30
     vpc: ${self:custom.vpcSettings.current}
     environment:
