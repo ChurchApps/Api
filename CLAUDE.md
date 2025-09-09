@@ -245,6 +245,7 @@ No additional environment variables are required. PayPal credentials are stored 
 All existing donation endpoints support PayPal by specifying `provider: "paypal"` in the request body:
 - `/donate/charge` - One-time PayPal donations
 - `/donate/subscribe` - PayPal recurring donations
+- `/donate/fee` - PayPal fee calculation
 - `/donate/webhook/paypal?churchId={id}` - PayPal webhook handler
 
 ### Frontend Integration

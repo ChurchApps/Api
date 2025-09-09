@@ -1,11 +1,9 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
-import Stripe from "stripe";
 import { GivingBaseController } from "./GivingBaseController";
-import { StripeHelper } from "../../../shared/helpers/StripeHelper";
-import { PayPalHelper } from "../../../shared/helpers/PayPalHelper";
+import { GatewayService } from "../../../shared/helpers/GatewayService";
 import { EncryptionHelper, EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
-import { Donation, FundDonation, DonationBatch, PaymentDetails, Subscription, SubscriptionFund } from "../models";
+import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models";
 import { Environment } from "../../../shared/helpers/Environment";
 import Axios from "axios";
 import dayjs from "dayjs";
@@ -23,7 +21,7 @@ export class DonateController extends GivingBaseController {
   }
 
   @httpPost("/webhook/:provider")
-  public async webhook(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async webhook(req: express.Request<{ provider: string }, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "Missing churchId parameter" }, 400);
@@ -32,42 +30,54 @@ export class DonateController extends GivingBaseController {
       if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
 
       const provider = req.params.provider?.toLowerCase();
-      if (provider === "stripe") {
-        const secretKey = EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
-        if (secretKey === "") return this.json({ error: "Invalid gateway configuration" }, 401);
-        const sig = req.headers["stripe-signature"]?.toString();
-        if (!sig) return this.json({ error: "Missing stripe signature" }, 400);
-        const webhookKey = EncryptionHelper.decrypt((gateways as any[])[0].webhookKey);
-        const stripeEvent: Stripe.Event = await StripeHelper.verifySignature(secretKey, req, sig, webhookKey);
-        const eventData = stripeEvent.data.object as any;
-        const subscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
-        if (stripeEvent.type === "charge.succeeded" && subscriptionEvent) return this.json({}, 200);
-        const existingEvent = await this.repositories.eventLog.load(churchId, stripeEvent.id);
-        if (!existingEvent) await StripeHelper.logEvent(churchId, stripeEvent, eventData, this.repositories);
-        if (!existingEvent && (stripeEvent.type === "charge.succeeded" || stripeEvent.type === "invoice.paid")) {
-          await StripeHelper.logDonation(secretKey, churchId, eventData, this.repositories);
+      const gateway = gateways[0];
+
+      try {
+        const webhookResult = await GatewayService.verifyWebhook(gateway, req.headers, req.body);
+
+        if (!webhookResult.success) {
+          console.error(`${provider} webhook verification failed`);
+          return this.json({ error: `Invalid ${provider} webhook signature` }, 401);
         }
-      } else if (provider === "paypal") {
-        const gateway = (gateways as any[])[0];
-        const clientId = gateway.publicKey;
-        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
-        const webhookId = EncryptionHelper.decrypt(gateway.webhookKey);
-        await PayPalHelper.verifySignature(clientId, clientSecret, webhookId, req.headers, req.body);
-        const payPalEvent = req.body as any;
-        const eventData = payPalEvent.resource;
-        const existingEvent = await this.repositories.eventLog.load(churchId, payPalEvent.id);
-        if (!existingEvent) await PayPalHelper.logEvent(churchId, payPalEvent, eventData, this.repositories);
-        if (!existingEvent && payPalEvent.event_type === "PAYMENT.CAPTURE.COMPLETED") {
-          await PayPalHelper.logDonation(clientId, clientSecret, churchId, eventData, this.repositories);
+
+        if (!webhookResult.shouldProcess) {
+          return this.json({}, 200);
         }
-        if (!existingEvent && payPalEvent.event_type === "BILLING.SUBSCRIPTION.CANCELLED") {
-          await this.repositories.subscription.delete(churchId, eventData.id);
+
+        const existingEvent = await this.repositories.eventLog.load(churchId, webhookResult.eventId!);
+
+        if (!existingEvent) {
+          await GatewayService.logEvent(gateway, churchId, req.body, webhookResult.eventData, this.repositories);
+
+          if (this.shouldProcessDonation(provider, webhookResult.eventType!)) {
+            await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repositories);
+          } else if (this.shouldCancelSubscription(provider, webhookResult.eventType!)) {
+            await this.repositories.subscription.delete(churchId, webhookResult.eventData.id);
+          }
         }
-      } else {
-        return this.json({ error: "Unsupported provider" }, 400);
+      } catch (error) {
+        console.error(`Webhook processing failed for ${provider}:`, error);
+        return this.json({ error: "Webhook processing failed" }, 500);
       }
+
       return this.json({}, 200);
     });
+  }
+
+  private shouldProcessDonation(provider: string, eventType: string): boolean {
+    const donationEvents = {
+      stripe: ["charge.succeeded", "invoice.paid"],
+      paypal: ["PAYMENT.CAPTURE.COMPLETED"]
+    };
+    return donationEvents[provider as keyof typeof donationEvents]?.includes(eventType) || false;
+  }
+
+  private shouldCancelSubscription(provider: string, eventType: string): boolean {
+    const cancellationEvents = {
+      stripe: ["customer.subscription.deleted"],
+      paypal: ["BILLING.SUBSCRIPTION.CANCELLED"]
+    };
+    return cancellationEvents[provider as keyof typeof cancellationEvents]?.includes(eventType) || false;
   }
 
   @httpPost("/charge")
@@ -77,34 +87,29 @@ export class DonateController extends GivingBaseController {
       const churchId = au.churchId || donationData.churchId;
       const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
       const gateway = gateways[0];
-      if (donationData.provider === "paypal") {
-        const clientId = gateway.publicKey;
-        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
-        const capture = await PayPalHelper.captureOrder(clientId, clientSecret, donationData.id);
-        const eventData = capture.purchase_units?.[0]?.payments?.captures?.[0] || capture;
-        await PayPalHelper.logEvent(churchId, capture, eventData, this.repositories);
-        await PayPalHelper.logDonation(clientId, clientSecret, churchId, eventData, this.repositories);
+
+      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      try {
+        const chargeResult = await GatewayService.processCharge(gateway, donationData);
+
+        if (!chargeResult.success) {
+          return this.json({ error: "Charge processing failed" }, 400);
+        }
+
+        // For PayPal, we need to log the events since it's captured immediately
+        if (donationData.provider === "paypal") {
+          await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repositories);
+          await GatewayService.logDonation(gateway, churchId, chargeResult.data, this.repositories);
+        }
+
         await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
-        return eventData;
+
+        return chargeResult.data;
+      } catch (error) {
+        console.error("Charge processing failed:", error);
+        return this.json({ error: "Charge processing failed" }, 500);
       }
-      const secretKey = await this.loadPrivateKey(churchId);
-      if (secretKey === "") return this.json({}, 401);
-      const fundDonations: FundDonation[] = donationData.funds;
-      const paymentData: PaymentDetails = {
-        amount: donationData.amount,
-        currency: "usd",
-        customer: donationData.customerId,
-        metadata: { funds: JSON.stringify(fundDonations), notes: donationData.notes }
-      };
-      if (donationData.type === "card") {
-        paymentData.payment_method = donationData.id;
-        paymentData.confirm = true;
-        paymentData.off_session = true;
-      }
-      if (donationData.type === "bank") paymentData.source = donationData.id;
-      const stripeDonation = await StripeHelper.donate(secretKey, paymentData);
-      await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
-      return stripeDonation;
     });
   }
 
@@ -115,12 +120,36 @@ export class DonateController extends GivingBaseController {
       const churchId = au.churchId || CHURCH_ID;
       const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
       const gateway = gateways[0];
-      if (req.body.provider === "paypal") {
-        const clientId = gateway.publicKey;
-        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
-        const payPalSub = await PayPalHelper.getSubscriptionDetails(clientId, clientSecret, id);
-        const subscription: Subscription = { id: payPalSub.id, churchId, personId: person.id, customerId };
+
+      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      try {
+        const subscriptionData = {
+          id,
+          amount,
+          customerId,
+          type,
+          billing_cycle_anchor,
+          proration_behavior,
+          interval,
+          notes
+        };
+
+        const subscriptionResult = await GatewayService.createSubscription(gateway, subscriptionData);
+
+        if (!subscriptionResult.success) {
+          return this.json({ error: "Subscription creation failed" }, 400);
+        }
+
+        const subscription: Subscription = {
+          id: subscriptionResult.subscriptionId,
+          churchId,
+          personId: person.id,
+          customerId
+        };
+
         await this.repositories.subscription.save(subscription);
+
         const promises: Promise<SubscriptionFund>[] = [];
         funds.forEach((fund: FundDonation) => {
           const subscriptionFund: SubscriptionFund = {
@@ -131,51 +160,49 @@ export class DonateController extends GivingBaseController {
           };
           promises.push(this.repositories.subscriptionFunds.save(subscriptionFund));
         });
+
         await Promise.all(promises);
         await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
-        return payPalSub;
+
+        return subscriptionResult.data;
+      } catch (error) {
+        console.error("Subscription creation failed:", error);
+        return this.json({ error: "Subscription creation failed" }, 500);
       }
-      const secretKey = await this.loadPrivateKey(churchId);
-      if (secretKey === "") return this.json({}, 401);
-      const paymentData: PaymentDetails = {
-        payment_method_id: id,
-        amount,
-        currency: "usd",
-        customer: customerId,
-        type,
-        billing_cycle_anchor,
-        proration_behavior,
-        interval,
-        metadata: { notes }
-      };
-      paymentData.productId = gateway.productId;
-      const stripeSubscription = await StripeHelper.createSubscription(secretKey, paymentData);
-      const subscription: Subscription = { id: stripeSubscription.id, churchId, personId: person.id, customerId };
-      await this.repositories.subscription.save(subscription);
-      const promises: Promise<SubscriptionFund>[] = [];
-      funds.forEach((fund: FundDonation) => {
-        const subscriptionFund: SubscriptionFund = {
-          churchId,
-          subscriptionId: subscription.id,
-          fundId: fund.id,
-          amount: fund.amount
-        };
-        promises.push(this.repositories.subscriptionFunds.save(subscriptionFund));
-      });
-      await Promise.all(promises);
-      await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
-      return stripeSubscription;
     });
   }
 
   @httpPost("/fee")
-  public async calculateFee(req: express.Request<{}, {}, { type: string; amount: number }>, res: express.Response): Promise<any> {
+  public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; amount: number }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const { type, amount } = req.body;
-      const { churchId } = req.query;
-      if (type === "creditCard") return { calculatedFee: await this.getCreditCardFees(amount, churchId?.toString() as string) };
-      else if (type === "ach") return { calculatedFee: await this.getACHFees(amount, churchId?.toString() as string) };
-      else return { calculatedFee: 0 };
+      const { type, provider, amount } = req.body;
+      const churchId = req.query.churchId?.toString() || "";
+
+      try {
+        let calculatedFee = 0;
+
+        if (provider) {
+          // Use gateway-specific fee calculation
+          const gateways = await this.repositories.gateway.loadAll(churchId);
+          const gateway = (gateways as any[]).find((g) => g.provider.toLowerCase() === provider.toLowerCase());
+
+          if (gateway) {
+            calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId);
+          }
+        } else {
+          // Legacy type-based calculation for backward compatibility
+          if (type === "creditCard") {
+            calculatedFee = await this.getCreditCardFees(amount, churchId);
+          } else if (type === "ach") {
+            calculatedFee = await this.getACHFees(amount, churchId);
+          }
+        }
+
+        return { calculatedFee };
+      } catch (error) {
+        console.error("Fee calculation failed:", error);
+        return { calculatedFee: 0 };
+      }
     });
   }
 
@@ -330,6 +357,20 @@ export class DonateController extends GivingBaseController {
 
     const fee = Math.round((amount / (1 - fixedPercent) - amount) * 100) / 100;
     return Math.min(fee, fixedMaxFee);
+  };
+
+  private getPayPalFees = async (amount: number, churchId: string) => {
+    let customFixedFee: number | null = null;
+    let customPercentFee: number | null = null;
+    if (churchId) {
+      const response = await Axios.get(Environment.membershipApi + "/settings/public/" + churchId);
+      const data = response.data;
+      if (data?.flatRatePayPal != null && data.flatRatePayPal !== "") customFixedFee = +data.flatRatePayPal;
+      if (data?.transFeePayPal != null && data.transFeePayPal !== "") customPercentFee = +data.transFeePayPal / 100;
+    }
+    const fixedFee = customFixedFee ?? 0.3;
+    const fixedPercent = customPercentFee ?? 0.029;
+    return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   };
 
   @httpPost("/captcha-verify")

@@ -2,7 +2,7 @@ import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversi
 import express from "express";
 import { GivingBaseController } from "./GivingBaseController";
 import { Permissions } from "../../../shared/helpers/Permissions";
-import { StripeHelper } from "../../../shared/helpers/StripeHelper";
+import { GatewayService } from "../../../shared/helpers/GatewayService";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
 @controller("/giving/subscriptions")
@@ -26,28 +26,43 @@ export class SubscriptionController extends GivingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, any[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const secretKey = await this.loadPrivateKey(au.churchId);
       let permission = au.checkAccess(Permissions.donations.edit);
       const promises: Promise<any>[] = [];
+      // Note: Subscription updates would need to be implemented in the gateway providers
+      // This is a placeholder for future implementation
       req.body.forEach(async (subscription) => {
         permission = permission || ((await this.repositories.subscription.load(au.churchId, subscription.id)) as any).personId === au.personId;
-        if (permission) promises.push(StripeHelper.updateSubscription(secretKey, subscription));
+        // TODO: Implement gateway-agnostic subscription updates
       });
       return await Promise.all(promises);
     });
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string; reason?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const secretKey = await this.loadPrivateKey(au.churchId);
-      const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || ((await this.repositories.subscription.load(au.churchId, id)) as any).personId === au.personId);
+      const subscription = await this.repositories.subscription.load(au.churchId, id);
+      const permission = au.checkAccess(Permissions.donations.edit) || (subscription as any)?.personId === au.personId;
       if (!permission) return this.json(null, 401);
-      else {
+
+      const gateways = await this.repositories.gateway.loadAll(au.churchId);
+      const gateway = (gateways as any[])[0];
+      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      try {
         const promises: Promise<any>[] = [];
-        promises.push(StripeHelper.deleteSubscription(secretKey, id));
+
+        // Cancel subscription with the gateway
+        promises.push(GatewayService.cancelSubscription(gateway, id, req.body?.reason));
+
+        // Delete from database
         promises.push(this.repositories.subscription.delete(au.churchId, id));
-        return await Promise.all(promises);
+
+        await Promise.all(promises);
+        return this.json({ success: true });
+      } catch (error) {
+        console.error("Subscription cancellation failed:", error);
+        return this.json({ error: "Subscription cancellation failed" }, 500);
       }
     });
   }

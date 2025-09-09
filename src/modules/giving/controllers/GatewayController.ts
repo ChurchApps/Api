@@ -2,8 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete, httpPatch } fr
 import express from "express";
 import { GivingBaseController } from "./GivingBaseController";
 import { Gateway } from "../models";
-import { StripeHelper } from "../../../shared/helpers/StripeHelper";
-import { PayPalHelper } from "../../../shared/helpers/PayPalHelper";
+import { GatewayService } from "../../../shared/helpers/GatewayService";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
@@ -50,24 +49,28 @@ export class GatewayController extends GivingBaseController {
         const promises: Promise<Gateway>[] = [];
         await Promise.all(
           req.body.map(async (gateway) => {
-            if (gateway.provider === "Stripe") {
-              if (req.hostname !== "localhost") {
-                await StripeHelper.deleteWebhooksByChurchId(gateway.privateKey as string, au.churchId);
-                const webHookUrl = req.get("x-forwarded-proto") + "://" + req.hostname + "/donate/webhook/stripe?churchId=" + au.churchId;
-                const webhook = await StripeHelper.createWebhookEndpoint(gateway.privateKey as string, webHookUrl);
-                gateway.webhookKey = EncryptionHelper.encrypt(webhook.secret as string);
-              }
-              gateway.productId = await StripeHelper.createProduct(gateway.privateKey as string, au.churchId);
-            } else if (gateway.provider === "paypal") {
-              if (req.hostname !== "localhost") {
-                const clientId = gateway.publicKey as string;
-                const clientSecret = gateway.privateKey as string;
-                await PayPalHelper.deleteWebhooksByChurchId(clientId, clientSecret, au.churchId);
-                const webHookUrl = req.get("x-forwarded-proto") + "://" + req.hostname + "/donate/webhook/paypal?churchId=" + au.churchId;
-                const webhook = await PayPalHelper.createWebhookEndpoint(clientId, clientSecret, webHookUrl);
-                gateway.webhookKey = EncryptionHelper.encrypt(webhook.id as string);
+            if (req.hostname !== "localhost") {
+              // Delete existing webhooks
+              await GatewayService.deleteWebhooks(gateway, au.churchId);
+
+              // Create new webhook
+              const providerName = gateway.provider.toLowerCase();
+              const webHookUrl = req.get("x-forwarded-proto") + "://" + req.hostname + `/donate/webhook/${providerName}?churchId=` + au.churchId;
+              const webhook = await GatewayService.createWebhook(gateway, webHookUrl);
+
+              if (webhook.secret) {
+                gateway.webhookKey = EncryptionHelper.encrypt(webhook.secret);
+              } else {
+                gateway.webhookKey = EncryptionHelper.encrypt(webhook.id);
               }
             }
+
+            // Create product if the gateway supports it
+            const productId = await GatewayService.createProduct(gateway, au.churchId);
+            if (productId) {
+              gateway.productId = productId;
+            }
+
             gateway.churchId = au.churchId;
             gateway.privateKey = EncryptionHelper.encrypt(gateway.privateKey as string);
             promises.push(this.repositories.gateway.save(gateway));
@@ -106,13 +109,8 @@ export class GatewayController extends GivingBaseController {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
         const gateway = (await this.repositories.gateway.load(au.churchId, id)) as any;
-        if (gateway.provider === "Stripe") {
-          const privateKey = EncryptionHelper.decrypt(gateway.privateKey);
-          await StripeHelper.deleteWebhooksByChurchId(privateKey, au.churchId);
-        } else if (gateway.provider === "paypal") {
-          const clientId = gateway.publicKey;
-          const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
-          await PayPalHelper.deleteWebhooksByChurchId(clientId, clientSecret, au.churchId);
+        if (gateway) {
+          await GatewayService.deleteWebhooks(gateway, au.churchId);
         }
         await this.repositories.gateway.delete(au.churchId, id);
         return this.json({});

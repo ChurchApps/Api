@@ -68,6 +68,16 @@ export class PayPalHelper {
     return response.result;
   }
 
+  static async cancelSubscription(clientId: string, clientSecret: string, subscriptionId: string, reason?: string): Promise<any> {
+    const client = PayPalHelper.getClient(clientId, clientSecret);
+    const request = new paypal.subscriptions.SubscriptionsCancelRequest(subscriptionId);
+    request.requestBody({
+      reason: reason || "Customer requested cancellation"
+    });
+    const response = await client.execute(request);
+    return response.result;
+  }
+
   static async logEvent(churchId: string, payPalEvent: any, eventData: any, givingRepositories: any) {
     const { id: eventId, event_type: eventType, create_time: createTime } = payPalEvent;
     const status = eventData.status || eventType;
