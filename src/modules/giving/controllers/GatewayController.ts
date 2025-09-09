@@ -3,6 +3,7 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController";
 import { Gateway } from "../models";
 import { StripeHelper } from "../../../shared/helpers/StripeHelper";
+import { PayPalHelper } from "../../../shared/helpers/PayPalHelper";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
@@ -57,6 +58,15 @@ export class GatewayController extends GivingBaseController {
                 gateway.webhookKey = EncryptionHelper.encrypt(webhook.secret as string);
               }
               gateway.productId = await StripeHelper.createProduct(gateway.privateKey as string, au.churchId);
+            } else if (gateway.provider === "paypal") {
+              if (req.hostname !== "localhost") {
+                const clientId = gateway.publicKey as string;
+                const clientSecret = gateway.privateKey as string;
+                await PayPalHelper.deleteWebhooksByChurchId(clientId, clientSecret, au.churchId);
+                const webHookUrl = req.get("x-forwarded-proto") + "://" + req.hostname + "/donate/webhook/paypal?churchId=" + au.churchId;
+                const webhook = await PayPalHelper.createWebhookEndpoint(clientId, clientSecret, webHookUrl);
+                gateway.webhookKey = EncryptionHelper.encrypt(webhook.id as string);
+              }
             }
             gateway.churchId = au.churchId;
             gateway.privateKey = EncryptionHelper.encrypt(gateway.privateKey as string);
@@ -99,6 +109,10 @@ export class GatewayController extends GivingBaseController {
         if (gateway.provider === "Stripe") {
           const privateKey = EncryptionHelper.decrypt(gateway.privateKey);
           await StripeHelper.deleteWebhooksByChurchId(privateKey, au.churchId);
+        } else if (gateway.provider === "paypal") {
+          const clientId = gateway.publicKey;
+          const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
+          await PayPalHelper.deleteWebhooksByChurchId(clientId, clientSecret, au.churchId);
         }
         await this.repositories.gateway.delete(au.churchId, id);
         return this.json({});

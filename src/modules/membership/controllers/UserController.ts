@@ -10,7 +10,10 @@ import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers";
 import { ArrayHelper } from "@churchapps/apihelper";
 
-const emailPasswordValidation = [body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("password").isLength({ min: 6 }).withMessage("must be at least 6 chars long")];
+const emailPasswordValidation = [
+  body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"),
+  body("password").isLength({ min: 6 }).withMessage("must be at least 6 chars long")
+];
 
 const loadOrCreateValidation = [
   oneOf([
@@ -33,7 +36,11 @@ const registerValidation = [
   ])
 ];
 
-const setDisplayNameValidation = [body("userId").optional().isString(), body("firstName").exists().withMessage("enter first name").not().isEmpty().trim().escape(), body("lastName").exists().withMessage("enter last name").not().isEmpty().trim().escape()];
+const setDisplayNameValidation = [
+  body("userId").optional().isString(),
+  body("firstName").exists().withMessage("enter first name").not().isEmpty().trim().escape(),
+  body("lastName").exists().withMessage("enter last name").not().isEmpty().trim().escape()
+];
 
 const updateEmailValidation = [body("userId").optional().isString(), body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address")];
 

@@ -145,20 +145,20 @@ export class PersonRepository {
 
   public search(churchId: string, term: string, filterOptedOut?: boolean) {
     const filter = filterOptedOut ? " AND (optedOut = FALSE OR optedOut IS NULL)" : "";
-    return DB.query("SELECT * FROM people WHERE churchId=? AND concat(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,'')) LIKE ? AND removed=0" + filter + " LIMIT 100;", [
-      churchId,
-      "%" + term.replace(" ", "%") + "%"
-    ]);
+    return DB.query(
+      "SELECT * FROM people WHERE churchId=? AND concat(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,'')) LIKE ? AND removed=0" +
+        filter +
+        " LIMIT 100;",
+      [churchId, "%" + term.replace(" ", "%") + "%"]
+    );
   }
 
   public searchPhone(churchId: string, phonestring: string) {
     const phoneSearch = "%" + phonestring.replace(/ |-/g, "%") + "%";
-    return DB.query("SELECT * FROM people WHERE churchId=? AND (REPLACE(REPLACE(HomePhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(WorkPhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(MobilePhone,'-',''), ' ', '') LIKE ?) AND removed=0 LIMIT 100;", [
-      churchId,
-      phoneSearch,
-      phoneSearch,
-      phoneSearch
-    ]);
+    return DB.query(
+      "SELECT * FROM people WHERE churchId=? AND (REPLACE(REPLACE(HomePhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(WorkPhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(MobilePhone,'-',''), ' ', '') LIKE ?) AND removed=0 LIMIT 100;",
+      [churchId, phoneSearch, phoneSearch, phoneSearch]
+    );
   }
 
   public searchEmail(churchId: string, email: string) {

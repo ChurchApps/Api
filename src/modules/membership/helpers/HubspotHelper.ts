@@ -20,7 +20,19 @@ export class HubspotHelper {
     return response.results[0];
   };
 
-  static register = async (churchId: string, companyName: string, firstName: string, lastName: string, address: string, city: string, state: string, zip: string, country: string, email: string, initialApp: string) => {
+  static register = async (
+    churchId: string,
+    companyName: string,
+    firstName: string,
+    lastName: string,
+    address: string,
+    city: string,
+    state: string,
+    zip: string,
+    country: string,
+    email: string,
+    initialApp: string
+  ) => {
     if (Environment.hubspotKey) {
       const client = this.getClient();
 

@@ -14,7 +14,17 @@ export class FormSubmissionRepository {
     const revisionDate = DateHelper.toMysqlDate(formSubmission.revisionDate);
     formSubmission.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO formSubmissions (id, churchId, formId, contentType, contentId, submissionDate, submittedBy, revisionDate, revisedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [formSubmission.id, formSubmission.churchId, formSubmission.formId, formSubmission.contentType, formSubmission.contentId, submissionDate, formSubmission.submittedBy, revisionDate, formSubmission.revisedBy];
+    const params = [
+      formSubmission.id,
+      formSubmission.churchId,
+      formSubmission.formId,
+      formSubmission.contentType,
+      formSubmission.contentId,
+      submissionDate,
+      formSubmission.submittedBy,
+      revisionDate,
+      formSubmission.revisedBy
+    ];
     await DB.query(sql, params);
     return formSubmission;
   }

@@ -12,7 +12,9 @@ export class FormController extends MembershipBaseController {
       if (au.checkAccess(Permissions.forms.admin)) return this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadAllArchived(au.churchId)) as any[]);
       else {
         const memberForms = await this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadMemberArchivedForms(au.churchId, au.personId)) as any[]);
-        const nonMemberForms = au.checkAccess(Permissions.forms.edit) ? await this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadNonMemberArchivedForms(au.churchId)) as any[]) : [];
+        const nonMemberForms = au.checkAccess(Permissions.forms.edit)
+          ? await this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadNonMemberArchivedForms(au.churchId)) as any[])
+          : [];
         return [...memberForms, ...nonMemberForms];
       }
     });
@@ -42,7 +44,9 @@ export class FormController extends MembershipBaseController {
       if (au.checkAccess(Permissions.forms.admin)) return await this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadAll(au.churchId)) as any[]);
       else {
         const memberForms = await this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadMemberForms(au.churchId, au.personId)) as any[]);
-        const nonMemberForms = au.checkAccess(Permissions.forms.edit) ? await this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadNonMemberForms(au.churchId)) as any[]) : [];
+        const nonMemberForms = au.checkAccess(Permissions.forms.edit)
+          ? await this.repositories.form.convertAllToModel(au.churchId, (await this.repositories.form.loadNonMemberForms(au.churchId)) as any[])
+          : [];
         return [...memberForms, ...nonMemberForms];
       }
     });

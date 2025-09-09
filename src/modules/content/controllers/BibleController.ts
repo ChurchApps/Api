@@ -83,7 +83,12 @@ export class BibleController extends ContentBaseController {
   }
 
   @httpGet("/:translationKey/chapters/:chapterKey/verses")
-  public async getVerses(@requestParam("translationKey") translationKey: string, @requestParam("chapterKey") chapterKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getVerses(
+    @requestParam("translationKey") translationKey: string,
+    @requestParam("chapterKey") chapterKey: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repositories.bibleVerse.loadAll(translationKey, chapterKey);
       if (result.length === 0) {

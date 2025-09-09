@@ -14,7 +14,8 @@ export class BlockController extends ContentBaseController {
       const block: Block = await this.repositories.block.load(churchId, id);
       let result: Block = {};
       if (block?.id !== undefined) {
-        const sections: Section[] = block.blockType === "elementBlock" ? [{ id: "", background: "#FFFFFF", textColor: "dark", blockId: block.id }] : await this.repositories.section.loadForBlock(churchId, block.id);
+        const sections: Section[] =
+          block.blockType === "elementBlock" ? [{ id: "", background: "#FFFFFF", textColor: "dark", blockId: block.id }] : await this.repositories.section.loadForBlock(churchId, block.id);
         const allElements: Element[] = await this.repositories.element.loadForBlock(churchId, block.id);
         /*
         const allElements: Element[] = (block.blockType === "elements")

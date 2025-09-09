@@ -21,19 +21,18 @@ export class ParameterStoreHelper {
     if (isLambda) {
       return false;
     }
-    
+
     // Check for explicit local development indicators
     const isServerlessOffline = process.env.IS_OFFLINE === "true";
     const hasNodeEnv = process.env.NODE_ENV === "development";
     const hasDevScript = process.argv.some((arg) => arg.includes("ts-node-dev") || arg.includes("ts-node"));
-    
+
     // Only check for local connection strings if we're definitely not in AWS
     // and if they look like local database URLs (containing localhost or 127.0.0.1)
     const membershipConn = process.env.MEMBERSHIP_CONNECTION_STRING || "";
     const contentConn = process.env.CONTENT_CONNECTION_STRING || "";
-    const hasLocalDbConnections = (membershipConn.includes("localhost") || membershipConn.includes("127.0.0.1")) ||
-                                   (contentConn.includes("localhost") || contentConn.includes("127.0.0.1"));
-    
+    const hasLocalDbConnections = membershipConn.includes("localhost") || membershipConn.includes("127.0.0.1") || contentConn.includes("localhost") || contentConn.includes("127.0.0.1");
+
     return isServerlessOffline || hasNodeEnv || hasDevScript || hasLocalDbConnections;
   }
 
@@ -219,7 +218,12 @@ export class ParameterStoreHelper {
       // For local development, try to load from .env using a different pattern
       if (isLocalDev) {
         // Try alternative .env naming patterns
-        const altEnvVarNames = [`${moduleName.toUpperCase()}_CONNECTION_STRING`, `${moduleName.toUpperCase()}_DB_CONNECTION_STRING`, `${moduleName.toUpperCase()}_DATABASE_URL`, `DB_${moduleName.toUpperCase()}_CONNECTION_STRING`];
+        const altEnvVarNames = [
+          `${moduleName.toUpperCase()}_CONNECTION_STRING`,
+          `${moduleName.toUpperCase()}_DB_CONNECTION_STRING`,
+          `${moduleName.toUpperCase()}_DATABASE_URL`,
+          `DB_${moduleName.toUpperCase()}_CONNECTION_STRING`
+        ];
 
         for (const altEnvVar of altEnvVarNames) {
           const altConnectionString = process.env[altEnvVar];

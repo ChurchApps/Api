@@ -45,7 +45,10 @@ export class VisitController extends AttendanceBaseController {
 
         const lastDate = await this.repositories.visit.loadLastLoggedDate(au.churchId, serviceId, peopleIds);
 
-        const visits: Visit[] = peopleIds.length === 0 ? [] : this.repositories.visit.convertAllToModel(au.churchId, (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds)) as any);
+        const visits: Visit[] =
+          peopleIds.length === 0
+            ? []
+            : this.repositories.visit.convertAllToModel(au.churchId, (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, lastDate, peopleIds)) as any);
 
         const visitIds: string[] = [];
         if (visits.length > 0) {
@@ -115,10 +118,16 @@ export class VisitController extends AttendanceBaseController {
         });
 
         const existingVisitIds: string[] = [];
-        const existingVisits: Visit[] = peopleIds.length === 0 ? [] : this.repositories.visit.convertAllToModel(au.churchId, (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any);
+        const existingVisits: Visit[] =
+          peopleIds.length === 0
+            ? []
+            : this.repositories.visit.convertAllToModel(au.churchId, (await this.repositories.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any);
         if (existingVisits.length > 0) {
           existingVisits.forEach((v) => existingVisitIds.push(v.id));
-          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(au.churchId, (await this.repositories.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any);
+          const visitSessions: VisitSession[] = this.repositories.visitSession.convertAllToModel(
+            au.churchId,
+            (await this.repositories.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any
+          );
           this.populateDeleteIds(existingVisits, submittedVisits, visitSessions, deleteVisitIds, deleteVisitSessionIds);
         }
 

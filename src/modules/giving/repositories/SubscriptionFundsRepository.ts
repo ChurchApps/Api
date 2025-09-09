@@ -46,14 +46,20 @@ export class SubscriptionFundsRepository {
   }
 
   public loadBySubscriptionId(churchId: string, subscriptionId: string) {
-    const sql = "SELECT subscriptionFunds.*, funds.name FROM subscriptionFunds" + " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" + " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
+    const sql =
+      "SELECT subscriptionFunds.*, funds.name FROM subscriptionFunds" +
+      " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" +
+      " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
     return DB.query(sql, [churchId, subscriptionId]);
   }
 
   // If the fund gets deleted for a recurring donation, the donations will go to '(General Fund)'
   public async loadForSubscriptionLog(churchId: string, subscriptionId: string) {
     let result;
-    const sql = "SELECT subscriptionFunds.*, funds.name, funds.removed FROM subscriptionFunds" + " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" + " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
+    const sql =
+      "SELECT subscriptionFunds.*, funds.name, funds.removed FROM subscriptionFunds" +
+      " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" +
+      " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
     const subscriptionFund = await DB.query(sql, [churchId, subscriptionId]);
     if (subscriptionFund && subscriptionFund[0].removed === false) {
       const { removed: _removed, ...sf } = (subscriptionFund as any)[0];

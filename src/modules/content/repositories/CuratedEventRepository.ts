@@ -51,7 +51,14 @@ export class CuratedEventRepository {
 
   public loadForEvents(curatedCalendarId: string, churchId: string) {
     const sql =
-      "SELECT * " + " FROM curatedEvents ce" + " INNER JOIN events e ON " + " (CASE" + " WHEN ce.eventId IS NULL THEN e.groupId=ce.groupId" + " ELSE e.id=ce.eventId" + " END)" + " where curatedCalendarId=? AND ce.churchId=? and e.visibility='public';";
+      "SELECT * " +
+      " FROM curatedEvents ce" +
+      " INNER JOIN events e ON " +
+      " (CASE" +
+      " WHEN ce.eventId IS NULL THEN e.groupId=ce.groupId" +
+      " ELSE e.id=ce.eventId" +
+      " END)" +
+      " where curatedCalendarId=? AND ce.churchId=? and e.visibility='public';";
     return TypedDB.query(sql, [curatedCalendarId, churchId]);
   }
 }

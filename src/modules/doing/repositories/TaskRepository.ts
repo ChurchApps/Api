@@ -114,7 +114,12 @@ export class TaskRepository {
   }
 
   private async loadByAutomationIdContentNoRepeat(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) order by taskNumber;", [churchId, automationId, associatedWithType, associatedWithIds]);
+    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) order by taskNumber;", [
+      churchId,
+      automationId,
+      associatedWithType,
+      associatedWithIds
+    ]);
     return result;
   }
 
@@ -150,12 +155,21 @@ export class TaskRepository {
   }
 
   public loadForPerson(churchId: string, personId: string, status: string) {
-    return DB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='person' AND assignedToId=?) OR (createdByType='person' AND createdById=?)) and status=? order by taskNumber;", [churchId, personId, personId, status]);
+    return DB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='person' AND assignedToId=?) OR (createdByType='person' AND createdById=?)) and status=? order by taskNumber;", [
+      churchId,
+      personId,
+      personId,
+      status
+    ]);
   }
 
   public async loadForGroups(churchId: string, groupIds: string[], status: string) {
     if (groupIds.length === 0) return [];
-    else return DB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;", [churchId, groupIds, groupIds, status]);
+    else
+      return DB.query(
+        "SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;",
+        [churchId, groupIds, groupIds, status]
+      );
   }
 
   public async loadForDirectoryUpdate(churchId: string, personId: string) {

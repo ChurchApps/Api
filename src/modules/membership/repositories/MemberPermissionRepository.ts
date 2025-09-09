@@ -12,14 +12,30 @@ export class MemberPermissionRepository {
   private async create(memberPermission: MemberPermission) {
     memberPermission.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO memberPermissions (id, churchId, memberId, contentType, contentId, action, emailNotification) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [memberPermission.id, memberPermission.churchId, memberPermission.memberId, memberPermission.contentType, memberPermission.contentId, memberPermission.action, memberPermission.emailNotification];
+    const params = [
+      memberPermission.id,
+      memberPermission.churchId,
+      memberPermission.memberId,
+      memberPermission.contentType,
+      memberPermission.contentId,
+      memberPermission.action,
+      memberPermission.emailNotification
+    ];
     await DB.query(sql, params);
     return memberPermission;
   }
 
   private async update(memberPermission: MemberPermission) {
     const sql = "UPDATE memberPermissions SET memberId=?, contentType=?, contentId=?, action=?, emailNotification=? WHERE id=? and churchId=?";
-    const params = [memberPermission.memberId, memberPermission.contentType, memberPermission.contentId, memberPermission.action, memberPermission.emailNotification, memberPermission.id, memberPermission.churchId];
+    const params = [
+      memberPermission.memberId,
+      memberPermission.contentType,
+      memberPermission.contentId,
+      memberPermission.action,
+      memberPermission.emailNotification,
+      memberPermission.id,
+      memberPermission.churchId
+    ];
     await DB.query(sql, params);
     return memberPermission;
   }
@@ -49,12 +65,22 @@ export class MemberPermissionRepository {
   }
 
   public loadFormsByPerson(churchId: string, personId: string) {
-    const sql = "SELECT mp.*, p.displayName as personName" + " FROM memberPermissions mp" + " INNER JOIN `people` p on p.id=mp.memberId" + " WHERE mp.churchId=? AND mp.memberId=?" + " ORDER BY mp.action, mp.emailNotification desc;";
+    const sql =
+      "SELECT mp.*, p.displayName as personName" +
+      " FROM memberPermissions mp" +
+      " INNER JOIN `people` p on p.id=mp.memberId" +
+      " WHERE mp.churchId=? AND mp.memberId=?" +
+      " ORDER BY mp.action, mp.emailNotification desc;";
     return DB.query(sql, [churchId, personId]);
   }
 
   public loadPeopleByForm(churchId: string, formId: string) {
-    const sql = "SELECT mp.*, p.displayName as personName" + " FROM memberPermissions mp" + " INNER JOIN `people` p on p.id=mp.memberId" + " WHERE mp.churchId=? AND mp.contentId=?" + " ORDER BY mp.action, mp.emailNotification desc;";
+    const sql =
+      "SELECT mp.*, p.displayName as personName" +
+      " FROM memberPermissions mp" +
+      " INNER JOIN `people` p on p.id=mp.memberId" +
+      " WHERE mp.churchId=? AND mp.contentId=?" +
+      " ORDER BY mp.action, mp.emailNotification desc;";
     return DB.query(sql, [churchId, formId]);
   }
 

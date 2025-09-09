@@ -280,7 +280,9 @@ export class NotificationHelper {
           <h4>${match[1]}</h4>
           ${
             notifications[0].link
-              ? "<a href='" + notifications[0].link + "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
+              ? "<a href='" +
+                notifications[0].link +
+                "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
               : ""
           }
           <p>Please log in and confirm</p>

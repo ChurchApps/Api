@@ -7,7 +7,12 @@ import { NotificationHelper } from "../helpers/NotificationHelper";
 @controller("/messaging/notifications")
 export class NotificationController extends MessagingBaseController {
   @httpGet("/:churchId/person/:personId")
-  public async loadByPerson(@requestParam("churchId") churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification[]> {
+  public async loadByPerson(
+    @requestParam("churchId") churchId: string,
+    @requestParam("personId") personId: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<Notification[]> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.notification.loadByPersonId(au.churchId, personId);
       return this.repositories.notification.convertAllToModel(data as any[]);

@@ -3,6 +3,7 @@ import express from "express";
 import Stripe from "stripe";
 import { GivingBaseController } from "./GivingBaseController";
 import { StripeHelper } from "../../../shared/helpers/StripeHelper";
+import { PayPalHelper } from "../../../shared/helpers/PayPalHelper";
 import { EncryptionHelper, EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, PaymentDetails, Subscription, SubscriptionFund } from "../models";
 import { Environment } from "../../../shared/helpers/Environment";
@@ -30,19 +31,41 @@ export class DonateController extends GivingBaseController {
       const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
       if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
 
-      const secretKey = EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
-      if (secretKey === "") return this.json({ error: "Invalid gateway configuration" }, 401);
-
-      const sig = req.headers["stripe-signature"]?.toString();
-      if (!sig) return this.json({ error: "Missing stripe signature" }, 400);
-      const webhookKey = EncryptionHelper.decrypt((gateways as any[])[0].webhookKey);
-      const stripeEvent: Stripe.Event = await StripeHelper.verifySignature(secretKey, req, sig, webhookKey);
-      const eventData = stripeEvent.data.object as any; // https://github.com/stripe/stripe-node/issues/758
-      const subscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
-      if (stripeEvent.type === "charge.succeeded" && subscriptionEvent) return this.json({}, 200); // Ignore charge.succeeded from subscription events in place of invoice.paid for access to subscription id
-      const existingEvent = await this.repositories.eventLog.load(churchId, stripeEvent.id);
-      if (!existingEvent) await StripeHelper.logEvent(churchId, stripeEvent, eventData, this.repositories);
-      if (!existingEvent && (stripeEvent.type === "charge.succeeded" || stripeEvent.type === "invoice.paid")) await StripeHelper.logDonation(secretKey, churchId, eventData, this.repositories);
+      const provider = req.params.provider?.toLowerCase();
+      if (provider === "stripe") {
+        const secretKey = EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
+        if (secretKey === "") return this.json({ error: "Invalid gateway configuration" }, 401);
+        const sig = req.headers["stripe-signature"]?.toString();
+        if (!sig) return this.json({ error: "Missing stripe signature" }, 400);
+        const webhookKey = EncryptionHelper.decrypt((gateways as any[])[0].webhookKey);
+        const stripeEvent: Stripe.Event = await StripeHelper.verifySignature(secretKey, req, sig, webhookKey);
+        const eventData = stripeEvent.data.object as any;
+        const subscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
+        if (stripeEvent.type === "charge.succeeded" && subscriptionEvent) return this.json({}, 200);
+        const existingEvent = await this.repositories.eventLog.load(churchId, stripeEvent.id);
+        if (!existingEvent) await StripeHelper.logEvent(churchId, stripeEvent, eventData, this.repositories);
+        if (!existingEvent && (stripeEvent.type === "charge.succeeded" || stripeEvent.type === "invoice.paid")) {
+          await StripeHelper.logDonation(secretKey, churchId, eventData, this.repositories);
+        }
+      } else if (provider === "paypal") {
+        const gateway = (gateways as any[])[0];
+        const clientId = gateway.publicKey;
+        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
+        const webhookId = EncryptionHelper.decrypt(gateway.webhookKey);
+        await PayPalHelper.verifySignature(clientId, clientSecret, webhookId, req.headers, req.body);
+        const payPalEvent = req.body as any;
+        const eventData = payPalEvent.resource;
+        const existingEvent = await this.repositories.eventLog.load(churchId, payPalEvent.id);
+        if (!existingEvent) await PayPalHelper.logEvent(churchId, payPalEvent, eventData, this.repositories);
+        if (!existingEvent && payPalEvent.event_type === "PAYMENT.CAPTURE.COMPLETED") {
+          await PayPalHelper.logDonation(clientId, clientSecret, churchId, eventData, this.repositories);
+        }
+        if (!existingEvent && payPalEvent.event_type === "BILLING.SUBSCRIPTION.CANCELLED") {
+          await this.repositories.subscription.delete(churchId, eventData.id);
+        }
+      } else {
+        return this.json({ error: "Unsupported provider" }, 400);
+      }
       return this.json({}, 200);
     });
   }
@@ -52,9 +75,20 @@ export class DonateController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const donationData = req.body;
       const churchId = au.churchId || donationData.churchId;
+      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+      const gateway = gateways[0];
+      if (donationData.provider === "paypal") {
+        const clientId = gateway.publicKey;
+        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
+        const capture = await PayPalHelper.captureOrder(clientId, clientSecret, donationData.id);
+        const eventData = capture.purchase_units?.[0]?.payments?.captures?.[0] || capture;
+        await PayPalHelper.logEvent(churchId, capture, eventData, this.repositories);
+        await PayPalHelper.logDonation(clientId, clientSecret, churchId, eventData, this.repositories);
+        await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
+        return eventData;
+      }
       const secretKey = await this.loadPrivateKey(churchId);
       if (secretKey === "") return this.json({}, 401);
-
       const fundDonations: FundDonation[] = donationData.funds;
       const paymentData: PaymentDetails = {
         amount: donationData.amount,
@@ -79,9 +113,30 @@ export class DonateController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID } = req.body;
       const churchId = au.churchId || CHURCH_ID;
+      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+      const gateway = gateways[0];
+      if (req.body.provider === "paypal") {
+        const clientId = gateway.publicKey;
+        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
+        const payPalSub = await PayPalHelper.getSubscriptionDetails(clientId, clientSecret, id);
+        const subscription: Subscription = { id: payPalSub.id, churchId, personId: person.id, customerId };
+        await this.repositories.subscription.save(subscription);
+        const promises: Promise<SubscriptionFund>[] = [];
+        funds.forEach((fund: FundDonation) => {
+          const subscriptionFund: SubscriptionFund = {
+            churchId,
+            subscriptionId: subscription.id,
+            fundId: fund.id,
+            amount: fund.amount
+          };
+          promises.push(this.repositories.subscriptionFunds.save(subscriptionFund));
+        });
+        await Promise.all(promises);
+        await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
+        return payPalSub;
+      }
       const secretKey = await this.loadPrivateKey(churchId);
       if (secretKey === "") return this.json({}, 401);
-
       const paymentData: PaymentDetails = {
         payment_method_id: id,
         amount,
@@ -93,13 +148,10 @@ export class DonateController extends GivingBaseController {
         interval,
         metadata: { notes }
       };
-      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
-      paymentData.productId = (gateways as any[])[0].productId;
-
+      paymentData.productId = gateway.productId;
       const stripeSubscription = await StripeHelper.createSubscription(secretKey, paymentData);
       const subscription: Subscription = { id: stripeSubscription.id, churchId, personId: person.id, customerId };
       await this.repositories.subscription.save(subscription);
-
       const promises: Promise<SubscriptionFund>[] = [];
       funds.forEach((fund: FundDonation) => {
         const subscriptionFund: SubscriptionFund = {

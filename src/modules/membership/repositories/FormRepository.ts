@@ -13,7 +13,8 @@ export class FormRepository {
     form.id = UniqueIdHelper.shortId();
     const startDate = form.accessStartTime ? DateHelper.toMysqlDate(form.accessStartTime) : null;
     const endDate = form.accessEndTime ? DateHelper.toMysqlDate(form.accessEndTime) : null;
-    const sql = "INSERT INTO forms (id, churchId, name, contentType, createdTime, modifiedTime, accessStartTime, accessEndTime, restricted, archived, removed, thankYouMessage) VALUES (?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, 0, 0, ?);";
+    const sql =
+      "INSERT INTO forms (id, churchId, name, contentType, createdTime, modifiedTime, accessStartTime, accessEndTime, restricted, archived, removed, thankYouMessage) VALUES (?, ?, ?, ?, NOW(), NOW(), ?, ?, ?, 0, 0, ?);";
     const params = [form.id, form.churchId, form.name, form.contentType, startDate, endDate, form.restricted, form.thankYouMessage];
     await DB.query(sql, params);
     return form;
@@ -59,15 +60,24 @@ export class FormRepository {
   }
 
   public loadMemberForms(churchId: string, personId: string) {
-    return DB.query("SELECT f.* , mp.action FROM forms f  " + "LEFT JOIN memberPermissions mp " + "ON mp.contentId = f.id " + "WHERE mp.memberId=? AND f.churchId=? AND f.removed=0 AND f.archived=0", [personId, churchId]);
+    return DB.query("SELECT f.* , mp.action FROM forms f  " + "LEFT JOIN memberPermissions mp " + "ON mp.contentId = f.id " + "WHERE mp.memberId=? AND f.churchId=? AND f.removed=0 AND f.archived=0", [
+      personId,
+      churchId
+    ]);
   }
 
   public loadMemberArchivedForms(churchId: string, personId: string) {
-    return DB.query("SELECT f.* FROM forms f  " + "LEFT JOIN memberPermissions mp " + "ON mp.contentId = f.id " + "WHERE mp.memberId=? AND f.churchId=? AND f.removed=0 AND f.archived=1", [personId, churchId]);
+    return DB.query("SELECT f.* FROM forms f  " + "LEFT JOIN memberPermissions mp " + "ON mp.contentId = f.id " + "WHERE mp.memberId=? AND f.churchId=? AND f.removed=0 AND f.archived=1", [
+      personId,
+      churchId
+    ]);
   }
 
   public loadWithMemberPermissions(churchId: string, formId: string, personId: string) {
-    return DB.queryOne("SELECT f.*, mp.action FROM forms f " + "LEFT JOIN memberPermissions mp " + "ON mp.contentId = f.id " + "WHERE f.id=? AND f.churchId=? AND mp.memberId=? AND f.removed=0 AND archived=0", [formId, churchId, personId]);
+    return DB.queryOne(
+      "SELECT f.*, mp.action FROM forms f " + "LEFT JOIN memberPermissions mp " + "ON mp.contentId = f.id " + "WHERE f.id=? AND f.churchId=? AND mp.memberId=? AND f.removed=0 AND archived=0",
+      [formId, churchId, personId]
+    );
   }
 
   public access(id: string) {

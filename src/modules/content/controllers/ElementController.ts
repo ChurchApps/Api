@@ -8,7 +8,6 @@ import { TreeHelper } from "../helpers/TreeHelper";
 
 @controller("/content/elements")
 export class ElementController extends ContentBaseController {
-
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

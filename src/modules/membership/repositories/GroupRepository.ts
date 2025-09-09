@@ -12,14 +12,31 @@ export class GroupRepository {
 
   private async create(group: Group) {
     group.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO `groups` (id, churchId, categoryName, name, trackAttendance, parentPickup, printNameTag, about, photoUrl, tags, meetingTime, meetingLocation, labels, slug, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);";
-    const params = [group.id, group.churchId, group.categoryName, group.name, group.trackAttendance, group.parentPickup, group.printNametag, group.about, group.photoUrl, group.tags, group.meetingTime, group.meetingLocation, group.labels, group.slug];
+    const sql =
+      "INSERT INTO `groups` (id, churchId, categoryName, name, trackAttendance, parentPickup, printNameTag, about, photoUrl, tags, meetingTime, meetingLocation, labels, slug, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);";
+    const params = [
+      group.id,
+      group.churchId,
+      group.categoryName,
+      group.name,
+      group.trackAttendance,
+      group.parentPickup,
+      group.printNametag,
+      group.about,
+      group.photoUrl,
+      group.tags,
+      group.meetingTime,
+      group.meetingLocation,
+      group.labels,
+      group.slug
+    ];
     await DB.query(sql, params);
     return group;
   }
 
   private async update(group: Group) {
-    const sql = "UPDATE `groups` SET churchId=?, categoryName=?, name=?, trackAttendance=?, parentPickup=?, printNametag=?, about=?, photoUrl=?, tags=?, meetingTime=?, meetingLocation=?, labels=?, slug=? WHERE id=? and churchId=?";
+    const sql =
+      "UPDATE `groups` SET churchId=?, categoryName=?, name=?, trackAttendance=?, parentPickup=?, printNametag=?, about=?, photoUrl=?, tags=?, meetingTime=?, meetingLocation=?, labels=?, slug=? WHERE id=? and churchId=?";
     const params = [
       group.churchId,
       group.categoryName,
@@ -59,7 +76,10 @@ export class GroupRepository {
   }
 
   public loadByTag(churchId: string, tag: string) {
-    return DB.query("SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM `groups` g WHERE churchId=? AND removed=0 AND tags like ? ORDER by categoryName, name;", [churchId, "%" + tag + "%"]);
+    return DB.query(
+      "SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM `groups` g WHERE churchId=? AND removed=0 AND tags like ? ORDER by categoryName, name;",
+      [churchId, "%" + tag + "%"]
+    );
   }
 
   public loadAll(churchId: string) {

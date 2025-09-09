@@ -12,7 +12,8 @@ export class SectionRepository {
   public async create(section: Section) {
     if (!section.id) section.id = UniqueIdHelper.shortId();
 
-    const sql = "INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const sql =
+      "INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
       section.id,
       section.churchId,
@@ -34,7 +35,8 @@ export class SectionRepository {
   }
 
   private async update(section: Section) {
-    const sql = "UPDATE sections SET pageId=?, blockId=?, zone=?, background=?, textColor=?, headingColor=?, linkColor=?, sort=?, targetBlockId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
+    const sql =
+      "UPDATE sections SET pageId=?, blockId=?, zone=?, background=?, textColor=?, headingColor=?, linkColor=?, sort=?, targetBlockId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
     const params = [
       section.pageId,
       section.blockId,

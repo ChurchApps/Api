@@ -42,7 +42,12 @@ export class BibleVerseTextRepository {
   }
 
   private loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number) {
-    return TypedDB.query("SELECT * FROM bibleVerseTexts WHERE translationKey=? and bookKey=? AND chapterNumber BETWEEN ? AND ? order by chapterNumber, verseNumber;", [translationKey, bookKey, startChapter, endChapter]);
+    return TypedDB.query("SELECT * FROM bibleVerseTexts WHERE translationKey=? and bookKey=? AND chapterNumber BETWEEN ? AND ? order by chapterNumber, verseNumber;", [
+      translationKey,
+      bookKey,
+      startChapter,
+      endChapter
+    ]);
   }
 
   private filterResults(data: BibleVerseText[], startChapter: number, startVerse: number, endChapter: number, endVerse: number) {

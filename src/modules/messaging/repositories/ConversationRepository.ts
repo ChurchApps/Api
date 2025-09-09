@@ -52,14 +52,27 @@ export class ConversationRepository {
   }
 
   public loadHostConversation(churchId: string, mainConversationId: string) {
-    const sql = "select c2.*" + " FROM conversations c" + " INNER JOIN conversations c2 on c2.churchId=c.churchId and c2.contentType='streamingLiveHost' and c2.contentId=c.contentId" + " WHERE c.id=? AND c.churchId=? LIMIT 1;";
+    const sql =
+      "select c2.*" +
+      " FROM conversations c" +
+      " INNER JOIN conversations c2 on c2.churchId=c.churchId and c2.contentType='streamingLiveHost' and c2.contentId=c.contentId" +
+      " WHERE c.id=? AND c.churchId=? LIMIT 1;";
     return DB.queryOne(sql, [mainConversationId, churchId]);
   }
 
   private async create(conversation: Conversation) {
     conversation.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO conversations (id, churchId, contentType, contentId, title, dateCreated, groupId, visibility, postCount, allowAnonymousPosts) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, 0, ?);";
-    const params = [conversation.id, conversation.churchId, conversation.contentType, conversation.contentId, conversation.title, conversation.groupId, conversation.visibility, conversation.allowAnonymousPosts];
+    const params = [
+      conversation.id,
+      conversation.churchId,
+      conversation.contentType,
+      conversation.contentId,
+      conversation.title,
+      conversation.groupId,
+      conversation.visibility,
+      conversation.allowAnonymousPosts
+    ];
     await DB.query(sql, params);
     return conversation;
   }

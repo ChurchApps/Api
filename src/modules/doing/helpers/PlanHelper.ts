@@ -8,7 +8,14 @@ interface NeededPosition {
 }
 
 export class PlanHelper {
-  static async autofill(positions: Position[], assignments: Assignment[], blockoutDates: BlockoutDate[], teams: { positionId: string; personIds: string[] }[], lastServed: { personId: string; serviceDate: Date }[], repositories?: Repositories) {
+  static async autofill(
+    positions: Position[],
+    assignments: Assignment[],
+    blockoutDates: BlockoutDate[],
+    teams: { positionId: string; personIds: string[] }[],
+    lastServed: { personId: string; serviceDate: Date }[],
+    repositories?: Repositories
+  ) {
     const repos = repositories || Repositories.getCurrent();
     const unavailablePeople = blockoutDates.map((b) => b.personId) || [];
     assignments.forEach((a) => {

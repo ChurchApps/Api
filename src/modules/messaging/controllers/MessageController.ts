@@ -8,7 +8,12 @@ import { NotificationHelper } from "../helpers/NotificationHelper";
 @controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {
   @httpGet("/:churchId/:conversationId")
-  public async loadForConversation(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message[]> {
+  public async loadForConversation(
+    @requestParam("churchId") churchId: string,
+    @requestParam("conversationId") conversationId: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repositories.message.loadForConversation(churchId, conversationId);
       return this.repositories.message.convertAllToModel(data as any[]);
@@ -43,7 +48,7 @@ export class MessageController extends MessagingBaseController {
             })) as any;
 
             // Handle notifications
-            await NotificationHelper.checkShouldNotify(conv, savedMessage, message.personId || "anonymous");
+            await NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous");
 
             return savedMessage;
           })

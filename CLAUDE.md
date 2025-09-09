@@ -231,7 +231,7 @@ PayPal gateways are configured in the `Gateway` table with these fields:
 
 1. Create a PayPal Developer account at https://developer.paypal.com
 2. Create a new application to get Client ID and Client Secret
-3. Set up webhooks for the following events:
+3. Webhooks for PayPal events are auto-configured when saving the PayPal gateway via the API. The system creates webhooks for:
    - `PAYMENT.CAPTURE.COMPLETED`
    - `BILLING.SUBSCRIPTION.ACTIVATED`
    - `BILLING.SUBSCRIPTION.CANCELLED`

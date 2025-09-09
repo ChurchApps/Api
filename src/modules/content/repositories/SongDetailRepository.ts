@@ -19,7 +19,8 @@ export class SongDetailRepository {
 
   private async create(songDetail: SongDetail) {
     songDetail.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO songDetails (id, praiseChartsId, title, artist, album, language, thumbnail, releaseDate, bpm, keySignature, seconds, meter, tones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const sql =
+      "INSERT INTO songDetails (id, praiseChartsId, title, artist, album, language, thumbnail, releaseDate, bpm, keySignature, seconds, meter, tones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
       songDetail.id,
       songDetail.praiseChartsId,
@@ -78,7 +79,13 @@ export class SongDetailRepository {
   }
 
   public loadForChurch(churchId: string) {
-    const sql = "SELECT sd.*, s.Id as songId, s.churchId" + " FROM songs s" + " INNER JOIN arrangements a on a.songId=s.id" + " INNER JOIN songDetails sd on sd.id=a.songDetailId" + " WHERE s.churchId=?" + " ORDER BY sd.title, sd.artist;";
+    const sql =
+      "SELECT sd.*, s.Id as songId, s.churchId" +
+      " FROM songs s" +
+      " INNER JOIN arrangements a on a.songId=s.id" +
+      " INNER JOIN songDetails sd on sd.id=a.songDetailId" +
+      " WHERE s.churchId=?" +
+      " ORDER BY sd.title, sd.artist;";
     return TypedDB.query(sql, [churchId]);
   }
 }

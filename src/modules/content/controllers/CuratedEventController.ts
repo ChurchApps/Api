@@ -17,7 +17,12 @@ export class CuratedEventController extends ContentBaseController {
   }
 
   @httpGet("/public/calendar/:churchId/:curatedCalendarId")
-  public async getPublicForCuratedCalendar(@requestParam("churchId") churchId: string, @requestParam("curatedCalendarId") curatedCalendarId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicForCuratedCalendar(
+    @requestParam("churchId") churchId: string,
+    @requestParam("curatedCalendarId") curatedCalendarId: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repositories.curatedEvent.loadForEvents(curatedCalendarId, churchId);
     });
@@ -81,7 +86,12 @@ export class CuratedEventController extends ContentBaseController {
   }
 
   @httpDelete("/calendar/:curatedCalendarId/event/:eventId")
-  public async deleteByEventId(@requestParam("curatedCalendarId") curatedCalendarId: string, @requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteByEventId(
+    @requestParam("curatedCalendarId") curatedCalendarId: string,
+    @requestParam("eventId") eventId: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -92,7 +102,12 @@ export class CuratedEventController extends ContentBaseController {
   }
 
   @httpDelete("/calendar/:curatedCalendarId/group/:groupId")
-  public async deleteByGroupId(@requestParam("curatedCalendarId") curatedCalendarId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteByGroupId(
+    @requestParam("curatedCalendarId") curatedCalendarId: string,
+    @requestParam("groupId") groupId: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

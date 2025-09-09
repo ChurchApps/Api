@@ -41,7 +41,12 @@ export class AutomationHelper {
     }
   }
 
-  public static async createTasks(automation: Automation, people: { id: string; displayName: string }[], details: { assignedToType?: string; assignedToId?: string; assignedToLabel?: string; title?: string }, repositories?: Repositories) {
+  public static async createTasks(
+    automation: Automation,
+    people: { id: string; displayName: string }[],
+    details: { assignedToType?: string; assignedToId?: string; assignedToLabel?: string; title?: string },
+    repositories?: Repositories
+  ) {
     const repos = repositories || Repositories.getCurrent();
     const result: Task[] = [];
     for (const p of people) {

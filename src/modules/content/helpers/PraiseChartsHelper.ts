@@ -15,7 +15,15 @@ export class PraiseChartsHelper {
   static getOAuth(returnUrl?: string) {
     const requestTokenUrl = "https://api.praisecharts.com/oauth/request_token";
     const accessTokenUrl = "https://api.praisecharts.com/oauth/access_token";
-    const oauth = new OAuth.OAuth(requestTokenUrl, accessTokenUrl, Environment.praiseChartsConsumerKey, Environment.praiseChartsConsumerSecret, "1.0A", returnUrl || "https://churchapps.org/", "HMAC-SHA1");
+    const oauth = new OAuth.OAuth(
+      requestTokenUrl,
+      accessTokenUrl,
+      Environment.praiseChartsConsumerKey,
+      Environment.praiseChartsConsumerSecret,
+      "1.0A",
+      returnUrl || "https://churchapps.org/",
+      "HMAC-SHA1"
+    );
     return oauth;
   }
 
@@ -65,7 +73,8 @@ export class PraiseChartsHelper {
   }
 
   static async search(query: string) {
-    const includes = "&arr_includes[]=id" + "&arr_includes[]=details.title" + "&arr_includes[]=details.artists.names" + "&arr_includes[]=details.album.title" + "&arr_includes[]=details.album.images.md.url";
+    const includes =
+      "&arr_includes[]=id" + "&arr_includes[]=details.title" + "&arr_includes[]=details.artists.names" + "&arr_includes[]=details.album.title" + "&arr_includes[]=details.album.images.md.url";
     const url = `https://api.praisecharts.com/v1.0/catalog/search?q=${encodeURIComponent(query)}${includes}`;
     const response = await fetch(url);
     if (response.ok) {

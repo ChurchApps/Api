@@ -50,7 +50,13 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:contentType/:contentId")
-  public async loadByContent(@requestParam("churchId") churchId: string, @requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation[]> {
+  public async loadByContent(
+    @requestParam("churchId") churchId: string,
+    @requestParam("contentType") contentType: string,
+    @requestParam("contentId") contentId: string,
+    req: express.Request<{}, {}, null>,
+    res: express.Response
+  ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
       const data = await this.repositories.conversation.loadForContent(churchId, contentType, contentId);
       return this.repositories.conversation.convertAllToModel(data as any[]);
@@ -133,7 +139,13 @@ export class ConversationController extends MessagingBaseController {
   }
 
   @httpGet("/current/:churchId/:contentType/:contentId")
-  public async current(@requestParam("churchId") churchId: string, @requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<any> {
+  public async current(
+    @requestParam("churchId") churchId: string,
+    @requestParam("contentType") contentType: string,
+    @requestParam("contentId") contentId: string,
+    req: express.Request<{}, {}, {}>,
+    res: express.Response
+  ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.getOrCreate(churchId, contentType, contentId, "public", true);
     }) as any;
