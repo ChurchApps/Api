@@ -14,7 +14,7 @@ custom:
         - sg-052314a1eec2f2567
       subnetIds:
         - subnet-01a6b61d749d10c46
-    current: ${self:custom.vpcSettings.${self:custom.env}, self:custom.vpcSettings.prod}
+    current: ${self:custom.vpcSettings.${self:custom.env}, ''}
   # Critical database connections loaded from Parameter Store at deploy time
   # These provide faster cold starts by avoiding runtime Parameter Store calls
 
@@ -64,9 +64,9 @@ functions:
     handler: lambda.web
     layers:
       - { Ref: DependenciesLambdaLayer }
-    memorySize: 1024
+    memorySize: 512
     timeout: 30
-    vpc: ${self:custom.vpcSettings.current}
+    vpc: ${self:custom.vpcSettings.current, ''}
     environment:
       # Database connections loaded at runtime from Parameter Store
     events:
@@ -89,7 +89,7 @@ functions:
       - { Ref: DependenciesLambdaLayer }
     memorySize: 1024
     timeout: 30
-    vpc: ${self:custom.vpcSettings.current}
+    vpc: ${self:custom.vpcSettings.current, ''}
     environment:
       # Database connections for WebSocket functionality
       MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.env}/membershipApi/connectionString, ''}
@@ -108,7 +108,7 @@ functions:
       - { Ref: DependenciesLambdaLayer }
     memorySize: 256
     timeout: 300
-    vpc: ${self:custom.vpcSettings.current}
+    vpc: ${self:custom.vpcSettings.current, ''}
     environment:
       # Database connections for messaging notifications
       MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.env}/membershipApi/connectionString, ''}
@@ -124,7 +124,7 @@ functions:
       - { Ref: DependenciesLambdaLayer }
     memorySize: 256
     timeout: 300
-    vpc: ${self:custom.vpcSettings.current}
+    vpc: ${self:custom.vpcSettings.current, ''}
     environment:
       # Database connections for daily digest notifications
       MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.env}/membershipApi/connectionString, ''}
