@@ -3,6 +3,7 @@ import { EncryptionHelper } from "@churchapps/apihelper";
 
 export class GatewayService {
   static getGatewayConfig(gateway: any): GatewayConfig {
+    console.log("Config.privateKey", gateway.privateKey);
     return {
       publicKey: gateway.publicKey,
       privateKey: EncryptionHelper.decrypt(gateway.privateKey),
@@ -23,7 +24,9 @@ export class GatewayService {
 
   static async deleteWebhooks(gateway: any, churchId: string): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
+    console.log("Provider", provider);
     const config = this.getGatewayConfig(gateway);
+    console.log("Config", config);
     await provider.deleteWebhooksByChurchId(config, churchId);
   }
 

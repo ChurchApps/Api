@@ -1,6 +1,7 @@
 import paypal from "@paypal/checkout-server-sdk";
 import express from "express";
 import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models";
+import { Environment } from "./Environment";
 
 export class PayPalHelper {
   private static getClient(clientId: string, clientSecret: string): paypal.core.PayPalHttpClient {
@@ -9,7 +10,7 @@ export class PayPalHelper {
   }
 
   private static getBaseUrl(): string {
-    return process.env.NODE_ENV === "production" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+    return Environment.apiEnv === "production" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
   }
 
   private static async getAccessToken(clientId: string, clientSecret: string): Promise<string> {
@@ -56,10 +57,20 @@ export class PayPalHelper {
   }
 
   static async deleteWebhooksByChurchId(clientId: string, clientSecret: string, churchId: string): Promise<void> {
+    console.log("ClientId", clientId);
+    console.log("ClientSecret", clientSecret);
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
     // Get list of webhooks using REST API
-    const listResponse = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks`, {
+    console.log("Getting list", `${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks?anchor_type=APPLICATION`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    const listResponse = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks?anchor_type=APPLICATION`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,

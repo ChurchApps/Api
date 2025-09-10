@@ -49,31 +49,42 @@ export class GatewayController extends GivingBaseController {
         const promises: Promise<Gateway>[] = [];
         await Promise.all(
           req.body.map(async (gateway) => {
+            // Encrypt the private key immediately so it's always encrypted when passed to GatewayService
+            const encryptedGateway = {
+              ...gateway,
+              privateKey: EncryptionHelper.encrypt(gateway.privateKey as string),
+              webhookKey: gateway.webhookKey ? EncryptionHelper.encrypt(gateway.webhookKey as string) : ""
+            };
+
             if (req.hostname !== "localhost") {
               // Delete existing webhooks
-              await GatewayService.deleteWebhooks(gateway, au.churchId);
+              console.log("Before delete");
+              await GatewayService.deleteWebhooks(encryptedGateway, au.churchId);
+              console.log("DELETED WEBHOOKS");
 
               // Create new webhook
               const providerName = gateway.provider.toLowerCase();
+              console.log("PROVIDER NAME", providerName);
               const webHookUrl = req.get("x-forwarded-proto") + "://" + req.hostname + `/donate/webhook/${providerName}?churchId=` + au.churchId;
-              const webhook = await GatewayService.createWebhook(gateway, webHookUrl);
+              console.log("WEBHOOK URL", webHookUrl);
+              const webhook = await GatewayService.createWebhook(encryptedGateway, webHookUrl);
+              console.log("WEBHOOK", webhook);
 
               if (webhook.secret) {
-                gateway.webhookKey = EncryptionHelper.encrypt(webhook.secret);
+                encryptedGateway.webhookKey = EncryptionHelper.encrypt(webhook.secret);
               } else {
-                gateway.webhookKey = EncryptionHelper.encrypt(webhook.id);
+                encryptedGateway.webhookKey = EncryptionHelper.encrypt(webhook.id);
               }
             }
 
             // Create product if the gateway supports it
-            const productId = await GatewayService.createProduct(gateway, au.churchId);
+            const productId = await GatewayService.createProduct(encryptedGateway, au.churchId);
             if (productId) {
-              gateway.productId = productId;
+              encryptedGateway.productId = productId;
             }
 
-            gateway.churchId = au.churchId;
-            gateway.privateKey = EncryptionHelper.encrypt(gateway.privateKey as string);
-            promises.push(this.repositories.gateway.save(gateway));
+            encryptedGateway.churchId = au.churchId;
+            promises.push(this.repositories.gateway.save(encryptedGateway));
           })
         );
         const result = await Promise.all(promises);
