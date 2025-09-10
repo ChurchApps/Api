@@ -17,7 +17,6 @@ export class DonationBatchController extends GivingBaseController {
     });
   }
 
-
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

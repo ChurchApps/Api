@@ -8,46 +8,118 @@ export class PayPalHelper {
     return new paypal.core.PayPalHttpClient(env);
   }
 
-  static async createWebhookEndpoint(clientId: string, clientSecret: string, webHookUrl: string): Promise<{ id: string }> {
-    const client = PayPalHelper.getClient(clientId, clientSecret);
-    const request = new paypal.notifications.WebhookCreateRequest();
-    request.requestBody({
-      url: webHookUrl,
-      event_types: [{ name: "PAYMENT.CAPTURE.COMPLETED" }, { name: "BILLING.SUBSCRIPTION.ACTIVATED" }, { name: "BILLING.SUBSCRIPTION.CANCELLED" }]
+  private static getBaseUrl(): string {
+    return process.env.NODE_ENV === "production" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+  }
+
+  private static async getAccessToken(clientId: string, clientSecret: string): Promise<string> {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/oauth2/token`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: "grant_type=client_credentials"
     });
-    const response = await client.execute(request);
-    return response.result;
+
+    if (!response.ok) {
+      throw new Error(`Failed to get PayPal access token: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  }
+
+  static async createWebhookEndpoint(clientId: string, clientSecret: string, webHookUrl: string): Promise<{ id: string }> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        url: webHookUrl,
+        event_types: [{ name: "PAYMENT.CAPTURE.COMPLETED" }, { name: "BILLING.SUBSCRIPTION.ACTIVATED" }, { name: "BILLING.SUBSCRIPTION.CANCELLED" }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create PayPal webhook: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return { id: result.id };
   }
 
   static async deleteWebhooksByChurchId(clientId: string, clientSecret: string, churchId: string): Promise<void> {
-    const client = PayPalHelper.getClient(clientId, clientSecret);
-    const listReq = new paypal.notifications.WebhookListRequest();
-    const listRes = await client.execute(listReq);
-    const hooks = listRes.result.webhooks || [];
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    // Get list of webhooks using REST API
+    const listResponse = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!listResponse.ok) {
+      throw new Error(`Failed to list webhooks: ${listResponse.status}`);
+    }
+
+    const data = await listResponse.json();
+    const hooks = data.webhooks || [];
+
+    // Delete webhooks that contain the churchId
     await Promise.all(
       hooks.map(async (hook: any) => {
-        if (hook.url.includes(churchId)) {
-          const delReq = new paypal.notifications.WebhookDeleteRequest(hook.id);
-          await client.execute(delReq);
+        if (hook.url && hook.url.includes(churchId)) {
+          const deleteResponse = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks/${hook.id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json"
+            }
+          });
+
+          if (!deleteResponse.ok) {
+            console.error(`Failed to delete webhook ${hook.id}: ${deleteResponse.status}`);
+          }
         }
       })
     );
   }
 
   static async verifySignature(clientId: string, clientSecret: string, webhookId: string, headers: express.Request["headers"], body: any): Promise<any> {
-    const client = PayPalHelper.getClient(clientId, clientSecret);
-    const request = new paypal.notifications.VerifyWebhookSignatureRequest();
-    request.requestBody({
-      auth_algo: headers["paypal-auth-algo"],
-      cert_url: headers["paypal-cert-url"],
-      transmission_id: headers["paypal-transmission-id"],
-      transmission_sig: headers["paypal-transmission-sig"],
-      transmission_time: headers["paypal-transmission-time"],
-      webhook_id: webhookId,
-      webhook_event: body
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/verify-webhook-signature`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        auth_algo: headers["paypal-auth-algo"],
+        cert_url: headers["paypal-cert-url"],
+        transmission_id: headers["paypal-transmission-id"],
+        transmission_sig: headers["paypal-transmission-sig"],
+        transmission_time: headers["paypal-transmission-time"],
+        webhook_id: webhookId,
+        webhook_event: body
+      })
     });
-    const response = await client.execute(request);
-    if (response.result.verification_status !== "SUCCESS") {
+
+    if (!response.ok) {
+      throw new Error(`Failed to verify PayPal webhook signature: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.verification_status !== "SUCCESS") {
       throw new Error("Invalid PayPal webhook signature");
     }
     return body;
