@@ -7,9 +7,88 @@ import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund }
 import { Environment } from "../../../shared/helpers/Environment";
 import Axios from "axios";
 import dayjs from "dayjs";
+import { PayPalHelper } from "../../../shared/helpers/PayPalHelper";
 
 @controller("/giving/donate")
 export class DonateController extends GivingBaseController {
+  @httpPost("/paypal/client-token")
+  public async paypalClientToken(req: express.Request<{}, {}, { churchId?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      try {
+        const churchId = req.body.churchId || au.churchId;
+        if (!churchId) return this.json({ error: "Missing churchId" }, 400);
+        if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
+
+        const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+        if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
+        const gateway = gateways[0];
+        const clientId = gateway.publicKey;
+        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
+
+        try {
+          const clientToken = await PayPalHelper.generateClientToken(clientId, clientSecret);
+          return { clientToken };
+        } catch (e) {
+          console.error("PayPal client token error", e);
+          return this.json({ error: "Failed to generate client token" }, 502);
+        }
+      } catch (e) {
+        console.error(e);
+        return this.json({ error: "Unexpected error" }, 500);
+      }
+    });
+  }
+
+  @httpPost("/paypal/create-order")
+  public async paypalCreateOrder(
+    req: express.Request<{}, {}, { churchId?: string; amount?: number; currency?: string; funds?: any[]; notes?: string; description?: string }>,
+    res: express.Response
+  ): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      try {
+        const churchId = req.body.churchId || au.churchId;
+        const amount = Number(req.body.amount);
+        const currency = (req.body.currency || "USD").toUpperCase();
+        if (!churchId) return this.json({ error: "Missing churchId" }, 400);
+        if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
+        if (!amount || amount <= 0 || !/^[A-Z]{3}$/.test(currency)) return this.json({ error: "Invalid amount or currency" }, 400);
+
+        const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+        if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
+        const gateway = gateways[0];
+        const clientId = gateway.publicKey;
+        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
+
+        const notes = req.body.notes || "";
+        const funds = Array.isArray(req.body.funds) ? req.body.funds : [];
+        // Warning: PayPal custom_id is limited (~127 chars). Keep it compact.
+        let customId = "";
+        try {
+          const minimalFunds = funds.map((f: any) => ({ id: f.id, amount: f.amount }));
+          const encoded = JSON.stringify(minimalFunds);
+          customId = encoded.length <= 120 ? encoded : ""; // avoid exceeding limit
+        } catch {
+          customId = "";
+        }
+
+        try {
+          const order = await PayPalHelper.createOrder(clientId, clientSecret, {
+            amount,
+            currency,
+            description: req.body.description || "Donation",
+            customId: customId || undefined
+          });
+          return { id: order.id, status: order.status };
+        } catch (e) {
+          console.error("PayPal create order error", e);
+          return this.json({ error: "Failed to create order" }, 502);
+        }
+      } catch (e) {
+        console.error(e);
+        return this.json({ error: "Unexpected error" }, 500);
+      }
+    });
+  }
   @httpPost("/log")
   public async log(req: express.Request<{}, {}, { donation: Donation; fundData: { id: string; amount: number } }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

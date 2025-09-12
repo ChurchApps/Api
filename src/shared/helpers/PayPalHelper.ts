@@ -33,6 +33,61 @@ export class PayPalHelper {
     return data.access_token;
   }
 
+  static async generateClientToken(clientId: string, clientSecret: string): Promise<string> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/identity/generate-token`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate PayPal client token: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.client_token;
+  }
+
+  static async createOrder(
+    clientId: string,
+    clientSecret: string,
+    params: { amount: number; currency?: string; description?: string; customId?: string }
+  ): Promise<any> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+    const currency = (params.currency || "USD").toUpperCase();
+    const body = {
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          amount: { currency_code: currency, value: params.amount.toFixed(2) },
+          description: params.description || "Donation",
+          ...(params.customId ? { custom_id: params.customId } : {})
+        }
+      ],
+      application_context: { shipping_preference: "NO_SHIPPING", user_action: "PAY_NOW" }
+    } as any;
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v2/checkout/orders`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Failed to create PayPal order: ${response.status} ${text}`);
+    }
+
+    return response.json();
+  }
+
   static async createWebhookEndpoint(clientId: string, clientSecret: string, webHookUrl: string): Promise<{ id: string }> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
