@@ -1,0 +1,9 @@
+import { GenericCrudController } from "../../../shared/controllers/GenericCrudController";
+import { Repositories } from "../repositories";
+
+export abstract class MessagingCrudController extends GenericCrudController {
+  declare public repositories: Repositories;
+  constructor() {
+    super("messaging");
+  }
+}

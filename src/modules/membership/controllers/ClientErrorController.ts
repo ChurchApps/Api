@@ -1,17 +1,11 @@
-import { controller, httpPost } from "inversify-express-utils";
-import express from "express";
-import { ClientError } from "../models";
-import { MembershipBaseController } from "./MembershipBaseController";
+import { controller } from "inversify-express-utils";
+import { MembershipCrudController } from "./MembershipCrudController";
 
 @controller("/membership/clientErrors")
-export class ClientErrorController extends MembershipBaseController {
-  @httpPost("/")
-  public async save(req: express.Request<{}, {}, ClientError[]>, res: express.Response): Promise<any> {
-    const promises: Promise<ClientError>[] = [];
-    req.body.forEach((person) => {
-      promises.push(this.repositories.clientError.save(person));
-    });
-    const result = await Promise.all(promises);
-    return result;
-  }
+export class ClientErrorController extends MembershipCrudController {
+  protected crudSettings = {
+    repoKey: "clientError",
+    permissions: { view: null, edit: null },
+    routes: ["post"] as const
+  };
 }

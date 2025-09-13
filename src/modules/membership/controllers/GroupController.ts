@@ -1,12 +1,17 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
+import { MembershipCrudController } from "./MembershipCrudController";
 import { Group } from "../models";
 import { Permissions } from "../helpers";
 import { ArrayHelper, SlugHelper } from "@churchapps/apihelper";
 
 @controller("/membership/groups")
-export class GroupController extends MembershipBaseController {
+export class GroupController extends MembershipCrudController {
+  protected crudSettings = {
+    repoKey: "group",
+    permissions: { view: null, edit: Permissions.groups.edit },
+    routes: ["getById", "getAll"] as const // Custom POST and DELETE implementations below
+  };
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -21,13 +26,6 @@ export class GroupController extends MembershipBaseController {
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return this.repositories.group.convertAllToModel(au.churchId, (await this.repositories.group.loadForPerson(au.personId)) as any[]);
-    });
-  }
-
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.group.convertToModel(au.churchId, await this.repositories.group.load(au.churchId, id));
     });
   }
 
@@ -67,13 +65,7 @@ export class GroupController extends MembershipBaseController {
     });
   }
 
-  @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.group.convertAllToModel(au.churchId, (await this.repositories.group.loadAll(au.churchId)) as any[]);
-    });
-  }
-
+  // Custom POST implementation (slug generation)
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Group[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -91,6 +83,7 @@ export class GroupController extends MembershipBaseController {
     });
   }
 
+  // Custom DELETE implementation (ministry tag handling)
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

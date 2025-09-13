@@ -1,10 +1,15 @@
 import { controller, httpDelete, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { GivingBaseController } from "./GivingBaseController";
+import { GivingCrudController } from "./GivingCrudController";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
 @controller("/giving/subscriptionfunds")
-export class SubscriptionFundController extends GivingBaseController {
+export class SubscriptionFundController extends GivingCrudController {
+  protected crudSettings = {
+    repoKey: "subscriptionFunds",
+    permissions: { view: Permissions.donations.view, edit: Permissions.donations.edit },
+    routes: [] as const
+  };
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

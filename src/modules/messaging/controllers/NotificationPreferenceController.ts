@@ -1,23 +1,15 @@
-import { controller, httpGet, httpPost } from "inversify-express-utils";
+import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
-import { MessagingBaseController } from "./MessagingBaseController";
-import { NotificationPreference } from "../models";
+import { MessagingCrudController } from "./MessagingCrudController";
 import { NotificationHelper } from "../helpers/NotificationHelper";
 
 @controller("/messaging/notificationpreferences")
-export class NotificationPreferenceController extends MessagingBaseController {
-  @httpPost("/")
-  public async save(req: express.Request<{}, {}, NotificationPreference[]>, res: express.Response): Promise<unknown> {
-    return this.actionWrapper(req, res, async (au) => {
-      const promises: Promise<NotificationPreference>[] = [];
-      req.body.forEach((n) => {
-        n.churchId = au.churchId;
-        promises.push(this.repositories.notificationPreference.save(n));
-      });
-      const result = await Promise.all(promises);
-      return result;
-    });
-  }
+export class NotificationPreferenceController extends MessagingCrudController {
+  protected crudSettings = {
+    repoKey: "notificationPreference",
+    permissions: { view: null, edit: null },
+    routes: ["post"] as const
+  };
 
   @httpGet("/my")
   public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {

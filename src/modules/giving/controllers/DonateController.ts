@@ -1,6 +1,7 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
-import { GivingBaseController } from "./GivingBaseController";
+import { GivingCrudController } from "./GivingCrudController";
+import { Permissions } from "../../../shared/helpers/Permissions";
 import { GatewayService } from "../../../shared/helpers/GatewayService";
 import { EncryptionHelper, EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models";
@@ -10,7 +11,12 @@ import dayjs from "dayjs";
 import { PayPalHelper } from "../../../shared/helpers/PayPalHelper";
 
 @controller("/giving/donate")
-export class DonateController extends GivingBaseController {
+export class DonateController extends GivingCrudController {
+  protected crudSettings = {
+    repoKey: "donation", // not used by base here
+    permissions: { view: Permissions.donations.view, edit: Permissions.donations.edit },
+    routes: [] as const // all CRUD endpoints disabled; custom routes only
+  };
   @httpPost("/paypal/client-token")
   public async paypalClientToken(req: express.Request<{}, {}, { churchId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -59,7 +65,6 @@ export class DonateController extends GivingBaseController {
         const clientId = gateway.publicKey;
         const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
 
-        const notes = req.body.notes || "";
         const funds = Array.isArray(req.body.funds) ? req.body.funds : [];
         // Warning: PayPal custom_id is limited (~127 chars). Keep it compact.
         let customId = "";

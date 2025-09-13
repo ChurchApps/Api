@@ -1,11 +1,17 @@
-import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { Permissions } from "../helpers";
-import { ContentBaseController } from "./ContentBaseController";
+import { ContentCrudController } from "./ContentCrudController";
 import { Link } from "../models";
+import { CrudHelper } from "../../../shared/controllers";
 
 @controller("/content/links")
-export class LinkController extends ContentBaseController {
+export class LinkController extends ContentCrudController {
+  protected crudSettings = {
+    repoKey: "link",
+    permissions: { view: undefined, edit: Permissions.content.edit },
+    routes: ["getById", "getAll", "post", "delete"] as const
+  };
   // Anonymous access
   @httpGet("/church/:churchId")
   public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
@@ -16,49 +22,13 @@ export class LinkController extends ContentBaseController {
     });
   }
 
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.link.load(au.churchId, id);
-    });
-  }
-
+  // Override GET / to support optional category filter and custom sort after save
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const category = req.query.category.toString();
-      let data;
-      if (category === undefined) {
-        data = await this.repositories.link.loadAll(au.churchId);
-      } else {
-        data = await this.repositories.link.loadByCategory(au.churchId, category);
-      }
-
-      const results = this.repositories.link.convertAllToModel(au.churchId, data);
-      return results;
-    });
-  }
-
-  @httpPost("/")
-  public async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      else {
-        let links: Link[] = req.body;
-        const promises: Promise<Link>[] = [];
-        links.forEach((link) => {
-          link.churchId = au.churchId;
-
-          promises.push(
-            this.repositories.link.save(link).then(async () => {
-              return link;
-            })
-          );
-        });
-        links = await Promise.all(promises);
-        if (links.length > 0) await this.repositories.link.sort(au.churchId, links[0].category, links[0].parentId);
-        return this.json(links, 200);
-      }
+      const category = req.query?.category?.toString();
+      const data = category ? await this.repositories.link.loadByCategory(au.churchId, category) : await this.repositories.link.loadAll(au.churchId);
+      return this.repositories.link.convertAllToModel(au.churchId, data);
     });
   }
 
@@ -71,6 +41,20 @@ export class LinkController extends ContentBaseController {
         return this.json({});
       }
     });
+  }
+
+  // Use base POST / but add post-save sort behavior
+  public override async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<any> {
+    const result = (await CrudHelper.saveManyWrapped<Link>(this, req as any, res, Permissions.content.edit, "link", (item, churchId) => (item.churchId = churchId))) as Link[];
+    if (Array.isArray(result) && result.length > 0) {
+      const au: any = (req as any).user || {};
+      try {
+        await this.repositories.link.sort(au.churchId, result[0].category, result[0].parentId);
+      } catch {
+        // ignore sort errors
+      }
+    }
+    return result as any;
   }
 
   /*

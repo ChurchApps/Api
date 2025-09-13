@@ -1,23 +1,16 @@
-import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
+import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { DoingBaseController } from "./DoingBaseController";
-import { Position } from "../models";
+import { DoingCrudController } from "./DoingCrudController";
 
 @controller("/doing/positions")
-export class PositionController extends DoingBaseController {
+export class PositionController extends DoingCrudController {
+  protected crudSettings = { repoKey: "position", permissions: {}, routes: ["getById", "post", "delete"] as const };
   @httpGet("/ids")
   public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = req.query.ids as string;
       const ids = idsString.split(",");
       return await this.repositories.position.loadByIds(au.churchId, ids);
-    });
-  }
-
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.position.load(au.churchId, id);
     });
   }
 
@@ -37,24 +30,5 @@ export class PositionController extends DoingBaseController {
     });
   }
 
-  @httpPost("/")
-  public async save(req: express.Request<{}, {}, Position[]>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const promises: Promise<Position>[] = [];
-      req.body.forEach((position) => {
-        position.churchId = au.churchId;
-        promises.push(this.repositories.position.save(position));
-      });
-      const result = await Promise.all(promises);
-      return result;
-    });
-  }
-
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.position.delete(au.churchId, id);
-      return {};
-    });
-  }
+  // Inherit GET /:id, POST /, and DELETE /:id
 }

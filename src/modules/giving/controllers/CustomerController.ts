@@ -1,12 +1,17 @@
-import { controller, httpGet, requestParam, httpDelete } from "inversify-express-utils";
+import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { GivingBaseController } from "./GivingBaseController";
+import { GivingCrudController } from "./GivingCrudController";
 import { Permissions } from "../../../shared/helpers/Permissions";
 import { StripeHelper } from "../../../shared/helpers/StripeHelper";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
 @controller("/giving/customers")
-export class CustomerController extends GivingBaseController {
+export class CustomerController extends GivingCrudController {
+  protected crudSettings = {
+    repoKey: "customer",
+    permissions: { view: Permissions.donations.viewSummary, edit: Permissions.donations.edit },
+    routes: ["getAll", "delete"] as const // no POST; custom GET /:id below
+  };
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -37,24 +42,8 @@ export class CustomerController extends GivingBaseController {
     });
   }
 
-  @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
-      else return this.repositories.customer.convertAllToModel(au.churchId, (await this.repositories.customer.loadAll(au.churchId)) as any[]);
-    });
-  }
-
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
-      else {
-        await this.repositories.customer.delete(au.churchId, id);
-        return this.json({});
-      }
-    });
-  }
+  // GET / inherited via enableGetAll=true
+  // DELETE /:id inherited via enableDelete=true
 
   private loadPrivateKey = async (churchId: string) => {
     const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];

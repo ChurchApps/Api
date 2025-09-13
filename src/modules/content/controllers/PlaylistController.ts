@@ -1,42 +1,22 @@
-import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
+import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { Playlist } from "../models";
-import { ContentBaseController } from "./ContentBaseController";
+import { ContentCrudController } from "./ContentCrudController";
 import { Permissions } from "../../../shared/helpers";
 import { Environment } from "../helpers";
 import { FileStorageHelper } from "@churchapps/apihelper";
 
 @controller("/content/playlists")
-export class PlaylistController extends ContentBaseController {
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.playlist.loadById(id, au.churchId);
-    });
-  }
-
-  @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.playlist.loadAll(au.churchId);
-    });
-  }
-
+export class PlaylistController extends ContentCrudController {
+  protected crudSettings = {
+    repoKey: "playlist",
+    permissions: { view: null, edit: Permissions.streamingServices.edit },
+    routes: ["getById", "getAll", "delete"] as const
+  };
   @httpGet("/public/:churchId")
   public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repositories.playlist.loadPublicAll(churchId);
-    });
-  }
-
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
-      else {
-        await this.repositories.playlist.delete(id, au.churchId);
-        return null;
-      }
     });
   }
 
