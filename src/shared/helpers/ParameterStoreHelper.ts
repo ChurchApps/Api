@@ -28,12 +28,26 @@ export class ParameterStoreHelper {
     const hasDevScript = process.argv.some((arg) => arg.includes("ts-node-dev") || arg.includes("ts-node"));
 
     // Only check for local connection strings if we're definitely not in AWS
-    // and if they look like local database URLs (containing localhost or 127.0.0.1)
+    // Previously we required localhost/127.0.0.1 to consider it local; this was too strict.
+    // Treat presence of any module connection string env var as local development, regardless of host.
     const membershipConn = process.env.MEMBERSHIP_CONNECTION_STRING || "";
     const contentConn = process.env.CONTENT_CONNECTION_STRING || "";
     const hasLocalDbConnections = membershipConn.includes("localhost") || membershipConn.includes("127.0.0.1") || contentConn.includes("localhost") || contentConn.includes("127.0.0.1");
 
-    return isServerlessOffline || hasNodeEnv || hasDevScript || hasLocalDbConnections;
+    const moduleNames = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
+    const anyModuleConn = moduleNames.some((m) => {
+      const upper = m.toUpperCase();
+      return (
+        !!process.env[`${upper}_CONNECTION_STRING`] ||
+        !!process.env[`${upper}_DB_CONNECTION_STRING`] ||
+        !!process.env[`${upper}_DATABASE_URL`] ||
+        !!process.env[`DB_${upper}_CONNECTION_STRING`]
+      );
+    });
+
+    const forceFromEnv = process.env.LOAD_DB_FROM_ENV === "true" || process.env.DB_FROM_ENV === "true";
+
+    return isServerlessOffline || hasNodeEnv || hasDevScript || hasLocalDbConnections || anyModuleConn || forceFromEnv;
   }
 
   /**
