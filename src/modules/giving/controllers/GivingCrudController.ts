@@ -5,9 +5,8 @@ import { Repositories } from "../repositories";
 // - Sets module name to "giving"
 // - Provides typed repositories field for better intellisense
 export abstract class GivingCrudController extends GenericCrudController {
-  public declare repositories: Repositories;
+  declare public repositories: Repositories;
   constructor() {
     super("giving");
   }
 }
-

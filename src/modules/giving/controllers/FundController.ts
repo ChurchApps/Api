@@ -22,5 +22,4 @@ export class FundController extends GivingCrudController {
   public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return CrudHelper.listAnonWrapped(this, req, res, "fund", (repos) => repos.fund.loadAll(churchId));
   }
-
 }

@@ -8,4 +8,3 @@ export class CollectionHelper {
     return data.map(convert);
   }
 }
-

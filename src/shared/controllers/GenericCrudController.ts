@@ -37,14 +37,7 @@ export abstract class GenericCrudController extends BaseController {
   @httpGet("")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     if (!this.crudSettings.routes.includes("getAll")) return this.json({}, 404);
-    return CrudHelper.listWrapped(
-      this,
-      req,
-      res,
-      this.crudSettings.repoKey,
-      (repos, au) => repos[this.crudSettings.repoKey].loadAll(au.churchId),
-      this.crudSettings.permissions.view || null
-    );
+    return CrudHelper.listWrapped(this, req, res, this.crudSettings.repoKey, (repos, au) => repos[this.crudSettings.repoKey].loadAll(au.churchId), this.crudSettings.permissions.view || null);
   }
 
   // POST /
@@ -58,13 +51,6 @@ export abstract class GenericCrudController extends BaseController {
   @httpDelete(":id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     if (!this.crudSettings.routes.includes("delete")) return this.json({}, 404);
-    return CrudHelper.deleteWrapped(
-      this,
-      req,
-      res,
-      this.crudSettings.permissions.edit,
-      this.crudSettings.repoKey,
-      (repos, au) => repos[this.crudSettings.repoKey].delete(au.churchId, id)
-    );
+    return CrudHelper.deleteWrapped(this, req, res, this.crudSettings.permissions.edit, this.crudSettings.repoKey, (repos, au) => repos[this.crudSettings.repoKey].delete(au.churchId, id));
   }
 }

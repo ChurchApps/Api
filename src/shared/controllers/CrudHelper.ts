@@ -1,12 +1,7 @@
 import express from "express";
 
 export class CrudHelper {
-  static async getById<TModel>(
-    au: any,
-    permission: any | null,
-    loader: () => Promise<any>,
-    convert: (churchId: string, row: any) => TModel
-  ): Promise<TModel | {}> {
+  static async getById<TModel>(au: any, permission: any | null, loader: () => Promise<any>, convert: (churchId: string, row: any) => TModel): Promise<TModel | {}> {
     if (permission && !au.checkAccess(permission)) return {};
     const data = await loader();
     return convert(au.churchId, data);
@@ -42,22 +37,13 @@ export class CrudHelper {
   }
 
   // Auto-convert variants using repository's convertToModel/convertAllToModel
-  static async getByIdAuto<TModel>(
-    au: any,
-    permission: any | null,
-    loader: () => Promise<any>,
-    repo: { convertToModel: (churchId: string, row: any) => TModel }
-  ): Promise<TModel | {}> {
+  static async getByIdAuto<TModel>(au: any, permission: any | null, loader: () => Promise<any>, repo: { convertToModel: (churchId: string, row: any) => TModel }): Promise<TModel | {}> {
     if (permission && !au.checkAccess(permission)) return {};
     const data = await loader();
     return repo.convertToModel(au.churchId, data);
   }
 
-  static async listAuto<TModel>(
-    au: any,
-    loader: () => Promise<any[]>,
-    repo: { convertAllToModel: (churchId: string, rows: any[]) => TModel[] }
-  ): Promise<TModel[]> {
+  static async listAuto<TModel>(au: any, loader: () => Promise<any[]>, repo: { convertAllToModel: (churchId: string, rows: any[]) => TModel[] }): Promise<TModel[]> {
     const data = (await loader()) || [];
     return repo.convertAllToModel(au.churchId, data);
   }
@@ -81,17 +67,8 @@ export class CrudHelper {
   }
 
   // Controller-wrapped variants (use controller's action wrappers and repositories)
-  static getByIdWrapped(
-    ctrl: { actionWrapper: Function; repositories: any },
-    req: express.Request,
-    res: express.Response,
-    permission: any | null,
-    repoKey: string,
-    id: string
-  ) {
-    return (ctrl as any).actionWrapper(req, res, async (au: any) =>
-      CrudHelper.getByIdAuto(au, permission, () => ctrl.repositories[repoKey].load(au.churchId, id), ctrl.repositories[repoKey])
-    );
+  static getByIdWrapped(ctrl: { actionWrapper: Function; repositories: any }, req: express.Request, res: express.Response, permission: any | null, repoKey: string, id: string) {
+    return (ctrl as any).actionWrapper(req, res, async (au: any) => CrudHelper.getByIdAuto(au, permission, () => ctrl.repositories[repoKey].load(au.churchId, id), ctrl.repositories[repoKey]));
   }
 
   static listWrapped(
@@ -108,13 +85,7 @@ export class CrudHelper {
     });
   }
 
-  static listAnonWrapped(
-    ctrl: { actionWrapperAnon: Function; repositories: any },
-    req: express.Request,
-    res: express.Response,
-    repoKey: string,
-    loader: (repos: any) => Promise<any[]>
-  ) {
+  static listAnonWrapped(ctrl: { actionWrapperAnon: Function; repositories: any }, req: express.Request, res: express.Response, repoKey: string, loader: (repos: any) => Promise<any[]>) {
     return (ctrl as any).actionWrapperAnon(req, res, async () => CrudHelper.listAuto({ churchId: undefined } as any, () => loader(ctrl.repositories), ctrl.repositories[repoKey]));
   }
 

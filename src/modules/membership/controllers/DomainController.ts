@@ -1,11 +1,16 @@
-import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
+import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
+import { MembershipCrudController } from "./MembershipCrudController";
 import { Domain } from "../models";
 import { CaddyHelper, Environment, Permissions } from "../helpers";
 
 @controller("/membership/domains")
-export class DomainController extends MembershipBaseController {
+export class DomainController extends MembershipCrudController {
+  protected crudSettings = {
+    repoKey: "domain",
+    permissions: { view: null, edit: Permissions.settings.edit },
+    routes: ["getById", "getAll", "delete"] as const
+  };
   @httpGet("/caddy")
   public async caddy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -31,13 +36,6 @@ export class DomainController extends MembershipBaseController {
     });
   }
 
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.domain.load(au.churchId, id);
-    });
-  }
-
   @httpGet("/lookup/:domainName")
   public async getByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -49,13 +47,6 @@ export class DomainController extends MembershipBaseController {
   public async getPublicByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repositories.domain.loadByName(domainName);
-    });
-  }
-
-  @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.domain.loadAll(au.churchId);
     });
   }
 
@@ -72,17 +63,6 @@ export class DomainController extends MembershipBaseController {
         const result = await Promise.all(promises);
         await CaddyHelper.updateCaddy();
         return result;
-      }
-    });
-  }
-
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
-      else {
-        await this.repositories.domain.delete(au.churchId, id);
-        return this.json({});
       }
     });
   }

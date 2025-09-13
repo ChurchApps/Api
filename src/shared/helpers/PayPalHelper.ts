@@ -52,11 +52,7 @@ export class PayPalHelper {
     return result.client_token;
   }
 
-  static async createOrder(
-    clientId: string,
-    clientSecret: string,
-    params: { amount: number; currency?: string; description?: string; customId?: string }
-  ): Promise<any> {
+  static async createOrder(clientId: string, clientSecret: string, params: { amount: number; currency?: string; description?: string; customId?: string }): Promise<any> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
     const currency = (params.currency || "USD").toUpperCase();
     const body = {

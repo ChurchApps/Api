@@ -1,10 +1,15 @@
-import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
+import { controller, httpPost, httpGet } from "inversify-express-utils";
 import express from "express";
-import { DoingBaseController } from "./DoingBaseController";
+import { DoingCrudController } from "./DoingCrudController";
 import { BlockoutDate } from "../models";
 
 @controller("/doing/blockoutDates")
-export class BlockoutDateController extends DoingBaseController {
+export class BlockoutDateController extends DoingCrudController {
+  protected crudSettings = {
+    repoKey: "blockoutDate",
+    permissions: { view: null, edit: null },
+    routes: ["getById", "delete"] as const
+  };
   @httpGet("/ids")
   public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -28,13 +33,6 @@ export class BlockoutDateController extends DoingBaseController {
     });
   }
 
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.blockoutDate.load(au.churchId, id);
-    });
-  }
-
   @httpPost("/")
   public async save(req: express.Request<{}, {}, BlockoutDate[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -46,14 +44,6 @@ export class BlockoutDateController extends DoingBaseController {
       });
       const result = await Promise.all(promises);
       return result;
-    });
-  }
-
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.blockoutDate.delete(au.churchId, id);
-      return {};
     });
   }
 }

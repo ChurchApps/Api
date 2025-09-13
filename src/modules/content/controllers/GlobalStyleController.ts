@@ -1,11 +1,16 @@
-import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
+import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { Permissions } from "../helpers";
-import { ContentBaseController } from "./ContentBaseController";
+import { ContentCrudController } from "./ContentCrudController";
 import { GlobalStyle } from "../models";
 
 @controller("/content/globalStyles")
-export class GlobalStyleController extends ContentBaseController {
+export class GlobalStyleController extends ContentCrudController {
+  protected crudSettings = {
+    repoKey: "globalStyle",
+    permissions: { view: null, edit: Permissions.content.edit },
+    routes: ["post", "delete"] as const
+  };
   defaultStyle: GlobalStyle = {
     fonts: JSON.stringify({ body: "Roboto", heading: "Roboto" }),
     palette: JSON.stringify({
@@ -33,33 +38,6 @@ export class GlobalStyleController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repositories.globalStyle.loadForChurch(au.churchId);
       return result || this.defaultStyle;
-    });
-  }
-
-  @httpPost("/")
-  public async save(req: express.Request<{}, {}, GlobalStyle[]>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      else {
-        const promises: Promise<GlobalStyle>[] = [];
-        req.body.forEach((globalStyle) => {
-          globalStyle.churchId = au.churchId;
-          promises.push(this.repositories.globalStyle.save(globalStyle));
-        });
-        const result = await Promise.all(promises);
-        return result;
-      }
-    });
-  }
-
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      else {
-        await this.repositories.globalStyle.delete(id, au.churchId);
-        return this.json({});
-      }
     });
   }
 }
