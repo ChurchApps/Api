@@ -1,13 +1,18 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete, httpPatch } from "inversify-express-utils";
 import express from "express";
-import { GivingBaseController } from "./GivingBaseController";
+import { GivingCrudController } from "./GivingCrudController";
 import { Gateway } from "../models";
 import { GatewayService } from "../../../shared/helpers/GatewayService";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
 @controller("/giving/gateways")
-export class GatewayController extends GivingBaseController {
+export class GatewayController extends GivingCrudController {
+  protected crudSettings = {
+    repoKey: "gateway",
+    permissions: { view: Permissions.settings.edit, edit: Permissions.settings.edit },
+    routes: [] as const
+  };
   @httpGet("/churchId/:churchId")
   public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

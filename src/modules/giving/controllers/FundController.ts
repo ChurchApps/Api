@@ -1,59 +1,26 @@
-import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
+import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { GivingBaseController } from "./GivingBaseController";
-import { Fund } from "../models";
+import { GivingCrudController } from "./GivingCrudController";
 import { Permissions } from "../../../shared/helpers/Permissions";
+import { CrudHelper } from "../../../shared/controllers";
 
 @controller("/giving/funds")
-export class FundController extends GivingBaseController {
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
-      else {
-        return this.repositories.fund.convertToModel(au.churchId, await this.repositories.fund.load(au.churchId, id));
-      }
-    });
-  }
+export class FundController extends GivingCrudController {
+  // Inherited endpoints from GenericCrudController:
+  // - GET "/:id" (view)
+  // - GET "/" (list)
+  // - POST "/" (save many)
+  // - DELETE "/:id" (remove)
+
+  protected crudSettings = {
+    repoKey: "fund",
+    permissions: { view: Permissions.donations.viewSummary, edit: Permissions.donations.edit },
+    routes: ["getById", "getAll", "post", "delete"] as const
+  };
 
   @httpGet("/churchId/:churchId")
   public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
-      return this.repositories.fund.convertAllToModel(churchId, (await this.repositories.fund.loadAll(churchId)) as any[]);
-    });
+    return CrudHelper.listAnonWrapped(this, req, res, "fund", (repos) => repos.fund.loadAll(churchId));
   }
 
-  @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.fund.convertAllToModel(au.churchId, (await this.repositories.fund.loadAll(au.churchId)) as any[]);
-    });
-  }
-
-  @httpPost("/")
-  public async save(req: express.Request<{}, {}, Fund[]>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.edit)) return this.json([], 401);
-      else {
-        const promises: Promise<Fund>[] = [];
-        req.body.forEach((fund) => {
-          fund.churchId = au.churchId;
-          promises.push(this.repositories.fund.save(fund));
-        });
-        const result = await Promise.all(promises);
-        return this.repositories.fund.convertAllToModel(au.churchId, result as any[]);
-      }
-    });
-  }
-
-  @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.edit)) return this.json([], 401);
-      else {
-        await this.repositories.fund.delete(au.churchId, id);
-        return this.json({});
-      }
-    });
-  }
 }

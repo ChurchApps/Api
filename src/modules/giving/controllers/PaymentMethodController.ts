@@ -1,12 +1,17 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { GivingBaseController } from "./GivingBaseController";
+import { GivingCrudController } from "./GivingCrudController";
 import { StripeHelper } from "../../../shared/helpers/StripeHelper";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
 @controller("/giving/paymentmethods")
-export class PaymentMethodController extends GivingBaseController {
+export class PaymentMethodController extends GivingCrudController {
+  protected crudSettings = {
+    repoKey: "customer", // not used by base here
+    permissions: { view: Permissions.donations.view, edit: Permissions.donations.edit },
+    routes: [] as const
+  };
   @httpGet("/personid/:id")
   public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -120,7 +125,7 @@ export class PaymentMethodController extends GivingBaseController {
   }
 
   @httpDelete("/:id/:customerid")
-  public async delete(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const secretKey = await this.loadPrivateKey(au.churchId);
       const permission =
