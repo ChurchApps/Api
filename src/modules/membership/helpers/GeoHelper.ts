@@ -1,6 +1,7 @@
 import { Church } from "../models";
 import NodeGeocoder from "node-geocoder";
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 
 export class GeoHelper {
   static async updateChurchAddress(church: Church) {
@@ -18,7 +19,7 @@ export class GeoHelper {
       }
       church.latitude = r.latitude;
       church.longitude = r.longitude;
-      Repositories.getCurrent().church.save(church);
+      (await RepositoryManager.getRepositories<Repositories>("membership")).church.save(church);
     }
   }
 }

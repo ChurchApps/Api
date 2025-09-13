@@ -1,11 +1,10 @@
-import { CustomBaseController } from "@churchapps/apihelper";
+import { BaseController } from "../../../shared/infrastructure";
 import { Repositories } from "../repositories";
 
-export class DoingBaseController extends CustomBaseController {
+export class DoingBaseController extends BaseController {
   public repositories: Repositories;
 
   constructor() {
-    super();
-    this.repositories = Repositories.getCurrent();
+    super("doing");
   }
 }

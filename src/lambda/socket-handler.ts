@@ -6,7 +6,8 @@ import { DB } from "../shared/infrastructure/DB";
 
 import { Logger } from "../modules/messaging/helpers/Logger";
 import { SocketHelper } from "../modules/messaging/helpers/SocketHelper";
-import { Repositories } from "../modules/messaging/repositories";
+import { initializeMessagingModule } from "../modules/messaging";
+import { RepositoryManager } from "../shared/infrastructure/RepositoryManager";
 
 let gwManagement: ApiGatewayManagementApiClient;
 
@@ -19,6 +20,12 @@ const initEnv = async () => {
     gwManagement = new ApiGatewayManagementApiClient({
       apiVersion: "2020-04-16",
       endpoint: Environment.socketUrl
+    });
+
+    // Initialize messaging module repositories and helpers in messaging context
+    await DB.runWithContext("messaging", async () => {
+      const repositories = await RepositoryManager.getRepositories<any>("messaging");
+      initializeMessagingModule(repositories);
     });
   }
 };
@@ -79,7 +86,6 @@ async function handleDisconnect(event: APIGatewayProxyEvent, _context: Context):
   }
 
   try {
-    const _repositories = Repositories.getCurrent();
     await SocketHelper.handleDisconnect(connectionId);
 
     console.log(`Connection disconnected: ${connectionId}`);

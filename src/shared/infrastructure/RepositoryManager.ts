@@ -18,31 +18,31 @@ export class RepositoryManager {
     switch (moduleName) {
       case "attendance":
         const { Repositories: AttendanceRepos } = await import("../../modules/attendance");
-        return AttendanceRepos.getCurrent();
+        return new AttendanceRepos();
 
       case "content":
         const { Repositories: ContentRepos } = await import("../../modules/content");
-        return ContentRepos.getCurrent();
+        return new ContentRepos();
 
       case "doing":
         const { Repositories: DoingRepos } = await import("../../modules/doing");
-        return DoingRepos.getCurrent();
+        return new DoingRepos();
 
       case "giving":
         const { Repositories: GivingRepos } = await import("../../modules/giving");
-        return GivingRepos.getCurrent();
+        return new GivingRepos();
 
       case "membership":
         const { Repositories: MembershipRepos } = await import("../../modules/membership");
-        return MembershipRepos.getCurrent();
+        return new MembershipRepos();
 
       case "messaging":
         const { Repositories: MessagingRepos } = await import("../../modules/messaging");
-        return MessagingRepos.getCurrent();
+        return new MessagingRepos();
 
       case "reporting":
         const { Repositories: ReportingRepos } = await import("../../modules/reporting");
-        return ReportingRepos.getCurrent();
+        return new ReportingRepos();
 
       default:
         throw new Error(`Unknown module: ${moduleName}`);

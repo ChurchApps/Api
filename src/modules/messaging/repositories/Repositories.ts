@@ -21,11 +21,7 @@ export class Repositories {
   public notificationPreference: NotificationPreferenceRepository;
   public privateMessage: PrivateMessageRepository;
 
-  private static _current: Repositories = null;
-  public static getCurrent = () => {
-    if (Repositories._current === null) Repositories._current = new Repositories();
-    return Repositories._current;
-  };
+  public static getCurrent = () => new Repositories();
 
   constructor() {
     this.blockedIp = new BlockedIpRepository();

@@ -1,14 +1,13 @@
-import { CustomBaseController } from "@churchapps/apihelper";
+import { BaseController } from "../../../shared/infrastructure";
 import { Repositories } from "../repositories";
 import { Permissions } from "../helpers";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 
-export class MembershipBaseController extends CustomBaseController {
+export class MembershipBaseController extends BaseController {
   public repositories: Repositories;
 
   constructor() {
-    super();
-    this.repositories = Repositories.getCurrent();
+    super("membership");
   }
 
   public async formAccess(au: AuthenticatedUser, formId: string, access?: string): Promise<boolean> {

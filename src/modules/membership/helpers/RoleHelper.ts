@@ -1,4 +1,5 @@
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 import { Role, RoleMember, RolePermission } from "../models";
 
 export class RoleHelper {
@@ -7,8 +8,11 @@ export class RoleHelper {
   constructor(
     private churchId: string,
     private userId: string
-  ) {
-    this.repositories = Repositories.getCurrent();
+  ) {}
+
+  private async repos(): Promise<Repositories> {
+    if (!this.repositories) this.repositories = await RepositoryManager.getRepositories<Repositories>("membership");
+    return this.repositories;
   }
 
   public async init() {
@@ -23,9 +27,10 @@ export class RoleHelper {
   }
 
   private async createRole(name: string, permissions: RolePermission[]): Promise<string> {
+    const repos = await this.repos();
     let role: Role = {};
     if (name) {
-      role = await this.repositories.role.save({ churchId: this.churchId, name });
+      role = await repos.role.save({ churchId: this.churchId, name });
     }
 
     const promises: Promise<RolePermission>[] = [];
@@ -33,7 +38,7 @@ export class RoleHelper {
       // roleId will override if permission object has `roleId` property. It is specifically for everyone role
       // where `roleId` is supposed to be kept null.
       const rp = new RolePermission({ churchId: this.churchId, roleId: role.id, ...p });
-      promises.push(this.repositories.rolePermission.save(rp));
+      promises.push(repos.rolePermission.save(rp));
     });
     await Promise.all(promises);
 
@@ -42,7 +47,8 @@ export class RoleHelper {
 
   private async createRoleMember(roleId: string) {
     const roleMember: RoleMember = { churchId: this.churchId, roleId, userId: this.userId, addedBy: this.userId };
-    await this.repositories.roleMember.save(roleMember);
+    const repos = await this.repos();
+    await repos.roleMember.save(roleMember);
   }
 
   private async createDomainAdminRole() {

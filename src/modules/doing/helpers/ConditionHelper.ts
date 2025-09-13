@@ -1,4 +1,5 @@
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 import { Condition } from "../models";
 
 export class ConditionHelper {
@@ -10,7 +11,7 @@ export class ConditionHelper {
   }
 
   private static async getPeopleIdsMatchingCondition(condition: Condition, repositories?: Repositories) {
-    const repos = repositories || Repositories.getCurrent();
+    const repos = repositories || (await RepositoryManager.getRepositories<Repositories>("doing"));
     condition.matchingIds = [];
     switch (condition.field) {
       case "today":

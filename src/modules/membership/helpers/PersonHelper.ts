@@ -1,15 +1,20 @@
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 import { Household, Person, UserChurch } from "../models";
 import { AuthenticatedUser } from "../auth";
 import { Permissions } from "../../../shared/helpers";
 import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 
 export class PersonHelper extends BasePersonHelper {
+  private static async repos(): Promise<Repositories> {
+    return await RepositoryManager.getRepositories<Repositories>("membership");
+  }
   public static async getPerson(churchId: string, email: string, firstName: string, lastName: string, canEdit: boolean) {
-    const data: Person[] = (await Repositories.getCurrent().person.searchEmail(churchId, email)) as Person[];
+    const repos = await this.repos();
+    const data: Person[] = (await repos.person.searchEmail(churchId, email)) as Person[];
     if (data.length === 0) {
       const household: Household = { churchId, name: lastName };
-      await Repositories.getCurrent().household.save(household);
+      await repos.household.save(household);
       let newPerson: Person = {
         churchId,
         householdId: household.id,
@@ -18,14 +23,14 @@ export class PersonHelper extends BasePersonHelper {
         membershipStatus: "Guest",
         contactInfo: { email }
       };
-      newPerson = await Repositories.getCurrent().person.save(newPerson);
-      data.push(await Repositories.getCurrent().person.load(newPerson.churchId, newPerson.id));
+      newPerson = await repos.person.save(newPerson);
+      data.push(await repos.person.load(newPerson.churchId, newPerson.id));
     }
-    const result = Repositories.getCurrent().person.convertAllToModel(churchId, data, canEdit);
+    const result = (await this.repos()).person.convertAllToModel(churchId, data, canEdit);
     const person = result[0];
     if (person.removed) {
       person.removed = false;
-      await Repositories.getCurrent().person.restore(person.churchId, person.id);
+      await (await this.repos()).person.restore(person.churchId, person.id);
     }
     return person;
   }
@@ -34,9 +39,10 @@ export class PersonHelper extends BasePersonHelper {
     if (au?.email) {
       let person: Person = null;
       if (au.personId) {
-        const d = await Repositories.getCurrent().person.load(au.churchId, au.personId);
+        const repos = await this.repos();
+        const d = await repos.person.load(au.churchId, au.personId);
         if (d === null) person = await this.getPerson(churchId, au.email, au.firstName, au.lastName, au.checkAccess(Permissions.people.edit));
-        else person = Repositories.getCurrent().person.convertToModel(au.churchId, d, au.checkAccess(Permissions.people.edit));
+        else person = repos.person.convertToModel(au.churchId, d, au.checkAccess(Permissions.people.edit));
       } else {
         person = await this.getPerson(churchId, au.email, au.firstName, au.lastName, au.checkAccess(Permissions.people.edit));
       }
@@ -47,14 +53,15 @@ export class PersonHelper extends BasePersonHelper {
         personId: person.id
       };
 
-      let existing: UserChurch = await Repositories.getCurrent().userChurch.loadByUserId(au.id, churchId);
+      const repos = await this.repos();
+      let existing: UserChurch = await repos.userChurch.loadByUserId(au.id, churchId);
       if (!existing) {
-        existing = await Repositories.getCurrent().userChurch.save(userChurch);
+        existing = await repos.userChurch.save(userChurch);
         // return Repositories.getCurrent().userChurch.convertToModel(result);
       } else {
         if (existing.personId !== person.id) {
           existing.personId = person.id;
-          await Repositories.getCurrent().userChurch.save(existing);
+          await repos.userChurch.save(existing);
         }
 
         // return existing;

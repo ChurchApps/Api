@@ -4,7 +4,7 @@ import { Environment } from "../shared/helpers/Environment";
 import { DB } from "../shared/infrastructure/DB";
 
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper";
-import { Repositories } from "../modules/messaging/repositories";
+import { RepositoryManager } from "../shared/infrastructure/RepositoryManager";
 
 const initEnv = async () => {
   if (!Environment.currentEnvironment) {
@@ -14,7 +14,7 @@ const initEnv = async () => {
 
     // Initialize messaging helpers within the messaging module context
     await DB.runWithContext("messaging", async () => {
-      const repositories = Repositories.getCurrent();
+      const repositories = await RepositoryManager.getRepositories<any>("messaging");
       NotificationHelper.init(repositories);
     });
   }

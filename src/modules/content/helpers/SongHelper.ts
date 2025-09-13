@@ -1,6 +1,7 @@
 import { SongDetail, Song, Arrangement, SongDetailLink, ArrangementKey } from "../models";
 import { PraiseChartsHelper } from "./PraiseChartsHelper";
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 
 export interface FreeShowSong {
   freeShowId: string;
@@ -29,13 +30,14 @@ export class SongHelper {
       keySignature: "",
       praiseChartsId: ""
     };
-    const songDetail = await Repositories.getCurrent().songDetail.save(customSongDetail);
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const songDetail = await repos.songDetail.save(customSongDetail);
     const customSong: Song = {
       churchId,
       name: customSongDetail.title,
       dateAdded: new Date()
     };
-    const song = await Repositories.getCurrent().song.save(customSong);
+    const song = await repos.song.save(customSong);
     const customArrangement: Arrangement = {
       churchId,
       songId: song.id,
@@ -44,21 +46,22 @@ export class SongHelper {
       lyrics: freeshowSong.lyrics || "",
       freeShowId: freeshowSong.freeShowId
     };
-    const result = await Repositories.getCurrent().arrangement.save(customArrangement);
+    const result = await repos.arrangement.save(customArrangement);
     const arrangementKey: ArrangementKey = {
       churchId,
       arrangementId: customArrangement.id,
       keySignature: customSongDetail.keySignature || "",
       shortDescription: "Default"
     };
-    await Repositories.getCurrent().arrangementKey.save(arrangementKey);
+    await repos.arrangementKey.save(arrangementKey);
     return result;
   }
 
   static async importSong(churchId: string, freeshowSong: FreeShowSong): Promise<Arrangement> {
     try {
       // 1. Check if arrangement already exists for this church and freeshow key
-      const exactMathArrangement = await Repositories.getCurrent().arrangement.loadByFreeShowId(churchId, freeshowSong.freeShowId);
+      const repos = await RepositoryManager.getRepositories<Repositories>("content");
+      const exactMathArrangement = await repos.arrangement.loadByFreeShowId(churchId, freeshowSong.freeShowId);
       if (exactMathArrangement) return exactMathArrangement;
 
       // 2. Try to find existing song by CCLI
@@ -81,12 +84,12 @@ export class SongHelper {
       const songDetail = await this.getOrCreateSongDetail(praiseChartsResult, freeshowSong.ccliNumber, freeshowSong.geniusId);
 
       // 6. Check if arrangement exists for this church
-      const existingArrangement = await Repositories.getCurrent().arrangement.loadBySongDetailId(churchId, songDetail.id);
+      const existingArrangement = await repos.arrangement.loadBySongDetailId(churchId, songDetail.id);
       if (existingArrangement.length > 0) {
         // If arrangement exists, update it with freeshow details
         if (!existingArrangement[0].freeShowId && freeshowSong.freeShowId) {
           existingArrangement[0].freeShowId = freeshowSong.freeShowId;
-          await Repositories.getCurrent().arrangement.save(existingArrangement[0]);
+          await repos.arrangement.save(existingArrangement[0]);
         }
         return existingArrangement[0];
       }
@@ -102,11 +105,12 @@ export class SongHelper {
   private static async findExistingSongByCCLI(churchId: string, ccliNumber?: string): Promise<SongDetail | null> {
     if (!ccliNumber) return null;
 
-    const existingByCCLI = await Repositories.getCurrent().songDetailLink.loadByServiceAndKey("CCLI", ccliNumber);
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const existingByCCLI = await repos.songDetailLink.loadByServiceAndKey("CCLI", ccliNumber);
     if (existingByCCLI) {
-      const songDetail = await Repositories.getCurrent().songDetail.load(existingByCCLI.songDetailId);
+      const songDetail = await repos.songDetail.load(existingByCCLI.songDetailId);
       if (songDetail) {
-        const existingArrangement = await Repositories.getCurrent().arrangement.loadBySongDetailId(churchId, songDetail.id);
+        const existingArrangement = await repos.arrangement.loadBySongDetailId(churchId, songDetail.id);
         if (existingArrangement.length > 0) return songDetail;
       }
     }
@@ -114,11 +118,12 @@ export class SongHelper {
   }
 
   private static async findExistingSongByGeniusId(churchId: string, geniusId: string): Promise<Arrangement | null> {
-    const existingByGenius = await Repositories.getCurrent().songDetailLink.loadByServiceAndKey("Genius", geniusId);
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const existingByGenius = await repos.songDetailLink.loadByServiceAndKey("Genius", geniusId);
     if (existingByGenius) {
-      const songDetail = await Repositories.getCurrent().songDetail.load(existingByGenius.songDetailId);
+      const songDetail = await repos.songDetail.load(existingByGenius.songDetailId);
       if (songDetail) {
-        const existingArrangement = await Repositories.getCurrent().arrangement.loadBySongDetailId(churchId, songDetail.id);
+        const existingArrangement = await repos.arrangement.loadBySongDetailId(churchId, songDetail.id);
         if (existingArrangement.length > 0) {
           return existingArrangement[0];
         }
@@ -128,7 +133,8 @@ export class SongHelper {
   }
 
   private static async getOrCreateSongDetail(praiseChartsResult: SongDetail, ccliNumber?: string, geniusId?: string): Promise<SongDetail> {
-    let songDetail = await Repositories.getCurrent().songDetail.loadByPraiseChartsId(praiseChartsResult.praiseChartsId);
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    let songDetail = await repos.songDetail.loadByPraiseChartsId(praiseChartsResult.praiseChartsId);
 
     if (!songDetail) {
       // Create new song detail
@@ -136,7 +142,7 @@ export class SongHelper {
       // Add additional details from PraiseCharts
       const rawData = await PraiseChartsHelper.loadRaw(praiseChartsResult.praiseChartsId);
       PraiseChartsHelper.appendDetails(rawData, songDetail);
-      songDetail = await Repositories.getCurrent().songDetail.save(songDetail);
+      songDetail = await repos.songDetail.save(songDetail);
 
       // Create song detail links from PraiseCharts
       await this.createSongDetailLinks(songDetail, praiseChartsResult.praiseChartsId);
@@ -149,15 +155,17 @@ export class SongHelper {
   }
 
   private static async createSongDetailLinks(songDetail: SongDetail, praiseChartsId: string): Promise<void> {
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
     const { links } = await PraiseChartsHelper.load(praiseChartsId);
     for (const link of links) {
       link.songDetailId = songDetail.id;
-      await Repositories.getCurrent().songDetailLink.save(link);
+      await repos.songDetailLink.save(link);
     }
   }
 
   private static async createAdditionalLinks(songDetail: SongDetail, ccliNumber?: string, geniusId?: string): Promise<void> {
-    const existingLinks = await Repositories.getCurrent().songDetailLink.loadForSongDetail(songDetail.id);
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const existingLinks = await repos.songDetailLink.loadForSongDetail(songDetail.id);
 
     // Create CCLI link if provided and doesn't exist
     if (ccliNumber && !existingLinks.some((link: SongDetailLink) => link.service === "CCLI" && link.serviceKey === ccliNumber)) {
@@ -167,7 +175,7 @@ export class SongHelper {
         serviceKey: ccliNumber,
         url: `https://songselect.ccli.com/Songs/${ccliNumber}`
       };
-      await Repositories.getCurrent().songDetailLink.save(ccliLink);
+      await repos.songDetailLink.save(ccliLink);
     }
 
     // Create Genius link if provided and doesn't exist
@@ -178,7 +186,7 @@ export class SongHelper {
         serviceKey: geniusId,
         url: `https://genius.com/songs/${geniusId}`
       };
-      await Repositories.getCurrent().songDetailLink.save(geniusLink);
+      await repos.songDetailLink.save(geniusLink);
     }
   }
 
@@ -189,7 +197,8 @@ export class SongHelper {
       name: songDetail.title,
       dateAdded: new Date()
     };
-    const savedSong = await Repositories.getCurrent().song.save(song);
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const savedSong = await repos.song.save(song);
 
     // Create new Arrangement
     const arrangement: Arrangement = {
@@ -200,7 +209,7 @@ export class SongHelper {
       lyrics: freeShowSong.lyrics || "",
       freeShowId: freeShowSong.freeShowId
     };
-    const result = await Repositories.getCurrent().arrangement.save(arrangement);
+    const result = await repos.arrangement.save(arrangement);
 
     const arrangementKey: ArrangementKey = {
       churchId,
@@ -208,7 +217,7 @@ export class SongHelper {
       keySignature: songDetail.keySignature || "",
       shortDescription: "Default"
     };
-    await Repositories.getCurrent().arrangementKey.save(arrangementKey);
+    await repos.arrangementKey.save(arrangementKey);
 
     return result;
   }

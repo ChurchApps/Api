@@ -222,11 +222,11 @@ export const createApp = async () => {
   try {
     console.log("📥 Importing messaging modules...");
     const { initializeMessagingModule } = await import("./modules/messaging");
-    const { Repositories } = await import("./modules/messaging/repositories");
+    const { RepositoryManager } = await import("./shared/infrastructure/RepositoryManager");
     console.log("✅ Messaging modules imported");
 
-    console.log("🗃️ Creating messaging repositories...");
-    const messagingRepositories = Repositories.getCurrent();
+    console.log("🗃️ Creating messaging repositories via RepositoryManager...");
+    const messagingRepositories = await RepositoryManager.getRepositories<any>("messaging");
     console.log("✅ Messaging repositories created");
 
     console.log("🔌 Initializing messaging module...");

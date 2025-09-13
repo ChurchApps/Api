@@ -2,11 +2,13 @@ import { Setting, SongDetail, SongDetailLink } from "../models";
 import OAuth from "oauth";
 import { Environment } from "../../../shared/helpers/Environment";
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 import https from "https";
 
 export class PraiseChartsHelper {
   static async loadUserTokens(au: any) {
-    const settings: Setting[] = await Repositories.getCurrent().setting.loadUser(au.churchId, au.id);
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const settings: Setting[] = await repos.setting.loadUser(au.churchId, au.id);
     const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
     const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;
     return { token, secret };

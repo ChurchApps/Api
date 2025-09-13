@@ -1,10 +1,11 @@
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 import { Action, Automation, Task } from "../models";
 import { ConjunctionHelper } from "./ConjunctionHelper";
 
 export class AutomationHelper {
   public static async checkAll(repositories?: Repositories) {
-    const repos = repositories || Repositories.getCurrent();
+    const repos = repositories || (await RepositoryManager.getRepositories<Repositories>("doing"));
     const automations: Automation[] = (await repos.automation.loadAllChurches()) as Automation[];
     if (automations.length > 0) {
       for (const a of automations) {
@@ -18,7 +19,7 @@ export class AutomationHelper {
   }
 
   public static async check(automation: Automation, repositories?: Repositories) {
-    const repos = repositories || Repositories.getCurrent();
+    const repos = repositories || (await RepositoryManager.getRepositories<Repositories>("doing"));
     const triggeredPeopleIds = await ConjunctionHelper.getPeopleIds(automation, repos);
     // if * load all peopele
 
@@ -47,7 +48,7 @@ export class AutomationHelper {
     details: { assignedToType?: string; assignedToId?: string; assignedToLabel?: string; title?: string },
     repositories?: Repositories
   ) {
-    const repos = repositories || Repositories.getCurrent();
+    const repos = repositories || (await RepositoryManager.getRepositories<Repositories>("doing"));
     const result: Task[] = [];
     for (const p of people) {
       const task: Task = {

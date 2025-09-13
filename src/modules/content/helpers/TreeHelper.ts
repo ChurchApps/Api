@@ -1,6 +1,7 @@
 import { Section, Element, Block } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { Repositories } from "../repositories";
+import { RepositoryManager } from "../../../shared/infrastructure";
 
 export class TreeHelper {
   public static getChildElements(element: Element, allElements: Element[]) {
@@ -26,7 +27,8 @@ export class TreeHelper {
 
   static async insertBlocks(sections: Section[], allElements: Element[], churchId: string) {
     const blockIds: string[] = [];
-    const footerBlocks: Block[] = await Repositories.getCurrent().block.loadByBlockType(churchId, "footerBlock");
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const footerBlocks: Block[] = await repos.block.loadByBlockType(churchId, "footerBlock");
     footerBlocks.forEach((b) => {
       blockIds.push(b.id);
     });
@@ -37,8 +39,8 @@ export class TreeHelper {
       if (e.answers.targetBlockId) blockIds.push(e.answers.targetBlockId);
     });
     if (blockIds.length > 0) {
-      const allBlockSections = await Repositories.getCurrent().section.loadForBlocks(churchId, blockIds);
-      const allBlockElements = await Repositories.getCurrent().element.loadForBlocks(churchId, blockIds);
+      const allBlockSections = await repos.section.loadForBlocks(churchId, blockIds);
+      const allBlockElements = await repos.element.loadForBlocks(churchId, blockIds);
       this.populateAnswers(allBlockElements);
       this.populateAnswers(allBlockSections);
 
@@ -90,8 +92,9 @@ export class TreeHelper {
   }
 
   static async convertToBlock(section: Section, blockName: string) {
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
     const sec = { ...section };
-    const block = await Repositories.getCurrent().block.save({
+    const block = await repos.block.save({
       churchId: sec.churchId,
       blockType: "sectionBlock",
       name: blockName || ""
@@ -99,7 +102,7 @@ export class TreeHelper {
     sec.id = undefined;
     sec.pageId = undefined;
     sec.blockId = block.id;
-    const result = await Repositories.getCurrent().section.save(sec);
+    const result = await repos.section.save(sec);
     const promises: Promise<Element>[] = [];
     sec.elements?.forEach((e) => {
       promises.push(this.duplicateElement(e, result.id, null, block.id));
@@ -109,9 +112,10 @@ export class TreeHelper {
   }
 
   static async duplicateSection(section: Section) {
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
     const sec = { ...section };
     sec.id = undefined;
-    const result = await Repositories.getCurrent().section.save(sec);
+    const result = await repos.section.save(sec);
     const promises: Promise<Element>[] = [];
     sec.elements?.forEach((e) => {
       promises.push(this.duplicateElement(e, result.id, null));
@@ -121,13 +125,14 @@ export class TreeHelper {
   }
 
   static async duplicateElement(element: Element, sectionId: string, parentId: string, blockId?: string) {
+    const repos = await RepositoryManager.getRepositories<Repositories>("content");
     const el = { ...element };
     el.id = undefined;
     el.sectionId = sectionId;
     el.parentId = parentId;
     if (blockId) el.blockId = blockId;
     // el.sort = element.sort + 1;
-    const result = await Repositories.getCurrent().element.save(el);
+    const result = await repos.element.save(el);
     const promises: Promise<Element>[] = [];
     el.elements?.forEach((e) => {
       promises.push(this.duplicateElement(e, sectionId, result.id, blockId));
