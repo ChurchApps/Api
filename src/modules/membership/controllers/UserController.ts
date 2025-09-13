@@ -48,50 +48,53 @@ const updateEmailValidation = [body("userId").optional().isString(), body("email
 export class UserController extends MembershipBaseController {
   @httpPost("/login")
   public async login(req: express.Request<{}, {}, LoginRequest>, res: express.Response): Promise<any> {
-    try {
-      let user: User = null;
-      if (req.body.jwt !== undefined && req.body.jwt !== "") {
-        user = await AuthenticatedUser.loadUserByJwt(req.body.jwt, this.repositories);
-      } else if (req.body.authGuid !== undefined && req.body.authGuid !== "") {
-        user = await this.repositories.user.loadByAuthGuid(req.body.authGuid);
-        if (user !== null) {
-          // user.authGuid = "";
-          // await this.repositories.user.save(user);
+    // Ensure repositories are hydrated for anonymous access routes
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        let user: User = null;
+        if (req.body.jwt !== undefined && req.body.jwt !== "") {
+          user = await AuthenticatedUser.loadUserByJwt(req.body.jwt, this.repositories);
+        } else if (req.body.authGuid !== undefined && req.body.authGuid !== "") {
+          user = await this.repositories.user.loadByAuthGuid(req.body.authGuid);
+          if (user !== null) {
+            // user.authGuid = "";
+            // await this.repositories.user.save(user);
+          }
+        } else {
+          user = await this.repositories.user.loadByEmail(req.body.email.trim());
+          if (user !== null) {
+            if (!bcrypt.compareSync(req.body.password, user.password?.toString() || "")) user = null;
+          }
         }
-      } else {
-        user = await this.repositories.user.loadByEmail(req.body.email.trim());
-        if (user !== null) {
-          if (!bcrypt.compareSync(req.body.password, user.password?.toString() || "")) user = null;
-        }
-      }
 
-      if (user === null) return this.denyAccess(["Login failed"]);
-      else {
-        const userChurches = await this.getUserChurches(user.id);
-
-        const churchesOnly: Church[] = [];
-        userChurches.forEach((uc) => churchesOnly.push(uc.church));
-        await ChurchHelper.appendLogos(churchesOnly);
-        userChurches.forEach((uc) => {
-          const foundChurch = ArrayHelper.getOne(churchesOnly, "id", uc.church.id);
-          uc.church.settings = foundChurch?.settings || [];
-        });
-
-        const result = await AuthenticatedUser.login(userChurches, user);
-        if (result === null) return this.denyAccess(["No permissions"]);
+        if (user === null) return this.denyAccess(["Login failed"]);
         else {
-          user.lastLogin = new Date();
-          this.repositories.user.save(user);
-          return this.json(result, 200);
+          const userChurches = await this.getUserChurches(user.id);
+
+          const churchesOnly: Church[] = [];
+          userChurches.forEach((uc) => churchesOnly.push(uc.church));
+          await ChurchHelper.appendLogos(churchesOnly);
+          userChurches.forEach((uc) => {
+            const foundChurch = ArrayHelper.getOne(churchesOnly, "id", uc.church.id);
+            uc.church.settings = foundChurch?.settings || [];
+          });
+
+          const result = await AuthenticatedUser.login(userChurches, user);
+          if (result === null) return this.denyAccess(["No permissions"]);
+          else {
+            user.lastLogin = new Date();
+            this.repositories.user.save(user);
+            return this.json(result, 200);
+          }
         }
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") {
+          throw e;
+        }
+        this.logger.error(e.toString());
+        return this.error([e.toString()]);
       }
-    } catch (e) {
-      if (Environment.currentEnvironment === "dev") {
-        throw e;
-      }
-      this.logger.error(e.toString());
-      return this.error([e.toString()]);
-    }
+    });
   }
 
   private async getUserChurches(id: string): Promise<LoginUserChurch[]> {
@@ -129,32 +132,34 @@ export class UserController extends MembershipBaseController {
 
   @httpPost("/verifyCredentials", ...emailPasswordValidation)
   public async verifyCredentials(req: express.Request<{}, {}, EmailPassword>, res: express.Response): Promise<any> {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
 
-      const user = await this.repositories.user.loadByEmail(req.body.email);
-      if (user === null) {
-        return this.json({}, 200);
-      }
+        const user = await this.repositories.user.loadByEmail(req.body.email);
+        if (user === null) {
+          return this.json({}, 200);
+        }
 
-      const passwordMatched = bcrypt.compareSync(req.body.password, user.password);
-      if (!passwordMatched) {
-        return this.denyAccess(["Incorrect password"]);
-      }
-      const userChurches = await this.repositories.rolePermission.loadForUser(user.id, false);
-      const churchNames = userChurches.map((uc) => uc.church.name);
+        const passwordMatched = bcrypt.compareSync(req.body.password, user.password);
+        if (!passwordMatched) {
+          return this.denyAccess(["Incorrect password"]);
+        }
+        const userChurches = await this.repositories.rolePermission.loadForUser(user.id, false);
+        const churchNames = userChurches.map((uc) => uc.church.name);
 
-      return this.json({ churches: churchNames }, 200);
-    } catch (e) {
-      if (Environment.currentEnvironment === "dev") {
-        throw e;
+        return this.json({ churches: churchNames }, 200);
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") {
+          throw e;
+        }
+        this.logger.error(e);
+        return this.error([e.toString()]);
       }
-      this.logger.error(e);
-      return this.error([e.toString()]);
-    }
+    });
   }
 
   private async grantAdminAccess(userChurches: LoginUserChurch[], churchId: string) {
@@ -250,50 +255,54 @@ export class UserController extends MembershipBaseController {
 
   @httpPost("/setPasswordGuid")
   public async setPasswordGuid(req: express.Request<{}, {}, NewPasswordRequest>, res: express.Response): Promise<any> {
-    try {
-      const user = await this.repositories.user.loadByAuthGuid(req.body.authGuid);
-      if (user !== null) {
-        user.authGuid = "";
-        const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
-        user.password = hashedPass;
-        await this.repositories.user.save(user);
-        return { success: true };
-      } else return { success: false };
-    } catch (e) {
-      if (Environment.currentEnvironment === "dev") {
-        throw e;
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const user = await this.repositories.user.loadByAuthGuid(req.body.authGuid);
+        if (user !== null) {
+          user.authGuid = "";
+          const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
+          user.password = hashedPass;
+          await this.repositories.user.save(user);
+          return { success: true };
+        } else return { success: false };
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") {
+          throw e;
+        }
+        this.logger.error(e);
+        return this.error([e.toString()]);
       }
-      this.logger.error(e);
-      return this.error([e.toString()]);
-    }
+    });
   }
 
   @httpPost("/forgot", body("userEmail").exists().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"))
   public async forgotPassword(req: express.Request<{}, {}, ResetPasswordRequest>, res: express.Response): Promise<any> {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
 
-      const user = await this.repositories.user.loadByEmail(req.body.userEmail);
-      if (user === null) return this.json({ emailed: false }, 200);
-      else {
-        user.authGuid = v4();
-        const promises = [];
-        const timestamp = Date.now();
-        promises.push(this.repositories.user.save(user));
-        promises.push(UserHelper.sendForgotEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, req.body.appName, req.body.appUrl));
-        await Promise.all(promises);
-        return this.json({ emailed: true }, 200);
+        const user = await this.repositories.user.loadByEmail(req.body.userEmail);
+        if (user === null) return this.json({ emailed: false }, 200);
+        else {
+          user.authGuid = v4();
+          const promises = [] as Promise<any>[];
+          const timestamp = Date.now();
+          promises.push(this.repositories.user.save(user));
+          promises.push(UserHelper.sendForgotEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, req.body.appName, req.body.appUrl));
+          await Promise.all(promises);
+          return this.json({ emailed: true }, 200);
+        }
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") {
+          throw e;
+        }
+        this.logger.error(e);
+        return this.error([e.toString()]);
       }
-    } catch (e) {
-      if (Environment.currentEnvironment === "dev") {
-        throw e;
-      }
-      this.logger.error(e);
-      return this.error([e.toString()]);
-    }
+    });
   }
 
   @httpPost("/setDisplayName", ...setDisplayNameValidation)
@@ -340,8 +349,10 @@ export class UserController extends MembershipBaseController {
 
   @httpPost("/updateOptedOut")
   public async updateOptedOut(req: express.Request<{}, {}, { personId: string; optedOut: boolean }>, res: express.Response): Promise<any> {
-    this.repositories.person.updateOptedOut(req.body.personId, req.body.optedOut);
-    return this.json({}, 200);
+    return this.actionWrapper(req, res, async () => {
+      await this.repositories.person.updateOptedOut(req.body.personId, req.body.optedOut);
+      return this.json({}, 200);
+    });
   }
 
   @httpPost("/updatePassword", body("newPassword").isLength({ min: 6 }).withMessage("must be at least 6 chars long"))

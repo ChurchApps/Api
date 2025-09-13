@@ -1,40 +1,17 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper, DateHelper } from "@churchapps/apihelper";
+import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { DateHelper } from "@churchapps/apihelper";
 import { FundDonation } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 @injectable()
-export class FundDonationRepository {
-  public save(fundDonation: FundDonation) {
-    return fundDonation.id ? this.update(fundDonation) : this.create(fundDonation);
-  }
-
-  private async create(fundDonation: FundDonation) {
-    fundDonation.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO fundDonations (id, churchId, donationId, fundId, amount) VALUES (?, ?, ?, ?, ?);";
-    const params = [fundDonation.id, fundDonation.churchId, fundDonation.donationId, fundDonation.fundId, fundDonation.amount];
-    await DB.query(sql, params);
-    return fundDonation;
-  }
-
-  private async update(fundDonation: FundDonation) {
-    const sql = "UPDATE fundDonations SET donationId=?, fundId=?, amount=? WHERE id=? and churchId=?";
-    const params = [fundDonation.donationId, fundDonation.fundId, fundDonation.amount, fundDonation.id, fundDonation.churchId];
-    await DB.query(sql, params);
-    return fundDonation;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM fundDonations WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM fundDonations WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM fundDonations WHERE churchId=?;", [churchId]);
+export class FundDonationRepository extends ConfiguredRepository<FundDonation> {
+  protected get repoConfig(): RepoConfig<FundDonation> {
+    return {
+      tableName: "fundDonations",
+      hasSoftDelete: false,
+      insertColumns: ["donationId", "fundId", "amount"],
+      updateColumns: ["donationId", "fundId", "amount"]
+    };
   }
 
   public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
@@ -83,7 +60,7 @@ export class FundDonationRepository {
     );
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(data: any): FundDonation {
     const result: FundDonation = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount };
     if (data.batchId !== undefined) {
       result.donation = {
@@ -96,7 +73,5 @@ export class FundDonationRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<FundDonation>(data, (d: any) => this.convertToModel(churchId, d));
-  }
+  // Inherit default convertToModel/convertAllToModel from BaseRepository
 }

@@ -1,4 +1,4 @@
-import { controller, httpPost, httpGet, interfaces, requestParam, httpDelete } from "inversify-express-utils";
+import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import { RegistrationRequest, Church, RolePermission, Api, RegisterChurchRequest, LoginUserChurch, Group, RoleMember, User } from "../models";
 import express from "express";
 import { body, validationResult } from "express-validator";
@@ -32,91 +32,97 @@ export class ChurchController extends MembershipBaseController {
   }
 
   @httpPost("/search")
-  public async searchPost(req: express.Request<{}, {}, { name: string }>, res: express.Response): Promise<interfaces.IHttpActionResult> {
-    try {
-      let result: Church[] = [];
-      if (req.body.name !== undefined) {
-        const data = await this.repositories.church.search(
-          // decode URI encoded character e.g. replace %20 with ' '
-          decodeURIComponent(
-            // decode unicode characters '\uXXXX'
+  public async searchPost(req: express.Request<{}, {}, { name: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        let result: Church[] = [];
+        if (req.body.name !== undefined) {
+          const data = await this.repositories.church.search(
+            // decode URI encoded character e.g. replace %20 with ' '
+            decodeURIComponent(
+              // decode unicode characters '\uXXXX'
 
-            JSON.parse(
-              "\"" +
-              req.body.name
-                .toString()
-                // prepare unicode characters '\uXXXX' for decoding
-                .replace(/%u/g, "\\u") +
-              "\""
-            )
-          ),
-          false
-        );
-        result = this.repositories.church.convertAllToModel(data);
-        await ChurchHelper.appendLogos(result);
-        if (result.length > 0 && this.include(req, "favicon_400x400")) await this.appendLogos(result);
+              JSON.parse(
+                "\"" +
+                req.body.name
+                  .toString()
+                  // prepare unicode characters '\uXXXX' for decoding
+                  .replace(/%u/g, "\\u") +
+                "\""
+              )
+            ),
+            false
+          );
+          result = this.repositories.church.convertAllToModel(data);
+          await ChurchHelper.appendLogos(result);
+          if (result.length > 0 && this.include(req, "favicon_400x400")) await this.appendLogos(result);
+        }
+        return this.json(result, 200);
+      } catch (e) {
+        this.logger.error(e);
+        return this.json({ error: "Internal server error" }, 500);
       }
-      return this.json(result, 200);
-    } catch (e) {
-      this.logger.error(e);
-      return this.json({ error: "Internal server error" }, 500);
-    }
+    });
   }
 
   @httpGet("/search/")
-  public async search(req: express.Request<{}, {}, []>, res: express.Response): Promise<interfaces.IHttpActionResult> {
-    try {
-      let result: Church[] = [];
-      if (req.query.name !== undefined) {
-        const app = req.query.app === undefined ? "" : req.query.app.toString();
-        const data = await this.repositories.church.search(
-          // decode URI encoded character e.g. replace %20 with ' '
-          decodeURIComponent(
-            // decode unicode characters '\uXXXX'
-            JSON.parse(
-              "\"" +
-              req.query.name
-                .toString()
-                // prepare unicode characters '\uXXXX' for decoding
-                .replace(/%u/g, "\\u") +
-              "\""
-            )
-          ),
-          false
-        );
-        result = this.repositories.church.convertAllToModel(data);
-        await ChurchHelper.appendLogos(result);
-        if (result.length > 0 && this.include(req, "favicon_400x400")) await this.appendLogos(result);
+  public async search(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        let result: Church[] = [];
+        if (req.query.name !== undefined) {
+          const app = req.query.app === undefined ? "" : req.query.app.toString();
+          const data = await this.repositories.church.search(
+            // decode URI encoded character e.g. replace %20 with ' '
+            decodeURIComponent(
+              // decode unicode characters '\uXXXX'
+              JSON.parse(
+                "\"" +
+                req.query.name
+                  .toString()
+                  // prepare unicode characters '\uXXXX' for decoding
+                  .replace(/%u/g, "\\u") +
+                "\""
+              )
+            ),
+            false
+          );
+          result = this.repositories.church.convertAllToModel(data);
+          await ChurchHelper.appendLogos(result);
+          if (result.length > 0 && this.include(req, "favicon_400x400")) await this.appendLogos(result);
+        }
+        return this.json(result, 200);
+      } catch (e) {
+        this.logger.error(e);
+        return this.json({ error: "Internal server error" }, 500);
       }
-      return this.json(result, 200);
-    } catch (e) {
-      this.logger.error(e);
-      return this.json({ error: "Internal server error" }, 500);
-    }
+    });
   }
 
   @httpGet("/lookup/")
-  public async getBySubDomain(req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<interfaces.IHttpActionResult> {
-    try {
-      let result = {};
-      if (req.query.subDomain !== undefined) {
-        const data = await this.repositories.church.loadBySubDomain(req.query.subDomain.toString());
-        if (data) {
-          const church = this.repositories.church.convertToModel(data);
-          result = { id: church.id, name: church.name, subDomain: church.subDomain };
+  public async getBySubDomain(req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        let result = {};
+        if (req.query.subDomain !== undefined) {
+          const data = await this.repositories.church.loadBySubDomain(req.query.subDomain.toString());
+          if (data) {
+            const church = this.repositories.church.convertToModel(data);
+            result = { id: church.id, name: church.name, subDomain: church.subDomain };
+          }
+        } else if (req.query.id !== undefined) {
+          const data = await this.repositories.church.loadById(req.query.id.toString());
+          if (data) {
+            const church = this.repositories.church.convertToModel(data);
+            result = { id: church.id, name: church.name, subDomain: church.subDomain };
+          }
         }
-      } else if (req.query.id !== undefined) {
-        const data = await this.repositories.church.loadById(req.query.id.toString());
-        if (data) {
-          const church = this.repositories.church.convertToModel(data);
-          result = { id: church.id, name: church.name, subDomain: church.subDomain };
-        }
+        return this.json(result, 200);
+      } catch (e) {
+        this.logger.error(e);
+        return this.json({ error: "Internal server error" }, 500);
       }
-      return this.json(result, 200);
-    } catch (e) {
-      this.logger.error(e);
-      return this.json({ error: "Internal server error" }, 500);
-    }
+    });
   }
 
   @httpDelete("/deleteAbandoned")

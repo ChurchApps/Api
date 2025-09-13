@@ -11,3 +11,4 @@ export { DateHelper } from "./DateHelper";
 export { ValidationHelper } from "./ValidationHelper";
 export { StripeHelper } from "./StripeHelper";
 export { CollectionHelper } from "./CollectionHelper";
+export { rowsToArray } from "./DbArrayHelper";

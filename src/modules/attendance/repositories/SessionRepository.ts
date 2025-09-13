@@ -1,18 +1,23 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
 import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { Session } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../../../shared/helpers";
 
 @injectable()
-export class SessionRepository {
-  public save(session: Session) {
-    return session.id ? this.update(session) : this.create(session);
+export class SessionRepository extends ConfiguredRepository<Session> {
+  protected get repoConfig(): RepoConfig<Session> {
+    return {
+      tableName: "sessions",
+      hasSoftDelete: false,
+      defaultOrderBy: "sessionDate DESC",
+      insertColumns: ["groupId", "serviceTimeId", "sessionDate"],
+      updateColumns: ["groupId", "serviceTimeId", "sessionDate"]
+    };
   }
 
-  private async create(session: Session) {
-    session.id = UniqueIdHelper.shortId();
+  protected async create(session: Session): Promise<Session> {
+    const m: any = session;
+    if (!m.id) m.id = this.createId();
     const sessionDate = DateHelper.toMysqlDate(session.sessionDate);
     const sql = "INSERT INTO sessions (id, churchId, groupId, serviceTimeId, sessionDate) VALUES (?, ?, ?, ?, ?);";
     const params = [session.id, session.churchId, session.groupId, session.serviceTimeId, sessionDate];
@@ -20,7 +25,7 @@ export class SessionRepository {
     return session;
   }
 
-  private async update(session: Session) {
+  protected async update(session: Session): Promise<Session> {
     const sessionDate = DateHelper.toMysqlDate(session.sessionDate);
     const sql = "UPDATE sessions SET groupId=?, serviceTimeId=?, sessionDate=? WHERE id=? and churchId=?";
     const params = [session.groupId, session.serviceTimeId, sessionDate, session.id, session.churchId];
@@ -28,28 +33,18 @@ export class SessionRepository {
     return session;
   }
 
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM sessions WHERE id=? AND churchId=?;", [id, churchId]);
+  public async loadByIds(churchId: string, ids: string[]) {
+    const result = await DB.query("SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");", [churchId].concat(ids));
+    return this.convertAllToModel(churchId, result);
   }
 
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM sessions WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadByIds(churchId: string, ids: string[]) {
-    return DB.query("SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");", [churchId].concat(ids));
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM sessions WHERE churchId=?;", [churchId]);
-  }
-
-  public loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
+  public async loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
     const sessDate = DateHelper.toMysqlDate(sessionDate);
-    return DB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
+    const result = await DB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
+    return result ? this.convertToModel(churchId, result) : null;
   }
 
-  public loadByGroupIdWithNames(churchId: string, groupId: string) {
+  public async loadByGroupIdWithNames(churchId: string, groupId: string) {
     const sql =
       "select s.id, " +
       " CASE" +
@@ -60,10 +55,11 @@ export class SessionRepository {
       " LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId" +
       " WHERE s.churchId=? AND s.groupId=?" +
       " ORDER by s.sessionDate desc";
-    return DB.query(sql, [churchId, groupId]);
+    const result = await DB.query(sql, [churchId, groupId]);
+    return this.convertAllToModel(churchId, result);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(data: any): Session {
     const result: Session = {
       id: data.id,
       groupId: data.groupId,
@@ -72,9 +68,5 @@ export class SessionRepository {
       displayName: data.displayName
     };
     return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Session>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

@@ -1,11 +1,20 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper, DateHelper } from "@churchapps/apihelper";
+import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { DateHelper } from "@churchapps/apihelper";
 import { DonationBatch } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 @injectable()
-export class DonationBatchRepository {
+export class DonationBatchRepository extends ConfiguredRepository<DonationBatch> {
+  protected get repoConfig(): RepoConfig<DonationBatch> {
+    return {
+      tableName: "donationBatches",
+      hasSoftDelete: false,
+      defaultOrderBy: "batchDate DESC",
+      insertColumns: ["name", "batchDate"],
+      updateColumns: ["name", "batchDate"]
+    };
+  }
+
   public async getOrCreateCurrent(churchId: string) {
     const data = await DB.queryOne("SELECT * FROM donationBatches WHERE churchId=? ORDER by batchDate DESC LIMIT 1;", [churchId]);
     if (data !== null) return this.convertToModel(churchId, data);
@@ -16,36 +25,25 @@ export class DonationBatchRepository {
     }
   }
 
-  public save(donationBatch: DonationBatch) {
-    return donationBatch.id ? this.update(donationBatch) : this.create(donationBatch);
-  }
-
-  private async create(donationBatch: DonationBatch) {
-    donationBatch.id = UniqueIdHelper.shortId();
-    const batchDate = DateHelper.toMysqlDate(donationBatch.batchDate as Date);
+  protected async create(batch: DonationBatch): Promise<DonationBatch> {
+    const m: any = batch;
+    if (!m.id) m.id = this.createId();
+    const batchDate = DateHelper.toMysqlDate(batch.batchDate as Date);
     const sql = "INSERT INTO donationBatches (id, churchId, name, batchDate) VALUES (?, ?, ?, ?);";
-    const params = [donationBatch.id, donationBatch.churchId, donationBatch.name, batchDate];
+    const params = [batch.id, batch.churchId, batch.name, batchDate];
     await DB.query(sql, params);
-    return donationBatch;
+    return batch;
   }
 
-  private async update(donationBatch: DonationBatch) {
-    const batchDate = DateHelper.toMysqlDate(donationBatch.batchDate as Date);
+  protected async update(batch: DonationBatch): Promise<DonationBatch> {
+    const batchDate = DateHelper.toMysqlDate(batch.batchDate as Date);
     const sql = "UPDATE donationBatches SET name=?, batchDate=? WHERE id=? and churchId=?";
-    const params = [donationBatch.name, batchDate, donationBatch.id, donationBatch.churchId];
+    const params = [batch.name, batchDate, batch.id, batch.churchId];
     await DB.query(sql, params);
-    return donationBatch;
+    return batch;
   }
 
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM donationBatches WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM donationBatches WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
+  public async loadAll(churchId: string) {
     const sql =
       "SELECT db.*, " +
       "IFNULL(d.donationCount, 0) AS donationCount, " +
@@ -59,10 +57,11 @@ export class DonationBatchRepository {
       ") d ON db.id = d.batchId " +
       "WHERE db.churchId = ? " +
       "ORDER BY db.batchDate DESC";
-    return DB.query(sql, [churchId, churchId]);
+    const result = await DB.query(sql, [churchId, churchId]);
+    return this.convertAllToModel(churchId, result);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(data: any): DonationBatch {
     const result: DonationBatch = {
       id: data.id,
       name: data.name,
@@ -71,9 +70,5 @@ export class DonationBatchRepository {
       totalAmount: data.totalAmount
     };
     return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<DonationBatch>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }
