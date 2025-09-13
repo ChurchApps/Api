@@ -130,7 +130,7 @@ export class Environment extends EnvironmentBase {
     await this.initializeDatabaseConnections(data);
 
     // Initialize app configurations
-    await this.initializeAppConfigs(data, environment);
+    await this.initializeAppConfigs(data);
 
     // Debug: Log final database connection state
     console.log(`🔍 Environment.init() complete. Database connections loaded: ${Array.from(this.dbConnections.keys()).join(", ")}`);
@@ -205,7 +205,7 @@ export class Environment extends EnvironmentBase {
     }
   }
 
-  private static async initializeAppConfigs(config: any, environment: string) {
+  private static async initializeAppConfigs(config: any) {
     // WebSocket configuration
     this.websocketUrl = process.env.SOCKET_URL || "";
     this.websocketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : 8087;
