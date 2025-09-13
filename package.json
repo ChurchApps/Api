@@ -21,7 +21,7 @@
     "reset-db": "ts-node tools/initdb.ts --reset",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "clean": "rimraf dist",
-    "lint": "eslint . --fix && prettier --write src/**/*.ts",
+    "lint": "prettier --write src/**/*.ts && eslint . --fix",
     "lint:check": "eslint .",
     "tsc": "tsc",
     "copy-assets": "copyfiles -u 1 src/**/*.html src/**/*.css dist/",

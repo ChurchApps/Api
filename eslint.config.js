@@ -46,6 +46,7 @@ module.exports = [
       // General rules (matching MembershipApi)
       "prefer-const": "error",
       "no-unused-vars": "off", // Turn off base rule since we use unused-imports plugin
+      indent: "off", // Delegate indentation to Prettier for consistency with VS Code
 
       // Code style (enforced by Prettier, but useful for linting)
       semi: ["error", "always"],

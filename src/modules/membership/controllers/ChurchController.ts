@@ -44,11 +44,11 @@ export class ChurchController extends MembershipBaseController {
 
               JSON.parse(
                 "\"" +
-                req.body.name
-                  .toString()
-                  // prepare unicode characters '\uXXXX' for decoding
-                  .replace(/%u/g, "\\u") +
-                "\""
+                  req.body.name
+                    .toString()
+                    // prepare unicode characters '\uXXXX' for decoding
+                    .replace(/%u/g, "\\u") +
+                  "\""
               )
             ),
             false
@@ -78,11 +78,11 @@ export class ChurchController extends MembershipBaseController {
               // decode unicode characters '\uXXXX'
               JSON.parse(
                 "\"" +
-                req.query.name
-                  .toString()
-                  // prepare unicode characters '\uXXXX' for decoding
-                  .replace(/%u/g, "\\u") +
-                "\""
+                  req.query.name
+                    .toString()
+                    // prepare unicode characters '\uXXXX' for decoding
+                    .replace(/%u/g, "\\u") +
+                  "\""
               )
             ),
             false
