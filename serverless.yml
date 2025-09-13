@@ -28,6 +28,31 @@ provider:
   environment:
     STAGE: ${self:custom.env}
     ENVIRONMENT: ${self:custom.env}
+    # App secrets and config loaded from SSM at deploy-time
+    JWT_SECRET: ${ssm:/${self:custom.env}/jwtSecret, ''}
+    
+    # Database connections for all modules
+    MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.env}/membershipApi/connectionString, ''}
+    ATTENDANCE_CONNECTION_STRING: ${ssm:/${self:custom.env}/attendanceApi/connectionString, ''}
+    CONTENT_CONNECTION_STRING: ${ssm:/${self:custom.env}/contentApi/connectionString, ''}
+    GIVING_CONNECTION_STRING: ${ssm:/${self:custom.env}/givingApi/connectionString, ''}
+    MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.env}/messagingApi/connectionString, ''}
+    DOING_CONNECTION_STRING: ${ssm:/${self:custom.env}/doingApi/connectionString, ''}
+    REPORTING_CONNECTION_STRING: ${ssm:/${self:custom.env}/reportingApi/connectionString, ''}
+
+    # Third-party API keys (non-DB secrets)
+    HUBSPOT_KEY: ${ssm:/${self:custom.env}/hubspotKey, ''}
+    CADDY_HOST: ${ssm:/${self:custom.env}/caddyHost, ''}
+    CADDY_PORT: ${ssm:/${self:custom.env}/caddyPort, ''}
+    YOUTUBE_API_KEY: ${ssm:/${self:custom.env}/youTubeApiKey, ''}
+    PEXELS_KEY: ${ssm:/${self:custom.env}/pexelsKey, ''}
+    VIMEO_TOKEN: ${ssm:/${self:custom.env}/vimeoToken, ''}
+    API_BIBLE_KEY: ${ssm:/${self:custom.env}/apiBibleKey, ''}
+    PRAISECHARTS_CONSUMER_KEY: ${ssm:/${self:custom.env}/praiseChartsConsumerKey, ''}
+    PRAISECHARTS_CONSUMER_SECRET: ${ssm:/${self:custom.env}/praiseChartsConsumerSecret, ''}
+    GOOGLE_RECAPTCHA_SECRET_KEY: ${ssm:/${self:custom.env}/recaptcha-secret-key, ''}
+    OPENROUTER_API_KEY: ${ssm:/${self:custom.env}/openRouterApiKey, ''}
+    OPENAI_API_KEY: ${ssm:/${self:custom.env}/openAiApiKey, ''}
   iam:
     role: arn:aws:iam::428019619026:role/ChurchAppsRole
 
@@ -68,7 +93,7 @@ functions:
     timeout: 30
     vpc: ${self:custom.vpcSettings.current, ''}
     environment:
-      # Database connections loaded at runtime from Parameter Store
+      # Function-specific overrides (if any) can be set here
     events:
       - http:
           path: /

@@ -1,8 +1,7 @@
 import fs from "fs";
 import path from "path";
-import { AwsHelper, EnvironmentBase } from "@churchapps/apihelper";
+import { EnvironmentBase } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser";
-import { ParameterStoreHelper } from "./ParameterStoreHelper";
 
 export class Environment extends EnvironmentBase {
   // Current environment and server configuration
@@ -111,17 +110,18 @@ export class Environment extends EnvironmentBase {
     // Set current environment and server config
     this.currentEnvironment = environment;
     this.port = process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : 8084;
-    this.socketUrl = process.env.SOCKET_URL || process.env.WEBSOCKET_URL;
+    this.socketUrl = process.env.SOCKET_URL;
 
     // Legacy environment variable support
     this.appEnv = environment;
     this.apiEnv = this.appEnv;
     this.serverPort = this.port;
-    this.socketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT) : 8087;
+    this.socketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : 8087;
     this.encryptionKey = process.env.ENCRYPTION_KEY || "";
     this.appName = data.appName || "API";
     this.corsOrigin = process.env.CORS_ORIGIN || "*";
-    this.jwtSecret = process.env.JWT_SECRET || (await AwsHelper.readParameter(`/${environment.toLowerCase()}/jwtSecret`));
+    // JWT secret strictly from environment variables
+    this.jwtSecret = process.env.JWT_SECRET || "";
 
     // Initialize module-specific configs
     this.initializeModuleConfigs(data);
@@ -169,73 +169,46 @@ export class Environment extends EnvironmentBase {
       }
     }
 
-    const isAwsEnvironment = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV;
-    const environment = (this.currentEnvironment || process.env.ENVIRONMENT || "dev").toLowerCase();
-
-    console.log(`🔍 Is AWS Environment: ${isAwsEnvironment}`);
-    console.log(`🔍 Using environment: ${environment}`);
-
-    // Load all database connections in parallel with retry logic
-    const connectionResults = await ParameterStoreHelper.loadDatabaseConnectionsParallel(modules, environment, !!isAwsEnvironment);
-
-    // Process results and set up database connections
+    // Load database connections from a single, canonical env var per module: <MODULE>_CONNECTION_STRING
     const successfulConnections: string[] = [];
     const failedConnections: string[] = [];
 
-    for (const result of connectionResults) {
-      if (result.connectionString) {
+    for (const moduleName of modules) {
+      const envVar = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
+      const connString = process.env[envVar];
+
+      if (connString) {
         try {
-          const dbConfig = DatabaseUrlParser.parseConnectionString(result.connectionString);
-          console.log(`🔍 About to set ${result.moduleName} in dbConnections Map`);
-          console.log(`🔍 Map reference before set: ${this.dbConnections}`);
-          console.log(`🔍 Map size before set: ${this.dbConnections.size}`);
-          this.dbConnections.set(result.moduleName, dbConfig);
-          console.log(`🔍 Map size after set: ${this.dbConnections.size}`);
-          console.log(`🔍 Can retrieve ${result.moduleName}: ${!!this.dbConnections.get(result.moduleName)}`);
-          console.log(`✅ Loaded ${result.moduleName} database config (source: ${result.source})`);
-          successfulConnections.push(result.moduleName);
+          const dbConfig = DatabaseUrlParser.parseConnectionString(connString);
+          this.dbConnections.set(moduleName, dbConfig);
+          console.log(`✅ Loaded ${moduleName} database config from ${envVar}`);
+          successfulConnections.push(moduleName);
         } catch (error) {
-          console.error(`❌ Failed to parse connection string for ${result.moduleName}: ${error}`);
-          failedConnections.push(result.moduleName);
-          // Don't throw here - allow other modules to continue working
+          console.error(`❌ Failed to parse ${moduleName} connection string from ${envVar}: ${error}`);
+          failedConnections.push(moduleName);
         }
       } else {
-        console.log(`⚠️ No connection string found for ${result.moduleName} module`);
-        failedConnections.push(result.moduleName);
-        if (result.error) {
-          console.error(`❌ Error details for ${result.moduleName}:`, result.error.message);
-        }
+        console.log(`⚠️ Missing required env var for ${moduleName} connection string: ${envVar}`);
+        failedConnections.push(moduleName);
       }
     }
 
-    // Log final state with more detail
     console.log("🔍 Database connections summary:");
     console.log(`  - Successful (${successfulConnections.length}): ${successfulConnections.join(", ")}`);
     if (failedConnections.length > 0) {
       console.log(`  - Failed (${failedConnections.length}): ${failedConnections.join(", ")}`);
     }
 
-    // Log detailed results per module
-    console.log("🔍 Detailed module results:");
-    for (const result of connectionResults) {
-      console.log(`  - ${result.moduleName}: ${result.source} (${result.connectionString ? "SUCCESS" : "FAILED"})`);
-      if (result.error) {
-        console.log(`    Error: ${result.error.message}`);
-      }
-    }
-
     // Only throw if critical modules failed (membership is always critical)
-    const criticalModules = ["membership"];
-    const failedCritical = criticalModules.filter((module) => failedConnections.includes(module));
-    if (failedCritical.length > 0) {
-      throw new Error(`Critical database modules failed to load: ${failedCritical.join(", ")}`);
+    if (failedConnections.includes("membership")) {
+      throw new Error("Critical database module 'membership' failed to load from environment variables");
     }
   }
 
   private static async initializeAppConfigs(config: any, environment: string) {
     // WebSocket configuration
-    this.websocketUrl = process.env.SOCKET_URL || process.env.WEBSOCKET_URL;
-    this.websocketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : process.env.WEBSOCKET_PORT ? parseInt(process.env.WEBSOCKET_PORT) : 8087;
+    this.websocketUrl = process.env.SOCKET_URL || "";
+    this.websocketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : 8087;
 
     // File storage configuration
     this.fileStore = process.env.FILE_STORE || config.fileStore;
@@ -253,40 +226,21 @@ export class Environment extends EnvironmentBase {
     // AI provider configuration (shared)
     this.aiProvider = process.env.AI_PROVIDER || config.aiProvider || "openrouter";
 
-    // Load Parameter Store values in parallel with retry logic
-    console.log("🔄 Loading configuration parameters in parallel...");
-    const parameterMap = {
-      hubspotKey: "hubspotKey",
-      caddyHost: "caddyHost",
-      caddyPort: "caddyPort",
-      youTubeApiKey: "youTubeApiKey",
-      pexelsKey: "pexelsKey",
-      vimeoToken: "vimeoToken",
-      apiBibleKey: "apiBibleKey",
-      praiseChartsConsumerKey: "praiseChartsConsumerKey",
-      praiseChartsConsumerSecret: "praiseChartsConsumerSecret",
-      googleRecaptchaSecretKey: "recaptcha-secret-key",
-      openRouterApiKey: "openRouterApiKey",
-      openAiApiKey: "openAiApiKey"
-    };
+    // Config strictly from environment variables (with config file fallback for non-secrets)
+    this.hubspotKey = process.env.HUBSPOT_KEY || "";
+    this.caddyHost = process.env.CADDY_HOST || config.caddyHost || "";
+    this.caddyPort = process.env.CADDY_PORT || config.caddyPort || "";
+    this.youTubeApiKey = process.env.YOUTUBE_API_KEY || "";
+    this.pexelsKey = process.env.PEXELS_KEY || "";
+    this.vimeoToken = process.env.VIMEO_TOKEN || "";
+    this.apiBibleKey = process.env.API_BIBLE_KEY || "";
+    this.praiseChartsConsumerKey = process.env.PRAISECHARTS_CONSUMER_KEY || "";
+    this.praiseChartsConsumerSecret = process.env.PRAISECHARTS_CONSUMER_SECRET || "";
+    this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || "";
+    this.openRouterApiKey = process.env.OPENROUTER_API_KEY || "";
+    this.openAiApiKey = process.env.OPENAI_API_KEY || "";
 
-    const parameterValues = await ParameterStoreHelper.loadConfigParametersParallel(parameterMap, environment);
-
-    // Set values with fallback to environment variables
-    this.hubspotKey = process.env.HUBSPOT_KEY || parameterValues.hubspotKey || "";
-    this.caddyHost = process.env.CADDY_HOST || parameterValues.caddyHost || "";
-    this.caddyPort = process.env.CADDY_PORT || parameterValues.caddyPort || "";
-    this.youTubeApiKey = process.env.YOUTUBE_API_KEY || parameterValues.youTubeApiKey || "";
-    this.pexelsKey = process.env.PEXELS_KEY || parameterValues.pexelsKey || "";
-    this.vimeoToken = process.env.VIMEO_TOKEN || parameterValues.vimeoToken || "";
-    this.apiBibleKey = process.env.API_BIBLE_KEY || parameterValues.apiBibleKey || "";
-    this.praiseChartsConsumerKey = process.env.PRAISECHARTS_CONSUMER_KEY || parameterValues.praiseChartsConsumerKey || "";
-    this.praiseChartsConsumerSecret = process.env.PRAISECHARTS_CONSUMER_SECRET || parameterValues.praiseChartsConsumerSecret || "";
-    this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || parameterValues.googleRecaptchaSecretKey || "";
-    this.openRouterApiKey = process.env.OPENROUTER_API_KEY || parameterValues.openRouterApiKey || "";
-    this.openAiApiKey = process.env.OPENAI_API_KEY || parameterValues.openAiApiKey || "";
-
-    console.log("✅ Configuration parameters loaded successfully");
+    console.log("✅ Configuration parameters loaded from environment variables");
   }
 
   static getDatabaseConfig(moduleName: string): any {
