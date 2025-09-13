@@ -37,12 +37,7 @@ export class ParameterStoreHelper {
     const moduleNames = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
     const anyModuleConn = moduleNames.some((m) => {
       const upper = m.toUpperCase();
-      return (
-        !!process.env[`${upper}_CONNECTION_STRING`] ||
-        !!process.env[`${upper}_DB_CONNECTION_STRING`] ||
-        !!process.env[`${upper}_DATABASE_URL`] ||
-        !!process.env[`DB_${upper}_CONNECTION_STRING`]
-      );
+      return !!process.env[`${upper}_CONNECTION_STRING`] || !!process.env[`${upper}_DB_CONNECTION_STRING`] || !!process.env[`${upper}_DATABASE_URL`] || !!process.env[`DB_${upper}_CONNECTION_STRING`];
     });
 
     const forceFromEnv = process.env.LOAD_DB_FROM_ENV === "true" || process.env.DB_FROM_ENV === "true";

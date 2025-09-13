@@ -47,8 +47,8 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
       } else {
         placeholders.push("?");
         params.push((model as any)[col]);
-    }
-  });
+      }
+    });
 
     const sql = `INSERT INTO ${this.tableName} (${cols.join(", ")}) VALUES (${placeholders.join(", ")});`;
     return { sql, params };
@@ -92,7 +92,7 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
 
   public async loadMany(churchId: string, orderBy?: string, includeRemoved = false) {
     const cfg = this.repoConfig;
-    const removedClause = (cfg.hasSoftDelete !== false && !includeRemoved) ? ` AND ${this.removedColumn}=0` : "";
+    const removedClause = cfg.hasSoftDelete !== false && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
     const order = orderBy || cfg.defaultOrderBy;
     const orderClause = order ? ` ORDER BY ${order}` : "";
     const sql = `SELECT * FROM ${this.table()} WHERE ${this.churchIdColumn}=?${removedClause}${orderClause};`;

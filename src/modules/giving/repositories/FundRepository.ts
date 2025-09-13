@@ -36,5 +36,4 @@ export class FundRepository extends ConfiguredRepository<Fund> {
     };
     return result;
   }
-
 }

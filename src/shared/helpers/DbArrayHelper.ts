@@ -9,4 +9,3 @@ export function rowsToArray<T = any>(result: any): T[] {
   if (result && Array.isArray(result.rows)) return result.rows as T[];
   return [] as T[];
 }
-

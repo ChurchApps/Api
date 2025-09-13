@@ -1,8 +1,7 @@
 import { injectable } from "inversify";
 import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
-import { UniqueIdHelper, DateHelper } from "@churchapps/apihelper";
+import { DateHelper } from "@churchapps/apihelper";
 import { FundDonation } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 @injectable()
 export class FundDonationRepository extends ConfiguredRepository<FundDonation> {
@@ -75,5 +74,4 @@ export class FundDonationRepository extends ConfiguredRepository<FundDonation> {
   }
 
   // Inherit default convertToModel/convertAllToModel from BaseRepository
-
 }

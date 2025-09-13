@@ -113,12 +113,12 @@ export class FormSubmissionController extends MembershipBaseController {
           formSubmission.questions.forEach((q) => {
             formSubmission.answers.forEach((a) => {
               if (q.id === a.questionId) {
-                contentRows.push("<tr><th style=\"font-size: 16px\" width=\"30%\">" + q.title + "</th><td style=\"font-size: 15px\">" + a.value + "</td></tr>");
+                contentRows.push('<tr><th style="font-size: 16px" width="30%">' + q.title + '</th><td style="font-size: 15px">' + a.value + "</td></tr>");
               }
             });
           });
 
-          const contents = "<table role=\"presentation\" style=\"text-align: left;\" cellspacing=\"8\" width=\"80%\"><tablebody>" + contentRows.join(" ") + "</tablebody></table>";
+          const contents = '<table role="presentation" style="text-align: left;" cellspacing="8" width="80%"><tablebody>' + contentRows.join(" ") + "</tablebody></table>";
           const promises: Promise<any>[] = [];
           (people as any[]).forEach((p: Person) => {
             promises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, p.email, church.name, Environment.chumsRoot, "New Submissions for " + form.name, contents));
