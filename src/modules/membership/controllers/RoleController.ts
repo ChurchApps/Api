@@ -2,11 +2,16 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import { Role } from "../models";
 import express from "express";
 import { AuthenticatedUser } from "../auth";
-import { MembershipBaseController } from "./MembershipBaseController";
+import { MembershipCrudController } from "./MembershipCrudController";
 import { Permissions, IPermission } from "../helpers";
 
 @controller("/membership/roles")
-export class RoleController extends MembershipBaseController {
+export class RoleController extends MembershipCrudController {
+  protected crudSettings = {
+    repoKey: "role",
+    permissions: { view: Permissions.roles.view, edit: Permissions.roles.edit },
+    routes: ["post", "delete"] as const
+  };
   @httpGet("/church/:churchId")
   public async loadByChurchId(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
