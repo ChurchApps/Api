@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { GroupServiceTime } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../../../shared/helpers";
 
 @injectable()
@@ -58,9 +59,7 @@ export class GroupServiceTimeRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: GroupServiceTime[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<GroupServiceTime>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

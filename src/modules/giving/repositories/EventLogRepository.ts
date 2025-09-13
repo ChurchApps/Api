@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { EventLog } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 
 @injectable()
 export class EventLogRepository {
@@ -56,9 +57,7 @@ export class EventLogRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: EventLog[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<EventLog>(data, (d: any) => this.convertToModel(d));
   }
 }

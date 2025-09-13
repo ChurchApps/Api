@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { SubscriptionFund } from "../models";
 
@@ -90,9 +91,7 @@ export class SubscriptionFundsRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: any[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<SubscriptionFund>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

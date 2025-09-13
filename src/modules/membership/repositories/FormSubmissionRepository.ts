@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { FormSubmission } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper, DateHelper } from "../helpers";
 
 @injectable()
@@ -72,10 +73,8 @@ export class FormSubmissionRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
+  public convertAllToModel(churchId: string, data: any) {
     console.log("Converting Form Submissions", data.length);
-    const result: FormSubmission[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+    return CollectionHelper.convertAll<FormSubmission>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

@@ -12,8 +12,7 @@ export class ServiceTimeController extends AttendanceBaseController {
       const campusId = req.query.campusId.toString();
       const serviceId = req.query.serviceId.toString();
       const data = await this.repositories.serviceTime.loadByChurchCampusService(au.churchId, campusId, serviceId);
-      const dataArray = (data as any)?.rows || data || [];
-      return this.repositories.serviceTime.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.serviceTime.convertAllToModel(au.churchId, data as any);
     });
   }
 

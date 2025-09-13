@@ -1,25 +1,26 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { BlockedIp } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 
 export class BlockedIpRepository {
   public async loadByConversationId(churchId: string, conversationId: string) {
     const sql = "SELECT * FROM blockedIps WHERE churchId=? AND conversationId=?;";
     const params = [churchId, conversationId];
     const result: any = await DB.query(sql, params);
-    const data = result.rows || result || [];
+    const data = result || [];
     const ips = data.map((d: BlockedIp) => d.ipAddress);
     return ips;
   }
 
   public async loadByServiceId(churchId: string, serviceId: string) {
     const result: any = await DB.query("SELECT * FROM blockedIps WHERE churchId=? AND serviceId=?;", [churchId, serviceId]);
-    return result.rows || result || [];
+    return result || [];
   }
 
   public async save(blockedIp: BlockedIp) {
     const result: any = await DB.query("SELECT id FROM blockedIps WHERE churchId=? AND conversationId=? AND ipAddress=?;", [blockedIp.churchId, blockedIp.conversationId, blockedIp.ipAddress]);
-    const existingIp = result.rows || result || [];
+    const existingIp = result || [];
     return existingIp[0]?.id ? this.deleteExisting(existingIp[0].id) : this.create(blockedIp);
   }
 
@@ -50,9 +51,7 @@ export class BlockedIpRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: BlockedIp[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<BlockedIp>(data, (d: any) => this.convertToModel(d));
   }
 }

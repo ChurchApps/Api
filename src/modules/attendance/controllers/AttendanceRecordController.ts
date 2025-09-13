@@ -9,8 +9,7 @@ export class AttendanceRecordController extends AttendanceBaseController {
   public async tree(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.attendance.loadTree(au.churchId);
-      const dataArray = (data as any)?.rows || data || [];
-      return this.repositories.attendance.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.attendance.convertAllToModel(au.churchId, data as any);
     });
   }
 
@@ -84,8 +83,7 @@ export class AttendanceRecordController extends AttendanceBaseController {
           result = await this.repositories.attendance.loadForPerson(au.churchId, personId);
         }
       }
-      const resultArray = (result as any)?.rows || result || [];
-      return this.repositories.attendance.convertAllToModel(au.churchId, resultArray);
+      return this.repositories.attendance.convertAllToModel(au.churchId, result as any);
     });
   }
 }

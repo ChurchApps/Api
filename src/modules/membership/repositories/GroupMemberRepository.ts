@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { GroupMember } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { PersonHelper } from "../helpers";
 import { UniqueIdHelper } from "../helpers";
 
@@ -100,10 +101,8 @@ export class GroupMemberRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: GroupMember[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<GroupMember>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   public convertAllToBasicModel(churchId: string, data: any[]) {

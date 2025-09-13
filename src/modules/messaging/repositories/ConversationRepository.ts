@@ -1,13 +1,14 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Conversation } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 
 export class ConversationRepository {
   public async loadByIds(churchId: string, ids: string[]) {
     const sql = "select id, firstPostId, lastPostId, postCount" + " FROM conversations" + " WHERE churchId=? and id IN (?)";
     const params = [churchId, ids];
     const result: any = await DB.query(sql, params);
-    return result.rows || result || [];
+    return result || [];
   }
 
   public async loadPosts(churchId: string, groupIds: string[]) {
@@ -20,7 +21,7 @@ export class ConversationRepository {
       " AND lp.timeSent>DATE_SUB(NOW(), INTERVAL 365 DAY)";
     const params = [churchId, groupIds];
     const result: any = await DB.query(sql, params);
-    return result.rows || result || [];
+    return result || [];
   }
 
   private cleanup() {
@@ -102,9 +103,7 @@ export class ConversationRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: Conversation[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<Conversation>(data, (d: any) => this.convertToModel(d));
   }
 }

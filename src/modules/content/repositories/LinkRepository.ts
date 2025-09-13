@@ -1,6 +1,7 @@
 import { Link } from "../models";
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../helpers";
+import { CollectionHelper } from "../../../shared/helpers";
 
 export class LinkRepository {
   public loadAll(churchId: string) {
@@ -71,9 +72,7 @@ export class LinkRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: Link[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Link>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

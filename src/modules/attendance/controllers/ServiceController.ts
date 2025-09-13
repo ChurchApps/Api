@@ -10,8 +10,7 @@ export class ServiceController extends AttendanceBaseController {
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.service.searchByCampus(au.churchId, req.query.campusId.toString());
-      const dataArray = (data as any)?.rows || data || [];
-      return this.repositories.service.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.service.convertAllToModel(au.churchId, data as any);
     });
   }
 
@@ -26,8 +25,7 @@ export class ServiceController extends AttendanceBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.service.loadWithCampus(au.churchId);
-      const dataArray = (data as any)?.rows || data || [];
-      return this.repositories.service.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.service.convertAllToModel(au.churchId, data as any);
     });
   }
 

@@ -1,5 +1,6 @@
 import { DB } from "../../../shared/infrastructure";
 import { UserChurch } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper, DateHelper } from "../helpers";
 
 export class UserChurchRepository {
@@ -51,9 +52,7 @@ export class UserChurchRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: UserChurch[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<UserChurch>(data, (d: any) => this.convertToModel(d));
   }
 }

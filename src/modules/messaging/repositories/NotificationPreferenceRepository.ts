@@ -1,6 +1,7 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { NotificationPreference } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 
 export class NotificationPreferenceRepository {
   public loadById(churchId: string, id: string) {
@@ -49,10 +50,8 @@ export class NotificationPreferenceRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: NotificationPreference[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<NotificationPreference>(data, (d: any) => this.convertToModel(d));
   }
 
   public loadByPersonIds(personIds: string[]) {

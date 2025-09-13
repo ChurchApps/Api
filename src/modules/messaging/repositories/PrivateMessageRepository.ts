@@ -1,5 +1,6 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { CollectionHelper } from "../../../shared/helpers";
 import { PrivateMessage } from "../models";
 
 export class PrivateMessageRepository {
@@ -70,10 +71,8 @@ export class PrivateMessageRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: PrivateMessage[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<PrivateMessage>(data, (d: any) => this.convertToModel(d));
   }
 
   public loadByConversationId(churchId: string, conversationId: string) {

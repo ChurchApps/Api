@@ -1,5 +1,6 @@
 import { DB } from "../../../shared/infrastructure";
 import { Church, Api, LoginUserChurch } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../helpers";
 
 export class ChurchRepository {
@@ -158,9 +159,7 @@ export class ChurchRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: Church[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<Church>(data, (d: any) => this.convertToModel(d));
   }
 }

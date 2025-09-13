@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { Campus } from "../models";
-import { UniqueIdHelper } from "../../../shared/helpers";
+import { UniqueIdHelper, CollectionHelper } from "../../../shared/helpers";
 
 @injectable()
 export class CampusRepository {
@@ -50,9 +50,7 @@ export class CampusRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: Campus[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Campus>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { Service } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../../../shared/helpers";
 
 @injectable()
@@ -50,9 +51,7 @@ export class ServiceRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: Service[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Service>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

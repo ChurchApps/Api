@@ -1,13 +1,14 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Connection } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { ViewerInterface } from "../helpers/Interfaces";
 
 export class ConnectionRepository {
   public async loadAttendance(churchId: string, conversationId: string) {
     const sql = "SELECT id, displayName, ipAddress FROM connections WHERE churchId=? AND conversationId=? ORDER BY displayName;";
     const result: any = await DB.query(sql, [churchId, conversationId]);
-    const data: ViewerInterface[] = result.rows || result || [];
+    const data: ViewerInterface[] = result || [];
     data.forEach((d: ViewerInterface) => {
       if (d.displayName === "") d.displayName = "Anonymous";
     });
@@ -16,22 +17,22 @@ export class ConnectionRepository {
 
   public async loadById(churchId: string, id: string) {
     const result: any = await DB.queryOne("SELECT * FROM connections WHERE id=? and churchId=?;", [id, churchId]);
-    return result.rows || result || {};
+    return result || {};
   }
 
   public async loadForConversation(churchId: string, conversationId: string) {
     const result: any = await DB.query("SELECT * FROM connections WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
-    return result.rows || result || [];
+    return result || [];
   }
 
   public async loadForNotification(churchId: string, personId: string) {
     const result: any = await DB.query("SELECT * FROM connections WHERE churchId=? AND personId=? and conversationId='alerts'", [churchId, personId]);
-    return result.rows || result || [];
+    return result || [];
   }
 
   public async loadBySocketId(socketId: string) {
     const result: any = await DB.query("SELECT * FROM connections WHERE socketId=?", [socketId]);
-    return result.rows || result || [];
+    return result || [];
   }
 
   public delete(churchId: string, id: string) {
@@ -82,9 +83,7 @@ export class ConnectionRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: Connection[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<Connection>(data, (d: any) => this.convertToModel(d));
   }
 }

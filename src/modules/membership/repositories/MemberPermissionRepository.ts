@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { MemberPermission } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../helpers";
 
 @injectable()
@@ -98,10 +99,8 @@ export class MemberPermissionRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: MemberPermission[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<MemberPermission>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   private existingPermissionRecord(churchId: string, contentId: string) {

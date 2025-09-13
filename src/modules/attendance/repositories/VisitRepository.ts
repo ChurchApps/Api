@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { Visit } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../../../shared/helpers";
 
 @injectable()
@@ -90,9 +91,7 @@ export class VisitRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: Visit[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Visit>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

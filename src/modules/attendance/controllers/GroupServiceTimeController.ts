@@ -10,8 +10,7 @@ export class GroupServiceTimeController extends AttendanceBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.groupServiceTime.load(au.churchId, id);
-      const dataArray = (data as any)?.rows || data || [];
-      return this.repositories.groupServiceTime.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.groupServiceTime.convertToModel(au.churchId, data as any);
     });
   }
 
@@ -21,8 +20,7 @@ export class GroupServiceTimeController extends AttendanceBaseController {
       let result = null;
       if (req.query.groupId !== undefined) result = await this.repositories.groupServiceTime.loadWithServiceNames(au.churchId, req.query.groupId.toString());
       else result = await this.repositories.groupServiceTime.loadAll(au.churchId);
-      const resultArray = (result as any)?.rows || result || [];
-      return this.repositories.groupServiceTime.convertAllToModel(au.churchId, resultArray);
+      return this.repositories.groupServiceTime.convertAllToModel(au.churchId, result as any);
     });
   }
 

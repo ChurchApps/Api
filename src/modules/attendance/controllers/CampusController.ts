@@ -17,8 +17,7 @@ export class CampusController extends AttendanceBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repositories.campus.loadAll(au.churchId);
-      const dataArray = (data as any)?.rows || data || [];
-      return this.repositories.campus.convertAllToModel(au.churchId, dataArray);
+      return this.repositories.campus.convertAllToModel(au.churchId, data as any);
     });
   }
 

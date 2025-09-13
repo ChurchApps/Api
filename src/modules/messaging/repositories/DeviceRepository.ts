@@ -1,6 +1,7 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Device } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 
 export class DeviceRepository {
   public loadByIds(churchId: string, ids: string[]) {
@@ -97,10 +98,8 @@ export class DeviceRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: Device[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<Device>(data, (d: any) => this.convertToModel(d));
   }
 
   public loadForPerson(churchId: string, personId: string) {

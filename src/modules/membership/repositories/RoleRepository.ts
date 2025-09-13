@@ -1,5 +1,6 @@
 import { DB } from "../../../shared/infrastructure";
 import { Role } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../helpers";
 
 export class RoleRepository {
@@ -55,9 +56,7 @@ export class RoleRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: Role[] = [];
-    data.forEach((r) => result.push(this.convertToModel(churchId, r)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Role>(data, (r: any) => this.convertToModel(churchId, r));
   }
 }

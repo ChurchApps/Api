@@ -1,5 +1,6 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { CollectionHelper } from "../../../shared/helpers";
 import { Notification } from "../models";
 
 export class NotificationRepository {
@@ -96,10 +97,8 @@ export class NotificationRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: Notification[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<Notification>(data, (d: any) => this.convertToModel(d));
   }
 
   public loadUndelivered() {

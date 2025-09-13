@@ -1,6 +1,7 @@
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DeviceContent } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 
 export class DeviceContentRepository {
   public loadByChurchId(churchId: string) {
@@ -53,9 +54,7 @@ export class DeviceContentRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: DeviceContent[] = [];
-    data.forEach((d) => result.push(this.convertToModel(d)));
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<DeviceContent>(data, (d: any) => this.convertToModel(d));
   }
 }

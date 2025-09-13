@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { Donation, DonationSummary } from "../models";
+import { CollectionHelper } from "../../../shared/helpers";
 
 @injectable()
 export class DonationRepository {
@@ -104,10 +105,8 @@ export class DonationRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: Donation[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Donation>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   public convertAllToSummary(churchId: string, data: any[]) {

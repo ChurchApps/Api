@@ -1,21 +1,22 @@
 import { DB } from "../../../shared/infrastructure";
+import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Message } from "../models";
 
 export class MessageRepository {
   public async loadById(churchId: string, id: string) {
     const result: any = await DB.queryOne("SELECT * FROM messages WHERE id=? AND churchId=?;", [id, churchId]);
-    return result.rows || result || {};
+    return result || {};
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
     const result: any = await DB.query("SELECT * FROM messages WHERE id IN (?) AND churchId=?;", [ids, churchId]);
-    return result.rows || result || [];
+    return result || [];
   }
 
   public async loadForConversation(churchId: string, conversationId: string) {
     const result: any = await DB.query("SELECT * FROM messages WHERE churchId=? AND conversationId=? ORDER BY timeSent", [churchId, conversationId]);
-    return result.rows || result || [];
+    return result || [];
   }
 
   public delete(churchId: string, id: string) {
@@ -56,11 +57,7 @@ export class MessageRepository {
     return result;
   }
 
-  public convertAllToModel(data: any[]) {
-    const result: Message[] = [];
-    if (data && Array.isArray(data)) {
-      data.forEach((d) => result.push(this.convertToModel(d)));
-    }
-    return result;
+  public convertAllToModel(data: any) {
+    return CollectionHelper.convertAll<Message>(data, (d: any) => this.convertToModel(d));
   }
 }

@@ -1,6 +1,7 @@
 import { DB } from "../../../shared/infrastructure";
 import { injectable } from "inversify";
 import { DateHelper, PersonHelper, UniqueIdHelper } from "../helpers";
+import { CollectionHelper } from "../../../shared/helpers";
 import { Person } from "../models";
 
 @injectable()
@@ -248,16 +249,12 @@ export class PersonRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[], canEdit: boolean) {
-    const result: Person[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d, canEdit)));
-    return result;
+  public convertAllToModel(churchId: string, data: any, canEdit: boolean) {
+    return CollectionHelper.convertAll<Person>(data, (d: any) => this.convertToModel(churchId, d, canEdit));
   }
 
-  public convertAllToBasicModel(churchId: string, data: any[]) {
-    const result: Person[] = [];
-    data.forEach((d) => result.push(this.convertToBasicModel(churchId, d)));
-    return result;
+  public convertAllToBasicModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Person>(data, (d: any) => this.convertToBasicModel(churchId, d));
   }
 
   public convertToBasicModel(churchId: string, data: any) {

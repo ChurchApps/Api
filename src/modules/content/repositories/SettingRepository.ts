@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../helpers";
+import { CollectionHelper } from "../../../shared/helpers";
 import { Setting } from "../models";
 
 @injectable()
@@ -70,10 +71,8 @@ export class SettingRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any[]) {
-    const result: Setting[] = [];
-    data.forEach((d) => result.push(this.convertToModel(churchId, d)));
-    return result;
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Setting>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   public getImports(data: any[], type?: string, playlistId?: string, channelId?: string) {
