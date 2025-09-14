@@ -99,7 +99,6 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     let result: User = null;
     try {
       const decoded = jwt.verify(token, Environment.jwtSecret);
-      console.log("🔓 Decoded JWT:", JSON.stringify(decoded, null, 2));
       if (typeof decoded === "string") {
         throw new Error("Invalid token format");
       }

@@ -12,44 +12,26 @@ import { ConnectionManager } from "./shared/infrastructure/ConnectionManager";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes";
 
 export const createApp = async () => {
-  console.log("🚀 Starting createApp...");
 
   // Initialize environment configuration (only if not already initialized)
   const environment = process.env.ENVIRONMENT || "dev";
-  console.log(`🔍 Environment class reference: ${Environment}`);
-  console.log(`🔍 Environment.currentEnvironment: ${Environment.currentEnvironment}`);
-  console.log(`🔍 Environment.dbConnections size: ${Environment.dbConnections?.size || 0}`);
 
   if (!Environment.currentEnvironment) {
-    console.log(`📋 Initializing environment: ${environment}`);
     await Environment.init(environment);
-    console.log("✅ Environment initialized");
-    console.log(`🔍 After init - Environment.currentEnvironment: ${Environment.currentEnvironment}`);
-    console.log(`🔍 After init - dbConnections size: ${Environment.dbConnections?.size || 0}`);
-  } else {
-    console.log(`✅ Environment already initialized: ${Environment.currentEnvironment}`);
-    console.log(`🔍 Already initialized - dbConnections size: ${Environment.dbConnections?.size || 0}`);
   }
 
   // Pools now auto-initialize on first use
 
   // Create Inversify container
-  console.log("📦 Creating Inversify container...");
   const container = new Container();
-  console.log("✅ Container created");
 
   // Load module bindings and controllers
-  console.log("🔗 Loading module bindings...");
   await loadModuleBindings(container);
-  console.log("✅ Module bindings loaded");
 
   // Create Express server with Inversify
-  console.log("🌐 Creating Express server...");
   const server = new InversifyExpressServer(container, null, { rootPath: "" }, null, CustomAuthProvider);
-  console.log("✅ Express server created");
 
   // Configure the server
-  console.log("⚙️ Configuring server...");
   server.setConfig((app) => {
     // Configure CORS first
     app.use(
@@ -178,9 +160,8 @@ export const createApp = async () => {
       });
     });
   });
-  console.log("✅ Server configuration complete");
 
-  console.log("🛠️ Setting error config...");
+
   server.setErrorConfig((app) => {
     // Global error handler
     app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -211,39 +192,24 @@ export const createApp = async () => {
       });
     });
   });
-  console.log("✅ Error config complete");
 
-  console.log("🏗️ Building Express app...");
+
   const app = server.build();
-  console.log("✅ Express app built");
 
   // Initialize messaging module after server is built but before returning
-  console.log("💬 Initializing messaging module...");
   try {
-    console.log("📥 Importing messaging modules...");
     const { initializeMessagingModule } = await import("./modules/messaging");
     const { RepositoryManager } = await import("./shared/infrastructure/RepositoryManager");
-    console.log("✅ Messaging modules imported");
-
-    console.log("🗃️ Creating messaging repositories via RepositoryManager...");
     const messagingRepositories = await RepositoryManager.getRepositories<any>("messaging");
-    console.log("✅ Messaging repositories created");
-
-    console.log("🔌 Initializing messaging module...");
     initializeMessagingModule(messagingRepositories);
-    console.log("✅ Messaging module initialized");
   } catch (error) {
-    console.warn("⚠️ Failed to initialize messaging module:", error.message);
-    console.log("Continuing without messaging features...");
+    console.warn("Failed to initialize messaging module:", (error as any)?.message || error);
   }
-
-  console.log("🎉 App creation complete!");
   return app;
 };
 
 async function loadModuleBindings(container: Container) {
   try {
-    console.log("Loading module controllers and bindings...");
     const startTime = Date.now();
 
     // Load all module controllers in parallel for faster startup
@@ -265,24 +231,20 @@ async function loadModuleBindings(container: Container) {
     // Report on each module's loading status
     results.forEach((result, index) => {
       const moduleName = moduleImports[index].name;
-      if (result.status === "fulfilled") {
-        console.log(`✓ ${moduleName} controllers loaded`);
-      } else {
-        console.error(`✗ Failed to load ${moduleName} controllers:`, result.reason);
+      if (result.status !== "fulfilled") {
+        console.error(`Failed to load ${moduleName} controllers:`, (result as any).reason);
       }
     });
 
     // Check if any modules failed to load
     const failedModules = results.filter((r) => r.status === "rejected");
-    if (failedModules.length > 0) {
-      console.warn(`⚠️ ${failedModules.length} module(s) failed to load, but continuing...`);
-    }
+    if (failedModules.length > 0) console.warn(`${failedModules.length} module(s) failed to load; continuing...`);
 
     // Set up repository manager as singleton
     container.bind<RepositoryManager>("RepositoryManager").toConstantValue(RepositoryManager);
 
     const loadTime = Date.now() - startTime;
-    console.log(`All module bindings loaded in ${loadTime}ms`);
+    if (loadTime > 2000) console.warn(`Module bindings loaded in ${loadTime}ms`);
   } catch (error) {
     console.error("Failed to load module bindings:", error);
     throw error;
@@ -291,14 +253,14 @@ async function loadModuleBindings(container: Container) {
 
 // Handle process termination
 process.on("SIGINT", async () => {
-  console.log("SIGINT received, shutting down gracefully...");
+  console.warn("SIGINT received, shutting down gracefully...");
 
   // Close WebSocket server
   try {
     const { SocketHelper } = await import("./modules/messaging/helpers/SocketHelper");
     SocketHelper.shutdown();
   } catch (error) {
-    console.warn("Failed to shutdown WebSocket server:", error.message);
+    console.warn("Failed to shutdown WebSocket server:", (error as any)?.message || error);
   }
 
   // Close database connections

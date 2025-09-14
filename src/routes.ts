@@ -58,7 +58,6 @@ export const createModuleContextMiddleware = (moduleName: string) => {
  * This function is called by the main Express app setup
  */
 export const configureModuleRoutes = (app: express.Application) => {
-  console.log("Configuring module-specific route contexts...");
 
   // Configure middleware for each module route prefix
   Object.entries(MODULE_ROUTES).forEach(([moduleName, routePrefix]) => {
@@ -68,7 +67,7 @@ export const configureModuleRoutes = (app: express.Application) => {
     // Apply module context middleware to all routes under this prefix
     app.use(fullPrefix, contextMiddleware);
 
-    console.log(`✓ Module context configured for ${moduleName} at ${fullPrefix}`);
+    // Context middleware configured for module
   });
 
   // Add module information endpoint
@@ -84,7 +83,7 @@ export const configureModuleRoutes = (app: express.Application) => {
     });
   });
 
-  console.log("Module route configuration complete");
+  // Module route configuration complete
 };
 
 /**
@@ -120,7 +119,7 @@ export const getModuleFromPath = (path: string): keyof typeof MODULE_ROUTES | nu
 export const moduleRoutingLogger = (req: express.Request, res: express.Response, next: express.NextFunction) => {
   const module = getModuleFromPath(req.path);
   if (module) {
-    console.log(`[${module.toUpperCase()}] ${req.method} ${req.path}`);
+    // Suppressed per-request logging by default to reduce noise
   }
   next();
 };

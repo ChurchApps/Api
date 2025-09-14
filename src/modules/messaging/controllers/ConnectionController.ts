@@ -51,23 +51,16 @@ export class ConnectionController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Connection[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      console.log(`🔵 ConnectionController.save - Received ${req.body.length} connections to save`);
-      console.log("🔵 Connection data:", JSON.stringify(req.body, null, 2));
-
       const promises: Promise<Connection>[] = [];
       for (const connection of req.body) {
         if (connection.personId === undefined) connection.personId = null;
         await this.updateAnonName(connection); // update 'Anonymous' names to Anonymous_1, Anonymous_2,..so on.
-
-        console.log(`🔵 About to save connection: ${JSON.stringify(connection)}`);
         promises.push(
           this.repositories.connection
             .save(connection)
             .then(async (c) => {
-              console.log("✅ Successfully saved connection to database:", JSON.stringify(c));
               await DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
               await DeliveryHelper.sendBlockedIps(c.churchId, c.conversationId);
-              console.log(`✅ Sent attendance and blocked IPs for connection ${c.id}`);
               return c;
             })
             .catch((error) => {
@@ -79,8 +72,6 @@ export class ConnectionController extends MessagingBaseController {
 
       const savedConnections = await Promise.all(promises);
       const result = this.repositories.connection.convertAllToModel(savedConnections);
-      console.log(`🎯 ConnectionController.save - Returning ${result.length} saved connections`);
-      console.log("🎯 Final result:", JSON.stringify(result, null, 2));
 
       return result;
     });
