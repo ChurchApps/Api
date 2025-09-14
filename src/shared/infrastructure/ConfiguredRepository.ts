@@ -21,6 +21,7 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
     const m: any = model as any;
     if (!m[this.idColumn]) m[this.idColumn] = this.createId();
     const { sql, params } = this.buildInsert(model);
+    //console.log(sql, params);
     await DB.query(sql, params);
     return model;
   }
@@ -50,7 +51,7 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
       }
     });
 
-    const sql = `INSERT INTO ${this.tableName} (${cols.join(", ")}) VALUES (${placeholders.join(", ")});`;
+    const sql = `INSERT INTO ${this.table()} (${cols.join(", ")}) VALUES (${placeholders.join(", ")});`;
     return { sql, params };
   }
 
