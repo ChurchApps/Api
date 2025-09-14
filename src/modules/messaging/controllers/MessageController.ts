@@ -7,17 +7,12 @@ import { NotificationHelper } from "../helpers/NotificationHelper";
 
 @controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {
-  @httpGet("/:churchId/:conversationId")
-  public async loadForConversation(
-    @requestParam("churchId") churchId: string,
-    @requestParam("conversationId") conversationId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
-  ): Promise<Message[]> {
-    return this.actionWrapperAnon(req, res, async () => {
-      const data = await this.repositories.message.loadForConversation(churchId, conversationId);
-      return this.repositories.message.convertAllToModel(data as any[]);
-    }) as any;
+  @httpGet("/conversation/:conversationId")
+  public async loadByConversation(@requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const messages: Message[] = await this.repositories.message.loadForConversation(au.churchId, conversationId);
+      return this.repositories.message.convertAllToModel(messages);
+    });
   }
 
   @httpGet("/:churchId/:id")
@@ -30,9 +25,11 @@ export class MessageController extends MessagingBaseController {
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<Message[]> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<Message>[] = [];
       req.body.forEach((message) => {
+        if (!message.churchId && au?.churchId) message.churchId = au.churchId;
+        if (!message.personId && au?.personId) message.personId = au.personId;
         promises.push(
           this.repositories.message.save(message).then(async (savedMessage) => {
             const conversation = await this.repositories.conversation.loadById(message.churchId, message.conversationId);
