@@ -10,5 +10,4 @@ export class ActionController extends BridgeBaseController {
       return [];
     });
   }
-
 }

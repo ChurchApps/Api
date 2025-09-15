@@ -1,45 +1,30 @@
-import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { Visit } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../../../shared/helpers";
 
-@injectable()
-export class VisitRepository {
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+
+export class VisitRepository extends ConfiguredRepository<Visit> {
+  protected get repoConfig(): RepoConfig<Visit> {
+    return {
+      tableName: "visits",
+      hasSoftDelete: false,
+      insertColumns: ["personId", "serviceId", "groupId", "visitDate", "checkinTime", "addedBy"],
+      updateColumns: ["personId", "serviceId", "groupId", "visitDate", "checkinTime", "addedBy"]
+    };
+  }
+
   public save(visit: Visit) {
-    return visit.id ? this.update(visit) : this.create(visit);
-  }
-
-  private async create(visit: Visit) {
-    visit.id = UniqueIdHelper.shortId();
-    const visitDate = DateHelper.toMysqlDate(visit.visitDate);
-    const checkinTime = DateHelper.toMysqlDate(visit.checkinTime);
-    const sql = "INSERT INTO visits (id, churchId, personId, serviceId, groupId, visitDate, checkinTime, addedBy) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [visit.id, visit.churchId, visit.personId, visit.serviceId, visit.groupId, visitDate, checkinTime, visit.addedBy];
-    await DB.query(sql, params);
-    return visit;
-  }
-
-  private async update(visit: Visit) {
-    const visitDate = DateHelper.toMysqlDate(visit.visitDate);
-    const checkinTime = DateHelper.toMysqlDate(visit.checkinTime);
-    const sql = "UPDATE visits SET personId=?, serviceId=?, groupId=?, visitDate=?, checkinTime=?, addedBy=? WHERE id=? and churchId=?";
-    const params = [visit.personId, visit.serviceId, visit.groupId, visitDate, checkinTime, visit.addedBy, visit.id, visit.churchId];
-    await DB.query(sql, params);
-    return visit;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM visits WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM visits WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM visits WHERE churchId=?;", [churchId]);
+    // Handle date conversion before saving
+    const processedVisit = { ...visit };
+    if (processedVisit.visitDate) {
+      (processedVisit as any).visitDate = DateHelper.toMysqlDate(processedVisit.visitDate);
+    }
+    if (processedVisit.checkinTime) {
+      (processedVisit as any).checkinTime = DateHelper.toMysqlDate(processedVisit.checkinTime);
+    }
+    return super.save(processedVisit);
   }
 
   public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {

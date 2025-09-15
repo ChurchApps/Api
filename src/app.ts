@@ -12,7 +12,6 @@ import { ConnectionManager } from "./shared/infrastructure/ConnectionManager";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes";
 
 export const createApp = async () => {
-
   // Initialize environment configuration (only if not already initialized)
   const environment = process.env.ENVIRONMENT || "dev";
 
@@ -161,7 +160,6 @@ export const createApp = async () => {
     });
   });
 
-
   server.setErrorConfig((app) => {
     // Global error handler
     app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -192,7 +190,6 @@ export const createApp = async () => {
       });
     });
   });
-
 
   const app = server.build();
 

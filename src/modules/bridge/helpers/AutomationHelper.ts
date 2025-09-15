@@ -2,13 +2,11 @@ import { Repositories as DoingRepositories } from "../../doing/repositories/Repo
 import { Repositories as MessagingRepositories } from "../../messaging/repositories/Repositories";
 import { Repositories as MemembershipRepositories } from "../../membership/repositories/Repositories";
 import { Notification } from "../../messaging/models/Notification";
-import { Assignment, Position } from "../../doing";
+import { Position } from "../../doing";
 import { DB } from "../../../shared/infrastructure/DB";
 
 export class AutomationHelper {
-
   private static subdomainCache: { [key: string]: string } = {};
-
 
   public static async remindServiceRequests(): Promise<void> {
     // Load assignments and create notifications all within proper contexts
@@ -18,17 +16,17 @@ export class AutomationHelper {
     // Load assignments and positions within doing context
     await DB.runWithContext("doing", async () => {
       const doingRepos = DoingRepositories.getCurrent();
-      const unconfirmedAssignments = await doingRepos.assignment.loadUnconfirmedByServiceDateRange() as any[];
-      
+      const unconfirmedAssignments = (await doingRepos.assignment.loadUnconfirmedByServiceDateRange()) as any[];
+
       for (const assignment of unconfirmedAssignments) {
         const personKey = `${assignment.churchId}-${assignment.personId}`;
 
         if (!processedPeople.has(personKey)) {
           processedPeople.add(personKey);
-          
+
           // Get position within the doing context
           const position: Position = await doingRepos.position.load(assignment.churchId, assignment.positionId);
-          
+
           // Get church subdomain within membership context
           let subDomain = this.subdomainCache[assignment.churchId];
           if (!subDomain) {
@@ -38,15 +36,15 @@ export class AutomationHelper {
             subDomain = church.subDomain;
             this.subdomainCache[assignment.churchId] = subDomain;
           }
-          
+
           // Create notification object
-          const serviceDateStr = new Date(assignment.serviceDate).toLocaleDateString("en-US", { 
-            weekday: "long", 
-            year: "numeric", 
-            month: "long", 
-            day: "numeric" 
+          const serviceDateStr = new Date(assignment.serviceDate).toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric"
           });
-          
+
           const notification: Notification = {
             churchId: assignment.churchId,
             personId: assignment.personId,
@@ -57,7 +55,7 @@ export class AutomationHelper {
             message: `Reminder: Please confirm your volunteer request on ${serviceDateStr}`,
             link: `https://${subDomain}.b1.church/my/plans/${position.planId}`
           };
-          
+
           notifications.push(notification);
         }
       }

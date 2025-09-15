@@ -58,7 +58,6 @@ export const createModuleContextMiddleware = (moduleName: string) => {
  * This function is called by the main Express app setup
  */
 export const configureModuleRoutes = (app: express.Application) => {
-
   // Configure middleware for each module route prefix
   Object.entries(MODULE_ROUTES).forEach(([moduleName, routePrefix]) => {
     const fullPrefix = routePrefix;

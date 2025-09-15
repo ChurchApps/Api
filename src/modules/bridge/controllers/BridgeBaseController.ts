@@ -2,8 +2,6 @@ import { CustomBaseController } from "@churchapps/apihelper";
 import express from "express";
 
 export class BridgeBaseController extends CustomBaseController {
-
-
   // Ensure repositories are hydrated per request without duplicating code in module controllers
   public actionWrapper(req: express.Request, res: express.Response, action: (au: any) => Promise<any>) {
     return super.actionWrapper(req, res, async (au) => {

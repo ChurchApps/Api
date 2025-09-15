@@ -3,39 +3,18 @@ import { DB } from "../../../shared/infrastructure";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { VisitSession } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../../../shared/helpers";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class VisitSessionRepository {
-  public save(visitSession: VisitSession) {
-    return visitSession.id ? this.update(visitSession) : this.create(visitSession);
-  }
-
-  private async create(visitSession: VisitSession) {
-    visitSession.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO visitSessions (id, churchId, visitId, sessionId) VALUES (?, ?, ?, ?);";
-    const params = [visitSession.id, visitSession.churchId, visitSession.visitId, visitSession.sessionId];
-    await DB.query(sql, params);
-    return visitSession;
-  }
-
-  private async update(visitSession: VisitSession) {
-    const sql = "UPDATE visitSessions SET visitId=?, sessionId=? WHERE id=? and churchId=?";
-    const params = [visitSession.visitId, visitSession.sessionId, visitSession.id, visitSession.churchId];
-    await DB.query(sql, params);
-    return visitSession;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM visitSessions WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM visitSessions WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM visitSessions WHERE churchId=?;", [churchId]);
+export class VisitSessionRepository extends ConfiguredRepository<VisitSession> {
+  protected get repoConfig(): RepoConfig<VisitSession> {
+    return {
+      tableName: "visitSessions",
+      hasSoftDelete: false,
+      insertColumns: ["visitId", "sessionId"],
+      updateColumns: ["visitId", "sessionId"]
+    };
   }
 
   public loadByVisitIdSessionId(churchId: string, visitId: string, sessionId: string) {
