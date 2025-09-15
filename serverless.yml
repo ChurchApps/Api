@@ -159,6 +159,23 @@ functions:
           rate: cron(0 5 * * ? *)
           enabled: true
 
+  timerScheduledTasks:
+    handler: lambda.timerScheduledTasks
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+    memorySize: 256
+    timeout: 300
+    vpc: ${self:custom.vpcSettings.current, ''}
+    environment:
+      # Database connections for scheduled tasks
+      MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.env}/membershipApi/connectionString, ''}
+      MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.env}/messagingApi/connectionString, ''}
+      DOING_CONNECTION_STRING: ${ssm:/${self:custom.env}/doingApi/connectionString, ''}
+    events:
+      - schedule:
+          rate: cron(0 5 * * ? *)
+          enabled: true
+
 plugins:
   - serverless-offline
 

@@ -5,6 +5,7 @@ import { DB } from "../shared/infrastructure/DB";
 
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper";
 import { RepositoryManager } from "../shared/infrastructure/RepositoryManager";
+import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper";
 
 const initEnv = async () => {
   if (!Environment.currentEnvironment) {
@@ -50,6 +51,23 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     });
   } catch (error) {
     console.error("Error in midnight timer:", error);
+    throw error;
+  }
+};
+
+export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Context): Promise<void> => {
+  try {
+    await initEnv();
+
+    console.log("Scheduled tasks timer triggered - processing service request reminders");
+
+    // Run the service request reminders
+    // This doesn't need a specific DB context since AutomationHelper manages its own contexts
+    await AutomationHelper.remindServiceRequests();
+    
+    console.log("Scheduled tasks timer completed");
+  } catch (error) {
+    console.error("Error in scheduled tasks timer:", error);
     throw error;
   }
 };

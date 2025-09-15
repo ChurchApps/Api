@@ -134,7 +134,7 @@ const web = async function(event, context) {
 
 // Import socket and timer handlers
 const { handleSocket } = require('./dist/lambda/socket-handler');
-const { handle15MinTimer, handleMidnightTimer } = require('./dist/lambda/timer-handler');
+const { handle15MinTimer, handleMidnightTimer, handleScheduledTasks } = require('./dist/lambda/timer-handler');
 
 // WebSocket handler
 const socket = async function(event, context) {
@@ -173,8 +173,20 @@ const timerMidnight = async function(event, context) {
   }
 };
 
+const timerScheduledTasks = async function(event, context) {
+  try {
+    await initializeEnvironment();
+    await handleScheduledTasks(event, context);
+    return { statusCode: 200, body: 'Scheduled tasks executed successfully' };
+  } catch (error) {
+    console.error('Error in scheduled tasks timer:', error);
+    throw error;
+  }
+};
+
 // Export handlers
 module.exports.web = web;
 module.exports.socket = socket;
 module.exports.timer15Min = timer15Min;
 module.exports.timerMidnight = timerMidnight;
+module.exports.timerScheduledTasks = timerScheduledTasks;
