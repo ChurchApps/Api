@@ -2,39 +2,17 @@ import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { GroupServiceTime } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../../../shared/helpers";
+import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
 
 @injectable()
-export class GroupServiceTimeRepository {
-  public save(groupServiceTime: GroupServiceTime) {
-    return groupServiceTime.id ? this.update(groupServiceTime) : this.create(groupServiceTime);
-  }
-
-  private async create(groupServiceTime: GroupServiceTime) {
-    groupServiceTime.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO groupServiceTimes (id, churchId, groupId, serviceTimeId) VALUES (?, ?, ?, ?);";
-    const params = [groupServiceTime.id, groupServiceTime.churchId, groupServiceTime.groupId, groupServiceTime.serviceTimeId];
-    await DB.query(sql, params);
-    return groupServiceTime;
-  }
-
-  private async update(groupServiceTime: GroupServiceTime) {
-    const sql = "UPDATE groupServiceTimes SET groupId=?, serviceTimeId=? WHERE id=? and churchId=?";
-    const params = [groupServiceTime.groupId, groupServiceTime.serviceTimeId, groupServiceTime.id, groupServiceTime.churchId];
-    await DB.query(sql, params);
-    return groupServiceTime;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM groupServiceTimes WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM groupServiceTimes WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM groupServiceTimes WHERE churchId=?;", [churchId]);
+export class GroupServiceTimeRepository extends ConfiguredRepository<GroupServiceTime> {
+  public constructor() {
+    super("groupServiceTimes", [
+      { name: "id", type: "string", primaryKey: true },
+      { name: "churchId", type: "string" },
+      { name: "groupId", type: "string" },
+      { name: "serviceTimeId", type: "string" }
+    ]);
   }
 
   public loadWithServiceNames(churchId: string, groupId: string) {

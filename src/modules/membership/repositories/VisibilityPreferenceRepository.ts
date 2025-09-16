@@ -1,31 +1,40 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { VisibilityPreference } from "../models";
-import { UniqueIdHelper } from "../helpers";
+import { CollectionHelper } from "../../../shared/helpers";
+import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
 
 @injectable()
-export class VisibilityPreferenceRepository {
-  public save(preference: VisibilityPreference) {
-    return preference.id ? this.update(preference) : this.create(preference);
-  }
-
-  private async create(preference: VisibilityPreference) {
-    preference.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO visibilityPreferences (id, churchId, personId, address, phoneNumber, email) VALUES (?, ?, ?, ?, ?, ?);";
-    const params = [preference.id, preference.churchId, preference.personId, preference.address, preference.phoneNumber, preference.email];
-    await DB.query(sql, params);
-    return preference;
-  }
-
-  private async update(preference: VisibilityPreference) {
-    const sql = "UPDATE visibilityPreferences SET personId=?, address=?, phoneNumber=?, email=? WHERE id=? AND churchId=?;";
-    const params = [preference.personId, preference.address, preference.phoneNumber, preference.email, preference.id, preference.churchId];
-    await DB.query(sql, params);
-    return preference;
+export class VisibilityPreferenceRepository extends ConfiguredRepository<VisibilityPreference> {
+  public constructor() {
+    super("visibilityPreferences", [
+      { name: "id", type: "string", primaryKey: true },
+      { name: "churchId", type: "string" },
+      { name: "personId", type: "string" },
+      { name: "address", type: "boolean" },
+      { name: "phoneNumber", type: "boolean" },
+      { name: "email", type: "boolean" }
+    ]);
   }
 
   public async loadForPerson(churchId: string, personId: string) {
     const sql = "SELECT * FROM visibilityPreferences WHERE churchId=? AND personId=?;";
     return DB.query(sql, [churchId, personId]);
+  }
+
+  public convertToModel(churchId: string, data: any): VisibilityPreference {
+    const result: VisibilityPreference = {
+      id: data.id,
+      churchId: data.churchId,
+      personId: data.personId,
+      address: data.address,
+      phoneNumber: data.phoneNumber,
+      email: data.email
+    };
+    return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any): VisibilityPreference[] {
+    return CollectionHelper.convertAll<VisibilityPreference>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

@@ -1,41 +1,25 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Position } from "../models";
-
 import { CollectionHelper } from "../../../shared/helpers";
+import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
 
 @injectable()
-export class PositionRepository {
-  public save(position: Position) {
-    return position.id ? this.update(position) : this.create(position);
-  }
-
-  private async create(position: Position) {
-    position.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO positions (id, churchId, planId, categoryName, name, count, groupId) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [position.id, position.churchId, position.planId, position.categoryName, position.name, position.count, position.groupId];
-    await DB.query(sql, params);
-    return position;
-  }
-
-  private async update(position: Position) {
-    const sql = "UPDATE positions SET planId=?, categoryName=?, name=?, count=?, groupId=? WHERE id=? and churchId=?";
-    const params = [position.planId, position.categoryName, position.name, position.count, position.groupId, position.id, position.churchId];
-    await DB.query(sql, params);
-    return position;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM positions WHERE id=? AND churchId=?;", [id, churchId]);
+export class PositionRepository extends ConfiguredRepository<Position> {
+  public constructor() {
+    super("positions", [
+      { name: "id", type: "string", primaryKey: true },
+      { name: "churchId", type: "string" },
+      { name: "planId", type: "string" },
+      { name: "categoryName", type: "string" },
+      { name: "name", type: "string" },
+      { name: "count", type: "number" },
+      { name: "groupId", type: "string" }
+    ]);
   }
 
   public deleteByPlanId(churchId: string, planId: string) {
     return DB.query("DELETE FROM positions WHERE churchId=? and planId=?;", [churchId, planId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM positions WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadByIds(churchId: string, ids: string[]) {

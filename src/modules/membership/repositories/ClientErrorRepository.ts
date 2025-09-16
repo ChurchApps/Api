@@ -1,57 +1,27 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { ClientError } from "../models";
-import { UniqueIdHelper } from "../helpers";
-
 import { CollectionHelper } from "../../../shared/helpers";
+import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
 
 @injectable()
-export class ClientErrorRepository {
-  public save(clientError: ClientError) {
-    return clientError.id ? this.update(clientError) : this.create(clientError);
-  }
-
-  private async create(clientError: ClientError) {
-    clientError.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO clientErrors (id, application, errorTime, userId, churchId, originUrl, errorType, message, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      clientError.id,
-      clientError.application,
-      clientError.errorTime,
-      clientError.userId,
-      clientError.churchId,
-      clientError.originUrl,
-      clientError.errorType,
-      clientError.message,
-      clientError.details
-    ];
-    await DB.query(sql, params);
-    return clientError;
-  }
-
-  private async update(clientError: ClientError) {
-    const sql = "UPDATE clientErrors SET application=?, errorTime=?, userId=?, churchId=?, originUrl=?, errorType=?, message=?, details=? WHERE id=?";
-    const params = [
-      clientError.application,
-      clientError.errorTime,
-      clientError.userId,
-      clientError.churchId,
-      clientError.originUrl,
-      clientError.errorType,
-      clientError.message,
-      clientError.details,
-      clientError.id
-    ];
-    await DB.query(sql, params);
-    return clientError;
+export class ClientErrorRepository extends ConfiguredRepository<ClientError> {
+  public constructor() {
+    super("clientErrors", [
+      { name: "id", type: "string", primaryKey: true },
+      { name: "application", type: "string" },
+      { name: "errorTime", type: "datetime" },
+      { name: "userId", type: "string" },
+      { name: "churchId", type: "string" },
+      { name: "originUrl", type: "string" },
+      { name: "errorType", type: "string" },
+      { name: "message", type: "string" },
+      { name: "details", type: "string" }
+    ]);
   }
 
   public deleteOld() {
     return DB.query("DELETE FROM clientErrors WHERE errorTime<date_add(NOW(), INTERVAL -7 DAY)", []);
-  }
-
-  public delete(id: string) {
-    return DB.query("DELETE FROM clientErrors WHERE id=?;", [id]);
   }
 
   public load(id: string) {
