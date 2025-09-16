@@ -1,9 +1,19 @@
 import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Device } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 
-export class DeviceRepository {
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+
+export class DeviceRepository extends ConfiguredRepository<Device> {
+  protected get repoConfig(): RepoConfig<Device> {
+    return {
+      tableName: "devices",
+      hasSoftDelete: false,
+      insertColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress"],
+      updateColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress"]
+    };
+  }
+
   public loadByIds(churchId: string, ids: string[]) {
     return DB.query("SELECT * FROM devices WHERE churchId=? AND id IN (?)", [churchId, ids]);
   }
@@ -26,57 +36,6 @@ export class DeviceRepository {
 
   public loadByChurchId(churchId: string) {
     return DB.query("SELECT * FROM devices WHERE churchId=? ORDER BY lastActiveDate desc", [churchId]);
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM devices WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public save(device: Device) {
-    return device.id ? this.update(device) : this.create(device);
-  }
-
-  private async create(device: Device): Promise<Device> {
-    device.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO devices (id, appName, deviceId, churchId, personId, fcmToken, label, registrationDate, lastActiveDate, deviceInfo, admId, pairingCode, ipAddress) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      device.id,
-      device.appName,
-      device.deviceId,
-      device.churchId,
-      device.personId,
-      device.fcmToken,
-      device.label,
-      device.registrationDate,
-      device.lastActiveDate,
-      device.deviceInfo,
-      device.admId,
-      device.pairingCode,
-      device.ipAddress
-    ];
-    await DB.query(sql, params);
-    return device;
-  }
-
-  private async update(device: Device) {
-    const sql = "UPDATE devices SET appName=?, deviceId=?, personId=?, fcmToken=?, label=?, lastActiveDate=?, deviceInfo=?, admId=?, pairingCode=?, ipAddress=? WHERE id=? AND churchId=?;";
-    const params = [
-      device.appName,
-      device.deviceId,
-      device.personId,
-      device.fcmToken,
-      device.label,
-      device.lastActiveDate,
-      device.deviceInfo,
-      device.admId,
-      device.pairingCode,
-      device.ipAddress,
-      device.id,
-      device.churchId
-    ];
-    await DB.query(sql, params);
-    return device;
   }
 
   public convertToModel(data: any) {

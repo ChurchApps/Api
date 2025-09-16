@@ -3,6 +3,8 @@ import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Position } from "../models";
 
+import { CollectionHelper } from "../../../shared/helpers";
+
 @injectable()
 export class PositionRepository {
   public save(position: Position) {
@@ -46,5 +48,22 @@ export class PositionRepository {
 
   public loadByPlanIds(churchId: string, planIds: string[]) {
     return DB.query("SELECT * FROM positions WHERE churchId=? AND planId in (?);", [churchId, planIds]);
+  }
+
+  public convertToModel(churchId: string, data: any): Position {
+    const result: Position = {
+      id: data.id,
+      churchId: data.churchId,
+      planId: data.planId,
+      categoryName: data.categoryName,
+      name: data.name,
+      count: data.count,
+      groupId: data.groupId
+    };
+    return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any): Position[] {
+    return CollectionHelper.convertAll<Position>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

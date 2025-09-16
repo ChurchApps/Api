@@ -36,7 +36,8 @@
     "deploy-prod": "npm run build && serverless deploy --stage prod",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "migrate-env": "node tools/migrate-env.js"
+    "migrate-env": "node tools/migrate-env.js",
+    "scheduled-tasks": "ts-node tools/run-scheduled-tasks.ts"
   },
   "keywords": [
     "church",

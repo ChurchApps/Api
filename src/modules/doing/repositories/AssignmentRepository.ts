@@ -60,4 +60,23 @@ export class AssignmentRepository {
   public loadByByPersonId(churchId: string, personId: string) {
     return DB.query("SELECT * FROM assignments WHERE churchId=? AND personId=?;", [churchId, personId]);
   }
+
+  public loadUnconfirmedByServiceDateRange(churchId?: string) {
+    let sql =
+      "SELECT a.*, pl.serviceDate, pl.name as planName" +
+      " FROM assignments a" +
+      " INNER JOIN positions p ON p.id = a.positionId" +
+      " INNER JOIN plans pl ON pl.id = p.planId" +
+      " WHERE a.status = 'Unconfirmed'" +
+      " AND pl.serviceDate >= DATE_ADD(CURDATE(), INTERVAL 2 DAY)" +
+      " AND pl.serviceDate < DATE_ADD(CURDATE(), INTERVAL 3 DAY)";
+
+    const params: any[] = [];
+    if (churchId) {
+      sql += " AND a.churchId = ?";
+      params.push(churchId);
+    }
+
+    return DB.query(sql, params);
+  }
 }

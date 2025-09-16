@@ -5,6 +5,7 @@ import { DB } from "../shared/infrastructure/DB";
 
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper";
 import { RepositoryManager } from "../shared/infrastructure/RepositoryManager";
+import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper";
 
 const initEnv = async () => {
   if (!Environment.currentEnvironment) {
@@ -42,6 +43,8 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     await initEnv();
 
     console.log("Midnight timer triggered - processing daily digest email notifications");
+
+    await AutomationHelper.remindServiceRequests();
 
     // Run within messaging module context
     await DB.runWithContext("messaging", async () => {

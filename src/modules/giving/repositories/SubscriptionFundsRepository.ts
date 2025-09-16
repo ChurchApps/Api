@@ -1,49 +1,27 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { SubscriptionFund } from "../models";
 
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+
 @injectable()
-export class SubscriptionFundsRepository {
+export class SubscriptionFundsRepository extends ConfiguredRepository<SubscriptionFund> {
   // Note: This repository will need dependency injection for FundRepository
   // to replace the static Repositories.getCurrent() call
   private fundRepository: any; // Will be injected by the container
 
-  public async save(subscriptionFund: SubscriptionFund) {
-    return subscriptionFund.id ? this.update(subscriptionFund) : this.create(subscriptionFund);
-  }
-
-  private async create(subscriptionFund: SubscriptionFund) {
-    subscriptionFund.id = UniqueIdHelper.shortId();
-    return DB.query("INSERT INTO subscriptionFunds (id, churchId, subscriptionId, fundId, amount) VALUES (?, ?, ?, ?, ?);", [
-      subscriptionFund.id,
-      subscriptionFund.churchId,
-      subscriptionFund.subscriptionId,
-      subscriptionFund.fundId,
-      subscriptionFund.amount
-    ]).then(() => {
-      return subscriptionFund;
-    });
-  }
-
-  private async update(subscriptionFund: SubscriptionFund) {
-    const sql = "UPDATE subscriptionFunds SET churchId=?, subscriptionId=?, fundId=?, amount=? WHERE id=? and churchId=?";
-    const params = [subscriptionFund.churchId, subscriptionFund.subscriptionId, subscriptionFund.fundId, subscriptionFund.amount, subscriptionFund.id, subscriptionFund.churchId];
-    await DB.query(sql, params);
-    return subscriptionFund;
-  }
-
-  public async delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM subscriptionFunds WHERE id=? AND churchId=?;", [id, churchId]);
+  protected get repoConfig(): RepoConfig<SubscriptionFund> {
+    return {
+      tableName: "subscriptionFunds",
+      hasSoftDelete: false,
+      insertColumns: ["subscriptionId", "fundId", "amount"],
+      updateColumns: ["subscriptionId", "fundId", "amount"]
+    };
   }
 
   public async deleteBySubscriptionId(churchId: string, subscriptionId: string) {
     return DB.query("DELETE FROM subscriptionFunds WHERE subscriptionId=? AND churchId=?;", [subscriptionId, churchId]);
-  }
-
-  public async load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM subscriptionFunds WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadBySubscriptionId(churchId: string, subscriptionId: string) {
@@ -74,10 +52,6 @@ export class SubscriptionFundsRepository {
       result = [sf];
     }
     return result;
-  }
-
-  public async loadAll(churchId: string) {
-    return DB.query("SELECT * FROM subscriptionFunds WHERE churchId=?;", [churchId]);
   }
 
   public convertToModel(churchId: string, data: any) {

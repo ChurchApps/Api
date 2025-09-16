@@ -3,6 +3,8 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../helpers";
 import { Block } from "../models";
 
+import { CollectionHelper } from "../../../shared/helpers";
+
 @injectable()
 export class BlockRepository {
   public save(block: Block) {
@@ -39,5 +41,19 @@ export class BlockRepository {
 
   public loadByBlockType(churchId: string, blockType: string) {
     return TypedDB.query("SELECT * FROM blocks WHERE churchId=? and blockType=? ORDER BY name;", [churchId, blockType]);
+  }
+
+  public convertToModel(churchId: string, data: any): Block {
+    const result: Block = {
+      id: data.id,
+      churchId: data.churchId,
+      blockType: data.blockType,
+      name: data.name
+    };
+    return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any): Block[] {
+    return CollectionHelper.convertAll<Block>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

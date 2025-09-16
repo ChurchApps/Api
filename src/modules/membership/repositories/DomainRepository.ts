@@ -3,6 +3,8 @@ import { DB } from "../../../shared/infrastructure";
 import { Domain } from "../models";
 import { UniqueIdHelper } from "../helpers";
 
+import { CollectionHelper } from "../../../shared/helpers";
+
 @injectable()
 export class DomainRepository {
   public save(domain: Domain) {
@@ -47,5 +49,18 @@ export class DomainRepository {
   public loadByIds(churchId: string, ids: string[]) {
     const sql = "SELECT * FROM `domains` WHERE churchId=? AND id IN (" + ids.join(",") + ") ORDER by name";
     return DB.query(sql, [churchId]);
+  }
+
+  public convertToModel(churchId: string, data: any): Domain {
+    const result: Domain = {
+      id: data.id,
+      churchId: data.churchId,
+      domainName: data.domainName
+    };
+    return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any): Domain[] {
+    return CollectionHelper.convertAll<Domain>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }
