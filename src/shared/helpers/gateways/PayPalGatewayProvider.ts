@@ -77,8 +77,8 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   }
 
-  async logEvent(churchId: string, event: any, eventData: any, repositories: any): Promise<void> {
-    await PayPalHelper.logEvent(churchId, event, eventData, repositories);
+  async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
+    await PayPalHelper.logEvent(churchId, event, eventData, repos);
   }
 
   async createProduct(config: GatewayConfig, churchId: string): Promise<string> {
@@ -86,7 +86,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return `paypal-product-${churchId}`;
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repositories: any): Promise<any> {
-    return await PayPalHelper.logDonation(config.publicKey, config.privateKey, churchId, eventData, repositories);
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
+    return await PayPalHelper.logDonation(config.publicKey, config.privateKey, churchId, eventData, repos);
   }
 }

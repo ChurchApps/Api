@@ -12,12 +12,12 @@ export class OAuthController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const { client_id, redirect_uri, response_type, scope, state } = req.body;
 
-      const client = (await this.repositories.oAuthClient.loadByClientId(client_id)) as any;
+      const client = (await this.repos.oAuthClient.loadByClientId(client_id)) as any;
       if (!client) return this.json({ error: "invalid_client" }, 400);
       if (!client.redirectUris?.includes(redirect_uri)) return this.json({ error: "invalid_redirect_uri" }, 400);
       if (response_type !== "code") return this.json({ error: "unsupported_response_type" }, 400);
 
-      const userChurch = (await this.repositories.userChurch.loadByUserId(au.id, au.churchId)) as any;
+      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
 
       // Create authorization code
       const authCode: OAuthCode = {
@@ -28,7 +28,7 @@ export class OAuthController extends MembershipBaseController {
         scopes: scope,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
       };
-      await this.repositories.oAuthCode.save(authCode);
+      await this.repos.oAuthCode.save(authCode);
 
       // Return authorization code
       return this.json({
@@ -57,23 +57,23 @@ export class OAuthController extends MembershipBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const { grant_type, code, refresh_token, client_id, client_secret, redirect_uri } = req.body;
 
-      const client = (await this.repositories.oAuthClient.loadByClientIdAndSecret(client_id, client_secret)) as any;
+      const client = (await this.repos.oAuthClient.loadByClientIdAndSecret(client_id, client_secret)) as any;
       if (!client) return this.json({ error: "invalid_client" }, 400);
 
       if (grant_type === "authorization_code") {
         if (!code) return this.json({ error: "invalid_request" }, 400);
-        const authCode = (await this.repositories.oAuthCode.loadByCode(code)) as any;
+        const authCode = (await this.repos.oAuthCode.loadByCode(code)) as any;
         if (!authCode || authCode.clientId !== client.clientId) return this.json({ error: "invalid_grant" }, 400);
         if (redirect_uri && authCode.redirectUri !== redirect_uri) return this.json({ error: "invalid_grant" }, 400);
 
         if (authCode.expiresAt && authCode.expiresAt < new Date()) {
-          await this.repositories.oAuthCode.delete(authCode.id);
+          await this.repos.oAuthCode.delete(authCode.id);
           return this.json({ error: "invalid_grant" }, 400);
         }
 
-        const userChurch = (await this.repositories.userChurch.load(authCode.userChurchId)) as any;
-        const user = (await this.repositories.user.load(userChurch.userId)) as any;
-        const church = (await this.repositories.church.loadById(userChurch.churchId)) as any;
+        const userChurch = (await this.repos.userChurch.load(authCode.userChurchId)) as any;
+        const user = (await this.repos.user.load(userChurch.userId)) as any;
+        const church = (await this.repos.church.loadById(userChurch.churchId)) as any;
         const loginUserChurch: LoginUserChurch = {
           church: { id: church.id, name: church.churchName, subDomain: church.subDomain },
           person: {
@@ -93,10 +93,10 @@ export class OAuthController extends MembershipBaseController {
           scopes: authCode.scopes,
           expiresAt: new Date(Date.now() + 60 * 60 * 1000 * 12) // 12 hours
         };
-        await this.repositories.oAuthToken.save(token);
+        await this.repos.oAuthToken.save(token);
 
         // Delete used authorization code
-        await this.repositories.oAuthCode.delete(authCode.id);
+        await this.repos.oAuthCode.delete(authCode.id);
 
         return this.json({
           access_token: token.accessToken,
@@ -108,14 +108,14 @@ export class OAuthController extends MembershipBaseController {
         });
       } else if (grant_type === "refresh_token") {
         if (!refresh_token) return this.json({ error: "invalid_request" }, 400);
-        const oldToken = (await this.repositories.oAuthToken.loadByRefreshToken(refresh_token)) as any;
+        const oldToken = (await this.repos.oAuthToken.loadByRefreshToken(refresh_token)) as any;
 
         if (!oldToken || oldToken.clientId !== client.clientId) return this.json({ error: "invalid_grant" }, 400);
 
         // Fetch user/church data to generate proper JWT
-        const userChurch = (await this.repositories.userChurch.load(oldToken.userChurchId)) as any;
-        const user = (await this.repositories.user.load(userChurch.userId)) as any;
-        const church = (await this.repositories.church.loadById(userChurch.churchId)) as any;
+        const userChurch = (await this.repos.userChurch.load(oldToken.userChurchId)) as any;
+        const user = (await this.repos.user.load(userChurch.userId)) as any;
+        const church = (await this.repos.church.loadById(userChurch.churchId)) as any;
         const loginUserChurch: LoginUserChurch = {
           church: { id: church.id, name: church.churchName, subDomain: church.subDomain },
           person: {
@@ -135,9 +135,9 @@ export class OAuthController extends MembershipBaseController {
           scopes: oldToken.scopes,
           expiresAt: new Date(Date.now() + 60 * 60 * 1000 * 12) // 12 hours
         };
-        await this.repositories.oAuthToken.save(token);
+        await this.repos.oAuthToken.save(token);
 
-        await this.repositories.oAuthToken.delete(oldToken.id);
+        await this.repos.oAuthToken.delete(oldToken.id);
 
         return this.json({
           access_token: token.accessToken,
@@ -155,14 +155,14 @@ export class OAuthController extends MembershipBaseController {
   public async getClients(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      return await this.repositories.oAuthClient.loadAll();
+      return await this.repos.oAuthClient.loadAll();
     });
   }
 
   @httpGet("/clients/clientId/:clientId")
   public async getClientByClientId(@requestParam("clientId") clientId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = (await this.repositories.oAuthClient.loadByClientId(clientId)) as any;
+      const result = (await this.repos.oAuthClient.loadByClientId(clientId)) as any;
       result.clientSecret = null;
       return result;
     });
@@ -172,7 +172,7 @@ export class OAuthController extends MembershipBaseController {
   public async getClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      return await this.repositories.oAuthClient.load(id);
+      return await this.repos.oAuthClient.load(id);
     });
   }
 
@@ -180,7 +180,7 @@ export class OAuthController extends MembershipBaseController {
   public async saveClient(req: express.Request<{}, {}, OAuthClient>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      return await this.repositories.oAuthClient.save(req.body);
+      return await this.repos.oAuthClient.save(req.body);
     });
   }
 
@@ -188,7 +188,7 @@ export class OAuthController extends MembershipBaseController {
   public async deleteClient(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      await this.repositories.oAuthClient.delete(id);
+      await this.repos.oAuthClient.delete(id);
       return this.json({}, 200);
     });
   }

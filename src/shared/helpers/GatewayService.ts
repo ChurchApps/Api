@@ -68,14 +68,14 @@ export class GatewayService {
     return undefined;
   }
 
-  static async logEvent(gateway: any, churchId: string, event: any, eventData: any, repositories: any): Promise<void> {
+  static async logEvent(gateway: any, churchId: string, event: any, eventData: any, repos: any): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
-    await provider.logEvent(churchId, event, eventData, repositories);
+    await provider.logEvent(churchId, event, eventData, repos);
   }
 
-  static async logDonation(gateway: any, churchId: string, eventData: any, repositories: any): Promise<any> {
+  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
-    return await provider.logDonation(config, churchId, eventData, repositories);
+    return await provider.logDonation(config, churchId, eventData, repos);
   }
 }

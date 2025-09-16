@@ -16,7 +16,7 @@ export class SubscriptionController extends GivingCrudController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
-      else return this.repositories.customer.convertToModel(au.churchId, await this.repositories.customer.load(au.churchId, id));
+      else return this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, id));
     });
   }
 
@@ -24,7 +24,7 @@ export class SubscriptionController extends GivingCrudController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
-      else return this.repositories.customer.convertAllToModel(au.churchId, (await this.repositories.customer.loadAll(au.churchId)) as any[]);
+      else return this.repos.customer.convertAllToModel(au.churchId, (await this.repos.customer.loadAll(au.churchId)) as any[]);
     });
   }
 
@@ -36,7 +36,7 @@ export class SubscriptionController extends GivingCrudController {
       // Note: Subscription updates would need to be implemented in the gateway providers
       // This is a placeholder for future implementation
       req.body.forEach(async (subscription) => {
-        permission = permission || ((await this.repositories.subscription.load(au.churchId, subscription.id)) as any).personId === au.personId;
+        permission = permission || ((await this.repos.subscription.load(au.churchId, subscription.id)) as any).personId === au.personId;
         // TODO: Implement gateway-agnostic subscription updates
       });
       return await Promise.all(promises);
@@ -46,11 +46,11 @@ export class SubscriptionController extends GivingCrudController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string; reason?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const subscription = await this.repositories.subscription.load(au.churchId, id);
+      const subscription = await this.repos.subscription.load(au.churchId, id);
       const permission = au.checkAccess(Permissions.donations.edit) || (subscription as any)?.personId === au.personId;
       if (!permission) return this.json(null, 401);
 
-      const gateways = await this.repositories.gateway.loadAll(au.churchId);
+      const gateways = await this.repos.gateway.loadAll(au.churchId);
       const gateway = (gateways as any[])[0];
       if (!gateway) return this.json({ error: "No gateway configured" }, 400);
 
@@ -61,7 +61,7 @@ export class SubscriptionController extends GivingCrudController {
         promises.push(GatewayService.cancelSubscription(gateway, id, req.body?.reason));
 
         // Delete from database
-        promises.push(this.repositories.subscription.delete(au.churchId, id));
+        promises.push(this.repos.subscription.delete(au.churchId, id));
 
         await Promise.all(promises);
         return this.json({ success: true });
@@ -73,7 +73,7 @@ export class SubscriptionController extends GivingCrudController {
   }
 
   private loadPrivateKey = async (churchId: string) => {
-    const gateways = await this.repositories.gateway.loadAll(churchId);
+    const gateways = await this.repos.gateway.loadAll(churchId);
     return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
   };
 }

@@ -10,9 +10,9 @@ export class CuratedEventController extends ContentBaseController {
   public async getForCuratedCalendar(@requestParam("curatedCalendarId") curatedCalendarId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (req.query?.withoutEvents) {
-        return await this.repositories.curatedEvent.loadByCuratedCalendarId(au.churchId, curatedCalendarId);
+        return await this.repos.curatedEvent.loadByCuratedCalendarId(au.churchId, curatedCalendarId);
       }
-      return await this.repositories.curatedEvent.loadForEvents(curatedCalendarId, au.churchId);
+      return await this.repos.curatedEvent.loadForEvents(curatedCalendarId, au.churchId);
     });
   }
 
@@ -24,21 +24,21 @@ export class CuratedEventController extends ContentBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repositories.curatedEvent.loadForEvents(curatedCalendarId, churchId);
+      return await this.repos.curatedEvent.loadForEvents(curatedCalendarId, churchId);
     });
   }
 
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.curatedEvent.load(au.churchId, id);
+      return await this.repos.curatedEvent.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.curatedEvent.loadAll(au.churchId);
+      return await this.repos.curatedEvent.loadAll(au.churchId);
     });
   }
 
@@ -55,13 +55,13 @@ export class CuratedEventController extends ContentBaseController {
               // If eventIds are there, it means only specific group events are need to be added.
               const eventPromises: Promise<CuratedEvent>[] = [];
               curatedEvent.eventIds.forEach((id) => {
-                eventPromises.push(this.repositories.curatedEvent.save({ ...curatedEvent, eventId: id }));
+                eventPromises.push(this.repos.curatedEvent.save({ ...curatedEvent, eventId: id }));
               });
 
               return await Promise.all(eventPromises);
             } else {
               // If eventId is not there, it means the whole group needs to be added to the curated calendar. All the group events will be added to the curated calendar.
-              return await this.repositories.curatedEvent.save(curatedEvent);
+              return await this.repos.curatedEvent.save(curatedEvent);
             }
           };
 
@@ -79,7 +79,7 @@ export class CuratedEventController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.curatedEvent.delete(au.churchId, id);
+        await this.repos.curatedEvent.delete(au.churchId, id);
         return this.json({});
       }
     });
@@ -95,7 +95,7 @@ export class CuratedEventController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.curatedEvent.deleteByEventId(au.churchId, curatedCalendarId, eventId);
+        await this.repos.curatedEvent.deleteByEventId(au.churchId, curatedCalendarId, eventId);
         return this.json({});
       }
     });
@@ -111,7 +111,7 @@ export class CuratedEventController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.curatedEvent.deleteByGroupId(au.churchId, curatedCalendarId, groupId);
+        await this.repos.curatedEvent.deleteByGroupId(au.churchId, curatedCalendarId, groupId);
         return this.json({});
       }
     });

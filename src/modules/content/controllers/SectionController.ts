@@ -10,7 +10,7 @@ export class SectionController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.section.load(au.churchId, id);
+      return await this.repos.section.load(au.churchId, id);
     });
   }
 
@@ -20,8 +20,8 @@ export class SectionController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const { convertToBlock } = req.query;
-        let section = await this.repositories.section.load(au.churchId, id);
-        const allElements: Element[] = await this.repositories.element.loadForSection(section.churchId, section.id);
+        let section = await this.repos.section.load(au.churchId, id);
+        const allElements: Element[] = await this.repos.element.loadForSection(section.churchId, section.id);
         section = TreeHelper.buildTree([section], allElements)[0];
         let result;
         if (convertToBlock && convertToBlock !== "") {
@@ -42,12 +42,12 @@ export class SectionController extends ContentBaseController {
         const promises: Promise<Section>[] = [];
         req.body.forEach((section) => {
           section.churchId = au.churchId;
-          promises.push(this.repositories.section.save(section));
+          promises.push(this.repos.section.save(section));
         });
         const result = await Promise.all(promises);
         if (req.body.length > 0) {
-          if (req.body[0].blockId) await this.repositories.section.updateSortForBlock(req.body[0].churchId, req.body[0].blockId);
-          else await this.repositories.section.updateSort(req.body[0].churchId, req.body[0].pageId, req.body[0].zone);
+          if (req.body[0].blockId) await this.repos.section.updateSortForBlock(req.body[0].churchId, req.body[0].blockId);
+          else await this.repos.section.updateSort(req.body[0].churchId, req.body[0].pageId, req.body[0].zone);
         }
         TreeHelper.populateAnswers(result);
         return result;
@@ -60,13 +60,13 @@ export class SectionController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        const section = await this.repositories.section.load(au.churchId, id);
-        await this.repositories.section.delete(au.churchId, id);
+        const section = await this.repos.section.load(au.churchId, id);
+        await this.repos.section.delete(au.churchId, id);
         if (section.blockId) {
-          await this.repositories.section.updateSortForBlock(section.churchId, section.blockId);
+          await this.repos.section.updateSortForBlock(section.churchId, section.blockId);
           return this.json({});
         } else {
-          await this.repositories.section.updateSort(section.churchId, section.pageId, section.zone);
+          await this.repos.section.updateSort(section.churchId, section.pageId, section.zone);
           return this.json({});
         }
       }

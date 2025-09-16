@@ -16,7 +16,7 @@ export class ConversationController extends MessagingBaseController {
       }) as any;
 
       if (postIds.length > 0) {
-        const posts = await this.repositories.message.loadByIds(churchId, postIds);
+        const posts = await this.repos.message.loadByIds(churchId, postIds);
         conversations.forEach((c: any) => {
           if (c && c.firstPostId) {
             const message = ArrayHelper.getOne(posts, "id", c.firstPostId);
@@ -41,7 +41,7 @@ export class ConversationController extends MessagingBaseController {
   public async getTimelineByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const ids = req.query.ids.toString().split(",");
-      const result = (await this.repositories.conversation.loadByIds(au.churchId, ids)) as Conversation[];
+      const result = (await this.repos.conversation.loadByIds(au.churchId, ids)) as Conversation[];
       if (result && Array.isArray(result)) {
         await this.appendMessages(result, au.churchId);
       }
@@ -58,16 +58,16 @@ export class ConversationController extends MessagingBaseController {
     res: express.Response
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
-      const data = await this.repositories.conversation.loadForContent(churchId, contentType, contentId);
-      return this.repositories.conversation.convertAllToModel(data as any[]);
+      const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
+      return this.repos.conversation.convertAllToModel(data as any[]);
     }) as any;
   }
 
   @httpGet("/:churchId/:id")
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation> {
     return this.actionWrapperAnon(req, res, async () => {
-      const data = await this.repositories.conversation.loadById(churchId, id);
-      return this.repositories.conversation.convertToModel(data);
+      const data = await this.repos.conversation.loadById(churchId, id);
+      return this.repos.conversation.convertToModel(data);
     }) as any;
   }
 
@@ -77,17 +77,17 @@ export class ConversationController extends MessagingBaseController {
       const promises: Promise<Conversation>[] = [];
       req.body.forEach((conversation) => {
         conversation.churchId = au.churchId;
-        promises.push(this.repositories.conversation.save(conversation));
+        promises.push(this.repos.conversation.save(conversation));
       }) as any;
       const result = await Promise.all(promises);
-      return this.repositories.conversation.convertAllToModel(result);
+      return this.repos.conversation.convertAllToModel(result);
     }) as any;
   }
 
   @httpGet("/posts/group/:groupId")
   public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = await this.repositories.conversation.loadPosts(au.churchId, [groupId]);
+      const result = await this.repos.conversation.loadPosts(au.churchId, [groupId]);
       if (result && Array.isArray(result)) {
         await this.appendMessages(result, au.churchId);
       }
@@ -98,7 +98,7 @@ export class ConversationController extends MessagingBaseController {
   @httpGet("/posts")
   public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = await this.repositories.conversation.loadPosts(au.churchId, au.groupIds || []);
+      const result = await this.repos.conversation.loadPosts(au.churchId, au.groupIds || []);
       if (result && Array.isArray(result)) {
         await this.appendMessages(result, au.churchId);
       }
@@ -119,7 +119,7 @@ export class ConversationController extends MessagingBaseController {
         allowAnonymousPosts: false,
         groupId: req.body.groupId
       };
-      const conversation = await this.repositories.conversation.save(c);
+      const conversation = await this.repos.conversation.save(c);
 
       const m: Message = {
         churchId: au.churchId,
@@ -130,9 +130,9 @@ export class ConversationController extends MessagingBaseController {
         content: req.body.comment,
         messageType: "comment"
       };
-      await this.repositories.message.save(m);
+      await this.repos.message.save(m);
 
-      this.repositories.conversation.updateStats(conversation.id);
+      this.repos.conversation.updateStats(conversation.id);
 
       return conversation;
     }) as any;
@@ -154,14 +154,14 @@ export class ConversationController extends MessagingBaseController {
   @httpGet("/:contentType/:contentId")
   public async forContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const conversations = (await this.repositories.conversation.loadForContent(au.churchId, contentType, contentId)) as Conversation[];
+      const conversations = (await this.repos.conversation.loadForContent(au.churchId, contentType, contentId)) as Conversation[];
       const messageIds: string[] = [];
       conversations.forEach((c) => {
         if (messageIds.indexOf(c.firstPostId) === -1) messageIds.push(c.firstPostId);
         if (messageIds.indexOf(c.lastPostId) === -1) messageIds.push(c.lastPostId);
       });
       if (messageIds.length > 0) {
-        const allMessages = await this.repositories.message.loadByIds(au.churchId, messageIds);
+        const allMessages = await this.repos.message.loadByIds(au.churchId, messageIds);
         conversations.forEach((c) => {
           c.messages = [];
           let msg = ArrayHelper.getOne(allMessages, "id", c.firstPostId);
@@ -184,13 +184,13 @@ export class ConversationController extends MessagingBaseController {
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.conversation.delete(au.churchId, id);
+      await this.repos.conversation.delete(au.churchId, id);
     }) as any;
   }
 
   private async getOrCreate(churchId: string, contentType: string, contentId: string, visibility: string, allowAnonymousPosts: boolean) {
     const CONTENT_ID = contentId.length > 11 ? EncryptionHelper.decrypt(contentId.toString()) : contentId;
-    let result: Conversation = await this.repositories.conversation.loadCurrent(churchId, contentType, CONTENT_ID);
+    let result: Conversation = await this.repos.conversation.loadCurrent(churchId, contentType, CONTENT_ID);
     if (result === null) {
       result = {
         contentId: CONTENT_ID,
@@ -201,7 +201,7 @@ export class ConversationController extends MessagingBaseController {
         visibility,
         allowAnonymousPosts
       };
-      result = await this.repositories.conversation.save(result);
+      result = await this.repos.conversation.save(result);
     }
     return result;
   }

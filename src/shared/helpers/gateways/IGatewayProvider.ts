@@ -47,6 +47,6 @@ export interface IGatewayProvider {
   createProduct?(config: GatewayConfig, churchId: string): Promise<string>;
 
   // Event logging
-  logEvent(churchId: string, event: any, eventData: any, repositories: any): Promise<void>;
-  logDonation(config: GatewayConfig, churchId: string, eventData: any, repositories: any): Promise<any>;
+  logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;
+  logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any>;
 }

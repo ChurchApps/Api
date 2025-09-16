@@ -10,7 +10,7 @@ export class PositionController extends DoingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = req.query.ids as string;
       const ids = idsString.split(",");
-      return await this.repositories.position.loadByIds(au.churchId, ids);
+      return await this.repos.position.loadByIds(au.churchId, ids);
     });
   }
 
@@ -19,14 +19,14 @@ export class PositionController extends DoingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const planIdsString = req.query.planIds as string;
       const planIds = planIdsString.split(",");
-      return await this.repositories.position.loadByPlanIds(au.churchId, planIds);
+      return await this.repos.position.loadByPlanIds(au.churchId, planIds);
     });
   }
 
   @httpGet("/plan/:planId")
   public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.position.loadByPlanId(au.churchId, planId);
+      return await this.repos.position.loadByPlanId(au.churchId, planId);
     });
   }
 

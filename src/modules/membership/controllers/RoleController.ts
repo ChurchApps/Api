@@ -17,7 +17,7 @@ export class RoleController extends MembershipCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
       else {
-        return this.repositories.role.convertAllToModel(churchId, await this.repositories.role.loadByChurchId(churchId));
+        return this.repos.role.convertAllToModel(churchId, await this.repos.role.loadByChurchId(churchId));
       }
     });
   }
@@ -25,7 +25,7 @@ export class RoleController extends MembershipCrudController {
   @httpGet("/:id")
   public async loadById(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const role: Role = await this.repositories.role.loadById(au.churchId, id);
+      const role: Role = await this.repos.role.loadById(au.churchId, id);
       const roles: Role[] = [role];
       const hasAccess = await this.checkAccess(roles, Permissions.roles.view, au);
       if (!hasAccess) return this.json({}, 401);
@@ -42,7 +42,7 @@ export class RoleController extends MembershipCrudController {
         const promises: Promise<Role>[] = [];
         roles.forEach((role) => {
           role.churchId = au.churchId;
-          promises.push(this.repositories.role.save(role));
+          promises.push(this.repos.role.save(role));
         });
         roles = await Promise.all(promises);
         return this.json(roles, 200);
@@ -53,14 +53,14 @@ export class RoleController extends MembershipCrudController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const role: Role = await this.repositories.role.loadById(au.churchId, id);
+      const role: Role = await this.repos.role.loadById(au.churchId, id);
       const roles: Role[] = [role];
       if (!this.checkAccess(roles, Permissions.roles.edit, au)) return this.json({}, 401);
       else {
-        await this.repositories.rolePermission.deleteForRole(au.churchId, id);
-        await this.repositories.roleMember.deleteForRole(au.churchId, id);
+        await this.repos.rolePermission.deleteForRole(au.churchId, id);
+        await this.repos.roleMember.deleteForRole(au.churchId, id);
         await new Promise((resolve) => setTimeout(resolve, 500)); // I think it takes a split second for the FK restraints to see the members were deleted sometimes and the delete below fails if I don't wait.
-        await this.repositories.role.delete(au.churchId, id);
+        await this.repos.role.delete(au.churchId, id);
         return this.json([], 200);
       }
     });

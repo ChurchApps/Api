@@ -16,12 +16,12 @@ export class SessionController extends AttendanceCrudController {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
       else {
         let result;
-        if (req.query.groupId === undefined) result = await this.repositories.session.loadAll(au.churchId);
+        if (req.query.groupId === undefined) result = await this.repos.session.loadAll(au.churchId);
         else {
           const groupId = req.query.groupId.toString();
-          result = await this.repositories.session.loadByGroupIdWithNames(au.churchId, groupId);
+          result = await this.repos.session.loadByGroupIdWithNames(au.churchId, groupId);
         }
-        return this.repositories.session.convertAllToModel(au.churchId, result as any);
+        return this.repos.session.convertAllToModel(au.churchId, result as any);
       }
     });
   }

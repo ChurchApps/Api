@@ -114,7 +114,7 @@ module.exports = [
       "src/app.ts",
       "src/routes.ts",
       "src/lambda/**/*.ts",
-      "src/shared/infrastructure/RepositoryManager.ts",
+      "src/shared/infrastructure/RepoManager.ts",
       "src/shared/helpers/StripeHelper.ts",
       "src/modules/*/index.ts"
     ],

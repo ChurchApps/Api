@@ -1,18 +1,18 @@
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 import { Role, RoleMember, RolePermission } from "../models";
 
 export class RoleHelper {
-  private repositories: Repositories;
+  private repos: Repos;
 
   constructor(
     private churchId: string,
     private userId: string
   ) {}
 
-  private async repos(): Promise<Repositories> {
-    if (!this.repositories) this.repositories = await RepositoryManager.getRepositories<Repositories>("membership");
-    return this.repositories;
+  private async getRepos(): Promise<Repos> {
+    if (!this.repos) this.repos = await RepoManager.getRepos<Repos>("membership");
+    return this.repos;
   }
 
   public async init() {
@@ -27,7 +27,7 @@ export class RoleHelper {
   }
 
   private async createRole(name: string, permissions: RolePermission[]): Promise<string> {
-    const repos = await this.repos();
+    const repos = await this.getRepos();
     let role: Role = {};
     if (name) {
       role = await repos.role.save({ churchId: this.churchId, name });
@@ -47,7 +47,7 @@ export class RoleHelper {
 
   private async createRoleMember(roleId: string) {
     const roleMember: RoleMember = { churchId: this.churchId, roleId, userId: this.userId, addedBy: this.userId };
-    const repos = await this.repos();
+    const repos = await this.getRepos();
     await repos.roleMember.save(roleMember);
   }
 

@@ -10,7 +10,7 @@ export class ContentSettingController extends ContentBaseController {
   @httpGet("/my")
   public async my(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.setting.convertAllToModel(au.churchId, await this.repositories.setting.loadUser(au.churchId, au.id));
+      return this.repos.setting.convertAllToModel(au.churchId, await this.repos.setting.loadUser(au.churchId, au.id));
     });
   }
 
@@ -19,7 +19,7 @@ export class ContentSettingController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
-        return this.repositories.setting.convertAllToModel(au.churchId, await this.repositories.setting.loadAll(au.churchId));
+        return this.repos.setting.convertAllToModel(au.churchId, await this.repos.setting.loadAll(au.churchId));
       }
     });
   }
@@ -34,7 +34,7 @@ export class ContentSettingController extends ContentBaseController {
         promises.push(this.saveSetting(setting));
       });
       const result = await Promise.all(promises);
-      return this.repositories.setting.convertAllToModel(au.churchId, result);
+      return this.repos.setting.convertAllToModel(au.churchId, result);
     });
   }
 
@@ -49,7 +49,7 @@ export class ContentSettingController extends ContentBaseController {
           promises.push(this.saveSetting(setting));
         });
         const result = await Promise.all(promises);
-        return this.repositories.setting.convertAllToModel(au.churchId, result);
+        return this.repos.setting.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -58,7 +58,7 @@ export class ContentSettingController extends ContentBaseController {
   public async publicRoute(@requestParam("churchId") churchId: string): Promise<any> {
     console.log("made it");
     //try {
-    const settings = this.repositories.setting.convertAllToModel(churchId, await this.repositories.setting.loadPublicSettings(churchId));
+    const settings = this.repos.setting.convertAllToModel(churchId, await this.repos.setting.loadPublicSettings(churchId));
     console.log("Setting count", settings.length);
     const result: any = {};
     settings.forEach((s) => {
@@ -79,14 +79,14 @@ export class ContentSettingController extends ContentBaseController {
         const playlistId = req.query?.playlistId ? req.query.playlistId.toString() : "";
         const channelId = req.query?.channelId ? req.query.channelId.toString() : "";
         const type = req.query?.type ? req.query.type.toString() : "";
-        let result = await this.repositories.setting.loadByKeyNames(au.churchId, ["youtubeChannelId", "vimeoChannelId", "autoImportSermons"]);
+        let result = await this.repos.setting.loadByKeyNames(au.churchId, ["youtubeChannelId", "vimeoChannelId", "autoImportSermons"]);
         result = result.filter((r: any) => r.value !== ""); // remove rows with empty value
         if (playlistId && channelId) {
-          const filteredData = this.repositories.setting.getImports(result, type, playlistId, channelId);
-          if (filteredData) return this.repositories.setting.convertAllImports(filteredData);
+          const filteredData = this.repos.setting.getImports(result, type, playlistId, channelId);
+          if (filteredData) return this.repos.setting.convertAllImports(filteredData);
         }
-        result = this.repositories.setting.getImports(result);
-        return this.repositories.setting.convertAllImports(result);
+        result = this.repos.setting.getImports(result);
+        return this.repos.setting.convertAllImports(result);
       }
     });
   }
@@ -94,14 +94,14 @@ export class ContentSettingController extends ContentBaseController {
   @httpDelete("/my/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.setting.deleteForUser(au.churchId, au.id, id);
+      await this.repos.setting.deleteForUser(au.churchId, au.id, id);
       return this.json({ success: true });
     });
   }
 
   private async saveSetting(setting: Setting) {
     if (setting.value.startsWith("data:image/")) setting = await this.saveImage(setting);
-    setting = await this.repositories.setting.save(setting);
+    setting = await this.repos.setting.save(setting);
     return setting;
   }
 

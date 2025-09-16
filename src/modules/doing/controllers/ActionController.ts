@@ -8,14 +8,14 @@ export class ActionController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.action.load(au.churchId, id);
+      return await this.repos.action.load(au.churchId, id);
     });
   }
 
   @httpGet("/automation/:id")
   public async getForAutomation(@requestParam("id") automationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.action.loadForAutomation(au.churchId, automationId);
+      return await this.repos.action.loadForAutomation(au.churchId, automationId);
     });
   }
 
@@ -25,7 +25,7 @@ export class ActionController extends DoingBaseController {
       const promises: Promise<Action>[] = [];
       req.body.forEach((action) => {
         action.churchId = au.churchId;
-        promises.push(this.repositories.action.save(action));
+        promises.push(this.repos.action.save(action));
       });
       const result = await Promise.all(promises);
       return result;
@@ -35,7 +35,7 @@ export class ActionController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.action.delete(au.churchId, id);
+      await this.repos.action.delete(au.churchId, id);
       return {};
     });
   }

@@ -7,7 +7,7 @@ import { TypedDB } from "../shared/infrastructure/TypedDB";
 import { Logger } from "../modules/messaging/helpers/Logger";
 import { SocketHelper } from "../modules/messaging/helpers/SocketHelper";
 import { initializeMessagingModule } from "../modules/messaging";
-import { RepositoryManager } from "../shared/infrastructure/RepositoryManager";
+import { RepoManager } from "../shared/infrastructure/RepoManager";
 
 let gwManagement: ApiGatewayManagementApiClient;
 
@@ -24,8 +24,8 @@ const initEnv = async () => {
 
     // Initialize messaging module repositories and helpers in messaging context
     await TypedDB.runWithContext("messaging", async () => {
-      const repositories = await RepositoryManager.getRepositories<any>("messaging");
-      initializeMessagingModule(repositories);
+      const repos = await RepoManager.getRepos<any>("messaging");
+      initializeMessagingModule(repos);
     });
   }
 };

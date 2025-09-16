@@ -67,12 +67,12 @@ export class CrudHelper {
   }
 
   // Controller-wrapped variants (use controller's action wrappers and repositories)
-  static getByIdWrapped(ctrl: { actionWrapper: Function; repositories: any }, req: express.Request, res: express.Response, permission: any | null, repoKey: string, id: string) {
-    return (ctrl as any).actionWrapper(req, res, async (au: any) => CrudHelper.getByIdAuto(au, permission, () => ctrl.repositories[repoKey].load(au.churchId, id), ctrl.repositories[repoKey]));
+  static getByIdWrapped(ctrl: { actionWrapper: Function; repos: any }, req: express.Request, res: express.Response, permission: any | null, repoKey: string, id: string) {
+    return (ctrl as any).actionWrapper(req, res, async (au: any) => CrudHelper.getByIdAuto(au, permission, () => ctrl.repos[repoKey].load(au.churchId, id), ctrl.repos[repoKey]));
   }
 
   static listWrapped(
-    ctrl: { actionWrapper: Function; repositories: any },
+    ctrl: { actionWrapper: Function; repos: any },
     req: express.Request,
     res: express.Response,
     repoKey: string,
@@ -81,16 +81,16 @@ export class CrudHelper {
   ) {
     return (ctrl as any).actionWrapper(req, res, async (au: any) => {
       if (permission && !au.checkAccess(permission)) return {};
-      return CrudHelper.listAuto(au, () => loader(ctrl.repositories, au), ctrl.repositories[repoKey]);
+      return CrudHelper.listAuto(au, () => loader(ctrl.repos, au), ctrl.repos[repoKey]);
     });
   }
 
-  static listAnonWrapped(ctrl: { actionWrapperAnon: Function; repositories: any }, req: express.Request, res: express.Response, repoKey: string, loader: (repos: any) => Promise<any[]>) {
-    return (ctrl as any).actionWrapperAnon(req, res, async () => CrudHelper.listAuto({ churchId: undefined } as any, () => loader(ctrl.repositories), ctrl.repositories[repoKey]));
+  static listAnonWrapped(ctrl: { actionWrapperAnon: Function; repos: any }, req: express.Request, res: express.Response, repoKey: string, loader: (repos: any) => Promise<any[]>) {
+    return (ctrl as any).actionWrapperAnon(req, res, async () => CrudHelper.listAuto({ churchId: undefined } as any, () => loader(ctrl.repos), ctrl.repos[repoKey]));
   }
 
   static saveManyWrapped<TInput extends { churchId?: string }>(
-    ctrl: { actionWrapper: Function; repositories: any },
+    ctrl: { actionWrapper: Function; repos: any },
     req: express.Request<{}, {}, TInput[]>,
     res: express.Response,
     editPermission: any,
@@ -103,20 +103,20 @@ export class CrudHelper {
         editPermission,
         req.body,
         (item, churchId) => (setChurchId ? setChurchId(item, churchId) : ((item as any).churchId = churchId)),
-        (item) => ctrl.repositories[repoKey].save(item),
-        ctrl.repositories[repoKey]
+        (item) => ctrl.repos[repoKey].save(item),
+        ctrl.repos[repoKey]
       )
     );
   }
 
   static deleteWrapped(
-    ctrl: { actionWrapper: Function; repositories: any },
+    ctrl: { actionWrapper: Function; repos: any },
     req: express.Request,
     res: express.Response,
     editPermission: any,
     repoKey: string,
     remover: (repos: any, au: any) => Promise<any>
   ) {
-    return (ctrl as any).actionWrapper(req, res, async (au: any) => CrudHelper.remove(au, editPermission, () => remover(ctrl.repositories, au)));
+    return (ctrl as any).actionWrapper(req, res, async (au: any) => CrudHelper.remove(au, editPermission, () => remover(ctrl.repos, au)));
   }
 }

@@ -8,7 +8,7 @@ export class DeviceContentController extends MessagingBaseController {
   @httpGet("/deviceId/:deviceId")
   public async getUnique(@requestParam("deviceId") deviceId: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const deviceContent = await this.repositories.deviceContent.loadByDeviceId(au.churchId, deviceId);
+      const deviceContent = await this.repos.deviceContent.loadByDeviceId(au.churchId, deviceId);
       return deviceContent;
     });
   }
@@ -19,7 +19,7 @@ export class DeviceContentController extends MessagingBaseController {
       const promises: Promise<DeviceContent>[] = [];
       req.body.forEach((deviceContent) => {
         deviceContent.churchId = au.churchId;
-        promises.push(this.repositories.deviceContent.save(deviceContent));
+        promises.push(this.repos.deviceContent.save(deviceContent));
       });
       const result = await Promise.all(promises);
       return result;
@@ -29,7 +29,7 @@ export class DeviceContentController extends MessagingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.deviceContent.delete(au.churchId, id);
+      await this.repos.deviceContent.delete(au.churchId, id);
       return this.json({});
     });
   }

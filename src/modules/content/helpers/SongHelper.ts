@@ -1,7 +1,7 @@
 import { SongDetail, Song, Arrangement, SongDetailLink, ArrangementKey } from "../models";
 import { PraiseChartsHelper } from "./PraiseChartsHelper";
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 
 export interface FreeShowSong {
   freeShowId: string;
@@ -30,7 +30,7 @@ export class SongHelper {
       keySignature: "",
       praiseChartsId: ""
     };
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const songDetail = await repos.songDetail.save(customSongDetail);
     const customSong: Song = {
       churchId,
@@ -60,7 +60,7 @@ export class SongHelper {
   static async importSong(churchId: string, freeshowSong: FreeShowSong): Promise<Arrangement> {
     try {
       // 1. Check if arrangement already exists for this church and freeshow key
-      const repos = await RepositoryManager.getRepositories<Repositories>("content");
+      const repos = await RepoManager.getRepos<Repos>("content");
       const exactMathArrangement = await repos.arrangement.loadByFreeShowId(churchId, freeshowSong.freeShowId);
       if (exactMathArrangement) return exactMathArrangement;
 
@@ -105,7 +105,7 @@ export class SongHelper {
   private static async findExistingSongByCCLI(churchId: string, ccliNumber?: string): Promise<SongDetail | null> {
     if (!ccliNumber) return null;
 
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const existingByCCLI = await repos.songDetailLink.loadByServiceAndKey("CCLI", ccliNumber);
     if (existingByCCLI) {
       const songDetail = await repos.songDetail.loadGlobal(existingByCCLI.songDetailId);
@@ -118,7 +118,7 @@ export class SongHelper {
   }
 
   private static async findExistingSongByGeniusId(churchId: string, geniusId: string): Promise<Arrangement | null> {
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const existingByGenius = await repos.songDetailLink.loadByServiceAndKey("Genius", geniusId);
     if (existingByGenius) {
       const songDetail = await repos.songDetail.loadGlobal(existingByGenius.songDetailId);
@@ -133,7 +133,7 @@ export class SongHelper {
   }
 
   private static async getOrCreateSongDetail(praiseChartsResult: SongDetail, ccliNumber?: string, geniusId?: string): Promise<SongDetail> {
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     let songDetail = await repos.songDetail.loadByPraiseChartsId(praiseChartsResult.praiseChartsId);
 
     if (!songDetail) {
@@ -155,7 +155,7 @@ export class SongHelper {
   }
 
   private static async createSongDetailLinks(songDetail: SongDetail, praiseChartsId: string): Promise<void> {
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const { links } = await PraiseChartsHelper.load(praiseChartsId);
     for (const link of links) {
       link.songDetailId = songDetail.id;
@@ -164,7 +164,7 @@ export class SongHelper {
   }
 
   private static async createAdditionalLinks(songDetail: SongDetail, ccliNumber?: string, geniusId?: string): Promise<void> {
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const existingLinks = await repos.songDetailLink.loadForSongDetail(songDetail.id);
 
     // Create CCLI link if provided and doesn't exist
@@ -197,7 +197,7 @@ export class SongHelper {
       name: songDetail.title,
       dateAdded: new Date()
     };
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const savedSong = await repos.song.save(song);
 
     // Create new Arrangement

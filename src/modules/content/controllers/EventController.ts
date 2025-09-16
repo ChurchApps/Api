@@ -11,7 +11,7 @@ export class EventController extends ContentBaseController {
   public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
-      return await this.repositories.event.loadTimelineGroup(au.churchId, groupId, eventIds);
+      return await this.repos.event.loadTimelineGroup(au.churchId, groupId, eventIds);
     });
   }
 
@@ -19,7 +19,7 @@ export class EventController extends ContentBaseController {
   public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
-      return await this.repositories.event.loadTimeline(au.churchId, au.groupIds, eventIds);
+      return await this.repos.event.loadTimeline(au.churchId, au.groupIds, eventIds);
     });
   }
 
@@ -28,10 +28,10 @@ export class EventController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       let newEvents: any[] = [];
       if (req.query.groupId) {
-        const groupEvents = await this.repositories.event.loadForGroup(req.query.churchId.toString(), req.query.groupId.toString());
+        const groupEvents = await this.repos.event.loadForGroup(req.query.churchId.toString(), req.query.groupId.toString());
         if (groupEvents && groupEvents.length > 0) newEvents = this.populateEventsForICS(groupEvents);
       } else if (req.query.curatedCalendarId) {
-        const curatedEvents = await this.repositories.curatedEvent.loadForEvents(req.query.curatedCalendarId.toString(), req.query.churchId.toString());
+        const curatedEvents = await this.repos.curatedEvent.loadForEvents(req.query.curatedCalendarId.toString(), req.query.churchId.toString());
         if (curatedEvents && curatedEvents.length > 0) newEvents = this.populateEventsForICS(curatedEvents);
       }
       const { error, value } = ics.createEvents(newEvents);
@@ -49,7 +49,7 @@ export class EventController extends ContentBaseController {
   @httpGet("/group/:groupId")
   public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = await this.repositories.event.loadForGroup(au.churchId, groupId);
+      const result = await this.repos.event.loadForGroup(au.churchId, groupId);
       await this.addExceptionDates(result);
       return result;
     });
@@ -58,7 +58,7 @@ export class EventController extends ContentBaseController {
   @httpGet("/public/group/:churchId/:groupId")
   public async getPublicForGroup(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const result = await this.repositories.event.loadPublicForGroup(churchId, groupId);
+      const result = await this.repos.event.loadPublicForGroup(churchId, groupId);
       await this.addExceptionDates(result);
       return result;
     });
@@ -67,7 +67,7 @@ export class EventController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.event.load(au.churchId, id);
+      return await this.repos.event.load(au.churchId, id);
     });
   }
 
@@ -79,7 +79,7 @@ export class EventController extends ContentBaseController {
       const promises: Promise<Event>[] = [];
       req.body.forEach((event) => {
         event.churchId = au.churchId;
-        promises.push(this.repositories.event.save(event));
+        promises.push(this.repos.event.save(event));
       });
       const result = await Promise.all(promises);
       return result;
@@ -92,7 +92,7 @@ export class EventController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.event.delete(au.churchId, id);
+        await this.repos.event.delete(au.churchId, id);
         return this.json({});
       }
     });
@@ -104,7 +104,7 @@ export class EventController extends ContentBaseController {
     events.forEach((event) => {
       event.exceptionDates = [];
     });
-    const result = await this.repositories.eventException.loadForEvents(events[0].churchId, eventIds);
+    const result = await this.repos.eventException.loadForEvents(events[0].churchId, eventIds);
     result.forEach((eventException: EventException) => {
       const event = events.find((ev) => ev.id === eventException.eventId);
       if (event) event.exceptionDates.push(eventException.exceptionDate);

@@ -212,7 +212,7 @@ export class PayPalHelper {
     return response.result;
   }
 
-  static async logEvent(churchId: string, payPalEvent: any, eventData: any, givingRepositories: any) {
+  static async logEvent(churchId: string, payPalEvent: any, eventData: any, givingRepos: any) {
     const { id: eventId, event_type: eventType, create_time: createTime } = payPalEvent;
     const status = eventData.status || eventType;
     const message = eventData.status || "";
@@ -226,15 +226,15 @@ export class PayPalHelper {
       message,
       created: new Date(createTime)
     };
-    return givingRepositories.eventLog.create(eventLog);
+    return givingRepos.eventLog.create(eventLog);
   }
 
-  static async logDonation(clientId: string, clientSecret: string, churchId: string, eventData: any, givingRepositories: any) {
+  static async logDonation(clientId: string, clientSecret: string, churchId: string, eventData: any, givingRepos: any) {
     const amount = parseFloat(eventData.amount?.value ?? eventData.purchase_units?.[0]?.amount?.value ?? "0");
     const payerId = eventData.payer?.payer_id || eventData.subscriber?.payer_id || "";
-    const customerData = (await givingRepositories.customer.load(churchId, payerId)) as any;
+    const customerData = (await givingRepos.customer.load(churchId, payerId)) as any;
     const personId = customerData?.personId;
-    const batch: DonationBatch = await givingRepositories.donationBatch.getOrCreateCurrent(churchId);
+    const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
     const donationData: Donation = {
       batchId: batch.id,
       amount,
@@ -245,13 +245,13 @@ export class PayPalHelper {
       donationDate: new Date(eventData.create_time),
       notes: eventData.custom_id || ""
     };
-    const donation = await givingRepositories.donation.save(donationData);
+    const donation = await givingRepos.donation.save(donationData);
     const funds: FundDonation[] = [];
     (eventData.custom_id ? JSON.parse(eventData.custom_id) : []).forEach((f: FundDonation) => {
       funds.push({ churchId, donationId: donation.id, fundId: f.id, amount: f.amount });
     });
     const promises: Promise<FundDonation>[] = [];
-    funds.forEach((fd) => promises.push(givingRepositories.fundDonation.save(fd)));
+    funds.forEach((fd) => promises.push(givingRepos.fundDonation.save(fd)));
     return Promise.all(promises);
   }
 }

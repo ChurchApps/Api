@@ -15,13 +15,13 @@ export class RolePermissionController extends MembershipBaseController {
         let permissions: RolePermission[] = [];
         // when "id" is null, return roles associated with every member of church
         if (id === "null") {
-          const everyonePermission = await this.repositories.rolePermission.loadForEveryone(au.churchId);
+          const everyonePermission = await this.repos.rolePermission.loadForEveryone(au.churchId);
           permissions = (everyonePermission as any[]).map((e: any) => {
             delete e.churchName;
             delete e.subDomain;
             return e;
           });
-        } else permissions = await this.repositories.rolePermission.loadByRoleId(au.churchId, id);
+        } else permissions = await this.repos.rolePermission.loadByRoleId(au.churchId, id);
 
         return this.json(permissions, 200);
       }
@@ -33,7 +33,7 @@ export class RolePermissionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
       else {
-        await this.repositories.rolePermission.delete(au.churchId, id);
+        await this.repos.rolePermission.delete(au.churchId, id);
         return this.json([], 200);
       }
     });
@@ -48,7 +48,7 @@ export class RolePermissionController extends MembershipBaseController {
         const promises: Promise<RolePermission>[] = [];
         rolePermissions.forEach((rolePermission) => {
           rolePermission.churchId = au.churchId;
-          promises.push(this.repositories.rolePermission.save(rolePermission));
+          promises.push(this.repos.rolePermission.save(rolePermission));
         });
         rolePermissions = await Promise.all(promises);
         return this.json(rolePermissions, 200);
@@ -63,7 +63,7 @@ export class RolePermissionController extends MembershipBaseController {
         const roleIds: string[] = [];
         permissions.forEach(p => { if (roleIds.indexOf(p.roleId) === -1) roleIds.push(p.roleId); })
         if (roleIds.length > 0) {
-            const roles = await this.repositories.role.loadByIds(roleIds);
+            const roles = await this.repos.role.loadByIds(roleIds);
             roles.forEach(r => { if (r.appName !== au.appName) hasAccess = false; })
         }
     }*/

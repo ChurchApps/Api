@@ -39,14 +39,14 @@ export class DomainController extends MembershipCrudController {
   @httpGet("/lookup/:domainName")
   public async getByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.domain.loadByName(domainName);
+      return await this.repos.domain.loadByName(domainName);
     });
   }
 
   @httpGet("/public/lookup/:domainName")
   public async getPublicByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repositories.domain.loadByName(domainName);
+      return await this.repos.domain.loadByName(domainName);
     });
   }
 
@@ -58,7 +58,7 @@ export class DomainController extends MembershipCrudController {
         const promises: Promise<Domain>[] = [];
         req.body.forEach((domain) => {
           domain.churchId = au.churchId;
-          promises.push(this.repositories.domain.save(domain));
+          promises.push(this.repos.domain.save(domain));
         });
         const result = await Promise.all(promises);
         await CaddyHelper.updateCaddy();

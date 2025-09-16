@@ -19,7 +19,7 @@ export interface CrudSettings {
 // Base controller that provides common CRUD endpoints.
 // Subclasses must decorate themselves with @controller(path) and provide crudSettings.
 export abstract class GenericCrudController extends BaseController {
-  public repositories: any;
+  public repos: any;
   protected abstract crudSettings: CrudSettings;
 
   constructor(moduleName: string) {

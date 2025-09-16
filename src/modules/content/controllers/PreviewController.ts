@@ -16,10 +16,10 @@ export class PreviewController extends ContentBaseController {
       let sermons: Sermon[] = null;
 
       const promises: Promise<any>[] = [];
-      promises.push(this.repositories.link.loadByCategory(churchId, "streamingTab").then((d) => (tabs = d)));
-      promises.push(this.repositories.link.loadByCategory(churchId, "streamingLink").then((d) => (links = d)));
-      promises.push(this.repositories.streamingService.loadAll(churchId).then((d) => (services = d)));
-      promises.push(this.repositories.sermon.loadAll(churchId).then((d) => (sermons = d)));
+      promises.push(this.repos.link.loadByCategory(churchId, "streamingTab").then((d) => (tabs = d)));
+      promises.push(this.repos.link.loadByCategory(churchId, "streamingLink").then((d) => (links = d)));
+      promises.push(this.repos.streamingService.loadAll(churchId).then((d) => (services = d)));
+      promises.push(this.repos.sermon.loadAll(churchId).then((d) => (sermons = d)));
       await Promise.all(promises);
 
       const result = StreamingConfigHelper.generateJson(churchId, tabs, links, services, sermons);

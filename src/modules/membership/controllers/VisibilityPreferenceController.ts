@@ -12,7 +12,7 @@ export class VisibilityPreferenceController extends MembershipBaseController {
       req.body.forEach((v) => {
         v.churchId = au.churchId;
         v.personId = au.personId;
-        promises.push(this.repositories.visibilityPreference.save(v));
+        promises.push(this.repos.visibilityPreference.save(v));
       });
       const result = await Promise.all(promises);
       return result;
@@ -22,7 +22,7 @@ export class VisibilityPreferenceController extends MembershipBaseController {
   @httpGet("/my")
   public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = await this.repositories.visibilityPreference.loadForPerson(au.churchId, au.personId);
+      const result = await this.repos.visibilityPreference.loadForPerson(au.churchId, au.personId);
       const preferences = result as VisibilityPreference[];
       return preferences?.length > 0 ? preferences[0] : [];
     });

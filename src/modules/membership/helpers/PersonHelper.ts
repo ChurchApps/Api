@@ -1,13 +1,13 @@
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 import { Household, Person, UserChurch } from "../models";
 import { AuthenticatedUser } from "../auth";
 import { Permissions } from "../../../shared/helpers";
 import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 
 export class PersonHelper extends BasePersonHelper {
-  private static async repos(): Promise<Repositories> {
-    return await RepositoryManager.getRepositories<Repositories>("membership");
+  private static async repos(): Promise<Repos> {
+    return await RepoManager.getRepos<Repos>("membership");
   }
   public static async getPerson(churchId: string, email: string, firstName: string, lastName: string, canEdit: boolean) {
     const repos = await this.repos();
@@ -57,7 +57,6 @@ export class PersonHelper extends BasePersonHelper {
       let existing: UserChurch = await repos.userChurch.loadByUserId(au.id, churchId);
       if (!existing) {
         existing = await repos.userChurch.save(userChurch);
-        // return Repositories.getCurrent().userChurch.convertToModel(result);
       } else {
         if (existing.personId !== person.id) {
           existing.personId = person.id;

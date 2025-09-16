@@ -53,15 +53,15 @@ export class UserController extends MembershipBaseController {
       try {
         let user: User = null;
         if (req.body.jwt !== undefined && req.body.jwt !== "") {
-          user = await AuthenticatedUser.loadUserByJwt(req.body.jwt, this.repositories);
+          user = await AuthenticatedUser.loadUserByJwt(req.body.jwt, this.repos);
         } else if (req.body.authGuid !== undefined && req.body.authGuid !== "") {
-          user = await this.repositories.user.loadByAuthGuid(req.body.authGuid);
+          user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
           if (user !== null) {
             // user.authGuid = "";
-            // await this.repositories.user.save(user);
+            // await this.repos.user.save(user);
           }
         } else {
-          user = await this.repositories.user.loadByEmail(req.body.email.trim());
+          user = await this.repos.user.loadByEmail(req.body.email.trim());
           if (user !== null) {
             if (!bcrypt.compareSync(req.body.password, user.password?.toString() || "")) user = null;
           }
@@ -83,7 +83,7 @@ export class UserController extends MembershipBaseController {
           if (result === null) return this.denyAccess(["No permissions"]);
           else {
             user.lastLogin = new Date();
-            this.repositories.user.save(user);
+            this.repos.user.save(user);
             return this.json(result, 200);
           }
         }
@@ -99,13 +99,13 @@ export class UserController extends MembershipBaseController {
 
   private async getUserChurches(id: string): Promise<LoginUserChurch[]> {
     // Load user churches via Roles
-    const roleUserChurches = await this.repositories.rolePermission.loadForUser(id, true); // Set to true so churches[0] is always a real church.  Not sre why it was false before.  If we need to change this make it a param on the login request
+    const roleUserChurches = await this.repos.rolePermission.loadForUser(id, true); // Set to true so churches[0] is always a real church.  Not sre why it was false before.  If we need to change this make it a param on the login request
 
     UserHelper.replaceDomainAdminPermissions(roleUserChurches);
     UserHelper.addAllReportingPermissions(roleUserChurches);
 
     // Load churches via userChurches relationships
-    const userChurches: LoginUserChurch[] = await this.repositories.church.loadForUser(id);
+    const userChurches: LoginUserChurch[] = await this.repos.church.loadForUser(id);
 
     userChurches.forEach((uc) => {
       if (!ArrayHelper.getOne(roleUserChurches, "church.id", uc.church.id)) roleUserChurches.push(uc);
@@ -116,8 +116,8 @@ export class UserController extends MembershipBaseController {
       if (uc.person.id) peopleIds.push(uc.person.id);
     });
 
-    const allPeople = peopleIds.length > 0 ? await this.repositories.person.loadByIdsOnly(peopleIds) : [];
-    const allGroups = peopleIds.length > 0 ? await this.repositories.groupMember.loadForPeople(peopleIds) : [];
+    const allPeople = peopleIds.length > 0 ? await this.repos.person.loadByIdsOnly(peopleIds) : [];
+    const allGroups = peopleIds.length > 0 ? await this.repos.groupMember.loadForPeople(peopleIds) : [];
     roleUserChurches.forEach((uc) => {
       const person = ArrayHelper.getOne(allPeople as any[], "id", uc.person.id);
       if (person) uc.person.membershipStatus = person.membershipStatus;
@@ -139,7 +139,7 @@ export class UserController extends MembershipBaseController {
           return res.status(400).json({ errors: errors.array() });
         }
 
-        const user = await this.repositories.user.loadByEmail(req.body.email);
+        const user = await this.repos.user.loadByEmail(req.body.email);
         if (user === null) {
           return this.json({}, 200);
         }
@@ -148,7 +148,7 @@ export class UserController extends MembershipBaseController {
         if (!passwordMatched) {
           return this.denyAccess(["Incorrect password"]);
         }
-        const userChurches = await this.repositories.rolePermission.loadForUser(user.id, false);
+        const userChurches = await this.repos.rolePermission.loadForUser(user.id, false);
         const churchNames = userChurches.map((uc) => uc.church.name);
 
         return this.json({ churches: churchNames }, 200);
@@ -174,7 +174,7 @@ export class UserController extends MembershipBaseController {
         if (uc.church.id === churchId) selectedChurch = uc;
       });
       if (selectedChurch === null) {
-        selectedChurch = await this.repositories.rolePermission.loadForChurch(churchId, universalChurch);
+        selectedChurch = await this.repos.rolePermission.loadForChurch(churchId, universalChurch);
         userChurches.push(selectedChurch);
       }
     }
@@ -189,8 +189,8 @@ export class UserController extends MembershipBaseController {
       const { userId, userEmail, firstName, lastName } = req.body;
       let user: User;
 
-      if (userId) user = await this.repositories.user.load(userId);
-      else user = await this.repositories.user.loadByEmail(userEmail);
+      if (userId) user = await this.repos.user.load(userId);
+      else user = await this.repos.user.loadByEmail(userEmail);
 
       if (!user) {
         const timestamp = Date.now();
@@ -200,7 +200,7 @@ export class UserController extends MembershipBaseController {
         const tempPassword = UniqueIdHelper.shortId();
         user.password = bcrypt.hashSync(tempPassword, 10);
         user.authGuid = v4();
-        user = await this.repositories.user.save(user);
+        user = await this.repos.user.save(user);
         await UserHelper.sendWelcomeEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, null, null);
       }
       user.password = null;
@@ -215,7 +215,7 @@ export class UserController extends MembershipBaseController {
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const register: RegisterUserRequest = req.body;
-      let user: User = await this.repositories.user.loadByEmail(register.email);
+      let user: User = await this.repos.user.loadByEmail(register.email);
 
       if (user) return res.status(400).json({ errors: ["user already exists"] });
       else {
@@ -237,14 +237,14 @@ export class UserController extends MembershipBaseController {
           return this.json({ errors: [err.toString()] });
           // return this.json({ errors: ["Email address does not exist."] })
         }
-        const userCount = await this.repositories.user.loadCount();
+        const userCount = await this.repos.user.loadCount();
 
-        user = await this.repositories.user.save(user);
+        user = await this.repos.user.save(user);
 
         // Add first user to server admins group
         if (userCount === 0) {
-          this.repositories.role.loadAll().then((roles) => {
-            this.repositories.roleMember.save({ roleId: roles[0].id, userId: user.id, addedBy: user.id });
+          this.repos.role.loadAll().then((roles) => {
+            this.repos.roleMember.save({ roleId: roles[0].id, userId: user.id, addedBy: user.id });
           });
         }
       }
@@ -257,12 +257,12 @@ export class UserController extends MembershipBaseController {
   public async setPasswordGuid(req: express.Request<{}, {}, NewPasswordRequest>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
-        const user = await this.repositories.user.loadByAuthGuid(req.body.authGuid);
+        const user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
         if (user !== null) {
           user.authGuid = "";
           const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
           user.password = hashedPass;
-          await this.repositories.user.save(user);
+          await this.repos.user.save(user);
           return { success: true };
         } else return { success: false };
       } catch (e) {
@@ -284,13 +284,13 @@ export class UserController extends MembershipBaseController {
           return res.status(400).json({ errors: errors.array() });
         }
 
-        const user = await this.repositories.user.loadByEmail(req.body.userEmail);
+        const user = await this.repos.user.loadByEmail(req.body.userEmail);
         if (user === null) return this.json({ emailed: false }, 200);
         else {
           user.authGuid = v4();
           const promises = [] as Promise<any>[];
           const timestamp = Date.now();
-          promises.push(this.repositories.user.save(user));
+          promises.push(this.repos.user.save(user));
           promises.push(UserHelper.sendForgotEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, req.body.appName, req.body.appUrl));
           await Promise.all(promises);
           return this.json({ emailed: true }, 200);
@@ -313,11 +313,11 @@ export class UserController extends MembershipBaseController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      let user = await this.repositories.user.load(req.body.userId || au.id);
+      let user = await this.repos.user.load(req.body.userId || au.id);
       if (user !== null) {
         user.firstName = req.body.firstName;
         user.lastName = req.body.lastName;
-        user = await this.repositories.user.save(user);
+        user = await this.repos.user.save(user);
       }
       user.password = null;
       return this.json(user, 200);
@@ -333,12 +333,12 @@ export class UserController extends MembershipBaseController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      let user = await this.repositories.user.load(workingUserId);
+      let user = await this.repos.user.load(workingUserId);
       if (user !== null) {
-        const existingUser = await this.repositories.user.loadByEmail(req.body.email);
+        const existingUser = await this.repos.user.loadByEmail(req.body.email);
         if (existingUser === null || existingUser.id === workingUserId) {
           user.email = req.body.email;
-          user = await this.repositories.user.save(user);
+          user = await this.repos.user.save(user);
         } else return this.denyAccess(["Access denied"]);
       }
 
@@ -350,7 +350,7 @@ export class UserController extends MembershipBaseController {
   @httpPost("/updateOptedOut")
   public async updateOptedOut(req: express.Request<{}, {}, { personId: string; optedOut: boolean }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
-      await this.repositories.person.updateOptedOut(req.body.personId, req.body.optedOut);
+      await this.repos.person.updateOptedOut(req.body.personId, req.body.optedOut);
       return this.json({}, 200);
     });
   }
@@ -363,11 +363,11 @@ export class UserController extends MembershipBaseController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      let user = await this.repositories.user.load(au.id);
+      let user = await this.repos.user.load(au.id);
       if (user !== null) {
         const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
         user.password = hashedPass;
-        user = await this.repositories.user.save(user);
+        user = await this.repos.user.save(user);
       }
       user.password = null;
       return this.json(user, 200);
@@ -377,9 +377,9 @@ export class UserController extends MembershipBaseController {
   @httpDelete("/")
   public async Delete(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.user.delete(au.id);
-      await this.repositories.userChurch.delete(au.id);
-      await this.repositories.roleMember.deleteUser(au.id);
+      await this.repos.user.delete(au.id);
+      await this.repos.userChurch.delete(au.id);
+      await this.repos.roleMember.deleteUser(au.id);
       return this.json({});
     });
   }

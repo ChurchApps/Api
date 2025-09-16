@@ -1,8 +1,8 @@
 import { BaseController } from "../../../shared/infrastructure";
-import { Repositories } from "../repositories";
+import { Repos } from "../repositories";
 
 export class MessagingBaseController extends BaseController {
-  public repositories: Repositories;
+  public repos: Repos;
 
   constructor() {
     super("messaging");

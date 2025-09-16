@@ -15,12 +15,12 @@ export class PageController2 extends ContentBaseController {
         url = "/" + url;
       }
       const id = req.query.id as string;
-      const page = id ? await this.repositories.page.load(churchId, id) : await this.repositories.page.loadByUrl(churchId, url);
+      const page = id ? await this.repos.page.load(churchId, id) : await this.repos.page.loadByUrl(churchId, url);
 
       let result: Page = {};
       if (page?.id !== undefined) {
-        const sections = await this.repositories.section.loadForPage(churchId, page.id);
-        const allElements: Element[] = await this.repositories.element.loadForPage(churchId, page.id);
+        const sections = await this.repos.section.loadForPage(churchId, page.id);
+        const allElements: Element[] = await this.repos.element.loadForPage(churchId, page.id);
         TreeHelper.populateAnswers(allElements);
         TreeHelper.populateAnswers(sections);
         result = page;
@@ -35,14 +35,14 @@ export class PageController2 extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.page.load(au.churchId, id);
+      return await this.repos.page.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.page.loadAll(au.churchId);
+      return await this.repos.page.loadAll(au.churchId);
     });
   }
 
@@ -51,13 +51,13 @@ export class PageController2 extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        const page = await this.repositories.page.load(au.churchId, id);
+        const page = await this.repos.page.load(au.churchId, id);
         page.id = undefined;
         page.name += " (copy)";
         page.url += "-copy";
-        const newPage = await this.repositories.page.save(page);
-        const sections: Section[] = await this.repositories.section.loadForPage(au.churchId, id);
-        const allElements: Element[] = await this.repositories.element.loadForPage(au.churchId, id);
+        const newPage = await this.repos.page.save(page);
+        const sections: Section[] = await this.repos.section.loadForPage(au.churchId, id);
+        const allElements: Element[] = await this.repos.element.loadForPage(au.churchId, id);
 
         TreeHelper.populateAnswers(allElements);
         TreeHelper.populateAnswers(sections);
@@ -85,12 +85,12 @@ export class PageController2 extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const promises: Promise<Page>[] = [];
-        promises.push(this.repositories.page.save(req.body.page));
+        promises.push(this.repos.page.save(req.body.page));
         req.body.sections.forEach((section) => {
-          promises.push(this.repositories.section.save(section));
+          promises.push(this.repos.section.save(section));
         });
         req.body.elements.forEach((element) => {
-          promises.push(this.repositories.element.save(element));
+          promises.push(this.repos.element.save(element));
         });
         const result = await Promise.all(promises);
         return result[0];
@@ -106,7 +106,7 @@ export class PageController2 extends ContentBaseController {
         const promises: Promise<Page>[] = [];
         req.body.forEach((page) => {
           page.churchId = au.churchId;
-          promises.push(this.repositories.page.save(page));
+          promises.push(this.repos.page.save(page));
         });
         const result = await Promise.all(promises);
         return result;
@@ -119,7 +119,7 @@ export class PageController2 extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.page.delete(au.churchId, id);
+        await this.repos.page.delete(au.churchId, id);
         return this.json({});
       }
     });

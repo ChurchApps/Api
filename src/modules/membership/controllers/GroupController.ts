@@ -18,21 +18,21 @@ export class GroupController extends MembershipCrudController {
       const campusId = req.query.campusId.toString();
       const serviceId = req.query.serviceId.toString();
       const serviceTimeId = req.query.serviceTimeId.toString();
-      return this.repositories.group.convertAllToModel(au.churchId, (await this.repositories.group.search(au.churchId, campusId, serviceId, serviceTimeId)) as any[]);
+      return this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.search(au.churchId, campusId, serviceId, serviceTimeId)) as any[]);
     });
   }
 
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.group.convertAllToModel(au.churchId, (await this.repositories.group.loadForPerson(au.personId)) as any[]);
+      return this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.loadForPerson(au.personId)) as any[]);
     });
   }
 
   @httpGet("/public/:churchId/slug/:slug")
   public async getPublicSlug(@requestParam("churchId") churchId: string, @requestParam("slug") slug: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repositories.group.convertToModel(churchId, await this.repositories.group.loadPublicSlug(churchId, slug));
+      return this.repos.group.convertToModel(churchId, await this.repos.group.loadPublicSlug(churchId, slug));
     });
   }
 
@@ -40,28 +40,28 @@ export class GroupController extends MembershipCrudController {
   public async getPublicLabel(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const label = req.query.label.toString();
-      return this.repositories.group.convertAllToModel(churchId, (await this.repositories.group.publicLabel(churchId, label)) as any[]);
+      return this.repos.group.convertAllToModel(churchId, (await this.repos.group.publicLabel(churchId, label)) as any[]);
     });
   }
 
   @httpGet("/public/:churchId/:id")
   public async getPublic(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repositories.group.convertToModel(churchId, await this.repositories.group.load(churchId, id));
+      return this.repos.group.convertToModel(churchId, await this.repos.group.load(churchId, id));
     });
   }
 
   @httpGet("/tag/:tag")
   public async getByTag(@requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.group.convertAllToModel(au.churchId, (await this.repositories.group.loadByTag(au.churchId, tag)) as any[]);
+      return this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.loadByTag(au.churchId, tag)) as any[]);
     });
   }
 
   @httpGet("/public/:churchId/tag/:tag")
   public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repositories.group.convertAllToModel(churchId, (await this.repositories.group.loadByTag(churchId, tag)) as any[]);
+      return this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadByTag(churchId, tag)) as any[]);
     });
   }
 
@@ -75,10 +75,10 @@ export class GroupController extends MembershipCrudController {
         req.body.forEach((group) => {
           group.churchId = au.churchId;
           if (!group.slug) group.slug = SlugHelper.slugifyString(group.name);
-          promises.push(this.repositories.group.save(group));
+          promises.push(this.repos.group.save(group));
         });
         const result = await Promise.all(promises);
-        return this.repositories.group.convertAllToModel(au.churchId, result);
+        return this.repos.group.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -89,16 +89,16 @@ export class GroupController extends MembershipCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groups.edit)) return this.json({}, 401);
       else {
-        const group: Group = await this.repositories.group.load(au.churchId, id);
+        const group: Group = await this.repos.group.load(au.churchId, id);
         if (group.tags.indexOf("ministry") > -1) {
-          const AllTeams = (await this.repositories.group.loadByTag(au.churchId, "team")) as any[];
+          const AllTeams = (await this.repos.group.loadByTag(au.churchId, "team")) as any[];
           const ministryTeams = ArrayHelper.getAll(AllTeams, "categoryName", id);
           const ids = ArrayHelper.getIds(ministryTeams, "id");
-          await this.repositories.group.delete(au.churchId, id);
-          await this.repositories.group.deleteByIds(au.churchId, ids);
+          await this.repos.group.delete(au.churchId, id);
+          await this.repos.group.deleteByIds(au.churchId, ids);
           return this.json({});
         } else {
-          await this.repositories.group.delete(au.churchId, id);
+          await this.repos.group.delete(au.churchId, id);
           return this.json({});
         }
       }

@@ -1,12 +1,12 @@
 import { BaseController } from "../../../shared/infrastructure";
-import { Repositories } from "../repositories/Repositories";
+import { Repos } from "../repositories/Repos";
 
 export class ReportingBaseController extends BaseController {
   constructor() {
     super("reporting");
   }
 
-  protected async getReportingRepositories(): Promise<Repositories> {
-    return await this.getRepositories<Repositories>();
+  protected async getReportingRepos(): Promise<Repos> {
+    return await this.getRepos<Repos>();
   }
 }

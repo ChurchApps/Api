@@ -8,14 +8,14 @@ export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/up")
   public async moveQuestionUp(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.question.moveQuestionUp(id);
+      return await this.repos.question.moveQuestionUp(id);
     });
   }
 
   @httpGet("/sort/:id/down")
   public async moveQuestionDown(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.question.moveQuestionDown(id);
+      return await this.repos.question.moveQuestionDown(id);
     });
   }
 
@@ -24,7 +24,7 @@ export class QuestionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!formId) return this.json({}, 401);
-      else return this.repositories.question.convertAllToModel("", (await this.repositories.question.loadForUnrestrictedForm(formId)) as any[]);
+      else return this.repos.question.convertAllToModel("", (await this.repos.question.loadForUnrestrictedForm(formId)) as any[]);
     });
   }
 
@@ -33,7 +33,7 @@ export class QuestionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!this.formAccess(au, formId, "view")) return this.json({}, 401);
-      else return this.repositories.question.convertToModel(au.churchId, await this.repositories.question.load(au.churchId, id));
+      else return this.repos.question.convertToModel(au.churchId, await this.repos.question.load(au.churchId, id));
     });
   }
 
@@ -42,7 +42,7 @@ export class QuestionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!this.formAccess(au, formId, "view")) return this.json({}, 401);
-      else return this.repositories.question.convertAllToModel(au.churchId, (await this.repositories.question.loadForForm(au.churchId, formId)) as any[]);
+      else return this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
     });
   }
 
@@ -54,17 +54,17 @@ export class QuestionController extends MembershipBaseController {
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
         if (this.formAccess(au, question.formId)) {
-          const availableQuestions = (await this.repositories.question.loadForForm(au.churchId, question.formId)) as any[];
+          const availableQuestions = (await this.repos.question.loadForForm(au.churchId, question.formId)) as any[];
           const maxValue = Math.max(...(availableQuestions as any[]).map((q: any) => q.sort));
           const addBy = i + 1;
           const sort = availableQuestions.length > 0 ? maxValue + addBy : 1;
           question.churchId = au.churchId;
           question.sort = question.sort ? question.sort : sort.toString();
-          promises.push(this.repositories.question.save(question));
+          promises.push(this.repos.question.save(question));
         }
       }
       const result = await Promise.all(promises);
-      return this.repositories.question.convertAllToModel(au.churchId, result);
+      return this.repos.question.convertAllToModel(au.churchId, result);
     });
   }
 
@@ -74,7 +74,7 @@ export class QuestionController extends MembershipBaseController {
       const formId = req?.query?.formId?.toString() || null;
       if (!this.formAccess(au, formId)) return this.json({}, 401);
       else {
-        await this.repositories.question.delete(au.churchId, id);
+        await this.repos.question.delete(au.churchId, id);
         return this.json({});
       }
     });

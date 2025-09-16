@@ -15,7 +15,7 @@ export class CustomerController extends GivingCrudController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const customer = await this.repositories.customer.convertToModel(au.churchId, (await this.repositories.customer.load(au.churchId, id)) as any);
+      const customer = await this.repos.customer.convertToModel(au.churchId, (await this.repos.customer.load(au.churchId, id)) as any);
       if (!au.checkAccess(Permissions.donations.viewSummary) && au.personId !== customer.personId) return this.json({}, 401);
       else return customer;
     });
@@ -30,9 +30,9 @@ export class CustomerController extends GivingCrudController {
         if (au.checkAccess(Permissions.donations.viewSummary)) {
           permission = true;
         } else {
-          const customerData = await this.repositories.customer.load(au.churchId, id);
+          const customerData = await this.repos.customer.load(au.churchId, id);
           if (customerData) {
-            const customer = this.repositories.customer.convertToModel(au.churchId, customerData as any);
+            const customer = this.repos.customer.convertToModel(au.churchId, customerData as any);
             permission = customer.personId === au.personId;
           }
         }
@@ -46,7 +46,7 @@ export class CustomerController extends GivingCrudController {
   // DELETE /:id inherited via enableDelete=true
 
   private loadPrivateKey = async (churchId: string) => {
-    const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
     return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
   };
 }

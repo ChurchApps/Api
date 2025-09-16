@@ -15,7 +15,7 @@ export class SermonController extends ContentBaseController {
   //   res: express.Response
   // ): Promise<any> {
   //   return this.actionWrapper(req, res, async (au) => {
-  //     const sermon = await this.repositories.sermon.loadById(id, au.churchId);
+  //     const sermon = await this.repos.sermon.loadById(id, au.churchId);
   //     if (sermon.videoType === "youtube") {
   //       return await TranscriptAPI.getTranscript(sermon.videoData);
   //     }
@@ -88,7 +88,7 @@ export class SermonController extends ContentBaseController {
   @httpGet("/public/tvFeed/:churchId/:sermonId")
   public async getSermonTvFeed(@requestParam("churchId") churchId: string, @requestParam("sermonId") sermonId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const sermon = await this.repositories.sermon.loadById(sermonId, churchId);
+      const sermon = await this.repos.sermon.loadById(sermonId, churchId);
 
       const result: any = {
         id: sermon.id,
@@ -119,8 +119,8 @@ export class SermonController extends ContentBaseController {
   @httpGet("/public/tvFeed/:churchId")
   public async getTvFeed(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const playlists: Playlist[] = await this.repositories.playlist.loadPublicAll(churchId);
-      const sermons = await this.repositories.sermon.loadPublicAll(churchId);
+      const playlists: Playlist[] = await this.repos.playlist.loadPublicAll(churchId);
+      const sermons = await this.repos.sermon.loadPublicAll(churchId);
 
       const result: any = {
         treeLabels: ["Series", "Sermon"],
@@ -159,7 +159,7 @@ export class SermonController extends ContentBaseController {
   public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       const sermonIds = req.query.sermonIds ? req.query.sermonIds.toString().split(",") : [];
-      return await this.repositories.sermon.loadTimeline(sermonIds);
+      return await this.repos.sermon.loadTimeline(sermonIds);
     });
   }
 
@@ -239,21 +239,21 @@ export class SermonController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.sermon.loadById(id, au.churchId);
+      return await this.repos.sermon.loadById(id, au.churchId);
     });
   }
 
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.sermon.loadAll(au.churchId);
+      return await this.repos.sermon.loadAll(au.churchId);
     });
   }
 
   @httpGet("/public/:churchId")
   public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repositories.sermon.loadPublicAll(churchId);
+      return await this.repos.sermon.loadPublicAll(churchId);
     });
   }
 
@@ -262,7 +262,7 @@ export class SermonController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {
-        await this.repositories.sermon.delete(id, au.churchId);
+        await this.repos.sermon.delete(id, au.churchId);
         return null;
       }
     });
@@ -283,7 +283,7 @@ export class SermonController extends ContentBaseController {
           }
           if (s.churchId === au.churchId)
             promises.push(
-              this.repositories.sermon.save(s).then(async (sermon) => {
+              this.repos.sermon.save(s).then(async (sermon) => {
                 if (base64Photo) {
                   sermon.thumbnail = base64Photo;
                   await this.savePhoto(au.churchId, sermon);
@@ -305,7 +305,7 @@ export class SermonController extends ContentBaseController {
     return FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64")).then(async () => {
       const photoUpdated = new Date();
       sermon.thumbnail = Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();
-      await this.repositories.sermon.save(sermon);
+      await this.repos.sermon.save(sermon);
     });
   }
 }
