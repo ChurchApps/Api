@@ -4,14 +4,22 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Gateway } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+
 @injectable()
-export class GatewayRepository {
-  public save(gateway: Gateway) {
-    return gateway.id ? this.update(gateway) : this.create(gateway);
+export class GatewayRepository extends ConfiguredRepository<Gateway> {
+  protected get repoConfig(): RepoConfig<Gateway> {
+    return {
+      tableName: "gateways",
+      hasSoftDelete: false,
+      insertColumns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees"],
+      updateColumns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees"]
+    };
   }
 
-  private async create(gateway: Gateway) {
-    gateway.id = UniqueIdHelper.shortId();
+  // Override create to handle the custom logic
+  protected async create(gateway: Gateway): Promise<Gateway> {
+    gateway.id = this.createId();
     await TypedDB.query("DELETE FROM gateways WHERE churchId=? AND id<>?;", [gateway.churchId, gateway.id]); // enforce a single record per church (for now)
     const sql = "INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees];
@@ -19,27 +27,8 @@ export class GatewayRepository {
     return gateway;
   }
 
-  private async update(gateway: Gateway) {
-    const sql = "UPDATE gateways SET provider=?, publicKey=?, privateKey=?, webhookKey=?, productId=?, payFees=? WHERE id=? and churchId=?";
-    const params = [gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees, gateway.id, gateway.churchId];
-    await TypedDB.query(sql, params);
-    return gateway;
-  }
-
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM gateways WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM gateways WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM gateways WHERE churchId=?;", [churchId]);
-  }
-
-  public convertToModel(churchId: string, data: any) {
-    const result: Gateway = {
+  protected rowToModel(data: any): Gateway {
+    return {
       id: data.id,
       provider: data.provider,
       publicKey: data.publicKey,
@@ -47,10 +36,13 @@ export class GatewayRepository {
       productId: data.productId,
       payFees: data.payFees
     };
-    return result;
+  }
+
+  public convertToModel(churchId: string, data: any) {
+    return this.rowToModel(data);
   }
 
   public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Gateway>(data, (d: any) => this.convertToModel(churchId, d));
+    return this.mapToModels(data);
   }
 }

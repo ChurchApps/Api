@@ -2,20 +2,23 @@ import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { User } from "../models";
 import { UniqueIdHelper, DateHelper } from "../helpers";
 
-export class UserRepository {
-  public save(user: User) {
-    return user.id ? this.update(user) : this.create(user);
-  }
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
+import { DateHelper } from "../helpers";
 
-  private async create(user: User) {
-    user.id = UniqueIdHelper.shortId();
+@injectable()
+export class UserRepository extends BaseRepository<User> {
+  protected tableName = "users";
+  protected hasSoftDelete = false;
+
+  protected async create(user: User): Promise<User> {
+    user.id = this.createId();
     const sql = "INSERT INTO users (id, email, password, authGuid, firstName, lastName) VALUES (?, ?, ?, ?, ?, ?);";
     const params = [user.id, user.email, user.password, user.authGuid, user.firstName, user.lastName];
     await TypedDB.query(sql, params);
     return user;
   }
 
-  private async update(user: User) {
+  protected async update(user: User): Promise<User> {
     const registrationDate = DateHelper.toMysqlDate(user.registrationDate);
     const lastLogin = DateHelper.toMysqlDate(user.lastLogin);
     const sql = "UPDATE users SET email=?, password=?, authGuid=?, firstName=?, lastName=?, registrationDate=?, lastLogin=? WHERE id=?;";

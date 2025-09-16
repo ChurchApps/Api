@@ -3,38 +3,21 @@ import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Automation } from "../models";
 
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+
 @injectable()
-export class AutomationRepository {
-  public save(automation: Automation) {
-    return automation.id ? this.update(automation) : this.create(automation);
+export class AutomationRepository extends ConfiguredRepository<Automation> {
+  protected get repoConfig(): RepoConfig<Automation> {
+    return {
+      tableName: "automations",
+      hasSoftDelete: false,
+      insertColumns: ["title", "recurs", "active"],
+      updateColumns: ["title", "recurs", "active"]
+    };
   }
 
-  private async create(automation: Automation) {
-    automation.id = UniqueIdHelper.shortId();
-
-    const sql = "INSERT INTO automations (id, churchId, title, recurs, active) VALUES (?, ?, ?, ?, ?);";
-    const params = [automation.id, automation.churchId, automation.title, automation.recurs, automation.active];
-    await TypedDB.query(sql, params);
-    return automation;
-  }
-
-  private async update(automation: Automation) {
-    const sql = "UPDATE automations SET title=?, recurs=?, active=? WHERE id=? and churchId=?";
-    const params = [automation.title, automation.recurs, automation.active, automation.id, automation.churchId];
-    await TypedDB.query(sql, params);
-    return automation;
-  }
-
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM automations WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM automations WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM automations WHERE churchId=? ORDER BY title;", [churchId]);
+  protected get defaultOrderBy(): string {
+    return "title";
   }
 
   public loadAllChurches() {
