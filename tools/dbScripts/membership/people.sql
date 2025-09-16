@@ -32,6 +32,7 @@ CREATE TABLE `people` (
   `conversationId` char(11) DEFAULT NULL,
   `optedOut` bit(1) DEFAULT NULL,
   `nametagNotes` varchar(20) DEFAULT NULL,
+  `donorNumber` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
   KEY `churchId` (`churchId`),

@@ -21,6 +21,7 @@ export class Person {
   public conversationId?: string;
   public optedOut?: boolean;
   public nametagNotes?: string;
+  public donorNumber?: string;
   public formSubmissions?: FormSubmission[];
   public email?: string;
 }
