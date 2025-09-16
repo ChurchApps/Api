@@ -55,20 +55,15 @@ export class ContentSettingController extends ContentBaseController {
   }
 
   @httpGet("/public/:churchId")
-  public async publicRoute(@requestParam("churchId") churchId: string): Promise<any> {
-    console.log("made it");
-    //try {
-    const settings = this.repos.setting.convertAllToModel(churchId, await this.repos.setting.loadPublicSettings(churchId));
-    console.log("Setting count", settings.length);
-    const result: any = {};
-    settings.forEach((s) => {
-      result[s.keyName] = s.value;
+  public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const settings = this.repos.setting.convertAllToModel(churchId, await this.repos.setting.loadPublicSettings(churchId));
+      const result: any = {};
+      settings.forEach((s) => {
+        result[s.keyName] = s.value;
+      });
+      return result;
     });
-    return this.json(result, 200);
-    //} catch (e) {
-    //      this.logger.error(e);
-    //return this.internalServerError(e);
-    //}
   }
 
   @httpGet("/imports")
