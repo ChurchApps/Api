@@ -22,6 +22,14 @@ export interface RepoConfig<T> {
 export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends BaseRepo<T> {
   protected abstract get repoConfig(): RepoConfig<T>;
 
+  protected getHasSoftDelete(): boolean {
+    return this.repoConfig.hasSoftDelete !== false;
+  }
+
+  protected getDefaultOrderBy(): string | undefined {
+    return this.repoConfig.defaultOrderBy;
+  }
+
   protected async create(model: T): Promise<T> {
     const m: any = model as any;
     if (!m[this.idColumn]) m[this.idColumn] = this.createId();
@@ -100,15 +108,9 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
     return this.deleteSoft(churchId, id);
   }
 
-  public async loadMany(churchId: string, orderBy?: string, includeRemoved = false) {
-    const cfg = this.repoConfig;
-    const removedClause = cfg.hasSoftDelete !== false && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
-    const order = orderBy || cfg.defaultOrderBy;
-    const orderClause = order ? ` ORDER BY ${order}` : "";
-    const sql = `SELECT * FROM ${this.table()} WHERE ${this.churchIdColumn}=?${removedClause}${orderClause};`;
-    const result = await TypedDB.query(sql, [churchId]);
-    return result as any[];
-  }
+  
+
+  
 
   public saveAll(models: T[]) {
     const promises: Promise<T>[] = [];

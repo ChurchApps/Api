@@ -15,6 +15,15 @@ export abstract class BaseRepo<T> {
   protected removedColumn = "removed";
   protected hasSoftDelete = true;
   protected defaultOrderBy?: string;
+  // Allow subclasses to override soft delete behavior
+  protected getHasSoftDelete(): boolean {
+    return this.hasSoftDelete;
+  }
+
+  // Allow subclasses to override default order by
+  protected getDefaultOrderBy(): string | undefined {
+    return this.defaultOrderBy;
+  }
 
   // Allow subclasses to override how the table name is resolved
   protected table(): string {
@@ -68,7 +77,7 @@ export abstract class BaseRepo<T> {
    * Standard soft delete helper (sets removed=1)
    */
   public async deleteSoft(churchId: string, id: string) {
-    if (!this.hasSoftDelete) throw new Error("Soft delete not enabled for this repository");
+    if (!this.getHasSoftDelete()) throw new Error("Soft delete not enabled for this repository");
     const sql = `UPDATE ${this.table()} SET ${this.removedColumn}=1 WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
     return TypedDB.query(sql, [id, churchId]);
   }
@@ -77,7 +86,7 @@ export abstract class BaseRepo<T> {
    * Default delete method: soft delete when enabled, otherwise hard delete
    */
   public async delete(churchId: string, id: string) {
-    if (this.hasSoftDelete) return this.deleteSoft(churchId, id);
+    if (this.getHasSoftDelete()) return this.deleteSoft(churchId, id);
     const sql = `DELETE FROM ${this.tableName} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
     return TypedDB.query(sql, [id, churchId]);
   }
@@ -86,7 +95,7 @@ export abstract class BaseRepo<T> {
    * Load a single row by id for a church, optionally including removed rows
    */
   public async loadOne(churchId: string, id: string, includeRemoved = false) {
-    const removedClause = this.hasSoftDelete && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
+    const removedClause = this.getHasSoftDelete() && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
     const sql = `SELECT * FROM ${this.table()} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?${removedClause};`;
     return TypedDB.queryOne(sql, [id, churchId]);
   }
@@ -95,8 +104,8 @@ export abstract class BaseRepo<T> {
    * Load all rows for a church, optionally including removed, and optional order by
    */
   public async loadMany(churchId: string, orderBy?: string, includeRemoved = false) {
-    const removedClause = this.hasSoftDelete && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
-    const order = orderBy || this.defaultOrderBy;
+    const removedClause = this.getHasSoftDelete() && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
+    const order = orderBy || this.getDefaultOrderBy();
     const orderClause = order ? ` ORDER BY ${order}` : "";
     const sql = `SELECT * FROM ${this.table()} WHERE ${this.churchIdColumn}=?${removedClause}${orderClause};`;
     const result = await TypedDB.query(sql, [churchId]);
