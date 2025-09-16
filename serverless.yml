@@ -4,7 +4,15 @@ frameworkVersion: "3"
 
 custom:
   env: ${opt:stage, 'dev'}
-  envLower: ${file(./serverless-helpers.js):toLowerCase(${self:custom.env})}
+  # Simple mapping to ensure lowercase - add more as needed
+  stageToLower:
+    dev: dev
+    demo: demo  
+    staging: staging
+    Staging: staging
+    prod: prod
+    Prod: prod
+  envLower: ${self:custom.stageToLower.${self:custom.env}, self:custom.env}
   serverless-offline:
     httpPort: 8084
     websocketPort: 8087
