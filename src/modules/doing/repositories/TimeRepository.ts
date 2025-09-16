@@ -10,8 +10,7 @@ export class TimeRepository extends ConfiguredRepository<Time> {
     return {
       tableName: "times",
       hasSoftDelete: false,
-      insertColumns: ["planId", "displayName", "startTime", "endTime", "teams"],
-      updateColumns: ["planId", "displayName", "startTime", "endTime", "teams"]
+      columns: ["planId", "displayName", "startTime", "endTime", "teams"]
     };
   }
 

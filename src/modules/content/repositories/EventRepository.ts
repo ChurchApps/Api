@@ -10,8 +10,7 @@ export class EventRepository extends ConfiguredRepository<Event> {
     return {
       tableName: "events",
       hasSoftDelete: false,
-      insertColumns: ["groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule"],
-      updateColumns: ["groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule"]
+      columns: ["groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule"]
     };
   }
 

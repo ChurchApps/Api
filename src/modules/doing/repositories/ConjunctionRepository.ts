@@ -9,8 +9,7 @@ export class ConjunctionRepository extends ConfiguredRepository<Conjunction> {
     return {
       tableName: "conjunctions",
       hasSoftDelete: false,
-      insertColumns: ["automationId", "parentId", "groupType"],
-      updateColumns: ["automationId", "parentId", "groupType"]
+      columns: ["automationId", "parentId", "groupType"]
     };
   }
 

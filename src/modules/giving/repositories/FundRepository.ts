@@ -10,8 +10,7 @@ export class FundRepository extends ConfiguredRepository<Fund> {
       tableName: "funds",
       hasSoftDelete: true,
       defaultOrderBy: "name",
-      insertColumns: ["name", "taxDeductible", "productId"],
-      updateColumns: ["name", "taxDeductible", "productId"],
+      columns: ["name", "taxDeductible", "productId"],
       insertLiterals: { removed: "0" }
     };
   }

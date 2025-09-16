@@ -10,8 +10,7 @@ export class GroupServiceTimeRepository extends ConfiguredRepository<GroupServic
     return {
       tableName: "groupServiceTimes",
       hasSoftDelete: false,
-      insertColumns: ["groupId", "serviceTimeId"],
-      updateColumns: ["groupId", "serviceTimeId"]
+      columns: ["groupId", "serviceTimeId"]
     };
   }
 

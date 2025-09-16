@@ -9,8 +9,7 @@ export class SongDetailRepository extends ConfiguredRepository<SongDetail> {
     return {
       tableName: "songDetails",
       hasSoftDelete: false,
-      insertColumns: ["praiseChartsId", "title", "artist", "album", "language", "thumbnail", "releaseDate", "bpm", "keySignature", "seconds", "meter", "tones"],
-      updateColumns: ["praiseChartsId", "title", "artist", "album", "language", "thumbnail", "releaseDate", "bpm", "keySignature", "seconds", "meter", "tones"]
+      columns: ["praiseChartsId", "title", "artist", "album", "language", "thumbnail", "releaseDate", "bpm", "keySignature", "seconds", "meter", "tones"]
     };
   }
 

@@ -11,8 +11,7 @@ export class SubscriptionRepository extends ConfiguredRepository<Subscription> {
       tableName: "subscriptions",
       hasSoftDelete: false,
       idColumn: "id", // External ID from payment provider
-      insertColumns: ["personId", "customerId"],
-      updateColumns: ["personId", "customerId"]
+      columns: ["personId", "customerId"]
     };
   }
 

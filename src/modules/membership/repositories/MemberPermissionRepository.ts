@@ -9,8 +9,7 @@ export class MemberPermissionRepository extends ConfiguredRepository<MemberPermi
     return {
       tableName: "memberPermissions",
       hasSoftDelete: false,
-      insertColumns: ["memberId", "contentType", "contentId", "action", "emailNotification"],
-      updateColumns: ["memberId", "contentType", "contentId", "action", "emailNotification"]
+      columns: ["memberId", "contentType", "contentId", "action", "emailNotification"]
     };
   }
 

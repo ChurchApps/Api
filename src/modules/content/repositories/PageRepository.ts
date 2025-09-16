@@ -9,8 +9,7 @@ export class PageRepository extends ConfiguredRepository<Page> {
     return {
       tableName: "pages",
       hasSoftDelete: false,
-      insertColumns: ["url", "title", "layout"],
-      updateColumns: ["url", "title", "layout"]
+      columns: ["url", "title", "layout"]
     };
   }
 

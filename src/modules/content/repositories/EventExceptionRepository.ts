@@ -10,8 +10,7 @@ export class EventExceptionRepository extends ConfiguredRepository<EventExceptio
     return {
       tableName: "eventExceptions",
       hasSoftDelete: false,
-      insertColumns: ["eventId", "exceptionDate"],
-      updateColumns: ["eventId", "exceptionDate"]
+      columns: ["eventId", "exceptionDate"]
     };
   }
 

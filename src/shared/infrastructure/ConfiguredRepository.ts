@@ -8,8 +8,13 @@ export interface RepoConfig<T> {
   idColumn?: string;
   churchIdColumn?: string;
   removedColumn?: string;
-  insertColumns: (keyof T | string)[];
-  updateColumns: (keyof T | string)[];
+  // New pattern: Single column list used for both insert and update operations
+  // This is the primary column configuration that should be used going forward
+  columns?: (keyof T | string)[];
+  // Legacy properties: Optional overrides for backward compatibility
+  // If not provided, insertColumns and updateColumns will fall back to using 'columns'
+  insertColumns?: (keyof T | string)[];
+  updateColumns?: (keyof T | string)[];
   insertLiterals?: Record<string, string>; // column -> SQL literal (e.g., "NOW()", "0")
   updateLiterals?: Record<string, string>;
 }
@@ -34,7 +39,9 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
 
   protected buildInsert(model: T): { sql: string; params: any[] } {
     const cfg = this.repoConfig;
-    const cols: string[] = [this.idColumn, this.churchIdColumn, ...cfg.insertColumns.map(String)];
+    // Use insertColumns override if provided, otherwise use columns, fallback to insertColumns for backward compatibility
+    const insertCols = cfg.insertColumns || cfg.columns || [];
+    const cols: string[] = [this.idColumn, this.churchIdColumn, ...insertCols.map(String)];
     const literals = cfg.insertLiterals || {};
     Object.keys(literals).forEach((c) => {
       if (!cols.includes(c)) cols.push(c);
@@ -61,7 +68,9 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
     const params: any[] = [];
     const literals = cfg.updateLiterals || {};
 
-    cfg.updateColumns.forEach((c) => {
+    // Use updateColumns override if provided, otherwise use columns, fallback to updateColumns for backward compatibility
+    const updateCols = cfg.updateColumns || cfg.columns || [];
+    updateCols.forEach((c) => {
       const col = String(c);
       sets.push(`${col}=?`);
       params.push((model as any)[col]);

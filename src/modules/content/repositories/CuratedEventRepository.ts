@@ -9,8 +9,7 @@ export class CuratedEventRepository extends ConfiguredRepository<CuratedEvent> {
     return {
       tableName: "curatedEvents",
       hasSoftDelete: false,
-      insertColumns: ["curatedCalendarId", "groupId", "eventId"],
-      updateColumns: ["curatedCalendarId", "groupId", "eventId"]
+      columns: ["curatedCalendarId", "groupId", "eventId"]
     };
   }
 

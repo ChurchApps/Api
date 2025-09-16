@@ -10,8 +10,7 @@ export class BlockoutDateRepository extends ConfiguredRepository<BlockoutDate> {
     return {
       tableName: "blockoutDates",
       hasSoftDelete: false,
-      insertColumns: ["personId", "startDate", "endDate"],
-      updateColumns: ["personId", "startDate", "endDate"]
+      columns: ["personId", "startDate", "endDate"]
     };
   }
 

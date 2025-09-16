@@ -10,8 +10,7 @@ export class LinkRepository extends ConfiguredRepository<Link> {
     return {
       tableName: "links",
       hasSoftDelete: false,
-      insertColumns: ["category", "url", "linkType", "linkData", "photo", "icon", "text", "sort", "parentId"],
-      updateColumns: ["category", "url", "linkType", "linkData", "photo", "icon", "text", "sort", "parentId"]
+      columns: ["category", "url", "linkType", "linkData", "photo", "icon", "text", "sort", "parentId"]
     };
   }
 

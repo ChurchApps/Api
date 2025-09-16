@@ -11,8 +11,7 @@ export class AutomationRepository extends ConfiguredRepository<Automation> {
       tableName: "automations",
       hasSoftDelete: false,
       defaultOrderBy: "title",
-      insertColumns: ["title", "recurs", "active"],
-      updateColumns: ["title", "recurs", "active"]
+      columns: ["title", "recurs", "active"]
     };
   }
 

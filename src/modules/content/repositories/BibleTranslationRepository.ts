@@ -9,8 +9,7 @@ export class BibleTranslationRepository extends GlobalConfiguredRepository<Bible
     return {
       tableName: "bibleTranslations",
       hasSoftDelete: false,
-      insertColumns: ["abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"],
-      updateColumns: ["abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"],
+      columns: ["abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"],
       defaultOrderBy: "name"
     };
   }

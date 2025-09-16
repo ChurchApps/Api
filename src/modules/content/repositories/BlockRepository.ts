@@ -10,8 +10,7 @@ export class BlockRepository extends ConfiguredRepository<Block> {
       tableName: "blocks",
       hasSoftDelete: false,
       defaultOrderBy: "name",
-      insertColumns: ["blockType", "name"],
-      updateColumns: ["blockType", "name"]
+      columns: ["blockType", "name"]
     };
   }
 

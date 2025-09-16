@@ -9,8 +9,7 @@ export class CampusRepository extends ConfiguredRepository<Campus> {
       tableName: "campuses",
       hasSoftDelete: true,
       defaultOrderBy: "name",
-      insertColumns: ["name", "address1", "address2", "city", "state", "zip"],
-      updateColumns: ["name", "address1", "address2", "city", "state", "zip"],
+      columns: ["name", "address1", "address2", "city", "state", "zip"],
       insertLiterals: { removed: "0" }
     };
   }

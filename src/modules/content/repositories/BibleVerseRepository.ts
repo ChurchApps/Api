@@ -9,8 +9,7 @@ export class BibleVerseRepository extends GlobalConfiguredRepository<BibleVerse>
     return {
       tableName: "bibleVerses",
       hasSoftDelete: false,
-      insertColumns: ["translationKey", "chapterKey", "keyName", "number"],
-      updateColumns: ["translationKey", "chapterKey", "keyName", "number"],
+      columns: ["translationKey", "chapterKey", "keyName", "number"],
       defaultOrderBy: "number"
     };
   }

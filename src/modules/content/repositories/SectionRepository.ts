@@ -10,8 +10,7 @@ export class SectionRepository extends ConfiguredRepository<Section> {
       tableName: "sections",
       hasSoftDelete: false,
       defaultOrderBy: "sort",
-      insertColumns: ["pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"],
-      updateColumns: ["pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"]
+      columns: ["pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"]
     };
   }
 

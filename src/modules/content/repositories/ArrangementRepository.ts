@@ -10,8 +10,7 @@ export class ArrangementRepository extends ConfiguredRepository<Arrangement> {
       tableName: "arrangements",
       hasSoftDelete: false,
       defaultOrderBy: "name",
-      insertColumns: ["songId", "songDetailId", "name", "lyrics", "freeShowId"],
-      updateColumns: ["songId", "songDetailId", "name", "lyrics", "freeShowId"]
+      columns: ["songId", "songDetailId", "name", "lyrics", "freeShowId"]
     };
   }
 

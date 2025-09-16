@@ -8,8 +8,7 @@ export class AccessLogRepository extends ConfiguredRepository<AccessLog> {
     return {
       tableName: "accessLogs",
       hasSoftDelete: false,
-      insertColumns: ["userId", "appName"],
-      updateColumns: ["userId", "appName"],
+      columns: ["userId", "appName"],
       insertLiterals: { loginTime: "NOW()" }
     };
   }

@@ -15,8 +15,7 @@ export class SubscriptionFundsRepository extends ConfiguredRepository<Subscripti
     return {
       tableName: "subscriptionFunds",
       hasSoftDelete: false,
-      insertColumns: ["subscriptionId", "fundId", "amount"],
-      updateColumns: ["subscriptionId", "fundId", "amount"]
+      columns: ["subscriptionId", "fundId", "amount"]
     };
   }
 

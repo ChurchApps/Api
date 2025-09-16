@@ -10,8 +10,7 @@ export class PositionRepository extends ConfiguredRepository<Position> {
     return {
       tableName: "positions",
       hasSoftDelete: false,
-      insertColumns: ["planId", "categoryName", "name", "count", "groupId"],
-      updateColumns: ["planId", "categoryName", "name", "count", "groupId"]
+      columns: ["planId", "categoryName", "name", "count", "groupId"]
     };
   }
 

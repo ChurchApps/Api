@@ -11,8 +11,7 @@ export class ElementRepository extends ConfiguredRepository<Element> {
       tableName: "elements",
       hasSoftDelete: false,
       defaultOrderBy: "sort",
-      insertColumns: ["sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"],
-      updateColumns: ["sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"]
+      columns: ["sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"]
     };
   }
 

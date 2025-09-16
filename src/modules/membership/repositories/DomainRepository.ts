@@ -10,8 +10,7 @@ export class DomainRepository extends ConfiguredRepository<Domain> {
     return {
       tableName: "domains",
       hasSoftDelete: false,
-      insertColumns: ["domainName"],
-      updateColumns: ["domainName"]
+      columns: ["domainName"]
     };
   }
 

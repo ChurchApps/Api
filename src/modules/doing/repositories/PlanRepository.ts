@@ -9,8 +9,7 @@ export class PlanRepository extends ConfiguredRepository<Plan> {
     return {
       tableName: "plans",
       hasSoftDelete: false,
-      insertColumns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId"],
-      updateColumns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId"]
+      columns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId"]
     };
   }
 

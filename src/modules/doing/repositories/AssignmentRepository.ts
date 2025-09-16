@@ -10,8 +10,7 @@ export class AssignmentRepository extends ConfiguredRepository<Assignment> {
     return {
       tableName: "assignments",
       hasSoftDelete: false,
-      insertColumns: ["positionId", "personId", "status", "notified"],
-      updateColumns: ["positionId", "personId", "status", "notified"]
+      columns: ["positionId", "personId", "status", "notified"]
     };
   }
 

@@ -10,8 +10,7 @@ export class BlockedIpRepository extends ConfiguredRepository<BlockedIp> {
     return {
       tableName: "blockedIps",
       hasSoftDelete: false,
-      insertColumns: ["conversationId", "serviceId", "ipAddress"],
-      updateColumns: ["conversationId", "serviceId", "ipAddress"]
+      columns: ["conversationId", "serviceId", "ipAddress"]
     };
   }
   public async loadByConversationId(churchId: string, conversationId: string) {

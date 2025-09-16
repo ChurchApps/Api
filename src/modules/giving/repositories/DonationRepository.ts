@@ -11,8 +11,7 @@ export class DonationRepository extends ConfiguredRepository<Donation> {
     return {
       tableName: "donations",
       hasSoftDelete: false,
-      insertColumns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes"],
-      updateColumns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes"]
+      columns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes"]
     };
   }
   // Override save to handle empty personId conversion

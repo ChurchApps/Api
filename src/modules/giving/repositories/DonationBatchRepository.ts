@@ -11,8 +11,7 @@ export class DonationBatchRepository extends ConfiguredRepository<DonationBatch>
       tableName: "donationBatches",
       hasSoftDelete: false,
       defaultOrderBy: "batchDate DESC",
-      insertColumns: ["name", "batchDate"],
-      updateColumns: ["name", "batchDate"]
+      columns: ["name", "batchDate"]
     };
   }
 

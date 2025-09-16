@@ -10,8 +10,7 @@ export class GroupRepository extends ConfiguredRepository<Group> {
       tableName: "groups",
       hasSoftDelete: true,
       removedColumn: "removed",
-      insertColumns: ["categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"],
-      updateColumns: ["categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"],
+      columns: ["categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"],
       insertLiterals: { removed: "0" }
     };
   }

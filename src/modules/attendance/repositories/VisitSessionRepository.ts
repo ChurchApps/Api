@@ -11,8 +11,7 @@ export class VisitSessionRepository extends ConfiguredRepository<VisitSession> {
     return {
       tableName: "visitSessions",
       hasSoftDelete: false,
-      insertColumns: ["visitId", "sessionId"],
-      updateColumns: ["visitId", "sessionId"]
+      columns: ["visitId", "sessionId"]
     };
   }
 

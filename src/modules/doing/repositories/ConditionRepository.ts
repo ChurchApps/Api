@@ -10,8 +10,7 @@ export class ConditionRepository extends ConfiguredRepository<Condition> {
     return {
       tableName: "conditions",
       hasSoftDelete: false,
-      insertColumns: ["conjunctionId", "field", "fieldData", "operator", "value", "label"],
-      updateColumns: ["conjunctionId", "field", "fieldData", "operator", "value", "label"]
+      columns: ["conjunctionId", "field", "fieldData", "operator", "value", "label"]
     };
   }
 

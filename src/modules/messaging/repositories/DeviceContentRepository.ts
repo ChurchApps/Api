@@ -10,8 +10,7 @@ export class DeviceContentRepository extends ConfiguredRepository<DeviceContent>
     return {
       tableName: "deviceContent",
       hasSoftDelete: false,
-      insertColumns: ["deviceId", "contentType", "contentId"],
-      updateColumns: ["deviceId", "contentType", "contentId"]
+      columns: ["deviceId", "contentType", "contentId"]
     };
   }
   public loadByDeviceId(churchId: string, deviceId: string) {

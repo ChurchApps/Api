@@ -10,8 +10,7 @@ export class ActionRepository extends ConfiguredRepository<Action> {
     return {
       tableName: "actions",
       hasSoftDelete: false,
-      insertColumns: ["automationId", "actionType", "actionData"],
-      updateColumns: ["automationId", "actionType", "actionData"]
+      columns: ["automationId", "actionType", "actionData"]
     };
   }
 

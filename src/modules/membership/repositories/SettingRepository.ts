@@ -9,8 +9,7 @@ export class SettingRepository extends ConfiguredRepository<Setting> {
     return {
       tableName: "settings",
       hasSoftDelete: false,
-      insertColumns: ["keyName", "value", "public"],
-      updateColumns: ["keyName", "value", "public"]
+      columns: ["keyName", "value", "public"]
     };
   }
 

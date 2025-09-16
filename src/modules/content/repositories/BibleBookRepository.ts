@@ -9,8 +9,7 @@ export class BibleBookRepository extends GlobalConfiguredRepository<BibleBook> {
     return {
       tableName: "bibleBooks",
       hasSoftDelete: false,
-      insertColumns: ["translationKey", "keyName", "abbreviation", "name", "sort"],
-      updateColumns: ["translationKey", "keyName", "abbreviation", "name", "sort"],
+      columns: ["translationKey", "keyName", "abbreviation", "name", "sort"],
       defaultOrderBy: "sort"
     };
   }

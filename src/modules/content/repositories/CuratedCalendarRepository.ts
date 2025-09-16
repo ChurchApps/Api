@@ -9,8 +9,7 @@ export class CuratedCalendarRepository extends ConfiguredRepository<CuratedCalen
     return {
       tableName: "curatedCalendars",
       hasSoftDelete: false,
-      insertColumns: ["name"],
-      updateColumns: ["name"]
+      columns: ["name"]
     };
   }
 

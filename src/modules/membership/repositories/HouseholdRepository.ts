@@ -9,8 +9,7 @@ export class HouseholdRepository extends ConfiguredRepository<Household> {
     return {
       tableName: "households",
       hasSoftDelete: false,
-      insertColumns: ["name"],
-      updateColumns: ["name"]
+      columns: ["name"]
     };
   }
 

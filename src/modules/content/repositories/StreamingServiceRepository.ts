@@ -10,8 +10,7 @@ export class StreamingServiceRepository extends ConfiguredRepository<StreamingSe
     return {
       tableName: "streamingServices",
       hasSoftDelete: false,
-      insertColumns: ["serviceTime", "earlyStart", "chatBefore", "chatAfter", "provider", "providerKey", "videoUrl", "timezoneOffset", "recurring", "label", "sermonId"],
-      updateColumns: ["serviceTime", "earlyStart", "chatBefore", "chatAfter", "provider", "providerKey", "videoUrl", "timezoneOffset", "recurring", "label", "sermonId"]
+      columns: ["serviceTime", "earlyStart", "chatBefore", "chatAfter", "provider", "providerKey", "videoUrl", "timezoneOffset", "recurring", "label", "sermonId"]
     };
   }
 

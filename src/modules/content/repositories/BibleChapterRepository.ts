@@ -9,8 +9,7 @@ export class BibleChapterRepository extends GlobalConfiguredRepository<BibleChap
     return {
       tableName: "bibleChapters",
       hasSoftDelete: false,
-      insertColumns: ["translationKey", "bookKey", "keyName", "number"],
-      updateColumns: ["translationKey", "bookKey", "keyName", "number"],
+      columns: ["translationKey", "bookKey", "keyName", "number"],
       defaultOrderBy: "number"
     };
   }

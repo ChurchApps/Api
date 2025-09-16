@@ -9,8 +9,7 @@ export class AnswerRepository extends ConfiguredRepository<Answer> {
     return {
       tableName: "answers",
       hasSoftDelete: false,
-      insertColumns: ["formSubmissionId", "questionId", "value"],
-      updateColumns: ["formSubmissionId", "questionId", "value"]
+      columns: ["formSubmissionId", "questionId", "value"]
     };
   }
 

@@ -11,8 +11,7 @@ export class SessionRepository extends ConfiguredRepository<Session> {
       tableName: "sessions",
       hasSoftDelete: false,
       defaultOrderBy: "sessionDate DESC",
-      insertColumns: ["groupId", "serviceTimeId", "sessionDate"],
-      updateColumns: ["groupId", "serviceTimeId", "sessionDate"]
+      columns: ["groupId", "serviceTimeId", "sessionDate"]
     };
   }
 

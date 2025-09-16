@@ -9,8 +9,7 @@ export class PrivateMessageRepository extends ConfiguredRepository<PrivateMessag
     return {
       tableName: "privateMessages",
       hasSoftDelete: false,
-      insertColumns: ["fromPersonId", "toPersonId", "conversationId", "notifyPersonId", "deliveryMethod"],
-      updateColumns: ["fromPersonId", "toPersonId", "conversationId", "notifyPersonId", "deliveryMethod"]
+      columns: ["fromPersonId", "toPersonId", "conversationId", "notifyPersonId", "deliveryMethod"]
     };
   }
   public loadById(churchId: string, id: string) {

@@ -10,8 +10,7 @@ export class ServiceTimeRepository extends ConfiguredRepository<ServiceTime> {
       tableName: "serviceTimes",
       hasSoftDelete: true,
       defaultOrderBy: "name",
-      insertColumns: ["serviceId", "name"],
-      updateColumns: ["serviceId", "name"],
+      columns: ["serviceId", "name"],
       insertLiterals: { removed: "0" }
     };
   }

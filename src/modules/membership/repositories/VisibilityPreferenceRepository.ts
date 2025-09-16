@@ -10,8 +10,7 @@ export class VisibilityPreferenceRepository extends ConfiguredRepository<Visibil
     return {
       tableName: "visibilityPreferences",
       hasSoftDelete: false,
-      insertColumns: ["personId", "address", "phoneNumber", "email"],
-      updateColumns: ["personId", "address", "phoneNumber", "email"]
+      columns: ["personId", "address", "phoneNumber", "email"]
     };
   }
 

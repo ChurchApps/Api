@@ -10,8 +10,7 @@ export class ServiceRepository extends ConfiguredRepository<Service> {
       tableName: "services",
       hasSoftDelete: true,
       defaultOrderBy: "name",
-      insertColumns: ["campusId", "name"],
-      updateColumns: ["campusId", "name"],
+      columns: ["campusId", "name"],
       insertLiterals: { removed: "0" }
     };
   }

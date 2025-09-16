@@ -10,8 +10,7 @@ export class GroupMemberRepository extends ConfiguredRepository<GroupMember> {
     return {
       tableName: "groupMembers",
       hasSoftDelete: false,
-      insertColumns: ["groupId", "personId", "leader"],
-      updateColumns: ["groupId", "personId", "leader"],
+      columns: ["groupId", "personId", "leader"],
       insertLiterals: { joinDate: "NOW()" }
     };
   }

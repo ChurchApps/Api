@@ -10,8 +10,7 @@ export class ClientErrorRepository extends ConfiguredRepository<ClientError> {
     return {
       tableName: "clientErrors",
       hasSoftDelete: false,
-      insertColumns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"],
-      updateColumns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"]
+      columns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"]
     };
   }
 

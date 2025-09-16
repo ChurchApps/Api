@@ -9,8 +9,7 @@ export class VisitRepository extends ConfiguredRepository<Visit> {
     return {
       tableName: "visits",
       hasSoftDelete: false,
-      insertColumns: ["personId", "serviceId", "groupId", "visitDate", "checkinTime", "addedBy"],
-      updateColumns: ["personId", "serviceId", "groupId", "visitDate", "checkinTime", "addedBy"]
+      columns: ["personId", "serviceId", "groupId", "visitDate", "checkinTime", "addedBy"]
     };
   }
 

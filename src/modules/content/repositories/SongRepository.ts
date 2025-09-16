@@ -9,8 +9,7 @@ export class SongRepository extends ConfiguredRepository<Song> {
     return {
       tableName: "songs",
       hasSoftDelete: false,
-      insertColumns: ["name", "dateAdded"],
-      updateColumns: ["name", "dateAdded"]
+      columns: ["name", "dateAdded"]
     };
   }
 

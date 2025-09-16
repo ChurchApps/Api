@@ -10,8 +10,7 @@ export class QuestionRepository extends ConfiguredRepository<Question> {
       tableName: "questions",
       hasSoftDelete: true,
       removedColumn: "removed",
-      insertColumns: ["formId", "parentId", "title", "description", "fieldType", "placeholder", "sort", "required", "choices"],
-      updateColumns: ["formId", "parentId", "title", "description", "fieldType", "placeholder", "sort", "required", "choices"],
+      columns: ["formId", "parentId", "title", "description", "fieldType", "placeholder", "sort", "required", "choices"],
       insertLiterals: { removed: "0" }
     };
   }

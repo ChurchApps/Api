@@ -5,9 +5,15 @@ export interface GlobalRepoConfig<T> {
   tableName: string;
   defaultOrderBy?: string;
   hasSoftDelete?: boolean;
+  hasChurchId?: boolean; // Whether the table has a churchId column
   idColumn?: string;
-  insertColumns: (keyof T | string)[];
-  updateColumns: (keyof T | string)[];
+  // New pattern: Single column list used for both insert and update operations
+  // This is the primary column configuration that should be used going forward
+  columns?: (keyof T | string)[];
+  // Legacy properties: Optional overrides for backward compatibility
+  // If not provided, insertColumns and updateColumns will fall back to using 'columns'
+  insertColumns?: (keyof T | string)[]; // Override for insert if different from columns
+  updateColumns?: (keyof T | string)[]; // Override for update if different from columns
   insertLiterals?: Record<string, string>; // column -> SQL literal (e.g., "NOW()", "0")
   updateLiterals?: Record<string, string>;
 }
@@ -39,7 +45,15 @@ export abstract class GlobalConfiguredRepository<T extends { [key: string]: any 
 
   protected buildInsert(model: T): { sql: string; params: any[] } {
     const cfg = this.repoConfig;
-    const cols: string[] = [this.idColumn, ...cfg.insertColumns.map(String)];
+    // Use insertColumns override if provided, otherwise use columns, fallback to insertColumns for backward compatibility
+    const insertCols = cfg.insertColumns || cfg.columns || [];
+    const cols: string[] = [this.idColumn, ...insertCols.map(String)];
+
+    // Automatically include churchId if the table has it
+    if (cfg.hasChurchId && !cols.includes("churchId")) {
+      cols.push("churchId");
+    }
+
     const literals = cfg.insertLiterals || {};
     Object.keys(literals).forEach((c) => {
       if (!cols.includes(c)) cols.push(c);
@@ -66,8 +80,14 @@ export abstract class GlobalConfiguredRepository<T extends { [key: string]: any 
     const params: any[] = [];
     const literals = cfg.updateLiterals || {};
 
-    cfg.updateColumns.forEach((c) => {
+    // Use updateColumns override if provided, otherwise use columns, fallback to updateColumns for backward compatibility
+    const updateCols = cfg.updateColumns || cfg.columns || [];
+    updateCols.forEach((c) => {
       const col = String(c);
+      // Skip churchId in updates - it should never be changed after creation
+      if (cfg.hasChurchId && col === "churchId") {
+        return;
+      }
       sets.push(`${col}=?`);
       params.push((model as any)[col]);
     });
@@ -75,8 +95,15 @@ export abstract class GlobalConfiguredRepository<T extends { [key: string]: any 
       sets.push(`${c}=${literals[c]}`);
     });
 
-    const where = ` WHERE ${this.idColumn}=?`;
+    // Build WHERE clause - include churchId if the table has it
+    let where = ` WHERE ${this.idColumn}=?`;
     params.push((model as any)[this.idColumn]);
+
+    if (cfg.hasChurchId) {
+      where += " AND churchId=?";
+      params.push((model as any).churchId);
+    }
+
     const sql = `UPDATE ${this.table()} SET ${sets.join(", ")} ${where}`;
     return { sql, params };
   }

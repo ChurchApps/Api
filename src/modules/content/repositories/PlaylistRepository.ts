@@ -10,8 +10,7 @@ export class PlaylistRepository extends ConfiguredRepository<Playlist> {
     return {
       tableName: "playlists",
       hasSoftDelete: false,
-      insertColumns: ["title", "description", "publishDate", "thumbnail"],
-      updateColumns: ["title", "description", "publishDate", "thumbnail"]
+      columns: ["title", "description", "publishDate", "thumbnail"]
     };
   }
 

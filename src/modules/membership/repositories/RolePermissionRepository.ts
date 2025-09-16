@@ -10,8 +10,7 @@ export class RolePermissionRepository extends ConfiguredRepository<RolePermissio
     return {
       tableName: "rolePermissions",
       hasSoftDelete: false,
-      insertColumns: ["roleId", "apiName", "contentType", "contentId", "action"],
-      updateColumns: ["roleId", "apiName", "contentType", "contentId", "action"]
+      columns: ["roleId", "apiName", "contentType", "contentId", "action"]
     };
   }
 

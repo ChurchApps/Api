@@ -9,8 +9,7 @@ export class SongDetailLinkRepository extends ConfiguredRepository<SongDetailLin
     return {
       tableName: "songDetailLinks",
       hasSoftDelete: false,
-      insertColumns: ["songDetailId", "service", "serviceKey", "url"],
-      updateColumns: ["songDetailId", "service", "serviceKey", "url"]
+      columns: ["songDetailId", "service", "serviceKey", "url"]
     };
   }
 

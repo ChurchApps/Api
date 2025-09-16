@@ -10,8 +10,7 @@ export class FundDonationRepository extends ConfiguredRepository<FundDonation> {
     return {
       tableName: "fundDonations",
       hasSoftDelete: false,
-      insertColumns: ["donationId", "fundId", "amount"],
-      updateColumns: ["donationId", "fundId", "amount"]
+      columns: ["donationId", "fundId", "amount"]
     };
   }
 

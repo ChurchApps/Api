@@ -9,8 +9,7 @@ export class UserChurchRepository extends ConfiguredRepository<UserChurch> {
     return {
       tableName: "userChurches",
       hasSoftDelete: false,
-      insertColumns: ["userId", "personId", "lastAccessed"],
-      updateColumns: ["userId", "personId", "lastAccessed"]
+      columns: ["userId", "personId", "lastAccessed"]
     };
   }
 

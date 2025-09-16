@@ -10,8 +10,7 @@ export class SermonRepository extends ConfiguredRepository<Sermon> {
     return {
       tableName: "sermons",
       hasSoftDelete: false,
-      insertColumns: ["playlistId", "videoType", "videoData", "videoUrl", "title", "description", "publishDate", "thumbnail", "duration", "permanentUrl"],
-      updateColumns: ["playlistId", "videoType", "videoData", "videoUrl", "title", "description", "publishDate", "thumbnail", "duration", "permanentUrl"]
+      columns: ["playlistId", "videoType", "videoData", "videoUrl", "title", "description", "publishDate", "thumbnail", "duration", "permanentUrl"]
     };
   }
 

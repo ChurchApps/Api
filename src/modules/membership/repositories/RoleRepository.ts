@@ -9,8 +9,7 @@ export class RoleRepository extends ConfiguredRepository<Role> {
     return {
       tableName: "roles",
       hasSoftDelete: false,
-      insertColumns: ["name"],
-      updateColumns: ["name"]
+      columns: ["name"]
     };
   }
 

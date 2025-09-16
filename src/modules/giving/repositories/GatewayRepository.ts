@@ -10,8 +10,7 @@ export class GatewayRepository extends ConfiguredRepository<Gateway> {
     return {
       tableName: "gateways",
       hasSoftDelete: false,
-      insertColumns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees"],
-      updateColumns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees"]
+      columns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees"]
     };
   }
 

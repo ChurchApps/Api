@@ -10,8 +10,7 @@ export class ArrangementKeyRepository extends ConfiguredRepository<ArrangementKe
     return {
       tableName: "arrangementKeys",
       hasSoftDelete: false,
-      insertColumns: ["arrangementId", "keySignature", "shortDescription"],
-      updateColumns: ["arrangementId", "keySignature", "shortDescription"]
+      columns: ["arrangementId", "keySignature", "shortDescription"]
     };
   }
 

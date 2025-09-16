@@ -11,8 +11,7 @@ export class CustomerRepository extends ConfiguredRepository<Customer> {
       tableName: "customers",
       hasSoftDelete: false,
       idColumn: "id", // Note: Customer uses external ID, not auto-generated
-      insertColumns: ["personId"],
-      updateColumns: ["personId"]
+      columns: ["personId"]
     };
   }
 

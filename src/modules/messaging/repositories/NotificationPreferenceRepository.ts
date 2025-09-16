@@ -9,8 +9,7 @@ export class NotificationPreferenceRepository extends ConfiguredRepository<Notif
     return {
       tableName: "notificationPreferences",
       hasSoftDelete: false,
-      insertColumns: ["personId", "allowPush", "emailFrequency"],
-      updateColumns: ["personId", "allowPush", "emailFrequency"]
+      columns: ["personId", "allowPush", "emailFrequency"]
     };
   }
   public loadById(churchId: string, id: string) {

@@ -9,8 +9,7 @@ export class GlobalStyleRepository extends ConfiguredRepository<GlobalStyle> {
     return {
       tableName: "globalStyles",
       hasSoftDelete: false,
-      insertColumns: ["fonts", "palette", "customCss", "customJS"],
-      updateColumns: ["fonts", "palette", "customCss", "customJS"]
+      columns: ["fonts", "palette", "customCss", "customJS"]
     };
   }
 
