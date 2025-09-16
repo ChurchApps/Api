@@ -1,59 +1,58 @@
+import { injectable } from "inversify";
 import { TypedDB } from "../helpers";
 import { GlobalStyle } from "../models";
-import { UniqueIdHelper } from "@churchapps/apihelper";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
-import { CollectionHelper } from "../../../shared/helpers";
-
-export class GlobalStyleRepository {
-  public save(globalStyle: GlobalStyle) {
-    if (UniqueIdHelper.isMissing(globalStyle.id)) return this.create(globalStyle);
-    else return this.update(globalStyle);
+@injectable()
+export class GlobalStyleRepository extends ConfiguredRepository<GlobalStyle> {
+  protected get repoConfig(): RepoConfig<GlobalStyle> {
+    return {
+      tableName: "globalStyles",
+      hasSoftDelete: false,
+      insertColumns: ["fonts", "palette", "customCss", "customJS"],
+      updateColumns: ["fonts", "palette", "customCss", "customJS"]
+    };
   }
 
-  public async create(globalStyle: GlobalStyle) {
-    globalStyle.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO globalStyles (id, churchId, fonts, palette, customCss, customJS) VALUES (?, ?, ?, ?, ?, ?);";
-    const params = [globalStyle.id, globalStyle.churchId, globalStyle.fonts, globalStyle.palette, globalStyle.customCss, globalStyle.customJS];
+  // Override to use TypedDB instead of DB
+  protected async create(model: GlobalStyle): Promise<GlobalStyle> {
+    const m: any = model as any;
+    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
+    const { sql, params } = this.buildInsert(model);
     await TypedDB.query(sql, params);
-    return globalStyle;
+    return model;
   }
 
-  public async update(globalStyle: GlobalStyle) {
-    const sql = "UPDATE globalStyles SET fonts=?, palette=?, customCss=?, customJS=? WHERE id=? AND churchId=?";
-    const params = [globalStyle.fonts, globalStyle.palette, globalStyle.customCss, globalStyle.customJS, globalStyle.id, globalStyle.churchId];
+  protected async update(model: GlobalStyle): Promise<GlobalStyle> {
+    const { sql, params } = this.buildUpdate(model);
     await TypedDB.query(sql, params);
-    return globalStyle;
+    return model;
   }
 
-  public load(churchId: string, id: string): Promise<GlobalStyle> {
+  public async load(churchId: string, id: string): Promise<GlobalStyle> {
     return TypedDB.queryOne("SELECT * FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
+  }
+
+  public async loadAll(churchId: string): Promise<GlobalStyle[]> {
+    return TypedDB.query("SELECT * FROM globalStyles WHERE churchId=?", [churchId]);
+  }
+
+  public async delete(churchId: string, id: string): Promise<any> {
+    return TypedDB.query("DELETE FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
   }
 
   public loadForChurch(churchId: string): Promise<GlobalStyle[]> {
     return TypedDB.queryOne("SELECT * FROM globalStyles WHERE churchId=? limit 1;", [churchId]);
   }
 
-  public delete(churchId: string, id: string): Promise<GlobalStyle> {
-    return TypedDB.query("DELETE FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
-  }
-
-  public loadAll(churchId: string): Promise<GlobalStyle[]> {
-    return TypedDB.query("SELECT * FROM globalStyles WHERE churchId=?", [churchId]);
-  }
-
-  public convertToModel(churchId: string, data: any): GlobalStyle {
-    const result: GlobalStyle = {
-      id: data.id,
-      churchId: data.churchId,
-      fonts: data.fonts,
-      palette: data.palette,
-      customCss: data.customCss,
-      customJS: data.customJS
+  protected rowToModel(row: any): GlobalStyle {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      fonts: row.fonts,
+      palette: row.palette,
+      customCss: row.customCss,
+      customJS: row.customJS
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): GlobalStyle[] {
-    return CollectionHelper.convertAll<GlobalStyle>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

@@ -1,32 +1,44 @@
 import { injectable } from "inversify";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../helpers";
 import { CuratedEvent } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class CuratedEventRepository {
-  public save(curatedEvent: CuratedEvent) {
-    return curatedEvent.id ? this.update(curatedEvent) : this.create(curatedEvent);
+export class CuratedEventRepository extends ConfiguredRepository<CuratedEvent> {
+  protected get repoConfig(): RepoConfig<CuratedEvent> {
+    return {
+      tableName: "curatedEvents",
+      hasSoftDelete: false,
+      insertColumns: ["curatedCalendarId", "groupId", "eventId"],
+      updateColumns: ["curatedCalendarId", "groupId", "eventId"]
+    };
   }
 
-  private async create(curatedEvent: CuratedEvent) {
-    curatedEvent.id = UniqueIdHelper.shortId();
-
-    const sql = "INSERT INTO curatedEvents (id, churchId, curatedCalendarId, groupId, eventId) VALUES (?, ?, ?, ?, ?);";
-    const params = [curatedEvent.id, curatedEvent.churchId, curatedEvent.curatedCalendarId, curatedEvent.groupId, curatedEvent.eventId];
+  // Override to use TypedDB instead of DB
+  protected async create(model: CuratedEvent): Promise<CuratedEvent> {
+    const m: any = model as any;
+    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
+    const { sql, params } = this.buildInsert(model);
     await TypedDB.query(sql, params);
-    return curatedEvent;
+    return model;
   }
 
-  private async update(curatedEvent: CuratedEvent) {
-    const sql = "UPDATE curatedEvents SET curatedCalendarId=?, groupId=?, eventId=? WHERE id=? and churchId=?";
-    const params = [curatedEvent.curatedCalendarId, curatedEvent.groupId, curatedEvent.eventId, curatedEvent.id, curatedEvent.churchId];
+  protected async update(model: CuratedEvent): Promise<CuratedEvent> {
+    const { sql, params } = this.buildUpdate(model);
     await TypedDB.query(sql, params);
-    return curatedEvent;
+    return model;
   }
 
-  public delete(churchId: string, id: string) {
+  public async delete(churchId: string, id: string): Promise<any> {
     return TypedDB.query("DELETE FROM curatedEvents WHERE id=? AND churchId=?;", [id, churchId]);
+  }
+
+  public async load(churchId: string, id: string): Promise<CuratedEvent> {
+    return TypedDB.queryOne("SELECT * FROM curatedEvents WHERE id=? AND churchId=?;", [id, churchId]);
+  }
+
+  public async loadAll(churchId: string): Promise<CuratedEvent[]> {
+    return TypedDB.query("SELECT * FROM curatedEvents WHERE churchId=?;", [churchId]);
   }
 
   public deleteByEventId(churchId: string, curatedCalendarId: string, eventId: string) {
@@ -35,14 +47,6 @@ export class CuratedEventRepository {
 
   public deleteByGroupId(churchId: string, curatedCalendarId: string, groupId: string) {
     return TypedDB.query("DELETE FROM curatedEvents WHERE curatedCalendarId=? AND groupId=? and churchId=?;", [curatedCalendarId, groupId, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM curatedEvents WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM curatedEvents WHERE churchId=?;", [churchId]);
   }
 
   public loadByCuratedCalendarId(churchId: string, curatedCalendarId: string) {
@@ -60,5 +64,15 @@ export class CuratedEventRepository {
       " END)" +
       " where curatedCalendarId=? AND ce.churchId=? and e.visibility='public';";
     return TypedDB.query(sql, [curatedCalendarId, churchId]);
+  }
+
+  protected rowToModel(row: any): CuratedEvent {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      curatedCalendarId: row.curatedCalendarId,
+      groupId: row.groupId,
+      eventId: row.eventId
+    };
   }
 }

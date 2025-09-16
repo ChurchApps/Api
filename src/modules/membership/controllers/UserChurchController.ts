@@ -44,7 +44,7 @@ export class UserChurchController extends MembershipBaseController {
           personId: req.body.personId
         };
         const data = await this.repositories.userChurch.save(userChurch);
-        result = this.repositories.userChurch.convertToModel(data);
+        result = this.repositories.userChurch.convertToModel(au.churchId, data);
       }
       return result;
     });
@@ -54,7 +54,7 @@ export class UserChurchController extends MembershipBaseController {
   public async getByUserId(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async ({ churchId }) => {
       const record = await this.repositories.userChurch.loadByUserId(userId, churchId);
-      return this.repositories.userChurch.convertToModel(record);
+      return this.repositories.userChurch.convertToModel(churchId, record);
     });
   }
 

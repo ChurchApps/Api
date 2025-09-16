@@ -1,71 +1,79 @@
-import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
+import { injectable } from "inversify";
+import { DateHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../helpers";
 import { StreamingService } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
-export class StreamingServiceRepository {
-  public save(service: StreamingService) {
-    return service.id ? this.update(service) : this.create(service);
+@injectable()
+export class StreamingServiceRepository extends ConfiguredRepository<StreamingService> {
+  protected get repoConfig(): RepoConfig<StreamingService> {
+    return {
+      tableName: "streamingServices",
+      hasSoftDelete: false,
+      insertColumns: ["serviceTime", "earlyStart", "chatBefore", "chatAfter", "provider", "providerKey", "videoUrl", "timezoneOffset", "recurring", "label", "sermonId"],
+      updateColumns: ["serviceTime", "earlyStart", "chatBefore", "chatAfter", "provider", "providerKey", "videoUrl", "timezoneOffset", "recurring", "label", "sermonId"]
+    };
   }
 
-  private async create(service: StreamingService) {
-    service.id = UniqueIdHelper.shortId();
+  // Override to use TypedDB and handle date conversion
+  protected async create(service: StreamingService): Promise<StreamingService> {
+    const m: any = service as any;
+    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
+
+    // Convert serviceTime to MySQL format for database insertion
     const serviceTime = DateHelper.toMysqlDate(service.serviceTime);
-    const sql =
-      "INSERT INTO streamingServices (id, churchId, serviceTime, earlyStart, chatBefore, chatAfter, provider, providerKey, videoUrl, timezoneOffset, recurring, label, sermonId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      service.id,
-      service.churchId,
-      serviceTime,
-      service.earlyStart,
-      service.chatBefore,
-      service.chatAfter,
-      service.provider,
-      service.providerKey,
-      service.videoUrl,
-      service.timezoneOffset,
-      service.recurring,
-      service.label,
-      service.sermonId
-    ];
+    const modifiedService = { ...service, serviceTime } as any;
+
+    const { sql, params } = this.buildInsert(modifiedService);
     await TypedDB.query(sql, params);
     return service;
   }
 
-  private async update(service: StreamingService) {
+  protected async update(service: StreamingService): Promise<StreamingService> {
+    // Convert serviceTime to MySQL format for database update
     const serviceTime = DateHelper.toMysqlDate(service.serviceTime);
-    const sql =
-      "UPDATE streamingServices SET serviceTime=?, earlyStart=?, chatBefore=?, chatAfter=?, provider=?, providerKey=?, videoUrl=?, timezoneOffset=?, recurring=?, label=?, sermonId=? WHERE id=?;";
-    const params = [
-      serviceTime,
-      service.earlyStart,
-      service.chatBefore,
-      service.chatAfter,
-      service.provider,
-      service.providerKey,
-      service.videoUrl,
-      service.timezoneOffset,
-      service.recurring,
-      service.label,
-      service.sermonId,
-      service.id
-    ];
+    const modifiedService = { ...service, serviceTime } as any;
+
+    const { sql, params } = this.buildUpdate(modifiedService);
     await TypedDB.query(sql, params);
     return service;
   }
 
-  public delete(id: string, churchId: string) {
+  public async delete(id: string, churchId: string): Promise<any> {
     return TypedDB.query("DELETE FROM streamingServices WHERE id=? AND churchId=?;", [id, churchId]);
+  }
+
+  public async load(churchId: string, id: string): Promise<StreamingService> {
+    return TypedDB.queryOne("SELECT * FROM streamingServices WHERE id=? AND churchId=?;", [id, churchId]);
+  }
+
+  public async loadAll(churchId: string): Promise<StreamingService[]> {
+    return TypedDB.query("SELECT * FROM streamingServices WHERE churchId=? ORDER BY serviceTime;", [churchId]);
   }
 
   public loadById(id: string, churchId: string): Promise<StreamingService> {
     return TypedDB.queryOne("SELECT * FROM streamingServices WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
-  public loadAll(churchId: string): Promise<StreamingService[]> {
-    return TypedDB.query("SELECT * FROM streamingServices WHERE churchId=? ORDER BY serviceTime;", [churchId]);
-  }
-
   public loadAllRecurring(): Promise<StreamingService[]> {
     return TypedDB.query("SELECT * FROM streamingServices WHERE recurring=1 ORDER BY serviceTime;", []);
+  }
+
+  protected rowToModel(row: any): StreamingService {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      serviceTime: row.serviceTime,
+      earlyStart: row.earlyStart,
+      chatBefore: row.chatBefore,
+      chatAfter: row.chatAfter,
+      provider: row.provider,
+      providerKey: row.providerKey,
+      videoUrl: row.videoUrl,
+      timezoneOffset: row.timezoneOffset,
+      recurring: row.recurring,
+      label: row.label,
+      sermonId: row.sermonId
+    };
   }
 }
