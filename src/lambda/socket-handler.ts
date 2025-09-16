@@ -2,7 +2,7 @@ import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
 
 import { Environment } from "../shared/helpers/Environment";
-import { DB } from "../shared/infrastructure/DB";
+import { TypedDB } from "../shared/infrastructure/TypedDB";
 
 import { Logger } from "../modules/messaging/helpers/Logger";
 import { SocketHelper } from "../modules/messaging/helpers/SocketHelper";
@@ -23,7 +23,7 @@ const initEnv = async () => {
     });
 
     // Initialize messaging module repositories and helpers in messaging context
-    await DB.runWithContext("messaging", async () => {
+    await TypedDB.runWithContext("messaging", async () => {
       const repositories = await RepositoryManager.getRepositories<any>("messaging");
       initializeMessagingModule(repositories);
     });
@@ -45,7 +45,7 @@ export const handleSocket = async (event: APIGatewayProxyEvent, context: Context
     console.log(`WebSocket ${eventType} for connection ${connectionId}`);
 
     // Run within messaging module context
-    return await DB.runWithContext("messaging", async () => {
+    return await TypedDB.runWithContext("messaging", async () => {
       switch (eventType) {
         case "CONNECT":
           return await handleConnect(event, context);

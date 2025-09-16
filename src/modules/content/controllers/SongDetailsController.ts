@@ -10,7 +10,7 @@ export class SongDetailsController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
-      return await this.repositories.songDetail.load(id);
+      return await this.repositories.songDetail.loadGlobal(id);
     });
   }
 

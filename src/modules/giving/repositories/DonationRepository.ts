@@ -1,55 +1,55 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { Donation, DonationSummary } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class DonationRepository {
-  public save(donation: Donation) {
+export class DonationRepository extends ConfiguredRepository<Donation> {
+  protected get repoConfig(): RepoConfig<Donation> {
+    return {
+      tableName: "donations",
+      hasSoftDelete: false,
+      insertColumns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes"],
+      updateColumns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes"]
+    };
+  }
+  // Override save to handle empty personId conversion
+  public async save(donation: Donation) {
     if (donation.personId === "") donation.personId = null as any;
-    return donation.id ? this.update(donation) : this.create(donation);
+    return super.save(donation);
   }
 
-  private async create(donation: Donation) {
+  // Override create to handle date conversion
+  protected async create(donation: Donation): Promise<Donation> {
     donation.id = UniqueIdHelper.shortId();
     const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
     const sql = "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return donation;
   }
 
-  private async update(donation: Donation) {
+  // Override update to handle date conversion
+  protected async update(donation: Donation): Promise<Donation> {
     const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
     const sql = "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, method=?, methodDetails=?, notes=? WHERE id=? and churchId=?";
     const params = [donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, donation.id, donation.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return donation;
   }
 
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM donations WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
   public deleteByBatchId(churchId: string, batchId: string) {
-    return DB.query("DELETE FROM donations WHERE churchId=? AND batchId=?;", [churchId, batchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM donations WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM donations WHERE churchId=? ORDER BY donationDate DESC;", [churchId]);
+    return TypedDB.query("DELETE FROM donations WHERE churchId=? AND batchId=?;", [churchId, batchId]);
   }
 
   public loadByBatchId(churchId: string, batchId: string) {
-    return DB.query("SELECT d.* FROM donations d WHERE d.churchId=? AND d.batchId=? ORDER BY d.donationDate DESC;", [churchId, batchId]);
+    return TypedDB.query("SELECT d.* FROM donations d WHERE d.churchId=? AND d.batchId=? ORDER BY d.donationDate DESC;", [churchId, batchId]);
   }
 
   public loadByMethodDetails(churchId: string, method: string, methodDetails: string) {
-    return DB.queryOne("SELECT d.* FROM donations d WHERE d.churchId=? AND d.method=? AND d.methodDetails=? ORDER BY d.donationDate DESC;", [churchId, method, methodDetails]);
+    return TypedDB.queryOne("SELECT d.* FROM donations d WHERE d.churchId=? AND d.method=? AND d.methodDetails=? ORDER BY d.donationDate DESC;", [churchId, method, methodDetails]);
   }
 
   public loadByPersonId(churchId: string, personId: string) {
@@ -60,7 +60,7 @@ export class DonationRepository {
       " LEFT JOIN funds f on f.id = fd.fundId" +
       " WHERE d.churchId = ? AND d.personId = ? AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)" +
       " ORDER BY d.donationDate DESC";
-    return DB.query(sql, [churchId, personId]);
+    return TypedDB.query(sql, [churchId, personId]);
   }
 
   public loadSummary(churchId: string, startDate: Date, endDate: Date) {
@@ -76,7 +76,7 @@ export class DonationRepository {
       " AND d.donationDate BETWEEN ? AND ?" +
       " GROUP BY year(d.donationDate), week(d.donationDate, 0), f.name" +
       " ORDER BY year(d.donationDate), week(d.donationDate, 0), f.name";
-    return DB.query(sql, [churchId, sDate, eDate]);
+    return TypedDB.query(sql, [churchId, sDate, eDate]);
   }
 
   public loadPersonBasedSummary(churchId: string, startDate: Date, endDate: Date) {
@@ -87,26 +87,31 @@ export class DonationRepository {
       " INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1" +
       " WHERE d.churchId=?" +
       " AND d.donationDate BETWEEN ? AND ?";
-    return DB.query(sql, [churchId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]);
+    return TypedDB.query(sql, [churchId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(row: any): Donation {
     const result: Donation = {
-      id: data.id,
-      batchId: data.batchId,
-      personId: data.personId,
-      donationDate: data.donationDate,
-      amount: data.amount,
-      method: data.method,
-      methodDetails: data.methodDetails,
-      notes: data.notes
+      id: row.id,
+      churchId: row.churchId,
+      batchId: row.batchId,
+      personId: row.personId,
+      donationDate: row.donationDate,
+      amount: row.amount,
+      method: row.method,
+      methodDetails: row.methodDetails,
+      notes: row.notes
     };
-    if (data.fundName !== undefined) result.fund = { id: data.fundId, name: data.fundName, amount: data.fundAmount };
+    if (row.fundName !== undefined) result.fund = { id: row.fundId, name: row.fundName, amount: row.fundAmount };
     return result;
   }
 
+  public convertToModel(churchId: string, data: any) {
+    return this.rowToModel(data);
+  }
+
   public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Donation>(data, (d: any) => this.convertToModel(churchId, d));
+    return CollectionHelper.convertAll<Donation>(data, (d: any) => this.rowToModel(d));
   }
 
   public convertAllToSummary(churchId: string, data: any[]) {

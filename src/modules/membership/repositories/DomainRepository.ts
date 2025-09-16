@@ -1,66 +1,41 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Domain } from "../models";
-import { UniqueIdHelper } from "../helpers";
 
-import { CollectionHelper } from "../../../shared/helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class DomainRepository {
-  public save(domain: Domain) {
-    return domain.id ? this.update(domain) : this.create(domain);
-  }
-
-  private async create(domain: Domain) {
-    domain.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO `domains` (id, churchId, domainName) VALUES (?, ?, ?);";
-    const params = [domain.id, domain.churchId, domain.domainName];
-    await DB.query(sql, params);
-    return domain;
-  }
-
-  private async update(domain: Domain) {
-    const sql = "UPDATE `domains` SET domainName=? WHERE id=? and churchId=?";
-    const params = [domain.domainName, domain.id, domain.churchId];
-    await DB.query(sql, params);
-    return domain;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM `domains` WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM `domains` WHERE id=? AND churchId=?;", [id, churchId]);
+export class DomainRepository extends ConfiguredRepository<Domain> {
+  protected get repoConfig(): RepoConfig<Domain> {
+    return {
+      tableName: "domains",
+      hasSoftDelete: false,
+      insertColumns: ["domainName"],
+      updateColumns: ["domainName"]
+    };
   }
 
   public loadByName(domainName: string) {
-    return DB.queryOne("SELECT * FROM `domains` WHERE domainName=?;", [domainName]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM `domains` WHERE churchId=? ORDER by domainName;", [churchId]);
+    return TypedDB.queryOne("SELECT * FROM `domains` WHERE domainName=?;", [domainName]);
   }
 
   public loadPairs() {
-    return DB.query("select d.domainName as host, concat(c.subDomain, '.b1.church:443') as dial from domains d inner join churches c on c.id=d.churchId WHERE d.domainName NOT like '%www.%';", []);
+    return TypedDB.query(
+      "select d.domainName as host, concat(c.subDomain, '.b1.church:443') as dial from domains d inner join churches c on c.id=d.churchId WHERE d.domainName NOT like '%www.%';",
+      []
+    );
   }
 
   public loadByIds(churchId: string, ids: string[]) {
     const sql = "SELECT * FROM `domains` WHERE churchId=? AND id IN (" + ids.join(",") + ") ORDER by name";
-    return DB.query(sql, [churchId]);
+    return TypedDB.query(sql, [churchId]);
   }
 
-  public convertToModel(churchId: string, data: any): Domain {
-    const result: Domain = {
-      id: data.id,
-      churchId: data.churchId,
-      domainName: data.domainName
+  protected rowToModel(row: any): Domain {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      domainName: row.domainName
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): Domain[] {
-    return CollectionHelper.convertAll<Domain>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

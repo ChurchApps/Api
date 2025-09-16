@@ -1,58 +1,53 @@
-import { DB } from "../../../shared/infrastructure";
+import { injectable } from "inversify";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UserChurch } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper, DateHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
-export class UserChurchRepository {
-  public save(userChurch: UserChurch) {
-    return userChurch.id ? this.update(userChurch) : this.create(userChurch);
+@injectable()
+export class UserChurchRepository extends ConfiguredRepository<UserChurch> {
+  protected get repoConfig(): RepoConfig<UserChurch> {
+    return {
+      tableName: "userChurches",
+      hasSoftDelete: false,
+      insertColumns: ["userId", "personId", "lastAccessed"],
+      updateColumns: ["userId", "personId", "lastAccessed"]
+    };
   }
 
-  private async create(userChurch: UserChurch) {
-    userChurch.id = UniqueIdHelper.shortId();
-    const { id, userId, churchId, personId } = userChurch;
-    const sql = "INSERT INTO userChurches (id, userId, churchId, personId, lastAccessed) values (?, ?, ?, ?, NOW())";
-    const params = [id, userId, churchId, personId];
-    await DB.query(sql, params);
-    return userChurch;
+  protected async create(userChurch: UserChurch): Promise<UserChurch> {
+    userChurch.lastAccessed = new Date();
+    return super.create(userChurch);
   }
 
-  private async update(userChurch: UserChurch) {
-    const { id, userId, churchId, personId, lastAccessed } = userChurch;
-    const sql = "UPDATE userChurches SET userId=?, churchId=?, personId=?, lastAccessed=? WHERE id=?;";
-    const params = [userId, churchId, personId, DateHelper.toMysqlDate(lastAccessed), id];
-    await DB.query(sql, params);
-    return userChurch;
-  }
-
-  public delete(userId: string) {
+  public async delete(userId: string): Promise<any> {
     const query = "DELETE FROM userChurches WHERE userId=?";
-    return DB.query(query, [userId]);
+    return TypedDB.query(query, [userId]);
   }
 
   public deleteRecord(userId: string, churchId: string, personId: string) {
     const sql = "DELETE FROM userChurches WHERE userId=? AND churchId=? AND personId=?;";
-    return DB.query(sql, [userId, churchId, personId]);
+    return TypedDB.query(sql, [userId, churchId, personId]);
   }
 
-  public load(userChurchId: string) {
+  public async load(userChurchId: string): Promise<UserChurch> {
     const sql = "SELECT * FROM userChurches WHERE id=?";
     const params = [userChurchId];
-    return DB.queryOne(sql, params);
+    return TypedDB.queryOne(sql, params);
   }
 
   public loadByUserId(userId: string, churchId: string) {
     const sql = "SELECT * FROM userChurches WHERE userId=? AND churchId=?";
     const params = [userId, churchId];
-    return DB.queryOne(sql, params);
+    return TypedDB.queryOne(sql, params);
   }
 
-  public convertToModel({ id, userId, churchId, personId, lastAccessed }: any) {
-    const result: UserChurch = { id, userId, churchId, personId, lastAccessed };
-    return result;
-  }
-
-  public convertAllToModel(data: any) {
-    return CollectionHelper.convertAll<UserChurch>(data, (d: any) => this.convertToModel(d));
+  protected rowToModel(row: any): UserChurch {
+    return {
+      id: row.id,
+      userId: row.userId,
+      churchId: row.churchId,
+      personId: row.personId,
+      lastAccessed: row.lastAccessed
+    };
   }
 }

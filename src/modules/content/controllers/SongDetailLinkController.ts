@@ -30,7 +30,7 @@ export class SongDetailLinkController extends ContentBaseController {
       const result = await Promise.all(promises);
 
       if (result[0].service === "MusicBrainz") {
-        const sd = await this.repositories.songDetail.load(result[0].songDetailId);
+        const sd = await this.repositories.songDetail.loadGlobal(result[0].songDetailId);
         if (sd) {
           await MusicBrainzHelper.appendDetailsById(sd, result[0].serviceKey);
           await this.repositories.songDetail.save(sd);

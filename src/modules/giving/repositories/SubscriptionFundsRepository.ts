@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { CollectionHelper } from "../../../shared/helpers";
 import { SubscriptionFund } from "../models";
 
@@ -21,7 +21,7 @@ export class SubscriptionFundsRepository extends ConfiguredRepository<Subscripti
   }
 
   public async deleteBySubscriptionId(churchId: string, subscriptionId: string) {
-    return DB.query("DELETE FROM subscriptionFunds WHERE subscriptionId=? AND churchId=?;", [subscriptionId, churchId]);
+    return TypedDB.query("DELETE FROM subscriptionFunds WHERE subscriptionId=? AND churchId=?;", [subscriptionId, churchId]);
   }
 
   public loadBySubscriptionId(churchId: string, subscriptionId: string) {
@@ -29,7 +29,7 @@ export class SubscriptionFundsRepository extends ConfiguredRepository<Subscripti
       "SELECT subscriptionFunds.*, funds.name FROM subscriptionFunds" +
       " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" +
       " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
-    return DB.query(sql, [churchId, subscriptionId]);
+    return TypedDB.query(sql, [churchId, subscriptionId]);
   }
 
   // If the fund gets deleted for a recurring donation, the donations will go to '(General Fund)'
@@ -39,7 +39,7 @@ export class SubscriptionFundsRepository extends ConfiguredRepository<Subscripti
       "SELECT subscriptionFunds.*, funds.name, funds.removed FROM subscriptionFunds" +
       " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" +
       " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
-    const subscriptionFund = await DB.query(sql, [churchId, subscriptionId]);
+    const subscriptionFund = await TypedDB.query(sql, [churchId, subscriptionId]);
     if (subscriptionFund && subscriptionFund[0].removed === false) {
       const { removed: _removed, ...sf } = (subscriptionFund as any)[0];
       result = [sf];

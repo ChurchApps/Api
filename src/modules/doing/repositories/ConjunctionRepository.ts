@@ -1,39 +1,20 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper } from "@churchapps/apihelper";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Conjunction } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class ConjunctionRepository {
-  public save(conjunction: Conjunction) {
-    return conjunction.id ? this.update(conjunction) : this.create(conjunction);
-  }
-
-  private async create(conjunction: Conjunction) {
-    conjunction.id = UniqueIdHelper.shortId();
-
-    const sql = "INSERT INTO conjunctions (id, churchId, automationId, parentId, groupType) VALUES (?, ?, ?, ?, ?);";
-    const params = [conjunction.id, conjunction.churchId, conjunction.automationId, conjunction.parentId, conjunction.groupType];
-    await DB.query(sql, params);
-    return conjunction;
-  }
-
-  private async update(conjunction: Conjunction) {
-    const sql = "UPDATE conjunctions SET automationId=?, parentId=?, groupType=? WHERE id=? and churchId=?";
-    const params = [conjunction.automationId, conjunction.parentId, conjunction.groupType, conjunction.id, conjunction.churchId];
-    await DB.query(sql, params);
-    return conjunction;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM conjunctions WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM conjunctions WHERE id=? AND churchId=?;", [id, churchId]);
+export class ConjunctionRepository extends ConfiguredRepository<Conjunction> {
+  protected get repoConfig(): RepoConfig<Conjunction> {
+    return {
+      tableName: "conjunctions",
+      hasSoftDelete: false,
+      insertColumns: ["automationId", "parentId", "groupType"],
+      updateColumns: ["automationId", "parentId", "groupType"]
+    };
   }
 
   public loadForAutomation(churchId: string, automationId: string) {
-    return DB.query("SELECT * FROM conjunctions WHERE automationId=? AND churchId=?;", [automationId, churchId]);
+    return TypedDB.query("SELECT * FROM conjunctions WHERE automationId=? AND churchId=?;", [automationId, churchId]);
   }
 }

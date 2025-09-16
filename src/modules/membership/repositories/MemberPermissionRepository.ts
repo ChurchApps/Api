@@ -1,68 +1,29 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { MemberPermission } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class MemberPermissionRepository {
-  public save(memberPermission: MemberPermission) {
-    return memberPermission.id ? this.update(memberPermission) : this.create(memberPermission);
-  }
-
-  private async create(memberPermission: MemberPermission) {
-    memberPermission.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO memberPermissions (id, churchId, memberId, contentType, contentId, action, emailNotification) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      memberPermission.id,
-      memberPermission.churchId,
-      memberPermission.memberId,
-      memberPermission.contentType,
-      memberPermission.contentId,
-      memberPermission.action,
-      memberPermission.emailNotification
-    ];
-    await DB.query(sql, params);
-    return memberPermission;
-  }
-
-  private async update(memberPermission: MemberPermission) {
-    const sql = "UPDATE memberPermissions SET memberId=?, contentType=?, contentId=?, action=?, emailNotification=? WHERE id=? and churchId=?";
-    const params = [
-      memberPermission.memberId,
-      memberPermission.contentType,
-      memberPermission.contentId,
-      memberPermission.action,
-      memberPermission.emailNotification,
-      memberPermission.id,
-      memberPermission.churchId
-    ];
-    await DB.query(sql, params);
-    return memberPermission;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
+export class MemberPermissionRepository extends ConfiguredRepository<MemberPermission> {
+  protected get repoConfig(): RepoConfig<MemberPermission> {
+    return {
+      tableName: "memberPermissions",
+      hasSoftDelete: false,
+      insertColumns: ["memberId", "contentType", "contentId", "action", "emailNotification"],
+      updateColumns: ["memberId", "contentType", "contentId", "action", "emailNotification"]
+    };
   }
 
   public deleteByMemberId(churchId: string, memberId: string, contentId: string) {
-    return DB.query("DELETE FROM memberPermissions WHERE memberId=? AND contentId=? AND churchId=?;", [memberId, churchId, contentId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM memberPermissions WHERE memberId=? AND contentId=? AND churchId=?;", [memberId, churchId, contentId]);
   }
 
   public loadMyByForm(churchId: string, formId: string, personId: string) {
-    return DB.queryOne("SELECT * FROM memberPermissions WHERE churchId=? and contentType='form' and contentId=? and memberId=?;", [churchId, formId, personId]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM memberPermissions WHERE churchId=?;", [churchId]);
+    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE churchId=? and contentType='form' and contentId=? and memberId=?;", [churchId, formId, personId]);
   }
 
   public loadByEmailNotification(churchId: string, emailNotification: boolean) {
-    return DB.query("SELECT * FROM memberPermissions WHERE churchId=? AND emailNotification=?;", [churchId, emailNotification]);
+    return TypedDB.query("SELECT * FROM memberPermissions WHERE churchId=? AND emailNotification=?;", [churchId, emailNotification]);
   }
 
   public loadFormsByPerson(churchId: string, personId: string) {
@@ -72,7 +33,7 @@ export class MemberPermissionRepository {
       " INNER JOIN `people` p on p.id=mp.memberId" +
       " WHERE mp.churchId=? AND mp.memberId=?" +
       " ORDER BY mp.action, mp.emailNotification desc;";
-    return DB.query(sql, [churchId, personId]);
+    return TypedDB.query(sql, [churchId, personId]);
   }
 
   public loadPeopleByForm(churchId: string, formId: string) {
@@ -82,28 +43,23 @@ export class MemberPermissionRepository {
       " INNER JOIN `people` p on p.id=mp.memberId" +
       " WHERE mp.churchId=? AND mp.contentId=?" +
       " ORDER BY mp.action, mp.emailNotification desc;";
-    return DB.query(sql, [churchId, formId]);
+    return TypedDB.query(sql, [churchId, formId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: MemberPermission = {
-      id: data.id,
-      churchId,
-      memberId: data.memberId,
-      contentType: data.contentType,
-      contentId: data.contentId,
-      action: data.action,
-      personName: data.personName,
-      emailNotification: data.emailNotification
+  protected rowToModel(row: any): MemberPermission {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      memberId: row.memberId,
+      contentType: row.contentType,
+      contentId: row.contentId,
+      action: row.action,
+      personName: row.personName,
+      emailNotification: row.emailNotification
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<MemberPermission>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   private existingPermissionRecord(churchId: string, contentId: string) {
-    return DB.queryOne("SELECT * FROM memberPermissions WHERE contentId=? AND churchId=?;", [contentId, churchId]);
+    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE contentId=? AND churchId=?;", [contentId, churchId]);
   }
 }

@@ -10,3 +10,4 @@ export { BaseController } from "./BaseController";
 export { DB, MultiDatabasePool } from "./DB";
 export { BaseRepository } from "./BaseRepository";
 export { ConfiguredRepository, type RepoConfig } from "./ConfiguredRepository";
+export { TypedDB } from "./TypedDB";

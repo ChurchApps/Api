@@ -18,7 +18,7 @@ export class BlockedIpController extends MessagingBaseController {
         });
         promises.push(promise);
       });
-      const result = this.repositories.blockedIp.convertAllToModel(await Promise.all(promises));
+      const result = this.repositories.blockedIp.convertAllToModel(au.churchId, await Promise.all(promises));
       return result;
     });
   }

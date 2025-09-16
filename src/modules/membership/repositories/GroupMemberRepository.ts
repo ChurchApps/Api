@@ -1,41 +1,19 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { GroupMember } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 import { PersonHelper } from "../helpers";
-import { UniqueIdHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class GroupMemberRepository {
-  public save(groupMember: GroupMember) {
-    return groupMember.id ? this.update(groupMember) : this.create(groupMember);
-  }
-
-  private async create(groupMember: GroupMember) {
-    groupMember.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VALUES (?, ?, ?, ?, NOW(), leader);";
-    const params = [groupMember.id, groupMember.churchId, groupMember.groupId, groupMember.personId, groupMember.leader];
-    await DB.query(sql, params);
-    return groupMember;
-  }
-
-  private async update(groupMember: GroupMember) {
-    const sql = "UPDATE groupMembers SET  groupId=?, personId=?, leader=? WHERE id=? and churchId=?";
-    const params = [groupMember.groupId, groupMember.personId, groupMember.leader, groupMember.id, groupMember.churchId];
-    await DB.query(sql, params);
-    return groupMember;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM groupMembers WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM groupMembers WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM groupMembers WHERE churchId=?;", [churchId]);
+export class GroupMemberRepository extends ConfiguredRepository<GroupMember> {
+  protected get repoConfig(): RepoConfig<GroupMember> {
+    return {
+      tableName: "groupMembers",
+      hasSoftDelete: false,
+      insertColumns: ["groupId", "personId", "leader"],
+      updateColumns: ["groupId", "personId", "leader"],
+      insertLiterals: { joinDate: "NOW()" }
+    };
   }
 
   public loadForGroup(churchId: string, groupId: string) {
@@ -45,7 +23,7 @@ export class GroupMemberRepository {
       " INNER JOIN people p on p.id=gm.personId" +
       " WHERE gm.churchId=? AND gm.groupId=?" +
       " ORDER BY gm.leader desc, p.lastName, p.firstName;";
-    return DB.query(sql, [churchId, groupId]);
+    return TypedDB.query(sql, [churchId, groupId]);
   }
 
   public loadLeadersForGroup(churchId: string, groupId: string) {
@@ -55,7 +33,7 @@ export class GroupMemberRepository {
       " INNER JOIN people p on p.id=gm.personId" +
       " WHERE gm.churchId=? AND gm.groupId=? and gm.leader=1" +
       " ORDER BY p.lastName, p.firstName;";
-    return DB.query(sql, [churchId, groupId]);
+    return TypedDB.query(sql, [churchId, groupId]);
   }
 
   public loadForGroups(churchId: string, groupIds: string[]) {
@@ -65,44 +43,41 @@ export class GroupMemberRepository {
       " INNER JOIN people p on p.id=gm.personId" +
       " WHERE gm.churchId=? AND gm.groupId IN (?)" +
       " ORDER BY gm.leader desc, p.lastName, p.firstName;";
-    return DB.query(sql, [churchId, groupIds]);
+    return TypedDB.query(sql, [churchId, groupIds]);
   }
 
   public loadForPerson(churchId: string, personId: string) {
     const sql =
       "SELECT gm.*, g.name as groupName" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.Id=gm.groupId" + " WHERE gm.churchId=? AND gm.personId=? AND g.removed=0" + " ORDER BY g.name;";
-    return DB.query(sql, [churchId, personId]);
+    return TypedDB.query(sql, [churchId, personId]);
   }
 
   public loadForPeople(peopleIds: string[]) {
     const sql = "SELECT gm.*, g.name, g.tags" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.Id=gm.groupId" + " WHERE gm.personId IN (?);";
-    return DB.query(sql, [peopleIds]);
+    return TypedDB.query(sql, [peopleIds]);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(row: any): GroupMember {
     const result: GroupMember = {
-      id: data.id,
-      groupId: data.groupId,
-      personId: data.personId,
-      joinDate: data.joinDate,
-      leader: data.leader
+      id: row.id,
+      churchId: row.churchId,
+      groupId: row.groupId,
+      personId: row.personId,
+      joinDate: row.joinDate,
+      leader: row.leader
     };
-    if (data.displayName !== undefined) {
+    if (row.displayName !== undefined) {
       result.person = {
         id: result.personId,
-        photoUpdated: data.photoUpdated,
-        name: { display: data.displayName },
-        contactInfo: { email: data.email }
+        photoUpdated: row.photoUpdated,
+        name: { display: row.displayName },
+        contactInfo: { email: row.email }
       };
-      result.person.photo = PersonHelper.getPhotoPath(churchId, result.person);
+      result.person.photo = PersonHelper.getPhotoPath(row.churchId, result.person);
     }
-    if (data.groupName !== undefined) result.group = { id: result.groupId, name: data.groupName };
+    if (row.groupName !== undefined) result.group = { id: result.groupId, name: row.groupName };
 
     return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<GroupMember>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   public convertAllToBasicModel(churchId: string, data: any[]) {

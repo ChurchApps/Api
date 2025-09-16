@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
-import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { Session } from "../models";
 
@@ -21,7 +22,7 @@ export class SessionRepository extends ConfiguredRepository<Session> {
     const sessionDate = DateHelper.toMysqlDate(session.sessionDate);
     const sql = "INSERT INTO sessions (id, churchId, groupId, serviceTimeId, sessionDate) VALUES (?, ?, ?, ?, ?);";
     const params = [session.id, session.churchId, session.groupId, session.serviceTimeId, sessionDate];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return session;
   }
 
@@ -29,18 +30,18 @@ export class SessionRepository extends ConfiguredRepository<Session> {
     const sessionDate = DateHelper.toMysqlDate(session.sessionDate);
     const sql = "UPDATE sessions SET groupId=?, serviceTimeId=?, sessionDate=? WHERE id=? and churchId=?";
     const params = [session.groupId, session.serviceTimeId, sessionDate, session.id, session.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return session;
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
-    const result = await DB.query("SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");", [churchId].concat(ids));
+    const result = await TypedDB.query("SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");", [churchId].concat(ids));
     return this.convertAllToModel(churchId, result);
   }
 
   public async loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
     const sessDate = DateHelper.toMysqlDate(sessionDate);
-    const result = await DB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
+    const result = await TypedDB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
     return result ? this.convertToModel(churchId, result) : null;
   }
 
@@ -55,7 +56,7 @@ export class SessionRepository extends ConfiguredRepository<Session> {
       " LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId" +
       " WHERE s.churchId=? AND s.groupId=?" +
       " ORDER by s.sessionDate desc";
-    const result = await DB.query(sql, [churchId, groupId]);
+    const result = await TypedDB.query(sql, [churchId, groupId]);
     return this.convertAllToModel(churchId, result);
   }
 

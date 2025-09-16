@@ -1,11 +1,22 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { DateHelper } from "@churchapps/apihelper";
 import { AttendanceRecord } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
+import { BaseRepository } from "../../../shared/infrastructure";
 
 @injectable()
-export class AttendanceRepository {
+export class AttendanceRepository extends BaseRepository<AttendanceRecord> {
+  protected tableName = ""; // Not used - this repository doesn't map to a single table
+  protected hasSoftDelete = false; // Not applicable for this analytics repository
+
+  // This repository doesn't need standard CRUD operations
+  protected async create(_model: AttendanceRecord): Promise<AttendanceRecord> {
+    throw new Error("AttendanceRepository does not support create operations");
+  }
+
+  protected async update(_model: AttendanceRecord): Promise<AttendanceRecord> {
+    throw new Error("AttendanceRepository does not support update operations");
+  }
   public loadTree(churchId: string) {
     const sql =
       "SELECT c.id as campusId, IFNULL(c.name, 'Unassigned') as campusName, s.id as serviceId, s.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName" +
@@ -15,7 +26,7 @@ export class AttendanceRepository {
       " WHERE(c.id is NULL or c.churchId = ?) AND IFNULL(c.removed, 0) = 0" +
       " ORDER by campusName, serviceName, serviceTimeName";
     const params = [churchId, churchId, churchId, churchId];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public loadTrend(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, groupId: string) {
@@ -35,7 +46,7 @@ export class AttendanceRepository {
       " GROUP BY year(v.visitDate), week(v.visitDate, 0), STR_TO_DATE(concat(year(v.visitDate), ' ', week(v.visitDate, 0), ' Sunday'), '%X %V %W')" +
       " ORDER BY year(v.visitDate), week(v.visitDate, 0);";
     const params = [churchId, groupId, serviceTimeId, serviceId, campusId];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public loadGroups(churchId: string, serviceId: string, week: Date) {
@@ -51,10 +62,10 @@ export class AttendanceRepository {
       " AND s.sessionDate BETWEEN ? AND DATE_ADD(?, INTERVAL 7 DAY)" +
       " ORDER by ser.name, st.name";
     const params = [churchId, serviceId, week, week];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(data: any): AttendanceRecord {
     const result: AttendanceRecord = {
       visitDate: data.visitDate,
       week: data.week,
@@ -67,9 +78,12 @@ export class AttendanceRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<AttendanceRecord>(data, (d: any) => this.convertToModel(churchId, d));
+  // Override the base convertToModel to use rowToModel
+  public convertToModel(churchId: string, data: any): AttendanceRecord {
+    return this.rowToModel(data);
   }
+
+  // convertAllToModel is provided by BaseRepository using convertToModel
 
   public loadForPerson(churchId: string, personId: string) {
     const sql =
@@ -83,7 +97,7 @@ export class AttendanceRepository {
       " WHERE v.churchId=? AND v.PersonId = ?" +
       " ORDER BY v.visitDate desc, c.name, ser.name, st.name";
     const params = [churchId, personId];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public loadByCampusId(churchId: string, campusId: string, startDate: Date, endDate: Date) {
@@ -95,14 +109,14 @@ export class AttendanceRepository {
       " WHERE v.churchId=? AND ser.campusId=?" +
       " AND v.visitDate BETWEEN ? AND ?";
     const params = [churchId, campusId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public loadByServiceId(churchId: string, serviceId: string, startDate: Date, endDate: Date) {
     const sql =
       "SELECT v.*, ser.name as serviceName" + " FROM visits v" + " INNER JOIN services ser on ser.id = v.serviceId" + " WHERE v.churchId=? AND v.serviceId=?" + " AND v.visitDate BETWEEN ? AND ?";
     const params = [churchId, serviceId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public loadByServiceTimeId(churchId: string, serviceTimeId: string, startDate: Date, endDate: Date) {
@@ -115,7 +129,7 @@ export class AttendanceRepository {
       " WHERE v.churchId=? AND st.id=?" +
       " AND v.visitDate BETWEEN ? AND ?";
     const params = [churchId, serviceTimeId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public loadByGroupId(churchId: string, groupId: string, startDate: Date, endDate: Date) {
@@ -127,6 +141,6 @@ export class AttendanceRepository {
       " WHERE v.churchId=? AND s.groupId=?" +
       " AND v.visitDate BETWEEN ? AND ?";
     const params = [churchId, groupId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 }

@@ -1,83 +1,43 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { ClientError } from "../models";
-import { UniqueIdHelper } from "../helpers";
 
-import { CollectionHelper } from "../../../shared/helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class ClientErrorRepository {
-  public save(clientError: ClientError) {
-    return clientError.id ? this.update(clientError) : this.create(clientError);
-  }
-
-  private async create(clientError: ClientError) {
-    clientError.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO clientErrors (id, application, errorTime, userId, churchId, originUrl, errorType, message, details) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      clientError.id,
-      clientError.application,
-      clientError.errorTime,
-      clientError.userId,
-      clientError.churchId,
-      clientError.originUrl,
-      clientError.errorType,
-      clientError.message,
-      clientError.details
-    ];
-    await DB.query(sql, params);
-    return clientError;
-  }
-
-  private async update(clientError: ClientError) {
-    const sql = "UPDATE clientErrors SET application=?, errorTime=?, userId=?, churchId=?, originUrl=?, errorType=?, message=?, details=? WHERE id=?";
-    const params = [
-      clientError.application,
-      clientError.errorTime,
-      clientError.userId,
-      clientError.churchId,
-      clientError.originUrl,
-      clientError.errorType,
-      clientError.message,
-      clientError.details,
-      clientError.id
-    ];
-    await DB.query(sql, params);
-    return clientError;
+export class ClientErrorRepository extends ConfiguredRepository<ClientError> {
+  protected get repoConfig(): RepoConfig<ClientError> {
+    return {
+      tableName: "clientErrors",
+      hasSoftDelete: false,
+      insertColumns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"],
+      updateColumns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"]
+    };
   }
 
   public deleteOld() {
-    return DB.query("DELETE FROM clientErrors WHERE errorTime<date_add(NOW(), INTERVAL -7 DAY)", []);
-  }
-
-  public delete(id: string) {
-    return DB.query("DELETE FROM clientErrors WHERE id=?;", [id]);
+    return TypedDB.query("DELETE FROM clientErrors WHERE errorTime<date_add(NOW(), INTERVAL -7 DAY)", []);
   }
 
   public load(id: string) {
-    return DB.queryOne("SELECT * FROM clientErrors WHERE id=?;", [id]);
+    return TypedDB.queryOne("SELECT * FROM clientErrors WHERE id=?;", [id]);
   }
 
   public loadAll() {
-    return DB.query("SELECT * FROM clientErrors;", []);
+    return TypedDB.query("SELECT * FROM clientErrors;", []);
   }
 
-  public convertToModel(churchId: string, data: any): ClientError {
-    const result: ClientError = {
-      id: data.id,
-      application: data.application,
-      errorTime: data.errorTime,
-      userId: data.userId,
-      churchId: data.churchId,
-      originUrl: data.originUrl,
-      errorType: data.errorType,
-      message: data.message,
-      details: data.details
+  protected rowToModel(row: any): ClientError {
+    return {
+      id: row.id,
+      application: row.application,
+      errorTime: row.errorTime,
+      userId: row.userId,
+      churchId: row.churchId,
+      originUrl: row.originUrl,
+      errorType: row.errorType,
+      message: row.message,
+      details: row.details
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): ClientError[] {
-    return CollectionHelper.convertAll<ClientError>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

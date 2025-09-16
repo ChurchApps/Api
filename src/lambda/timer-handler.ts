@@ -1,7 +1,7 @@
 import { ScheduledEvent, Context } from "aws-lambda";
 
 import { Environment } from "../shared/helpers/Environment";
-import { DB } from "../shared/infrastructure/DB";
+import { TypedDB } from "../shared/infrastructure/TypedDB";
 
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper";
 import { RepositoryManager } from "../shared/infrastructure/RepositoryManager";
@@ -14,7 +14,7 @@ const initEnv = async () => {
     // Pools now auto-initialize on first use
 
     // Initialize messaging helpers within the messaging module context
-    await DB.runWithContext("messaging", async () => {
+    await TypedDB.runWithContext("messaging", async () => {
       const repositories = await RepositoryManager.getRepositories<any>("messaging");
       NotificationHelper.init(repositories);
     });
@@ -28,7 +28,7 @@ export const handle15MinTimer = async (_event: ScheduledEvent, _context: Context
     console.log("15-minute timer triggered - processing individual email notifications");
 
     // Run within messaging module context
-    await DB.runWithContext("messaging", async () => {
+    await TypedDB.runWithContext("messaging", async () => {
       const result = await NotificationHelper.sendEmailNotifications("individual");
       console.log("15-minute timer completed", result);
     });
@@ -47,7 +47,7 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     await AutomationHelper.remindServiceRequests();
 
     // Run within messaging module context
-    await DB.runWithContext("messaging", async () => {
+    await TypedDB.runWithContext("messaging", async () => {
       const result = await NotificationHelper.sendEmailNotifications("daily");
       console.log("Midnight timer completed", result);
     });

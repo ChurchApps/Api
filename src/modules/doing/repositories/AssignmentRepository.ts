@@ -1,48 +1,30 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper } from "@churchapps/apihelper";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Assignment } from "../models";
 
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+
 @injectable()
-export class AssignmentRepository {
-  public save(assignment: Assignment) {
-    return assignment.id ? this.update(assignment) : this.create(assignment);
-  }
-
-  private async create(assignment: Assignment) {
-    assignment.id = UniqueIdHelper.shortId();
-
-    const sql = "INSERT INTO assignments (id, churchId, positionId, personId, status, notified) VALUES (?, ?, ?, ?, ?, ?);";
-    const params = [assignment.id, assignment.churchId, assignment.positionId, assignment.personId, assignment.status, assignment.notified];
-    await DB.query(sql, params);
-    return assignment;
-  }
-
-  private async update(assignment: Assignment) {
-    const sql = "UPDATE assignments SET positionId=?, personId=?, status=?, notified=? WHERE id=? and churchId=?";
-    const params = [assignment.positionId, assignment.personId, assignment.status, assignment.notified, assignment.id, assignment.churchId];
-    await DB.query(sql, params);
-    return assignment;
-  }
-
-  public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM assignments WHERE id=? AND churchId=?;", [id, churchId]);
+export class AssignmentRepository extends ConfiguredRepository<Assignment> {
+  protected get repoConfig(): RepoConfig<Assignment> {
+    return {
+      tableName: "assignments",
+      hasSoftDelete: false,
+      insertColumns: ["positionId", "personId", "status", "notified"],
+      updateColumns: ["positionId", "personId", "status", "notified"]
+    };
   }
 
   public deleteByPlanId(churchId: string, planId: string) {
-    return DB.query("DELETE FROM assignments WHERE churchId=? and positionId IN (SELECT id from positions WHERE planId=?);", [churchId, planId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM assignments WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM assignments WHERE churchId=? and positionId IN (SELECT id from positions WHERE planId=?);", [churchId, planId]);
   }
 
   public loadByPlanId(churchId: string, planId: string) {
-    return DB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId=?;", [churchId, planId]);
+    return TypedDB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId=?;", [churchId, planId]);
   }
 
   public loadByPlanIds(churchId: string, planIds: string[]) {
-    return DB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId IN (?);", [churchId, planIds]);
+    return TypedDB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId IN (?);", [churchId, planIds]);
   }
 
   public loadLastServed(churchId: string) {
@@ -54,11 +36,11 @@ export class AssignmentRepository {
       " where a.churchId=?" +
       " group by a.personId" +
       " order by max(pl.serviceDate)";
-    return DB.query(sql, [churchId]);
+    return TypedDB.query(sql, [churchId]);
   }
 
   public loadByByPersonId(churchId: string, personId: string) {
-    return DB.query("SELECT * FROM assignments WHERE churchId=? AND personId=?;", [churchId, personId]);
+    return TypedDB.query("SELECT * FROM assignments WHERE churchId=? AND personId=?;", [churchId, personId]);
   }
 
   public loadUnconfirmedByServiceDateRange(churchId?: string) {
@@ -77,6 +59,6 @@ export class AssignmentRepository {
       params.push(churchId);
     }
 
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 }

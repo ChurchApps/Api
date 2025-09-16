@@ -17,7 +17,7 @@ export class ArrangementKeyController extends ContentBaseController {
       }
 
       const song: Song = await this.repositories.song.load(churchId, arrangement.songId);
-      const songDetail: SongDetail = await this.repositories.songDetail.load(arrangement.songDetailId);
+      const songDetail: SongDetail = await this.repositories.songDetail.loadGlobal(arrangement.songDetailId);
       const result = { arrangementKey, arrangement, song, songDetail };
       return result;
     });

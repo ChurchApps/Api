@@ -7,7 +7,6 @@ export { PraiseChartsHelper } from "./PraiseChartsHelper";
 export { MusicBrainzHelper } from "./MusicBrainzHelper";
 
 // Content-specific helpers
-export { TypedDB } from "./TypedDB";
 export { TreeHelper } from "./TreeHelper";
 export { SongHelper } from "./SongHelper";
 export { StreamingConfigHelper } from "./StreamingConfigHelper";

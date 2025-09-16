@@ -1,61 +1,54 @@
-import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper } from "@churchapps/apihelper";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { NotificationPreference } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class NotificationPreferenceRepository {
+@injectable()
+export class NotificationPreferenceRepository extends ConfiguredRepository<NotificationPreference> {
+  protected get repoConfig(): RepoConfig<NotificationPreference> {
+    return {
+      tableName: "notificationPreferences",
+      hasSoftDelete: false,
+      insertColumns: ["personId", "allowPush", "emailFrequency"],
+      updateColumns: ["personId", "allowPush", "emailFrequency"]
+    };
+  }
   public loadById(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM notificationPreferences WHERE id=? and churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM notificationPreferences WHERE id=? and churchId=?;", [id, churchId]);
   }
 
   public loadByPersonId(churchId: string, personId: string) {
-    return DB.queryOne("SELECT * FROM notificationPreferences WHERE churchId=? AND personId=?", [churchId, personId]);
+    return TypedDB.queryOne("SELECT * FROM notificationPreferences WHERE churchId=? AND personId=?", [churchId, personId]);
   }
 
   public loadByChurchId(churchId: string) {
-    return DB.query("SELECT * FROM notificationPreferences WHERE churchId=?", [churchId]);
+    return TypedDB.query("SELECT * FROM notificationPreferences WHERE churchId=?", [churchId]);
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM notificationPreferences WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM notificationPreferences WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
-  public save(notificationPreference: NotificationPreference) {
-    return notificationPreference.id ? this.update(notificationPreference) : this.create(notificationPreference);
-  }
-
-  private async create(notificationPreference: NotificationPreference): Promise<NotificationPreference> {
-    notificationPreference.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO notificationPreferences (id, churchId, personId, allowPush, emailFrequency) VALUES (?, ?, ?, ?, ?);";
-    const params = [notificationPreference.id, notificationPreference.churchId, notificationPreference.personId, notificationPreference.allowPush, notificationPreference.emailFrequency];
-    await DB.query(sql, params);
-    return notificationPreference;
-  }
-
-  private async update(notificationPreference: NotificationPreference) {
-    const sql = "UPDATE notificationPreferences SET personId=?, allowPush=?, emailFrequency=? WHERE id=? AND churchId=?;";
-    const params = [notificationPreference.personId, notificationPreference.allowPush, notificationPreference.emailFrequency, notificationPreference.id, notificationPreference.churchId];
-    await DB.query(sql, params);
-    return notificationPreference;
-  }
-
-  public convertToModel(data: any) {
-    const result: NotificationPreference = {
+  protected rowToModel(data: any): NotificationPreference {
+    return {
       id: data.id,
       churchId: data.churchId,
       personId: data.personId,
       allowPush: data.allowPush,
       emailFrequency: data.emailFrequency
     };
-    return result;
+  }
+
+  public convertToModel(data: any) {
+    return this.rowToModel(data);
   }
 
   public convertAllToModel(data: any) {
-    return CollectionHelper.convertAll<NotificationPreference>(data, (d: any) => this.convertToModel(d));
+    return this.mapToModels(data);
   }
 
   public loadByPersonIds(personIds: string[]) {
     const sql = "SELECT * FROM notificationPreferences WHERE personId IN (?)";
-    return DB.query(sql, [personIds]);
+    return TypedDB.query(sql, [personIds]);
   }
 }

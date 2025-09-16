@@ -1,13 +1,22 @@
-import { DB } from "../../../shared/infrastructure";
+import { injectable } from "inversify";
 import { AccessLog } from "../models";
-import { UniqueIdHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
-export class AccessLogRepository {
+@injectable()
+export class AccessLogRepository extends ConfiguredRepository<AccessLog> {
+  protected get repoConfig(): RepoConfig<AccessLog> {
+    return {
+      tableName: "accessLogs",
+      hasSoftDelete: false,
+      insertColumns: ["userId", "appName"],
+      updateColumns: ["userId", "appName"],
+      insertLiterals: { loginTime: "NOW()" }
+    };
+  }
+
+  // For compatibility with existing controllers
   public async create(log: AccessLog) {
-    log.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO accessLogs (id, userId, churchId, appName, loginTime) VALUES (?, ?, ?, ?, ?);";
-    const params = [log.id, log.userId, log.churchId, log.appName, new Date()];
-    await DB.query(sql, params);
-    return log;
+    log.id = this.createId();
+    return super.save(log);
   }
 }

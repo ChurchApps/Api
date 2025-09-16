@@ -1,31 +1,33 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { VisibilityPreference } from "../models";
-import { UniqueIdHelper } from "../helpers";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class VisibilityPreferenceRepository {
-  public save(preference: VisibilityPreference) {
-    return preference.id ? this.update(preference) : this.create(preference);
-  }
-
-  private async create(preference: VisibilityPreference) {
-    preference.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO visibilityPreferences (id, churchId, personId, address, phoneNumber, email) VALUES (?, ?, ?, ?, ?, ?);";
-    const params = [preference.id, preference.churchId, preference.personId, preference.address, preference.phoneNumber, preference.email];
-    await DB.query(sql, params);
-    return preference;
-  }
-
-  private async update(preference: VisibilityPreference) {
-    const sql = "UPDATE visibilityPreferences SET personId=?, address=?, phoneNumber=?, email=? WHERE id=? AND churchId=?;";
-    const params = [preference.personId, preference.address, preference.phoneNumber, preference.email, preference.id, preference.churchId];
-    await DB.query(sql, params);
-    return preference;
+export class VisibilityPreferenceRepository extends ConfiguredRepository<VisibilityPreference> {
+  protected get repoConfig(): RepoConfig<VisibilityPreference> {
+    return {
+      tableName: "visibilityPreferences",
+      hasSoftDelete: false,
+      insertColumns: ["personId", "address", "phoneNumber", "email"],
+      updateColumns: ["personId", "address", "phoneNumber", "email"]
+    };
   }
 
   public async loadForPerson(churchId: string, personId: string) {
     const sql = "SELECT * FROM visibilityPreferences WHERE churchId=? AND personId=?;";
-    return DB.query(sql, [churchId, personId]);
+    return TypedDB.query(sql, [churchId, personId]);
+  }
+
+  protected rowToModel(row: any): VisibilityPreference {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      personId: row.personId,
+      address: row.address,
+      phoneNumber: row.phoneNumber,
+      email: row.email
+    };
   }
 }

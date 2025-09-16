@@ -85,12 +85,12 @@ export class PageController2 extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const promises: Promise<Page>[] = [];
-        promises.push(this.repositories.page.create(req.body.page));
+        promises.push(this.repositories.page.save(req.body.page));
         req.body.sections.forEach((section) => {
-          promises.push(this.repositories.section.create(section));
+          promises.push(this.repositories.section.save(section));
         });
         req.body.elements.forEach((element) => {
-          promises.push(this.repositories.element.create(element));
+          promises.push(this.repositories.element.save(element));
         });
         const result = await Promise.all(promises);
         return result[0];

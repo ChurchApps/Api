@@ -1,9 +1,22 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Condition } from "../models";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
 
 @injectable()
-export class MembershipRepository {
+export class MembershipRepository extends BaseRepository<any> {
+  protected tableName = "people";
+  protected hasSoftDelete = false;
+
+  protected async create(_model: any): Promise<any> {
+    // This repository doesn't handle create operations
+    throw new Error("Create operation not supported");
+  }
+
+  protected async update(_model: any): Promise<any> {
+    // This repository doesn't handle update operations
+    throw new Error("Update operation not supported");
+  }
   private getDBField(condition: Condition) {
     const fieldData = condition.fieldData ? JSON.parse(condition.fieldData) : {};
     let result = condition.field;
@@ -50,7 +63,7 @@ export class MembershipRepository {
     params.push(this.getDBValue(condition));
 
     const result: string[] = [];
-    const rows = (await DB.query(sql, params)) as { id: string }[];
+    const rows = (await TypedDB.query(sql, params)) as { id: string }[];
     rows.forEach((r: { id: string }) => result.push(r.id));
     return result;
   }
@@ -58,6 +71,6 @@ export class MembershipRepository {
   public async loadPeople(churchId: string, personIds: string[]) {
     const sql = "select id, displayName from people where churchId = ? AND removed = 0 AND id in (?)";
     const params = [churchId, personIds];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 }

@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
-import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { ServiceTime } from "../models";
 
 @injectable()
@@ -16,7 +17,7 @@ export class ServiceTimeRepository extends ConfiguredRepository<ServiceTime> {
   }
 
   public async loadNamesWithCampusService(churchId: string) {
-    const result = await DB.query(
+    const result = await TypedDB.query(
       "SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName FROM serviceTimes st INNER JOIN services s on s.Id=st.serviceId INNER JOIN campuses c on c.Id=s.campusId WHERE s.churchId=? AND st.removed=0 AND s.removed=0 AND c.removed=0 ORDER BY c.name, s.name, st.name;",
       [churchId]
     );
@@ -24,7 +25,7 @@ export class ServiceTimeRepository extends ConfiguredRepository<ServiceTime> {
   }
 
   public async loadNamesByServiceId(churchId: string, serviceId: string) {
-    const result = await DB.query(
+    const result = await TypedDB.query(
       "SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName FROM serviceTimes st INNER JOIN services s on s.id=st.serviceId INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=? AND s.id=? AND st.removed=0 ORDER BY c.name, s.name, st.name",
       [churchId, serviceId]
     );
@@ -37,7 +38,7 @@ export class ServiceTimeRepository extends ConfiguredRepository<ServiceTime> {
       " FROM serviceTimes st" +
       " LEFT OUTER JOIN services s on s.id=st.serviceId" +
       " WHERE st.churchId = ? AND (?=0 OR st.serviceId=?) AND (? = 0 OR s.campusId = ?) AND st.removed=0";
-    const result = await DB.query(sql, [churchId, serviceId, serviceId, campusId, campusId]);
+    const result = await TypedDB.query(sql, [churchId, serviceId, serviceId, campusId, campusId]);
     return this.convertAllToModel(churchId, result);
   }
 

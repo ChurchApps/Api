@@ -1,39 +1,36 @@
 import { injectable } from "inversify";
-import { UniqueIdHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { CuratedCalendar } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class CuratedCalendarRepository {
-  public save(curatedCalendar: CuratedCalendar) {
-    return curatedCalendar.id ? this.update(curatedCalendar) : this.create(curatedCalendar);
+export class CuratedCalendarRepository extends ConfiguredRepository<CuratedCalendar> {
+  protected get repoConfig(): RepoConfig<CuratedCalendar> {
+    return {
+      tableName: "curatedCalendars",
+      hasSoftDelete: false,
+      insertColumns: ["name"],
+      updateColumns: ["name"]
+    };
   }
 
-  private async create(curatedCalendar: CuratedCalendar) {
-    curatedCalendar.id = UniqueIdHelper.shortId();
-
-    const sql = "INSERT INTO curatedCalendars (id, churchId, name) VALUES (?, ?, ?);";
-    const params = [curatedCalendar.id, curatedCalendar.churchId, curatedCalendar.name];
-    await TypedDB.query(sql, params);
-    return curatedCalendar;
-  }
-
-  private async update(curatedCalendar: CuratedCalendar) {
-    const sql = "UPDATE curatedCalendars SET name=? WHERE id=? and churchId=?";
-    const params = [curatedCalendar.name, curatedCalendar.id, curatedCalendar.churchId];
-    await TypedDB.query(sql, params);
-    return curatedCalendar;
-  }
-
-  public delete(churchId: string, id: string) {
+  public async delete(churchId: string, id: string): Promise<any> {
     return TypedDB.query("DELETE FROM curatedCalendars WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
-  public load(churchId: string, id: string) {
+  public async load(churchId: string, id: string): Promise<CuratedCalendar> {
     return TypedDB.queryOne("SELECT * FROM curatedCalendars WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
-  public loadAll(churchId: string) {
+  public async loadAll(churchId: string): Promise<CuratedCalendar[]> {
     return TypedDB.query("SELECT * FROM curatedCalendars WHERE churchId=?;", [churchId]);
+  }
+
+  protected rowToModel(row: any): CuratedCalendar {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      name: row.name
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { File } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 
@@ -15,21 +15,6 @@ export class FileRepository extends ConfiguredRepository<File> {
         dateModified: "NOW()"
       }
     };
-  }
-
-  // Override to use TypedDB instead of DB
-  protected async create(model: File): Promise<File> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  protected async update(model: File): Promise<File> {
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
   }
 
   public async delete(churchId: string, id: string): Promise<any> {

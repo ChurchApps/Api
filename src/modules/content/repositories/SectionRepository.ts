@@ -1,60 +1,18 @@
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { injectable } from "inversify";
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Section } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class SectionRepository {
-  public save(section: Section) {
-    return section.id ? this.update(section) : this.create(section);
-  }
-
-  public async create(section: Section) {
-    if (!section.id) section.id = UniqueIdHelper.shortId();
-
-    const sql =
-      "INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      section.id,
-      section.churchId,
-      section.pageId,
-      section.blockId,
-      section.zone,
-      section.background,
-      section.textColor,
-      section.headingColor,
-      section.linkColor,
-      section.sort,
-      section.targetBlockId,
-      section.answersJSON,
-      section.stylesJSON,
-      section.animationsJSON
-    ];
-    await TypedDB.query(sql, params);
-    return section;
-  }
-
-  private async update(section: Section) {
-    const sql =
-      "UPDATE sections SET pageId=?, blockId=?, zone=?, background=?, textColor=?, headingColor=?, linkColor=?, sort=?, targetBlockId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
-    const params = [
-      section.pageId,
-      section.blockId,
-      section.zone,
-      section.background,
-      section.textColor,
-      section.headingColor,
-      section.linkColor,
-      section.sort,
-      section.targetBlockId,
-      section.answersJSON,
-      section.stylesJSON,
-      section.animationsJSON,
-      section.id,
-      section.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return section;
+export class SectionRepository extends ConfiguredRepository<Section> {
+  protected get repoConfig(): RepoConfig<Section> {
+    return {
+      tableName: "sections",
+      hasSoftDelete: false,
+      defaultOrderBy: "sort",
+      insertColumns: ["pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"],
+      updateColumns: ["pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"]
+    };
   }
 
   public async updateSortForBlock(churchId: string, blockId: string) {
@@ -81,14 +39,6 @@ export class SectionRepository {
     if (promises.length > 0) await Promise.all(promises);
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM sections WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM sections WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
   public loadForBlock(churchId: string, blockId: string) {
     return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND blockId=? order by sort;", [churchId, blockId]);
   }
@@ -103,5 +53,24 @@ export class SectionRepository {
 
   public loadForZone(churchId: string, pageId: string, zone: string) {
     return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND pageId=? AND zone=? order by sort;", [churchId, pageId, zone]);
+  }
+
+  protected rowToModel(row: any): Section {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      pageId: row.pageId,
+      blockId: row.blockId,
+      zone: row.zone,
+      background: row.background,
+      textColor: row.textColor,
+      headingColor: row.headingColor,
+      linkColor: row.linkColor,
+      sort: row.sort,
+      targetBlockId: row.targetBlockId,
+      answersJSON: row.answersJSON,
+      stylesJSON: row.stylesJSON,
+      animationsJSON: row.animationsJSON
+    };
   }
 }

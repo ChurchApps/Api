@@ -3,7 +3,7 @@ import { Repositories as MessagingRepositories } from "../../messaging/repositor
 import { Repositories as MemembershipRepositories } from "../../membership/repositories/Repositories";
 import { Notification } from "../../messaging/models/Notification";
 import { Position } from "../../doing";
-import { DB } from "../../../shared/infrastructure/DB";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 
 export class AutomationHelper {
   private static subdomainCache: { [key: string]: string } = {};
@@ -14,7 +14,7 @@ export class AutomationHelper {
     const processedPeople = new Set<string>();
 
     // Load assignments and positions within doing context
-    await DB.runWithContext("doing", async () => {
+    await TypedDB.runWithContext("doing", async () => {
       const doingRepos = DoingRepositories.getCurrent();
       const unconfirmedAssignments = (await doingRepos.assignment.loadUnconfirmedByServiceDateRange()) as any[];
 
@@ -30,7 +30,7 @@ export class AutomationHelper {
           // Get church subdomain within membership context
           let subDomain = this.subdomainCache[assignment.churchId];
           if (!subDomain) {
-            const church = await DB.runWithContext("membership", async () => {
+            const church = await TypedDB.runWithContext("membership", async () => {
               return await MemembershipRepositories.getCurrent().church.loadById(assignment.churchId);
             });
             subDomain = church.subDomain;
@@ -63,7 +63,7 @@ export class AutomationHelper {
 
     // Save notifications within messaging context
     if (notifications.length > 0) {
-      await DB.runWithContext("messaging", async () => {
+      await TypedDB.runWithContext("messaging", async () => {
         const messagingRepos = MessagingRepositories.getCurrent();
         const promises: Promise<Notification>[] = [];
         for (const notification of notifications) {
