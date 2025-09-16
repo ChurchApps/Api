@@ -3,6 +3,8 @@ import { DB } from "../../../shared/infrastructure";
 import { ClientError } from "../models";
 import { UniqueIdHelper } from "../helpers";
 
+import { CollectionHelper } from "../../../shared/helpers";
+
 @injectable()
 export class ClientErrorRepository {
   public save(clientError: ClientError) {
@@ -58,5 +60,24 @@ export class ClientErrorRepository {
 
   public loadAll() {
     return DB.query("SELECT * FROM clientErrors;", []);
+  }
+
+  public convertToModel(churchId: string, data: any): ClientError {
+    const result: ClientError = {
+      id: data.id,
+      application: data.application,
+      errorTime: data.errorTime,
+      userId: data.userId,
+      churchId: data.churchId,
+      originUrl: data.originUrl,
+      errorType: data.errorType,
+      message: data.message,
+      details: data.details
+    };
+    return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any): ClientError[] {
+    return CollectionHelper.convertAll<ClientError>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

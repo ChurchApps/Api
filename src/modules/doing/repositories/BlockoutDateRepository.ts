@@ -3,6 +3,8 @@ import { DB } from "../../../shared/infrastructure";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { BlockoutDate } from "../models";
 
+import { CollectionHelper } from "../../../shared/helpers";
+
 @injectable()
 export class BlockoutDateRepository {
   public save(blockoutDate: BlockoutDate) {
@@ -43,5 +45,20 @@ export class BlockoutDateRepository {
 
   public loadUpcoming(churchId: string) {
     return DB.query("SELECT * FROM blockoutDates WHERE churchId=? AND endDate>NOW();", [churchId]);
+  }
+
+  public convertToModel(churchId: string, data: any): BlockoutDate {
+    const result: BlockoutDate = {
+      id: data.id,
+      churchId: data.churchId,
+      personId: data.personId,
+      startDate: data.startDate,
+      endDate: data.endDate
+    };
+    return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any): BlockoutDate[] {
+    return CollectionHelper.convertAll<BlockoutDate>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }
