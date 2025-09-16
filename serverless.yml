@@ -23,7 +23,7 @@ custom:
         - sg-052314a1eec2f2567
       subnetIds:
         - subnet-01a6b61d749d10c46
-    current: ${self:custom.vpcSettings.${self:custom.env}, ''}
+    current: ${self:custom.vpcSettings.${self:custom.envLower}, ''}
   # Critical database connections loaded from Parameter Store at deploy time
   # These provide faster cold starts by avoiding runtime Parameter Store calls
 
