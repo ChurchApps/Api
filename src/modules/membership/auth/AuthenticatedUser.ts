@@ -1,7 +1,7 @@
 import { Principal, AuthenticatedUser as BaseAuthenticatedUser } from "@churchapps/apihelper";
 import { Api, LoginResponse, LoginUserChurch, User } from "../models";
 import jwt, { SignOptions, JwtPayload } from "jsonwebtoken";
-import { Repositories } from "../repositories";
+import { Repos } from "../repositories";
 import { Environment } from "../helpers";
 
 export class AuthenticatedUser extends BaseAuthenticatedUser {
@@ -95,7 +95,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     });
   }
 
-  public static async loadUserByJwt(token: string, repositories: Repositories) {
+  public static async loadUserByJwt(token: string, repos: Repos) {
     let result: User = null;
     try {
       const decoded = jwt.verify(token, Environment.jwtSecret);
@@ -104,7 +104,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
       }
       const principal = new Principal(decoded as JwtPayload);
       const userId: string = principal.details.id;
-      result = await repositories.user.load(userId);
+      result = await repos.user.load(userId);
     } catch {
       // JWT verification failed - user not found
     }

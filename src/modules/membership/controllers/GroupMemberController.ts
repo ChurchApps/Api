@@ -13,23 +13,23 @@ export class GroupMemberController extends MembershipCrudController {
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.groupMember.loadForPerson(au.churchId, au.personId);
+      return this.repos.groupMember.loadForPerson(au.churchId, au.personId);
     });
   }
 
   @httpGet("/public/leaders/:churchId/:groupId")
   public async getPublicLeaders(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const result = (await this.repositories.groupMember.loadLeadersForGroup(churchId, groupId)) as any[];
-      return this.repositories.groupMember.convertAllToModel(churchId, result);
+      const result = (await this.repos.groupMember.loadLeadersForGroup(churchId, groupId)) as any[];
+      return this.repos.groupMember.convertAllToModel(churchId, result);
     });
   }
 
   @httpGet("/basic/:groupId")
   public async getbasic(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = (await this.repositories.groupMember.loadForGroup(au.churchId, groupId)) as any[];
-      return this.repositories.groupMember.convertAllToBasicModel(au.churchId, result);
+      const result = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
+      return this.repos.groupMember.convertAllToBasicModel(au.churchId, result);
     });
   }
 
@@ -43,11 +43,11 @@ export class GroupMemberController extends MembershipCrudController {
       if (!hasAccess) return this.json({}, 401);
       else {
         let result = null;
-        if (req.query.groupId !== undefined) result = await this.repositories.groupMember.loadForGroup(au.churchId, req.query.groupId.toString());
-        else if (req.query.groupIds !== undefined) result = await this.repositories.groupMember.loadForGroups(au.churchId, req.query.groupIds.toString().split(","));
-        else if (req.query.personId !== undefined) result = await this.repositories.groupMember.loadForPerson(au.churchId, req.query.personId.toString());
-        else result = await this.repositories.groupMember.loadAll(au.churchId);
-        return this.repositories.groupMember.convertAllToModel(au.churchId, result);
+        if (req.query.groupId !== undefined) result = await this.repos.groupMember.loadForGroup(au.churchId, req.query.groupId.toString());
+        else if (req.query.groupIds !== undefined) result = await this.repos.groupMember.loadForGroups(au.churchId, req.query.groupIds.toString().split(","));
+        else if (req.query.personId !== undefined) result = await this.repos.groupMember.loadForPerson(au.churchId, req.query.personId.toString());
+        else result = await this.repos.groupMember.loadAll(au.churchId);
+        return this.repos.groupMember.convertAllToModel(au.churchId, result);
       }
     });
   }

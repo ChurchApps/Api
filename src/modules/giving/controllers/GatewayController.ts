@@ -16,14 +16,14 @@ export class GatewayController extends GivingCrudController {
   @httpGet("/churchId/:churchId")
   public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repositories.gateway.convertAllToModel(churchId, (await this.repositories.gateway.loadAll(churchId)) as any[]);
+      return this.repos.gateway.convertAllToModel(churchId, (await this.repos.gateway.loadAll(churchId)) as any[]);
     });
   }
 
   @httpGet("/configured/:churchId")
   public async isConfigured(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
       const hasConfiguredGateway = gateways.length > 0 && gateways.some((g: any) => g.privateKey && g.privateKey.trim() !== "");
       return { configured: hasConfiguredGateway };
     });
@@ -34,7 +34,7 @@ export class GatewayController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
-        return this.repositories.gateway.convertToModel(au.churchId, await this.repositories.gateway.load(au.churchId, id));
+        return this.repos.gateway.convertToModel(au.churchId, await this.repos.gateway.load(au.churchId, id));
       }
     });
   }
@@ -42,7 +42,7 @@ export class GatewayController extends GivingCrudController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repositories.gateway.convertAllToModel(au.churchId, (await this.repositories.gateway.loadAll(au.churchId)) as any[]);
+      return this.repos.gateway.convertAllToModel(au.churchId, (await this.repos.gateway.loadAll(au.churchId)) as any[]);
     });
   }
 
@@ -89,11 +89,11 @@ export class GatewayController extends GivingCrudController {
             }
 
             encryptedGateway.churchId = au.churchId;
-            promises.push(this.repositories.gateway.save(encryptedGateway));
+            promises.push(this.repos.gateway.save(encryptedGateway));
           })
         );
         const result = await Promise.all(promises);
-        return this.repositories.gateway.convertAllToModel(au.churchId, result as any[]);
+        return this.repos.gateway.convertAllToModel(au.churchId, result as any[]);
       }
     });
   }
@@ -103,7 +103,7 @@ export class GatewayController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
-        const existing = await this.repositories.gateway.load(au.churchId, id);
+        const existing = await this.repos.gateway.load(au.churchId, id);
         if (!existing) {
           return this.json({ message: "No gateway found for this church" }, 400);
         } else {
@@ -112,7 +112,7 @@ export class GatewayController extends GivingCrudController {
             ...(existing as any),
             ...req.body
           };
-          await this.repositories.gateway.save(updatedGateway);
+          await this.repos.gateway.save(updatedGateway);
         }
         return existing;
       }
@@ -124,11 +124,11 @@ export class GatewayController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
-        const gateway = (await this.repositories.gateway.load(au.churchId, id)) as any;
+        const gateway = (await this.repos.gateway.load(au.churchId, id)) as any;
         if (gateway) {
           await GatewayService.deleteWebhooks(gateway, au.churchId);
         }
-        await this.repositories.gateway.delete(au.churchId, id);
+        await this.repos.gateway.delete(au.churchId, id);
         return this.json({});
       }
     });

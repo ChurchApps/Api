@@ -117,11 +117,11 @@ export class StripeGatewayProvider implements IGatewayProvider {
     return await StripeHelper.createProduct(config.privateKey, churchId);
   }
 
-  async logEvent(churchId: string, event: any, eventData: any, repositories: any): Promise<void> {
-    await StripeHelper.logEvent(churchId, event, eventData, repositories);
+  async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
+    await StripeHelper.logEvent(churchId, event, eventData, repos);
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repositories: any): Promise<any> {
-    return await StripeHelper.logDonation(config.privateKey, churchId, eventData, repositories);
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
+    return await StripeHelper.logDonation(config.privateKey, churchId, eventData, repos);
   }
 }

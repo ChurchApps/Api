@@ -173,10 +173,9 @@ export class StripeHelper {
     return { method: methodTypes[paymentType], methodDetails: payment_method_details[paymentType].last4 };
   }
 
-  // Note: These methods need to be updated to use dependency injection
-  // instead of static Repositories.getCurrent() calls
+  // Note: These methods use dependency injection with repository parameters
 
-  static async logEvent(churchId: string, stripeEvent: any, eventData: any, givingRepositories: any) {
+  static async logEvent(churchId: string, stripeEvent: any, eventData: any, givingRepos: any) {
     const { billing_reason, status, failure_message, outcome, created, customer } = eventData;
     let message = billing_reason + " " + status;
     if (!billing_reason) message = failure_message ? failure_message + " " + outcome.seller_message : outcome.seller_message;
@@ -190,15 +189,15 @@ export class StripeHelper {
       message,
       created: new Date(created * 1000)
     };
-    return givingRepositories.eventLog.create(eventLog);
+    return givingRepos.eventLog.create(eventLog);
   }
 
-  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepositories: any) {
+  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any) {
     const amount = (eventData.amount || eventData.amount_paid) / 100;
-    const customerData = (await givingRepositories.customer.load(churchId, eventData.customer)) as any;
+    const customerData = (await givingRepos.customer.load(churchId, eventData.customer)) as any;
     const personId = customerData?.personId;
     const { method, methodDetails } = await this.getPaymentDetails(secretKey, eventData);
-    const batch: DonationBatch = await givingRepositories.donationBatch.getOrCreateCurrent(churchId);
+    const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
     const donationData: Donation = {
       batchId: batch.id,
       amount,
@@ -209,12 +208,12 @@ export class StripeHelper {
       donationDate: new Date(eventData.created * 1000),
       notes: eventData?.metadata?.notes
     };
-    const funds = eventData.metadata.funds ? JSON.parse(eventData.metadata.funds) : await givingRepositories.subscriptionFund.loadForSubscriptionLog(churchId, eventData.subscription);
-    const donation: Donation = await givingRepositories.donation.save(donationData);
+    const funds = eventData.metadata.funds ? JSON.parse(eventData.metadata.funds) : await givingRepos.subscriptionFund.loadForSubscriptionLog(churchId, eventData.subscription);
+    const donation: Donation = await givingRepos.donation.save(donationData);
     const promises: Promise<FundDonation>[] = [];
     funds.forEach((fund: FundDonation) => {
       const fundDonation: FundDonation = { churchId, amount: fund.amount, donationId: donation.id, fundId: fund.id };
-      promises.push(givingRepositories.fundDonation.save(fundDonation));
+      promises.push(givingRepos.fundDonation.save(fundDonation));
     });
     return await Promise.all(promises);
   }

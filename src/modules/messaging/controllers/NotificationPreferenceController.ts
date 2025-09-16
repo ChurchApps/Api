@@ -14,7 +14,7 @@ export class NotificationPreferenceController extends MessagingCrudController {
   @httpGet("/my")
   public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      let result = await this.repositories.notificationPreference.loadByPersonId(au.churchId, au.personId);
+      let result = await this.repos.notificationPreference.loadByPersonId(au.churchId, au.personId);
       if (!result) result = await NotificationHelper.createNotificationPref(au.churchId, au.personId);
       return result;
     });

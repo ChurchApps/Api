@@ -17,7 +17,7 @@ export class QueryController extends MembershipBaseController {
         const apiRequestPrompt = await OpenAiHelper.buildPrompt(text);
         const aiResponse = await OpenAiHelper.getCompletion(apiRequestPrompt, subDomain, siteUrl);
         if (aiResponse && aiResponse.length > 0) {
-          let peopleData: any[] = (await this.repositories.person.loadAll(au.churchId)) as any[];
+          let peopleData: any[] = (await this.repos.person.loadAll(au.churchId)) as any[];
           aiResponse.forEach((resp: { field: string; value: string; operator: string }) => {
             switch (resp.field) {
               case "age":
@@ -50,7 +50,7 @@ export class QueryController extends MembershipBaseController {
                 break;
             }
           });
-          const result = this.repositories.person.convertAllToModelWithPermissions(au.churchId, peopleData, au.checkAccess(Permissions.people.edit));
+          const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, peopleData, au.checkAccess(Permissions.people.edit));
           return result;
         } else {
           return { error: "No valid response from AI service" };

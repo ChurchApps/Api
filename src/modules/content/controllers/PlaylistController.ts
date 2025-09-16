@@ -16,7 +16,7 @@ export class PlaylistController extends ContentCrudController {
   @httpGet("/public/:churchId")
   public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repositories.playlist.loadPublicAll(churchId);
+      return await this.repos.playlist.loadPublicAll(churchId);
     });
   }
 
@@ -27,7 +27,7 @@ export class PlaylistController extends ContentCrudController {
       else {
         let playlists: Playlist[] = req.body;
         const promises: Promise<Playlist>[] = [];
-        // playlist.forEach((s) => { if (s.churchId === au.churchId) promises.push(this.repositories.playlist.save(s)); });
+        // playlist.forEach((s) => { if (s.churchId === au.churchId) promises.push(this.repos.playlist.save(s)); });
 
         for (const p of playlists) {
           let base64Photo = "";
@@ -37,7 +37,7 @@ export class PlaylistController extends ContentCrudController {
           }
           if (p.churchId === au.churchId)
             promises.push(
-              this.repositories.playlist.save(p).then(async (playlist: Playlist) => {
+              this.repos.playlist.save(p).then(async (playlist: Playlist) => {
                 if (base64Photo) {
                   playlist.thumbnail = base64Photo;
                   await this.savePhoto(au.churchId, playlist);
@@ -60,7 +60,7 @@ export class PlaylistController extends ContentCrudController {
     return FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64")).then(async () => {
       const photoUpdated = new Date();
       playlist.thumbnail = Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();
-      await this.repositories.playlist.save(playlist);
+      await this.repos.playlist.save(playlist);
     });
   }
 }

@@ -1,12 +1,12 @@
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 import { Automation, Condition, Conjunction } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { ConditionHelper } from "./ConditionHelper";
 
 export class ConjunctionHelper {
-  public static async getPeopleIds(automation: Automation, repositories?: Repositories) {
-    const repos = repositories || (await RepositoryManager.getRepositories<Repositories>("doing"));
+  public static async getPeopleIds(automation: Automation, repositories?: Repos) {
+    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
     const conjunctions = await repos.conjunction.loadForAutomation(automation.churchId || "", automation.id || "");
     let conditions = (await repos.condition.loadForAutomation(automation.churchId || "", automation.id || "")) as Condition[];
     conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions, repos);

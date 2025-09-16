@@ -10,28 +10,28 @@ export class TimeController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const idsString = req.query.planIds as string;
       const planIds = idsString.split(",");
-      return await this.repositories.time.loadByPlanIds(au.churchId, planIds);
+      return await this.repos.time.loadByPlanIds(au.churchId, planIds);
     });
   }
 
   @httpGet("/all")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.time.loadAll(au.churchId);
+      return await this.repos.time.loadAll(au.churchId);
     });
   }
 
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.time.load(au.churchId, id);
+      return await this.repos.time.load(au.churchId, id);
     });
   }
 
   @httpGet("/plan/:planId")
   public async getForPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.time.loadByPlanId(au.churchId, planId);
+      return await this.repos.time.loadByPlanId(au.churchId, planId);
     });
   }
 
@@ -41,7 +41,7 @@ export class TimeController extends DoingBaseController {
       const promises: Promise<Time>[] = [];
       req.body.forEach((time) => {
         time.churchId = au.churchId;
-        promises.push(this.repositories.time.save(time));
+        promises.push(this.repos.time.save(time));
       });
       const result = await Promise.all(promises);
       return result;
@@ -51,7 +51,7 @@ export class TimeController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.time.delete(au.churchId, id);
+      await this.repos.time.delete(au.churchId, id);
       return {};
     });
   }

@@ -11,7 +11,7 @@ export class SongController extends ContentBaseController {
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const query = req.query.q as string;
-      const results = await this.repositories.song.search(au.churchId, query);
+      const results = await this.repos.song.search(au.churchId, query);
       return results;
     });
   }
@@ -19,7 +19,7 @@ export class SongController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.song.load(au.churchId, id);
+      return await this.repos.song.load(au.churchId, id);
     });
   }
 
@@ -28,7 +28,7 @@ export class SongController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        return await this.repositories.song.loadAll(au.churchId);
+        return await this.repos.song.loadAll(au.churchId);
       }
     });
   }
@@ -40,9 +40,9 @@ export class SongController extends ContentBaseController {
         const song = req.body;
         song.churchId = au.churchId;
         if (!song.songDetailId) return null;
-        const existing = await this.repositories.song.loadBySongDetailId(au.churchId, song.songDetailId);
+        const existing = await this.repos.song.loadBySongDetailId(au.churchId, song.songDetailId);
         if (existing) return existing;
-        else return await this.repositories.song.save(song);
+        else return await this.repos.song.save(song);
       })
     }*/
 
@@ -54,7 +54,7 @@ export class SongController extends ContentBaseController {
         const promises: Promise<Song>[] = [];
         req.body.forEach((song) => {
           song.churchId = au.churchId;
-          promises.push(this.repositories.song.save(song));
+          promises.push(this.repos.song.save(song));
         });
         const result = await Promise.all(promises);
         return result;

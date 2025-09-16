@@ -1,2 +1,2 @@
-export { ReportRepository } from "./ReportRepository";
-export { Repositories } from "./Repositories";
+export { ReportRepo } from "./ReportRepo";
+export { Repos } from "./Repos";

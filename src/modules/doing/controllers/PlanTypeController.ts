@@ -15,14 +15,14 @@ export class PlanTypeController extends DoingCrudController {
       const idsString = typeof req.query.ids === "string" ? req.query.ids : req.query.ids ? String(req.query.ids) : "";
       if (!idsString) return this.json({ error: "Missing required parameter: ids" });
       const ids = idsString.split(",");
-      return await this.repositories.planType.loadByIds(au.churchId, ids);
+      return await this.repos.planType.loadByIds(au.churchId, ids);
     });
   }
 
   @httpGet("/ministryId/:ministryId")
   public async getByMinistryId(@requestParam("ministryId") ministryId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.planType.loadByMinistryId(au.churchId, ministryId);
+      return await this.repos.planType.loadByMinistryId(au.churchId, ministryId);
     });
   }
 }

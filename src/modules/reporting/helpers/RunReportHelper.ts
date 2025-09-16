@@ -1,7 +1,7 @@
 import { ArrayHelper } from "@churchapps/apihelper";
 import { Parameter, Query, Report } from "../models";
-import { Repositories } from "../repositories/Repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories/Repos";
+import { RepoManager } from "../../../shared/infrastructure";
 
 export class RunReportHelper {
   public static async runAllQueries(report: Report) {
@@ -59,7 +59,7 @@ export class RunReportHelper {
       sql = sql.replace(m, "?");
     });
 
-    const repos = await RepositoryManager.getRepositories<Repositories>("reporting");
+    const repos = await RepoManager.getRepos<Repos>("reporting");
     query.value = await repos.report.run(query.db, sql, parameters);
   }
 }

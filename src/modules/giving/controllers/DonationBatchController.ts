@@ -16,8 +16,8 @@ export class DonationBatchController extends GivingCrudController {
     if (!this.crudSettings?.permissions?.edit) return this.json({}, 404);
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(this.crudSettings.permissions.edit)) return this.json({}, 401);
-      await this.repositories.donationBatch.delete(au.churchId, id);
-      await this.repositories.donation.deleteByBatchId(au.churchId, id);
+      await this.repos.donationBatch.delete(au.churchId, id);
+      await this.repos.donation.deleteByBatchId(au.churchId, id);
       return this.json({});
     });
   }

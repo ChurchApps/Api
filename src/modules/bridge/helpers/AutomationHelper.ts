@@ -1,6 +1,6 @@
-import { Repositories as DoingRepositories } from "../../doing/repositories/Repositories";
-import { Repositories as MessagingRepositories } from "../../messaging/repositories/Repositories";
-import { Repositories as MemembershipRepositories } from "../../membership/repositories/Repositories";
+import { Repos as DoingRepos } from "../../doing/repositories/Repos";
+import { Repos as MessagingRepos } from "../../messaging/repositories/Repos";
+import { Repos as MembershipRepos } from "../../membership/repositories/Repos";
 import { Notification } from "../../messaging/models/Notification";
 import { Position } from "../../doing";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
@@ -15,7 +15,7 @@ export class AutomationHelper {
 
     // Load assignments and positions within doing context
     await TypedDB.runWithContext("doing", async () => {
-      const doingRepos = DoingRepositories.getCurrent();
+      const doingRepos = DoingRepos.getCurrent();
       const unconfirmedAssignments = (await doingRepos.assignment.loadUnconfirmedByServiceDateRange()) as any[];
 
       for (const assignment of unconfirmedAssignments) {
@@ -31,7 +31,7 @@ export class AutomationHelper {
           let subDomain = this.subdomainCache[assignment.churchId];
           if (!subDomain) {
             const church = await TypedDB.runWithContext("membership", async () => {
-              return await MemembershipRepositories.getCurrent().church.loadById(assignment.churchId);
+              return await MembershipRepos.getCurrent().church.loadById(assignment.churchId);
             });
             subDomain = church.subDomain;
             this.subdomainCache[assignment.churchId] = subDomain;
@@ -64,7 +64,7 @@ export class AutomationHelper {
     // Save notifications within messaging context
     if (notifications.length > 0) {
       await TypedDB.runWithContext("messaging", async () => {
-        const messagingRepos = MessagingRepositories.getCurrent();
+        const messagingRepos = MessagingRepos.getCurrent();
         const promises: Promise<Notification>[] = [];
         for (const notification of notifications) {
           promises.push(messagingRepos.notification.save(notification));

@@ -4,7 +4,7 @@ import { Environment } from "../shared/helpers/Environment";
 import { TypedDB } from "../shared/infrastructure/TypedDB";
 
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper";
-import { RepositoryManager } from "../shared/infrastructure/RepositoryManager";
+import { RepoManager } from "../shared/infrastructure/RepoManager";
 import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper";
 
 const initEnv = async () => {
@@ -15,8 +15,8 @@ const initEnv = async () => {
 
     // Initialize messaging helpers within the messaging module context
     await TypedDB.runWithContext("messaging", async () => {
-      const repositories = await RepositoryManager.getRepositories<any>("messaging");
-      NotificationHelper.init(repositories);
+      const repos = await RepoManager.getRepos<any>("messaging");
+      NotificationHelper.init(repos);
     });
   }
 };

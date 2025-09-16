@@ -11,42 +11,42 @@ export class TaskController extends DoingBaseController {
   public async getTimeline(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const taskIds = typeof req.query.taskIds === "string" ? req.query.taskIds.split(",") : req.query.taskIds ? [String(req.query.taskIds)] : [];
-      return await this.repositories.task.loadTimeline(au.churchId, au.personId, taskIds);
+      return await this.repos.task.loadTimeline(au.churchId, au.personId, taskIds);
     });
   }
 
   @httpGet("/closed")
   public async getForPersonClosed(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.task.loadForPerson(au.churchId, au.personId, "Closed");
+      return await this.repos.task.loadForPerson(au.churchId, au.personId, "Closed");
     });
   }
 
   @httpGet("/directoryUpdate/:personId")
   public async getPersonDirectoryUpdate(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.task.loadForDirectoryUpdate(au.churchId, personId);
+      return await this.repos.task.loadForDirectoryUpdate(au.churchId, personId);
     });
   }
 
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.task.load(au.churchId, id);
+      return await this.repos.task.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
   public async getForPerson(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.task.loadForPerson(au.churchId, au.personId, "Open");
+      return await this.repos.task.loadForPerson(au.churchId, au.personId, "Open");
     });
   }
 
   @httpPost("/loadForGroups")
   public async loadForGroups(req: express.Request<{}, {}, { groupIds: string[]; status: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.task.loadForGroups(au.churchId, req.body.groupIds, req.body.status);
+      return await this.repos.task.loadForGroups(au.churchId, req.body.groupIds, req.body.status);
     });
   }
 
@@ -57,7 +57,7 @@ export class TaskController extends DoingBaseController {
       for (const task of req.body) {
         task.churchId = au.churchId;
         if (req.query?.type === "directoryUpdate") await this.handleDirectoryUpdate(au.churchId, task);
-        result.push(await this.repositories.task.save(task));
+        result.push(await this.repos.task.save(task));
       }
       return result;
     });

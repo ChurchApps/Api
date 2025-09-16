@@ -28,7 +28,7 @@ export class GlobalStyleController extends ContentCrudController {
   @httpGet("/church/:churchId")
   public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const result = await this.repositories.globalStyle.loadForChurch(churchId);
+      const result = await this.repos.globalStyle.loadForChurch(churchId);
       return result || this.defaultStyle;
     });
   }
@@ -36,7 +36,7 @@ export class GlobalStyleController extends ContentCrudController {
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = await this.repositories.globalStyle.loadForChurch(au.churchId);
+      const result = await this.repos.globalStyle.loadForChurch(au.churchId);
       return result || this.defaultStyle;
     });
   }

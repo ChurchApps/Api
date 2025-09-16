@@ -1,5 +1,5 @@
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 import { Position, Assignment, BlockoutDate } from "../models";
 
 interface NeededPosition {
@@ -15,9 +15,9 @@ export class PlanHelper {
     blockoutDates: BlockoutDate[],
     teams: { positionId: string; personIds: string[] }[],
     lastServed: { personId: string; serviceDate: Date }[],
-    repositories?: Repositories
+    repositories?: Repos
   ) {
-    const repos = repositories || (await RepositoryManager.getRepositories<Repositories>("doing"));
+    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
     const unavailablePeople = blockoutDates.map((b) => b.personId) || [];
     assignments.forEach((a) => {
       if (unavailablePeople.indexOf(a.personId) === -1) unavailablePeople.push(a.personId);

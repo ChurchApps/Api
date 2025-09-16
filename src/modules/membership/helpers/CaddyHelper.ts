@@ -1,5 +1,5 @@
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers";
 
@@ -18,7 +18,7 @@ export class CaddyHelper {
   }
 
   static async generateJsonData() {
-    const repos = await RepositoryManager.getRepositories<Repositories>("membership");
+    const repos = await RepoManager.getRepos<Repos>("membership");
     const hostDials: HostDial[] = (await repos.domain.loadPairs()) as HostDial[];
     const routes: any[] = [];
     hostDials.forEach((hd) => {

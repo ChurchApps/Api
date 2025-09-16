@@ -9,7 +9,7 @@ export class MemberPermissionController extends MembershipBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.formAccess(au, id, "view")) return this.json({}, 401);
-      else return this.repositories.memberPermission.convertToModel(au.churchId, await this.repositories.memberPermission.load(au.churchId, id));
+      else return this.repos.memberPermission.convertToModel(au.churchId, await this.repos.memberPermission.load(au.churchId, id));
     });
   }
 
@@ -17,7 +17,7 @@ export class MemberPermissionController extends MembershipBaseController {
   public async getByMember(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.formAccess(au, id)) return this.json({}, 401);
-      else return this.repositories.memberPermission.convertAllToModel(au.churchId, (await this.repositories.memberPermission.loadFormsByPerson(au.churchId, id)) as any[]);
+      else return this.repos.memberPermission.convertAllToModel(au.churchId, (await this.repos.memberPermission.loadFormsByPerson(au.churchId, id)) as any[]);
     });
   }
 
@@ -25,7 +25,7 @@ export class MemberPermissionController extends MembershipBaseController {
   public async getByForm(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.formAccess(au, id)) return this.json({}, 401);
-      else return this.repositories.memberPermission.convertAllToModel(au.churchId, (await this.repositories.memberPermission.loadPeopleByForm(au.churchId, id)) as any[]);
+      else return this.repos.memberPermission.convertAllToModel(au.churchId, (await this.repos.memberPermission.loadPeopleByForm(au.churchId, id)) as any[]);
     });
   }
 
@@ -34,8 +34,8 @@ export class MemberPermissionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.formAccess(au, id)) return this.json({}, 401);
       else {
-        const permission = await this.repositories.memberPermission.loadMyByForm(au.churchId, id, au.personId);
-        return permission ? this.repositories.memberPermission.convertToModel(au.churchId, permission) : null;
+        const permission = await this.repos.memberPermission.loadMyByForm(au.churchId, id, au.personId);
+        return permission ? this.repos.memberPermission.convertToModel(au.churchId, permission) : null;
       }
     });
   }
@@ -47,11 +47,11 @@ export class MemberPermissionController extends MembershipBaseController {
       req.body.forEach((memberPermission: MemberPermission) => {
         if (this.formAccess(au, memberPermission.contentId)) {
           memberPermission.churchId = au.churchId;
-          promises.push(this.repositories.memberPermission.save(memberPermission));
+          promises.push(this.repos.memberPermission.save(memberPermission));
         }
       });
       const result = await Promise.all(promises);
-      return this.repositories.memberPermission.convertAllToModel(au.churchId, result);
+      return this.repos.memberPermission.convertAllToModel(au.churchId, result);
     });
   }
 
@@ -61,7 +61,7 @@ export class MemberPermissionController extends MembershipBaseController {
       const formId = req?.query?.formId.toString();
       if (!this.formAccess(au, formId)) return this.json({}, 401);
       else {
-        await this.repositories.memberPermission.delete(au.churchId, id);
+        await this.repos.memberPermission.delete(au.churchId, id);
         return this.json({});
       }
     });
@@ -73,7 +73,7 @@ export class MemberPermissionController extends MembershipBaseController {
       const formId = req?.query?.formId.toString();
       if (!formId || !this.formAccess(au, formId)) return this.json({}, 401);
       else {
-        await this.repositories.memberPermission.deleteByMemberId(au.churchId, id, formId);
+        await this.repos.memberPermission.deleteByMemberId(au.churchId, id, formId);
         return this.json({});
       }
     });

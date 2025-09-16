@@ -11,7 +11,7 @@ export class RoleMemberController extends MembershipBaseController {
   @httpGet("/roles/:id")
   public async loadByRole(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const members = await this.repositories.roleMember.loadByRoleId(id, au.churchId);
+      const members = await this.repos.roleMember.loadByRoleId(id, au.churchId);
       const hasAccess = await this.checkAccess(members, Permissions.roles.view, au);
       if (!hasAccess) return this.json({}, 401);
       else {
@@ -21,7 +21,7 @@ export class RoleMemberController extends MembershipBaseController {
             if (userIds.indexOf(m.userId) === -1) userIds.push(m.userId);
           });
           if (userIds.length > 0) {
-            const users = await this.repositories.user.loadByIds(userIds);
+            const users = await this.repos.user.loadByIds(userIds);
             users.forEach((u) => {
               u.password = null;
               u.registrationDate = null;
@@ -49,7 +49,7 @@ export class RoleMemberController extends MembershipBaseController {
           member.churchId = au.churchId;
           if (member.addedBy === undefined || member.addedBy === null) member.addedBy = au.id;
           if (member.userId === undefined || member.userId === null || member.userId === "") member.userId = await this.getUserId(member.user);
-          promises.push(this.repositories.roleMember.save(member));
+          promises.push(this.repos.roleMember.save(member));
         }
         members = await Promise.all(promises);
         return this.json(members, 200);
@@ -58,13 +58,13 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   private async getUserId(user: User) {
-    let u: User = await this.repositories.user.loadByEmail(user.email);
+    let u: User = await this.repos.user.loadByEmail(user.email);
     if (u !== null) return u.id;
     else {
       user.lastLogin = new Date();
       user.password = (Math.random() * 9999999999).toString();
       user.registrationDate = new Date();
-      u = await this.repositories.user.save(user);
+      u = await this.repos.user.save(user);
       return u.id;
     }
   }
@@ -72,11 +72,11 @@ export class RoleMemberController extends MembershipBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const member = await this.repositories.roleMember.loadById(id, au.churchId);
+      const member = await this.repos.roleMember.loadById(id, au.churchId);
       const hasAccess = await this.checkAccess([member], Permissions.roles.view, au);
       if (!hasAccess) return this.json({}, 401);
       else {
-        await this.repositories.roleMember.delete(id, au.churchId);
+        await this.repos.roleMember.delete(id, au.churchId);
         return this.json([], 200);
       }
     });
@@ -85,7 +85,7 @@ export class RoleMemberController extends MembershipBaseController {
   @httpDelete("/self/:churchId/:userId")
   public async deleteSelf(@requestParam("churchId") churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.roleMember.deleteSelf(churchId, userId);
+      await this.repos.roleMember.deleteSelf(churchId, userId);
       return this.json([], 200);
     });
   }
@@ -97,7 +97,7 @@ export class RoleMemberController extends MembershipBaseController {
         const roleIds: string[] = [];
         members.forEach(m => { if (roleIds.indexOf(m.roleId) === -1) roleIds.push(m.roleId); })
         if (roleIds.length > 0) {
-            const roles = await this.repositories.role.loadByIds(roleIds);
+            const roles = await this.repos.role.loadByIds(roleIds);
             roles.forEach(r => { if (r.appName !== au.appName) hasAccess = false; })
         }
     }*/

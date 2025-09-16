@@ -11,7 +11,7 @@ export class ElementController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.element.load(au.churchId, id);
+      return await this.repos.element.load(au.churchId, id);
     });
   }
 
@@ -20,8 +20,8 @@ export class ElementController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        const element = await this.repositories.element.load(au.churchId, id);
-        const allElements: Element[] = await this.repositories.element.loadForSection(element.churchId, element.sectionId);
+        const element = await this.repos.element.load(au.churchId, id);
+        const allElements: Element[] = await this.repos.element.loadForSection(element.churchId, element.sectionId);
         TreeHelper.getChildElements(element, allElements);
         const result = await TreeHelper.duplicateElement(element, element.sectionId, element.parentId);
         return result;
@@ -37,12 +37,12 @@ export class ElementController extends ContentBaseController {
         const promises: Promise<Element>[] = [];
         req.body.forEach((element) => {
           element.churchId = au.churchId;
-          promises.push(this.repositories.element.save(element));
+          promises.push(this.repos.element.save(element));
         });
         const result = await Promise.all(promises);
         if (req.body.length > 0) {
-          if (req.body[0].blockId) await this.repositories.element.updateSortForBlock(req.body[0].churchId, req.body[0].blockId, req.body[0].parentId);
-          else await this.repositories.element.updateSort(req.body[0].churchId, req.body[0].sectionId, req.body[0].parentId);
+          if (req.body[0].blockId) await this.repos.element.updateSortForBlock(req.body[0].churchId, req.body[0].blockId, req.body[0].parentId);
+          else await this.repos.element.updateSort(req.body[0].churchId, req.body[0].sectionId, req.body[0].parentId);
         }
         await this.checkRows(result);
         await this.checkSlides(result);
@@ -56,7 +56,7 @@ export class ElementController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.element.delete(au.churchId, id);
+        await this.repos.element.delete(au.churchId, id);
         return this.json({});
       }
     });
@@ -71,7 +71,7 @@ export class ElementController extends ContentBaseController {
         for (let i = 0; i < slidesNumber; i++) {
           slides.push(i);
         }
-        const allElements: Element[] = await this.repositories.element.loadForSection(element.churchId, element.sectionId);
+        const allElements: Element[] = await this.repos.element.loadForSection(element.churchId, element.sectionId);
         const children = ArrayHelper.getAll(allElements, "parentId", element.id);
         await this.checkSlide(element, children, slides);
       }
@@ -92,13 +92,13 @@ export class ElementController extends ContentBaseController {
           parentId: row.id,
           answersJSON: JSON.stringify(answers)
         };
-        await this.repositories.element.save(column);
+        await this.repos.element.save(column);
       }
     }
 
     // Delete slides
     if (children.length > slides.length) {
-      for (let i = slides.length; i < children.length; i++) await this.repositories.element.delete(children[i].churchId, children[i].id);
+      for (let i = slides.length; i < children.length; i++) await this.repos.element.delete(children[i].churchId, children[i].id);
     }
   }
 
@@ -115,7 +115,7 @@ export class ElementController extends ContentBaseController {
         element.answers.mobileOrder?.split(",").forEach((c: string) => mobileOrder.push(parseInt(c, 0)));
         if (mobileOrder.length !== cols.length) element.answers.mobileOrder = [];
 
-        const allElements: Element[] = await this.repositories.element.loadForSection(element.churchId, element.sectionId);
+        const allElements: Element[] = await this.repos.element.loadForSection(element.churchId, element.sectionId);
         const children = ArrayHelper.getAll(allElements, "parentId", element.id);
         await this.checkRow(element, children, cols, mobileSizes, mobileOrder);
       }
@@ -125,7 +125,7 @@ export class ElementController extends ContentBaseController {
   private async checkRow(row: Element, children: Element[], cols: number[], mobileSizes: number[], mobileOrder: number[]) {
     // Delete existing columns that should no longer exist
     if (children.length > cols.length) {
-      for (let i = cols.length; i < children.length; i++) await this.repositories.element.delete(children[i].churchId, children[i].id);
+      for (let i = cols.length; i < children.length; i++) await this.repos.element.delete(children[i].churchId, children[i].id);
     }
 
     // Update existing column sizes
@@ -151,7 +151,7 @@ export class ElementController extends ContentBaseController {
       }
       if (shouldSave) {
         children[i].answersJSON = JSON.stringify(children[i].answers);
-        await this.repositories.element.save(children[i]);
+        await this.repos.element.save(children[i]);
       }
     }
 
@@ -168,7 +168,7 @@ export class ElementController extends ContentBaseController {
           parentId: row.id,
           answersJSON: JSON.stringify(answers)
         };
-        await this.repositories.element.save(column);
+        await this.repos.element.save(column);
         // populate row.elements here too, so it's available in the POST response.
         if (row?.elements) {
           row.elements.push(column);

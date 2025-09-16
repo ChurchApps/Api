@@ -1,33 +1,33 @@
-export { BlockRepository } from "./BlockRepository";
-export { ElementRepository } from "./ElementRepository";
-export { PageRepository } from "./PageRepository";
-export { SectionRepository } from "./SectionRepository";
-export { LinkRepository } from "./LinkRepository";
-export { FileRepository } from "./FileRepository";
-export { GlobalStyleRepository } from "./GlobalStyleRepository";
+export { BlockRepo } from "./BlockRepo";
+export { ElementRepo } from "./ElementRepo";
+export { PageRepo } from "./PageRepo";
+export { SectionRepo } from "./SectionRepo";
+export { LinkRepo } from "./LinkRepo";
+export { FileRepo } from "./FileRepo";
+export { GlobalStyleRepo } from "./GlobalStyleRepo";
 
-export { PlaylistRepository } from "./PlaylistRepository";
-export { SermonRepository } from "./SermonRepository";
-export { StreamingServiceRepository } from "./StreamingServiceRepository";
+export { PlaylistRepo } from "./PlaylistRepo";
+export { SermonRepo } from "./SermonRepo";
+export { StreamingServiceRepo } from "./StreamingServiceRepo";
 
-export { EventRepository } from "./EventRepository";
-export { EventExceptionRepository } from "./EventExceptionRepository";
-export { CuratedCalendarRepository } from "./CuratedCalendarRepository";
-export { CuratedEventRepository } from "./CuratedEventRepository";
+export { EventRepo } from "./EventRepo";
+export { EventExceptionRepo } from "./EventExceptionRepo";
+export { CuratedCalendarRepo } from "./CuratedCalendarRepo";
+export { CuratedEventRepo } from "./CuratedEventRepo";
 
-export { SettingRepository } from "./SettingRepository";
+export { SettingRepo } from "./SettingRepo";
 
-export { BibleTranslationRepository } from "./BibleTranslationRepository";
-export { BibleBookRepository } from "./BibleBookRepository";
-export { BibleChapterRepository } from "./BibleChapterRepository";
-export { BibleVerseRepository } from "./BibleVerseRepository";
-export { BibleVerseTextRepository } from "./BibleVerseTextRepository";
-export { BibleLookupRepository } from "./BibleLookupRepository";
+export { BibleTranslationRepo } from "./BibleTranslationRepo";
+export { BibleBookRepo } from "./BibleBookRepo";
+export { BibleChapterRepo } from "./BibleChapterRepo";
+export { BibleVerseRepo } from "./BibleVerseRepo";
+export { BibleVerseTextRepo } from "./BibleVerseTextRepo";
+export { BibleLookupRepo } from "./BibleLookupRepo";
 
-export { SongDetailRepository } from "./SongDetailRepository";
-export { SongDetailLinkRepository } from "./SongDetailLinkRepository";
-export { SongRepository } from "./SongRepository";
-export { ArrangementRepository } from "./ArrangementRepository";
-export { ArrangementKeyRepository } from "./ArrangementKeyRepository";
+export { SongDetailRepo } from "./SongDetailRepo";
+export { SongDetailLinkRepo } from "./SongDetailLinkRepo";
+export { SongRepo } from "./SongRepo";
+export { ArrangementRepo } from "./ArrangementRepo";
+export { ArrangementKeyRepo } from "./ArrangementKeyRepo";
 
-export { Repositories } from "./Repositories";
+export { Repos } from "./Repos";

@@ -1,7 +1,7 @@
 import { Section, Element, Block } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 
 export class TreeHelper {
   public static getChildElements(element: Element, allElements: Element[]) {
@@ -27,7 +27,7 @@ export class TreeHelper {
 
   static async insertBlocks(sections: Section[], allElements: Element[], churchId: string) {
     const blockIds: string[] = [];
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const footerBlocks: Block[] = await repos.block.loadByBlockType(churchId, "footerBlock");
     footerBlocks.forEach((b) => {
       blockIds.push(b.id);
@@ -92,7 +92,7 @@ export class TreeHelper {
   }
 
   static async convertToBlock(section: Section, blockName: string) {
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const sec = { ...section };
     const block = await repos.block.save({
       churchId: sec.churchId,
@@ -112,7 +112,7 @@ export class TreeHelper {
   }
 
   static async duplicateSection(section: Section) {
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const sec = { ...section };
     sec.id = undefined;
     const result = await repos.section.save(sec);
@@ -125,7 +125,7 @@ export class TreeHelper {
   }
 
   static async duplicateElement(element: Element, sectionId: string, parentId: string, blockId?: string) {
-    const repos = await RepositoryManager.getRepositories<Repositories>("content");
+    const repos = await RepoManager.getRepos<Repos>("content");
     const el = { ...element };
     el.id = undefined;
     el.sectionId = sectionId;

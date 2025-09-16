@@ -12,9 +12,9 @@ export class AnswerController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
         let data = null;
-        if (req.query.formSubmissionId !== undefined) data = this.repositories.answer.loadForFormSubmission(au.churchId, req.query.formSubmissionId.toString());
-        else data = await this.repositories.answer.loadAll(au.churchId);
-        return this.repositories.answer.convertAllToModel(au.churchId, data);
+        if (req.query.formSubmissionId !== undefined) data = this.repos.answer.loadForFormSubmission(au.churchId, req.query.formSubmissionId.toString());
+        else data = await this.repos.answer.loadAll(au.churchId);
+        return this.repos.answer.convertAllToModel(au.churchId, data);
       }
     });
   }
@@ -30,10 +30,10 @@ export class AnswerController extends MembershipBaseController {
 
         if (!churchId && answer.questionId) {
           // Look up question to get formId
-          const question = await this.repositories.question.load(au.churchId || "", answer.questionId);
+          const question = await this.repos.question.load(au.churchId || "", answer.questionId);
           if (question && question.formId) {
             // Look up form to get churchId
-            const formAccess = await this.repositories.form.access(question.formId);
+            const formAccess = await this.repos.form.access(question.formId);
             if (formAccess) {
               churchId = formAccess.churchId;
             }
@@ -47,8 +47,8 @@ export class AnswerController extends MembershipBaseController {
 
         if (churchId) {
           answer.churchId = churchId;
-          const savedAnswer = await this.repositories.answer.save(answer);
-          results.push(this.repositories.answer.convertToModel(churchId, savedAnswer));
+          const savedAnswer = await this.repos.answer.save(answer);
+          results.push(this.repos.answer.convertToModel(churchId, savedAnswer));
         } else {
           results.push({ error: `Unable to determine churchId for answer with questionId ${answer.questionId}` });
         }

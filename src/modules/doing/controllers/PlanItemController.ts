@@ -11,21 +11,21 @@ export class PlanItemController extends DoingBaseController {
       const idsString = typeof req.query.ids === "string" ? req.query.ids : req.query.ids ? String(req.query.ids) : "";
       if (!idsString) return this.json({ error: "Missing required parameter: ids" });
       const ids = idsString.split(",");
-      return await this.repositories.planItem.loadByIds(au.churchId, ids);
+      return await this.repos.planItem.loadByIds(au.churchId, ids);
     });
   }
 
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.planItem.load(au.churchId, id);
+      return await this.repos.planItem.load(au.churchId, id);
     });
   }
 
   @httpGet("/presenter/:churchId/:planId")
   public async getForPresenter(@requestParam("churchId") churchId: string, @requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const result = (await this.repositories.planItem.loadForPlan(churchId, planId)) as PlanItem[];
+      const result = (await this.repos.planItem.loadForPlan(churchId, planId)) as PlanItem[];
       return this.buildTree(result, null as any);
     });
   }
@@ -33,7 +33,7 @@ export class PlanItemController extends DoingBaseController {
   @httpGet("/plan/:planId")
   public async getByPlan(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = (await this.repositories.planItem.loadForPlan(au.churchId, planId)) as PlanItem[];
+      const result = (await this.repos.planItem.loadForPlan(au.churchId, planId)) as PlanItem[];
       return this.buildTree(result, null as any);
     });
   }
@@ -41,14 +41,14 @@ export class PlanItemController extends DoingBaseController {
   @httpPost("/sort")
   public async sort(req: express.Request<{}, {}, PlanItem>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.planItem.save(req.body);
+      await this.repos.planItem.save(req.body);
 
-      const items = (await this.repositories.planItem.loadForPlan(au.churchId, req.body.planId || "")) as PlanItem[];
+      const items = (await this.repos.planItem.loadForPlan(au.churchId, req.body.planId || "")) as PlanItem[];
       const filtered = items.filter((i: PlanItem) => i.parentId === req.body.parentId || "");
       filtered.sort((a: PlanItem, b: PlanItem) => (a.sort || 0) - (b.sort || 0));
       for (let i = 0; i < filtered.length; i++) {
         filtered[i].sort = i + 1;
-        await this.repositories.planItem.save(filtered[i]);
+        await this.repos.planItem.save(filtered[i]);
       }
       return [];
     });
@@ -60,7 +60,7 @@ export class PlanItemController extends DoingBaseController {
       const promises: Promise<PlanItem>[] = [];
       req.body.forEach((planItem) => {
         planItem.churchId = au.churchId;
-        promises.push(this.repositories.planItem.save(planItem));
+        promises.push(this.repos.planItem.save(planItem));
       });
       const result = await Promise.all(promises);
       return result;
@@ -70,7 +70,7 @@ export class PlanItemController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.planItem.delete(au.churchId, id);
+      await this.repos.planItem.delete(au.churchId, id);
       return {};
     });
   }

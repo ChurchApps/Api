@@ -17,8 +17,8 @@ export class LinkController extends ContentCrudController {
   public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const category = req.query.category.toString();
-      if (category === undefined) return await this.repositories.link.loadAll(churchId);
-      else return await this.repositories.link.loadByCategory(churchId, category);
+      if (category === undefined) return await this.repos.link.loadAll(churchId);
+      else return await this.repos.link.loadByCategory(churchId, category);
     });
   }
 
@@ -27,8 +27,8 @@ export class LinkController extends ContentCrudController {
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query?.category?.toString();
-      const data = category ? await this.repositories.link.loadByCategory(au.churchId, category) : await this.repositories.link.loadAll(au.churchId);
-      return this.repositories.link.convertAllToModel(au.churchId, data);
+      const data = category ? await this.repos.link.loadByCategory(au.churchId, category) : await this.repos.link.loadAll(au.churchId);
+      return this.repos.link.convertAllToModel(au.churchId, data);
     });
   }
 
@@ -37,7 +37,7 @@ export class LinkController extends ContentCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.link.delete(id, au.churchId);
+        await this.repos.link.delete(id, au.churchId);
         return this.json({});
       }
     });
@@ -49,7 +49,7 @@ export class LinkController extends ContentCrudController {
     if (Array.isArray(result) && result.length > 0) {
       const au: any = (req as any).user || {};
       try {
-        await this.repositories.link.sort(au.churchId, result[0].category, result[0].parentId);
+        await this.repos.link.sort(au.churchId, result[0].category, result[0].parentId);
       } catch {
         // ignore sort errors
       }
@@ -63,7 +63,7 @@ export class LinkController extends ContentCrudController {
     const key = "/" + churchId + "/tabs/" + link.id + ".png";
     return FileStorageHelper.store(key, "image/png", Buffer.from(base64, 'base64')).then(async () => {
       link.photo = EnvironmentBase.contentRoot + key + "?dt=" + new Date().getTime().toString();
-      await this.baseRepositories.link.save(link);
+      await this.repos.link.save(link);
     });
   }
   */

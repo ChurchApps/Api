@@ -13,8 +13,8 @@ export class ServiceController extends AttendanceCrudController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const data = await this.repositories.service.searchByCampus(au.churchId, req.query.campusId.toString());
-      return this.repositories.service.convertAllToModel(au.churchId, data as any);
+      const data = await this.repos.service.searchByCampus(au.churchId, req.query.campusId.toString());
+      return this.repos.service.convertAllToModel(au.churchId, data as any);
     });
   }
 
@@ -22,8 +22,8 @@ export class ServiceController extends AttendanceCrudController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const data = await this.repositories.service.loadWithCampus(au.churchId);
-      return this.repositories.service.convertAllToModel(au.churchId, data as any);
+      const data = await this.repos.service.loadWithCampus(au.churchId);
+      return this.repos.service.convertAllToModel(au.churchId, data as any);
     });
   }
 }

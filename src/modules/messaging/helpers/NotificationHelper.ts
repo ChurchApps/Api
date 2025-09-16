@@ -1,16 +1,16 @@
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
 import { Conversation, Device, Message, PrivateMessage, Notification, NotificationPreference } from "../models";
-import { Repositories } from "../repositories";
+import { Repos } from "../repositories";
 import { DeliveryHelper } from "./DeliveryHelper";
 import { ExpoPushHelper } from "./ExpoPushHelper";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment";
 
 export class NotificationHelper {
-  private static repositories: Repositories;
+  private static repos: Repos;
 
-  static init(repositories: Repositories) {
-    NotificationHelper.repositories = repositories;
+  static init(repos: Repos) {
+    NotificationHelper.repos = repos;
   }
 
   static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string) => {
@@ -19,18 +19,18 @@ export class NotificationHelper {
         // don't send notifications for live stream chat room.
         break;
       case "privateMessage": {
-        const pm: PrivateMessage = await NotificationHelper.repositories.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
+        const pm: PrivateMessage = await NotificationHelper.repos.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
-        await NotificationHelper.repositories.privateMessage.save(pm);
+        await NotificationHelper.repos.privateMessage.save(pm);
         const _method = await this.notifyUserForPrivateMessage(message.churchId, pm.notifyPersonId, message.displayName, message.content, conversation.id);
         if (_method) {
           pm.deliveryMethod = _method;
-          await NotificationHelper.repositories.privateMessage.save(pm);
+          await NotificationHelper.repos.privateMessage.save(pm);
         }
         break;
       }
       default: {
-        const allMessages: Message[] = await NotificationHelper.repositories.message.loadForConversation(conversation.churchId, conversation.id);
+        const allMessages: Message[] = await NotificationHelper.repos.message.loadForConversation(conversation.churchId, conversation.id);
         const peopleIds = ArrayHelper.getIds(allMessages, "personId");
         if (peopleIds.length > 1) {
           for (let i = peopleIds.length - 1; i >= 0; i--) {
@@ -60,17 +60,17 @@ export class NotificationHelper {
     });
 
     // don't notify people a second time about the same type of event.
-    const existing = (await NotificationHelper.repositories.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[];
+    const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[];
     for (let i = notifications.length - 1; i >= 0; i--) {
       if (ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) notifications.splice(i, 1);
     }
     if (notifications.length > 0) {
       const promises: Promise<Notification>[] = [];
       notifications.forEach((n) => {
-        const promise = NotificationHelper.repositories.notification.save(n).then(async (notification) => {
+        const promise = NotificationHelper.repos.notification.save(n).then(async (notification) => {
           const method = await NotificationHelper.notifyUserForGeneralNotification(n.churchId, n.personId, n.message, notification.id);
           notification.deliveryMethod = method;
-          await NotificationHelper.repositories.notification.save(notification);
+          await NotificationHelper.repos.notification.save(notification);
           return notification;
         });
         promises.push(promise);
@@ -86,7 +86,7 @@ export class NotificationHelper {
     const _deliveryCount = 0;
 
     // Handle web socket notifications
-    const connections = await NotificationHelper.repositories.connection.loadForNotification(churchId, personId);
+    const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
       method = "socket";
       await DeliveryHelper.sendMessages(connections, {
@@ -98,7 +98,7 @@ export class NotificationHelper {
     }
 
     // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(churchId, personId)) as any[];
+    const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
       try {
@@ -123,7 +123,7 @@ export class NotificationHelper {
     let method = "";
 
     // Handle web socket notifications
-    const connections = await NotificationHelper.repositories.connection.loadForNotification(churchId, personId);
+    const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
       method = "socket";
       await DeliveryHelper.sendMessages(connections, {
@@ -135,7 +135,7 @@ export class NotificationHelper {
     }
 
     // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(churchId, personId)) as any[];
+    const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
       try {
@@ -159,7 +159,7 @@ export class NotificationHelper {
     let method = "";
 
     // Handle web socket notifications
-    const connections = await NotificationHelper.repositories.connection.loadForNotification(churchId, personId);
+    const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
       method = "socket";
       await DeliveryHelper.sendMessages(connections, {
@@ -171,7 +171,7 @@ export class NotificationHelper {
     }
 
     // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repositories.device.loadForPerson(churchId, personId)) as any[];
+    const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
       try {
@@ -202,14 +202,14 @@ export class NotificationHelper {
 
   static sendEmailNotifications = async (frequency: string) => {
     let promises: Promise<any>[] = [];
-    const allNotifications: Notification[] = (await NotificationHelper.repositories.notification.loadUndelivered()) as any[];
-    const allPMs: PrivateMessage[] = (await NotificationHelper.repositories.privateMessage.loadUndelivered()) as any[];
+    const allNotifications: Notification[] = (await NotificationHelper.repos.notification.loadUndelivered()) as any[];
+    const allPMs: PrivateMessage[] = (await NotificationHelper.repos.privateMessage.loadUndelivered()) as any[];
     // Removed excessive logging - only log significant batch operations
     if (allNotifications.length === 0 && allPMs.length === 0) return;
 
     const peopleIds = ArrayHelper.getIds(allNotifications, "personId").concat(ArrayHelper.getIds(allPMs, "notifyPersonId"));
 
-    const notificationPrefs = (await NotificationHelper.repositories.notificationPreference.loadByPersonIds(peopleIds)) as any[];
+    const notificationPrefs = (await NotificationHelper.repos.notificationPreference.loadByPersonIds(peopleIds)) as any[];
     const todoPrefs: NotificationPreference[] = [];
     peopleIds.forEach(async (personId) => {
       // Removed per-person logging to reduce CloudWatch noise
@@ -237,11 +237,11 @@ export class NotificationHelper {
     const promises: Promise<any>[] = [];
     notifications.forEach((notification) => {
       notification.deliveryMethod = "none";
-      promises.push(NotificationHelper.repositories.notification.save(notification));
+      promises.push(NotificationHelper.repos.notification.save(notification));
     });
     privateMessages.forEach((pm) => {
       pm.deliveryMethod = "none";
-      promises.push(NotificationHelper.repositories.privateMessage.save(pm));
+      promises.push(NotificationHelper.repos.privateMessage.save(pm));
     });
     return promises;
   };
@@ -253,7 +253,7 @@ export class NotificationHelper {
       allowPush: true,
       emailFrequency: "daily"
     };
-    const result = await NotificationHelper.repositories.notificationPreference.save(pref);
+    const result = await NotificationHelper.repos.notificationPreference.save(pref);
     return result;
   };
 

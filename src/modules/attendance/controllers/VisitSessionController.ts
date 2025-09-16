@@ -16,9 +16,9 @@ export class VisitSessionController extends AttendanceBaseController {
         const personId = (req.body as Visit).personId;
 
         let newVisit = false;
-        let visit: Visit = await this.repositories.visitSession.loadForSessionPerson(au.churchId, sessionId, personId);
+        let visit: Visit = await this.repos.visitSession.loadForSessionPerson(au.churchId, sessionId, personId);
         if (visit == null) {
-          const session: Session = await this.repositories.session.load(au.churchId, sessionId);
+          const session: Session = await this.repos.session.load(au.churchId, sessionId);
           visit = {
             addedBy: au.id,
             checkinTime: new Date(),
@@ -29,17 +29,17 @@ export class VisitSessionController extends AttendanceBaseController {
 
           if (session.serviceTimeId === null) (visit as any).groupId = session.groupId;
           else {
-            const st: ServiceTime = await this.repositories.serviceTime.load(au.churchId, session.serviceTimeId);
+            const st: ServiceTime = await this.repos.serviceTime.load(au.churchId, session.serviceTimeId);
             (visit as any).serviceId = st.serviceId;
           }
-          await this.repositories.visit.save(visit);
+          await this.repos.visit.save(visit);
           newVisit = true;
         }
         let existingSession: VisitSession = null;
-        if (!newVisit) existingSession = await this.repositories.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
+        if (!newVisit) existingSession = await this.repos.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
         if (existingSession == null) {
           const vs: VisitSession = { churchId: au.churchId, sessionId, visitId: visit.id };
-          await this.repositories.visitSession.save(vs);
+          await this.repos.visitSession.save(vs);
         }
         return {};
       }
@@ -60,8 +60,8 @@ export class VisitSessionController extends AttendanceBaseController {
           status: "present" | "absent";
         }[] = [];
         const apiUrl = Environment.membershipApi;
-        const visitSessions: VisitSession[] = ((await this.repositories.visitSession.loadForSession(au.churchId, sessionId)) as VisitSession[]) || [];
-        const session: Session = await this.repositories.session.load(au.churchId, sessionId);
+        const visitSessions: VisitSession[] = ((await this.repos.visitSession.loadForSession(au.churchId, sessionId)) as VisitSession[]) || [];
+        const session: Session = await this.repos.session.load(au.churchId, sessionId);
 
         if (visitSessions.length > 0) {
           const url = apiUrl + `/groupmembers/basic/${(session as any).groupId}`;
@@ -92,8 +92,8 @@ export class VisitSessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.view)) return this.json([], 401);
       else {
-        const data = await this.repositories.visitSession.load(au.churchId, id);
-        return this.repositories.visitSession.convertToModel(au.churchId, data);
+        const data = await this.repos.visitSession.load(au.churchId, id);
+        return this.repos.visitSession.convertToModel(au.churchId, data);
       }
     });
   }
@@ -105,9 +105,9 @@ export class VisitSessionController extends AttendanceBaseController {
       else {
         let data;
         const sessionId = req.query.sessionId === undefined ? "" : req.query.sessionId.toString();
-        if (sessionId !== "") data = await this.repositories.visitSession.loadForSession(au.churchId, sessionId);
-        else data = await this.repositories.visitSession.loadAll(au.churchId);
-        return this.repositories.visitSession.convertAllToModel(au.churchId, data as any) || [];
+        if (sessionId !== "") data = await this.repos.visitSession.loadForSession(au.churchId, sessionId);
+        else data = await this.repos.visitSession.loadAll(au.churchId);
+        return this.repos.visitSession.convertAllToModel(au.churchId, data as any) || [];
       }
     });
   }
@@ -120,10 +120,10 @@ export class VisitSessionController extends AttendanceBaseController {
         const promises: Promise<VisitSession>[] = [];
         req.body.forEach((visitsession) => {
           visitsession.churchId = au.churchId;
-          promises.push(this.repositories.visitSession.save(visitsession));
+          promises.push(this.repos.visitSession.save(visitsession));
         });
         const data = await Promise.all(promises);
-        return this.repositories.visitSession.convertAllToModel(au.churchId, data);
+        return this.repos.visitSession.convertAllToModel(au.churchId, data);
       }
     });
   }
@@ -133,7 +133,7 @@ export class VisitSessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       else {
-        await this.repositories.visitSession.delete(au.churchId, id);
+        await this.repos.visitSession.delete(au.churchId, id);
         return this.json({});
       }
     });
@@ -146,12 +146,12 @@ export class VisitSessionController extends AttendanceBaseController {
       else {
         const personId = req.query.personId.toString();
         const sessionId = req.query.sessionId.toString();
-        const visit: Visit = await this.repositories.visit.loadForSessionPerson(au.churchId, sessionId, personId);
+        const visit: Visit = await this.repos.visit.loadForSessionPerson(au.churchId, sessionId, personId);
         if (visit !== null) {
-          const existingSession = await this.repositories.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
-          if (existingSession !== null) await this.repositories.visitSession.delete(au.churchId, (existingSession as any).id);
-          const visitSessions: VisitSession[] = ((await this.repositories.visitSession.loadByVisitId(au.churchId, visit.id)) as VisitSession[]) || [];
-          if (visitSessions.length === 0) await this.repositories.visit.delete(au.churchId, visit.id);
+          const existingSession = await this.repos.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
+          if (existingSession !== null) await this.repos.visitSession.delete(au.churchId, (existingSession as any).id);
+          const visitSessions: VisitSession[] = ((await this.repos.visitSession.loadByVisitId(au.churchId, visit.id)) as VisitSession[]) || [];
+          if (visitSessions.length === 0) await this.repos.visit.delete(au.churchId, visit.id);
         }
         return this.json({});
       }

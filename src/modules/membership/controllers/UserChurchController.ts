@@ -9,8 +9,8 @@ export class UserChurchController extends MembershipBaseController {
   public async update(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       const { churchId, appName } = req.body;
-      await this.repositories.accessLog.create({ appName: appName || "", churchId, userId });
-      const existing = await this.repositories.userChurch.loadByUserId(userId, churchId);
+      await this.repos.accessLog.create({ appName: appName || "", churchId, userId });
+      const existing = await this.repos.userChurch.loadByUserId(userId, churchId);
       if (!existing) {
         return this.json({ message: "No church found for user" }, 400);
       } else {
@@ -22,7 +22,7 @@ export class UserChurchController extends MembershipBaseController {
           churchId,
           lastAccessed: new Date()
         };
-        await this.repositories.userChurch.save(updatedUserChrurch);
+        await this.repos.userChurch.save(updatedUserChrurch);
       }
       return existing;
     });
@@ -32,7 +32,7 @@ export class UserChurchController extends MembershipBaseController {
   public async save(req: express.Request<{}, {}, UserChurch, { userId: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const userId = req.query.userId || au.id;
-      const record = await this.repositories.userChurch.loadByUserId(userId, au.churchId);
+      const record = await this.repos.userChurch.loadByUserId(userId, au.churchId);
       let result: any = {};
       if (record) {
         const userChurchRecord = record as UserChurch;
@@ -43,8 +43,8 @@ export class UserChurchController extends MembershipBaseController {
           churchId: au.churchId,
           personId: req.body.personId
         };
-        const data = await this.repositories.userChurch.save(userChurch);
-        result = this.repositories.userChurch.convertToModel(au.churchId, data);
+        const data = await this.repos.userChurch.save(userChurch);
+        result = this.repos.userChurch.convertToModel(au.churchId, data);
       }
       return result;
     });
@@ -53,8 +53,8 @@ export class UserChurchController extends MembershipBaseController {
   @httpGet("/userid/:userId")
   public async getByUserId(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async ({ churchId }) => {
-      const record = await this.repositories.userChurch.loadByUserId(userId, churchId);
-      return this.repositories.userChurch.convertToModel(churchId, record);
+      const record = await this.repos.userChurch.loadByUserId(userId, churchId);
+      return this.repos.userChurch.convertToModel(churchId, record);
     });
   }
 
@@ -67,7 +67,7 @@ export class UserChurchController extends MembershipBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.userChurch.deleteRecord(userId, churchId, personId);
+      await this.repos.userChurch.deleteRecord(userId, churchId, personId);
       return this.json({});
     });
   }

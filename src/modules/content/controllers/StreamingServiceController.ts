@@ -21,19 +21,19 @@ export class StreamingServiceController extends ContentBaseController {
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const services = await this.repositories.streamingService.loadAll(au.churchId);
+      const services = await this.repos.streamingService.loadAll(au.churchId);
       const promises: Promise<any>[] = [];
       services.forEach((s: StreamingService, index: number, allServices: StreamingService[]) => {
         // Update service time
         if (s.serviceTime < DateHelper.subtractHoursFromNow(6)) {
           if (!s.recurring) {
-            promises.push(this.repositories.streamingService.delete(s.id, s.churchId));
+            promises.push(this.repos.streamingService.delete(s.id, s.churchId));
             // remove blocked Ips
             promises.push(axios.post(Environment.messagingApi + "/blockedIps/clear", [{ serviceId: s.id, churchId: s.churchId }]));
             allServices.splice(index, 1);
           } else {
             s.serviceTime.setDate(s.serviceTime.getDate() + 7);
-            promises.push(this.repositories.streamingService.save(s));
+            promises.push(this.repos.streamingService.save(s));
           }
         }
         s.serviceTime.setMinutes(s.serviceTime.getMinutes() - s.timezoneOffset);
@@ -49,7 +49,7 @@ export class StreamingServiceController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {
-        await this.repositories.streamingService.delete(id, au.churchId);
+        await this.repos.streamingService.delete(id, au.churchId);
         // remove blocked Ips
         await axios.post(Environment.messagingApi + "/blockedIps/clear", [{ serviceId: id, churchId: au.churchId }]);
         return null;
@@ -65,7 +65,7 @@ export class StreamingServiceController extends ContentBaseController {
         let services: StreamingService[] = req.body;
         const promises: Promise<StreamingService>[] = [];
         services.forEach((service) => {
-          if (service.churchId === au.churchId) promises.push(this.repositories.streamingService.save(service));
+          if (service.churchId === au.churchId) promises.push(this.repos.streamingService.save(service));
         });
         services = await Promise.all(promises);
         return this.json(services, 200);

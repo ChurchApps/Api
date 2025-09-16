@@ -16,7 +16,7 @@ export class EventLogController extends GivingCrudController {
   public async getByType(@requestParam("type") type: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json([], 401);
-      return this.repositories.eventLog.convertAllToModel(au.churchId, (await this.repositories.eventLog.loadByType(au.churchId, type)) as any[]);
+      return this.repos.eventLog.convertAllToModel(au.churchId, (await this.repos.eventLog.loadByType(au.churchId, type)) as any[]);
     });
   }
 

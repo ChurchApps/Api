@@ -12,13 +12,13 @@ export class BlockedIpController extends MessagingBaseController {
       const promises: Promise<BlockedIp>[] = [];
       req.body.forEach((blockedIp) => {
         blockedIp.churchId = au.churchId;
-        const promise = this.repositories.blockedIp.save(blockedIp).then(async (ip: BlockedIp) => {
+        const promise = this.repos.blockedIp.save(blockedIp).then(async (ip: BlockedIp) => {
           await DeliveryHelper.sendBlockedIps(blockedIp.churchId, blockedIp.conversationId);
           return ip;
         });
         promises.push(promise);
       });
-      const result = this.repositories.blockedIp.convertAllToModel(au.churchId, await Promise.all(promises));
+      const result = this.repos.blockedIp.convertAllToModel(au.churchId, await Promise.all(promises));
       return result;
     });
   }
@@ -27,9 +27,9 @@ export class BlockedIpController extends MessagingBaseController {
   public async clear(req: express.Request<{}, {}, { serviceId: string; churchId: string }[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       for (const { serviceId, churchId } of req.body) {
-        const ips = await this.repositories.blockedIp.loadByServiceId(churchId, serviceId);
+        const ips = await this.repos.blockedIp.loadByServiceId(churchId, serviceId);
         if (ips.length > 0) {
-          await this.repositories.blockedIp.deleteByServiceId(churchId, serviceId);
+          await this.repos.blockedIp.deleteByServiceId(churchId, serviceId);
         }
       }
     });

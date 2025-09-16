@@ -14,16 +14,16 @@ export class NotificationController extends MessagingBaseController {
     res: express.Response
   ): Promise<Notification[]> {
     return this.actionWrapper(req, res, async (au) => {
-      const data = await this.repositories.notification.loadByPersonId(au.churchId, personId);
-      return this.repositories.notification.convertAllToModel(data as any[]);
+      const data = await this.repos.notification.loadByPersonId(au.churchId, personId);
+      return this.repos.notification.convertAllToModel(data as any[]);
     }) as any;
   }
 
   @httpGet("/:churchId/:id")
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification> {
     return this.actionWrapper(req, res, async (au) => {
-      const data = await this.repositories.notification.loadById(au.churchId, id);
-      return this.repositories.notification.convertToModel(data);
+      const data = await this.repos.notification.loadById(au.churchId, id);
+      return this.repos.notification.convertToModel(data);
     }) as any;
   }
 
@@ -33,17 +33,17 @@ export class NotificationController extends MessagingBaseController {
       const promises: Promise<Notification>[] = [];
       req.body.forEach((notification) => {
         notification.churchId = au.churchId;
-        promises.push(this.repositories.notification.save(notification));
+        promises.push(this.repos.notification.save(notification));
       }) as any;
       const result = await Promise.all(promises);
-      return this.repositories.notification.convertAllToModel(result as any[]);
+      return this.repos.notification.convertAllToModel(result as any[]);
     }) as any;
   }
 
   @httpPost("/markRead/:churchId/:personId")
   public async markRead(@requestParam("churchId") churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.notification.markRead(au.churchId, personId);
+      await this.repos.notification.markRead(au.churchId, personId);
     }) as any;
   }
 
@@ -59,7 +59,7 @@ export class NotificationController extends MessagingBaseController {
   @httpGet("/unreadCount")
   public async loadMyUnread(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const existing = await this.repositories.notification.loadNewCounts(au.churchId, au.personId);
+      const existing = await this.repos.notification.loadNewCounts(au.churchId, au.personId);
       return existing || {};
     }) as any;
   }
@@ -67,8 +67,8 @@ export class NotificationController extends MessagingBaseController {
   @httpGet("/my")
   public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const existing = await this.repositories.notification.loadForPerson(au.churchId, au.personId);
-      await this.repositories.notification.markAllRead(au.churchId, au.personId);
+      const existing = await this.repos.notification.loadForPerson(au.churchId, au.personId);
+      await this.repos.notification.markAllRead(au.churchId, au.personId);
       return existing || {};
     }) as any;
   }
@@ -97,7 +97,7 @@ export class NotificationController extends MessagingBaseController {
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
-      await this.repositories.notification.delete(au.churchId, id);
+      await this.repos.notification.delete(au.churchId, id);
     }) as any;
   }
 }

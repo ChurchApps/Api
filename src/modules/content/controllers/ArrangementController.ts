@@ -9,7 +9,7 @@ export class ArrangementController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.arrangement.load(au.churchId, id);
+      return await this.repos.arrangement.load(au.churchId, id);
     });
   }
 
@@ -18,7 +18,7 @@ export class ArrangementController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        return await this.repositories.arrangement.loadBySongId(au.churchId, songId);
+        return await this.repos.arrangement.loadBySongId(au.churchId, songId);
       }
     });
   }
@@ -28,7 +28,7 @@ export class ArrangementController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        return await this.repositories.arrangement.loadBySongDetailId(au.churchId, songDetailId);
+        return await this.repos.arrangement.loadBySongDetailId(au.churchId, songDetailId);
       }
     });
   }
@@ -38,7 +38,7 @@ export class ArrangementController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        return await this.repositories.arrangement.loadAll(au.churchId);
+        return await this.repos.arrangement.loadAll(au.churchId);
       }
     });
   }
@@ -51,7 +51,7 @@ export class ArrangementController extends ContentBaseController {
         const promises: Promise<Arrangement>[] = [];
         req.body.forEach((arrangement) => {
           arrangement.churchId = au.churchId;
-          promises.push(this.repositories.arrangement.save(arrangement));
+          promises.push(this.repos.arrangement.save(arrangement));
         });
         const result = await Promise.all(promises);
         return result;
@@ -64,12 +64,12 @@ export class ArrangementController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        const existing = await this.repositories.arrangement.load(au.churchId, id);
+        const existing = await this.repos.arrangement.load(au.churchId, id);
         if (existing) {
-          await this.repositories.arrangement.delete(au.churchId, id);
-          await this.repositories.arrangementKey.deleteForArrangement(au.churchId, id);
-          const songArrangments = await this.repositories.arrangement.loadBySongId(au.churchId, existing.songId);
-          if (songArrangments.length === 0) await this.repositories.song.delete(au.churchId, existing.songId);
+          await this.repos.arrangement.delete(au.churchId, id);
+          await this.repos.arrangementKey.deleteForArrangement(au.churchId, id);
+          const songArrangments = await this.repos.arrangement.loadBySongId(au.churchId, existing.songId);
+          if (songArrangments.length === 0) await this.repos.song.delete(au.churchId, existing.songId);
         }
         return this.json({});
       }
@@ -84,7 +84,7 @@ export class ArrangementController extends ContentBaseController {
         return this.json({ error: "Invalid request body. Expected array of freeShowIds" }, 400);
       }
 
-      const existingArrangements = await this.repositories.arrangement.loadAll(au.churchId);
+      const existingArrangements = await this.repos.arrangement.loadAll(au.churchId);
       const existingFreeShowIds = existingArrangements.map((a: Arrangement) => a.freeShowId).filter((id: string | undefined) => id);
 
       // Return array of IDs that don't exist in Chums

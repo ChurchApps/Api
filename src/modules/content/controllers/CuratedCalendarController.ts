@@ -9,14 +9,14 @@ export class CuratedCalendarController extends ContentBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.curatedCalendar.load(au.churchId, id);
+      return await this.repos.curatedCalendar.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repositories.curatedCalendar.loadAll(au.churchId);
+      return await this.repos.curatedCalendar.loadAll(au.churchId);
     });
   }
 
@@ -28,7 +28,7 @@ export class CuratedCalendarController extends ContentBaseController {
         const promises: Promise<CuratedCalendar>[] = [];
         req.body.forEach((curatedCalendar) => {
           curatedCalendar.churchId = au.churchId;
-          promises.push(this.repositories.curatedCalendar.save(curatedCalendar));
+          promises.push(this.repos.curatedCalendar.save(curatedCalendar));
         });
         const result = await Promise.all(promises);
         return result;
@@ -41,7 +41,7 @@ export class CuratedCalendarController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repositories.curatedCalendar.delete(au.churchId, id);
+        await this.repos.curatedCalendar.delete(au.churchId, id);
         return this.json({});
       }
     });

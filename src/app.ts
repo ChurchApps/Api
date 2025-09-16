@@ -4,7 +4,7 @@ import { Container } from "inversify";
 import { InversifyExpressServer } from "inversify-express-utils";
 import { Environment } from "./shared/helpers/Environment";
 import { CustomAuthProvider } from "./shared/infrastructure/CustomAuthProvider";
-import { RepositoryManager } from "./shared/infrastructure/RepositoryManager";
+import { RepoManager } from "./shared/infrastructure/RepoManager";
 import cors from "cors";
 import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
@@ -196,9 +196,9 @@ export const createApp = async () => {
   // Initialize messaging module after server is built but before returning
   try {
     const { initializeMessagingModule } = await import("./modules/messaging");
-    const { RepositoryManager } = await import("./shared/infrastructure/RepositoryManager");
-    const messagingRepositories = await RepositoryManager.getRepositories<any>("messaging");
-    initializeMessagingModule(messagingRepositories);
+    const { RepoManager } = await import("./shared/infrastructure/RepoManager");
+    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    initializeMessagingModule(messagingRepos);
   } catch (error) {
     console.warn("Failed to initialize messaging module:", (error as any)?.message || error);
   }
@@ -238,7 +238,7 @@ async function loadModuleBindings(container: Container) {
     if (failedModules.length > 0) console.warn(`${failedModules.length} module(s) failed to load; continuing...`);
 
     // Set up repository manager as singleton
-    container.bind<RepositoryManager>("RepositoryManager").toConstantValue(RepositoryManager);
+    container.bind<RepoManager>("RepoManager").toConstantValue(RepoManager);
 
     const loadTime = Date.now() - startTime;
     if (loadTime > 2000) console.warn(`Module bindings loaded in ${loadTime}ms`);

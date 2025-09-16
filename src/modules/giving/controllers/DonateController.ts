@@ -25,7 +25,7 @@ export class DonateController extends GivingCrudController {
         if (!churchId) return this.json({ error: "Missing churchId" }, 400);
         if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
 
-        const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+        const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
         if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
         const gateway = gateways[0];
         const clientId = gateway.publicKey;
@@ -59,7 +59,7 @@ export class DonateController extends GivingCrudController {
         if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
         if (!amount || amount <= 0 || !/^[A-Z]{3}$/.test(currency)) return this.json({ error: "Invalid amount or currency" }, 400);
 
-        const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+        const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
         if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
         const gateway = gateways[0];
         const clientId = gateway.publicKey;
@@ -110,7 +110,7 @@ export class DonateController extends GivingCrudController {
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "Missing churchId parameter" }, 400);
 
-      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
       if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
 
       const provider = req.params.provider?.toLowerCase();
@@ -128,15 +128,15 @@ export class DonateController extends GivingCrudController {
           return this.json({}, 200);
         }
 
-        const existingEvent = await this.repositories.eventLog.load(churchId, webhookResult.eventId!);
+        const existingEvent = await this.repos.eventLog.load(churchId, webhookResult.eventId!);
 
         if (!existingEvent) {
-          await GatewayService.logEvent(gateway, churchId, req.body, webhookResult.eventData, this.repositories);
+          await GatewayService.logEvent(gateway, churchId, req.body, webhookResult.eventData, this.repos);
 
           if (this.shouldProcessDonation(provider, webhookResult.eventType!)) {
-            await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repositories);
+            await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos);
           } else if (this.shouldCancelSubscription(provider, webhookResult.eventType!)) {
-            await this.repositories.subscription.delete(churchId, webhookResult.eventData.id);
+            await this.repos.subscription.delete(churchId, webhookResult.eventData.id);
           }
         }
       } catch (error) {
@@ -169,7 +169,7 @@ export class DonateController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const donationData = req.body;
       const churchId = au.churchId || donationData.churchId;
-      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
       const gateway = gateways[0];
 
       if (!gateway) return this.json({ error: "No gateway configured" }, 400);
@@ -183,8 +183,8 @@ export class DonateController extends GivingCrudController {
 
         // For PayPal, we need to log the events since it's captured immediately
         if (donationData.provider === "paypal") {
-          await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repositories);
-          await GatewayService.logDonation(gateway, churchId, chargeResult.data, this.repositories);
+          await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repos);
+          await GatewayService.logDonation(gateway, churchId, chargeResult.data, this.repos);
         }
 
         await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
@@ -202,7 +202,7 @@ export class DonateController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID } = req.body;
       const churchId = au.churchId || CHURCH_ID;
-      const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
       const gateway = gateways[0];
 
       if (!gateway) return this.json({ error: "No gateway configured" }, 400);
@@ -232,7 +232,7 @@ export class DonateController extends GivingCrudController {
           customerId
         };
 
-        await this.repositories.subscription.save(subscription);
+        await this.repos.subscription.save(subscription);
 
         const promises: Promise<SubscriptionFund>[] = [];
         funds.forEach((fund: FundDonation) => {
@@ -242,7 +242,7 @@ export class DonateController extends GivingCrudController {
             fundId: fund.id,
             amount: fund.amount
           };
-          promises.push(this.repositories.subscriptionFunds.save(subscriptionFund));
+          promises.push(this.repos.subscriptionFunds.save(subscriptionFund));
         });
 
         await Promise.all(promises);
@@ -267,7 +267,7 @@ export class DonateController extends GivingCrudController {
 
         if (provider) {
           // Use gateway-specific fee calculation
-          const gateways = await this.repositories.gateway.loadAll(churchId);
+          const gateways = await this.repos.gateway.loadAll(churchId);
           const gateway = (gateways as any[]).find((g) => g.provider.toLowerCase() === provider.toLowerCase());
 
           if (gateway) {
@@ -388,9 +388,9 @@ export class DonateController extends GivingCrudController {
   };
 
   private logDonation = async (donationData: Donation, fundData: FundDonation[]) => {
-    const batch: DonationBatch = await this.repositories.donationBatch.getOrCreateCurrent(donationData.churchId as string);
+    const batch: DonationBatch = await this.repos.donationBatch.getOrCreateCurrent(donationData.churchId as string);
     donationData.batchId = batch.id;
-    const donation = await this.repositories.donation.save(donationData);
+    const donation = await this.repos.donation.save(donationData);
     const promises: Promise<FundDonation>[] = [];
     fundData.forEach((fund: FundDonation) => {
       const fundDonation: FundDonation = {
@@ -399,13 +399,13 @@ export class DonateController extends GivingCrudController {
         donationId: donation.id,
         fundId: fund.id
       };
-      promises.push(this.repositories.fundDonation.save(fundDonation));
+      promises.push(this.repos.fundDonation.save(fundDonation));
     });
     return await Promise.all(promises);
   };
 
   private loadPrivateKey = async (churchId: string) => {
-    const gateways = (await this.repositories.gateway.loadAll(churchId)) as any[];
+    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
     return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
   };
 

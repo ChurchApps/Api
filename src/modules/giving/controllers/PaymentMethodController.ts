@@ -19,7 +19,7 @@ export class PaymentMethodController extends GivingCrudController {
       const permission = secretKey && (au.checkAccess(Permissions.donations.view) || id === au.personId);
       if (!permission) return this.json({}, 401);
       else {
-        const customer = await this.repositories.customer.loadByPersonId(au.churchId, id);
+        const customer = await this.repos.customer.loadByPersonId(au.churchId, id);
         return customer ? await StripeHelper.getCustomerPaymentMethods(secretKey, customer) : [];
       }
     });
@@ -40,7 +40,7 @@ export class PaymentMethodController extends GivingCrudController {
         let customer = customerId;
         if (!customer) {
           customer = await StripeHelper.createCustomer(secretKey, email, name);
-          await this.repositories.customer.save({ id: customer, churchId: cId, personId });
+          await this.repos.customer.save({ id: customer, churchId: cId, personId });
         }
         try {
           const pm = await StripeHelper.attachPaymentMethod(secretKey, id, { customer });
@@ -78,7 +78,7 @@ export class PaymentMethodController extends GivingCrudController {
         let customer = customerId;
         if (!customer) {
           customer = await StripeHelper.createCustomer(secretKey, email, name);
-          this.repositories.customer.save({ id: customer, churchId: au.churchId, personId });
+          this.repos.customer.save({ id: customer, churchId: au.churchId, personId });
         }
         try {
           return await StripeHelper.createBankAccount(secretKey, customer, { source: id });
@@ -111,8 +111,7 @@ export class PaymentMethodController extends GivingCrudController {
       const { paymentMethodId, customerId, amountData } = req.body;
       const permission =
         secretKey &&
-        (au.checkAccess(Permissions.donations.edit) ||
-          (await this.repositories.customer.convertToModel(au.churchId, await this.repositories.customer.load(au.churchId, customerId)).personId) === au.personId);
+        (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
         try {
@@ -130,8 +129,7 @@ export class PaymentMethodController extends GivingCrudController {
       const secretKey = await this.loadPrivateKey(au.churchId);
       const permission =
         secretKey &&
-        (au.checkAccess(Permissions.donations.edit) ||
-          (await this.repositories.customer.convertToModel(au.churchId, await this.repositories.customer.load(au.churchId, customerId)).personId) === au.personId);
+        (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
         const paymentType = id.substring(0, 2);
@@ -143,7 +141,7 @@ export class PaymentMethodController extends GivingCrudController {
   }
 
   private loadPrivateKey = async (churchId: string) => {
-    const gateways = await this.repositories.gateway.loadAll(churchId);
+    const gateways = await this.repos.gateway.loadAll(churchId);
     return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
   };
 }

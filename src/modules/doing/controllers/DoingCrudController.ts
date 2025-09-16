@@ -1,8 +1,8 @@
 import { GenericCrudController } from "../../../shared/controllers/GenericCrudController";
-import { Repositories } from "../repositories";
+import { Repos } from "../repositories";
 
 export abstract class DoingCrudController extends GenericCrudController {
-  declare public repositories: Repositories;
+  declare public repos: Repos;
   constructor() {
     super("doing");
   }

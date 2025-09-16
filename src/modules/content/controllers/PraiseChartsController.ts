@@ -76,7 +76,7 @@ export class PraiseChartsController extends ContentBaseController {
   @httpGet("/download")
   public async download(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const settings: Setting[] = await this.repositories.setting.loadUser(au.churchId, au.id);
+      const settings: Setting[] = await this.repos.setting.loadUser(au.churchId, au.id);
       const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
       const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;
       const fileBuffer: any = await PraiseChartsHelper.download(req.query.skus.toString().split(","), req.query.keys.toString().split(","), token, secret);
@@ -131,7 +131,7 @@ export class PraiseChartsController extends ContentBaseController {
         }
       ];
 
-      await this.repositories.setting.saveAll(settings);
+      await this.repos.setting.saveAll(settings);
 
       return result;
     });
@@ -140,7 +140,7 @@ export class PraiseChartsController extends ContentBaseController {
   @httpGet("/library")
   public async praiseChartsCatalog(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const settings: Setting[] = await this.repositories.setting.loadUser(au.churchId, au.id);
+      const settings: Setting[] = await this.repos.setting.loadUser(au.churchId, au.id);
       const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
       const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;
 

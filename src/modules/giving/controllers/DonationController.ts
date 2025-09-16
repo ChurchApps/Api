@@ -37,11 +37,11 @@ export class DonationController extends GivingBaseController {
         const endDate = req.query.endDate ? new Date(req.query.endDate.toString()) : new Date();
         const type = req.query.type?.toString() || "";
         if (type === "person") {
-          const result = await this.repositories.donation.loadPersonBasedSummary(au.churchId, startDate, endDate);
-          return this.repositories.donation.convertAllToPersonSummary(au.churchId, result as any[]);
+          const result = await this.repos.donation.loadPersonBasedSummary(au.churchId, startDate, endDate);
+          return this.repos.donation.convertAllToPersonSummary(au.churchId, result as any[]);
         }
-        const result = await this.repositories.donation.loadSummary(au.churchId, startDate, endDate);
-        return this.repositories.donation.convertAllToSummary(au.churchId, result as any[]);
+        const result = await this.repos.donation.loadSummary(au.churchId, startDate, endDate);
+        return this.repos.donation.convertAllToSummary(au.churchId, result as any[]);
       }
     });
   }
@@ -49,8 +49,8 @@ export class DonationController extends GivingBaseController {
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = await this.repositories.donation.loadByPersonId(au.churchId, au.personId);
-      return this.repositories.donation.convertAllToModel(au.churchId, result as any[]);
+      const result = await this.repos.donation.loadByPersonId(au.churchId, au.personId);
+      return this.repos.donation.convertAllToModel(au.churchId, result as any[]);
     });
   }
 
@@ -59,8 +59,8 @@ export class DonationController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       else {
-        const data = await this.repositories.donation.load(au.churchId, id);
-        const result = this.repositories.donation.convertToModel(au.churchId, data);
+        const data = await this.repos.donation.load(au.churchId, id);
+        const result = this.repos.donation.convertToModel(au.churchId, data);
         return result;
       }
     });
@@ -73,10 +73,10 @@ export class DonationController extends GivingBaseController {
       if (!au.checkAccess(Permissions.donations.view) && personId !== au.personId) return this.json({}, 401);
       else {
         let result;
-        if (req.query.batchId !== undefined) result = await this.repositories.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
-        else if (personId) result = await this.repositories.donation.loadByPersonId(au.churchId, personId);
-        else result = await this.repositories.donation.loadAll(au.churchId);
-        return this.repositories.donation.convertAllToModel(au.churchId, result as any[] as any[]);
+        if (req.query.batchId !== undefined) result = await this.repos.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
+        else if (personId) result = await this.repos.donation.loadByPersonId(au.churchId, personId);
+        else result = await this.repos.donation.loadAll(au.churchId);
+        return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);
       }
     });
   }
@@ -89,10 +89,10 @@ export class DonationController extends GivingBaseController {
         const promises: Promise<Donation>[] = [];
         req.body.forEach((donation) => {
           donation.churchId = au.churchId;
-          promises.push(this.repositories.donation.save(donation));
+          promises.push(this.repos.donation.save(donation));
         });
         const result = await Promise.all(promises);
-        return this.repositories.donation.convertAllToModel(au.churchId, result as any[] as any[]);
+        return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);
       }
     });
   }
@@ -102,7 +102,7 @@ export class DonationController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
       else {
-        await this.repositories.donation.delete(au.churchId, id);
+        await this.repos.donation.delete(au.churchId, id);
         return this.json({});
       }
     });

@@ -1,17 +1,17 @@
-import { Repositories } from "../repositories";
-import { RepositoryManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories";
+import { RepoManager } from "../../../shared/infrastructure";
 import { Condition } from "../models";
 
 export class ConditionHelper {
-  public static async getPeopleIdsMatchingConditions(conditions: Condition[], repositories?: Repositories) {
+  public static async getPeopleIdsMatchingConditions(conditions: Condition[], repositories?: Repos) {
     const promises: Promise<Condition>[] = [];
     conditions.forEach((c) => promises.push(ConditionHelper.getPeopleIdsMatchingCondition(c, repositories)));
     const result = await Promise.all(promises);
     return result;
   }
 
-  private static async getPeopleIdsMatchingCondition(condition: Condition, repositories?: Repositories) {
-    const repos = repositories || (await RepositoryManager.getRepositories<Repositories>("doing"));
+  private static async getPeopleIdsMatchingCondition(condition: Condition, repositories?: Repos) {
+    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
     condition.matchingIds = [];
     switch (condition.field) {
       case "today":

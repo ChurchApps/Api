@@ -13,13 +13,13 @@ export class PrivateMessageController extends MessagingBaseController {
       const promises: Promise<PrivateMessage>[] = [];
       req.body.forEach((conv) => {
         conv.churchId = au.churchId;
-        const promise = this.repositories.privateMessage.save(conv).then((c) => {
+        const promise = this.repos.privateMessage.save(conv).then((c) => {
           // For direct private message API, use generic notification since we don't have message content
           // Private messages through conversations use the typed notification in checkShouldNotify
           NotificationHelper.notifyUser(au.churchId, c.toPersonId, "New Private Message").then((method) => {
             if (method) {
               c.deliveryMethod = method;
-              this.repositories.privateMessage.save(c);
+              this.repos.privateMessage.save(c);
             }
           });
           return c;
@@ -34,7 +34,7 @@ export class PrivateMessageController extends MessagingBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const privateMessages: PrivateMessage[] = await this.repositories.privateMessage.loadByPersonId(au.churchId, au.personId);
+      const privateMessages: PrivateMessage[] = await this.repos.privateMessage.loadByPersonId(au.churchId, au.personId);
       const messageIds: string[] = [];
       privateMessages.forEach((pm) => {
         if (pm.conversation.lastPostId && messageIds.indexOf(pm.conversation.lastPostId) === -1) {
@@ -42,7 +42,7 @@ export class PrivateMessageController extends MessagingBaseController {
         }
       });
       if (messageIds.length > 0) {
-        const allMessages = await this.repositories.message.loadByIds(au.churchId, messageIds);
+        const allMessages = await this.repos.message.loadByIds(au.churchId, messageIds);
         privateMessages.forEach((pm) => {
           if (pm.conversation.lastPostId) {
             pm.conversation.messages = [ArrayHelper.getOne(allMessages, "id", pm.conversation.lastPostId)];
@@ -58,7 +58,7 @@ export class PrivateMessageController extends MessagingBaseController {
       }
 
       // TODO: Implement markAllRead functionality in PrivateMessageRepository
-      // await this.repositories.privateMessage.markAllRead(au.churchId, au.personId);
+      // await this.repos.privateMessage.markAllRead(au.churchId, au.personId);
 
       return privateMessages;
     });
@@ -68,7 +68,7 @@ export class PrivateMessageController extends MessagingBaseController {
   public async getExisting(@requestParam("personId") personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       // TODO: Implement loadExisting functionality to find existing conversation between two people
-      // const existing = await this.repositories.privateMessage.loadExisting(au.churchId, au.personId, personId);
+      // const existing = await this.repos.privateMessage.loadExisting(au.churchId, au.personId, personId);
       const existing = null; // Temporary placeholder
       return existing || {};
     });
@@ -77,10 +77,10 @@ export class PrivateMessageController extends MessagingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = (await this.repositories.privateMessage.loadById(au.churchId, id)) as any;
+      const result = (await this.repos.privateMessage.loadById(au.churchId, id)) as any;
       if (result.notifyPersonId === au.personId) {
         result.notifyPersonId = null;
-        await this.repositories.privateMessage.save(result);
+        await this.repos.privateMessage.save(result);
       }
       return result;
     });

@@ -1,7 +1,7 @@
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import WebSocket from "ws";
 import { PayloadInterface, SocketConnectionInterface } from "./Interfaces";
-import { Repositories } from "../repositories";
+import { Repos } from "../repositories";
 import { Connection } from "../models";
 import { DeliveryHelper } from "./DeliveryHelper";
 import { Environment } from "../../../shared/helpers/Environment";
@@ -9,10 +9,10 @@ import { Environment } from "../../../shared/helpers/Environment";
 export class SocketHelper {
   private static wss: WebSocket.Server = null;
   private static connections: SocketConnectionInterface[] = [];
-  private static repositories: Repositories;
+  private static repos: Repos;
 
-  static init = (repositories: Repositories) => {
-    SocketHelper.repositories = repositories;
+  static init = (repos: Repos) => {
+    SocketHelper.repos = repos;
     const port = Environment.websocketPort;
     console.log(`SocketHelper: Initializing with port ${port}, deliveryProvider: ${Environment.deliveryProvider}`);
 
@@ -48,10 +48,10 @@ export class SocketHelper {
   };
 
   static handleDisconnect = async (socketId: string) => {
-    if (!SocketHelper.repositories) return;
+    if (!SocketHelper.repos) return;
 
-    const connections = await SocketHelper.repositories.connection.loadBySocketId(socketId);
-    await SocketHelper.repositories.connection.deleteForSocket(socketId);
+    const connections = await SocketHelper.repos.connection.loadBySocketId(socketId);
+    await SocketHelper.repos.connection.deleteForSocket(socketId);
     connections.forEach((c: Connection) => {
       DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
     });

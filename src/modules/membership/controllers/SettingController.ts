@@ -11,7 +11,7 @@ export class MembershipSettingController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
-        return this.repositories.setting.convertAllToModel(au.churchId, (await this.repositories.setting.loadAll(au.churchId)) as any[]);
+        return this.repos.setting.convertAllToModel(au.churchId, (await this.repos.setting.loadAll(au.churchId)) as any[]);
       }
     });
   }
@@ -27,7 +27,7 @@ export class MembershipSettingController extends MembershipBaseController {
           promises.push(this.saveSetting(setting));
         });
         const result = await Promise.all(promises);
-        return this.repositories.setting.convertAllToModel(au.churchId, result);
+        return this.repos.setting.convertAllToModel(au.churchId, result);
       }
     });
   }
@@ -36,9 +36,9 @@ export class MembershipSettingController extends MembershipBaseController {
   public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     console.log("MADE IT");
 
-    const publicSettings = await this.repositories.setting.loadPublicSettings(churchId);
+    const publicSettings = await this.repos.setting.loadPublicSettings(churchId);
     console.log("PUBLIC SETTINGS", publicSettings);
-    const settings = this.repositories.setting.convertAllToModel(churchId, publicSettings as any[]);
+    const settings = this.repos.setting.convertAllToModel(churchId, publicSettings as any[]);
     console.log("CONVERTED SETTINGS", settings);
     const result: any = {};
     settings.forEach((s) => {
@@ -111,7 +111,7 @@ export class MembershipSettingController extends MembershipBaseController {
 
   private async saveSetting(setting: Setting) {
     if (setting.value.startsWith("data:image/")) setting = await this.saveImage(setting);
-    setting = await this.repositories.setting.save(setting);
+    setting = await this.repos.setting.save(setting);
     return setting;
   }
 

@@ -16,19 +16,19 @@ export class ServiceTimeController extends AttendanceCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const campusId = req.query.campusId.toString();
       const serviceId = req.query.serviceId.toString();
-      const data = await this.repositories.serviceTime.loadByChurchCampusService(au.churchId, campusId, serviceId);
-      return this.repositories.serviceTime.convertAllToModel(au.churchId, data as any);
+      const data = await this.repos.serviceTime.loadByChurchCampusService(au.churchId, campusId, serviceId);
+      return this.repos.serviceTime.convertAllToModel(au.churchId, data as any);
     });
   }
 
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      // return await this.repositories.serviceTime.loadAll(au.churchId);
+      // return await this.repos.serviceTime.loadAll(au.churchId);
       let data = null;
-      if (req.query.serviceId !== undefined) data = await this.repositories.serviceTime.loadNamesByServiceId(au.churchId, req.query.serviceId.toString());
-      else data = await this.repositories.serviceTime.loadNamesWithCampusService(au.churchId);
-      const result: ServiceTime[] = this.repositories.serviceTime.convertAllToModel(au.churchId, data as any);
+      if (req.query.serviceId !== undefined) data = await this.repos.serviceTime.loadNamesByServiceId(au.churchId, req.query.serviceId.toString());
+      else data = await this.repos.serviceTime.loadNamesWithCampusService(au.churchId);
+      const result: ServiceTime[] = this.repos.serviceTime.convertAllToModel(au.churchId, data as any);
       if (result.length > 0 && this.include(req, "groups")) await this.appendGroups(au.churchId, result);
       return result;
     });
@@ -39,7 +39,7 @@ export class ServiceTimeController extends AttendanceCrudController {
     times.forEach((t) => {
       timeIds.push(t.id);
     });
-    const allGroupServiceTimes: GroupServiceTime[] = (await this.repositories.groupServiceTime.loadByServiceTimeIds(churchId, timeIds)) as any;
+    const allGroupServiceTimes: GroupServiceTime[] = (await this.repos.groupServiceTime.loadByServiceTimeIds(churchId, timeIds)) as any;
     const allGroupIds: string[] = [];
     if (allGroupServiceTimes) {
       allGroupServiceTimes.forEach((gst) => {

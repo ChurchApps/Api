@@ -11,14 +11,14 @@ export { DeliveryHelper } from "./helpers/DeliveryHelper";
 export { ExpoPushHelper } from "./helpers/ExpoPushHelper";
 
 // Module initialization function
-import { Repositories } from "./repositories/Repositories";
+import { Repos } from "./repositories/Repos";
 import { NotificationHelper } from "./helpers/NotificationHelper";
 import { DeliveryHelper } from "./helpers/DeliveryHelper";
 import { SocketHelper } from "./helpers/SocketHelper";
 
-export function initializeMessagingModule(repositories: Repositories) {
+export function initializeMessagingModule(repos: Repos) {
   // Initialize helpers with repositories
-  NotificationHelper.init(repositories);
-  DeliveryHelper.init(repositories);
-  SocketHelper.init(repositories);
+  NotificationHelper.init(repos);
+  DeliveryHelper.init(repos);
+  SocketHelper.init(repos);
 }
