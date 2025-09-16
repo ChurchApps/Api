@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Household } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../helpers";
@@ -14,31 +14,34 @@ export class HouseholdRepository {
     household.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO households (id, churchId, name) VALUES (?, ?, ?);";
     const params = [household.id, household.churchId, household.name];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return household;
   }
 
   private async update(household: Household) {
     const sql = "UPDATE households SET name=? WHERE id=? and churchId=?";
     const params = [household.name, household.id, household.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return household;
   }
 
   public deleteUnused(churchId: string) {
-    return DB.query("DELETE FROM households WHERE churchId=? AND id not in (SELECT householdId FROM people WHERE churchId=? AND householdId IS NOT NULL group by householdId)", [churchId, churchId]);
+    return TypedDB.query("DELETE FROM households WHERE churchId=? AND id not in (SELECT householdId FROM people WHERE churchId=? AND householdId IS NOT NULL group by householdId)", [
+      churchId,
+      churchId
+    ]);
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM households WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM households WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM households WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM households WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM households WHERE churchId=?;", [churchId]);
+    return TypedDB.query("SELECT * FROM households WHERE churchId=?;", [churchId]);
   }
 
   public convertToModel(churchId: string, data: any) {

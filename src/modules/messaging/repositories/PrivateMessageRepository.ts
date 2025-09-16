@@ -1,26 +1,26 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { CollectionHelper } from "../../../shared/helpers";
 import { PrivateMessage } from "../models";
 
 export class PrivateMessageRepository {
   public loadById(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM privateMessages WHERE id=? and churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM privateMessages WHERE id=? and churchId=?;", [id, churchId]);
   }
 
   public loadByPersonId(churchId: string, personId: string) {
-    return DB.query(
+    return TypedDB.query(
       "SELECT pm.*, c.title FROM privateMessages pm INNER JOIN conversations c on c.id=pm.conversationId WHERE pm.churchId=? AND (pm.fromPersonId=? OR pm.toPersonId=?) ORDER BY c.dateCreated DESC",
       [churchId, personId, personId]
     );
   }
 
   public loadByChurchId(churchId: string) {
-    return DB.query("SELECT * FROM privateMessages WHERE churchId=?", [churchId]);
+    return TypedDB.query("SELECT * FROM privateMessages WHERE churchId=?", [churchId]);
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM privateMessages WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM privateMessages WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public save(privateMessage: PrivateMessage) {
@@ -39,7 +39,7 @@ export class PrivateMessageRepository {
       privateMessage.notifyPersonId,
       privateMessage.deliveryMethod
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return privateMessage;
   }
 
@@ -54,7 +54,7 @@ export class PrivateMessageRepository {
       privateMessage.id,
       privateMessage.churchId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return privateMessage;
   }
 
@@ -76,11 +76,11 @@ export class PrivateMessageRepository {
   }
 
   public loadByConversationId(churchId: string, conversationId: string) {
-    return DB.queryOne("SELECT * FROM privateMessages WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
+    return TypedDB.queryOne("SELECT * FROM privateMessages WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
   }
 
   public loadUndelivered() {
     const sql = "SELECT * FROM privateMessages WHERE deliveryMethod IS NULL OR deliveryMethod=''";
-    return DB.query(sql, []);
+    return TypedDB.query(sql, []);
   }
 }

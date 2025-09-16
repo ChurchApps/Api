@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
-import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { DateHelper } from "@churchapps/apihelper";
 import { DonationBatch } from "../models";
 
@@ -16,7 +17,7 @@ export class DonationBatchRepository extends ConfiguredRepository<DonationBatch>
   }
 
   public async getOrCreateCurrent(churchId: string) {
-    const data = await DB.queryOne("SELECT * FROM donationBatches WHERE churchId=? ORDER by batchDate DESC LIMIT 1;", [churchId]);
+    const data = await TypedDB.queryOne("SELECT * FROM donationBatches WHERE churchId=? ORDER by batchDate DESC LIMIT 1;", [churchId]);
     if (data !== null) return this.convertToModel(churchId, data);
     else {
       const batch: DonationBatch = { churchId, name: "Online Donation", batchDate: new Date() };
@@ -31,7 +32,7 @@ export class DonationBatchRepository extends ConfiguredRepository<DonationBatch>
     const batchDate = DateHelper.toMysqlDate(batch.batchDate as Date);
     const sql = "INSERT INTO donationBatches (id, churchId, name, batchDate) VALUES (?, ?, ?, ?);";
     const params = [batch.id, batch.churchId, batch.name, batchDate];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return batch;
   }
 
@@ -39,7 +40,7 @@ export class DonationBatchRepository extends ConfiguredRepository<DonationBatch>
     const batchDate = DateHelper.toMysqlDate(batch.batchDate as Date);
     const sql = "UPDATE donationBatches SET name=?, batchDate=? WHERE id=? and churchId=?";
     const params = [batch.name, batchDate, batch.id, batch.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return batch;
   }
 
@@ -57,7 +58,7 @@ export class DonationBatchRepository extends ConfiguredRepository<DonationBatch>
       ") d ON db.id = d.batchId " +
       "WHERE db.churchId = ? " +
       "ORDER BY db.batchDate DESC";
-    const result = await DB.query(sql, [churchId, churchId]);
+    const result = await TypedDB.query(sql, [churchId, churchId]);
     return this.convertAllToModel(churchId, result);
   }
 

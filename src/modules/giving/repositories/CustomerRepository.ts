@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Customer } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -21,7 +21,7 @@ export class CustomerRepository extends ConfiguredRepository<Customer> {
     // Customer ID comes from external system, don't auto-generate
     const sql = "INSERT INTO customers (id, churchId, personId) VALUES (?, ?, ?);";
     const params = [model.id, model.churchId, model.personId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return model;
   }
 
@@ -30,12 +30,12 @@ export class CustomerRepository extends ConfiguredRepository<Customer> {
     // Customers typically don't get updated, but provide implementation for completeness
     const sql = "UPDATE customers SET personId=? WHERE id=? AND churchId=?";
     const params = [model.personId, model.id, model.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return model;
   }
 
   public async loadByPersonId(churchId: string, personId: string) {
-    return DB.queryOne("SELECT * FROM customers WHERE personId=? AND churchId=?;", [personId, churchId]);
+    return TypedDB.queryOne("SELECT * FROM customers WHERE personId=? AND churchId=?;", [personId, churchId]);
   }
 
   protected rowToModel(row: any): Customer {

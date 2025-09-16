@@ -1,4 +1,4 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { injectable } from "inversify";
 import { Plan } from "../models";
@@ -25,7 +25,7 @@ export class PlanRepository {
       plan.contentType,
       plan.contentId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return plan;
   }
 
@@ -43,31 +43,31 @@ export class PlanRepository {
       plan.id,
       plan.churchId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return plan;
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM plans WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM plans WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM plans WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM plans WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return DB.query("SELECT * FROM plans WHERE churchId=? and id in (?);", [churchId, ids]);
+    return TypedDB.query("SELECT * FROM plans WHERE churchId=? and id in (?);", [churchId, ids]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM plans WHERE churchId=? order by serviceDate desc;", [churchId]);
+    return TypedDB.query("SELECT * FROM plans WHERE churchId=? order by serviceDate desc;", [churchId]);
   }
 
   public load7Days(churchId: string) {
-    return DB.query("SELECT * FROM plans WHERE churchId=? AND serviceDate BETWEEN CURDATE() AND (CURDATE() + INTERVAL 7 DAY) order by serviceDate desc;", [churchId]);
+    return TypedDB.query("SELECT * FROM plans WHERE churchId=? AND serviceDate BETWEEN CURDATE() AND (CURDATE() + INTERVAL 7 DAY) order by serviceDate desc;", [churchId]);
   }
 
   public loadByPlanTypeId(churchId: string, planTypeId: string) {
-    return DB.query("SELECT * FROM plans WHERE churchId=? AND planTypeId=? order by serviceDate desc;", [churchId, planTypeId]);
+    return TypedDB.query("SELECT * FROM plans WHERE churchId=? AND planTypeId=? order by serviceDate desc;", [churchId, planTypeId]);
   }
 }

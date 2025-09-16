@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Subscription } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -20,7 +20,7 @@ export class SubscriptionRepository extends ConfiguredRepository<Subscription> {
   protected async create(model: Subscription): Promise<Subscription> {
     const sql = "INSERT INTO subscriptions (id, churchId, personId, customerId) VALUES (?, ?, ?, ?);";
     const params = [model.id, model.churchId, model.personId, model.customerId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return model;
   }
 
@@ -28,7 +28,7 @@ export class SubscriptionRepository extends ConfiguredRepository<Subscription> {
   protected async update(model: Subscription): Promise<Subscription> {
     const sql = "UPDATE subscriptions SET personId=?, customerId=? WHERE id=? AND churchId=?";
     const params = [model.personId, model.customerId, model.id, model.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return model;
   }
 
@@ -38,7 +38,7 @@ export class SubscriptionRepository extends ConfiguredRepository<Subscription> {
   }
 
   public async loadByCustomerId(churchId: string, customerId: string) {
-    return DB.queryOne("SELECT * FROM subscriptions WHERE customerId=? AND churchId=?;", [customerId, churchId]);
+    return TypedDB.queryOne("SELECT * FROM subscriptions WHERE customerId=? AND churchId=?;", [customerId, churchId]);
   }
 
   protected rowToModel(row: any): Subscription {

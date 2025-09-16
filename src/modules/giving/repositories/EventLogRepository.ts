@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { EventLog } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -23,7 +23,7 @@ export class EventLogRepository extends ConfiguredRepository<EventLog> {
   protected async create(model: EventLog): Promise<EventLog> {
     const sql = "INSERT INTO eventLogs (id, churchId, customerId, provider, eventType, message, status, created, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [model.id, model.churchId, model.customerId, model.provider, model.eventType, model.message, model.status, model.created, false];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return model;
   }
 
@@ -34,7 +34,7 @@ export class EventLogRepository extends ConfiguredRepository<EventLog> {
   }
 
   public async loadByType(churchId: string, status: string) {
-    return DB.query(
+    return TypedDB.query(
       "SELECT eventLogs.*, personId FROM customers LEFT JOIN eventLogs ON customers.id = eventLogs.customerId WHERE eventLogs.status=? AND eventLogs.churchId=? ORDER BY eventLogs.created DESC;",
       [status, churchId]
     );

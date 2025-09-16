@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { VisibilityPreference } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -17,7 +17,7 @@ export class VisibilityPreferenceRepository extends ConfiguredRepository<Visibil
 
   public async loadForPerson(churchId: string, personId: string) {
     const sql = "SELECT * FROM visibilityPreferences WHERE churchId=? AND personId=?;";
-    return DB.query(sql, [churchId, personId]);
+    return TypedDB.query(sql, [churchId, personId]);
   }
 
   protected rowToModel(row: any): VisibilityPreference {

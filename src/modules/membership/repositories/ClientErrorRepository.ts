@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { ClientError } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -16,15 +16,15 @@ export class ClientErrorRepository extends ConfiguredRepository<ClientError> {
   }
 
   public deleteOld() {
-    return DB.query("DELETE FROM clientErrors WHERE errorTime<date_add(NOW(), INTERVAL -7 DAY)", []);
+    return TypedDB.query("DELETE FROM clientErrors WHERE errorTime<date_add(NOW(), INTERVAL -7 DAY)", []);
   }
 
   public load(id: string) {
-    return DB.queryOne("SELECT * FROM clientErrors WHERE id=?;", [id]);
+    return TypedDB.queryOne("SELECT * FROM clientErrors WHERE id=?;", [id]);
   }
 
   public loadAll() {
-    return DB.query("SELECT * FROM clientErrors;", []);
+    return TypedDB.query("SELECT * FROM clientErrors;", []);
   }
 
   protected rowToModel(row: any): ClientError {

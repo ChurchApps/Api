@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { BlockoutDate } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -16,15 +16,15 @@ export class BlockoutDateRepository extends ConfiguredRepository<BlockoutDate> {
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return DB.query("SELECT * FROM blockoutDates WHERE churchId=? and id in (?);", [churchId, ids]);
+    return TypedDB.query("SELECT * FROM blockoutDates WHERE churchId=? and id in (?);", [churchId, ids]);
   }
 
   public loadForPerson(churchId: string, personId: string) {
-    return DB.query("SELECT * FROM blockoutDates WHERE churchId=? and personId=?;", [churchId, personId]);
+    return TypedDB.query("SELECT * FROM blockoutDates WHERE churchId=? and personId=?;", [churchId, personId]);
   }
 
   public loadUpcoming(churchId: string) {
-    return DB.query("SELECT * FROM blockoutDates WHERE churchId=? AND endDate>NOW();", [churchId]);
+    return TypedDB.query("SELECT * FROM blockoutDates WHERE churchId=? AND endDate>NOW();", [churchId]);
   }
 
   protected rowToModel(row: any): BlockoutDate {

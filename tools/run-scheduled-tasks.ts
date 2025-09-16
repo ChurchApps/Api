@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { Environment } from "../src/shared/helpers/Environment";
 import { MultiDatabasePool } from "../src/shared/infrastructure/MultiDatabasePool";
-import { DB } from "../src/shared/infrastructure/DB";
+import { TypedDB } from "../src/shared/infrastructure/TypedDB";
 import { Notification } from "../src/modules/messaging/models/Notification";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
@@ -26,7 +26,7 @@ async function runScheduledTasks() {
       " AND pl.serviceDate >= DATE_ADD(CURDATE(), INTERVAL 2 DAY)" +
       " AND pl.serviceDate < DATE_ADD(CURDATE(), INTERVAL 3 DAY)";
     
-    const unconfirmedAssignments = await DB.queryModule("doing", assignmentsSql, []);
+    const unconfirmedAssignments = await TypedDB.queryModule("doing", assignmentsSql, []);
     console.log(`Found ${unconfirmedAssignments.length} unconfirmed assignments`);
     
     const notifications: Notification[] = [];
@@ -42,7 +42,7 @@ async function runScheduledTasks() {
         // Get church subdomain if not cached
         let subDomain = subdomainCache[assignment.churchId];
         if (!subDomain) {
-          const churchResult = await DB.queryOneModule(
+          const churchResult = await TypedDB.queryOneModule(
             "membership", 
             "SELECT subDomain FROM churches WHERE id = ?", 
             [assignment.churchId]
@@ -90,7 +90,7 @@ async function runScheduledTasks() {
           notification.message,
           notification.link
         ];
-        await DB.queryModule("messaging", sql, params);
+        await TypedDB.queryModule("messaging", sql, params);
       }
     }
     

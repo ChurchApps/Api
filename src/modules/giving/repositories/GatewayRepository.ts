@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Gateway } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
@@ -12,30 +12,30 @@ export class GatewayRepository {
 
   private async create(gateway: Gateway) {
     gateway.id = UniqueIdHelper.shortId();
-    await DB.query("DELETE FROM gateways WHERE churchId=? AND id<>?;", [gateway.churchId, gateway.id]); // enforce a single record per church (for now)
+    await TypedDB.query("DELETE FROM gateways WHERE churchId=? AND id<>?;", [gateway.churchId, gateway.id]); // enforce a single record per church (for now)
     const sql = "INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return gateway;
   }
 
   private async update(gateway: Gateway) {
     const sql = "UPDATE gateways SET provider=?, publicKey=?, privateKey=?, webhookKey=?, productId=?, payFees=? WHERE id=? and churchId=?";
     const params = [gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees, gateway.id, gateway.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return gateway;
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM gateways WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM gateways WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM gateways WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM gateways WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM gateways WHERE churchId=?;", [churchId]);
+    return TypedDB.query("SELECT * FROM gateways WHERE churchId=?;", [churchId]);
   }
 
   public convertToModel(churchId: string, data: any) {

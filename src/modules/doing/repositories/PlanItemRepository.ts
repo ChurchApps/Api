@@ -1,4 +1,4 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { injectable } from "inversify";
 import { PlanItem } from "../models";
@@ -26,7 +26,7 @@ export class PlanItemRepository {
       planItem.seconds,
       planItem.link
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return planItem;
   }
 
@@ -45,27 +45,27 @@ export class PlanItemRepository {
       planItem.id,
       planItem.churchId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return planItem;
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM planItems WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM planItems WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public deleteByPlanId(churchId: string, planId: string) {
-    return DB.query("DELETE FROM planItems WHERE churchId=? and planId=?;", [churchId, planId]);
+    return TypedDB.query("DELETE FROM planItems WHERE churchId=? and planId=?;", [churchId, planId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM planItems WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM planItems WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return DB.query("SELECT * FROM planItems WHERE churchId=? and id in (?);", [churchId, ids]);
+    return TypedDB.query("SELECT * FROM planItems WHERE churchId=? and id in (?);", [churchId, ids]);
   }
 
   public loadForPlan(churchId: string, planId: string) {
-    return DB.query("SELECT * FROM planItems WHERE churchId=? and planId=? ORDER BY sort", [churchId, planId]);
+    return TypedDB.query("SELECT * FROM planItems WHERE churchId=? and planId=? ORDER BY sort", [churchId, planId]);
   }
 }

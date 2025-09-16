@@ -108,7 +108,7 @@ export class SongHelper {
     const repos = await RepositoryManager.getRepositories<Repositories>("content");
     const existingByCCLI = await repos.songDetailLink.loadByServiceAndKey("CCLI", ccliNumber);
     if (existingByCCLI) {
-      const songDetail = await repos.songDetail.load(existingByCCLI.songDetailId);
+      const songDetail = await repos.songDetail.loadGlobal(existingByCCLI.songDetailId);
       if (songDetail) {
         const existingArrangement = await repos.arrangement.loadBySongDetailId(churchId, songDetail.id);
         if (existingArrangement.length > 0) return songDetail;
@@ -121,7 +121,7 @@ export class SongHelper {
     const repos = await RepositoryManager.getRepositories<Repositories>("content");
     const existingByGenius = await repos.songDetailLink.loadByServiceAndKey("Genius", geniusId);
     if (existingByGenius) {
-      const songDetail = await repos.songDetail.load(existingByGenius.songDetailId);
+      const songDetail = await repos.songDetail.loadGlobal(existingByGenius.songDetailId);
       if (songDetail) {
         const existingArrangement = await repos.arrangement.loadBySongDetailId(churchId, songDetail.id);
         if (existingArrangement.length > 0) {

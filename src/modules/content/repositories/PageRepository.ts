@@ -1,6 +1,6 @@
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { injectable } from "inversify";
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Page } from "../models";
 
 @injectable()

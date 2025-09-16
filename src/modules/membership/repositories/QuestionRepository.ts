@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Question } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../helpers";
@@ -26,7 +26,7 @@ export class QuestionRepository {
       question.required,
       JSON.stringify(question.choices)
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return question;
   }
 
@@ -45,51 +45,51 @@ export class QuestionRepository {
       question.id,
       question.churchId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return question;
   }
 
   public async delete(churchId: string, id: string) {
-    const question = (await DB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
+    const question = (await TypedDB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
       formId: string;
       sort: number;
     };
-    const result = await DB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort>?;", [question.formId, +question.sort]);
-    return DB.query("UPDATE questions SET sort=CONCAT('d', sort), removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
+    const result = await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort>?;", [question.formId, +question.sort]);
+    return TypedDB.query("UPDATE questions SET sort=CONCAT('d', sort), removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM questions WHERE id=? AND churchId=? AND removed=0;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM questions WHERE id=? AND churchId=? AND removed=0;", [id, churchId]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM questions WHERE churchId=? AND removed=0;", [churchId]);
+    return TypedDB.query("SELECT * FROM questions WHERE churchId=? AND removed=0;", [churchId]);
   }
 
   public loadForForm(churchId: string, formId: string) {
-    return DB.query("SELECT * FROM questions WHERE churchId=? AND formId=? AND removed=0 ORDER BY sort;", [churchId, formId]);
+    return TypedDB.query("SELECT * FROM questions WHERE churchId=? AND formId=? AND removed=0 ORDER BY sort;", [churchId, formId]);
   }
 
   public loadForUnrestrictedForm(formId: string) {
-    return DB.query("SELECT * FROM questions WHERE formId=? AND removed=0 ORDER BY sort;", [formId]);
+    return TypedDB.query("SELECT * FROM questions WHERE formId=? AND removed=0 ORDER BY sort;", [formId]);
   }
 
   public async moveQuestionUp(id: string) {
-    const question = (await DB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
+    const question = (await TypedDB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
       formId: string;
       sort: number;
     };
-    let result = await DB.query("UPDATE questions SET sort=sort+1 WHERE formId=? AND sort=?;", [question.formId, +question.sort - 1]);
-    result = await DB.query("UPDATE questions SET sort=sort-1 WHERE id=?;", [id]);
+    let result = await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE formId=? AND sort=?;", [question.formId, +question.sort - 1]);
+    result = await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE id=?;", [id]);
   }
 
   public async moveQuestionDown(id: string) {
-    const question = (await DB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
+    const question = (await TypedDB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
       formId: string;
       sort: number;
     };
-    let result = await DB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort=?;", [question.formId, +question.sort + 1]);
-    result = await DB.query("UPDATE questions SET sort=sort+1 WHERE id=?;", [id]);
+    let result = await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort=?;", [question.formId, +question.sort + 1]);
+    result = await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE id=?;", [id]);
   }
 
   public convertToModel(churchId: string, data: any) {

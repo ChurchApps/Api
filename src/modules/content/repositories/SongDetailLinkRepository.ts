@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { SongDetailLink } from "../models";
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 

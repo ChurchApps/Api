@@ -1,4 +1,4 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { RolePermission, Api, LoginUserChurch } from "../models";
 import { UniqueIdHelper } from "../helpers";
 import { ArrayHelper } from "@churchapps/apihelper";
@@ -12,27 +12,27 @@ export class RolePermissionRepository {
     rolePermission.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, contentId, action) VALUES (?, ?, ?, ?, ?, ?, ?);";
     const params = [rolePermission.id, rolePermission.churchId, rolePermission.roleId, rolePermission.apiName, rolePermission.contentType, rolePermission.contentId, rolePermission.action];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return rolePermission;
   }
 
   private async update(rolePermission: RolePermission) {
     const sql = "UPDATE rolePermissions SET roleId=?, apiName=?, contentType=?, contentId=?, action=? WHERE id=? AND churchId=?";
     const params = [rolePermission.roleId, rolePermission.apiName, rolePermission.contentType, rolePermission.contentId, rolePermission.action, rolePermission.id, rolePermission.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return rolePermission;
   }
 
   public deleteForRole(churchId: string, roleId: string) {
     const sql = "DELETE FROM rolePermissions WHERE churchId=? AND roleId=?";
     const params = [churchId, roleId];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public delete(churchId: string, id: string) {
     const sql = "DELETE FROM rolePermissions WHERE churchId=? AND id=?";
     const params = [churchId, id];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public async loadForUser(userId: string, removeUniversal: boolean): Promise<LoginUserChurch[]> {
@@ -47,7 +47,7 @@ export class RolePermissionRepository {
       " WHERE rm.userId=?" +
       " GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, uc.personId, p.membershipStatus, c.archivedDate" +
       " ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, uc.personId, p.membershipStatus, c.archivedDate";
-    const data = (await DB.query(query, [userId])) as any[];
+    const data = (await TypedDB.query(query, [userId])) as any[];
 
     const result: LoginUserChurch[] = [];
     let currentUserChurch: LoginUserChurch = null;
@@ -109,7 +109,7 @@ export class RolePermissionRepository {
       " WHERE c.id=?" +
       " GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action" +
       " ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action";
-    const data = (await DB.query(query, [churchId])) as any[];
+    const data = (await TypedDB.query(query, [churchId])) as any[];
     let result: LoginUserChurch = null;
     let currentApi: Api = null;
     data.forEach((row: any) => {
@@ -174,7 +174,7 @@ export class RolePermissionRepository {
       " WHERE rm.userId=? AND rm.churchId=?" +
       " GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action" +
       " ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action";
-    const data = (await DB.query(query, [userId, churchId])) as any[];
+    const data = (await TypedDB.query(query, [userId, churchId])) as any[];
 
     let result: LoginUserChurch = null;
     let currentApi: Api = null;
@@ -235,12 +235,12 @@ export class RolePermissionRepository {
   }
 
   public loadByRoleId(churchId: string, roleId: string): Promise<RolePermission[]> {
-    return DB.query("SELECT * FROM rolePermissions WHERE churchId=? AND roleId=?", [churchId, roleId]) as Promise<RolePermission[]>;
+    return TypedDB.query("SELECT * FROM rolePermissions WHERE churchId=? AND roleId=?", [churchId, roleId]) as Promise<RolePermission[]>;
   }
 
   // permissions applied to all the members of church
   public loadForEveryone(churchId: string) {
-    return DB.query(
+    return TypedDB.query(
       "SELECT rp.id, rp.churchId, rp.roleId, rp.apiName, rp.contentType, rp.contentId, rp.action, c.name AS churchName, c.subDomain FROM rolePermissions rp LEFT JOIN churches c on c.id=rp.churchId WHERE rp.churchId=? AND rp.roleId IS NULL",
       [churchId]
     );

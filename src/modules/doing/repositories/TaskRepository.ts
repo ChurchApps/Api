@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Task } from "../models";
 
@@ -26,7 +26,7 @@ export class TaskRepository {
       sql += " OR id IN (?)";
       params.push(taskIds);
     }
-    const result = await DB.query(sql, params);
+    const result = await TypedDB.query(sql, params);
     return result;
   }
 
@@ -57,7 +57,7 @@ export class TaskRepository {
       task.conversationId,
       task.data
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return task;
   }
 
@@ -85,16 +85,16 @@ export class TaskRepository {
       task.id,
       task.churchId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return task;
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM tasks WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM tasks WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM tasks WHERE id=? AND churchId=? order by taskNumber;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM tasks WHERE id=? AND churchId=? order by taskNumber;", [id, churchId]);
   }
 
   public async loadByAutomationIdContent(churchId: string, automationId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
@@ -114,7 +114,7 @@ export class TaskRepository {
   }
 
   private async loadByAutomationIdContentNoRepeat(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) order by taskNumber;", [
+    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) order by taskNumber;", [
       churchId,
       automationId,
       associatedWithType,
@@ -126,7 +126,7 @@ export class TaskRepository {
   private async loadByAutomationIdContentYearly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
     const threshold = new Date();
     threshold.setFullYear(threshold.getFullYear() - 1);
-    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
+    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
       churchId,
       automationId,
       associatedWithType,
@@ -139,7 +139,7 @@ export class TaskRepository {
   private async loadByAutomationIdContentMonthly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
     const threshold = new Date();
     threshold.setMonth(threshold.getMonth() - 1);
-    const result = await DB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
+    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
       churchId,
       automationId,
       associatedWithType,
@@ -150,12 +150,12 @@ export class TaskRepository {
   }
 
   private async loadNextTaskNumber(churchId: string) {
-    const result = await DB.queryOne("select max(ifnull(taskNumber, 0)) + 1 as taskNumber from tasks where churchId=?", [churchId]);
+    const result = await TypedDB.queryOne("select max(ifnull(taskNumber, 0)) + 1 as taskNumber from tasks where churchId=?", [churchId]);
     return (result as any).taskNumber;
   }
 
   public loadForPerson(churchId: string, personId: string, status: string) {
-    return DB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='person' AND assignedToId=?) OR (createdByType='person' AND createdById=?)) and status=? order by taskNumber;", [
+    return TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='person' AND assignedToId=?) OR (createdByType='person' AND createdById=?)) and status=? order by taskNumber;", [
       churchId,
       personId,
       personId,
@@ -166,17 +166,17 @@ export class TaskRepository {
   public async loadForGroups(churchId: string, groupIds: string[], status: string) {
     if (groupIds.length === 0) return [];
     else
-      return DB.query(
+      return TypedDB.query(
         "SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;",
         [churchId, groupIds, groupIds, status]
       );
   }
 
   public async loadForDirectoryUpdate(churchId: string, personId: string) {
-    return DB.query("SELECT * FROM tasks WHERE taskType='directoryUpdate' AND status='Open' AND churchId=? AND associatedWithId=?;", [churchId, personId]);
+    return TypedDB.query("SELECT * FROM tasks WHERE taskType='directoryUpdate' AND status='Open' AND churchId=? AND associatedWithId=?;", [churchId, personId]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM tasks WHERE churchId=?;", [churchId]);
+    return TypedDB.query("SELECT * FROM tasks WHERE churchId=?;", [churchId]);
   }
 }

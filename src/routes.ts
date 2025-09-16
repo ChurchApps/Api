@@ -30,14 +30,14 @@ export const MODULE_ROUTES = {
 export const createModuleContextMiddleware = (moduleName: string) => {
   return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
-      // Import DB to set up request context
-      const { DB } = await import("./shared/infrastructure/DB");
+      // Import TypedDB to set up request context
+      const { TypedDB } = await import("./shared/infrastructure/TypedDB");
 
       // Add module information to request for debugging/logging
       (req as any).module = moduleName;
 
       // Run the rest of the request handling within the module's database context
-      await DB.runWithContext(moduleName, async () => {
+      await TypedDB.runWithContext(moduleName, async () => {
         next();
       });
     } catch (error) {

@@ -1,6 +1,6 @@
 import { injectable } from "inversify";
 import { DateHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { StreamingService } from "../models";
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 

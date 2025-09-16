@@ -1,5 +1,5 @@
 import { UniqueIdHelper, DateHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { EventException } from "../models";
 
 export class EventExceptionRepository {

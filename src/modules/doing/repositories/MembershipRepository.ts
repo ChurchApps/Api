@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Condition } from "../models";
 
 @injectable()
@@ -50,7 +50,7 @@ export class MembershipRepository {
     params.push(this.getDBValue(condition));
 
     const result: string[] = [];
-    const rows = (await DB.query(sql, params)) as { id: string }[];
+    const rows = (await TypedDB.query(sql, params)) as { id: string }[];
     rows.forEach((r: { id: string }) => result.push(r.id));
     return result;
   }
@@ -58,6 +58,6 @@ export class MembershipRepository {
   public async loadPeople(churchId: string, personIds: string[]) {
     const sql = "select id, displayName from people where churchId = ? AND removed = 0 AND id in (?)";
     const params = [churchId, personIds];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 }

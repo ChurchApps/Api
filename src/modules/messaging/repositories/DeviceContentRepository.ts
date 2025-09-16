@@ -1,4 +1,4 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { DeviceContent } from "../models";
 import { injectable } from "inversify";
 
@@ -15,11 +15,11 @@ export class DeviceContentRepository extends ConfiguredRepository<DeviceContent>
     };
   }
   public loadByDeviceId(churchId: string, deviceId: string) {
-    return DB.query("SELECT * FROM deviceContent WHERE churchId=? AND deviceId=?", [churchId, deviceId]);
+    return TypedDB.query("SELECT * FROM deviceContent WHERE churchId=? AND deviceId=?", [churchId, deviceId]);
   }
 
   public deleteByDeviceId(churchId: string, deviceId: string) {
-    return DB.query("DELETE FROM deviceContent WHERE deviceId=? AND churchId=?;", [deviceId, churchId]);
+    return TypedDB.query("DELETE FROM deviceContent WHERE deviceId=? AND churchId=?;", [deviceId, churchId]);
   }
 
   protected rowToModel(row: any): DeviceContent {

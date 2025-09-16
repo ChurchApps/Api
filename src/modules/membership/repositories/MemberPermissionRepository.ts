@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { MemberPermission } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../helpers";
@@ -22,7 +22,7 @@ export class MemberPermissionRepository {
       memberPermission.action,
       memberPermission.emailNotification
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return memberPermission;
   }
 
@@ -37,32 +37,32 @@ export class MemberPermissionRepository {
       memberPermission.id,
       memberPermission.churchId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return memberPermission;
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public deleteByMemberId(churchId: string, memberId: string, contentId: string) {
-    return DB.query("DELETE FROM memberPermissions WHERE memberId=? AND contentId=? AND churchId=?;", [memberId, churchId, contentId]);
+    return TypedDB.query("DELETE FROM memberPermissions WHERE memberId=? AND contentId=? AND churchId=?;", [memberId, churchId, contentId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadMyByForm(churchId: string, formId: string, personId: string) {
-    return DB.queryOne("SELECT * FROM memberPermissions WHERE churchId=? and contentType='form' and contentId=? and memberId=?;", [churchId, formId, personId]);
+    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE churchId=? and contentType='form' and contentId=? and memberId=?;", [churchId, formId, personId]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM memberPermissions WHERE churchId=?;", [churchId]);
+    return TypedDB.query("SELECT * FROM memberPermissions WHERE churchId=?;", [churchId]);
   }
 
   public loadByEmailNotification(churchId: string, emailNotification: boolean) {
-    return DB.query("SELECT * FROM memberPermissions WHERE churchId=? AND emailNotification=?;", [churchId, emailNotification]);
+    return TypedDB.query("SELECT * FROM memberPermissions WHERE churchId=? AND emailNotification=?;", [churchId, emailNotification]);
   }
 
   public loadFormsByPerson(churchId: string, personId: string) {
@@ -72,7 +72,7 @@ export class MemberPermissionRepository {
       " INNER JOIN `people` p on p.id=mp.memberId" +
       " WHERE mp.churchId=? AND mp.memberId=?" +
       " ORDER BY mp.action, mp.emailNotification desc;";
-    return DB.query(sql, [churchId, personId]);
+    return TypedDB.query(sql, [churchId, personId]);
   }
 
   public loadPeopleByForm(churchId: string, formId: string) {
@@ -82,7 +82,7 @@ export class MemberPermissionRepository {
       " INNER JOIN `people` p on p.id=mp.memberId" +
       " WHERE mp.churchId=? AND mp.contentId=?" +
       " ORDER BY mp.action, mp.emailNotification desc;";
-    return DB.query(sql, [churchId, formId]);
+    return TypedDB.query(sql, [churchId, formId]);
   }
 
   public convertToModel(churchId: string, data: any) {
@@ -104,6 +104,6 @@ export class MemberPermissionRepository {
   }
 
   private existingPermissionRecord(churchId: string, contentId: string) {
-    return DB.queryOne("SELECT * FROM memberPermissions WHERE contentId=? AND churchId=?;", [contentId, churchId]);
+    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE contentId=? AND churchId=?;", [contentId, churchId]);
   }
 }

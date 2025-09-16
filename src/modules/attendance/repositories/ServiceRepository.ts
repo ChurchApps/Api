@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
-import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Service } from "../models";
 
 @injectable()
@@ -16,7 +17,7 @@ export class ServiceRepository extends ConfiguredRepository<Service> {
   }
 
   public async loadWithCampus(churchId: string) {
-    const result = await DB.query(
+    const result = await TypedDB.query(
       "SELECT s.*, c.name as campusName FROM services s INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=? AND s.removed=0 and c.removed=0 ORDER BY c.name, s.name",
       [churchId]
     );
@@ -24,7 +25,7 @@ export class ServiceRepository extends ConfiguredRepository<Service> {
   }
 
   public async searchByCampus(churchId: string, campusId: string) {
-    const result = await DB.query("SELECT * FROM services WHERE churchId=? AND (?=0 OR CampusId=?) AND removed=0 ORDER by name;", [churchId, campusId, campusId]);
+    const result = await TypedDB.query("SELECT * FROM services WHERE churchId=? AND (?=0 OR CampusId=?) AND removed=0 ORDER by name;", [churchId, campusId, campusId]);
     return this.convertAllToModel(churchId, result);
   }
 

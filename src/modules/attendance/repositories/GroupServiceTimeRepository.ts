@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { GroupServiceTime } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -23,12 +23,12 @@ export class GroupServiceTimeRepository extends ConfiguredRepository<GroupServic
       " INNER JOIN services s on s.id = st.serviceId" +
       " INNER JOIN campuses c on c.id = s.campusId" +
       " WHERE gst.churchId=? AND gst.groupId=?";
-    return DB.query(sql, [churchId, groupId]);
+    return TypedDB.query(sql, [churchId, groupId]);
   }
 
   public loadByServiceTimeIds(churchId: string, serviceTimeIds: string[]) {
     const sql = "SELECT * FROM groupServiceTimes WHERE churchId=? AND serviceTimeId IN (" + serviceTimeIds.join(",") + ")";
-    return DB.query(sql, [churchId]);
+    return TypedDB.query(sql, [churchId]);
   }
 
   protected rowToModel(row: any): GroupServiceTime {

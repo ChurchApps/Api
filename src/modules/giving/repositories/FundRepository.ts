@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
-import { DB, ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { ConfiguredRepository, type RepoConfig } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Fund } from "../models";
 
 @injectable()
@@ -16,7 +17,7 @@ export class FundRepository extends ConfiguredRepository<Fund> {
   }
 
   public async getOrCreateGeneral(churchId: string) {
-    const data = await DB.queryOne("SELECT * FROM funds WHERE churchId=? AND name='(General Fund)' AND removed=0;", [churchId]);
+    const data = await TypedDB.queryOne("SELECT * FROM funds WHERE churchId=? AND name='(General Fund)' AND removed=0;", [churchId]);
 
     if (data !== null) return this.convertToModel(churchId, data);
     else {

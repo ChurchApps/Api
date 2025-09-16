@@ -1,4 +1,4 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { AccessLog } from "../models";
 import { UniqueIdHelper } from "../helpers";
 
@@ -7,7 +7,7 @@ export class AccessLogRepository {
     log.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO accessLogs (id, userId, churchId, appName, loginTime) VALUES (?, ?, ?, ?, ?);";
     const params = [log.id, log.userId, log.churchId, log.appName, new Date()];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return log;
   }
 }

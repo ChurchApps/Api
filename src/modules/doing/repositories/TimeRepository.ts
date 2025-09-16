@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Time } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -16,14 +16,14 @@ export class TimeRepository extends ConfiguredRepository<Time> {
   }
 
   public deleteByPlanId(churchId: string, planId: string) {
-    return DB.query("DELETE FROM times WHERE churchId=? and planId=?;", [churchId, planId]);
+    return TypedDB.query("DELETE FROM times WHERE churchId=? and planId=?;", [churchId, planId]);
   }
 
   public loadByPlanId(churchId: string, planId: string) {
-    return DB.query("SELECT * FROM times WHERE churchId=? AND planId=?;", [churchId, planId]);
+    return TypedDB.query("SELECT * FROM times WHERE churchId=? AND planId=?;", [churchId, planId]);
   }
 
   public loadByPlanIds(churchId: string, planIds: string[]) {
-    return DB.query("SELECT * FROM times WHERE churchId=? and planId in (?);", [churchId, planIds]);
+    return TypedDB.query("SELECT * FROM times WHERE churchId=? and planId in (?);", [churchId, planIds]);
   }
 }

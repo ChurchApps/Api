@@ -1,4 +1,4 @@
-import { DB } from "./DB";
+import { TypedDB } from "./TypedDB";
 import { rowsToArray } from "../helpers/DbArrayHelper";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
@@ -70,7 +70,7 @@ export abstract class BaseRepository<T> {
   public async deleteSoft(churchId: string, id: string) {
     if (!this.hasSoftDelete) throw new Error("Soft delete not enabled for this repository");
     const sql = `UPDATE ${this.table()} SET ${this.removedColumn}=1 WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
-    return DB.query(sql, [id, churchId]);
+    return TypedDB.query(sql, [id, churchId]);
   }
 
   /**
@@ -79,7 +79,7 @@ export abstract class BaseRepository<T> {
   public async delete(churchId: string, id: string) {
     if (this.hasSoftDelete) return this.deleteSoft(churchId, id);
     const sql = `DELETE FROM ${this.tableName} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
-    return DB.query(sql, [id, churchId]);
+    return TypedDB.query(sql, [id, churchId]);
   }
 
   /**
@@ -88,7 +88,7 @@ export abstract class BaseRepository<T> {
   public async loadOne(churchId: string, id: string, includeRemoved = false) {
     const removedClause = this.hasSoftDelete && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
     const sql = `SELECT * FROM ${this.table()} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?${removedClause};`;
-    return DB.queryOne(sql, [id, churchId]);
+    return TypedDB.queryOne(sql, [id, churchId]);
   }
 
   /**
@@ -99,7 +99,7 @@ export abstract class BaseRepository<T> {
     const order = orderBy || this.defaultOrderBy;
     const orderClause = order ? ` ORDER BY ${order}` : "";
     const sql = `SELECT * FROM ${this.table()} WHERE ${this.churchIdColumn}=?${removedClause}${orderClause};`;
-    const result = await DB.query(sql, [churchId]);
+    const result = await TypedDB.query(sql, [churchId]);
     return rowsToArray(result);
   }
 

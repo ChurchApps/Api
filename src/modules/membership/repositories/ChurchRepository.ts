@@ -1,16 +1,16 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Church, Api, LoginUserChurch } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "../helpers";
 
 export class ChurchRepository {
   public async loadCount() {
-    const data = (await DB.queryOne("SELECT COUNT(*) as count FROM churches", [])) as { count: string };
+    const data = (await TypedDB.queryOne("SELECT COUNT(*) as count FROM churches", [])) as { count: string };
     return parseInt(data.count, 0);
   }
 
   public loadAll() {
-    return DB.query("SELECT * FROM churches WHERE archivedDate IS NULL ORDER BY name", []).then((rows: unknown) => {
+    return TypedDB.query("SELECT * FROM churches WHERE archivedDate IS NULL ORDER BY name", []).then((rows: unknown) => {
       return rows as Church[];
     });
   }
@@ -22,25 +22,25 @@ export class ChurchRepository {
     query += " ORDER BY name";
     if (name) query += " LIMIT 50";
     else query += " LIMIT 10";
-    return DB.query(query, params).then((rows: Church[]) => {
+    return TypedDB.query(query, params).then((rows: Church[]) => {
       return rows;
     });
   }
 
   public loadContainingSubDomain(subDomain: string) {
-    return DB.query("SELECT * FROM churches WHERE subDomain like ? and archivedDate IS NULL;", [subDomain + "%"]) as Promise<Church[]>;
+    return TypedDB.query("SELECT * FROM churches WHERE subDomain like ? and archivedDate IS NULL;", [subDomain + "%"]) as Promise<Church[]>;
   }
 
   public loadBySubDomain(subDomain: string) {
-    return DB.queryOne("SELECT * FROM churches WHERE subDomain=? and archivedDate IS NULL;", [subDomain]) as Promise<Church>;
+    return TypedDB.queryOne("SELECT * FROM churches WHERE subDomain=? and archivedDate IS NULL;", [subDomain]) as Promise<Church>;
   }
 
   public loadById(id: string) {
-    return DB.queryOne("SELECT * FROM churches WHERE id=?;", [id]) as Promise<Church>;
+    return TypedDB.queryOne("SELECT * FROM churches WHERE id=?;", [id]) as Promise<Church>;
   }
 
   public loadByIds(ids: string[]) {
-    return DB.query("SELECT * FROM churches WHERE id IN (?) order by name;", [ids]) as Promise<Church[]>;
+    return TypedDB.query("SELECT * FROM churches WHERE id IN (?) order by name;", [ids]) as Promise<Church[]>;
   }
 
   public async loadForUser(userId: string) {
@@ -49,7 +49,7 @@ export class ChurchRepository {
       " inner join churches c on c.id=uc.churchId and c.archivedDate IS NULL" +
       " LEFT JOIN people p on p.id=uc.personId" +
       " where uc.userId=?";
-    const rows = (await DB.query(sql, [userId])) as any[];
+    const rows = (await TypedDB.query(sql, [userId])) as any[];
     const result: LoginUserChurch[] = [];
     rows.forEach((row: any) => {
       const apis: Api[] = [];
@@ -82,7 +82,7 @@ export class ChurchRepository {
       "SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL " +
       noMonths +
       " MONTH);";
-    const rows = await DB.query(sql, []);
+    const rows = await TypedDB.query(sql, []);
     return rows;
   }
 
@@ -91,7 +91,7 @@ export class ChurchRepository {
       "DELETE churches FROM churches LEFT JOIN (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches ON churches.id = groupedChurches.churchId WHERE groupedChurches.lastAccessed <= DATE_SUB(NOW(), INTERVAL " +
       noMonths +
       " MONTH);";
-    return await DB.query(sql, []);
+    return await TypedDB.query(sql, []);
   }
 
   public save(church: Church) {
@@ -116,7 +116,7 @@ export class ChurchRepository {
       church.latitude,
       church.longitude
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return church;
   }
 
@@ -136,7 +136,7 @@ export class ChurchRepository {
       church.longitude,
       church.id
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return church;
   }
 

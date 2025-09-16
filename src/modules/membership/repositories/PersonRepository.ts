@@ -1,4 +1,4 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { injectable } from "inversify";
 import { DateHelper, PersonHelper, UniqueIdHelper } from "../helpers";
 import { CollectionHelper } from "../../../shared/helpers";
@@ -49,14 +49,14 @@ export class PersonRepository {
       person.conversationId,
       person.optedOut
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return person;
   }
 
   public updateOptedOut(personId: string, optedOut: boolean) {
     const sql = "UPDATE people SET optedOut=? WHERE id=?";
     const params = [optedOut, personId];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   private async update(person: Person) {
@@ -96,57 +96,57 @@ export class PersonRepository {
       person.id,
       person.churchId
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return person;
   }
 
   public async updateHousehold(person: Person) {
     const sql = "UPDATE people SET householdId=?, householdRole=? WHERE id=? and churchId=?";
     const params = [person.householdId, person.householdRole, person.id, person.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return person;
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("UPDATE people SET removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("UPDATE people SET removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public restore(churchId: string, id: string) {
-    return DB.query("UPDATE people SET removed=0 WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("UPDATE people SET removed=0 WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM people WHERE id=? AND churchId=? AND removed=0;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM people WHERE id=? AND churchId=? AND removed=0;", [id, churchId]);
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return DB.query("SELECT * FROM people WHERE id IN (?) AND churchId=?;", [ids, churchId]);
+    return TypedDB.query("SELECT * FROM people WHERE id IN (?) AND churchId=?;", [ids, churchId]);
   }
 
   public loadByIdsOnly(ids: string[]) {
-    return DB.query("SELECT * FROM people WHERE id IN (?);", [ids]);
+    return TypedDB.query("SELECT * FROM people WHERE id IN (?);", [ids]);
   }
 
   public loadMembers(churchId: string) {
-    return DB.query("SELECT * FROM people WHERE churchId=? AND removed=0 and membershipStatus in ('Member', 'Staff');", [churchId]);
+    return TypedDB.query("SELECT * FROM people WHERE churchId=? AND removed=0 and membershipStatus in ('Member', 'Staff');", [churchId]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM people WHERE churchId=? AND removed=0;", [churchId]);
+    return TypedDB.query("SELECT * FROM people WHERE churchId=? AND removed=0;", [churchId]);
   }
 
   public loadRecent(churchId: string, filterOptedOut?: boolean) {
     const filter = filterOptedOut ? " AND (optedOut = FALSE OR optedOut IS NULL)" : "";
-    return DB.query("SELECT * FROM (SELECT * FROM people WHERE churchId=? AND removed=0" + filter + " order by id desc limit 25) people ORDER BY lastName, firstName;", [churchId]);
+    return TypedDB.query("SELECT * FROM (SELECT * FROM people WHERE churchId=? AND removed=0" + filter + " order by id desc limit 25) people ORDER BY lastName, firstName;", [churchId]);
   }
 
   public loadByHousehold(churchId: string, householdId: string) {
-    return DB.query("SELECT * FROM people WHERE churchId=? and householdId=? AND removed=0;", [churchId, householdId]);
+    return TypedDB.query("SELECT * FROM people WHERE churchId=? and householdId=? AND removed=0;", [churchId, householdId]);
   }
 
   public search(churchId: string, term: string, filterOptedOut?: boolean) {
     const filter = filterOptedOut ? " AND (optedOut = FALSE OR optedOut IS NULL)" : "";
-    return DB.query(
+    return TypedDB.query(
       "SELECT * FROM people WHERE churchId=? AND concat(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,'')) LIKE ? AND removed=0" +
         filter +
         " LIMIT 100;",
@@ -156,14 +156,14 @@ export class PersonRepository {
 
   public searchPhone(churchId: string, phonestring: string) {
     const phoneSearch = "%" + phonestring.replace(/ |-/g, "%") + "%";
-    return DB.query(
+    return TypedDB.query(
       "SELECT * FROM people WHERE churchId=? AND (REPLACE(REPLACE(HomePhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(WorkPhone,'-',''), ' ', '') LIKE ? OR REPLACE(REPLACE(MobilePhone,'-',''), ' ', '') LIKE ?) AND removed=0 LIMIT 100;",
       [churchId, phoneSearch, phoneSearch, phoneSearch]
     );
   }
 
   public searchEmail(churchId: string, email: string) {
-    return DB.query("SELECT * FROM people WHERE churchId=? AND email like ? AND removed=0 LIMIT 100;", [churchId, "%" + email + "%"]);
+    return TypedDB.query("SELECT * FROM people WHERE churchId=? AND email like ? AND removed=0 LIMIT 100;", [churchId, "%" + email + "%"]);
   }
 
   public loadAttendees(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, categoryName: string, groupId: string, startDate: Date, endDate: Date) {
@@ -205,7 +205,7 @@ export class PersonRepository {
     }
     sql += " GROUP BY p.id, p.displayName, p.firstName, p.lastName, p.photoUpdated";
     sql += " ORDER BY p.lastName, p.firstName";
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public convertToModel(churchId: string, data: any, canEdit: boolean) {

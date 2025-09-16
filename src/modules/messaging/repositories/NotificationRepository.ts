@@ -1,15 +1,15 @@
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { CollectionHelper } from "../../../shared/helpers";
 import { Notification } from "../models";
 
 export class NotificationRepository {
   public loadById(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM notifications WHERE id=? and churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM notifications WHERE id=? and churchId=?;", [id, churchId]);
   }
 
   public loadByPersonId(churchId: string, personId: string) {
-    return DB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? ORDER BY timeSent DESC", [churchId, personId]);
+    return TypedDB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? ORDER BY timeSent DESC", [churchId, personId]);
   }
 
   public loadForEmail(frequency: string) {
@@ -19,38 +19,38 @@ export class NotificationRepository {
       " INNER JOIN notificationPreferences np on np.churchId=n.churchId and np.personId=n.personId" +
       " WHERE n.deliveryMethod='email' AND np.emailFrequency=? AND n.timeSent>DATE_SUB(NOW(), INTERVAL 24 HOUR)" +
       " LIMIT 200";
-    return DB.query(sql, [frequency]);
+    return TypedDB.query(sql, [frequency]);
   }
 
   public loadByPersonIdForEmail(churchId: string, personId: string, frequency: string) {
     let timeCutoff = "DATE_SUB(NOW(), INTERVAL 24 HOUR)";
     if (frequency === "individual") timeCutoff = "DATE_SUB(NOW(), INTERVAL 30 MINUTE)";
     const sql = "SELECT * FROM notifications WHERE churchId=? AND personId=? AND deliveryMethod='email' AND timeSent>=" + timeCutoff + " ORDER BY timeSent";
-    return DB.query(sql, [churchId, personId]);
+    return TypedDB.query(sql, [churchId, personId]);
   }
 
   public delete(churchId: string, id: string) {
-    return DB.query("DELETE FROM notifications WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.query("DELETE FROM notifications WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public async markRead(churchId: string, personId: string) {
     const sql = "UPDATE notifications SET isNew=0 WHERE churchId=? AND personId=?;";
     const params = [churchId, personId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
   }
 
   public async markAllRead(churchId: string, personId: string) {
     const sql = "UPDATE notifications SET isNew=0 WHERE churchId=? AND personId=?;";
     const params = [churchId, personId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
   }
 
   public loadForPerson(churchId: string, personId: string) {
-    return DB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? AND isNew=1 ORDER BY timeSent DESC", [churchId, personId]);
+    return TypedDB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? AND isNew=1 ORDER BY timeSent DESC", [churchId, personId]);
   }
 
   public loadNewCounts(churchId: string, personId: string) {
-    return DB.queryOne("SELECT COUNT(*) as count FROM notifications WHERE churchId=? AND personId=? AND isNew=1", [churchId, personId]);
+    return TypedDB.queryOne("SELECT COUNT(*) as count FROM notifications WHERE churchId=? AND personId=? AND isNew=1", [churchId, personId]);
   }
 
   public save(notification: Notification) {
@@ -70,14 +70,14 @@ export class NotificationRepository {
       notification.link,
       notification.deliveryMethod
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return notification;
   }
 
   private async update(notification: Notification) {
     const sql = "UPDATE notifications SET contentType=?, contentId=?, isNew=?, message=?, link=?, deliveryMethod=? WHERE id=? AND churchId=?;";
     const params = [notification.contentType, notification.contentId, notification.isNew, notification.message, notification.link, notification.deliveryMethod, notification.id, notification.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return notification;
   }
 
@@ -103,11 +103,11 @@ export class NotificationRepository {
 
   public loadUndelivered() {
     const sql = "SELECT * FROM notifications WHERE deliveryMethod IS NULL OR deliveryMethod=''";
-    return DB.query(sql, []);
+    return TypedDB.query(sql, []);
   }
 
   public loadExistingUnread(churchId: string, contentType: string, contentId: string) {
     const sql = "SELECT * FROM notifications WHERE churchId=? AND contentType=? AND contentId=? AND isNew=1";
-    return DB.query(sql, [churchId, contentType, contentId]);
+    return TypedDB.query(sql, [churchId, contentType, contentId]);
   }
 }

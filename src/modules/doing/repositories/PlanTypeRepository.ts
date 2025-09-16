@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { PlanType } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -16,11 +16,11 @@ export class PlanTypeRepository extends ConfiguredRepository<PlanType> {
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return DB.query("SELECT * FROM planTypes WHERE churchId=? and id in (?);", [churchId, ids]);
+    return TypedDB.query("SELECT * FROM planTypes WHERE churchId=? and id in (?);", [churchId, ids]);
   }
 
   public loadByMinistryId(churchId: string, ministryId: string) {
-    return DB.query("SELECT * FROM planTypes WHERE churchId=? AND ministryId=?;", [churchId, ministryId]);
+    return TypedDB.query("SELECT * FROM planTypes WHERE churchId=? AND ministryId=?;", [churchId, ministryId]);
   }
 
   protected rowToModel(row: any): PlanType {

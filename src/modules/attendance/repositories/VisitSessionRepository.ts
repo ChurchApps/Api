@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { VisitSession } from "../models";
 
@@ -17,15 +17,15 @@ export class VisitSessionRepository extends ConfiguredRepository<VisitSession> {
   }
 
   public loadByVisitIdSessionId(churchId: string, visitId: string, sessionId: string) {
-    return DB.queryOne("SELECT * FROM visitSessions WHERE churchId=? AND visitId=? AND sessionId=? LIMIT 1;", [churchId, visitId, sessionId]);
+    return TypedDB.queryOne("SELECT * FROM visitSessions WHERE churchId=? AND visitId=? AND sessionId=? LIMIT 1;", [churchId, visitId, sessionId]);
   }
 
   public loadByVisitIds(churchId: string, visitIds: string[]) {
-    return DB.query("SELECT * FROM visitSessions WHERE churchId=? AND visitId IN (" + ArrayHelper.fillArray("?", visitIds.length).join(", ") + ");", [churchId].concat(visitIds));
+    return TypedDB.query("SELECT * FROM visitSessions WHERE churchId=? AND visitId IN (" + ArrayHelper.fillArray("?", visitIds.length).join(", ") + ");", [churchId].concat(visitIds));
   }
 
   public loadByVisitId(churchId: string, visitId: string) {
-    return DB.query("SELECT * FROM visitSessions WHERE churchId=? AND visitId=?;", [churchId, visitId]);
+    return TypedDB.query("SELECT * FROM visitSessions WHERE churchId=? AND visitId=?;", [churchId, visitId]);
   }
 
   public loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
@@ -35,12 +35,12 @@ export class VisitSessionRepository extends ConfiguredRepository<VisitSession> {
       " LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId" +
       " INNER JOIN visits v on(v.serviceId = st.serviceId or v.groupId = s.groupId) and v.visitDate = s.sessionDate" +
       " WHERE v.churchId=? AND s.id = ? AND v.personId=? LIMIT 1";
-    return DB.queryOne(sql, [churchId, sessionId, personId]);
+    return TypedDB.queryOne(sql, [churchId, sessionId, personId]);
   }
 
   public loadForSession(churchId: string, sessionId: string) {
     const sql = "SELECT vs.*, v.personId FROM" + " visitSessions vs" + " INNER JOIN visits v on v.id = vs.visitId" + " WHERE vs.churchId=? AND vs.sessionId = ?";
-    return DB.query(sql, [churchId, sessionId]);
+    return TypedDB.query(sql, [churchId, sessionId]);
   }
 
   protected rowToModel(row: any): VisitSession {

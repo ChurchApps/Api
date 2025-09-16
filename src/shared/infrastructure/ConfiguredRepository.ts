@@ -1,4 +1,4 @@
-import { DB } from "./DB";
+import { TypedDB } from "./TypedDB";
 import { BaseRepository } from "./BaseRepository";
 
 export interface RepoConfig<T> {
@@ -22,13 +22,13 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
     if (!m[this.idColumn]) m[this.idColumn] = this.createId();
     const { sql, params } = this.buildInsert(model);
     //console.log(sql, params);
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return model;
   }
 
   protected async update(model: T): Promise<T> {
     const { sql, params } = this.buildUpdate(model);
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return model;
   }
 
@@ -86,7 +86,7 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
     const cfg = this.repoConfig;
     if (cfg.hasSoftDelete === false) {
       const sql = `DELETE FROM ${this.table()} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
-      return DB.query(sql, [id, churchId]);
+      return TypedDB.query(sql, [id, churchId]);
     }
     return this.deleteSoft(churchId, id);
   }
@@ -97,7 +97,7 @@ export abstract class ConfiguredRepository<T extends { [key: string]: any }> ext
     const order = orderBy || cfg.defaultOrderBy;
     const orderClause = order ? ` ORDER BY ${order}` : "";
     const sql = `SELECT * FROM ${this.table()} WHERE ${this.churchIdColumn}=?${removedClause}${orderClause};`;
-    const result = await DB.query(sql, [churchId]);
+    const result = await TypedDB.query(sql, [churchId]);
     return result as any[];
   }
 }

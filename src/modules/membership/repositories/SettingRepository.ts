@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Setting } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper } from "@churchapps/apihelper";
@@ -14,24 +14,24 @@ export class SettingRepository {
     setting.id = UniqueIdHelper.shortId();
     const sql = "INSERT INTO settings (id, churchId, keyName, value, public) VALUES (?, ?, ?, ?, ?)";
     const params = [setting.id, setting.churchId, setting.keyName, setting.value, setting.public];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return setting;
   }
 
   private async update(setting: Setting) {
     const sql = "UPDATE settings SET churchId=?, keyName=?, value=?, public=? WHERE id=? AND churchId=?";
     const params = [setting.churchId, setting.keyName, setting.value, setting.public, setting.id, setting.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return setting;
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM settings WHERE churchId=?;", [churchId]);
+    return TypedDB.query("SELECT * FROM settings WHERE churchId=?;", [churchId]);
   }
 
   public loadPublicSettings(churchId: string) {
     console.log("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
-    return DB.query("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
+    return TypedDB.query("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
   }
 
   public loadMulipleChurches(keyNames: string[], churchIds: string[]) {
@@ -43,7 +43,7 @@ export class SettingRepository {
     const sql = `SELECT * FROM settings WHERE keyName IN (${keyNamePlaceholders}) AND churchId IN (${churchIdPlaceholders}) AND public=1`;
     const params = [...keyNames, ...churchIds];
 
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public convertToModel(churchId: string, data: any) {

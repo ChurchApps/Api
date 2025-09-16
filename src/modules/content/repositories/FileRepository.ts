@@ -1,4 +1,4 @@
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { File } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 

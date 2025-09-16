@@ -1,5 +1,5 @@
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../helpers";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Element } from "../models";
 
 export class ElementRepository {

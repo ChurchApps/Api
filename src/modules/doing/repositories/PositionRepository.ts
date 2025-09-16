@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Position } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -16,19 +16,19 @@ export class PositionRepository extends ConfiguredRepository<Position> {
   }
 
   public deleteByPlanId(churchId: string, planId: string) {
-    return DB.query("DELETE FROM positions WHERE churchId=? and planId=?;", [churchId, planId]);
+    return TypedDB.query("DELETE FROM positions WHERE churchId=? and planId=?;", [churchId, planId]);
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return DB.query("SELECT * FROM positions WHERE churchId=? and id in (?);", [churchId, ids]);
+    return TypedDB.query("SELECT * FROM positions WHERE churchId=? and id in (?);", [churchId, ids]);
   }
 
   public loadByPlanId(churchId: string, planId: string) {
-    return DB.query("SELECT * FROM positions WHERE churchId=? AND planId=? ORDER BY categoryName, name;", [churchId, planId]);
+    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId=? ORDER BY categoryName, name;", [churchId, planId]);
   }
 
   public loadByPlanIds(churchId: string, planIds: string[]) {
-    return DB.query("SELECT * FROM positions WHERE churchId=? AND planId in (?);", [churchId, planIds]);
+    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId in (?);", [churchId, planIds]);
   }
 
   protected rowToModel(row: any): Position {

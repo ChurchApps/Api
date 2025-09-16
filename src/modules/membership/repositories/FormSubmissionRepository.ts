@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { DB } from "../../../shared/infrastructure";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { FormSubmission } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
 import { UniqueIdHelper, DateHelper } from "../helpers";
@@ -26,37 +26,37 @@ export class FormSubmissionRepository {
       revisionDate,
       formSubmission.revisedBy
     ];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return formSubmission;
   }
 
   private async update(formSubmission: FormSubmission) {
     const sql = "UPDATE formSubmissions SET revisionDate=NOW(), contentId=?, revisedBy=? WHERE id=? and churchId=?";
     const params = [formSubmission.contentId, formSubmission.revisedBy, formSubmission.id, formSubmission.churchId];
-    await DB.query(sql, params);
+    await TypedDB.query(sql, params);
     return formSubmission;
   }
 
   public delete(churchId: string, id: string) {
     const sql = "DELETE FROM formSubmissions WHERE id=? AND churchId=?;";
     const params = [id, churchId];
-    return DB.query(sql, params);
+    return TypedDB.query(sql, params);
   }
 
   public load(churchId: string, id: string) {
-    return DB.queryOne("SELECT * FROM formSubmissions WHERE id=? AND churchId=?;", [id, churchId]);
+    return TypedDB.queryOne("SELECT * FROM formSubmissions WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public loadAll(churchId: string) {
-    return DB.query("SELECT * FROM formSubmissions WHERE churchId=?;", [churchId]);
+    return TypedDB.query("SELECT * FROM formSubmissions WHERE churchId=?;", [churchId]);
   }
 
   public loadForContent(churchId: string, contentType: string, contentId: string) {
-    return DB.query("SELECT * FROM formSubmissions WHERE churchId=? AND contentType=? AND contentId=?;", [churchId, contentType, contentId]);
+    return TypedDB.query("SELECT * FROM formSubmissions WHERE churchId=? AND contentType=? AND contentId=?;", [churchId, contentType, contentId]);
   }
 
   public loadByFormId(churchId: string, formId: string) {
-    return DB.query("SELECT * FROM formSubmissions WHERE churchId=? AND formId=?;", [churchId, formId]);
+    return TypedDB.query("SELECT * FROM formSubmissions WHERE churchId=? AND formId=?;", [churchId, formId]);
   }
 
   public convertToModel(churchId: string, data: any) {
