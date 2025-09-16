@@ -25,8 +25,13 @@ export class DeviceRepo extends ConfiguredRepo<Device> {
     return TypedDB.queryOne("SELECT * FROM devices WHERE id=? and churchId=?;", [id, churchId]);
   }
 
-  public loadByDeviceId(churchId: string, deviceId: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE deviceId=? and churchId=?;", [deviceId, churchId]);
+  public async loadByPairingCode(pairingCode: string) {
+    const result: any = await TypedDB.queryOne("SELECT * FROM devices WHERE pairingCode=?;", [pairingCode]);
+    return result.rows || result || {};
+  }
+
+  public loadByDeviceId(deviceId: string) {
+    return TypedDB.queryOne("SELECT * FROM devices WHERE deviceId=? and churchId=?;", [deviceId]);
   }
 
   public loadByFcmToken(churchId: string, fcmToken: string) {

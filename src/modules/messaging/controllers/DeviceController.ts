@@ -5,6 +5,37 @@ import { Device } from "../models";
 
 @controller("/messaging/devices")
 export class DeviceController extends MessagingBaseController {
+
+  @httpPost("/enroll")
+  public async enroll(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      let result = await this.repos.device.loadByDeviceId(req.body.deviceId);
+      if (result) {
+        result.pairingCode = req.body.pairingCode;
+        result.personId = null;
+        await this.repos.device.save(result);
+      } else result = await this.repos.device.save(req.body);
+      return result;
+    });
+  }
+
+  @httpGet("/pair/:pairingCode")
+  public async pair(@requestParam("pairingCode") pairingCode: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      let success = false;
+      const existing = await this.repos.device.loadByPairingCode(pairingCode);
+      if (existing) {
+        existing.personId = au.personId;
+        existing.churchId = au.churchId;
+        existing.pairingCode = "";
+        await this.repos.device.save(existing);
+        success = true;
+      }
+      return { success };
+    });
+  }
+
+
   @httpGet("/:churchId")
   public async loadByChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
