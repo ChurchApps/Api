@@ -91,7 +91,6 @@ export class UserController extends MembershipBaseController {
         if (Environment.currentEnvironment === "dev") {
           throw e;
         }
-        this.logger.error(e.toString());
         return this.error([e.toString()]);
       }
     });
