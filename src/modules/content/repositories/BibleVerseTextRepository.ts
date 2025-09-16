@@ -1,42 +1,18 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { BibleVerseText } from "../models";
-import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
+import { GlobalConfiguredRepository, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepository";
 
 @injectable()
-export class BibleVerseTextRepository extends BaseRepository<BibleVerseText> {
-  protected tableName = "bibleVerseTexts";
-  protected hasSoftDelete = false;
-
-  protected async create(text: BibleVerseText): Promise<BibleVerseText> {
-    if (!text.id) text.id = this.createId();
-    const sql = "INSERT INTO bibleVerseTexts (id, translationKey, verseKey, bookKey, chapterNumber, verseNumber, content, newParagraph) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [text.id, text.translationKey, text.verseKey, text.bookKey, text.chapterNumber, text.verseNumber, text.content, text.newParagraph];
-    await TypedDB.query(sql, params);
-    return text;
-  }
-
-  protected async update(text: BibleVerseText): Promise<BibleVerseText> {
-    const sql = "UPDATE bibleVerseTexts SET translationKey=?, verseKey=?, bookKey=?, chapterNumber=?, verseNumber=?, content=?, newParagraph=? WHERE id=?";
-    const params = [text.translationKey, text.verseKey, text.bookKey, text.chapterNumber, text.verseNumber, text.content, text.newParagraph, text.id];
-    await TypedDB.query(sql, params);
-    return text;
-  }
-
-  public saveAll(texts: BibleVerseText[]) {
-    const promises: Promise<BibleVerseText>[] = [];
-    texts.forEach((v) => {
-      promises.push(this.save(v));
-    });
-    return Promise.all(promises);
-  }
-
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM bibleVerseTexts WHERE id=?;", [id]);
-  }
-
-  public load(id: string) {
-    return TypedDB.queryOne("SELECT * FROM bibleVerseTexts WHERE id=?;", [id]);
+export class BibleVerseTextRepository extends GlobalConfiguredRepository<BibleVerseText> {
+  protected get repoConfig(): GlobalRepoConfig<BibleVerseText> {
+    return {
+      tableName: "bibleVerseTexts",
+      hasSoftDelete: false,
+      insertColumns: ["translationKey", "verseKey", "bookKey", "chapterNumber", "verseNumber", "content", "newParagraph"],
+      updateColumns: ["translationKey", "verseKey", "bookKey", "chapterNumber", "verseNumber", "content", "newParagraph"],
+      defaultOrderBy: "chapterNumber, verseNumber"
+    };
   }
 
   private loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number) {

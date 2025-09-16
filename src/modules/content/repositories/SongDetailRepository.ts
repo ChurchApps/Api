@@ -14,39 +14,16 @@ export class SongDetailRepository extends ConfiguredRepository<SongDetail> {
     };
   }
 
-  // Override to use TypedDB instead of DB
-  protected async create(model: SongDetail): Promise<SongDetail> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  protected async update(model: SongDetail): Promise<SongDetail> {
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  public saveAll(songDetails: SongDetail[]) {
-    const promises: Promise<SongDetail>[] = [];
-    songDetails.forEach((sd) => {
-      promises.push(this.save(sd));
-    });
-    return Promise.all(promises);
-  }
-
   // SongDetails is a global table (no churchId), so override standard methods
-  public async delete(churchId: string, id: string): Promise<any> {
+  public async delete(_churchId: string, id: string): Promise<any> {
     return TypedDB.query("DELETE FROM songDetails WHERE id=?;", [id]);
   }
 
-  public async load(churchId: string, id: string): Promise<SongDetail> {
+  public async load(_churchId: string, id: string): Promise<SongDetail> {
     return TypedDB.queryOne("SELECT * FROM songDetails WHERE id=?;", [id]);
   }
 
-  public async loadAll(churchId: string): Promise<SongDetail[]> {
+  public async loadAll(_churchId: string): Promise<SongDetail[]> {
     return TypedDB.query("SELECT * FROM songDetails ORDER BY title, artist;", []);
   }
 

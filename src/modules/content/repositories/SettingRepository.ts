@@ -15,14 +15,6 @@ export class SettingRepository extends ConfiguredRepository<Setting> {
     };
   }
 
-  public saveAll(settings: Setting[]) {
-    const promises: Promise<Setting>[] = [];
-    settings.forEach((s) => {
-      promises.push(this.save(s));
-    });
-    return Promise.all(promises);
-  }
-
   public deleteForUser(churchId: string, userId: string, id: string) {
     return TypedDB.query("DELETE FROM settings WHERE id=? and churchId=? and userId=?;", [id, churchId, userId]);
   }

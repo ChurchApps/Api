@@ -1,70 +1,18 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { BibleTranslation } from "../models";
-import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
+import { GlobalConfiguredRepository, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepository";
 
 @injectable()
-export class BibleTranslationRepository extends BaseRepository<BibleTranslation> {
-  protected tableName = "bibleTranslations";
-  protected hasSoftDelete = false;
-
-  protected async create(translation: BibleTranslation): Promise<BibleTranslation> {
-    if (!translation.id) translation.id = this.createId();
-    const sql =
-      "INSERT INTO bibleTranslations (id, abbreviation, name, nameLocal, description, source, sourceKey, language, countries, copyright, attributionRequired, attributionString) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      translation.id,
-      translation.abbreviation,
-      translation.name,
-      translation.nameLocal,
-      translation.description,
-      translation.source,
-      translation.sourceKey,
-      translation.language,
-      translation.countries,
-      translation.copyright,
-      translation.attributionRequired,
-      translation.attributionString
-    ];
-    await TypedDB.query(sql, params);
-    return translation;
-  }
-
-  protected async update(translation: BibleTranslation): Promise<BibleTranslation> {
-    const sql =
-      "UPDATE bibleTranslations SET abbreviation=?, name=?, nameLocal=?, description=?, source=?, sourceKey=?, language=?, countries=?, copyright=?, attributionRequired=?, attributionString=? WHERE id=?";
-    const params = [
-      translation.abbreviation,
-      translation.name,
-      translation.nameLocal,
-      translation.description,
-      translation.source,
-      translation.sourceKey,
-      translation.language,
-      translation.countries,
-      translation.copyright,
-      translation.attributionRequired,
-      translation.attributionString,
-      translation.id
-    ];
-    await TypedDB.query(sql, params);
-    return translation;
-  }
-
-  public saveAll(translations: BibleTranslation[]) {
-    const promises: Promise<BibleTranslation>[] = [];
-    translations.forEach((t) => {
-      promises.push(this.save(t));
-    });
-    return Promise.all(promises);
-  }
-
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM bibleTranslations WHERE id=?;", [id]);
-  }
-
-  public load(id: string) {
-    return TypedDB.queryOne("SELECT * FROM bibleTranslations WHERE id=?;", [id]);
+export class BibleTranslationRepository extends GlobalConfiguredRepository<BibleTranslation> {
+  protected get repoConfig(): GlobalRepoConfig<BibleTranslation> {
+    return {
+      tableName: "bibleTranslations",
+      hasSoftDelete: false,
+      insertColumns: ["abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"],
+      updateColumns: ["abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"],
+      defaultOrderBy: "name"
+    };
   }
 
   public loadBySourceKey(source: string, sourceKey: string) {

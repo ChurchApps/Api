@@ -15,21 +15,6 @@ export class ArrangementKeyRepository extends ConfiguredRepository<ArrangementKe
     };
   }
 
-  // Override to use TypedDB instead of DB
-  protected async create(model: ArrangementKey): Promise<ArrangementKey> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  protected async update(model: ArrangementKey): Promise<ArrangementKey> {
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
   public async delete(churchId: string, id: string): Promise<any> {
     return TypedDB.query("DELETE FROM arrangementKeys WHERE id=? AND churchId=?", [id, churchId]);
   }
@@ -40,14 +25,6 @@ export class ArrangementKeyRepository extends ConfiguredRepository<ArrangementKe
 
   public async loadAll(churchId: string): Promise<ArrangementKey[]> {
     return TypedDB.query("SELECT * FROM arrangementKeys WHERE churchId=?", [churchId]);
-  }
-
-  public saveAll(arrangementKeys: ArrangementKey[]) {
-    const promises: Promise<ArrangementKey>[] = [];
-    arrangementKeys.forEach((sd) => {
-      promises.push(this.save(sd));
-    });
-    return Promise.all(promises);
   }
 
   public deleteForArrangement(churchId: string, arrangementId: string) {

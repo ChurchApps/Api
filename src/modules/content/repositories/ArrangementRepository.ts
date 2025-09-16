@@ -15,14 +15,6 @@ export class ArrangementRepository extends ConfiguredRepository<Arrangement> {
     };
   }
 
-  public saveAll(arrangements: Arrangement[]) {
-    const promises: Promise<Arrangement>[] = [];
-    arrangements.forEach((sd) => {
-      promises.push(this.save(sd));
-    });
-    return Promise.all(promises);
-  }
-
   public loadBySongId(churchId: string, songId: string) {
     return TypedDB.query("SELECT * FROM arrangements where churchId=? and songId=?;", [churchId, songId]) as Promise<Arrangement[]>;
   }

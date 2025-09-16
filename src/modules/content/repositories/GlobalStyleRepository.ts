@@ -14,21 +14,6 @@ export class GlobalStyleRepository extends ConfiguredRepository<GlobalStyle> {
     };
   }
 
-  // Override to use TypedDB instead of DB
-  protected async create(model: GlobalStyle): Promise<GlobalStyle> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  protected async update(model: GlobalStyle): Promise<GlobalStyle> {
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
   public async load(churchId: string, id: string): Promise<GlobalStyle> {
     return TypedDB.queryOne("SELECT * FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
   }

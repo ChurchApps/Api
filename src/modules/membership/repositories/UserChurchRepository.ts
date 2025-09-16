@@ -15,18 +15,8 @@ export class UserChurchRepository extends ConfiguredRepository<UserChurch> {
   }
 
   protected async create(userChurch: UserChurch): Promise<UserChurch> {
-    const m: any = userChurch as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    m.lastAccessed = new Date();
-    const { sql, params } = this.buildInsert(userChurch);
-    await TypedDB.query(sql, params);
-    return userChurch;
-  }
-
-  protected async update(userChurch: UserChurch): Promise<UserChurch> {
-    const { sql, params } = this.buildUpdate(userChurch);
-    await TypedDB.query(sql, params);
-    return userChurch;
+    userChurch.lastAccessed = new Date();
+    return super.create(userChurch);
   }
 
   public async delete(userId: string): Promise<any> {

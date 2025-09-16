@@ -14,29 +14,6 @@ export class SongRepository extends ConfiguredRepository<Song> {
     };
   }
 
-  // Override to use TypedDB instead of DB
-  protected async create(model: Song): Promise<Song> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  protected async update(model: Song): Promise<Song> {
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  public saveAll(songs: Song[]) {
-    const promises: Promise<Song>[] = [];
-    songs.forEach((sd) => {
-      promises.push(this.save(sd));
-    });
-    return Promise.all(promises);
-  }
-
   public async delete(churchId: string, id: string): Promise<any> {
     return TypedDB.query("DELETE FROM songs WHERE churchId=? AND id=?;", [churchId, id]);
   }

@@ -14,21 +14,6 @@ export class CuratedCalendarRepository extends ConfiguredRepository<CuratedCalen
     };
   }
 
-  // Override to use TypedDB instead of DB
-  protected async create(model: CuratedCalendar): Promise<CuratedCalendar> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  protected async update(model: CuratedCalendar): Promise<CuratedCalendar> {
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
   public async delete(churchId: string, id: string): Promise<any> {
     return TypedDB.query("DELETE FROM curatedCalendars WHERE id=? AND churchId=?;", [id, churchId]);
   }
