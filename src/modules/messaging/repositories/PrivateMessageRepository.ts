@@ -1,9 +1,18 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { UniqueIdHelper } from "@churchapps/apihelper";
-import { CollectionHelper } from "../../../shared/helpers";
 import { PrivateMessage } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class PrivateMessageRepository {
+@injectable()
+export class PrivateMessageRepository extends ConfiguredRepository<PrivateMessage> {
+  protected get repoConfig(): RepoConfig<PrivateMessage> {
+    return {
+      tableName: "privateMessages",
+      hasSoftDelete: false,
+      insertColumns: ["fromPersonId", "toPersonId", "conversationId", "notifyPersonId", "deliveryMethod"],
+      updateColumns: ["fromPersonId", "toPersonId", "conversationId", "notifyPersonId", "deliveryMethod"]
+    };
+  }
   public loadById(churchId: string, id: string) {
     return TypedDB.queryOne("SELECT * FROM privateMessages WHERE id=? and churchId=?;", [id, churchId]);
   }
@@ -23,43 +32,8 @@ export class PrivateMessageRepository {
     return TypedDB.query("DELETE FROM privateMessages WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
-  public save(privateMessage: PrivateMessage) {
-    return privateMessage.id ? this.update(privateMessage) : this.create(privateMessage);
-  }
-
-  private async create(privateMessage: PrivateMessage): Promise<PrivateMessage> {
-    privateMessage.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO privateMessages (id, churchId, fromPersonId, toPersonId, conversationId, notifyPersonId, deliveryMethod) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      privateMessage.id,
-      privateMessage.churchId,
-      privateMessage.fromPersonId,
-      privateMessage.toPersonId,
-      privateMessage.conversationId,
-      privateMessage.notifyPersonId,
-      privateMessage.deliveryMethod
-    ];
-    await TypedDB.query(sql, params);
-    return privateMessage;
-  }
-
-  private async update(privateMessage: PrivateMessage) {
-    const sql = "UPDATE privateMessages SET fromPersonId=?, toPersonId=?, conversationId=?, notifyPersonId=?, deliveryMethod=? WHERE id=? AND churchId=?;";
-    const params = [
-      privateMessage.fromPersonId,
-      privateMessage.toPersonId,
-      privateMessage.conversationId,
-      privateMessage.notifyPersonId,
-      privateMessage.deliveryMethod,
-      privateMessage.id,
-      privateMessage.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return privateMessage;
-  }
-
-  public convertToModel(data: any) {
-    const result: PrivateMessage = {
+  protected rowToModel(data: any): PrivateMessage {
+    return {
       id: data.id,
       churchId: data.churchId,
       fromPersonId: data.fromPersonId,
@@ -68,11 +42,14 @@ export class PrivateMessageRepository {
       notifyPersonId: data.notifyPersonId,
       deliveryMethod: data.deliveryMethod
     };
-    return result;
+  }
+
+  public convertToModel(data: any) {
+    return this.rowToModel(data);
   }
 
   public convertAllToModel(data: any) {
-    return CollectionHelper.convertAll<PrivateMessage>(data, (d: any) => this.convertToModel(d));
+    return this.mapToModels(data);
   }
 
   public loadByConversationId(churchId: string, conversationId: string) {

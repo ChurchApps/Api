@@ -1,64 +1,25 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { MemberPermission } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class MemberPermissionRepository {
-  public save(memberPermission: MemberPermission) {
-    return memberPermission.id ? this.update(memberPermission) : this.create(memberPermission);
-  }
-
-  private async create(memberPermission: MemberPermission) {
-    memberPermission.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO memberPermissions (id, churchId, memberId, contentType, contentId, action, emailNotification) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      memberPermission.id,
-      memberPermission.churchId,
-      memberPermission.memberId,
-      memberPermission.contentType,
-      memberPermission.contentId,
-      memberPermission.action,
-      memberPermission.emailNotification
-    ];
-    await TypedDB.query(sql, params);
-    return memberPermission;
-  }
-
-  private async update(memberPermission: MemberPermission) {
-    const sql = "UPDATE memberPermissions SET memberId=?, contentType=?, contentId=?, action=?, emailNotification=? WHERE id=? and churchId=?";
-    const params = [
-      memberPermission.memberId,
-      memberPermission.contentType,
-      memberPermission.contentId,
-      memberPermission.action,
-      memberPermission.emailNotification,
-      memberPermission.id,
-      memberPermission.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return memberPermission;
-  }
-
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
+export class MemberPermissionRepository extends ConfiguredRepository<MemberPermission> {
+  protected get repoConfig(): RepoConfig<MemberPermission> {
+    return {
+      tableName: "memberPermissions",
+      hasSoftDelete: false,
+      insertColumns: ["memberId", "contentType", "contentId", "action", "emailNotification"],
+      updateColumns: ["memberId", "contentType", "contentId", "action", "emailNotification"]
+    };
   }
 
   public deleteByMemberId(churchId: string, memberId: string, contentId: string) {
     return TypedDB.query("DELETE FROM memberPermissions WHERE memberId=? AND contentId=? AND churchId=?;", [memberId, churchId, contentId]);
   }
 
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
   public loadMyByForm(churchId: string, formId: string, personId: string) {
     return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE churchId=? and contentType='form' and contentId=? and memberId=?;", [churchId, formId, personId]);
-  }
-
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM memberPermissions WHERE churchId=?;", [churchId]);
   }
 
   public loadByEmailNotification(churchId: string, emailNotification: boolean) {
@@ -85,22 +46,17 @@ export class MemberPermissionRepository {
     return TypedDB.query(sql, [churchId, formId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: MemberPermission = {
-      id: data.id,
-      churchId,
-      memberId: data.memberId,
-      contentType: data.contentType,
-      contentId: data.contentId,
-      action: data.action,
-      personName: data.personName,
-      emailNotification: data.emailNotification
+  protected rowToModel(row: any): MemberPermission {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      memberId: row.memberId,
+      contentType: row.contentType,
+      contentId: row.contentId,
+      action: row.action,
+      personName: row.personName,
+      emailNotification: row.emailNotification
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<MemberPermission>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   private existingPermissionRecord(churchId: string, contentId: string) {

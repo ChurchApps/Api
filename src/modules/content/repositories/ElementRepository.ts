@@ -1,48 +1,19 @@
-import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
+import { ArrayHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Element } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class ElementRepository {
-  public save(element: Element) {
-    return element.id ? this.update(element) : this.create(element);
-  }
-
-  public async create(element: Element) {
-    if (!element.id) element.id = UniqueIdHelper.shortId();
-
-    const sql = "INSERT INTO elements (id, churchId, sectionId, blockId, elementType, sort, parentId, answersJSON, stylesJSON, animationsJSON) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      element.id,
-      element.churchId,
-      element.sectionId,
-      element.blockId,
-      element.elementType,
-      element.sort,
-      element.parentId,
-      element.answersJSON,
-      element.stylesJSON,
-      element.animationsJSON
-    ];
-    await TypedDB.query(sql, params);
-    return element;
-  }
-
-  private async update(element: Element) {
-    const sql = "UPDATE elements SET sectionId=?, blockId=?, elementType=?, sort=?, parentId=?, answersJSON=?, stylesJSON=?, animationsJSON=? WHERE id=? and churchId=?";
-    const params = [
-      element.sectionId,
-      element.blockId,
-      element.elementType,
-      element.sort,
-      element.parentId,
-      element.answersJSON,
-      element.stylesJSON,
-      element.animationsJSON,
-      element.id,
-      element.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return element;
+@injectable()
+export class ElementRepository extends ConfiguredRepository<Element> {
+  protected get repoConfig(): RepoConfig<Element> {
+    return {
+      tableName: "elements",
+      hasSoftDelete: false,
+      defaultOrderBy: "sort",
+      insertColumns: ["sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"],
+      updateColumns: ["sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"]
+    };
   }
 
   public async updateSortForBlock(churchId: string, blockId: string, parentId: string) {
@@ -80,14 +51,6 @@ export class ElementRepository {
     if (promises.length > 0) await Promise.all(promises);
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM elements WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM elements WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
   public loadForSection(churchId: string, sectionId: string) {
     return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND sectionId=? order by sort;", [churchId, sectionId]);
   }
@@ -123,5 +86,20 @@ export class ElementRepository {
     const sql =
       "SELECT e.* " + " FROM elements e" + " INNER JOIN sections s on s.id=e.sectionId" + " WHERE (s.pageId=? OR (s.pageId IS NULL and s.blockId IS NULL)) AND e.churchId=?" + " ORDER BY sort;";
     return TypedDB.query(sql, [pageId, churchId]);
+  }
+
+  protected rowToModel(row: any): Element {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      sectionId: row.sectionId,
+      blockId: row.blockId,
+      elementType: row.elementType,
+      sort: row.sort,
+      parentId: row.parentId,
+      answersJSON: row.answersJSON,
+      stylesJSON: row.stylesJSON,
+      animationsJSON: row.animationsJSON
+    };
   }
 }

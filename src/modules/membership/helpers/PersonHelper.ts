@@ -26,7 +26,7 @@ export class PersonHelper extends BasePersonHelper {
       newPerson = await repos.person.save(newPerson);
       data.push(await repos.person.load(newPerson.churchId, newPerson.id));
     }
-    const result = (await this.repos()).person.convertAllToModel(churchId, data, canEdit);
+    const result = (await this.repos()).person.convertAllToModelWithPermissions(churchId, data, canEdit);
     const person = result[0];
     if (person.removed) {
       person.removed = false;
@@ -42,7 +42,7 @@ export class PersonHelper extends BasePersonHelper {
         const repos = await this.repos();
         const d = await repos.person.load(au.churchId, au.personId);
         if (d === null) person = await this.getPerson(churchId, au.email, au.firstName, au.lastName, au.checkAccess(Permissions.people.edit));
-        else person = repos.person.convertToModel(au.churchId, d, au.checkAccess(Permissions.people.edit));
+        else person = repos.person.convertToModelWithPermissions(au.churchId, d, au.checkAccess(Permissions.people.edit));
       } else {
         person = await this.getPerson(churchId, au.email, au.firstName, au.lastName, au.checkAccess(Permissions.people.edit));
       }

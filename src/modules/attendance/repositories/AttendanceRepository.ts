@@ -2,10 +2,21 @@ import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { DateHelper } from "@churchapps/apihelper";
 import { AttendanceRecord } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
+import { BaseRepository } from "../../../shared/infrastructure";
 
 @injectable()
-export class AttendanceRepository {
+export class AttendanceRepository extends BaseRepository<AttendanceRecord> {
+  protected tableName = ""; // Not used - this repository doesn't map to a single table
+  protected hasSoftDelete = false; // Not applicable for this analytics repository
+
+  // This repository doesn't need standard CRUD operations
+  protected async create(_model: AttendanceRecord): Promise<AttendanceRecord> {
+    throw new Error("AttendanceRepository does not support create operations");
+  }
+
+  protected async update(_model: AttendanceRecord): Promise<AttendanceRecord> {
+    throw new Error("AttendanceRepository does not support update operations");
+  }
   public loadTree(churchId: string) {
     const sql =
       "SELECT c.id as campusId, IFNULL(c.name, 'Unassigned') as campusName, s.id as serviceId, s.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName" +
@@ -54,7 +65,7 @@ export class AttendanceRepository {
     return TypedDB.query(sql, params);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(data: any): AttendanceRecord {
     const result: AttendanceRecord = {
       visitDate: data.visitDate,
       week: data.week,
@@ -67,9 +78,12 @@ export class AttendanceRepository {
     return result;
   }
 
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<AttendanceRecord>(data, (d: any) => this.convertToModel(churchId, d));
+  // Override the base convertToModel to use rowToModel
+  public convertToModel(churchId: string, data: any): AttendanceRecord {
+    return this.rowToModel(data);
   }
+
+  // convertAllToModel is provided by BaseRepository using convertToModel
 
   public loadForPerson(churchId: string, personId: string) {
     const sql =

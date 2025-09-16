@@ -1,9 +1,22 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Condition } from "../models";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
 
 @injectable()
-export class MembershipRepository {
+export class MembershipRepository extends BaseRepository<any> {
+  protected tableName = "people";
+  protected hasSoftDelete = false;
+
+  protected async create(_model: any): Promise<any> {
+    // This repository doesn't handle create operations
+    throw new Error("Create operation not supported");
+  }
+
+  protected async update(_model: any): Promise<any> {
+    // This repository doesn't handle update operations
+    throw new Error("Update operation not supported");
+  }
   private getDBField(condition: Condition) {
     const fieldData = condition.fieldData ? JSON.parse(condition.fieldData) : {};
     let result = condition.field;

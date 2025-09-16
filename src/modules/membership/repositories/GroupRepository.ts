@@ -1,66 +1,33 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Group } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class GroupRepository {
+export class GroupRepository extends ConfiguredRepository<Group> {
+  protected get repoConfig(): RepoConfig<Group> {
+    return {
+      tableName: "groups",
+      hasSoftDelete: true,
+      removedColumn: "removed",
+      insertColumns: ["categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"],
+      updateColumns: ["categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"],
+      insertLiterals: { removed: "0" }
+    };
+  }
   public save(group: Group) {
     this.convertFromModel(group);
-    return group.id ? this.update(group) : this.create(group);
+    return super.save(group);
   }
 
-  private async create(group: Group) {
-    group.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO `groups` (id, churchId, categoryName, name, trackAttendance, parentPickup, printNameTag, about, photoUrl, tags, meetingTime, meetingLocation, labels, slug, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0);";
-    const params = [
-      group.id,
-      group.churchId,
-      group.categoryName,
-      group.name,
-      group.trackAttendance,
-      group.parentPickup,
-      group.printNametag,
-      group.about,
-      group.photoUrl,
-      group.tags,
-      group.meetingTime,
-      group.meetingLocation,
-      group.labels,
-      group.slug
-    ];
-    await TypedDB.query(sql, params);
-    return group;
+  protected async create(group: Group): Promise<Group> {
+    this.convertFromModel(group);
+    return super.create(group);
   }
 
-  private async update(group: Group) {
-    const sql =
-      "UPDATE `groups` SET churchId=?, categoryName=?, name=?, trackAttendance=?, parentPickup=?, printNametag=?, about=?, photoUrl=?, tags=?, meetingTime=?, meetingLocation=?, labels=?, slug=? WHERE id=? and churchId=?";
-    const params = [
-      group.churchId,
-      group.categoryName,
-      group.name,
-      group.trackAttendance,
-      group.parentPickup,
-      group.printNametag,
-      group.about,
-      group.photoUrl,
-      group.tags,
-      group.meetingTime,
-      group.meetingLocation,
-      group.labels,
-      group.slug,
-      group.id,
-      group.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return group;
-  }
-
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("UPDATE `groups` SET removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
+  protected async update(group: Group): Promise<Group> {
+    this.convertFromModel(group);
+    return super.update(group);
   }
 
   public deleteByIds(churchId: string, ids: string[]) {
@@ -122,28 +89,25 @@ export class GroupRepository {
     if (group.labelArray?.length > 0) group.labels = group.labelArray.join(",");
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(row: any): Group {
     const result: Group = {
-      id: data.id,
-      categoryName: data.categoryName,
-      name: data.name,
-      trackAttendance: data.trackAttendance,
-      parentPickup: data.parentPickup,
-      printNametag: data.printNametag,
-      memberCount: data.memberCount,
-      about: data.about,
-      photoUrl: data.photoUrl,
-      tags: data.tags,
-      meetingTime: data.meetingTime,
-      meetingLocation: data.meetingLocation,
+      id: row.id,
+      churchId: row.churchId,
+      categoryName: row.categoryName,
+      name: row.name,
+      trackAttendance: row.trackAttendance,
+      parentPickup: row.parentPickup,
+      printNametag: row.printNametag,
+      memberCount: row.memberCount,
+      about: row.about,
+      photoUrl: row.photoUrl,
+      tags: row.tags,
+      meetingTime: row.meetingTime,
+      meetingLocation: row.meetingLocation,
       labelArray: [],
-      slug: data.slug
+      slug: row.slug
     };
-    data.labels?.split(",").forEach((label: string) => result.labelArray.push(label.trim()));
+    row.labels?.split(",").forEach((label: string) => result.labelArray.push(label.trim()));
     return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Group>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

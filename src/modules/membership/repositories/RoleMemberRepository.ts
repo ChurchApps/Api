@@ -1,25 +1,18 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { RoleMember } from "../models";
-import { UniqueIdHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class RoleMemberRepository {
-  public save(roleMember: RoleMember) {
-    return roleMember.id ? this.update(roleMember) : this.create(roleMember);
-  }
-
-  private async create(roleMember: RoleMember) {
-    roleMember.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded, addedBy) VALUES (?, ?, ?, ?, NOW(), ?);";
-    const params = [roleMember.id, roleMember.churchId, roleMember.roleId, roleMember.userId, roleMember.addedBy];
-    await TypedDB.query(sql, params);
-    return roleMember;
-  }
-
-  private async update(roleMember: RoleMember) {
-    const sql = "UPDATE roleMembers SET roleId=?, userId=?, dateAdded=?, addedBy=? WHERE id=? AND churchId=?";
-    const params = [roleMember.roleId, roleMember.userId, roleMember.dateAdded, roleMember.addedBy, roleMember.id, roleMember.churchId];
-    await TypedDB.query(sql, params);
-    return roleMember;
+@injectable()
+export class RoleMemberRepository extends ConfiguredRepository<RoleMember> {
+  protected get repoConfig(): RepoConfig<RoleMember> {
+    return {
+      tableName: "roleMembers",
+      hasSoftDelete: false,
+      insertColumns: ["roleId", "userId", "addedBy"],
+      updateColumns: ["roleId", "userId", "dateAdded", "addedBy"],
+      insertLiterals: { dateAdded: "NOW()" }
+    };
   }
 
   public loadByRoleId(roleId: string, churchId: string): Promise<RoleMember[]> {
@@ -29,12 +22,12 @@ export class RoleMemberRepository {
     ) as Promise<RoleMember[]>;
   }
 
-  public loadById(id: string, churchId: string): Promise<RoleMember> {
-    return TypedDB.queryOne("SELECT * FROM roleMembers WHERE id=? AND churchId=?", [id, churchId]);
-  }
-
   public delete(id: string, churchId: string): Promise<RoleMember> {
     return TypedDB.query("DELETE FROM roleMembers WHERE id=? AND churchId=?", [id, churchId]);
+  }
+
+  public loadById(id: string, churchId: string): Promise<RoleMember> {
+    return this.loadOne(churchId, id) as Promise<RoleMember>;
   }
 
   public deleteForRole(churchId: string, roleId: string) {

@@ -1,16 +1,21 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { injectable } from "inversify";
 import { Plan } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class PlanRepository {
-  public save(plan: Plan) {
-    return plan.id ? this.update(plan) : this.create(plan);
+export class PlanRepository extends ConfiguredRepository<Plan> {
+  protected get repoConfig(): RepoConfig<Plan> {
+    return {
+      tableName: "plans",
+      hasSoftDelete: false,
+      insertColumns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId"],
+      updateColumns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId"]
+    };
   }
 
-  private async create(plan: Plan) {
-    plan.id = UniqueIdHelper.shortId();
+  protected async create(plan: Plan): Promise<Plan> {
+    if (!plan.id) plan.id = this.createId();
 
     const sql = "INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
@@ -29,7 +34,7 @@ export class PlanRepository {
     return plan;
   }
 
-  private async update(plan: Plan) {
+  protected async update(plan: Plan): Promise<Plan> {
     const sql = "UPDATE plans SET ministryId=?, planTypeId=?, name=?, serviceDate=?, notes=?, serviceOrder=?, contentType=?, contentId=? WHERE id=? and churchId=?";
     const params = [
       plan.ministryId,
@@ -47,20 +52,8 @@ export class PlanRepository {
     return plan;
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM plans WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM plans WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
   public loadByIds(churchId: string, ids: string[]) {
     return TypedDB.query("SELECT * FROM plans WHERE churchId=? and id in (?);", [churchId, ids]);
-  }
-
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM plans WHERE churchId=? order by serviceDate desc;", [churchId]);
   }
 
   public load7Days(churchId: string) {

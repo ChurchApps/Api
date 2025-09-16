@@ -1,8 +1,6 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Gateway } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 

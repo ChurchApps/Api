@@ -1,26 +1,18 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { RolePermission, Api, LoginUserChurch } from "../models";
-import { UniqueIdHelper } from "../helpers";
 import { ArrayHelper } from "@churchapps/apihelper";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class RolePermissionRepository {
-  public save(rolePermission: RolePermission) {
-    return rolePermission.id ? this.update(rolePermission) : this.create(rolePermission);
-  }
-
-  private async create(rolePermission: RolePermission) {
-    rolePermission.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, contentId, action) VALUES (?, ?, ?, ?, ?, ?, ?);";
-    const params = [rolePermission.id, rolePermission.churchId, rolePermission.roleId, rolePermission.apiName, rolePermission.contentType, rolePermission.contentId, rolePermission.action];
-    await TypedDB.query(sql, params);
-    return rolePermission;
-  }
-
-  private async update(rolePermission: RolePermission) {
-    const sql = "UPDATE rolePermissions SET roleId=?, apiName=?, contentType=?, contentId=?, action=? WHERE id=? AND churchId=?";
-    const params = [rolePermission.roleId, rolePermission.apiName, rolePermission.contentType, rolePermission.contentId, rolePermission.action, rolePermission.id, rolePermission.churchId];
-    await TypedDB.query(sql, params);
-    return rolePermission;
+@injectable()
+export class RolePermissionRepository extends ConfiguredRepository<RolePermission> {
+  protected get repoConfig(): RepoConfig<RolePermission> {
+    return {
+      tableName: "rolePermissions",
+      hasSoftDelete: false,
+      insertColumns: ["roleId", "apiName", "contentType", "contentId", "action"],
+      updateColumns: ["roleId", "apiName", "contentType", "contentId", "action"]
+    };
   }
 
   public deleteForRole(churchId: string, roleId: string) {

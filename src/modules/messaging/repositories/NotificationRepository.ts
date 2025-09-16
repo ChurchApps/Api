@@ -1,9 +1,19 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { UniqueIdHelper } from "@churchapps/apihelper";
-import { CollectionHelper } from "../../../shared/helpers";
 import { Notification } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class NotificationRepository {
+@injectable()
+export class NotificationRepository extends ConfiguredRepository<Notification> {
+  protected get repoConfig(): RepoConfig<Notification> {
+    return {
+      tableName: "notifications",
+      hasSoftDelete: false,
+      insertColumns: ["personId", "contentType", "contentId", "message", "link", "deliveryMethod"],
+      updateColumns: ["contentType", "contentId", "isNew", "message", "link", "deliveryMethod"],
+      insertLiterals: { timeSent: "NOW()", isNew: "1" }
+    };
+  }
   public loadById(churchId: string, id: string) {
     return TypedDB.queryOne("SELECT * FROM notifications WHERE id=? and churchId=?;", [id, churchId]);
   }
@@ -53,36 +63,8 @@ export class NotificationRepository {
     return TypedDB.queryOne("SELECT COUNT(*) as count FROM notifications WHERE churchId=? AND personId=? AND isNew=1", [churchId, personId]);
   }
 
-  public save(notification: Notification) {
-    return notification.id ? this.update(notification) : this.create(notification);
-  }
-
-  private async create(notification: Notification): Promise<Notification> {
-    notification.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO notifications (id, churchId, personId, contentType, contentId, timeSent, isNew, message, link, deliveryMethod) VALUES (?, ?, ?, ?, ?, NOW(), 1, ?, ?, ?);";
-    const params = [
-      notification.id,
-      notification.churchId,
-      notification.personId,
-      notification.contentType,
-      notification.contentId,
-      notification.message,
-      notification.link,
-      notification.deliveryMethod
-    ];
-    await TypedDB.query(sql, params);
-    return notification;
-  }
-
-  private async update(notification: Notification) {
-    const sql = "UPDATE notifications SET contentType=?, contentId=?, isNew=?, message=?, link=?, deliveryMethod=? WHERE id=? AND churchId=?;";
-    const params = [notification.contentType, notification.contentId, notification.isNew, notification.message, notification.link, notification.deliveryMethod, notification.id, notification.churchId];
-    await TypedDB.query(sql, params);
-    return notification;
-  }
-
-  public convertToModel(data: any) {
-    const result: Notification = {
+  protected rowToModel(data: any): Notification {
+    return {
       id: data.id,
       churchId: data.churchId,
       personId: data.personId,
@@ -94,11 +76,14 @@ export class NotificationRepository {
       link: data.link,
       deliveryMethod: data.deliveryMethod
     };
-    return result;
+  }
+
+  public convertToModel(data: any) {
+    return this.rowToModel(data);
   }
 
   public convertAllToModel(data: any) {
-    return CollectionHelper.convertAll<Notification>(data, (d: any) => this.convertToModel(d));
+    return this.mapToModels(data);
   }
 
   public loadUndelivered() {

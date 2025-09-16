@@ -1,7 +1,5 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Conversation } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 import { injectable } from "inversify";
@@ -14,7 +12,7 @@ export class ConversationRepository extends ConfiguredRepository<Conversation> {
       hasSoftDelete: false,
       insertColumns: ["contentType", "contentId", "title", "groupId", "visibility", "allowAnonymousPosts"],
       updateColumns: ["title", "groupId", "visibility", "allowAnonymousPosts"],
-      insertLiterals: { "dateCreated": "NOW()", "postCount": "0" }
+      insertLiterals: { dateCreated: "NOW()", postCount: "0" }
     };
   }
 

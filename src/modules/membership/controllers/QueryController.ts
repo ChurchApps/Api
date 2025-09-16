@@ -50,7 +50,7 @@ export class QueryController extends MembershipBaseController {
                 break;
             }
           });
-          const result = this.repositories.person.convertAllToModel(au.churchId, peopleData, au.checkAccess(Permissions.people.edit));
+          const result = this.repositories.person.convertAllToModelWithPermissions(au.churchId, peopleData, au.checkAccess(Permissions.people.edit));
           return result;
         } else {
           return { error: "No valid response from AI service" };

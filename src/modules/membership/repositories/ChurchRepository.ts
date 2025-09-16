@@ -1,9 +1,12 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { Church, Api, LoginUserChurch } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { UniqueIdHelper } from "../helpers";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
+import { injectable } from "inversify";
 
-export class ChurchRepository {
+@injectable()
+export class ChurchRepository extends BaseRepository<Church> {
+  protected tableName = "churches";
+  protected hasSoftDelete = false;
   public async loadCount() {
     const data = (await TypedDB.queryOne("SELECT COUNT(*) as count FROM churches", [])) as { count: string };
     return parseInt(data.count, 0);
@@ -94,12 +97,8 @@ export class ChurchRepository {
     return await TypedDB.query(sql, []);
   }
 
-  public save(church: Church) {
-    return church.id ? this.update(church) : this.create(church);
-  }
-
-  private async create(church: Church) {
-    church.id = UniqueIdHelper.shortId();
+  protected async create(church: Church): Promise<Church> {
+    church.id = this.createId();
     const sql =
       "INSERT INTO churches (id, name, subDomain, registrationDate, address1, address2, city, state, zip, country, archivedDate, latitude, longitude) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
@@ -120,7 +119,7 @@ export class ChurchRepository {
     return church;
   }
 
-  private async update(church: Church) {
+  protected async update(church: Church): Promise<Church> {
     const sql = "UPDATE churches SET name=?, subDomain=?, address1=?, address2=?, city=?, state=?, zip=?, country=?, archivedDate=?, latitude=?, longitude=? WHERE id=?;";
     const params = [
       church.name,
@@ -140,26 +139,30 @@ export class ChurchRepository {
     return church;
   }
 
-  public convertToModel(data: any) {
-    const result: Church = {
-      id: data.id,
-      name: data.name,
-      address1: data.address1,
-      address2: data.address2,
-      city: data.city,
-      state: data.state,
-      zip: data.zip,
-      country: data.country,
-      registrationDate: data.registrationDate,
-      subDomain: data.subDomain,
-      archivedDate: data.archivedDate,
-      latitude: data.latitude,
-      longitude: data.longitude
+  protected rowToModel(row: any): Church {
+    return {
+      id: row.id,
+      name: row.name,
+      address1: row.address1,
+      address2: row.address2,
+      city: row.city,
+      state: row.state,
+      zip: row.zip,
+      country: row.country,
+      registrationDate: row.registrationDate,
+      subDomain: row.subDomain,
+      archivedDate: row.archivedDate,
+      latitude: row.latitude,
+      longitude: row.longitude
     };
-    return result;
+  }
+
+  // For compatibility with existing controllers
+  public convertToModel(data: any) {
+    return this.rowToModel(data);
   }
 
   public convertAllToModel(data: any) {
-    return CollectionHelper.convertAll<Church>(data, (d: any) => this.convertToModel(d));
+    return this.mapToModels(data);
   }
 }

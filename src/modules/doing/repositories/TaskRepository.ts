@@ -1,37 +1,58 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Task } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class TaskRepository {
-  public save(task: Task) {
-    return task.id ? this.update(task) : this.create(task);
+export class TaskRepository extends ConfiguredRepository<Task> {
+  protected get repoConfig(): RepoConfig<Task> {
+    return {
+      tableName: "tasks",
+      hasSoftDelete: false,
+      insertColumns: [
+        "taskNumber",
+        "taskType",
+        "dateCreated",
+        "dateClosed",
+        "associatedWithType",
+        "associatedWithId",
+        "associatedWithLabel",
+        "createdByType",
+        "createdById",
+        "createdByLabel",
+        "assignedToType",
+        "assignedToId",
+        "assignedToLabel",
+        "title",
+        "status",
+        "automationId",
+        "conversationId",
+        "data"
+      ],
+      updateColumns: [
+        "taskType",
+        "dateCreated",
+        "dateClosed",
+        "associatedWithType",
+        "associatedWithId",
+        "associatedWithLabel",
+        "createdByType",
+        "createdById",
+        "createdByLabel",
+        "assignedToType",
+        "assignedToId",
+        "assignedToLabel",
+        "title",
+        "status",
+        "automationId",
+        "conversationId",
+        "data"
+      ]
+    };
   }
 
-  public async loadTimeline(churchId: string, personId: string, taskIds: string[]) {
-    let sql =
-      "select *, 'task' as postType, id as postId from tasks" +
-      " where churchId=? AND (" +
-      "   status='Open' and (" +
-      "	    (associatedWithType='person' and associatedWithId=?)" +
-      "        OR" +
-      "        (createdByType='person' and createdById=?)" +
-      "        OR" +
-      "        (assignedToType='person' and assignedToId=?)" +
-      "   )" +
-      ")";
-    const params: unknown[] = [churchId, personId, personId, personId];
-    if (taskIds.length > 0) {
-      sql += " OR id IN (?)";
-      params.push(taskIds);
-    }
-    const result = await TypedDB.query(sql, params);
-    return result;
-  }
-
-  private async create(task: Task) {
-    task.id = UniqueIdHelper.shortId();
+  protected async create(task: Task): Promise<Task> {
+    if (!task.id) task.id = this.createId();
     const taskNumber = await this.loadNextTaskNumber(task.churchId || ""); // NOTE - This is problematic if saving multiple records asyncronously.  Be sure to await each call
 
     const sql =
@@ -61,7 +82,7 @@ export class TaskRepository {
     return task;
   }
 
-  private async update(task: Task) {
+  protected async update(task: Task): Promise<Task> {
     const sql =
       "UPDATE tasks SET taskType=?, dateCreated=?, dateClosed=?, associatedWithType=?, associatedWithId=?, associatedWithLabel=?, createdByType=?, createdById=?, createdByLabel=?, assignedToType=?, assignedToId=?, assignedToLabel=?, title=?, status=?, automationId=?, conversationId=?, data=? WHERE id=? and churchId=?";
     const params = [
@@ -89,12 +110,25 @@ export class TaskRepository {
     return task;
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM tasks WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM tasks WHERE id=? AND churchId=? order by taskNumber;", [id, churchId]);
+  public async loadTimeline(churchId: string, personId: string, taskIds: string[]) {
+    let sql =
+      "select *, 'task' as postType, id as postId from tasks" +
+      " where churchId=? AND (" +
+      "   status='Open' and (" +
+      "	    (associatedWithType='person' and associatedWithId=?)" +
+      "        OR" +
+      "        (createdByType='person' and createdById=?)" +
+      "        OR" +
+      "        (assignedToType='person' and assignedToId=?)" +
+      "   )" +
+      ")";
+    const params: unknown[] = [churchId, personId, personId, personId];
+    if (taskIds.length > 0) {
+      sql += " OR id IN (?)";
+      params.push(taskIds);
+    }
+    const result = await TypedDB.query(sql, params);
+    return result;
   }
 
   public async loadByAutomationIdContent(churchId: string, automationId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
@@ -174,6 +208,10 @@ export class TaskRepository {
 
   public async loadForDirectoryUpdate(churchId: string, personId: string) {
     return TypedDB.query("SELECT * FROM tasks WHERE taskType='directoryUpdate' AND status='Open' AND churchId=? AND associatedWithId=?;", [churchId, personId]);
+  }
+
+  public load(churchId: string, id: string) {
+    return TypedDB.queryOne("SELECT * FROM tasks WHERE id=? AND churchId=? order by taskNumber;", [id, churchId]);
   }
 
   public loadAll(churchId: string) {

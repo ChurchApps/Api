@@ -1,36 +1,34 @@
 import { injectable } from "inversify";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { BibleLookup } from "../models";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
 
 @injectable()
-export class BibleLookupRepository {
-  public saveAll(lookups: BibleLookup[]) {
-    const promises: Promise<BibleLookup>[] = [];
-    lookups.forEach((b) => {
-      promises.push(this.save(b));
-    });
-    return Promise.all(promises);
-  }
+export class BibleLookupRepository extends BaseRepository<BibleLookup> {
+  protected tableName = "bibleLookups";
+  protected hasSoftDelete = false;
 
-  public save(lookup: BibleLookup) {
-    return lookup.id ? this.update(lookup) : this.create(lookup);
-  }
-
-  private async create(lookup: BibleLookup) {
-    lookup.id = UniqueIdHelper.shortId();
-
+  protected async create(lookup: BibleLookup): Promise<BibleLookup> {
+    if (!lookup.id) lookup.id = this.createId();
     const sql = "INSERT INTO bibleLookups (id, translationKey, lookupTime, ipAddress, startVerseKey, endVerseKey) VALUES (?, ?, now(), ?, ?, ?);";
     const params = [lookup.id, lookup.translationKey, lookup.ipAddress, lookup.startVerseKey, lookup.endVerseKey];
     await TypedDB.query(sql, params);
     return lookup;
   }
 
-  private async update(lookup: BibleLookup) {
+  protected async update(lookup: BibleLookup): Promise<BibleLookup> {
     const sql = "UPDATE bibleLookups SET translationKey=?, lookupTime=?, ipAddress=?, startVerseKey=?, endVerseKey=? WHERE id=?";
     const params = [lookup.translationKey, lookup.lookupTime, lookup.ipAddress, lookup.startVerseKey, lookup.endVerseKey, lookup.id];
     await TypedDB.query(sql, params);
     return lookup;
+  }
+
+  public saveAll(lookups: BibleLookup[]) {
+    const promises: Promise<BibleLookup>[] = [];
+    lookups.forEach((b) => {
+      promises.push(this.save(b));
+    });
+    return Promise.all(promises);
   }
 
   public async getStats(startDate: Date, endDate: Date) {
@@ -51,5 +49,16 @@ export class BibleLookupRepository {
 
   public load(id: string) {
     return TypedDB.queryOne("SELECT * FROM bibleLookups WHERE id=?;", [id]);
+  }
+
+  protected rowToModel(row: any): BibleLookup {
+    return {
+      id: row.id,
+      translationKey: row.translationKey,
+      lookupTime: row.lookupTime,
+      ipAddress: row.ipAddress,
+      startVerseKey: row.startVerseKey,
+      endVerseKey: row.endVerseKey
+    };
   }
 }

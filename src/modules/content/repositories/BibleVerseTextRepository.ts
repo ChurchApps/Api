@@ -1,36 +1,34 @@
 import { injectable } from "inversify";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { BibleVerseText } from "../models";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
 
 @injectable()
-export class BibleVerseTextRepository {
-  public saveAll(texts: BibleVerseText[]) {
-    const promises: Promise<BibleVerseText>[] = [];
-    texts.forEach((v) => {
-      promises.push(this.save(v));
-    });
-    return Promise.all(promises);
-  }
+export class BibleVerseTextRepository extends BaseRepository<BibleVerseText> {
+  protected tableName = "bibleVerseTexts";
+  protected hasSoftDelete = false;
 
-  public save(text: BibleVerseText) {
-    return text.id ? this.update(text) : this.create(text);
-  }
-
-  private async create(text: BibleVerseText) {
-    text.id = UniqueIdHelper.shortId();
-
+  protected async create(text: BibleVerseText): Promise<BibleVerseText> {
+    if (!text.id) text.id = this.createId();
     const sql = "INSERT INTO bibleVerseTexts (id, translationKey, verseKey, bookKey, chapterNumber, verseNumber, content, newParagraph) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [text.id, text.translationKey, text.verseKey, text.bookKey, text.chapterNumber, text.verseNumber, text.content, text.newParagraph];
     await TypedDB.query(sql, params);
     return text;
   }
 
-  private async update(text: BibleVerseText) {
+  protected async update(text: BibleVerseText): Promise<BibleVerseText> {
     const sql = "UPDATE bibleVerseTexts SET translationKey=?, verseKey=?, bookKey=?, chapterNumber=?, verseNumber=?, content=?, newParagraph=? WHERE id=?";
     const params = [text.translationKey, text.verseKey, text.bookKey, text.chapterNumber, text.verseNumber, text.content, text.newParagraph, text.id];
     await TypedDB.query(sql, params);
     return text;
+  }
+
+  public saveAll(texts: BibleVerseText[]) {
+    const promises: Promise<BibleVerseText>[] = [];
+    texts.forEach((v) => {
+      promises.push(this.save(v));
+    });
+    return Promise.all(promises);
   }
 
   public delete(id: string) {
@@ -75,5 +73,18 @@ export class BibleVerseTextRepository {
 
     const data = await this.loadChapters(translationKey, startParts[0], startChapter, endChapter);
     return this.filterResults(data, startChapter, startVerse, endChapter, endVerse);
+  }
+
+  protected rowToModel(row: any): BibleVerseText {
+    return {
+      id: row.id,
+      translationKey: row.translationKey,
+      verseKey: row.verseKey,
+      bookKey: row.bookKey,
+      chapterNumber: row.chapterNumber,
+      verseNumber: row.verseNumber,
+      content: row.content,
+      newParagraph: row.newParagraph
+    };
   }
 }

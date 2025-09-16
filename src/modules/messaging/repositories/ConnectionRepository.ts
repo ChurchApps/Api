@@ -1,10 +1,27 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Connection } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 import { ViewerInterface } from "../helpers/Interfaces";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class ConnectionRepository {
+@injectable()
+export class ConnectionRepository extends ConfiguredRepository<Connection> {
+  protected get repoConfig(): RepoConfig<Connection> {
+    return {
+      tableName: "connections",
+      hasSoftDelete: false,
+      insertColumns: ["conversationId", "personId", "displayName", "socketId", "ipAddress"],
+      updateColumns: ["personId", "displayName"],
+      insertLiterals: { timeJoined: "NOW()" }
+    };
+  }
+
+  // Override create to handle deleteExisting logic
+  protected async create(connection: Connection): Promise<Connection> {
+    if (!connection.id) connection.id = this.createId();
+    await this.deleteExisting(connection.churchId, connection.conversationId, connection.socketId, connection.id);
+    return super.create(connection);
+  }
   public async loadAttendance(churchId: string, conversationId: string) {
     const sql = "SELECT id, displayName, ipAddress FROM connections WHERE churchId=? AND conversationId=? ORDER BY displayName;";
     const result: any = await TypedDB.query(sql, [churchId, conversationId]);
@@ -49,28 +66,8 @@ export class ConnectionRepository {
     return TypedDB.query(sql, params);
   }
 
-  public save(connection: Connection) {
-    return connection.id ? this.update(connection) : this.create(connection);
-  }
-
-  private async create(connection: Connection): Promise<Connection> {
-    connection.id = UniqueIdHelper.shortId();
-    await this.deleteExisting(connection.churchId, connection.conversationId, connection.socketId, connection.id);
-    const sql = "INSERT INTO connections (id, churchId, conversationId, personId, displayName, timeJoined, socketId, ipAddress) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?);";
-    const params = [connection.id, connection.churchId, connection.conversationId, connection.personId, connection.displayName, connection.socketId, connection.ipAddress];
-    await TypedDB.query(sql, params);
-    return connection;
-  }
-
-  private async update(connection: Connection) {
-    const sql = "UPDATE connections SET personId=?, displayName=? WHERE id=? AND churchId=?;";
-    const params = [connection.personId, connection.displayName, connection.id, connection.churchId];
-    await TypedDB.query(sql, params);
-    return connection;
-  }
-
-  public convertToModel(data: any) {
-    const result: Connection = {
+  protected rowToModel(data: any): Connection {
+    return {
       id: data.id,
       churchId: data.churchId,
       conversationId: data.conversationId,
@@ -80,10 +77,13 @@ export class ConnectionRepository {
       socketId: data.socketId,
       ipAddress: data.ipAddress
     };
-    return result;
+  }
+
+  public convertToModel(data: any) {
+    return this.rowToModel(data);
   }
 
   public convertAllToModel(data: any) {
-    return CollectionHelper.convertAll<Connection>(data, (d: any) => this.convertToModel(d));
+    return this.mapToModels(data);
   }
 }

@@ -1,9 +1,8 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { User } from "../models";
-import { UniqueIdHelper, DateHelper } from "../helpers";
-
-import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
 import { DateHelper } from "../helpers";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
+import { injectable } from "inversify";
 
 @injectable()
 export class UserRepository extends BaseRepository<User> {

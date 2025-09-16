@@ -1,36 +1,26 @@
 import { injectable } from "inversify";
-import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
+import { ArrayHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { CollectionHelper } from "../../../shared/helpers";
 import { Setting } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class SettingRepository {
+export class SettingRepository extends ConfiguredRepository<Setting> {
+  protected get repoConfig(): RepoConfig<Setting> {
+    return {
+      tableName: "settings",
+      hasSoftDelete: false,
+      insertColumns: ["userId", "keyName", "value", "public"],
+      updateColumns: ["userId", "keyName", "value", "public"]
+    };
+  }
+
   public saveAll(settings: Setting[]) {
     const promises: Promise<Setting>[] = [];
     settings.forEach((s) => {
       promises.push(this.save(s));
     });
     return Promise.all(promises);
-  }
-
-  public save(setting: Setting) {
-    return setting.id ? this.update(setting) : this.create(setting);
-  }
-
-  private async create(setting: Setting) {
-    setting.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO settings (id, churchId, userId, keyName, value, public) VALUES (?, ?, ?, ?, ?, ?)";
-    const params = [setting.id, setting.churchId, setting.userId, setting.keyName, setting.value, setting.public];
-    await TypedDB.query(sql, params);
-    return setting;
-  }
-
-  private async update(setting: Setting) {
-    const sql = "UPDATE settings SET churchId=?, userId=?, keyName=?, value=?, public=? WHERE id=? AND churchId=?";
-    const params = [setting.churchId, setting.userId, setting.keyName, setting.value, setting.public, setting.id, setting.churchId];
-    await TypedDB.query(sql, params);
-    return setting;
   }
 
   public deleteForUser(churchId: string, userId: string, id: string) {
@@ -59,20 +49,6 @@ export class SettingRepository {
 
   public loadByKeyNames(churchId: string, keyNames: string[]) {
     return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId=? and userId is null;", [keyNames, churchId]);
-  }
-
-  public convertToModel(churchId: string, data: any) {
-    const result: Setting = {
-      id: data.id,
-      keyName: data.keyName,
-      value: data.value,
-      public: data.public
-    };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Setting>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   public getImports(data: any[], type?: string, playlistId?: string, channelId?: string) {
@@ -134,5 +110,16 @@ export class SettingRepository {
       });
     });
     return result;
+  }
+
+  protected rowToModel(row: any): Setting {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      userId: row.userId,
+      keyName: row.keyName,
+      value: row.value,
+      public: row.public
+    };
   }
 }

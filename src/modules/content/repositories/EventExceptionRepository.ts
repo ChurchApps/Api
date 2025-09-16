@@ -1,38 +1,54 @@
-import { UniqueIdHelper, DateHelper } from "@churchapps/apihelper";
+import { DateHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { EventException } from "../models";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+import { injectable } from "inversify";
 
-export class EventExceptionRepository {
-  public save(eventException: EventException) {
-    return eventException.id ? this.update(eventException) : this.create(eventException);
+@injectable()
+export class EventExceptionRepository extends ConfiguredRepository<EventException> {
+  protected get repoConfig(): RepoConfig<EventException> {
+    return {
+      tableName: "eventExceptions",
+      hasSoftDelete: false,
+      insertColumns: ["eventId", "exceptionDate"],
+      updateColumns: ["eventId", "exceptionDate"]
+    };
   }
 
-  private async create(eventException: EventException) {
-    eventException.id = UniqueIdHelper.shortId();
-    const exceptionDate = DateHelper.toMysqlDate(eventException.exceptionDate);
-    const sql = "INSERT INTO eventExceptions (id, churchId, eventId, exceptionDate) VALUES (?, ?, ?, ?);";
-    const params = [eventException.id, eventException.churchId, eventException.eventId, exceptionDate];
+  // Override to handle date conversion
+  protected async create(model: EventException): Promise<EventException> {
+    const m: any = model as any;
+    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
+    // Convert exceptionDate before insert
+    if (m.exceptionDate) {
+      m.exceptionDate = DateHelper.toMysqlDate(m.exceptionDate);
+    }
+    const { sql, params } = this.buildInsert(model);
     await TypedDB.query(sql, params);
-    return eventException;
+    return model;
   }
 
-  private async update(eventException: EventException) {
-    const exceptionDate = DateHelper.toMysqlDate(eventException.exceptionDate);
-    const sql = "UPDATE eventExceptions SET eventId=?, exceptionDate=?, WHERE id=? and churchId=?";
-    const params = [eventException.eventId, exceptionDate, eventException.id, eventException.churchId];
+  protected async update(model: EventException): Promise<EventException> {
+    const m: any = model as any;
+    // Convert exceptionDate before update
+    if (m.exceptionDate) {
+      m.exceptionDate = DateHelper.toMysqlDate(m.exceptionDate);
+    }
+    const { sql, params } = this.buildUpdate(model);
     await TypedDB.query(sql, params);
-    return eventException;
-  }
-
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM eventExceptions WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM eventExceptions WHERE id=? AND churchId=?;", [id, churchId]);
+    return model;
   }
 
   public loadForEvents(churchId: string, eventIds: string[]) {
     return TypedDB.query("SELECT * FROM eventExceptions WHERE churchId=? and eventId in (?);", [churchId, eventIds]);
+  }
+
+  protected rowToModel(row: any): EventException {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      eventId: row.eventId,
+      exceptionDate: row.exceptionDate
+    };
   }
 }

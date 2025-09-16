@@ -1,14 +1,15 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { OAuthCode } from "../models";
-import { UniqueIdHelper, DateHelper } from "../helpers";
+import { DateHelper } from "../helpers";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
+import { injectable } from "inversify";
 
-export class OAuthCodeRepository {
-  public save(authCode: OAuthCode) {
-    return authCode.id ? this.update(authCode) : this.create(authCode);
-  }
-
-  private async create(authCode: OAuthCode) {
-    authCode.id = UniqueIdHelper.shortId();
+@injectable()
+export class OAuthCodeRepository extends BaseRepository<OAuthCode> {
+  protected tableName = "oAuthCodes";
+  protected hasSoftDelete = false;
+  protected async create(authCode: OAuthCode): Promise<OAuthCode> {
+    authCode.id = this.createId();
     const expiresAt = DateHelper.toMysqlDate(authCode.expiresAt);
     const sql = "INSERT INTO oAuthCodes (id, code, clientId, userChurchId, redirectUri, scopes, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW());";
     const params = [authCode.id, authCode.code, authCode.clientId, authCode.userChurchId, authCode.redirectUri, authCode.scopes, expiresAt];
@@ -16,7 +17,7 @@ export class OAuthCodeRepository {
     return authCode;
   }
 
-  private async update(authCode: OAuthCode) {
+  protected async update(authCode: OAuthCode): Promise<OAuthCode> {
     const expiresAt = DateHelper.toMysqlDate(authCode.expiresAt);
     const sql = "UPDATE oAuthCodes SET code=?, clientId=?, userChurchId=?, redirectUri=?, scopes=?, expiresAt=? WHERE id=?;";
     const params = [authCode.code, authCode.clientId, authCode.userChurchId, authCode.redirectUri, authCode.scopes, expiresAt, authCode.id];

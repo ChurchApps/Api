@@ -1,41 +1,19 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { GroupMember } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 import { PersonHelper } from "../helpers";
-import { UniqueIdHelper } from "../helpers";
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
-export class GroupMemberRepository {
-  public save(groupMember: GroupMember) {
-    return groupMember.id ? this.update(groupMember) : this.create(groupMember);
-  }
-
-  private async create(groupMember: GroupMember) {
-    groupMember.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VALUES (?, ?, ?, ?, NOW(), leader);";
-    const params = [groupMember.id, groupMember.churchId, groupMember.groupId, groupMember.personId, groupMember.leader];
-    await TypedDB.query(sql, params);
-    return groupMember;
-  }
-
-  private async update(groupMember: GroupMember) {
-    const sql = "UPDATE groupMembers SET  groupId=?, personId=?, leader=? WHERE id=? and churchId=?";
-    const params = [groupMember.groupId, groupMember.personId, groupMember.leader, groupMember.id, groupMember.churchId];
-    await TypedDB.query(sql, params);
-    return groupMember;
-  }
-
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM groupMembers WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM groupMembers WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM groupMembers WHERE churchId=?;", [churchId]);
+export class GroupMemberRepository extends ConfiguredRepository<GroupMember> {
+  protected get repoConfig(): RepoConfig<GroupMember> {
+    return {
+      tableName: "groupMembers",
+      hasSoftDelete: false,
+      insertColumns: ["groupId", "personId", "leader"],
+      updateColumns: ["groupId", "personId", "leader"],
+      insertLiterals: { joinDate: "NOW()" }
+    };
   }
 
   public loadForGroup(churchId: string, groupId: string) {
@@ -79,30 +57,27 @@ export class GroupMemberRepository {
     return TypedDB.query(sql, [peopleIds]);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  protected rowToModel(row: any): GroupMember {
     const result: GroupMember = {
-      id: data.id,
-      groupId: data.groupId,
-      personId: data.personId,
-      joinDate: data.joinDate,
-      leader: data.leader
+      id: row.id,
+      churchId: row.churchId,
+      groupId: row.groupId,
+      personId: row.personId,
+      joinDate: row.joinDate,
+      leader: row.leader
     };
-    if (data.displayName !== undefined) {
+    if (row.displayName !== undefined) {
       result.person = {
         id: result.personId,
-        photoUpdated: data.photoUpdated,
-        name: { display: data.displayName },
-        contactInfo: { email: data.email }
+        photoUpdated: row.photoUpdated,
+        name: { display: row.displayName },
+        contactInfo: { email: row.email }
       };
-      result.person.photo = PersonHelper.getPhotoPath(churchId, result.person);
+      result.person.photo = PersonHelper.getPhotoPath(row.churchId, result.person);
     }
-    if (data.groupName !== undefined) result.group = { id: result.groupId, name: data.groupName };
+    if (row.groupName !== undefined) result.group = { id: result.groupId, name: row.groupName };
 
     return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<GroupMember>(data, (d: any) => this.convertToModel(churchId, d));
   }
 
   public convertAllToBasicModel(churchId: string, data: any[]) {

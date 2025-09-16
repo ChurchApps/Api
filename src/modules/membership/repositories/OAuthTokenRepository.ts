@@ -1,14 +1,15 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { OAuthToken } from "../models";
-import { UniqueIdHelper, DateHelper } from "../helpers";
+import { DateHelper } from "../helpers";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
+import { injectable } from "inversify";
 
-export class OAuthTokenRepository {
-  public save(token: OAuthToken) {
-    return token.id ? this.update(token) : this.create(token);
-  }
-
-  private async create(token: OAuthToken) {
-    token.id = UniqueIdHelper.shortId();
+@injectable()
+export class OAuthTokenRepository extends BaseRepository<OAuthToken> {
+  protected tableName = "oAuthTokens";
+  protected hasSoftDelete = false;
+  protected async create(token: OAuthToken): Promise<OAuthToken> {
+    token.id = this.createId();
     const expiresAt = DateHelper.toMysqlDate(token.expiresAt);
     const sql = "INSERT INTO oAuthTokens (id, accessToken, refreshToken, clientId, userChurchId, scopes, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW());";
     const params = [token.id, token.accessToken, token.refreshToken, token.clientId, token.userChurchId, token.scopes, expiresAt];
@@ -16,7 +17,7 @@ export class OAuthTokenRepository {
     return token;
   }
 
-  private async update(token: OAuthToken) {
+  protected async update(token: OAuthToken): Promise<OAuthToken> {
     const expiresAt = DateHelper.toMysqlDate(token.expiresAt);
     const sql = "UPDATE oAuthTokens SET accessToken=?, refreshToken=?, clientId=?, userChurchId=?, scopes=?, expiresAt=? WHERE id=?;";
     const params = [token.accessToken, token.refreshToken, token.clientId, token.userChurchId, token.scopes, expiresAt, token.id];

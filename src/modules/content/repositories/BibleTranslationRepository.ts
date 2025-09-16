@@ -1,25 +1,15 @@
 import { injectable } from "inversify";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { BibleTranslation } from "../models";
+import { BaseRepository } from "../../../shared/infrastructure/BaseRepository";
 
 @injectable()
-export class BibleTranslationRepository {
-  public saveAll(translations: BibleTranslation[]) {
-    const promises: Promise<BibleTranslation>[] = [];
-    translations.forEach((t) => {
-      promises.push(this.save(t));
-    });
-    return Promise.all(promises);
-  }
+export class BibleTranslationRepository extends BaseRepository<BibleTranslation> {
+  protected tableName = "bibleTranslations";
+  protected hasSoftDelete = false;
 
-  public save(translation: BibleTranslation) {
-    return translation.id ? this.update(translation) : this.create(translation);
-  }
-
-  private async create(translation: BibleTranslation) {
-    translation.id = UniqueIdHelper.shortId();
-
+  protected async create(translation: BibleTranslation): Promise<BibleTranslation> {
+    if (!translation.id) translation.id = this.createId();
     const sql =
       "INSERT INTO bibleTranslations (id, abbreviation, name, nameLocal, description, source, sourceKey, language, countries, copyright, attributionRequired, attributionString) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
@@ -40,7 +30,7 @@ export class BibleTranslationRepository {
     return translation;
   }
 
-  private async update(translation: BibleTranslation) {
+  protected async update(translation: BibleTranslation): Promise<BibleTranslation> {
     const sql =
       "UPDATE bibleTranslations SET abbreviation=?, name=?, nameLocal=?, description=?, source=?, sourceKey=?, language=?, countries=?, copyright=?, attributionRequired=?, attributionString=? WHERE id=?";
     const params = [
@@ -61,6 +51,14 @@ export class BibleTranslationRepository {
     return translation;
   }
 
+  public saveAll(translations: BibleTranslation[]) {
+    const promises: Promise<BibleTranslation>[] = [];
+    translations.forEach((t) => {
+      promises.push(this.save(t));
+    });
+    return Promise.all(promises);
+  }
+
   public delete(id: string) {
     return TypedDB.query("DELETE FROM bibleTranslations WHERE id=?;", [id]);
   }
@@ -79,5 +77,22 @@ export class BibleTranslationRepository {
 
   public loadNeedingCopyrights() {
     return TypedDB.query("SELECT * FROM bibleTranslations where copyright is null;", []);
+  }
+
+  protected rowToModel(row: any): BibleTranslation {
+    return {
+      id: row.id,
+      abbreviation: row.abbreviation,
+      name: row.name,
+      nameLocal: row.nameLocal,
+      description: row.description,
+      source: row.source,
+      sourceKey: row.sourceKey,
+      language: row.language,
+      countries: row.countries,
+      copyright: row.copyright,
+      attributionRequired: row.attributionRequired,
+      attributionString: row.attributionString
+    };
   }
 }
