@@ -1,6 +1,5 @@
 import { DB } from "../../../shared/infrastructure";
 import { DeviceContent } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 import { injectable } from "inversify";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -23,18 +22,13 @@ export class DeviceContentRepository extends ConfiguredRepository<DeviceContent>
     return DB.query("DELETE FROM deviceContent WHERE deviceId=? AND churchId=?;", [deviceId, churchId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: DeviceContent = {
-      id: data.id,
-      churchId,
-      deviceId: data.deviceId,
-      contentType: data.contentType,
-      contentId: data.contentId
+  protected rowToModel(row: any): DeviceContent {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      deviceId: row.deviceId,
+      contentType: row.contentType,
+      contentId: row.contentId
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<DeviceContent>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

@@ -2,7 +2,6 @@ import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { VisitSession } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
@@ -44,15 +43,11 @@ export class VisitSessionRepository extends ConfiguredRepository<VisitSession> {
     return DB.query(sql, [churchId, sessionId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: VisitSession = { id: data.id, visitId: data.visitId, sessionId: data.sessionId };
-    if (data.personId !== undefined) {
-      result.visit = { id: result.visitId, personId: data.personId };
+  protected rowToModel(row: any): VisitSession {
+    const result: VisitSession = { id: row.id, visitId: row.visitId, sessionId: row.sessionId };
+    if (row.personId !== undefined) {
+      result.visit = { id: result.visitId, personId: row.personId };
     }
     return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<VisitSession>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

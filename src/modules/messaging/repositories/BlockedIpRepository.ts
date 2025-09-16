@@ -1,6 +1,5 @@
 import { DB } from "../../../shared/infrastructure";
 import { BlockedIp } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 import { injectable } from "inversify";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -44,18 +43,13 @@ export class BlockedIpRepository extends ConfiguredRepository<BlockedIp> {
     return DB.query("DELETE FROM blockedIps WHERE churchId=? AND serviceId=?;", [churchId, serviceId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: BlockedIp = {
-      id: data.id,
-      churchId,
-      conversationId: data.conversationId,
-      serviceId: data.serviceId,
-      ipAddress: data.ipAddress
+  protected rowToModel(row: any): BlockedIp {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      conversationId: row.conversationId,
+      serviceId: row.serviceId,
+      ipAddress: row.ipAddress
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<BlockedIp>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

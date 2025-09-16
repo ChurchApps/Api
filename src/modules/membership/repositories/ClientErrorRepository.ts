@@ -1,23 +1,18 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { ClientError } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
 export class ClientErrorRepository extends ConfiguredRepository<ClientError> {
-  public constructor() {
-    super("clientErrors", [
-      { name: "id", type: "string", primaryKey: true },
-      { name: "application", type: "string" },
-      { name: "errorTime", type: "datetime" },
-      { name: "userId", type: "string" },
-      { name: "churchId", type: "string" },
-      { name: "originUrl", type: "string" },
-      { name: "errorType", type: "string" },
-      { name: "message", type: "string" },
-      { name: "details", type: "string" }
-    ]);
+  protected get repoConfig(): RepoConfig<ClientError> {
+    return {
+      tableName: "clientErrors",
+      hasSoftDelete: false,
+      insertColumns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"],
+      updateColumns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"]
+    };
   }
 
   public deleteOld() {
@@ -32,22 +27,17 @@ export class ClientErrorRepository extends ConfiguredRepository<ClientError> {
     return DB.query("SELECT * FROM clientErrors;", []);
   }
 
-  public convertToModel(churchId: string, data: any): ClientError {
-    const result: ClientError = {
-      id: data.id,
-      application: data.application,
-      errorTime: data.errorTime,
-      userId: data.userId,
-      churchId: data.churchId,
-      originUrl: data.originUrl,
-      errorType: data.errorType,
-      message: data.message,
-      details: data.details
+  protected rowToModel(row: any): ClientError {
+    return {
+      id: row.id,
+      application: row.application,
+      errorTime: row.errorTime,
+      userId: row.userId,
+      churchId: row.churchId,
+      originUrl: row.originUrl,
+      errorType: row.errorType,
+      message: row.message,
+      details: row.details
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): ClientError[] {
-    return CollectionHelper.convertAll<ClientError>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

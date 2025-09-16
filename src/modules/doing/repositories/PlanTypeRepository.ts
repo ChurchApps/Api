@@ -1,18 +1,18 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { PlanType } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
 export class PlanTypeRepository extends ConfiguredRepository<PlanType> {
-  public constructor() {
-    super("planTypes", [
-      { name: "id", type: "string", primaryKey: true },
-      { name: "churchId", type: "string" },
-      { name: "ministryId", type: "string" },
-      { name: "name", type: "string" }
-    ]);
+  protected get repoConfig(): RepoConfig<PlanType> {
+    return {
+      tableName: "planTypes",
+      hasSoftDelete: false,
+      insertColumns: ["ministryId", "name"],
+      updateColumns: ["ministryId", "name"]
+    };
   }
 
   public loadByIds(churchId: string, ids: string[]) {
@@ -23,17 +23,12 @@ export class PlanTypeRepository extends ConfiguredRepository<PlanType> {
     return DB.query("SELECT * FROM planTypes WHERE churchId=? AND ministryId=?;", [churchId, ministryId]);
   }
 
-  public convertToModel(churchId: string, data: any): PlanType {
-    const result: PlanType = {
-      id: data.id,
-      churchId: data.churchId,
-      ministryId: data.ministryId,
-      name: data.name
+  protected rowToModel(row: any): PlanType {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      ministryId: row.ministryId,
+      name: row.name
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): PlanType[] {
-    return CollectionHelper.convertAll<PlanType>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

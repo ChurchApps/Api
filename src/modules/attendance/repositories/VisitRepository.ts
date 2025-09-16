@@ -1,7 +1,6 @@
 import { DB } from "../../../shared/infrastructure";
 import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { Visit } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
@@ -64,19 +63,14 @@ export class VisitRepository extends ConfiguredRepository<Visit> {
     return DB.query("SELECT * FROM visits WHERE churchId=? AND personId=?", [churchId, personId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: Visit = {
-      id: data.id,
-      personId: data.personId,
-      serviceId: data.serviceId,
-      groupId: data.groupId,
-      visitDate: data.visitDate,
-      checkinTime: data.checkinTime
+  protected rowToModel(row: any): Visit {
+    return {
+      id: row.id,
+      personId: row.personId,
+      serviceId: row.serviceId,
+      groupId: row.groupId,
+      visitDate: row.visitDate,
+      checkinTime: row.checkinTime
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Visit>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

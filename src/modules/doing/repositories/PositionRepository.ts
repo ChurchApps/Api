@@ -1,21 +1,18 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { Position } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
 export class PositionRepository extends ConfiguredRepository<Position> {
-  public constructor() {
-    super("positions", [
-      { name: "id", type: "string", primaryKey: true },
-      { name: "churchId", type: "string" },
-      { name: "planId", type: "string" },
-      { name: "categoryName", type: "string" },
-      { name: "name", type: "string" },
-      { name: "count", type: "number" },
-      { name: "groupId", type: "string" }
-    ]);
+  protected get repoConfig(): RepoConfig<Position> {
+    return {
+      tableName: "positions",
+      hasSoftDelete: false,
+      insertColumns: ["planId", "categoryName", "name", "count", "groupId"],
+      updateColumns: ["planId", "categoryName", "name", "count", "groupId"]
+    };
   }
 
   public deleteByPlanId(churchId: string, planId: string) {
@@ -34,20 +31,15 @@ export class PositionRepository extends ConfiguredRepository<Position> {
     return DB.query("SELECT * FROM positions WHERE churchId=? AND planId in (?);", [churchId, planIds]);
   }
 
-  public convertToModel(churchId: string, data: any): Position {
-    const result: Position = {
-      id: data.id,
-      churchId: data.churchId,
-      planId: data.planId,
-      categoryName: data.categoryName,
-      name: data.name,
-      count: data.count,
-      groupId: data.groupId
+  protected rowToModel(row: any): Position {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      planId: row.planId,
+      categoryName: row.categoryName,
+      name: row.name,
+      count: row.count,
+      groupId: row.groupId
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): Position[] {
-    return CollectionHelper.convertAll<Position>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

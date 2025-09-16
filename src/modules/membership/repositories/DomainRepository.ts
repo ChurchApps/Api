@@ -1,17 +1,18 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { Domain } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
 export class DomainRepository extends ConfiguredRepository<Domain> {
-  public constructor() {
-    super("domains", [
-      { name: "id", type: "string", primaryKey: true },
-      { name: "churchId", type: "string" },
-      { name: "domainName", type: "string" }
-    ]);
+  protected get repoConfig(): RepoConfig<Domain> {
+    return {
+      tableName: "domains",
+      hasSoftDelete: false,
+      insertColumns: ["domainName"],
+      updateColumns: ["domainName"]
+    };
   }
 
   public loadByName(domainName: string) {
@@ -27,16 +28,11 @@ export class DomainRepository extends ConfiguredRepository<Domain> {
     return DB.query(sql, [churchId]);
   }
 
-  public convertToModel(churchId: string, data: any): Domain {
-    const result: Domain = {
-      id: data.id,
-      churchId: data.churchId,
-      domainName: data.domainName
+  protected rowToModel(row: any): Domain {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      domainName: row.domainName
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): Domain[] {
-    return CollectionHelper.convertAll<Domain>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

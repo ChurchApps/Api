@@ -1,6 +1,5 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
-import { CollectionHelper } from "../../../shared/helpers";
 import { Customer } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -39,12 +38,7 @@ export class CustomerRepository extends ConfiguredRepository<Customer> {
     return DB.queryOne("SELECT * FROM customers WHERE personId=? AND churchId=?;", [personId, churchId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: Customer = { id: data.id, churchId, personId: data.personId };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Customer>(data, (d: any) => this.convertToModel(churchId, d));
+  protected rowToModel(row: any): Customer {
+    return { id: row.id, churchId: row.churchId, personId: row.personId };
   }
 }

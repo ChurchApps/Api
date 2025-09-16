@@ -1,18 +1,18 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { GroupServiceTime } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
 export class GroupServiceTimeRepository extends ConfiguredRepository<GroupServiceTime> {
-  public constructor() {
-    super("groupServiceTimes", [
-      { name: "id", type: "string", primaryKey: true },
-      { name: "churchId", type: "string" },
-      { name: "groupId", type: "string" },
-      { name: "serviceTimeId", type: "string" }
-    ]);
+  protected get repoConfig(): RepoConfig<GroupServiceTime> {
+    return {
+      tableName: "groupServiceTimes",
+      hasSoftDelete: false,
+      insertColumns: ["groupId", "serviceTimeId"],
+      updateColumns: ["groupId", "serviceTimeId"]
+    };
   }
 
   public loadWithServiceNames(churchId: string, groupId: string) {
@@ -31,13 +31,9 @@ export class GroupServiceTimeRepository extends ConfiguredRepository<GroupServic
     return DB.query(sql, [churchId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: GroupServiceTime = { id: data.id, groupId: data.groupId, serviceTimeId: data.serviceTimeId };
-    if (data.serviceTimeName !== undefined) result.serviceTime = { id: result.serviceTimeId, name: data.serviceTimeName };
+  protected rowToModel(row: any): GroupServiceTime {
+    const result: GroupServiceTime = { id: row.id, groupId: row.groupId, serviceTimeId: row.serviceTimeId };
+    if (row.serviceTimeName !== undefined) result.serviceTime = { id: result.serviceTimeId, name: row.serviceTimeName };
     return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<GroupServiceTime>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }

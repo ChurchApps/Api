@@ -1,7 +1,6 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { EventLog } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
@@ -41,18 +40,7 @@ export class EventLogRepository extends ConfiguredRepository<EventLog> {
     );
   }
 
-  // Add overloads to match CrudController expectations
-  public convertToModel(churchId: string, data: any): EventLog;
-  public convertToModel(data: any): EventLog;
-  public convertToModel(churchIdOrData: string | any, data?: any): EventLog {
-    const actualData = data !== undefined ? data : churchIdOrData;
-    return { ...actualData };
-  }
-
-  public convertAllToModel(churchId: string, data: any): EventLog[];
-  public convertAllToModel(data: any): EventLog[];
-  public convertAllToModel(churchIdOrData: string | any, data?: any): EventLog[] {
-    const actualData = data !== undefined ? data : churchIdOrData;
-    return CollectionHelper.convertAll<EventLog>(actualData, (d: any) => this.convertToModel(d));
+  protected rowToModel(row: any): EventLog {
+    return { ...row };
   }
 }

@@ -1,6 +1,5 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
-import { CollectionHelper } from "../../../shared/helpers";
 import { Subscription } from "../models";
 
 import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
@@ -42,12 +41,7 @@ export class SubscriptionRepository extends ConfiguredRepository<Subscription> {
     return DB.queryOne("SELECT * FROM subscriptions WHERE customerId=? AND churchId=?;", [customerId, churchId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
-    const result: Subscription = { id: data.id, churchId, personId: data.personId, customerId: data.customerId };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any) {
-    return CollectionHelper.convertAll<Subscription>(data, (d: any) => this.convertToModel(churchId, d));
+  protected rowToModel(row: any): Subscription {
+    return { id: row.id, churchId: row.churchId, personId: row.personId, customerId: row.customerId };
   }
 }

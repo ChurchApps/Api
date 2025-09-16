@@ -1,19 +1,18 @@
 import { injectable } from "inversify";
 import { DB } from "../../../shared/infrastructure";
 import { BlockoutDate } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { ConfiguredRepository } from "../../../shared/repositories/ConfiguredRepository";
+
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
 
 @injectable()
 export class BlockoutDateRepository extends ConfiguredRepository<BlockoutDate> {
-  public constructor() {
-    super("blockoutDates", [
-      { name: "id", type: "string", primaryKey: true },
-      { name: "churchId", type: "string" },
-      { name: "personId", type: "string" },
-      { name: "startDate", type: "date" },
-      { name: "endDate", type: "date" }
-    ]);
+  protected get repoConfig(): RepoConfig<BlockoutDate> {
+    return {
+      tableName: "blockoutDates",
+      hasSoftDelete: false,
+      insertColumns: ["personId", "startDate", "endDate"],
+      updateColumns: ["personId", "startDate", "endDate"]
+    };
   }
 
   public loadByIds(churchId: string, ids: string[]) {
@@ -28,18 +27,13 @@ export class BlockoutDateRepository extends ConfiguredRepository<BlockoutDate> {
     return DB.query("SELECT * FROM blockoutDates WHERE churchId=? AND endDate>NOW();", [churchId]);
   }
 
-  public convertToModel(churchId: string, data: any): BlockoutDate {
-    const result: BlockoutDate = {
-      id: data.id,
-      churchId: data.churchId,
-      personId: data.personId,
-      startDate: data.startDate,
-      endDate: data.endDate
+  protected rowToModel(row: any): BlockoutDate {
+    return {
+      id: row.id,
+      churchId: row.churchId,
+      personId: row.personId,
+      startDate: row.startDate,
+      endDate: row.endDate
     };
-    return result;
-  }
-
-  public convertAllToModel(churchId: string, data: any): BlockoutDate[] {
-    return CollectionHelper.convertAll<BlockoutDate>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }
