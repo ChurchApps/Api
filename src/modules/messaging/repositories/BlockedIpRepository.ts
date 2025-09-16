@@ -1,9 +1,20 @@
 import { DB } from "../../../shared/infrastructure";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { BlockedIp } from "../models";
 import { CollectionHelper } from "../../../shared/helpers";
+import { injectable } from "inversify";
 
-export class BlockedIpRepository {
+import { ConfiguredRepository, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepository";
+
+@injectable()
+export class BlockedIpRepository extends ConfiguredRepository<BlockedIp> {
+  protected get repoConfig(): RepoConfig<BlockedIp> {
+    return {
+      tableName: "blockedIps",
+      hasSoftDelete: false,
+      insertColumns: ["conversationId", "serviceId", "ipAddress"],
+      updateColumns: ["conversationId", "serviceId", "ipAddress"]
+    };
+  }
   public async loadByConversationId(churchId: string, conversationId: string) {
     const sql = "SELECT * FROM blockedIps WHERE churchId=? AND conversationId=?;";
     const params = [churchId, conversationId];
@@ -18,18 +29,11 @@ export class BlockedIpRepository {
     return result || [];
   }
 
+  // Override save to implement toggle behavior (if exists, delete; if not, create)
   public async save(blockedIp: BlockedIp) {
     const result: any = await DB.query("SELECT id FROM blockedIps WHERE churchId=? AND conversationId=? AND ipAddress=?;", [blockedIp.churchId, blockedIp.conversationId, blockedIp.ipAddress]);
     const existingIp = result || [];
-    return existingIp[0]?.id ? this.deleteExisting(existingIp[0].id) : this.create(blockedIp);
-  }
-
-  private async create(blockedIp: BlockedIp): Promise<BlockedIp> {
-    blockedIp.id = UniqueIdHelper.shortId();
-    const sql = "INSERT INTO blockedIps (id, churchId, conversationId, serviceId, ipAddress) VALUES (?, ?, ?, ?, ?);";
-    const params = [blockedIp.id, blockedIp.churchId, blockedIp.conversationId, blockedIp.serviceId, blockedIp.ipAddress];
-    await DB.query(sql, params);
-    return blockedIp;
+    return existingIp[0]?.id ? this.deleteExisting(existingIp[0].id) : super.save(blockedIp);
   }
 
   private deleteExisting(id: string) {
@@ -40,10 +44,10 @@ export class BlockedIpRepository {
     return DB.query("DELETE FROM blockedIps WHERE churchId=? AND serviceId=?;", [churchId, serviceId]);
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(churchId: string, data: any) {
     const result: BlockedIp = {
       id: data.id,
-      churchId: data.churchId,
+      churchId,
       conversationId: data.conversationId,
       serviceId: data.serviceId,
       ipAddress: data.ipAddress
@@ -51,7 +55,7 @@ export class BlockedIpRepository {
     return result;
   }
 
-  public convertAllToModel(data: any) {
-    return CollectionHelper.convertAll<BlockedIp>(data, (d: any) => this.convertToModel(d));
+  public convertAllToModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<BlockedIp>(data, (d: any) => this.convertToModel(churchId, d));
   }
 }
