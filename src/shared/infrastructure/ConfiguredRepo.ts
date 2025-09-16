@@ -108,10 +108,6 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
     return this.deleteSoft(churchId, id);
   }
 
-  
-
-  
-
   public saveAll(models: T[]) {
     const promises: Promise<T>[] = [];
     models.forEach((model) => {
