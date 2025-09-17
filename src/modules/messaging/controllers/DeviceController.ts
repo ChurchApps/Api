@@ -5,7 +5,6 @@ import { Device } from "../models";
 
 @controller("/messaging/devices")
 export class DeviceController extends MessagingBaseController {
-
   @httpPost("/enroll")
   public async enroll(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -34,7 +33,6 @@ export class DeviceController extends MessagingBaseController {
       return { success };
     });
   }
-
 
   @httpGet("/:churchId")
   public async loadByChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {

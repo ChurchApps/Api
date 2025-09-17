@@ -26,12 +26,11 @@ export class DeviceRepo extends ConfiguredRepo<Device> {
   }
 
   public async loadByPairingCode(pairingCode: string) {
-    const result: any = await TypedDB.queryOne("SELECT * FROM devices WHERE pairingCode=?;", [pairingCode]);
-    return result.rows || result || {};
+    return TypedDB.queryOne("SELECT * FROM devices WHERE pairingCode=?;", [pairingCode]);
   }
 
   public loadByDeviceId(deviceId: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE deviceId=? and churchId=?;", [deviceId]);
+    return TypedDB.queryOne("SELECT * FROM devices WHERE deviceId=?;", [deviceId]);
   }
 
   public loadByFcmToken(churchId: string, fcmToken: string) {

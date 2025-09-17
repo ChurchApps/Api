@@ -134,8 +134,8 @@ export class PersonRepo extends ConfiguredRepo<Person> {
     const filter = filterOptedOut ? " AND (optedOut = FALSE OR optedOut IS NULL)" : "";
     return TypedDB.query(
       "SELECT * FROM people WHERE churchId=? AND concat(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,''), ' ', IFNULL(donorNumber,'')) LIKE ? AND removed=0" +
-      filter +
-      " LIMIT 100;",
+        filter +
+        " LIMIT 100;",
       [churchId, "%" + term.replace(" ", "%") + "%"]
     );
   }
