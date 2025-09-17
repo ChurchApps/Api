@@ -18,14 +18,18 @@ export class BaseController extends CustomBaseController {
   public actionWrapper(req: express.Request, res: express.Response, action: (au: any) => Promise<any>) {
     return super.actionWrapper(req, res, async (au) => {
       (this as any).repos = await this.getRepos<any>();
-      return action(au);
+      const result = await action(au);
+      // Return empty object instead of null for single entity queries
+      return result === null ? {} : result;
     });
   }
 
   public actionWrapperAnon(req: express.Request, res: express.Response, action: () => Promise<any>) {
     return super.actionWrapperAnon(req, res, async () => {
       (this as any).repos = await this.getRepos<any>();
-      return action();
+      const result = await action();
+      // Return empty object instead of null for single entity queries
+      return result === null ? {} : result;
     });
   }
 }
