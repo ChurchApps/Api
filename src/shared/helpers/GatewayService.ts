@@ -48,6 +48,12 @@ export class GatewayService {
     return await provider.createSubscription(config, subscriptionData);
   }
 
+  static async updateSubscription(gateway: any, subscriptionData: any) {
+    const provider = this.getProviderFromGateway(gateway);
+    const config = this.getGatewayConfig(gateway);
+    return await provider.updateSubscription(config, subscriptionData);
+  }
+
   static async cancelSubscription(gateway: any, subscriptionId: string, reason?: string): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);

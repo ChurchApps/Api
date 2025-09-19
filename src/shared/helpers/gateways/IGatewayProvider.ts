@@ -38,6 +38,7 @@ export interface IGatewayProvider {
   // Payment processing
   processCharge(config: GatewayConfig, donationData: any): Promise<ChargeResult>;
   createSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult>;
+  updateSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult>;
   cancelSubscription(config: GatewayConfig, subscriptionId: string, reason?: string): Promise<void>;
 
   // Fee calculation

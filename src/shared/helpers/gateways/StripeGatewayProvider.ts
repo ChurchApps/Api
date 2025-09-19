@@ -89,6 +89,15 @@ export class StripeGatewayProvider implements IGatewayProvider {
     };
   }
 
+  async updateSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+    const result = await StripeHelper.updateSubscription(config.privateKey, subscriptionData);
+    return {
+      success: !!result,
+      subscriptionId: result?.id || "",
+      data: result
+    };
+  }
+
   async cancelSubscription(config: GatewayConfig, subscriptionId: string): Promise<void> {
     await StripeHelper.deleteSubscription(config.privateKey, subscriptionId);
   }

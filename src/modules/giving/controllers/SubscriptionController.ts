@@ -31,15 +31,23 @@ export class SubscriptionController extends GivingCrudController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, any[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      let permission = au.checkAccess(Permissions.donations.edit);
       const promises: Promise<any>[] = [];
-      // Note: Subscription updates would need to be implemented in the gateway providers
-      // This is a placeholder for future implementation
-      req.body.forEach(async (subscription) => {
-        permission = permission || ((await this.repos.subscription.load(au.churchId, subscription.id)) as any).personId === au.personId;
-        // TODO: Implement gateway-agnostic subscription updates
-      });
-      return await Promise.all(promises);
+      const gateways = await this.repos.gateway.loadAll(au.churchId);
+      const gateway = (gateways as any[])[0];
+
+      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      for (const subscription of req.body) {
+        const existingSub = await this.repos.subscription.load(au.churchId, subscription.id);
+        const permission = au.checkAccess(Permissions.donations.edit) || (existingSub as any)?.personId === au.personId;
+
+        if (permission) {
+          promises.push(GatewayService.updateSubscription(gateway, subscription));
+        }
+      }
+
+      const results = await Promise.all(promises);
+      return this.json(results);
     });
   }
 
