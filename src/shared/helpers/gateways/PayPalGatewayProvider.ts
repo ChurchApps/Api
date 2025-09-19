@@ -54,10 +54,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
   }
 
   async updateSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
-    // PayPal subscription updates would require implementing the PATCH /v1/billing/subscriptions/{id} endpoint
-    // This would allow updating plan_id, quantity, shipping_amount, etc.
-    // For now, return the current subscription details
-    const payPalSub = await PayPalHelper.getSubscriptionDetails(config.publicKey, config.privateKey, subscriptionData.id);
+    const payPalSub = await PayPalHelper.updateSubscription(config.publicKey, config.privateKey, subscriptionData);
 
     return {
       success: !!payPalSub,

@@ -2,13 +2,18 @@ import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { CollectionHelper } from "../../../shared/helpers";
 import { SubscriptionFund } from "../models";
+import { FundRepo } from "./FundRepo";
 
 import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
 
 @injectable()
 export class SubscriptionFundsRepo extends ConfiguredRepo<SubscriptionFund> {
-  // Note: This repository uses dependency injection for FundRepository
-  private fundRepository: any; // Will be injected by the container
+  private fundRepository: FundRepo;
+
+  constructor() {
+    super();
+    this.fundRepository = new FundRepo();
+  }
 
   protected get repoConfig(): RepoConfig<SubscriptionFund> {
     return {
@@ -38,16 +43,19 @@ export class SubscriptionFundsRepo extends ConfiguredRepo<SubscriptionFund> {
       " LEFT JOIN funds ON subscriptionFunds.fundId = funds.id" +
       " WHERE subscriptionFunds.churchId=? AND subscriptionFunds.subscriptionId=?";
     const subscriptionFund = await TypedDB.query(sql, [churchId, subscriptionId]);
-    if (subscriptionFund && subscriptionFund[0].removed === false) {
+    if (subscriptionFund && subscriptionFund[0] && subscriptionFund[0].removed === false) {
       const { removed: _removed, ...sf } = (subscriptionFund as any)[0];
+      result = [sf];
+    } else if (subscriptionFund && subscriptionFund[0]) {
+      // Fund was deleted, use general fund instead
+      const generalFund = await this.fundRepository.getOrCreateGeneral(churchId);
+      const { removed: _removed, ...sf } = (subscriptionFund as any)[0];
+      sf.fundId = generalFund.id;
+      sf.name = generalFund.name;
       result = [sf];
     } else {
-      // TODO: This needs to be updated to use dependency injection
-      // const generalFund = await this.fundRepository.getOrCreateGeneral(churchId);
-      const { removed: _removed, ...sf } = (subscriptionFund as any)[0];
-      // sf.fundId = generalFund.id;
-      // sf.name = generalFund.name;
-      result = [sf];
+      // No subscription fund found, return empty array
+      result = [];
     }
     return result;
   }

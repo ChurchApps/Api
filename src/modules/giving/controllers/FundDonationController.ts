@@ -18,25 +18,6 @@ export class FundDonationController extends GivingCrudController {
     });
   }
 
-  // TODO: This is a temporary endpoint for the basic report. It will be moved to the default get.
-  @httpGet("/basic")
-  public async getBasic(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      let result;
-      const startDate = new Date(req.query.startDate.toString());
-      const endDate = new Date(req.query.endDate.toString());
-      if (req.query.fundName !== undefined) {
-        if (req.query.startDate === undefined) result = await this.repos.fundDonation.loadByFundName(au.churchId, req.query.fundName.toString());
-        else {
-          result = await this.repos.fundDonation.loadByFundNameDate(au.churchId, req.query.fundName.toString(), startDate, endDate);
-        }
-      } else {
-        result = await this.repos.fundDonation.loadAllByDate(au.churchId, startDate, endDate);
-      }
-      return this.repos.fundDonation.convertAllToModel(au.churchId, result as any[]);
-    });
-  }
-
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -52,14 +33,26 @@ export class FundDonationController extends GivingCrudController {
       else {
         let result;
 
-        if (req.query.donationId !== undefined) result = await this.repos.fundDonation.loadByDonationId(au.churchId, req.query.donationId.toString());
-        else if (req.query.personId !== undefined) result = await this.repos.fundDonation.loadByPersonId(au.churchId, req.query.personId.toString());
-        else if (req.query.fundId !== undefined) {
-          if (req.query.startDate === undefined) result = await this.repos.fundDonation.loadByFundId(au.churchId, req.query.fundId.toString());
-          else {
+        if (req.query.donationId !== undefined) {
+          result = await this.repos.fundDonation.loadByDonationId(au.churchId, req.query.donationId.toString());
+        } else if (req.query.personId !== undefined) {
+          result = await this.repos.fundDonation.loadByPersonId(au.churchId, req.query.personId.toString());
+        } else if (req.query.fundId !== undefined) {
+          if (req.query.startDate === undefined) {
+            result = await this.repos.fundDonation.loadByFundId(au.churchId, req.query.fundId.toString());
+          } else {
             const startDate = new Date(req.query.startDate.toString());
             const endDate = new Date(req.query.endDate!.toString());
             result = await this.repos.fundDonation.loadByFundIdDate(au.churchId, req.query.fundId.toString(), startDate, endDate);
+          }
+        } else if (req.query.fundName !== undefined) {
+          // Support for fund name queries (previously in /basic endpoint)
+          if (req.query.startDate === undefined) {
+            result = await this.repos.fundDonation.loadByFundName(au.churchId, req.query.fundName.toString());
+          } else {
+            const startDate = new Date(req.query.startDate.toString());
+            const endDate = new Date(req.query.endDate!.toString());
+            result = await this.repos.fundDonation.loadByFundNameDate(au.churchId, req.query.fundName.toString(), startDate, endDate);
           }
         } else {
           if (req.query.startDate !== undefined) {
