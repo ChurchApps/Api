@@ -2,8 +2,7 @@ import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { GivingCrudController } from "./GivingCrudController";
 import { Permissions } from "../../../shared/helpers/Permissions";
-import { StripeHelper } from "../../../shared/helpers/StripeHelper";
-import { EncryptionHelper } from "@churchapps/apihelper";
+import { GatewayService } from "../../../shared/helpers/GatewayService";
 
 @controller("/giving/customers")
 export class CustomerController extends GivingCrudController {
@@ -24,9 +23,9 @@ export class CustomerController extends GivingCrudController {
   @httpGet("/:id/subscriptions")
   public async getSubscriptions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const secretKey = await this.loadPrivateKey(au.churchId);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       let permission = false;
-      if (secretKey) {
+      if (gateways.length > 0) {
         if (au.checkAccess(Permissions.donations.viewSummary)) {
           permission = true;
         } else {
@@ -38,15 +37,14 @@ export class CustomerController extends GivingCrudController {
         }
       }
       if (!permission) return this.json({}, 401);
-      else return await StripeHelper.getCustomerSubscriptions(secretKey, id);
+      else {
+        const gateway = gateways[0];
+        return await GatewayService.getCustomerSubscriptions(gateway, id);
+      }
     });
   }
 
   // GET / inherited via enableGetAll=true
   // DELETE /:id inherited via enableDelete=true
 
-  private loadPrivateKey = async (churchId: string) => {
-    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-    return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
-  };
 }

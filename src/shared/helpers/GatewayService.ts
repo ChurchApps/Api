@@ -84,4 +84,115 @@ export class GatewayService {
     const config = this.getGatewayConfig(gateway);
     return await provider.logDonation(config, churchId, eventData, repos);
   }
+
+  // Customer management
+  static async createCustomer(gateway: any, email: string, name: string): Promise<string | undefined> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.createCustomer) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.createCustomer(config, email, name);
+    }
+    return undefined;
+  }
+
+  static async getCustomerSubscriptions(gateway: any, customerId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.getCustomerSubscriptions) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.getCustomerSubscriptions(config, customerId);
+    }
+    return [];
+  }
+
+  static async getCustomerPaymentMethods(gateway: any, customer: any): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.getCustomerPaymentMethods) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.getCustomerPaymentMethods(config, customer);
+    }
+    return [];
+  }
+
+  // Payment method management
+  static async attachPaymentMethod(gateway: any, paymentMethodId: string, options: any): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.attachPaymentMethod) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.attachPaymentMethod(config, paymentMethodId, options);
+    }
+    throw new Error(`${gateway.provider} does not support payment method attachment`);
+  }
+
+  static async detachPaymentMethod(gateway: any, paymentMethodId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.detachPaymentMethod) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.detachPaymentMethod(config, paymentMethodId);
+    }
+    throw new Error(`${gateway.provider} does not support payment method detachment`);
+  }
+
+  static async updateCard(gateway: any, paymentMethodId: string, cardData: any): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.updateCard) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.updateCard(config, paymentMethodId, cardData);
+    }
+    throw new Error(`${gateway.provider} does not support card updates`);
+  }
+
+  static async createBankAccount(gateway: any, customerId: string, options: any): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.createBankAccount) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.createBankAccount(config, customerId, options);
+    }
+    throw new Error(`${gateway.provider} does not support bank account creation`);
+  }
+
+  static async updateBank(gateway: any, paymentMethodId: string, bankData: any, customerId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.updateBank) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.updateBank(config, paymentMethodId, bankData, customerId);
+    }
+    throw new Error(`${gateway.provider} does not support bank account updates`);
+  }
+
+  static async verifyBank(gateway: any, paymentMethodId: string, amountData: any, customerId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.verifyBank) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.verifyBank(config, paymentMethodId, amountData, customerId);
+    }
+    throw new Error(`${gateway.provider} does not support bank account verification`);
+  }
+
+  static async deleteBankAccount(gateway: any, customerId: string, bankAccountId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.deleteBankAccount) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.deleteBankAccount(config, customerId, bankAccountId);
+    }
+    throw new Error(`${gateway.provider} does not support bank account deletion`);
+  }
+
+  // Provider-specific functionality
+  static async generateClientToken(gateway: any): Promise<string | undefined> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.generateClientToken) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.generateClientToken(config);
+    }
+    return undefined;
+  }
+
+  static async createOrder(gateway: any, orderData: any): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.createOrder) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.createOrder(config, orderData);
+    }
+    throw new Error(`${gateway.provider} does not support order creation`);
+  }
 }

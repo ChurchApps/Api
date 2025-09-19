@@ -99,4 +99,55 @@ export class PayPalGatewayProvider implements IGatewayProvider {
   async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
     return await PayPalHelper.logDonation(config.publicKey, config.privateKey, churchId, eventData, repos);
   }
+
+  // PayPal-specific functionality
+  async generateClientToken(config: GatewayConfig): Promise<string> {
+    return await PayPalHelper.generateClientToken(config.publicKey, config.privateKey);
+  }
+
+  async createOrder(config: GatewayConfig, orderData: any): Promise<any> {
+    return await PayPalHelper.createOrder(config.publicKey, config.privateKey, orderData);
+  }
+
+  // PayPal doesn't have the same customer/payment method management as Stripe
+  // These methods throw errors to indicate they're not supported
+  async createCustomer(): Promise<string> {
+    throw new Error("PayPal does not support customer creation");
+  }
+
+  async getCustomerSubscriptions(): Promise<any> {
+    throw new Error("PayPal does not support customer subscription listing");
+  }
+
+  async getCustomerPaymentMethods(): Promise<any> {
+    throw new Error("PayPal does not support payment method listing");
+  }
+
+  async attachPaymentMethod(): Promise<any> {
+    throw new Error("PayPal does not support payment method attachment");
+  }
+
+  async detachPaymentMethod(): Promise<any> {
+    throw new Error("PayPal does not support payment method detachment");
+  }
+
+  async updateCard(): Promise<any> {
+    throw new Error("PayPal does not support card updates");
+  }
+
+  async createBankAccount(): Promise<any> {
+    throw new Error("PayPal does not support bank account creation");
+  }
+
+  async updateBank(): Promise<any> {
+    throw new Error("PayPal does not support bank account updates");
+  }
+
+  async verifyBank(): Promise<any> {
+    throw new Error("PayPal does not support bank account verification");
+  }
+
+  async deleteBankAccount(): Promise<any> {
+    throw new Error("PayPal does not support bank account deletion");
+  }
 }

@@ -47,6 +47,24 @@ export interface IGatewayProvider {
   // Product/service management
   createProduct?(config: GatewayConfig, churchId: string): Promise<string>;
 
+  // Customer management
+  createCustomer?(config: GatewayConfig, email: string, name: string): Promise<string>;
+  getCustomerSubscriptions?(config: GatewayConfig, customerId: string): Promise<any>;
+  getCustomerPaymentMethods?(config: GatewayConfig, customer: any): Promise<any>;
+
+  // Payment method management
+  attachPaymentMethod?(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any>;
+  detachPaymentMethod?(config: GatewayConfig, paymentMethodId: string): Promise<any>;
+  updateCard?(config: GatewayConfig, paymentMethodId: string, cardData: any): Promise<any>;
+  createBankAccount?(config: GatewayConfig, customerId: string, options: any): Promise<any>;
+  updateBank?(config: GatewayConfig, paymentMethodId: string, bankData: any, customerId: string): Promise<any>;
+  verifyBank?(config: GatewayConfig, paymentMethodId: string, amountData: any, customerId: string): Promise<any>;
+  deleteBankAccount?(config: GatewayConfig, customerId: string, bankAccountId: string): Promise<any>;
+
+  // Provider-specific functionality
+  generateClientToken?(config: GatewayConfig): Promise<string>;
+  createOrder?(config: GatewayConfig, orderData: any): Promise<any>;
+
   // Event logging
   logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;
   logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any>;

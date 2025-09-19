@@ -3,12 +3,11 @@ import express from "express";
 import { GivingCrudController } from "./GivingCrudController";
 import { Permissions } from "../../../shared/helpers/Permissions";
 import { GatewayService } from "../../../shared/helpers/GatewayService";
-import { EncryptionHelper, EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
+import { EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models";
 import { Environment } from "../../../shared/helpers/Environment";
 import Axios from "axios";
 import dayjs from "dayjs";
-import { PayPalHelper } from "../../../shared/helpers/PayPalHelper";
 
 @controller("/giving/donate")
 export class DonateController extends GivingCrudController {
@@ -17,8 +16,8 @@ export class DonateController extends GivingCrudController {
     permissions: { view: Permissions.donations.view, edit: Permissions.donations.edit },
     routes: [] as const // all CRUD endpoints disabled; custom routes only
   };
-  @httpPost("/paypal/client-token")
-  public async paypalClientToken(req: express.Request<{}, {}, { churchId?: string }>, res: express.Response): Promise<any> {
+  @httpPost("/client-token")
+  public async clientToken(req: express.Request<{}, {}, { churchId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       try {
         const churchId = req.body.churchId || au.churchId;
@@ -28,14 +27,12 @@ export class DonateController extends GivingCrudController {
         const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
         if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
         const gateway = gateways[0];
-        const clientId = gateway.publicKey;
-        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
 
         try {
-          const clientToken = await PayPalHelper.generateClientToken(clientId, clientSecret);
+          const clientToken = await GatewayService.generateClientToken(gateway);
           return { clientToken };
         } catch (e) {
-          console.error("PayPal client token error", e);
+          console.error("Client token error", e);
           return this.json({ error: "Failed to generate client token" }, 502);
         }
       } catch (e) {
@@ -45,8 +42,8 @@ export class DonateController extends GivingCrudController {
     });
   }
 
-  @httpPost("/paypal/create-order")
-  public async paypalCreateOrder(
+  @httpPost("/create-order")
+  public async createOrder(
     req: express.Request<{}, {}, { churchId?: string; amount?: number; currency?: string; funds?: any[]; notes?: string; description?: string }>,
     res: express.Response
   ): Promise<any> {
@@ -62,8 +59,6 @@ export class DonateController extends GivingCrudController {
         const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
         if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
         const gateway = gateways[0];
-        const clientId = gateway.publicKey;
-        const clientSecret = EncryptionHelper.decrypt(gateway.privateKey);
 
         const funds = Array.isArray(req.body.funds) ? req.body.funds : [];
         // Warning: PayPal custom_id is limited (~127 chars). Keep it compact.
@@ -77,7 +72,7 @@ export class DonateController extends GivingCrudController {
         }
 
         try {
-          const order = await PayPalHelper.createOrder(clientId, clientSecret, {
+          const order = await GatewayService.createOrder(gateway, {
             amount,
             currency,
             description: req.body.description || "Donation",
@@ -85,7 +80,7 @@ export class DonateController extends GivingCrudController {
           });
           return { id: order.id, status: order.status };
         } catch (e) {
-          console.error("PayPal create order error", e);
+          console.error("Create order error", e);
           return this.json({ error: "Failed to create order" }, 502);
         }
       } catch (e) {
@@ -97,9 +92,9 @@ export class DonateController extends GivingCrudController {
   @httpPost("/log")
   public async log(req: express.Request<{}, {}, { donation: Donation; fundData: { id: string; amount: number } }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const secretKey = await this.loadPrivateKey(req.body.donation.churchId as string);
+      const gateways = (await this.repos.gateway.loadAll(req.body.donation.churchId as string)) as any[];
       const { donation, fundData } = req.body;
-      if (secretKey === "") return this.json({}, 401);
+      if (gateways.length === 0) return this.json({}, 401);
       return this.logDonation(donation, [fundData]);
     });
   }
@@ -404,57 +399,50 @@ export class DonateController extends GivingCrudController {
     return await Promise.all(promises);
   };
 
-  private loadPrivateKey = async (churchId: string) => {
-    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-    return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
-  };
 
+  // Legacy fee calculation methods for backward compatibility
   private getCreditCardFees = async (amount: number, churchId: string) => {
+    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+    const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
+    if (stripeGateway) {
+      return await GatewayService.calculateFees(stripeGateway, amount, churchId);
+    }
+
+    // Fallback to hardcoded calculation if no Stripe gateway found
     let customFixedFee: number | null = null;
     let customPercentFee: number | null = null;
     if (churchId) {
       const response = await Axios.get(Environment.membershipApi + "/settings/public/" + churchId);
       const data = response.data;
-
       if (data?.flatRateCC && data.flatRateCC !== null && data.flatRateCC !== undefined && data.flatRateCC !== "") customFixedFee = +data.flatRateCC;
       if (data?.transFeeCC && data.transFeeCC !== null && data.transFeeCC !== undefined && data.transFeeCC !== "") customPercentFee = +data.transFeeCC / 100;
     }
-    const fixedFee = customFixedFee ?? 0.3; // default to $0.30 if not provided
-    const fixedPercent = customPercentFee ?? 0.029; // default to 2.9% if not provided
-
+    const fixedFee = customFixedFee ?? 0.3;
+    const fixedPercent = customPercentFee ?? 0.029;
     return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   };
 
   private getACHFees = async (amount: number, churchId: string) => {
+    // ACH is typically handled by Stripe, so find Stripe gateway
+    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+    const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
+    if (stripeGateway) {
+      return await GatewayService.calculateFees(stripeGateway, amount, churchId);
+    }
+
+    // Fallback to hardcoded calculation if no Stripe gateway found
     let customPercentFee: number | null = null;
     let customMaxFee: number | null = null;
     if (churchId) {
       const response = await Axios.get(Environment.membershipApi + "/settings/public/" + churchId);
       const data = response.data;
-
       if (data?.flatRateACH && data.flatRateACH !== null && data.flatRateACH !== undefined && data.flatRateACH !== "") customPercentFee = +data.flatRateACH / 100;
       if (data?.hardLimitACH && data.hardLimitACH !== null && data.hardLimitACH !== undefined && data.hardLimitACH !== "") customMaxFee = +data.hardLimitACH;
     }
-
-    const fixedPercent = customPercentFee ?? 0.008; // default to 0.8% if not provided
-    const fixedMaxFee = customMaxFee ?? 5.0; // default to $5 if not provided
-
+    const fixedPercent = customPercentFee ?? 0.008;
+    const fixedMaxFee = customMaxFee ?? 5.0;
     const fee = Math.round((amount / (1 - fixedPercent) - amount) * 100) / 100;
     return Math.min(fee, fixedMaxFee);
-  };
-
-  private getPayPalFees = async (amount: number, churchId: string) => {
-    let customFixedFee: number | null = null;
-    let customPercentFee: number | null = null;
-    if (churchId) {
-      const response = await Axios.get(Environment.membershipApi + "/settings/public/" + churchId);
-      const data = response.data;
-      if (data?.flatRatePayPal != null && data.flatRatePayPal !== "") customFixedFee = +data.flatRatePayPal;
-      if (data?.transFeePayPal != null && data.transFeePayPal !== "") customPercentFee = +data.transFeePayPal / 100;
-    }
-    const fixedFee = customFixedFee ?? 0.3;
-    const fixedPercent = customPercentFee ?? 0.029;
-    return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   };
 
   @httpPost("/captcha-verify")

@@ -1,8 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { GivingCrudController } from "./GivingCrudController";
-import { StripeHelper } from "../../../shared/helpers/StripeHelper";
-import { EncryptionHelper } from "@churchapps/apihelper";
+import { GatewayService } from "../../../shared/helpers/GatewayService";
 import { Permissions } from "../../../shared/helpers/Permissions";
 
 @controller("/giving/paymentmethods")
@@ -16,12 +15,15 @@ export class PaymentMethodController extends GivingCrudController {
   @httpGet("/personid/:id")
   public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const secretKey = await this.loadPrivateKey(au.churchId);
-      const permission = secretKey && (au.checkAccess(Permissions.donations.view) || id === au.personId);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.view) || id === au.personId);
       if (!permission) return this.json({}, 401);
       else {
         const customer = await this.repos.customer.loadByPersonId(au.churchId, id);
-        return customer ? await StripeHelper.getCustomerPaymentMethods(secretKey, customer) : [];
+        if (!customer) return [];
+
+        const gateway = gateways[0];
+        return await GatewayService.getCustomerPaymentMethods(gateway, customer);
       }
     });
   }
@@ -31,35 +33,36 @@ export class PaymentMethodController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name, churchId } = req.body;
       const cId = au?.churchId || churchId;
-      const secretKey = await this.loadPrivateKey(cId);
+      const gateways = (await this.repos.gateway.loadAll(cId)) as any[];
 
-      // Require permission to edit cards, but not add so we can accept logged out donations
-      // const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
-
-      if (!secretKey) {
+      if (gateways.length === 0) {
         return this.json({ error: "Payment gateway not configured" }, 400);
       }
 
-      // Validate payment method ID format
-      if (!id || !id.startsWith("pm_")) {
+      const gateway = gateways[0];
+
+      // Validate payment method ID format for Stripe
+      if (gateway.provider === "stripe" && (!id || !id.startsWith("pm_"))) {
         return this.json({ error: "Invalid payment method ID format" }, 400);
       }
 
       let customer = customerId;
       if (!customer) {
         try {
-          customer = await StripeHelper.createCustomer(secretKey, email, name);
-          await this.repos.customer.save({ id: customer, churchId: cId, personId });
+          customer = await GatewayService.createCustomer(gateway, email, name);
+          if (customer) {
+            await this.repos.customer.save({ id: customer, churchId: cId, personId });
+          }
         } catch (e: any) {
           return this.json({ error: "Failed to create customer", details: e.message }, 500);
         }
       }
 
       try {
-        const pm = await StripeHelper.attachPaymentMethod(secretKey, id, { customer });
+        const pm = await GatewayService.attachPaymentMethod(gateway, id, { customer });
         return { paymentMethod: pm, customerId: customer };
       } catch (e: any) {
-        // Handle specific Stripe errors
+        // Handle specific gateway errors
         if (e.type === "StripeInvalidRequestError") {
           if (e.code === "resource_missing") {
             return this.json({
@@ -87,12 +90,13 @@ export class PaymentMethodController extends GivingCrudController {
   public async updateCard(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { personId, paymentMethodId, cardData } = req.body;
-      const secretKey = await this.loadPrivateKey(au.churchId);
-      const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
+      const gateway = gateways[0];
       try {
-        return await StripeHelper.updateCard(secretKey, paymentMethodId, cardData);
+        return await GatewayService.updateCard(gateway, paymentMethodId, cardData);
       } catch (e: any) {
         console.error("Error updating card:", e);
         if (e.type === "StripeInvalidRequestError" && e.code === "resource_missing") {
@@ -113,15 +117,18 @@ export class PaymentMethodController extends GivingCrudController {
   public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name } = req.body;
-      const secretKey = await this.loadPrivateKey(au.churchId);
-      const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
+      const gateway = gateways[0];
       let customer = customerId;
       if (!customer) {
         try {
-          customer = await StripeHelper.createCustomer(secretKey, email, name);
-          await this.repos.customer.save({ id: customer, churchId: au.churchId, personId });
+          customer = await GatewayService.createCustomer(gateway, email, name);
+          if (customer) {
+            await this.repos.customer.save({ id: customer, churchId: au.churchId, personId });
+          }
         } catch (e: any) {
           console.error("Error creating customer:", e);
           return this.json({ error: "Failed to create customer", details: e.message }, 500);
@@ -129,7 +136,7 @@ export class PaymentMethodController extends GivingCrudController {
       }
 
       try {
-        return await StripeHelper.createBankAccount(secretKey, customer, { source: id });
+        return await GatewayService.createBankAccount(gateway, customer, { source: id });
       } catch (e: any) {
         console.error("Error adding bank account:", e);
         if (e.type === "StripeInvalidRequestError" && e.code === "resource_missing") {
@@ -149,12 +156,13 @@ export class PaymentMethodController extends GivingCrudController {
   @httpPost("/updatebank")
   public async updateBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const secretKey = await this.loadPrivateKey(au.churchId);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       const { paymentMethodId, personId, bankData, customerId } = req.body;
-      const permission = secretKey && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({}, 401);
+      const gateway = gateways[0];
       try {
-        return await StripeHelper.updateBank(secretKey, paymentMethodId, bankData, customerId);
+        return await GatewayService.updateBank(gateway, paymentMethodId, bankData, customerId);
       } catch (e) {
         return e;
       }
@@ -164,15 +172,16 @@ export class PaymentMethodController extends GivingCrudController {
   @httpPost("/verifybank")
   public async verifyBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const secretKey = await this.loadPrivateKey(au.churchId);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       const { paymentMethodId, customerId, amountData } = req.body;
       const permission =
-        secretKey &&
+        gateways.length > 0 &&
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
+        const gateway = gateways[0];
         try {
-          return await StripeHelper.verifyBank(secretKey, paymentMethodId, amountData, customerId);
+          return await GatewayService.verifyBank(gateway, paymentMethodId, amountData, customerId);
         } catch (e) {
           return e;
         }
@@ -183,22 +192,19 @@ export class PaymentMethodController extends GivingCrudController {
   @httpDelete("/:id/:customerid")
   public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const secretKey = await this.loadPrivateKey(au.churchId);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       const permission =
-        secretKey &&
+        gateways.length > 0 &&
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
+        const gateway = gateways[0];
         const paymentType = id.substring(0, 2);
-        if (paymentType === "pm") await StripeHelper.detachPaymentMethod(secretKey, id);
-        if (paymentType === "ba") await StripeHelper.deleteBankAccount(secretKey, customerId, id);
+        if (paymentType === "pm") await GatewayService.detachPaymentMethod(gateway, id);
+        if (paymentType === "ba") await GatewayService.deleteBankAccount(gateway, customerId, id);
         return this.json({});
       }
     });
   }
 
-  private loadPrivateKey = async (churchId: string) => {
-    const gateways = await this.repos.gateway.loadAll(churchId);
-    return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
-  };
 }
