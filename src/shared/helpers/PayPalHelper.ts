@@ -202,6 +202,73 @@ export class PayPalHelper {
     return response.result;
   }
 
+  static async updateSubscription(clientId: string, clientSecret: string, subscriptionData: any): Promise<any> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+    const baseUrl = PayPalHelper.getBaseUrl();
+
+    // Build patch operations based on what needs to be updated
+    const patchOps = [];
+
+    // Update plan if provided
+    if (subscriptionData.planId) {
+      patchOps.push({
+        op: "replace",
+        path: "/plan_id",
+        value: subscriptionData.planId
+      });
+    }
+
+    // Update quantity if provided
+    if (subscriptionData.quantity) {
+      patchOps.push({
+        op: "replace",
+        path: "/quantity",
+        value: subscriptionData.quantity.toString()
+      });
+    }
+
+    // Update shipping amount if provided
+    if (subscriptionData.shippingAmount) {
+      patchOps.push({
+        op: "replace",
+        path: "/shipping_amount",
+        value: {
+          currency_code: subscriptionData.currency || "USD",
+          value: subscriptionData.shippingAmount.toString()
+        }
+      });
+    }
+
+    // Update custom ID if provided
+    if (subscriptionData.customId) {
+      patchOps.push({
+        op: "replace",
+        path: "/custom_id",
+        value: subscriptionData.customId
+      });
+    }
+
+    // If no updates, just return the current subscription details
+    if (patchOps.length === 0) {
+      return await PayPalHelper.getSubscriptionDetails(clientId, clientSecret, subscriptionData.id);
+    }
+
+    const _response = await fetch(
+      `${baseUrl}/v1/billing/subscriptions/${subscriptionData.id}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(patchOps)
+      }
+    );
+
+    // After update, fetch and return the updated subscription details
+    return await PayPalHelper.getSubscriptionDetails(clientId, clientSecret, subscriptionData.id);
+  }
+
   static async cancelSubscription(clientId: string, clientSecret: string, subscriptionId: string, reason?: string): Promise<any> {
     const client = PayPalHelper.getClient(clientId, clientSecret);
     const request = new paypal.subscriptions.SubscriptionsCancelRequest(subscriptionId);

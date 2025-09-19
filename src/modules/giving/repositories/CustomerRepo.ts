@@ -24,6 +24,20 @@ export class CustomerRepo extends ConfiguredRepo<Customer> {
     return model;
   }
 
+  // Override save method to handle external IDs properly
+  public async save(model: Customer): Promise<Customer> {
+    // Check if customer already exists in database
+    const existing = await this.loadByPersonId(model.churchId!, model.personId!);
+
+    if (existing) {
+      // Customer exists, update it
+      return await this.update(model);
+    } else {
+      // Customer doesn't exist, create it
+      return await this.create(model);
+    }
+  }
+
   // Override update since we likely won't update customers
   protected async update(model: Customer): Promise<Customer> {
     // Customers typically don't get updated, but provide implementation for completeness
