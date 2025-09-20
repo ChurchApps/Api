@@ -36,11 +36,25 @@ type GatewayResolutionReason = "not-found" | "ambiguous" | null;
 
 export class GatewayService {
   static getGatewayConfig(gateway: any): GatewayConfig {
+    const decryptIfPresent = (value: string | null | undefined) => {
+      if (!value) return "";
+      try {
+        return EncryptionHelper.decrypt(value);
+      } catch (err) {
+        console.error("Failed to decrypt gateway secret", { provider: gateway?.provider, gatewayId: gateway?.id, err });
+        return "";
+      }
+    };
+
     return {
+      gatewayId: gateway.id,
+      churchId: gateway.churchId,
       publicKey: gateway.publicKey,
-      privateKey: EncryptionHelper.decrypt(gateway.privateKey),
-      webhookKey: EncryptionHelper.decrypt(gateway.webhookKey),
-      productId: gateway.productId
+      privateKey: decryptIfPresent(gateway.privateKey),
+      webhookKey: decryptIfPresent(gateway.webhookKey),
+      productId: gateway.productId,
+      settings: gateway.settings ?? null,
+      environment: gateway.environment ?? null
     };
   }
 
@@ -224,6 +238,25 @@ export class GatewayService {
       return await provider.createOrder(config, orderData);
     }
     throw new Error(`${gateway.provider} does not support order creation`);
+  }
+
+  // Subscription plan management
+  static async createSubscriptionPlan(gateway: any, planData: any): Promise<string | undefined> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.createSubscriptionPlan) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.createSubscriptionPlan(config, planData);
+    }
+    throw new Error(`${gateway.provider} does not support subscription plan creation`);
+  }
+
+  static async createSubscriptionWithPlan(gateway: any, subscriptionData: any): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.createSubscriptionWithPlan) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.createSubscriptionWithPlan(config, subscriptionData);
+    }
+    throw new Error(`${gateway.provider} does not support plan-based subscription creation`);
   }
 
   /**

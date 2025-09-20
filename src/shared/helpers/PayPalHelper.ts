@@ -321,4 +321,268 @@ export class PayPalHelper {
     funds.forEach((fd) => promises.push(givingRepos.fundDonation.save(fd)));
     return Promise.all(promises);
   }
+
+  // PayPal Vault API methods for customer and payment method management
+  static async createVaultCustomer(
+    clientId: string,
+    clientSecret: string,
+    customerData: { email?: string; name?: string; payerId?: string; returnUrl?: string; cancelUrl?: string }
+  ): Promise<string> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const experienceContext = {
+      payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED",
+      return_url: customerData.returnUrl || "https://example.com/return",
+      cancel_url: customerData.cancelUrl || "https://example.com/cancel"
+    };
+
+    const body: any = {
+      payment_source: {
+        paypal: {
+          usage_type: "MERCHANT",
+          experience_context: experienceContext
+        }
+      }
+    };
+
+    if (customerData.payerId) {
+      body.customer = { id: customerData.payerId };
+      body.external_id = customerData.payerId;
+    } else if (customerData.email || customerData.name) {
+      const customerPayload: any = {};
+      if (customerData.email) customerPayload.email_address = customerData.email;
+      if (customerData.name) {
+        const [givenName, ...rest] = customerData.name.split(" ");
+        const surname = rest.join(" ").trim();
+        customerPayload.name = {
+          given_name: givenName,
+          surname: surname || undefined
+        };
+      }
+      if (Object.keys(customerPayload).length > 0) {
+        body.customer = customerPayload;
+      }
+    }
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v3/vault/setup-tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create PayPal vault customer: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result.id || result.customer?.id || customerData.payerId || "";
+  }
+
+  static async createVaultPaymentMethod(clientId: string, clientSecret: string, paymentData: { customerId: string; token: string }): Promise<any> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v3/vault/payment-tokens`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        payment_source: {
+          token: {
+            id: paymentData.token,
+            type: "SETUP_TOKEN"
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create PayPal vault payment method: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json();
+    if (paymentData.customerId && !result.customer_id) {
+      result.customer_id = paymentData.customerId;
+    }
+    return result;
+  }
+
+  static async listVaultPaymentMethods(clientId: string, clientSecret: string, customerId: string): Promise<any[]> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v3/vault/payment-tokens?customer_id=${customerId}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return [];
+      }
+      const errorText = await response.text();
+      throw new Error(`Failed to list PayPal vault payment methods: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result.payment_tokens || [];
+  }
+
+  static async deleteVaultPaymentMethod(clientId: string, clientSecret: string, paymentTokenId: string): Promise<void> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v3/vault/payment-tokens/${paymentTokenId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok && response.status !== 404) {
+      const errorText = await response.text();
+      throw new Error(`Failed to delete PayPal vault payment method: ${response.status} ${errorText}`);
+    }
+  }
+
+  static async createSubscriptionPlan(clientId: string, clientSecret: string, planData: {
+    productId: string;
+    name: string;
+    amount: number;
+    currency?: string;
+    interval?: "DAY" | "WEEK" | "MONTH" | "YEAR";
+    intervalCount?: number;
+  }): Promise<string> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+    const currency = (planData.currency || "USD").toUpperCase();
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/billing/plans`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        product_id: planData.productId,
+        name: planData.name,
+        billing_cycles: [
+          {
+            frequency: {
+              interval_unit: planData.interval || "MONTH",
+              interval_count: planData.intervalCount || 1
+            },
+            tenure_type: "REGULAR",
+            sequence: 1,
+            total_cycles: 0,
+            pricing_scheme: {
+              fixed_price: {
+                value: planData.amount.toFixed(2),
+                currency_code: currency
+              }
+            }
+          }
+        ],
+        payment_preferences: {
+          auto_bill_outstanding: true,
+          payment_failure_threshold: 3
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create PayPal subscription plan: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result.id;
+  }
+
+  static async createProduct(clientId: string, clientSecret: string, productData: { name: string; description?: string; category?: string }): Promise<string> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/catalogs/products`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: productData.name,
+        description: productData.description || productData.name,
+        type: "SERVICE",
+        category: productData.category || "NONPROFIT"
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create PayPal product: ${response.status} ${errorText}`);
+    }
+
+    const result = await response.json();
+    return result.id;
+  }
+
+  static async createSubscriptionWithVault(clientId: string, clientSecret: string, subscriptionData: {
+    planId: string;
+    customerId?: string;
+    paymentTokenId?: string;
+    customId?: string;
+    startDate?: string;
+  }): Promise<any> {
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+
+    const body: any = {
+      plan_id: subscriptionData.planId,
+      quantity: "1"
+    };
+
+    if (subscriptionData.customId) {
+      body.custom_id = subscriptionData.customId;
+    }
+
+    if (subscriptionData.startDate) {
+      body.start_time = subscriptionData.startDate;
+    }
+
+    if (subscriptionData.customerId) {
+      body.subscriber = {
+        payer_id: subscriptionData.customerId
+      };
+    }
+
+    if (subscriptionData.paymentTokenId) {
+      body.payment_source = {
+        token: {
+          id: subscriptionData.paymentTokenId,
+          type: "PAYMENT_METHOD_TOKEN"
+        }
+      };
+    }
+
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/billing/subscriptions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create PayPal subscription: ${response.status} ${errorText}`);
+    }
+
+    return response.json();
+  }
 }

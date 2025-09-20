@@ -57,6 +57,14 @@ export class CustomerRepo extends ConfiguredRepo<Customer> {
     return row ? this.rowToModel(row) : null;
   }
 
+  public async loadByPersonAndProvider(churchId: string, personId: string, provider: string) {
+    const row = await TypedDB.queryOne(
+      "SELECT * FROM customers WHERE personId=? AND churchId=? AND provider=?;",
+      [personId, churchId, provider]
+    );
+    return row ? this.rowToModel(row) : null;
+  }
+
   protected rowToModel(row: any): Customer {
     return {
       id: row.id,

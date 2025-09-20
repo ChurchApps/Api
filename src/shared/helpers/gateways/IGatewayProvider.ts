@@ -21,10 +21,14 @@ export interface SubscriptionResult {
 }
 
 export interface GatewayConfig {
+  gatewayId: string;
+  churchId: string;
   publicKey: string;
   privateKey: string;
   webhookKey: string;
   productId?: string;
+  settings?: Record<string, unknown> | null;
+  environment?: string | null;
 }
 
 export interface IGatewayProvider {
@@ -64,6 +68,10 @@ export interface IGatewayProvider {
   // Provider-specific functionality
   generateClientToken?(config: GatewayConfig): Promise<string>;
   createOrder?(config: GatewayConfig, orderData: any): Promise<any>;
+
+  // Subscription plan management
+  createSubscriptionPlan?(config: GatewayConfig, planData: any): Promise<string>;
+  createSubscriptionWithPlan?(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult>;
 
   // Event logging
   logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;

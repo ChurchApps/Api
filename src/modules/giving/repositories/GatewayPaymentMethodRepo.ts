@@ -73,6 +73,23 @@ export class GatewayPaymentMethodRepo extends ConfiguredRepo<GatewayPaymentMetho
     return this.mapToModels(data);
   }
 
+  public async loadByExternalId(churchId: string, gatewayId: string, externalId: string): Promise<GatewayPaymentMethod | null> {
+    const sql = "SELECT * FROM gatewayPaymentMethods WHERE churchId=? AND gatewayId=? AND externalId=? LIMIT 1";
+    const row = await TypedDB.queryOne(sql, [churchId, gatewayId, externalId]);
+    return row ? this.rowToModel(row) : null;
+  }
+
+  public async deleteByExternalId(churchId: string, gatewayId: string, externalId: string): Promise<void> {
+    const sql = "DELETE FROM gatewayPaymentMethods WHERE churchId=? AND gatewayId=? AND externalId=?";
+    await TypedDB.query(sql, [churchId, gatewayId, externalId]);
+  }
+
+  public async loadByCustomer(churchId: string, gatewayId: string, customerId: string): Promise<GatewayPaymentMethod[]> {
+    const sql = "SELECT * FROM gatewayPaymentMethods WHERE churchId=? AND gatewayId=? AND customerId=?";
+    const rows = await TypedDB.query(sql, [churchId, gatewayId, customerId]);
+    return this.mapToModels(rows);
+  }
+
   private parseJson(value: unknown) {
     if (value === null || value === undefined) return null;
     if (typeof value === "string") {

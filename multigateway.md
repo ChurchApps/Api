@@ -59,17 +59,17 @@ Enable the donations stack to run on Stripe, PayPal, Square, or ePayMints (one g
 
 ### Phase 4 – Provider Implementations
 1. **PayPal**
-   - Implement Vault customer+payment-method flows in `PayPalHelper` (create/list/update/delete) and wire them through `PayPalGatewayProvider`.
-   - Use `gateway_payment_methods` to persist PayPal vault IDs.
-   - Support subscription plan creation/lookups for dynamic amounts.
+   - ✅ Vault customer and payment-method flows implemented in `PayPalHelper` and exposed via `PayPalGatewayProvider` (create/list/delete with contract-safe error handling).
+   - ✅ PayPal vault tokens are persisted in `gateway_payment_methods` with controller-level syncing for attach/detach flows.
+   - ✅ Subscription plan creation uses helper wiring so dynamic-plan scenarios consume gateway settings and product fallbacks.
 2. **Square**
-   - Add `SquareHelper` to encapsulate API calls (customer management, payments, webhooks, subscriptions where supported).
-   - Implement `SquareGatewayProvider` satisfying `IGatewayProvider` (respect capability map: ACH, vault, subscriptions).
-   - Store Square-specific config (locationId, applicationId) in `Gateway.settings`.
+   - ✅ `SquareHelper` continues to encapsulate API calls with environment resolution; provider now pulls credentials from `Gateway.settings` with validation for required fields.
+   - ✅ `SquareGatewayProvider` respects capability flags and returns descriptive errors for unsupported operations while remaining feature-flagged.
+   - ✅ Square-specific configuration (`locationId`, `applicationId`, `environment`) now flows through the typed settings column.
 3. **ePayMints**
-   - Create `EPayMintsHelper` with REST/SOAP integration (depending on API) for tokenised payments and ACH.
-   - Implement `EPayMintsGatewayProvider`; mark unsupported features (`supportsSubscriptions=false`, etc.).
-4. Ensure each provider sets meaningful errors for unsupported flows so controllers can relay clear messaging.
+   - ✅ `EPayMintsHelper` provides REST scaffolding for card + ACH flows keyed off gateway settings.
+   - ✅ `EPayMintsGatewayProvider` advertises unsupported capabilities with explicit exceptions and reuses shared settings plumbing.
+4. ✅ Provider implementations surface clear error messages for unsupported flows so controllers can relay actionable messaging.
 
 ### Phase 5 – Testing & Observability
 1. Unit-test helpers and providers with mocked SDK clients.

@@ -3,6 +3,7 @@ import express from "express";
 import { GivingCrudController } from "./GivingCrudController";
 import { GatewayService } from "../../../shared/helpers/GatewayService";
 import { Permissions } from "../../../shared/helpers/Permissions";
+import { GatewayPaymentMethod } from "../models";
 
 @controller("/giving/paymentmethods")
 export class PaymentMethodController extends GivingCrudController {
@@ -25,9 +26,25 @@ export class PaymentMethodController extends GivingCrudController {
         return []; // Return empty array for providers without vault support
       }
 
-      const customer = await this.repos.customer.loadByPersonId(au.churchId, id);
+      let customer = await this.repos.customer.loadByPersonAndProvider(au.churchId, id, gateway.provider);
+      if (!customer) {
+        customer = await this.repos.customer.loadByPersonId(au.churchId, id);
+      }
       if (!customer) return [];
-      return await GatewayService.getCustomerPaymentMethods(gateway, customer);
+      const paymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);
+
+      if (gateway.provider === "paypal" && Array.isArray(paymentMethods)) {
+        const stored = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
+        if (stored.length) {
+          const lookup = new Map(stored.map((record) => [record.externalId, record]));
+          return paymentMethods.map((method: any) => {
+            const record = lookup.get(method?.id);
+            return record ? { ...method, localRecord: record } : method;
+          });
+        }
+      }
+
+      return paymentMethods;
     });
   }
 
@@ -58,7 +75,7 @@ export class PaymentMethodController extends GivingCrudController {
         try {
           customer = await GatewayService.createCustomer(gateway, email, name);
           if (customer) {
-            await this.repos.customer.save({ id: customer, churchId: cId, personId });
+            await this.repos.customer.save({ id: customer, churchId: cId, personId, provider: gateway.provider });
           }
         } catch (e: any) {
           return this.json({ error: "Failed to create customer", details: e.message }, 500);
@@ -67,6 +84,44 @@ export class PaymentMethodController extends GivingCrudController {
 
       try {
         const pm = await GatewayService.attachPaymentMethod(gateway, id, { customer });
+        if (gateway.provider === "paypal" && customer) {
+          const tokenId = pm?.id || id;
+          if (tokenId) {
+            const paymentSource = pm?.payment_source || {};
+            const card = paymentSource.card as { last4?: string; brand?: string } | undefined;
+            const paypalSource = paymentSource.paypal as { email_address?: string } | undefined;
+
+            const methodType = card
+              ? "card"
+              : paypalSource
+              ? "paypal"
+              : typeof pm?.type === "string"
+              ? pm.type
+              : "token";
+
+            const displayName = card
+              ? `${(card.brand || "Card").toUpperCase()} •••• ${card.last4 ?? ""}`.trim()
+              : paypalSource?.email_address || `PayPal token ${tokenId.substring(0, 6)}...`;
+
+            const existing = await this.repos.gatewayPaymentMethod.loadByExternalId(cId, gateway.id, tokenId);
+            const record: GatewayPaymentMethod = {
+              id: existing?.id,
+              churchId: cId,
+              gatewayId: gateway.id,
+              customerId: customer,
+              externalId: tokenId,
+              methodType,
+              displayName,
+              metadata: {
+                status: pm?.status,
+                brand: card?.brand,
+                last4: card?.last4
+              }
+            };
+            await this.repos.gatewayPaymentMethod.save(record);
+          }
+        }
+
         return { paymentMethod: pm, customerId: customer };
       } catch (e: any) {
         // Handle specific gateway errors
@@ -136,7 +191,7 @@ export class PaymentMethodController extends GivingCrudController {
         try {
           customer = await GatewayService.createCustomer(gateway, email, name);
           if (customer) {
-            await this.repos.customer.save({ id: customer, churchId: au.churchId, personId });
+            await this.repos.customer.save({ id: customer, churchId: au.churchId, personId, provider: gateway.provider });
           }
         } catch (e: any) {
           console.error("Error creating customer:", e);
@@ -205,10 +260,24 @@ export class PaymentMethodController extends GivingCrudController {
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
-        const paymentType = id.substring(0, 2);
-        if (paymentType === "pm") await GatewayService.detachPaymentMethod(gateway, id);
-        if (paymentType === "ba") await GatewayService.deleteBankAccount(gateway, customerId, id);
-        return this.json({});
+        try {
+          if (id.startsWith("ba_")) {
+            await GatewayService.deleteBankAccount(gateway, customerId, id);
+          } else {
+            await GatewayService.detachPaymentMethod(gateway, id);
+          }
+
+          if (gateway.provider === "paypal") {
+            await this.repos.gatewayPaymentMethod.deleteByExternalId(au.churchId, gateway.id, id);
+          }
+
+          return this.json({});
+        } catch (e: any) {
+          return this.json({
+            error: e?.message || "Failed to delete payment method",
+            code: e?.code || "unknown_error"
+          }, e?.statusCode || 500);
+        }
       }
     });
   }

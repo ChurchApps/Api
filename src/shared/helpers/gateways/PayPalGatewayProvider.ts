@@ -109,34 +109,55 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return await PayPalHelper.createOrder(config.publicKey, config.privateKey, orderData);
   }
 
-  // PayPal doesn't have the same customer/payment method management as Stripe
-  // These methods throw errors to indicate they're not supported
-  async createCustomer(): Promise<string> {
-    throw new Error("PayPal does not support customer creation");
+  // PayPal Vault customer and payment method management
+  async createCustomer(config: GatewayConfig, email: string, name: string): Promise<string> {
+    const settings = (config.settings ?? {}) as Record<string, unknown>;
+    return await PayPalHelper.createVaultCustomer(config.publicKey, config.privateKey, {
+      email,
+      name,
+      returnUrl: typeof settings.returnUrl === "string" ? settings.returnUrl : undefined,
+      cancelUrl: typeof settings.cancelUrl === "string" ? settings.cancelUrl : undefined
+    });
   }
 
-  async getCustomerSubscriptions(): Promise<any> {
-    throw new Error("PayPal does not support customer subscription listing");
+  async getCustomerSubscriptions(config: GatewayConfig, _customerId: string): Promise<any> {
+    // PayPal doesn't provide a direct API to list subscriptions by customer
+    // This would need to be tracked in the database
+    return [];
   }
 
-  async getCustomerPaymentMethods(): Promise<any> {
-    throw new Error("PayPal does not support payment method listing");
+  async getCustomerPaymentMethods(config: GatewayConfig, customer: any): Promise<any> {
+    const customerId = typeof customer === "string" ? customer : customer?.id;
+    if (!customerId) {
+      throw new Error("PayPal customer id is required to list payment methods");
+    }
+    return await PayPalHelper.listVaultPaymentMethods(config.publicKey, config.privateKey, customerId);
   }
 
-  async attachPaymentMethod(): Promise<any> {
-    throw new Error("PayPal does not support payment method attachment");
+  async attachPaymentMethod(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any> {
+    const customerId = typeof options?.customer === "string" ? options.customer : options?.customer?.id;
+    if (!customerId) {
+      throw new Error("PayPal payment method attachment requires a customer identifier");
+    }
+    return await PayPalHelper.createVaultPaymentMethod(config.publicKey, config.privateKey, {
+      customerId,
+      token: paymentMethodId
+    });
   }
 
-  async detachPaymentMethod(): Promise<any> {
-    throw new Error("PayPal does not support payment method detachment");
+  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string): Promise<any> {
+    await PayPalHelper.deleteVaultPaymentMethod(config.publicKey, config.privateKey, paymentMethodId);
+    return { success: true };
   }
 
   async updateCard(): Promise<any> {
-    throw new Error("PayPal does not support card updates");
+    // PayPal Vault doesn't support direct card updates
+    // Users need to add a new payment method and remove the old one
+    throw new Error("PayPal does not support direct card updates. Please add a new payment method and remove the old one.");
   }
 
   async createBankAccount(): Promise<any> {
-    throw new Error("PayPal does not support bank account creation");
+    throw new Error("PayPal does not support bank account creation through this API");
   }
 
   async updateBank(): Promise<any> {
@@ -144,10 +165,43 @@ export class PayPalGatewayProvider implements IGatewayProvider {
   }
 
   async verifyBank(): Promise<any> {
-    throw new Error("PayPal does not support bank account verification");
+    throw new Error("PayPal does not support bank account verification through this API");
   }
 
   async deleteBankAccount(): Promise<any> {
-    throw new Error("PayPal does not support bank account deletion");
+    throw new Error("PayPal does not support bank account deletion through this API");
+  }
+
+  // PayPal-specific methods for subscription plans
+  async createSubscriptionPlan(config: GatewayConfig, planData: any): Promise<string> {
+    // Create product if it doesn't exist
+    let productId = config.productId;
+    if (!productId) {
+      productId = await PayPalHelper.createProduct(config.publicKey, config.privateKey, {
+        name: planData.productName || "Church Donation",
+        description: planData.productDescription || "Recurring donation to church",
+        category: "NONPROFIT"
+      });
+    }
+
+    // Create subscription plan with the amount
+    return await PayPalHelper.createSubscriptionPlan(config.publicKey, config.privateKey, {
+      productId,
+      name: planData.name || `Donation Plan $${planData.amount}`,
+      amount: planData.amount,
+      currency: planData.currency || "USD",
+      interval: planData.interval || "MONTH",
+      intervalCount: planData.intervalCount || 1
+    });
+  }
+
+  async createSubscriptionWithPlan(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
+    const paypalSub = await PayPalHelper.createSubscriptionWithVault(config.publicKey, config.privateKey, subscriptionData);
+
+    return {
+      success: !!paypalSub,
+      subscriptionId: paypalSub?.id || "",
+      data: paypalSub
+    };
   }
 }
