@@ -3,4 +3,5 @@ export class Subscription {
   public churchId?: string;
   public personId?: string;
   public customerId?: string;
+  public gatewayId?: string;
 }

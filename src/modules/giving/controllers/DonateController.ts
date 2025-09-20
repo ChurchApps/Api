@@ -16,21 +16,45 @@ export class DonateController extends GivingCrudController {
     permissions: { view: Permissions.donations.view, edit: Permissions.donations.edit },
     routes: [] as const // all CRUD endpoints disabled; custom routes only
   };
+
+  /**
+   * Get available payment gateways for a church
+   */
+  @httpPost("/gateways")
+  public async getGateways(req: express.Request<{}, {}, { churchId?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const churchId = req.body.churchId || au.churchId;
+      if (!churchId) return this.json({ error: "Missing churchId" }, 400);
+      if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
+
+      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+
+      // Return gateway info without sensitive data
+      const publicGateways = gateways.map(gateway => ({
+        id: gateway.id,
+        provider: gateway.provider,
+        publicKey: gateway.publicKey,
+        productId: gateway.productId
+      }));
+
+      return { gateways: publicGateways };
+    });
+  }
+
   @httpPost("/client-token")
-  public async clientToken(req: express.Request<{}, {}, { churchId?: string }>, res: express.Response): Promise<any> {
+  public async clientToken(req: express.Request<{}, {}, { churchId?: string; provider?: string; gatewayId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       try {
         const churchId = req.body.churchId || au.churchId;
         if (!churchId) return this.json({ error: "Missing churchId" }, 400);
         if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
 
-        const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-        if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
-        const gateway = gateways[0];
+        const gateway = await this.getGateway(churchId, req.body.provider, req.body.gatewayId);
+        if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
         try {
           const clientToken = await GatewayService.generateClientToken(gateway);
-          return { clientToken };
+          return { clientToken, provider: gateway.provider };
         } catch (e) {
           console.error("Client token error", e);
           return this.json({ error: "Failed to generate client token" }, 502);
@@ -44,7 +68,16 @@ export class DonateController extends GivingCrudController {
 
   @httpPost("/create-order")
   public async createOrder(
-    req: express.Request<{}, {}, { churchId?: string; amount?: number; currency?: string; funds?: any[]; notes?: string; description?: string }>,
+    req: express.Request<{}, {}, {
+      churchId?: string;
+      provider?: string;
+      gatewayId?: string;
+      amount?: number;
+      currency?: string;
+      funds?: any[];
+      notes?: string;
+      description?: string
+    }>,
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -56,9 +89,8 @@ export class DonateController extends GivingCrudController {
         if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
         if (!amount || amount <= 0 || !/^[A-Z]{3}$/.test(currency)) return this.json({ error: "Invalid amount or currency" }, 400);
 
-        const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-        if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
-        const gateway = gateways[0];
+        const gateway = await this.getGateway(churchId, req.body.provider, req.body.gatewayId);
+        if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
         const funds = Array.isArray(req.body.funds) ? req.body.funds : [];
         // Warning: PayPal custom_id is limited (~127 chars). Keep it compact.
@@ -78,7 +110,7 @@ export class DonateController extends GivingCrudController {
             description: req.body.description || "Donation",
             customId: customId || undefined
           });
-          return { id: order.id, status: order.status };
+          return { id: order.id, status: order.status, provider: gateway.provider };
         } catch (e) {
           console.error("Create order error", e);
           return this.json({ error: "Failed to create order" }, 502);
@@ -109,7 +141,11 @@ export class DonateController extends GivingCrudController {
       if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
 
       const provider = req.params.provider?.toLowerCase();
-      const gateway = gateways[0];
+      const gateway = gateways.find(g => g.provider.toLowerCase() === provider);
+
+      if (!gateway) {
+        return this.json({ error: `No ${provider} gateway configured` }, 404);
+      }
 
       try {
         const webhookResult = await GatewayService.verifyWebhook(gateway, req.headers, req.body);
@@ -164,10 +200,14 @@ export class DonateController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const donationData = req.body;
       const churchId = au.churchId || donationData.churchId;
-      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-      const gateway = gateways[0];
 
-      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+      // Validate required parameters
+      if (!donationData.provider && !donationData.gatewayId) {
+        return this.json({ error: "Either provider or gatewayId is required" }, 400);
+      }
+
+      const gateway = await this.getGateway(churchId, donationData.provider, donationData.gatewayId);
+      if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
       try {
         const chargeResult = await GatewayService.processCharge(gateway, donationData);
@@ -177,14 +217,14 @@ export class DonateController extends GivingCrudController {
         }
 
         // For PayPal, we need to log the events since it's captured immediately
-        if (donationData.provider === "paypal") {
+        if (gateway.provider === "paypal") {
           await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repos);
           await GatewayService.logDonation(gateway, churchId, chargeResult.data, this.repos);
         }
 
         await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
 
-        return chargeResult.data;
+        return { ...chargeResult.data, provider: gateway.provider };
       } catch (error) {
         console.error("Charge processing failed:", error);
         return this.json({ error: "Charge processing failed" }, 500);
@@ -195,12 +235,16 @@ export class DonateController extends GivingCrudController {
   @httpPost("/subscribe")
   public async subscribe(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID } = req.body;
+      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID, provider, gatewayId } = req.body;
       const churchId = au.churchId || CHURCH_ID;
-      const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-      const gateway = gateways[0];
 
-      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+      // Validate required parameters
+      if (!provider && !gatewayId) {
+        return this.json({ error: "Either provider or gatewayId is required" }, 400);
+      }
+
+      const gateway = await this.getGateway(churchId, provider, gatewayId);
+      if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
       try {
         const subscriptionData = {
@@ -224,7 +268,8 @@ export class DonateController extends GivingCrudController {
           id: subscriptionResult.subscriptionId,
           churchId,
           personId: person.id,
-          customerId
+          customerId,
+          gatewayId: gateway.id
         };
 
         await this.repos.subscription.save(subscription);
@@ -243,7 +288,7 @@ export class DonateController extends GivingCrudController {
         await Promise.all(promises);
         await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
 
-        return subscriptionResult.data;
+        return { ...subscriptionResult.data, provider: gateway.provider };
       } catch (error) {
         console.error("Subscription creation failed:", error);
         return this.json({ error: "Subscription creation failed" }, 500);
@@ -252,22 +297,29 @@ export class DonateController extends GivingCrudController {
   }
 
   @httpPost("/fee")
-  public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; amount: number }>, res: express.Response): Promise<any> {
+  public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; gatewayId?: string; amount: number }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const { type, provider, amount } = req.body;
-      const churchId = req.query.churchId?.toString() || "";
+      const { type, provider, gatewayId, amount } = req.body;
+      const churchId = req.query.churchId?.toString();
+
+      if (!churchId) {
+        return this.json({ error: "Missing churchId parameter" }, 400);
+      }
 
       try {
         let calculatedFee = 0;
+        let gatewayProvider = null;
 
-        if (provider) {
+        if (provider || gatewayId) {
           // Use gateway-specific fee calculation
-          const gateways = await this.repos.gateway.loadAll(churchId);
-          const gateway = (gateways as any[]).find((g) => g.provider.toLowerCase() === provider.toLowerCase());
+          const gateway = await this.getGateway(churchId, provider, gatewayId);
 
-          if (gateway) {
-            calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId);
+          if (!gateway) {
+            return this.json({ error: "Gateway not found" }, 404);
           }
+
+          calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId);
+          gatewayProvider = gateway.provider;
         } else {
           // Legacy type-based calculation for backward compatibility
           if (type === "creditCard") {
@@ -277,7 +329,7 @@ export class DonateController extends GivingCrudController {
           }
         }
 
-        return { calculatedFee };
+        return { calculatedFee, provider: gatewayProvider };
       } catch (error) {
         console.error("Fee calculation failed:", error);
         return { calculatedFee: 0 };
@@ -481,5 +533,23 @@ export class DonateController extends GivingCrudController {
         return this.json({ message: "Error verifying reCAPTCHA" }, 400);
       }
     });
+  }
+
+  /**
+   * Get gateway by provider name or ID
+   */
+  private async getGateway(churchId: string, provider?: string, gatewayId?: string): Promise<any> {
+    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+
+    if (gatewayId) {
+      return gateways.find(g => g.id === gatewayId);
+    }
+
+    if (provider) {
+      return gateways.find(g => g.provider.toLowerCase() === provider.toLowerCase());
+    }
+
+    // Return first gateway if no specific selection
+    return gateways.length > 0 ? gateways[0] : null;
   }
 }

@@ -5,6 +5,7 @@ export { DonationSummaryDonation } from "./DonationSummaryDonation";
 export { Fund } from "./Fund";
 export { FundDonation } from "./FundDonation";
 export { Gateway } from "./Gateway";
+export { GatewayPaymentMethod } from "./GatewayPaymentMethod";
 export { CheckoutDetails } from "./CheckoutDetails";
 export { Customer } from "./Customer";
 export { PaymentDetails } from "./PaymentDetails";

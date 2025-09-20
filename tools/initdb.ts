@@ -162,6 +162,7 @@ const moduleDefinitions = {
           { title: "Donation Batches", file: "donationBatches.sql" },
           { title: "Gateways", file: "gateways.sql" },
           { title: "Customers", file: "customers.sql" },
+          { title: "Gateway Payment Methods", file: "gatewayPaymentMethods.sql" },
           { title: "Event Logs", file: "eventLogs.sql" },
           { title: "Settings", file: "settings.sql" },
           { title: "Subscriptions", file: "subscriptions.sql" },

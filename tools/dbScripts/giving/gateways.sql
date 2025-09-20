@@ -9,6 +9,10 @@ CREATE TABLE `gateways` (
   `webhookKey` varchar(255) DEFAULT NULL,
   `productId` varchar(255) DEFAULT NULL,
   `payFees` bit(1) DEFAULT NULL,
+  `settings` json DEFAULT NULL,
+  `environment` varchar(50) DEFAULT NULL,
+  `createdAt` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`)
 ) ENGINE=InnoDB;
