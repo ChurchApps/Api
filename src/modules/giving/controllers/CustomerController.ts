@@ -23,9 +23,9 @@ export class CustomerController extends GivingCrudController {
   @httpGet("/:id/subscriptions")
   public async getSubscriptions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
       let permission = false;
-      if (gateways.length > 0) {
+      if (gateway) {
         if (au.checkAccess(Permissions.donations.viewSummary)) {
           permission = true;
         } else {
@@ -37,10 +37,14 @@ export class CustomerController extends GivingCrudController {
         }
       }
       if (!permission) return this.json({}, 401);
-      else {
-        const gateway = gateways[0];
-        return await GatewayService.getCustomerSubscriptions(gateway, id);
+
+      // Check if provider supports subscriptions
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsSubscriptions) {
+        return []; // Return empty array for providers without subscription support
       }
+
+      return await GatewayService.getCustomerSubscriptions(gateway, id);
     });
   }
 

@@ -32,10 +32,14 @@ export class SubscriptionController extends GivingCrudController {
   public async save(req: express.Request<{}, {}, any[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<any>[] = [];
-      const gateways = await this.repos.gateway.loadAll(au.churchId);
-      const gateway = (gateways as any[])[0];
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
 
       if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsSubscriptions) {
+        return this.json({ error: `${gateway.provider} does not support subscription management` }, 400);
+      }
 
       for (const subscription of req.body) {
         const existingSub = await this.repos.subscription.load(au.churchId, subscription.id);
@@ -58,9 +62,13 @@ export class SubscriptionController extends GivingCrudController {
       const permission = au.checkAccess(Permissions.donations.edit) || (subscription as any)?.personId === au.personId;
       if (!permission) return this.json(null, 401);
 
-      const gateways = await this.repos.gateway.loadAll(au.churchId);
-      const gateway = (gateways as any[])[0];
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
       if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsSubscriptions) {
+        return this.json({ error: `${gateway.provider} does not support subscription management` }, 400);
+      }
 
       try {
         const promises: Promise<any>[] = [];
@@ -81,7 +89,13 @@ export class SubscriptionController extends GivingCrudController {
   }
 
   private loadPrivateKey = async (churchId: string) => {
-    const gateways = await this.repos.gateway.loadAll(churchId);
-    return (gateways as any[]).length === 0 ? "" : EncryptionHelper.decrypt((gateways as any[])[0].privateKey);
+    const gateway = await GatewayService.getGatewayForChurch(churchId, {}, this.repos.gateway).catch(() => null);
+    if (!gateway || !gateway.privateKey) return "";
+
+    try {
+      return EncryptionHelper.decrypt(gateway.privateKey);
+    } catch {
+      return "";
+    }
   };
 }

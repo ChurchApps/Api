@@ -17,8 +17,8 @@ export namespace StripeSettings {
     paymentMethodTypes?: string[];
     connectAccountId?: string;
     applicationFeePercent?: number;
-    captureMethod?: 'automatic' | 'manual';
-    setupFutureUsage?: 'on_session' | 'off_session';
+    captureMethod?: "automatic" | "manual";
+    setupFutureUsage?: "on_session" | "off_session";
   }
 }
 
@@ -26,9 +26,9 @@ export namespace StripeSettings {
 export namespace PayPalSettings {
   export interface Settings extends BaseGatewaySettings {
     brandName?: string;
-    landingPage?: 'LOGIN' | 'BILLING' | 'NO_PREFERENCE';
-    userAction?: 'CONTINUE' | 'PAY_NOW';
-    shippingPreference?: 'GET_FROM_FILE' | 'NO_SHIPPING' | 'SET_PROVIDED_ADDRESS';
+    landingPage?: "LOGIN" | "BILLING" | "NO_PREFERENCE";
+    userAction?: "CONTINUE" | "PAY_NOW";
+    shippingPreference?: "GET_FROM_FILE" | "NO_SHIPPING" | "SET_PROVIDED_ADDRESS";
     returnUrl?: string;
     cancelUrl?: string;
     experienceProfileId?: string;
@@ -61,26 +61,26 @@ export namespace ePayMintsSettings {
 
 // Union type for all gateway settings
 export type GatewaySettings =
-  | { provider: 'stripe'; settings: StripeSettings.Settings }
-  | { provider: 'paypal'; settings: PayPalSettings.Settings }
-  | { provider: 'square'; settings: SquareSettings.Settings }
-  | { provider: 'epaymints'; settings: ePayMintsSettings.Settings };
+  | { provider: "stripe"; settings: StripeSettings.Settings }
+  | { provider: "paypal"; settings: PayPalSettings.Settings }
+  | { provider: "square"; settings: SquareSettings.Settings }
+  | { provider: "epaymints"; settings: ePayMintsSettings.Settings };
 
 // Type guard functions
 export function isStripeSettings(settings: any): settings is StripeSettings.Settings {
-  return settings && typeof settings === 'object';
+  return settings && typeof settings === "object";
 }
 
 export function isPayPalSettings(settings: any): settings is PayPalSettings.Settings {
-  return settings && typeof settings === 'object';
+  return settings && typeof settings === "object";
 }
 
 export function isSquareSettings(settings: any): settings is SquareSettings.Settings {
-  return settings && typeof settings === 'object';
+  return settings && typeof settings === "object";
 }
 
 export function isEPayMintsSettings(settings: any): settings is ePayMintsSettings.Settings {
-  return settings && typeof settings === 'object';
+  return settings && typeof settings === "object";
 }
 
 // Helper to validate and cast settings based on provider
@@ -88,13 +88,13 @@ export function validateGatewaySettings(provider: string, settings: Record<strin
   if (!settings) return null;
 
   switch (provider.toLowerCase()) {
-    case 'stripe':
+    case "stripe":
       return isStripeSettings(settings) ? settings : null;
-    case 'paypal':
+    case "paypal":
       return isPayPalSettings(settings) ? settings : null;
-    case 'square':
+    case "square":
       return isSquareSettings(settings) ? settings : null;
-    case 'epaymints':
+    case "epaymints":
       return isEPayMintsSettings(settings) ? settings : null;
     default:
       return null;

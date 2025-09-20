@@ -30,9 +30,9 @@ export class GatewayFactory {
    */
   private static loadFeatureFlags(): void {
     this.featureFlags = {
-      enableSquare: process.env.ENABLE_SQUARE === 'true',
-      enableEPayMints: process.env.ENABLE_EPAYMINTS === 'true',
-      enableCustomProviders: process.env.ENABLE_CUSTOM_GATEWAY_PROVIDERS === 'true'
+      enableSquare: process.env.ENABLE_SQUARE === "true",
+      enableEPayMints: process.env.ENABLE_EPAYMINTS === "true",
+      enableCustomProviders: process.env.ENABLE_CUSTOM_GATEWAY_PROVIDERS === "true"
     };
   }
 
@@ -57,7 +57,7 @@ export class GatewayFactory {
   static getProvider(providerName: string): IGatewayProvider {
     const provider = this.providers.get(providerName.toLowerCase());
     if (!provider) {
-      throw new Error(`Unsupported payment gateway: ${providerName}. Available providers: ${this.getSupportedProviders().join(', ')}`);
+      throw new Error(`Unsupported payment gateway: ${providerName}. Available providers: ${this.getSupportedProviders().join(", ")}`);
     }
     return provider;
   }
@@ -73,8 +73,8 @@ export class GatewayFactory {
    * Register a custom provider (only if feature flag is enabled)
    */
   static registerProvider(name: string, provider: IGatewayProvider): void {
-    if (!this.featureFlags.enableCustomProviders && !['stripe', 'paypal'].includes(name.toLowerCase())) {
-      throw new Error(`Custom gateway providers are disabled. Enable via ENABLE_CUSTOM_GATEWAY_PROVIDERS environment variable.`);
+    if (!this.featureFlags.enableCustomProviders && !["stripe", "paypal"].includes(name.toLowerCase())) {
+      throw new Error("Custom gateway providers are disabled. Enable via ENABLE_CUSTOM_GATEWAY_PROVIDERS environment variable.");
     }
     this.providers.set(name.toLowerCase(), provider);
   }
@@ -117,7 +117,7 @@ export class GatewayFactory {
    * Unregister a provider (mainly for testing)
    */
   static unregisterProvider(name: string): boolean {
-    if (['stripe', 'paypal'].includes(name.toLowerCase())) {
+    if (["stripe", "paypal"].includes(name.toLowerCase())) {
       console.warn(`Cannot unregister core provider: ${name}`);
       return false;
     }

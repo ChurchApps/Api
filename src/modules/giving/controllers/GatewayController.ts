@@ -51,49 +51,57 @@ export class GatewayController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
-        const promises: Promise<Gateway>[] = [];
-        await Promise.all(
-          req.body.map(async (gateway) => {
-            // Encrypt the private key immediately so it's always encrypted when passed to GatewayService
-            const encryptedGateway = {
-              ...gateway,
-              privateKey: EncryptionHelper.encrypt(gateway.privateKey as string),
-              webhookKey: gateway.webhookKey ? EncryptionHelper.encrypt(gateway.webhookKey as string) : ""
-            };
+        try {
+          const savedGateways = await Promise.all(
+            req.body.map(async (gateway) => {
+              const validatedSettings = this.validateProviderSettings(gateway.provider, gateway.settings);
+              const environment = this.normalizeEnvironment(gateway.environment);
+              const privateKey = typeof gateway.privateKey === "string" ? gateway.privateKey : "";
+              const webhookKey = typeof gateway.webhookKey === "string" ? gateway.webhookKey : "";
 
-            if (req.hostname !== "localhost") {
-              // Delete existing webhooks
-              console.log("Before delete");
-              await GatewayService.deleteWebhooks(encryptedGateway, au.churchId);
-              console.log("DELETED WEBHOOKS");
+              // Encrypt secrets immediately so downstream helpers receive encrypted values
+              const encryptedGateway: Gateway = {
+                ...gateway,
+                privateKey: privateKey ? EncryptionHelper.encrypt(privateKey) : "",
+                webhookKey: webhookKey ? EncryptionHelper.encrypt(webhookKey) : "",
+                settings: validatedSettings,
+                environment,
+                churchId: au.churchId,
+                payFees: gateway.payFees ?? false
+              };
 
-              // Create new webhook
-              const providerName = gateway.provider.toLowerCase();
-              console.log("PROVIDER NAME", providerName);
-              const webHookUrl = req.get("x-forwarded-proto") + "://" + req.hostname + `/donate/webhook/${providerName}?churchId=` + au.churchId;
-              console.log("WEBHOOK URL", webHookUrl);
-              const webhook = await GatewayService.createWebhook(encryptedGateway, webHookUrl);
-              console.log("WEBHOOK", webhook);
+              if (req.hostname !== "localhost") {
+                // Delete existing webhooks before provisioning a new one
+                await GatewayService.deleteWebhooks(encryptedGateway, au.churchId);
 
-              if (webhook.secret) {
-                encryptedGateway.webhookKey = EncryptionHelper.encrypt(webhook.secret);
-              } else {
-                encryptedGateway.webhookKey = EncryptionHelper.encrypt(webhook.id);
+                // Create new webhook based on provider capabilities
+                const providerName = encryptedGateway.provider?.toLowerCase();
+                const webHookUrl =
+                  req.get("x-forwarded-proto") +
+                  "://" +
+                  req.hostname +
+                  `/donate/webhook/${providerName}?churchId=` +
+                  au.churchId;
+                const webhook = await GatewayService.createWebhook(encryptedGateway, webHookUrl);
+
+                const resolvedWebhookSecret = webhook.secret || webhook.id;
+                encryptedGateway.webhookKey = resolvedWebhookSecret ? EncryptionHelper.encrypt(resolvedWebhookSecret) : "";
               }
-            }
 
-            // Create product if the gateway supports it
-            const productId = await GatewayService.createProduct(encryptedGateway, au.churchId);
-            if (productId) {
-              encryptedGateway.productId = productId;
-            }
+              // Create provider product if supported
+              const productId = await GatewayService.createProduct(encryptedGateway, au.churchId);
+              if (productId) {
+                encryptedGateway.productId = productId;
+              }
 
-            encryptedGateway.churchId = au.churchId;
-            promises.push(this.repos.gateway.save(encryptedGateway));
-          })
-        );
-        const result = await Promise.all(promises);
-        return this.repos.gateway.convertAllToModel(au.churchId, result as any[]);
+              return this.repos.gateway.save(encryptedGateway);
+            })
+          );
+
+          return this.repos.gateway.convertAllToModel(au.churchId, savedGateways as any[]);
+        } catch (error: any) {
+          return this.json({ message: error?.message || "Failed to save gateway configuration" }, 400);
+        }
       }
     });
   }
@@ -103,18 +111,44 @@ export class GatewayController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json(null, 401);
       else {
-        const existing = await this.repos.gateway.load(au.churchId, id);
-        if (!existing) {
-          return this.json({ message: "No gateway found for this church" }, 400);
-        } else {
+        try {
+          const existing = await this.repos.gateway.load(au.churchId, id);
+          if (!existing) {
+            return this.json({ message: "No gateway found for this church" }, 400);
+          }
+
           if (req.body.id) delete req.body.id;
+
+          const provider = (req.body.provider ?? existing.provider) as string | undefined;
+          const settingsSource = req.body.settings !== undefined ? req.body.settings : existing.settings;
+          const validatedSettings = this.validateProviderSettings(provider, settingsSource);
+          const environment = this.normalizeEnvironment(req.body.environment ?? existing.environment);
+
           const updatedGateway: Gateway = {
             ...(existing as any),
-            ...req.body
+            ...req.body,
+            provider,
+            settings: validatedSettings,
+            environment,
+            churchId: au.churchId
           };
+
+          if (req.body.privateKey !== undefined) {
+            const privateKey = typeof req.body.privateKey === "string" ? req.body.privateKey : "";
+            updatedGateway.privateKey = privateKey ? EncryptionHelper.encrypt(privateKey) : "";
+          }
+
+          if (req.body.webhookKey !== undefined) {
+            const webhookKey = typeof req.body.webhookKey === "string" ? req.body.webhookKey : "";
+            updatedGateway.webhookKey = webhookKey ? EncryptionHelper.encrypt(webhookKey) : "";
+          }
+
           await this.repos.gateway.save(updatedGateway);
+          const refreshed = await this.repos.gateway.load(au.churchId, id);
+          return this.repos.gateway.convertToModel(au.churchId, refreshed as any);
+        } catch (error: any) {
+          return this.json({ message: error?.message || "Failed to update gateway" }, 400);
         }
-        return existing;
       }
     });
   }
@@ -132,5 +166,62 @@ export class GatewayController extends GivingCrudController {
         return this.json({});
       }
     });
+  }
+
+  private normalizeSettings(settings: unknown): Record<string, unknown> | null {
+    if (settings === null || settings === undefined) return null;
+
+    if (typeof settings === "string") {
+      const trimmed = settings.trim();
+      if (!trimmed) return null;
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+        throw new Error("Gateway settings must be a JSON object");
+      } catch (error: any) {
+        if (error?.message === "Gateway settings must be a JSON object") {
+          throw error;
+        }
+        throw new Error("Gateway settings must be valid JSON");
+      }
+    }
+
+    if (typeof settings === "object" && !Array.isArray(settings)) {
+      return settings as Record<string, unknown>;
+    }
+
+    throw new Error("Gateway settings must be an object or JSON string");
+  }
+
+  private normalizeEnvironment(environment: unknown): string | null {
+    if (environment === null || environment === undefined) return null;
+    if (typeof environment !== "string") return null;
+    const trimmed = environment.trim();
+    return trimmed || null;
+  }
+
+  private validateProviderSettings(provider: string | undefined, settings: unknown): Record<string, unknown> | null {
+    if (!provider) {
+      throw new Error("Provider is required");
+    }
+
+    const capabilities = GatewayService.getProviderCapabilities(provider);
+    if (!capabilities) {
+      throw new Error(`Unsupported gateway provider ${provider}`);
+    }
+
+    const normalizedSettings = this.normalizeSettings(settings);
+    if (!normalizedSettings) {
+      return null;
+    }
+
+    const validatedSettings = GatewayService.validateSettings({ provider, settings: normalizedSettings } as any);
+    if (!validatedSettings) {
+      throw new Error(`Invalid settings for provider ${provider}`);
+    }
+
+    return validatedSettings as Record<string, unknown>;
   }
 }

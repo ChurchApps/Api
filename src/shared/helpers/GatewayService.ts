@@ -359,8 +359,8 @@ export class GatewayService {
         supportsPartialRefunds: true,
         supportsWebhooks: true,
         supportsOrders: false,
-        supportedPaymentMethods: ['card', 'ach_debit', 'link', 'apple_pay', 'google_pay'],
-        supportedCurrencies: ['usd', 'eur', 'gbp', 'cad', 'aud', 'jpy', 'mxn', 'nzd', 'sgd'],
+        supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
+        supportedCurrencies: ["usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"],
         requiresPlansForSubscriptions: false,
         requiresCustomerForSubscription: true,
         supportsInstantCapture: true,
@@ -369,7 +369,7 @@ export class GatewayService {
         maxRefundWindow: 180,
         minTransactionAmount: 50, // 50 cents
         maxTransactionAmount: 99999999, // $999,999.99
-        notes: ['Supports ACH via Plaid or micro-deposits', 'Ideal for card + bank payments']
+        notes: ["Supports ACH via Plaid or micro-deposits", "Ideal for card + bank payments"]
       },
       paypal: {
         supportsOneTimePayments: true,
@@ -380,8 +380,8 @@ export class GatewayService {
         supportsPartialRefunds: true,
         supportsWebhooks: true,
         supportsOrders: true,
-        supportedPaymentMethods: ['paypal', 'card', 'venmo', 'pay_later'],
-        supportedCurrencies: ['usd', 'eur', 'gbp', 'cad', 'aud', 'jpy', 'mxn', 'nzd', 'sgd'],
+        supportedPaymentMethods: ["paypal", "card", "venmo", "pay_later"],
+        supportedCurrencies: ["usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"],
         requiresPlansForSubscriptions: true,
         requiresCustomerForSubscription: false,
         supportsInstantCapture: true,
@@ -390,7 +390,7 @@ export class GatewayService {
         maxRefundWindow: 180,
         minTransactionAmount: 100, // $1.00
         maxTransactionAmount: 1000000, // $10,000.00
-        notes: ['Subscriptions require Billing Plans', 'Order APIs power PayPal smart buttons']
+        notes: ["Subscriptions require Billing Plans", "Order APIs power PayPal smart buttons"]
       },
       square: {
         supportsOneTimePayments: true,
@@ -401,8 +401,8 @@ export class GatewayService {
         supportsPartialRefunds: true,
         supportsWebhooks: true,
         supportsOrders: false,
-        supportedPaymentMethods: ['card', 'apple_pay', 'google_pay', 'ach_debit', 'gift_card'],
-        supportedCurrencies: ['usd', 'cad', 'gbp', 'aud', 'jpy', 'eur'],
+        supportedPaymentMethods: ["card", "apple_pay", "google_pay", "ach_debit", "gift_card"],
+        supportedCurrencies: ["usd", "cad", "gbp", "aud", "jpy", "eur"],
         requiresPlansForSubscriptions: false,
         requiresCustomerForSubscription: true,
         supportsInstantCapture: true,
@@ -411,7 +411,7 @@ export class GatewayService {
         maxRefundWindow: 120,
         minTransactionAmount: 100, // $1.00
         maxTransactionAmount: 5000000, // $50,000.00
-        notes: ['ACH support requires Square bank on file', 'Subscriptions available with catalog plans']
+        notes: ["ACH support requires Square bank on file", "Subscriptions available with catalog plans"]
       },
       epaymints: {
         supportsOneTimePayments: true,
@@ -422,8 +422,8 @@ export class GatewayService {
         supportsPartialRefunds: false,
         supportsWebhooks: false,
         supportsOrders: false,
-        supportedPaymentMethods: ['card', 'ach'],
-        supportedCurrencies: ['usd'],
+        supportedPaymentMethods: ["card", "ach"],
+        supportedCurrencies: ["usd"],
         requiresPlansForSubscriptions: false,
         requiresCustomerForSubscription: false,
         supportsInstantCapture: true,
@@ -432,7 +432,7 @@ export class GatewayService {
         maxRefundWindow: 90,
         minTransactionAmount: 100, // $1.00
         maxTransactionAmount: 10000000, // $100,000.00
-        notes: ['Webhooks limited; polling recommended', 'ACH available via tokenised transactions']
+        notes: ["Webhooks limited; polling recommended", "ACH available via tokenised transactions"]
       }
     };
 

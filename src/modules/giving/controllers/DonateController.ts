@@ -92,6 +92,12 @@ export class DonateController extends GivingCrudController {
         const gateway = await this.getGateway(churchId, req.body.provider, req.body.gatewayId);
         if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
+        // Check if provider supports orders (required for PayPal-style checkout)
+        const capabilities = GatewayService.getProviderCapabilities(gateway);
+        if (!capabilities?.supportsOrders) {
+          return this.json({ error: `${gateway.provider} does not support order-based checkout` }, 400);
+        }
+
         const funds = Array.isArray(req.body.funds) ? req.body.funds : [];
         // Warning: PayPal custom_id is limited (~127 chars). Keep it compact.
         let customId = "";
@@ -245,6 +251,12 @@ export class DonateController extends GivingCrudController {
 
       const gateway = await this.getGateway(churchId, provider, gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);
+
+      // Check if provider supports subscriptions
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsSubscriptions) {
+        return this.json({ error: `${gateway.provider} does not support recurring subscriptions` }, 400);
+      }
 
       try {
         const subscriptionData = {
@@ -536,20 +548,17 @@ export class DonateController extends GivingCrudController {
   }
 
   /**
-   * Get gateway by provider name or ID
+   * Get gateway by provider name or ID using the centralized helper
    */
   private async getGateway(churchId: string, provider?: string, gatewayId?: string): Promise<any> {
-    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-
-    if (gatewayId) {
-      return gateways.find(g => g.id === gatewayId);
+    try {
+      return await GatewayService.getGatewayForChurch(churchId, {
+        provider,
+        gatewayId
+      }, this.repos.gateway);
+    } catch {
+      // Return null for backward compatibility when gateway not found
+      return null;
     }
-
-    if (provider) {
-      return gateways.find(g => g.provider.toLowerCase() === provider.toLowerCase());
-    }
-
-    // Return first gateway if no specific selection
-    return gateways.length > 0 ? gateways[0] : null;
   }
 }

@@ -15,16 +15,19 @@ export class PaymentMethodController extends GivingCrudController {
   @httpGet("/personid/:id")
   public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
-      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.view) || id === au.personId);
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      const permission = gateway && (au.checkAccess(Permissions.donations.view) || id === au.personId);
       if (!permission) return this.json({}, 401);
-      else {
-        const customer = await this.repos.customer.loadByPersonId(au.churchId, id);
-        if (!customer) return [];
 
-        const gateway = gateways[0];
-        return await GatewayService.getCustomerPaymentMethods(gateway, customer);
+      // Check if provider supports vault/stored payment methods
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsVault) {
+        return []; // Return empty array for providers without vault support
       }
+
+      const customer = await this.repos.customer.loadByPersonId(au.churchId, id);
+      if (!customer) return [];
+      return await GatewayService.getCustomerPaymentMethods(gateway, customer);
     });
   }
 
@@ -33,13 +36,17 @@ export class PaymentMethodController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name, churchId } = req.body;
       const cId = au?.churchId || churchId;
-      const gateways = (await this.repos.gateway.loadAll(cId)) as any[];
+      const gateway = await GatewayService.getGatewayForChurch(cId, {}, this.repos.gateway).catch(() => null);
 
-      if (gateways.length === 0) {
+      if (!gateway) {
         return this.json({ error: "Payment gateway not configured" }, 400);
       }
 
-      const gateway = gateways[0];
+      // Check if provider supports vault/stored payment methods
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsVault) {
+        return this.json({ error: `${gateway.provider} does not support stored payment methods` }, 400);
+      }
 
       // Validate payment method ID format for Stripe
       if (gateway.provider === "stripe" && (!id || !id.startsWith("pm_"))) {
@@ -90,11 +97,9 @@ export class PaymentMethodController extends GivingCrudController {
   public async updateCard(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { personId, paymentMethodId, cardData } = req.body;
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
-      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
-
-      const gateway = gateways[0];
       try {
         return await GatewayService.updateCard(gateway, paymentMethodId, cardData);
       } catch (e: any) {
@@ -117,11 +122,15 @@ export class PaymentMethodController extends GivingCrudController {
   public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name } = req.body;
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
-      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
-      const gateway = gateways[0];
+      // Check if provider supports ACH/bank accounts
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsACH) {
+        return this.json({ error: `${gateway.provider} does not support bank account payments` }, 400);
+      }
       let customer = customerId;
       if (!customer) {
         try {
@@ -156,11 +165,10 @@ export class PaymentMethodController extends GivingCrudController {
   @httpPost("/updatebank")
   public async updateBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       const { paymentMethodId, personId, bankData, customerId } = req.body;
-      const permission = gateways.length > 0 && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({}, 401);
-      const gateway = gateways[0];
       try {
         return await GatewayService.updateBank(gateway, paymentMethodId, bankData, customerId);
       } catch (e) {
@@ -172,14 +180,13 @@ export class PaymentMethodController extends GivingCrudController {
   @httpPost("/verifybank")
   public async verifyBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       const { paymentMethodId, customerId, amountData } = req.body;
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
       const permission =
-        gateways.length > 0 &&
+        gateway &&
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
-        const gateway = gateways[0];
         try {
           return await GatewayService.verifyBank(gateway, paymentMethodId, amountData, customerId);
         } catch (e) {
@@ -192,13 +199,12 @@ export class PaymentMethodController extends GivingCrudController {
   @httpDelete("/:id/:customerid")
   public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
       const permission =
-        gateways.length > 0 &&
+        gateway &&
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
       if (!permission) return this.json({}, 401);
       else {
-        const gateway = gateways[0];
         const paymentType = id.substring(0, 2);
         if (paymentType === "pm") await GatewayService.detachPaymentMethod(gateway, id);
         if (paymentType === "ba") await GatewayService.deleteBankAccount(gateway, customerId, id);
