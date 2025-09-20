@@ -219,7 +219,8 @@ async function loadModuleBindings(container: Container) {
       { name: "Doing", import: import("./modules/doing/controllers") },
       { name: "Giving", import: import("./modules/giving/controllers") },
       { name: "Messaging", import: import("./modules/messaging/controllers") },
-      { name: "Reporting", import: import("./modules/reporting/controllers") }
+      { name: "Reporting", import: import("./modules/reporting/controllers") },
+      { name: "Playground", import: import("./playground/controllers/PlaygroundController") }
     ];
 
     // Execute all imports in parallel

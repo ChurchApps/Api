@@ -1,0 +1,323 @@
+import { Request, Response } from "express";
+import { controller, httpPost, httpGet } from "inversify-express-utils";
+import { GivingBaseController } from "../../modules/giving/controllers/GivingBaseController";
+import { IGatewayProvider, GatewayConfig } from "../../shared/helpers/gateways/IGatewayProvider";
+import { StripeGatewayProvider } from "../../shared/helpers/gateways/StripeGatewayProvider";
+import { PayPalGatewayProvider } from "../../shared/helpers/gateways/PayPalGatewayProvider";
+import { SquareGatewayProvider } from "../../shared/helpers/gateways/SquareGatewayProvider";
+import { EPayMintsGatewayProvider } from "../../shared/helpers/gateways/EPayMintsGatewayProvider";
+
+@controller("/playground")
+export class PlaygroundController extends GivingBaseController {
+
+  // Serve the playground HTML page
+  @httpGet("/")
+  public async getPlaygroundPage(req: Request, res: Response): Promise<void> {
+    const fs = await import("fs");
+    const path = await import("path");
+
+    try {
+      const htmlPath = path.join(__dirname, "../index.html");
+      const htmlContent = fs.readFileSync(htmlPath, "utf8");
+      res.setHeader("Content-Type", "text/html");
+      res.send(htmlContent);
+    } catch (error) {
+      res.status(404).json({ error: "Playground page not found" });
+    }
+  }
+
+  // Serve the playground JavaScript file
+  @httpGet("/playground.js")
+  public async getPlaygroundJS(req: Request, res: Response): Promise<void> {
+    const fs = await import("fs");
+    const path = await import("path");
+
+    try {
+      const jsPath = path.join(__dirname, "../playground.js");
+      const jsContent = fs.readFileSync(jsPath, "utf8");
+      res.setHeader("Content-Type", "application/javascript");
+      res.send(jsContent);
+    } catch (error) {
+      res.status(404).json({ error: "Playground script not found" });
+    }
+  }
+
+  // Gateway testing endpoints
+  @httpPost("/gateway/calculate-fees")
+  public async testCalculateFees(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config, amount } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      const result = await gatewayProvider.calculateFees(amount, config.churchId);
+
+      return res.json({
+        success: true,
+        method: "calculateFees",
+        provider,
+        input: { amount, churchId: config.churchId },
+        result: { fees: result, total: amount + result }
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/process-charge")
+  public async testProcessCharge(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config, donationData } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      const result = await gatewayProvider.processCharge(config, donationData);
+
+      return res.json({
+        success: true,
+        method: "processCharge",
+        provider,
+        input: donationData,
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/create-customer")
+  public async testCreateCustomer(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config, email, name } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.createCustomer) {
+        throw new Error(`${provider} provider does not support createCustomer method`);
+      }
+
+      const result = await gatewayProvider.createCustomer(config, email, name);
+
+      return res.json({
+        success: true,
+        method: "createCustomer",
+        provider,
+        input: { email, name },
+        result: { customerId: result }
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/create-subscription")
+  public async testCreateSubscription(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config, subscriptionData } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      const result = await gatewayProvider.createSubscription(config, subscriptionData);
+
+      return res.json({
+        success: true,
+        method: "createSubscription",
+        provider,
+        input: subscriptionData,
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/generate-client-token")
+  public async testGenerateClientToken(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.generateClientToken) {
+        throw new Error(`${provider} provider does not support generateClientToken method`);
+      }
+
+      const result = await gatewayProvider.generateClientToken(config);
+
+      return res.json({
+        success: true,
+        method: "generateClientToken",
+        provider,
+        result: { clientToken: result }
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/create-webhook")
+  public async testCreateWebhook(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config, webhookUrl } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      const result = await gatewayProvider.createWebhookEndpoint(config, webhookUrl);
+
+      return res.json({
+        success: true,
+        method: "createWebhookEndpoint",
+        provider,
+        input: { webhookUrl },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/update-subscription")
+  public async testUpdateSubscription(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config, subscriptionData } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      const result = await gatewayProvider.updateSubscription(config, subscriptionData);
+
+      return res.json({
+        success: true,
+        method: "updateSubscription",
+        provider,
+        input: subscriptionData,
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/cancel-subscription")
+  public async testCancelSubscription(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config, subscriptionId, reason } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      await gatewayProvider.cancelSubscription(config, subscriptionId, reason);
+
+      return res.json({
+        success: true,
+        method: "cancelSubscription",
+        provider,
+        input: { subscriptionId, reason },
+        result: { message: "Subscription cancelled successfully" }
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/create-product")
+  public async testCreateProduct(req: Request, res: Response): Promise<any> {
+    try {
+      const { provider, config } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.createProduct) {
+        throw new Error(`${provider} provider does not support createProduct method`);
+      }
+
+      const result = await gatewayProvider.createProduct(config, config.churchId);
+
+      return res.json({
+        success: true,
+        method: "createProduct",
+        provider,
+        input: { churchId: config.churchId },
+        result: { productId: result }
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpGet("/gateway/providers")
+  public async getAvailableProviders(req: Request, res: Response): Promise<any> {
+    return res.json({
+      success: true,
+      providers: [
+        {
+          name: "stripe",
+          displayName: "Stripe",
+          supportedMethods: [
+            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
+            "cancelSubscription", "createCustomer", "createWebhookEndpoint",
+            "getCustomerSubscriptions", "getCustomerPaymentMethods", "attachPaymentMethod",
+            "detachPaymentMethod", "updateCard", "createBankAccount", "updateBank",
+            "verifyBank", "deleteBankAccount"
+          ]
+        },
+        {
+          name: "paypal",
+          displayName: "PayPal",
+          supportedMethods: [
+            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
+            "cancelSubscription", "createWebhookEndpoint", "generateClientToken",
+            "createOrder", "createSubscriptionPlan", "createSubscriptionWithPlan"
+          ]
+        },
+        {
+          name: "square",
+          displayName: "Square",
+          supportedMethods: [
+            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
+            "cancelSubscription", "createCustomer", "createWebhookEndpoint"
+          ]
+        },
+        {
+          name: "epaymints",
+          displayName: "EPayMints",
+          supportedMethods: [
+            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
+            "cancelSubscription", "createWebhookEndpoint"
+          ]
+        }
+      ]
+    });
+  }
+
+  private getGatewayProvider(provider: string): IGatewayProvider {
+    switch (provider.toLowerCase()) {
+      case "stripe":
+        return new StripeGatewayProvider();
+      case "paypal":
+        return new PayPalGatewayProvider();
+      case "square":
+        return new SquareGatewayProvider();
+      case "epaymints":
+        return new EPayMintsGatewayProvider();
+      default:
+        throw new Error(`Unsupported gateway provider: ${provider}`);
+    }
+  }
+}
