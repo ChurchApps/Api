@@ -108,19 +108,9 @@ export class PayPalHelper {
   }
 
   static async deleteWebhooksByChurchId(clientId: string, clientSecret: string, churchId: string): Promise<void> {
-    console.log("ClientId", clientId);
-    console.log("ClientSecret", clientSecret);
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
     // Get list of webhooks using REST API
-    console.log("Getting list", `${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks?anchor_type=APPLICATION`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json"
-      }
-    });
-
     const listResponse = await fetch(`${PayPalHelper.getBaseUrl()}/v1/notifications/webhooks?anchor_type=APPLICATION`, {
       method: "GET",
       headers: {

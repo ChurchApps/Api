@@ -26,19 +26,44 @@ export class PlaygroundController extends GivingBaseController {
     }
   }
 
-  // Serve the playground JavaScript file
+  // Serve the compiled playground JavaScript file
   @httpGet("/playground.js")
   public async getPlaygroundJS(req: Request, res: Response): Promise<void> {
     const fs = await import("fs");
     const path = await import("path");
 
     try {
-      const jsPath = path.join(__dirname, "../playground.js");
-      const jsContent = fs.readFileSync(jsPath, "utf8");
-      res.setHeader("Content-Type", "application/javascript");
-      res.send(jsContent);
+      // Try to serve the compiled TypeScript output first
+      const compiledPath = path.join(__dirname, "../dist/playground.js");
+      if (fs.existsSync(compiledPath)) {
+        const jsContent = fs.readFileSync(compiledPath, "utf8");
+        res.setHeader("Content-Type", "application/javascript");
+        res.send(jsContent);
+      } else {
+        // Fall back to the original JavaScript file if TypeScript not compiled
+        const jsPath = path.join(__dirname, "../playground.js");
+        const jsContent = fs.readFileSync(jsPath, "utf8");
+        res.setHeader("Content-Type", "application/javascript");
+        res.send(jsContent);
+      }
     } catch (error) {
       res.status(404).json({ error: "Playground script not found" });
+    }
+  }
+
+  // Serve the source map for debugging
+  @httpGet("/playground.js.map")
+  public async getPlaygroundSourceMap(req: Request, res: Response): Promise<void> {
+    const fs = await import("fs");
+    const path = await import("path");
+
+    try {
+      const mapPath = path.join(__dirname, "../dist/playground.js.map");
+      const mapContent = fs.readFileSync(mapPath, "utf8");
+      res.setHeader("Content-Type", "application/json");
+      res.send(mapContent);
+    } catch (error) {
+      res.status(404).json({ error: "Source map not found" });
     }
   }
 
