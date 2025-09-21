@@ -473,6 +473,68 @@ export class PlaygroundController extends GivingBaseController {
     }
   }
 
+  @httpPost("/gateway/update-card")
+  public async testUpdateCard(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, paymentMethodId, cardData } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.updateCard) {
+        throw new Error(`${provider} provider does not support updateCard method`);
+      }
+
+      const result = await gatewayProvider.updateCard(config, paymentMethodId, cardData);
+
+      return res.json({
+        success: true,
+        method: "updateCard",
+        provider,
+        input: { paymentMethodId, cardData },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/add-card")
+  public async testAddCard(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, customerId, cardData } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.addCard) {
+        throw new Error(`${provider} provider does not support addCard method`);
+      }
+
+      const result = await gatewayProvider.addCard(config, customerId, cardData);
+
+      return res.json({
+        success: true,
+        method: "addCard",
+        provider,
+        input: { customerId, cardData },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
   @httpGet("/gateway/providers")
   public async getAvailableProviders(req: Request, res: Response): Promise<any> {
     if (!this.isPlaygroundEnabled()) {

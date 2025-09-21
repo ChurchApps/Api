@@ -149,6 +149,24 @@ class PlaygroundApiService {
     });
   }
 
+  async updateCard(provider: string, config: GatewayConfig, paymentMethodId: string, cardData: any): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/update-card', {
+      provider,
+      config,
+      paymentMethodId,
+      cardData,
+    });
+  }
+
+  async addCard(provider: string, config: GatewayConfig, customerId: string, cardData: any): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/add-card', {
+      provider,
+      config,
+      customerId,
+      cardData,
+    });
+  }
+
   async getAvailableProviders(): Promise<{ success: boolean; providers: GatewayProvider[] }> {
     return this.makeAPICall('/playground/gateway/providers');
   }

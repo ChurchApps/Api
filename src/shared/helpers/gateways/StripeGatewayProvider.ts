@@ -175,4 +175,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
   async deleteBankAccount(config: GatewayConfig, customerId: string, bankAccountId: string): Promise<any> {
     return await StripeHelper.deleteBankAccount(config.privateKey, customerId, bankAccountId);
   }
+
+  async addCard(config: GatewayConfig, customerId: string, cardData: any): Promise<any> {
+    return await StripeHelper.addCard(config.privateKey, customerId, cardData);
+  }
 }

@@ -59,6 +59,7 @@ export interface IGatewayProvider {
   // Payment method management
   attachPaymentMethod?(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any>;
   detachPaymentMethod?(config: GatewayConfig, paymentMethodId: string): Promise<any>;
+  addCard?(config: GatewayConfig, customerId: string, cardData: any): Promise<any>;
   updateCard?(config: GatewayConfig, paymentMethodId: string, cardData: any): Promise<any>;
   createBankAccount?(config: GatewayConfig, customerId: string, options: any): Promise<any>;
   updateBank?(config: GatewayConfig, paymentMethodId: string, bankData: any, customerId: string): Promise<any>;

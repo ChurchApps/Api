@@ -42,6 +42,21 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
   const [bankCustomerId, setBankCustomerId] = useState('cus_test123');
   const [bankAccountNumber, setBankAccountNumber] = useState('000123456789');
   const [bankRoutingNumber, setBankRoutingNumber] = useState('110000000');
+  // Card update states
+  const [cardPaymentMethodId, setCardPaymentMethodId] = useState('pm_test_4242424242424242');
+  const [cardNumber, setCardNumber] = useState('4111111111111111');
+  const [cardExpMonth, setCardExpMonth] = useState('12');
+  const [cardExpYear, setCardExpYear] = useState('2030');
+  const [cardCvc, setCardCvc] = useState('123');
+  const [cardZip, setCardZip] = useState('90210');
+
+  // Add card states
+  const [addCardCustomerId, setAddCardCustomerId] = useState('cus_test123');
+  const [addCardNumber, setAddCardNumber] = useState('4111111111111111');
+  const [addCardExpMonth, setAddCardExpMonth] = useState('12');
+  const [addCardExpYear, setAddCardExpYear] = useState('2030');
+  const [addCardCvc, setAddCardCvc] = useState('123');
+  const [addCardZip, setAddCardZip] = useState('90210');
 
   // Fetch supported methods for the current provider
   useEffect(() => {
@@ -364,6 +379,56 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
     }
   };
 
+  const testUpdateCard = async () => {
+    setLoading('updateCard', true);
+    try {
+      validateConfig();
+      if (!cardPaymentMethodId) throw new Error('Payment Method ID is required');
+      if (!cardNumber) throw new Error('Card Number is required');
+      if (!cardExpMonth) throw new Error('Expiration Month is required');
+      if (!cardExpYear) throw new Error('Expiration Year is required');
+
+      const cardData = {
+        card: {
+          number: cardNumber,
+          exp_month: cardExpMonth,
+          exp_year: cardExpYear,
+          cvc: cardCvc,
+          address_zip: cardZip
+        }
+      };
+      const result = await playgroundApi.updateCard(provider, config, cardPaymentMethodId, cardData);
+      setResponse('updateCard', result);
+    } catch (error) {
+      setResponse('updateCard', null, (error as Error).message);
+    }
+  };
+
+  const testAddCard = async () => {
+    setLoading('addCard', true);
+    try {
+      validateConfig();
+      if (!addCardCustomerId) throw new Error('Customer ID is required');
+      if (!addCardNumber) throw new Error('Card Number is required');
+      if (!addCardExpMonth) throw new Error('Expiration Month is required');
+      if (!addCardExpYear) throw new Error('Expiration Year is required');
+      const cardData = {
+        source: {
+          object: 'card',
+          number: addCardNumber,
+          exp_month: addCardExpMonth,
+          exp_year: addCardExpYear,
+          cvc: addCardCvc,
+          address_zip: addCardZip
+        }
+      };
+      const result = await playgroundApi.addCard(provider, config, addCardCustomerId, cardData);
+      setResponse('addCard', result);
+    } catch (error) {
+      setResponse('addCard', null, (error as Error).message);
+    }
+  };
+
   return (
     <Card>
       <Card.Header>
@@ -577,6 +642,168 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Accordion.Item>
 
           <Accordion.Item eventKey="6">
+            <Accordion.Header><strong>💳 Payment Methods:</strong> Add New Card</Accordion.Header>
+            <Accordion.Body>
+              <p className="text-muted">Add a new card payment method to a customer. Pre-filled with test card data (4111 1111 1111 1111).</p>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Customer ID <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={addCardCustomerId}
+                      onChange={(e) => setAddCardCustomerId(e.target.value)}
+                      placeholder="Customer ID to add card to"
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Card Number <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={addCardNumber}
+                      onChange={(e) => setAddCardNumber(e.target.value)}
+                      placeholder="4111111111111111"
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Expiration Month <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={addCardExpMonth}
+                      onChange={(e) => setAddCardExpMonth(e.target.value)}
+                      placeholder="12"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Expiration Year <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={addCardExpYear}
+                      onChange={(e) => setAddCardExpYear(e.target.value)}
+                      placeholder="2030"
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>CVC</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={addCardCvc}
+                      onChange={(e) => setAddCardCvc(e.target.value)}
+                      placeholder="123"
+                    />
+                  </Form.Group>
+                  <Form.Group className="mb-3">
+                    <Form.Label>ZIP Code</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={addCardZip}
+                      onChange={(e) => setAddCardZip(e.target.value)}
+                      placeholder="90210"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Button
+                variant="primary"
+                onClick={testAddCard}
+                disabled={responses.addCard?.loading}
+              >
+                {responses.addCard?.loading ? 'Adding...' : 'Add Card'}
+              </Button>
+              <ResponseDisplay response={responses.addCard} />
+            </Accordion.Body>
+          </Accordion.Item>
+          <Accordion.Item eventKey="8">
+            <Accordion.Header><strong>💳 Payment Methods:</strong> Update Existing Card</Accordion.Header>
+            <Accordion.Body>
+              <p className="text-muted">Update details of an existing payment method in Stripe. Requires an existing Payment Method ID. Pre-filled with test card data.</p>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Payment Method ID <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={cardPaymentMethodId}
+                      onChange={(e) => setCardPaymentMethodId(e.target.value)}
+                      placeholder="pm_test_4242424242424242"
+                    />
+                    <Form.Text className="text-muted">
+                      Must be an existing payment method ID to update
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Card Number</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      placeholder="4111111111111111"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Row>
+                <Col md={3}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Exp Month</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={cardExpMonth}
+                      onChange={(e) => setCardExpMonth(e.target.value)}
+                      placeholder="12"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={3}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Exp Year</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={cardExpYear}
+                      onChange={(e) => setCardExpYear(e.target.value)}
+                      placeholder="2030"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={3}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>CVC</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={cardCvc}
+                      onChange={(e) => setCardCvc(e.target.value)}
+                      placeholder="123"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={3}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>ZIP Code</Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={cardZip}
+                      onChange={(e) => setCardZip(e.target.value)}
+                      placeholder="90210"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Button
+                variant="primary"
+                onClick={testUpdateCard}
+                disabled={responses.updateCard?.loading}
+              >
+                {responses.updateCard?.loading ? 'Updating...' : 'Update Card'}
+              </Button>
+              <ResponseDisplay response={responses.updateCard} />
+            </Accordion.Body>
+          </Accordion.Item>
+
+          <Accordion.Item eventKey="9">
             <Accordion.Header><strong>💳 Payment Methods:</strong> Create Bank Account</Accordion.Header>
             <Accordion.Body>
               <Row>
