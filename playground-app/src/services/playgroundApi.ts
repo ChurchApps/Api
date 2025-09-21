@@ -115,6 +115,40 @@ class PlaygroundApiService {
     });
   }
 
+  async getCustomerPaymentMethods(provider: string, config: GatewayConfig, customer: any): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/get-customer-payment-methods', {
+      provider,
+      config,
+      customer,
+    });
+  }
+
+  async attachPaymentMethod(provider: string, config: GatewayConfig, paymentMethodId: string, options: any): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/attach-payment-method', {
+      provider,
+      config,
+      paymentMethodId,
+      options,
+    });
+  }
+
+  async detachPaymentMethod(provider: string, config: GatewayConfig, paymentMethodId: string): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/detach-payment-method', {
+      provider,
+      config,
+      paymentMethodId,
+    });
+  }
+
+  async createBankAccount(provider: string, config: GatewayConfig, customerId: string, options: any): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/create-bank-account', {
+      provider,
+      config,
+      customerId,
+      options,
+    });
+  }
+
   async getAvailableProviders(): Promise<{ success: boolean; providers: GatewayProvider[] }> {
     return this.makeAPICall('/playground/gateway/providers');
   }

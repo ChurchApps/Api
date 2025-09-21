@@ -16,6 +16,10 @@ This playground allows you to:
   - Update Subscription
   - Cancel Subscription
   - Create Product
+  - Get Customer Payment Methods
+  - Attach Payment Method
+  - Detach Payment Method
+  - Create Bank Account
 
 ## Prerequisites
 

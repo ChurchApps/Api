@@ -349,6 +349,130 @@ export class PlaygroundController extends GivingBaseController {
     }
   }
 
+  @httpPost("/gateway/get-customer-payment-methods")
+  public async testGetCustomerPaymentMethods(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, customer } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.getCustomerPaymentMethods) {
+        throw new Error(`${provider} provider does not support getCustomerPaymentMethods method`);
+      }
+
+      const result = await gatewayProvider.getCustomerPaymentMethods(config, customer);
+
+      return res.json({
+        success: true,
+        method: "getCustomerPaymentMethods",
+        provider,
+        input: { customer },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/attach-payment-method")
+  public async testAttachPaymentMethod(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, paymentMethodId, options } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.attachPaymentMethod) {
+        throw new Error(`${provider} provider does not support attachPaymentMethod method`);
+      }
+
+      const result = await gatewayProvider.attachPaymentMethod(config, paymentMethodId, options);
+
+      return res.json({
+        success: true,
+        method: "attachPaymentMethod",
+        provider,
+        input: { paymentMethodId, options },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/detach-payment-method")
+  public async testDetachPaymentMethod(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, paymentMethodId } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.detachPaymentMethod) {
+        throw new Error(`${provider} provider does not support detachPaymentMethod method`);
+      }
+
+      const result = await gatewayProvider.detachPaymentMethod(config, paymentMethodId);
+
+      return res.json({
+        success: true,
+        method: "detachPaymentMethod",
+        provider,
+        input: { paymentMethodId },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/create-bank-account")
+  public async testCreateBankAccount(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, customerId, options } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.createBankAccount) {
+        throw new Error(`${provider} provider does not support createBankAccount method`);
+      }
+
+      const result = await gatewayProvider.createBankAccount(config, customerId, options);
+
+      return res.json({
+        success: true,
+        method: "createBankAccount",
+        provider,
+        input: { customerId, options },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
   @httpGet("/gateway/providers")
   public async getAvailableProviders(req: Request, res: Response): Promise<any> {
     if (!this.isPlaygroundEnabled()) {
@@ -366,7 +490,7 @@ export class PlaygroundController extends GivingBaseController {
             "cancelSubscription", "createCustomer", "createWebhookEndpoint",
             "getCustomerSubscriptions", "getCustomerPaymentMethods", "attachPaymentMethod",
             "detachPaymentMethod", "updateCard", "createBankAccount", "updateBank",
-            "verifyBank", "deleteBankAccount"
+            "verifyBank", "deleteBankAccount", "createProduct"
           ]
         },
         {
