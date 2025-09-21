@@ -74,6 +74,9 @@ export interface IGatewayProvider {
   createSubscriptionPlan?(config: GatewayConfig, planData: any): Promise<string>;
   createSubscriptionWithPlan?(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult>;
 
+  // Transaction lookup
+  getCharge?(config: GatewayConfig, chargeId: string): Promise<any>;
+
   // Event logging
   logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;
   logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any>;

@@ -167,6 +167,14 @@ class PlaygroundApiService {
     });
   }
 
+  async getCharge(provider: string, config: GatewayConfig, chargeId: string): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/get-charge', {
+      provider,
+      config,
+      chargeId,
+    });
+  }
+
   async getAvailableProviders(): Promise<{ success: boolean; providers: GatewayProvider[] }> {
     return this.makeAPICall('/playground/gateway/providers');
   }

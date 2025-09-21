@@ -58,6 +58,9 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
   const [addCardCvc, setAddCardCvc] = useState('123');
   const [addCardZip, setAddCardZip] = useState('90210');
 
+  // Get charge states
+  const [getChargeId, setGetChargeId] = useState('ch_test_1234567890');
+
   // Fetch supported methods for the current provider
   useEffect(() => {
     const fetchProviderInfo = async () => {
@@ -426,6 +429,18 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
       setResponse('addCard', result);
     } catch (error) {
       setResponse('addCard', null, (error as Error).message);
+    }
+  };
+
+  const testGetCharge = async () => {
+    setLoading('getCharge', true);
+    try {
+      validateConfig();
+      if (!getChargeId) throw new Error('Charge ID is required');
+      const result = await playgroundApi.getCharge(provider, config, getChargeId);
+      setResponse('getCharge', result);
+    } catch (error) {
+      setResponse('getCharge', null, (error as Error).message);
     }
   };
 
@@ -881,6 +896,34 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Accordion.Item>
 
           {/* ===== FEES & CHARGES ===== */}
+          <Accordion.Item eventKey="0">
+            <Accordion.Header><strong>🔍 Transactions:</strong> Get Charge Details</Accordion.Header>
+            <Accordion.Body>
+              <p className="text-muted">Retrieve detailed information about a specific charge/transaction by its ID.</p>
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Charge ID <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={getChargeId}
+                      onChange={(e) => setGetChargeId(e.target.value)}
+                      placeholder="ch_test_1234567890"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Button
+                variant="primary"
+                onClick={testGetCharge}
+                disabled={responses.getCharge?.loading}
+              >
+                {responses.getCharge?.loading ? 'Getting...' : 'Get Charge'}
+              </Button>
+              <ResponseDisplay response={responses.getCharge} />
+            </Accordion.Body>
+          </Accordion.Item>
+
           <Accordion.Item eventKey="8">
             <Accordion.Header><strong>💰 Charges:</strong> Calculate Fees</Accordion.Header>
             <Accordion.Body>

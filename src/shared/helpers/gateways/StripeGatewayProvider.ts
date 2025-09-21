@@ -179,4 +179,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
   async addCard(config: GatewayConfig, customerId: string, cardData: any): Promise<any> {
     return await StripeHelper.addCard(config.privateKey, customerId, cardData);
   }
+
+  async getCharge(config: GatewayConfig, chargeId: string): Promise<any> {
+    return await StripeHelper.getCharge(config.privateKey, chargeId);
+  }
 }

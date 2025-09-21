@@ -535,6 +535,37 @@ export class PlaygroundController extends GivingBaseController {
     }
   }
 
+  @httpPost("/gateway/get-charge")
+  public async testGetCharge(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, chargeId } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.getCharge) {
+        throw new Error(`${provider} provider does not support getCharge method`);
+      }
+
+      const result = await gatewayProvider.getCharge(config, chargeId);
+
+      return res.json({
+        success: true,
+        method: "getCharge",
+        provider,
+        input: { chargeId },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
   @httpGet("/gateway/providers")
   public async getAvailableProviders(req: Request, res: Response): Promise<any> {
     if (!this.isPlaygroundEnabled()) {
