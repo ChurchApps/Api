@@ -219,9 +219,15 @@ async function loadModuleBindings(container: Container) {
       { name: "Doing", import: import("./modules/doing/controllers") },
       { name: "Giving", import: import("./modules/giving/controllers") },
       { name: "Messaging", import: import("./modules/messaging/controllers") },
-      { name: "Reporting", import: import("./modules/reporting/controllers") },
-      { name: "Playground", import: import("./playground/controllers/PlaygroundController") }
+      { name: "Reporting", import: import("./modules/reporting/controllers") }
     ];
+
+    // Only load playground in development environment
+    const env = Environment.currentEnvironment || process.env.ENVIRONMENT || "dev";
+    if (env === "dev" || env === "development" || env === "local") {
+      moduleImports.push({ name: "Playground", import: import("./playground/controllers/PlaygroundController") });
+      console.log("🎮 Playground enabled (development mode)");
+    }
 
     // Execute all imports in parallel
     const results = await Promise.allSettled(moduleImports.map((m) => m.import));

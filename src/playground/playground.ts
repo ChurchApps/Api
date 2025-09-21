@@ -1,18 +1,92 @@
-import type {
-  GatewayConfig,
-  GatewayProvider,
-  DonationData,
-  SubscriptionData,
-  APIResponse,
-  FeeResult,
-  ChargeResult,
-  SubscriptionResult,
-  WebhookResult,
-  CustomerResult,
-  ClientTokenResult,
-  ProductResult,
-  ResponseElementId
-} from './types/playground.types';
+// Type definitions (inline since we're not using modules)
+interface GatewayConfig {
+  gatewayId: string;
+  churchId: string;
+  publicKey: string;
+  privateKey: string;
+  webhookKey: string;
+  productId?: string | null;
+  environment?: string;
+  settings?: Record<string, unknown> | null;
+}
+
+interface DonationData {
+  amount: number;
+  currency: string;
+  customer: {
+    email: string;
+  };
+  customerId?: string;
+  paymentMethodId: string;
+  type?: string;
+  id?: string;
+  description?: string;
+}
+
+interface SubscriptionData {
+  amount: number;
+  currency: string;
+  interval: string;
+  customerId: string;
+  id?: string;
+  subscriptionId?: string;
+  description?: string;
+}
+
+interface APIResponse<T = any> {
+  success: boolean;
+  method?: string;
+  provider?: string;
+  input?: any;
+  result?: T;
+  error?: string;
+  message?: string;
+}
+
+interface FeeResult {
+  fees: number;
+  total: number;
+}
+
+interface ChargeResult {
+  success: boolean;
+  transactionId: string;
+  data: any;
+}
+
+interface SubscriptionResult {
+  success: boolean;
+  subscriptionId: string;
+  data: any;
+}
+
+interface WebhookResult {
+  id: string;
+  secret?: string;
+}
+
+interface CustomerResult {
+  customerId: string;
+}
+
+interface ClientTokenResult {
+  clientToken: string;
+}
+
+interface ProductResult {
+  productId: string;
+}
+
+type ResponseElementId =
+  | 'feesResponse'
+  | 'chargeResponse'
+  | 'customerResponse'
+  | 'subscriptionResponse'
+  | 'tokenResponse'
+  | 'webhookResponse'
+  | 'updateSubResponse'
+  | 'cancelSubResponse'
+  | 'productResponse';
 
 // Base URL for API calls (adjust based on your environment)
 const BASE_URL: string = window.location.origin;
@@ -413,18 +487,53 @@ function updateProviderPlaceholders(provider: string): void {
 function initializePage(): void {
   // Set default values for testing
   const elements: { [key: string]: string } = {
+    // Gateway Configuration
+    'gatewayProvider': 'stripe',
     'churchId': 'test-church-' + Date.now(),
-    'chargeAmount': '25.00',
+    'publicKey': 'pk_test_IsC6UPM4P5EZ6KAEorHwEMvU00M6ioef1d',
+    'privateKey': 'sk_test_51234567890abcdef',
+    'webhookKey': 'whsec_test1234567890abcdef',
+    'productId': 'prod_test123',
+    'environment': 'sandbox',
+
+    // Calculate Fees
     'feeAmount': '100.00',
-    'subAmount': '15.00',
+
+    // Process Charge
+    'chargeAmount': '25.00',
+    'chargeCurrency': 'USD',
+    'chargeEmail': 'customer@example.com',
+    'chargePaymentMethod': 'pm_test_4242424242424242',
+    'chargeCustomerId': 'cus_test123',
+
+    // Create Customer
     'customerEmail': 'test@example.com',
     'customerName': 'Test User',
-    'chargeEmail': 'customer@example.com',
-    'webhookUrl': 'https://api.example.com/webhook'
+
+    // Create Subscription
+    'subAmount': '15.00',
+    'subInterval': 'month',
+    'subCustomerId': 'cus_test123',
+    'subResourceId': 'pm_test_4242424242424242',
+
+    // Generate Client Token - no fields needed
+
+    // Create Webhook
+    'webhookUrl': 'https://api.example.com/webhook',
+
+    // Update Subscription
+    'updateSubId': 'sub_test123',
+    'updateSubAmount': '35.00',
+
+    // Cancel Subscription
+    'cancelSubId': 'sub_test123',
+    'cancelReason': 'User requested cancellation'
+
+    // Create Product - no fields needed
   };
 
   for (const [id, value] of Object.entries(elements)) {
-    const element = document.getElementById(id) as HTMLInputElement;
+    const element = document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
     if (element) {
       element.value = value;
     }
@@ -436,34 +545,24 @@ function initializePage(): void {
     providerSelect.addEventListener('change', function() {
       updateProviderPlaceholders(this.value);
     });
-  }
-}
 
-// Export functions to global scope for HTML onclick handlers
-declare global {
-  interface Window {
-    testCalculateFees: () => Promise<void>;
-    testProcessCharge: () => Promise<void>;
-    testCreateCustomer: () => Promise<void>;
-    testCreateSubscription: () => Promise<void>;
-    testGenerateClientToken: () => Promise<void>;
-    testCreateWebhook: () => Promise<void>;
-    testUpdateSubscription: () => Promise<void>;
-    testCancelSubscription: () => Promise<void>;
-    testCreateProduct: () => Promise<void>;
+    // Trigger the change event for the default selected provider
+    updateProviderPlaceholders(providerSelect.value);
   }
 }
 
 // Attach functions to window object for HTML onclick handlers
-window.testCalculateFees = testCalculateFees;
-window.testProcessCharge = testProcessCharge;
-window.testCreateCustomer = testCreateCustomer;
-window.testCreateSubscription = testCreateSubscription;
-window.testGenerateClientToken = testGenerateClientToken;
-window.testCreateWebhook = testCreateWebhook;
-window.testUpdateSubscription = testUpdateSubscription;
-window.testCancelSubscription = testCancelSubscription;
-window.testCreateProduct = testCreateProduct;
+console.log('Attaching functions to window object...');
+(window as any).testCalculateFees = testCalculateFees;
+(window as any).testProcessCharge = testProcessCharge;
+(window as any).testCreateCustomer = testCreateCustomer;
+(window as any).testCreateSubscription = testCreateSubscription;
+(window as any).testGenerateClientToken = testGenerateClientToken;
+(window as any).testCreateWebhook = testCreateWebhook;
+(window as any).testUpdateSubscription = testUpdateSubscription;
+(window as any).testCancelSubscription = testCancelSubscription;
+(window as any).testCreateProduct = testCreateProduct;
+console.log('Functions attached. testCalculateFees:', typeof (window as any).testCalculateFees);
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {

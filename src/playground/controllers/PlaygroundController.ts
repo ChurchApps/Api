@@ -6,13 +6,32 @@ import { StripeGatewayProvider } from "../../shared/helpers/gateways/StripeGatew
 import { PayPalGatewayProvider } from "../../shared/helpers/gateways/PayPalGatewayProvider";
 import { SquareGatewayProvider } from "../../shared/helpers/gateways/SquareGatewayProvider";
 import { EPayMintsGatewayProvider } from "../../shared/helpers/gateways/EPayMintsGatewayProvider";
+import { Environment } from "../../shared/helpers/Environment";
 
 @controller("/playground")
 export class PlaygroundController extends GivingBaseController {
 
+  // Middleware to check if playground is allowed
+  private isPlaygroundEnabled(): boolean {
+    // Only enable playground in development environment
+    const env = Environment.currentEnvironment || process.env.ENVIRONMENT || "dev";
+    return env === "dev" || env === "development" || env === "local";
+  }
+
+  private sendDisabledResponse(res: Response): void {
+    res.status(403).json({
+      error: "Playground is only available in development environment",
+      currentEnvironment: Environment.currentEnvironment || process.env.ENVIRONMENT
+    });
+  }
+
   // Serve the playground HTML page
   @httpGet("/")
   public async getPlaygroundPage(req: Request, res: Response): Promise<void> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     const fs = await import("fs");
     const path = await import("path");
 
@@ -29,6 +48,10 @@ export class PlaygroundController extends GivingBaseController {
   // Serve the compiled playground JavaScript file
   @httpGet("/playground.js")
   public async getPlaygroundJS(req: Request, res: Response): Promise<void> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     const fs = await import("fs");
     const path = await import("path");
 
@@ -54,6 +77,10 @@ export class PlaygroundController extends GivingBaseController {
   // Serve the source map for debugging
   @httpGet("/playground.js.map")
   public async getPlaygroundSourceMap(req: Request, res: Response): Promise<void> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     const fs = await import("fs");
     const path = await import("path");
 
@@ -70,6 +97,10 @@ export class PlaygroundController extends GivingBaseController {
   // Gateway testing endpoints
   @httpPost("/gateway/calculate-fees")
   public async testCalculateFees(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config, amount } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -93,6 +124,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/process-charge")
   public async testProcessCharge(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config, donationData } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -116,6 +151,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/create-customer")
   public async testCreateCustomer(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config, email, name } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -143,6 +182,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/create-subscription")
   public async testCreateSubscription(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config, subscriptionData } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -166,6 +209,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/generate-client-token")
   public async testGenerateClientToken(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -192,6 +239,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/create-webhook")
   public async testCreateWebhook(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config, webhookUrl } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -215,6 +266,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/update-subscription")
   public async testUpdateSubscription(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config, subscriptionData } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -238,6 +293,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/cancel-subscription")
   public async testCancelSubscription(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config, subscriptionId, reason } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -261,6 +320,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpPost("/gateway/create-product")
   public async testCreateProduct(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     try {
       const { provider, config } = req.body;
       const gatewayProvider = this.getGatewayProvider(provider);
@@ -288,6 +351,10 @@ export class PlaygroundController extends GivingBaseController {
 
   @httpGet("/gateway/providers")
   public async getAvailableProviders(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
     return res.json({
       success: true,
       providers: [
