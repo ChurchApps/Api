@@ -77,6 +77,11 @@ export interface IGatewayProvider {
   // Transaction lookup
   getCharge?(config: GatewayConfig, chargeId: string): Promise<any>;
 
+  // Token-based payment methods (for secure card handling)
+  createSetupIntent?(config: GatewayConfig, customerId?: string): Promise<any>;
+  createPaymentMethod?(config: GatewayConfig, paymentMethodData: any): Promise<any>;
+  confirmSetupIntent?(config: GatewayConfig, setupIntentId: string, paymentMethodId: string): Promise<any>;
+
   // Event logging
   logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;
   logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any>;

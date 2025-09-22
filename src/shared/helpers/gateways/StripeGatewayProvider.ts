@@ -183,4 +183,17 @@ export class StripeGatewayProvider implements IGatewayProvider {
   async getCharge(config: GatewayConfig, chargeId: string): Promise<any> {
     return await StripeHelper.getCharge(config.privateKey, chargeId);
   }
+
+  // Token-based payment methods
+  async createSetupIntent(config: GatewayConfig, customerId?: string): Promise<any> {
+    return await StripeHelper.createSetupIntent(config.privateKey, customerId);
+  }
+
+  async createPaymentMethod(config: GatewayConfig, paymentMethodData: any): Promise<any> {
+    return await StripeHelper.createPaymentMethod(config.privateKey, paymentMethodData);
+  }
+
+  async confirmSetupIntent(config: GatewayConfig, setupIntentId: string, paymentMethodId: string): Promise<any> {
+    return await StripeHelper.confirmSetupIntent(config.privateKey, setupIntentId, paymentMethodId);
+  }
 }

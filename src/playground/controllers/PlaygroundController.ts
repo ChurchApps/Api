@@ -615,6 +615,69 @@ export class PlaygroundController extends GivingBaseController {
     });
   }
 
+  @httpPost("/gateway/create-setup-intent")
+  public async testCreateSetupIntent(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, customerId } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.createSetupIntent) {
+        throw new Error(`${provider} provider does not support createSetupIntent method`);
+      }
+
+      const result = await gatewayProvider.createSetupIntent(config, customerId);
+
+      return res.json({
+        success: true,
+        method: "createSetupIntent",
+        provider,
+        input: { customerId },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
+  @httpPost("/gateway/add-card-token")
+  public async testAddCardToken(req: Request, res: Response): Promise<any> {
+    if (!this.isPlaygroundEnabled()) {
+      return this.sendDisabledResponse(res);
+    }
+
+    try {
+      const { provider, config, customerId, paymentMethodId } = req.body;
+      const gatewayProvider = this.getGatewayProvider(provider);
+
+      if (!gatewayProvider.addCard) {
+        throw new Error(`${provider} provider does not support addCard method`);
+      }
+
+      // Use the token/payment method ID directly
+      const result = await gatewayProvider.addCard(config, customerId, paymentMethodId);
+
+      return res.json({
+        success: true,
+        method: "addCardToken",
+        provider,
+        input: { customerId, paymentMethodId },
+        result
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: (error as Error).message
+      });
+    }
+  }
+
   private getGatewayProvider(provider: string): IGatewayProvider {
     switch (provider.toLowerCase()) {
       case "stripe":

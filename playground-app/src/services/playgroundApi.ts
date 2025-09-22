@@ -175,6 +175,23 @@ class PlaygroundApiService {
     });
   }
 
+  async addCardToken(provider: string, config: GatewayConfig, customerId: string, paymentMethodId: string): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/add-card-token', {
+      provider,
+      config,
+      customerId,
+      paymentMethodId,
+    });
+  }
+
+  async createSetupIntent(provider: string, config: GatewayConfig, customerId?: string): Promise<APIResponse> {
+    return this.makeAPICall('/playground/gateway/create-setup-intent', {
+      provider,
+      config,
+      customerId,
+    });
+  }
+
   async getAvailableProviders(): Promise<{ success: boolean; providers: GatewayProvider[] }> {
     return this.makeAPICall('/playground/gateway/providers');
   }
