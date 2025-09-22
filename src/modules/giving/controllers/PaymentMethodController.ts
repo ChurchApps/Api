@@ -13,6 +13,88 @@ export class PaymentMethodController extends GivingCrudController {
     routes: [] as const
   };
 
+  @httpGet("/test/personid/:id")
+  public async testGetPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    // Test endpoint without auth for debugging - initialize repos manually
+    const RepoManager = require("../../../shared/infrastructure/RepoManager").RepoManager;
+    this.repos = await RepoManager.getRepos("giving");
+
+    const churchId = "AOjIt0W-SeY"; // hardcoded for testing
+
+    const gateway = await GatewayService.getGatewayForChurch(churchId, {}, this.repos.gateway).catch(() => null);
+
+    if (!gateway) {
+      console.log("No gateway found for church");
+      return [];
+    }
+
+    // Check if provider supports vault/stored payment methods
+    const capabilities = GatewayService.getProviderCapabilities(gateway);
+    if (!capabilities?.supportsVault) {
+      console.log("Provider doesn't support vault");
+      return []; // Return empty array for providers without vault support
+    }
+
+    let customer = await this.repos.customer.loadByPersonAndProvider(churchId, id, gateway.provider);
+    if (!customer) {
+      customer = await this.repos.customer.loadByPersonId(churchId, id);
+    }
+
+    console.log("Customer lookup result:", customer);
+
+    if (!customer) return [];
+    const rawPaymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);
+
+    // Debug logging
+    console.log("Raw payment methods from gateway:", JSON.stringify(rawPaymentMethods, null, 2));
+
+    // Normalize payment methods to consistent format
+    const normalizedMethods: any[] = [];
+
+    console.log("Gateway provider:", gateway.provider, "->", gateway.provider?.toLowerCase());
+
+    if (gateway.provider?.toLowerCase() === "stripe" && Array.isArray(rawPaymentMethods)) {
+      console.log("Processing Stripe payment methods");
+      for (const customerData of rawPaymentMethods) {
+        console.log("Processing customerData, has cards.data:", !!customerData.cards?.data);
+        // Handle Stripe payment methods (cards)
+        if (customerData.cards?.data) {
+          for (const pm of customerData.cards.data) {
+            // Stripe PaymentMethod object structure
+            normalizedMethods.push({
+              id: pm.id,
+              type: "card",
+              provider: "stripe",
+              name: pm.card?.brand || "Card",
+              last4: pm.card?.last4,
+              customerId: pm.customer || customerData.customer?.id,
+              status: "active"
+            });
+          }
+        }
+
+        // Handle Stripe bank accounts (sources)
+        if (customerData.banks?.data) {
+          for (const bank of customerData.banks.data) {
+            // Stripe Source (bank_account) object structure
+            normalizedMethods.push({
+              id: bank.id,
+              type: "bank",
+              provider: "stripe",
+              name: "Bank Account",
+              last4: bank.last4,
+              customerId: bank.customer || customerData.customer?.id,
+              status: bank.status || "new"
+            });
+          }
+        }
+      }
+    }
+
+    console.log("Normalized methods:", normalizedMethods);
+    return normalizedMethods;
+  }
+
   @httpGet("/personid/:id")
   public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -30,21 +112,84 @@ export class PaymentMethodController extends GivingCrudController {
       if (!customer) {
         customer = await this.repos.customer.loadByPersonId(au.churchId, id);
       }
-      if (!customer) return [];
-      const paymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);
 
-      if (gateway.provider === "paypal" && Array.isArray(paymentMethods)) {
+      console.log("Customer lookup result:", customer);
+
+      if (!customer) return [];
+      const rawPaymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);
+
+      // Debug logging
+      console.log("Raw payment methods from gateway:", JSON.stringify(rawPaymentMethods, null, 2));
+
+      // Normalize payment methods to consistent format
+      const normalizedMethods: any[] = [];
+
+      if (gateway.provider?.toLowerCase() === "stripe" && Array.isArray(rawPaymentMethods)) {
+        for (const customerData of rawPaymentMethods) {
+          // Handle Stripe payment methods (cards)
+          if (customerData.cards?.data) {
+            for (const pm of customerData.cards.data) {
+              // Stripe PaymentMethod object structure
+              normalizedMethods.push({
+                id: pm.id,
+                type: "card",
+                provider: "stripe",
+                name: pm.card?.brand || "Card",
+                last4: pm.card?.last4,
+                customerId: pm.customer || customerData.customer?.id,
+                status: "active"
+              });
+            }
+          }
+
+          // Handle Stripe bank accounts (sources)
+          if (customerData.banks?.data) {
+            for (const bank of customerData.banks.data) {
+              // Stripe Source (bank_account) object structure
+              normalizedMethods.push({
+                id: bank.id,
+                type: "bank",
+                provider: "stripe",
+                name: "Bank Account",
+                last4: bank.last4,
+                customerId: bank.customer || customerData.customer?.id,
+                status: bank.status || "new"
+              });
+            }
+          }
+        }
+      } else if (gateway.provider?.toLowerCase() === "paypal" && Array.isArray(rawPaymentMethods)) {
         const stored = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
         if (stored.length) {
           const lookup = new Map(stored.map((record) => [record.externalId, record]));
-          return paymentMethods.map((method: any) => {
+          for (const method of rawPaymentMethods) {
             const record = lookup.get(method?.id);
-            return record ? { ...method, localRecord: record } : method;
-          });
+            const normalizedMethod = {
+              id: method.id,
+              type: "paypal",
+              provider: "paypal",
+              name: record?.displayName || "PayPal",
+              email: method.email,
+              customerId: record?.customerId || customer.id
+            };
+            normalizedMethods.push(record ? { ...normalizedMethod, localRecord: record } : normalizedMethod);
+          }
+        } else {
+          // No stored records, just normalize what we have
+          for (const method of rawPaymentMethods) {
+            normalizedMethods.push({
+              id: method.id,
+              type: "paypal",
+              provider: "paypal",
+              name: "PayPal",
+              email: method.email,
+              customerId: customer.id
+            });
+          }
         }
       }
 
-      return paymentMethods;
+      return normalizedMethods;
     });
   }
 
