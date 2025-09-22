@@ -1,4 +1,4 @@
-import { controller, httpPost } from "inversify-express-utils";
+import { controller, httpPost, httpGet } from "inversify-express-utils";
 import express from "express";
 import { GivingCrudController } from "./GivingCrudController";
 import { Permissions } from "../../../shared/helpers/Permissions";
@@ -20,12 +20,11 @@ export class DonateController extends GivingCrudController {
   /**
    * Get available payment gateways for a church
    */
-  @httpPost("/gateways")
-  public async getGateways(req: express.Request<{}, {}, { churchId?: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const churchId = req.body.churchId || au.churchId;
+  @httpGet("/gateways/:churchId")
+  public async getGateways(req: express.Request<{ churchId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const churchId = req.params.churchId;
       if (!churchId) return this.json({ error: "Missing churchId" }, 400);
-      if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
 
       const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
 

@@ -1,4 +1,5 @@
 export { GetCharge } from './GetCharge';
+export { GetGateways } from './GetGateways';
 export { CalculateFees } from './CalculateFees';
 export { ProcessCharge } from './ProcessCharge';
 export { CreateCustomer } from './CreateCustomer';

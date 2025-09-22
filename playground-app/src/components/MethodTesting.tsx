@@ -4,6 +4,7 @@ import { GatewayConfig } from '../types/playground.types';
 import ResponseDisplay from './ResponseDisplay';
 import {
   GetCharge,
+  GetGateways,
   CalculateFees,
   ProcessCharge,
   CreateCustomer,
@@ -72,8 +73,24 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
         )}
 
         <Accordion defaultActiveKey="0">
-          {/* Transaction Lookup */}
+          {/* Get Gateways */}
           <Accordion.Item eventKey="0">
+            <Accordion.Header>
+              <strong>⚙️ Configuration:</strong> Get Payment Gateways
+            </Accordion.Header>
+            <Accordion.Body>
+              <GetGateways
+                config={config}
+                provider={provider}
+                onResponse={handleResponse}
+                loading={responses.getGateways?.loading || false}
+              />
+              <ResponseDisplay response={responses.getGateways} />
+            </Accordion.Body>
+          </Accordion.Item>
+
+          {/* Transaction Lookup */}
+          <Accordion.Item eventKey="1">
             <Accordion.Header>
               <strong>🔍 Transactions:</strong> Get Charge Details
             </Accordion.Header>
@@ -89,7 +106,7 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Accordion.Item>
 
           {/* Calculate Fees */}
-          <Accordion.Item eventKey="1">
+          <Accordion.Item eventKey="2">
             <Accordion.Header>
               <strong>💰 Charges:</strong> Calculate Fees
             </Accordion.Header>
@@ -105,7 +122,7 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Accordion.Item>
 
           {/* Process Charge */}
-          <Accordion.Item eventKey="2">
+          <Accordion.Item eventKey="3">
             <Accordion.Header>
               <strong>💳 Charges:</strong> Process Charge
             </Accordion.Header>
@@ -122,7 +139,7 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Accordion.Item>
 
           {/* Create Customer */}
-          <Accordion.Item eventKey="3">
+          <Accordion.Item eventKey="4">
             <Accordion.Header>
               <strong>👤 Customer:</strong> Create Customer
             </Accordion.Header>
@@ -139,7 +156,7 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Accordion.Item>
 
           {/* Add Card */}
-          <Accordion.Item eventKey="4">
+          <Accordion.Item eventKey="5">
             <Accordion.Header>
               <strong>💳 Payment Methods:</strong> Add New Card
             </Accordion.Header>
@@ -155,7 +172,7 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Accordion.Item>
 
           {/* Create Subscription */}
-          <Accordion.Item eventKey="5">
+          <Accordion.Item eventKey="6">
             <Accordion.Header>
               <strong>🔄 Subscriptions:</strong> Create Subscription
             </Accordion.Header>

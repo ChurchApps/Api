@@ -195,6 +195,10 @@ class PlaygroundApiService {
   async getAvailableProviders(): Promise<{ success: boolean; providers: GatewayProvider[] }> {
     return this.makeAPICall('/playground/gateway/providers');
   }
+
+  async getGateways(churchId: string): Promise<APIResponse<{ gateways: any[] }>> {
+    return this.makeAPICall(`/donate/gateways/${churchId}`);
+  }
 }
 
 export const playgroundApi = new PlaygroundApiService();
