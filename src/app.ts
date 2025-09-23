@@ -211,7 +211,7 @@ async function loadModuleBindings(container: Container) {
 
     // Load all module controllers in parallel for faster startup
     // The @controller decorators automatically register with the container
-    const moduleImports = [
+    const moduleImports: Array<{ name: string; import: Promise<any> }> = [
       { name: "Shared", import: import("./shared/controllers/HealthController") },
       { name: "Membership", import: import("./modules/membership/controllers") },
       { name: "Attendance", import: import("./modules/attendance/controllers") },
@@ -225,7 +225,7 @@ async function loadModuleBindings(container: Container) {
     // Only load playground in development environment
     const env = Environment.currentEnvironment || process.env.ENVIRONMENT || "dev";
     if (env === "dev" || env === "development" || env === "local") {
-      moduleImports.push({ name: "Playground", import: import("./playground/controllers/PlaygroundController") });
+      moduleImports.push({ name: "Playground", import: import("./playground/controllers") });
       console.log("🎮 Playground enabled (development mode)");
     }
 
