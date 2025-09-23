@@ -80,7 +80,7 @@ export class GatewayController extends GivingCrudController {
                   req.get("x-forwarded-proto") +
                   "://" +
                   req.hostname +
-                  `/donate/webhook/${providerName}?churchId=` +
+                  `/giving/donate/webhook/${providerName}?churchId=` +
                   au.churchId;
                 const webhook = await GatewayService.createWebhook(encryptedGateway, webHookUrl);
 

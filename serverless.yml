@@ -39,6 +39,7 @@ provider:
     ENVIRONMENT: ${self:custom.env}
     # App secrets and config loaded from SSM at deploy-time
     JWT_SECRET: ${ssm:/${self:custom.envLower}/jwtSecret, ''}
+    ENCRYPTION_KEY: ${ssm:/${self:custom.envLower}/encryptionKey, ''}
     
     # Database connections for all modules
     MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/membershipApi/connectionString, ''}
