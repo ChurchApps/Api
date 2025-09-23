@@ -31,14 +31,12 @@ export class CrudHelper {
   }
 
   static async remove(au: any, editPermission: any, remover: () => Promise<any>): Promise<{}> {
-    if (!au.checkAccess(editPermission)) return {};
     await remover();
     return {};
   }
 
   // Auto-convert variants using repository's convertToModel/convertAllToModel
-  static async getByIdAuto<TModel>(au: any, permission: any | null, loader: () => Promise<any>, repo: { convertToModel: (churchId: string, row: any) => TModel }): Promise<TModel | {}> {
-    if (permission && !au.checkAccess(permission)) return {};
+  static async getByIdAuto<TModel>(au: any, permission: any | null, loader: () => Promise<any>, repo: { convertToModel: (churchId: string, row: any) => TModel }): Promise<TModel> {
     const data = await loader();
     return repo.convertToModel(au.churchId, data);
   }
@@ -55,8 +53,7 @@ export class CrudHelper {
     setChurchId: (item: TInput, churchId: string) => void,
     save: (item: TInput) => Promise<TModel>,
     repo: { convertAllToModel: (churchId: string, rows: any[]) => TModel[] }
-  ): Promise<TModel[] | {}> {
-    if (!au.checkAccess(editPermission)) return {};
+  ): Promise<TModel[]> {
     const promises: Promise<TModel>[] = [];
     items.forEach((item) => {
       setChurchId(item, au.churchId);
@@ -67,12 +64,17 @@ export class CrudHelper {
   }
 
   // Controller-wrapped variants (use controller's action wrappers and repositories)
-  static getByIdWrapped(ctrl: { actionWrapper: Function; repos: any }, req: express.Request, res: express.Response, permission: any | null, repoKey: string, id: string) {
-    return (ctrl as any).actionWrapper(req, res, async (au: any) => CrudHelper.getByIdAuto(au, permission, () => ctrl.repos[repoKey].load(au.churchId, id), ctrl.repos[repoKey]));
+  static getByIdWrapped(ctrl: any, req: express.Request, res: express.Response, permission: any | null, repoKey: string, id: string) {
+    return (ctrl as any).actionWrapper(req, res, async (au: any) => {
+      if (permission && !au.checkAccess(permission)) {
+        return (ctrl as any).json({ error: `User lacks ${permission} permission` }, 401);
+      }
+      return CrudHelper.getByIdAuto(au, permission, () => ctrl.repos[repoKey].load(au.churchId, id), ctrl.repos[repoKey]);
+    });
   }
 
   static listWrapped(
-    ctrl: { actionWrapper: Function; repos: any },
+    ctrl: any,
     req: express.Request,
     res: express.Response,
     repoKey: string,
@@ -80,7 +82,9 @@ export class CrudHelper {
     permission?: any | null
   ) {
     return (ctrl as any).actionWrapper(req, res, async (au: any) => {
-      if (permission && !au.checkAccess(permission)) return {};
+      if (permission && !au.checkAccess(permission)) {
+        return (ctrl as any).json({ error: `User lacks ${permission} permission` }, 401);
+      }
       return CrudHelper.listAuto(au, () => loader(ctrl.repos, au), ctrl.repos[repoKey]);
     });
   }
@@ -90,33 +94,41 @@ export class CrudHelper {
   }
 
   static saveManyWrapped<TInput extends { churchId?: string }>(
-    ctrl: { actionWrapper: Function; repos: any },
+    ctrl: any,
     req: express.Request<{}, {}, TInput[]>,
     res: express.Response,
     editPermission: any,
     repoKey: string,
     setChurchId?: (item: TInput, churchId: string) => void
   ) {
-    return (ctrl as any).actionWrapper(req, res, async (au: any) =>
-      CrudHelper.saveManyAuto(
+    return (ctrl as any).actionWrapper(req, res, async (au: any) => {
+      if (!au.checkAccess(editPermission)) {
+        return (ctrl as any).json({ error: `User lacks ${editPermission} permission` }, 401);
+      }
+      return CrudHelper.saveManyAuto(
         au,
         editPermission,
         req.body,
         (item, churchId) => (setChurchId ? setChurchId(item, churchId) : ((item as any).churchId = churchId)),
         (item) => ctrl.repos[repoKey].save(item),
         ctrl.repos[repoKey]
-      )
-    );
+      );
+    });
   }
 
   static deleteWrapped(
-    ctrl: { actionWrapper: Function; repos: any },
+    ctrl: any,
     req: express.Request,
     res: express.Response,
     editPermission: any,
     repoKey: string,
     remover: (repos: any, au: any) => Promise<any>
   ) {
-    return (ctrl as any).actionWrapper(req, res, async (au: any) => CrudHelper.remove(au, editPermission, () => remover(ctrl.repos, au)));
+    return (ctrl as any).actionWrapper(req, res, async (au: any) => {
+      if (!au.checkAccess(editPermission)) {
+        return (ctrl as any).json({ error: `User lacks ${editPermission} permission` }, 401);
+      }
+      return CrudHelper.remove(au, editPermission, () => remover(ctrl.repos, au));
+    });
   }
 }
