@@ -93,7 +93,36 @@ export class StripeHelper {
 
   static async addCard(secretKey: string, customerId: string, paymentMethod: any) {
     const stripe = StripeHelper.getStripeObj(secretKey);
+    // If paymentMethod is a string (token/payment method ID), attach it
+    if (typeof paymentMethod === 'string') {
+      return await stripe.paymentMethods.attach(paymentMethod, { customer: customerId });
+    }
+    // Legacy support for source objects (will be deprecated)
     return await stripe.customers.createSource(customerId, paymentMethod);
+  }
+
+  static async createSetupIntent(secretKey: string, customerId?: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    const params: any = {
+      usage: 'on_session',
+      automatic_payment_methods: {
+        enabled: true,
+      }
+    };
+    if (customerId) params.customer = customerId;
+    return await stripe.setupIntents.create(params);
+  }
+
+  static async createPaymentMethod(secretKey: string, paymentMethodData: any) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.paymentMethods.create(paymentMethodData);
+  }
+
+  static async confirmSetupIntent(secretKey: string, setupIntentId: string, paymentMethodId: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.setupIntents.confirm(setupIntentId, {
+      payment_method: paymentMethodId
+    });
   }
 
   static async updateCard(secretKey: string, paymentMethodId: string, card: any) {

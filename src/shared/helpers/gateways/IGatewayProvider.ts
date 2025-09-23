@@ -21,10 +21,14 @@ export interface SubscriptionResult {
 }
 
 export interface GatewayConfig {
+  gatewayId: string;
+  churchId: string;
   publicKey: string;
   privateKey: string;
   webhookKey: string;
   productId?: string;
+  settings?: Record<string, unknown> | null;
+  environment?: string | null;
 }
 
 export interface IGatewayProvider {
@@ -46,6 +50,37 @@ export interface IGatewayProvider {
 
   // Product/service management
   createProduct?(config: GatewayConfig, churchId: string): Promise<string>;
+
+  // Customer management
+  createCustomer?(config: GatewayConfig, email: string, name: string): Promise<string>;
+  getCustomerSubscriptions?(config: GatewayConfig, customerId: string): Promise<any>;
+  getCustomerPaymentMethods?(config: GatewayConfig, customer: any): Promise<any>;
+
+  // Payment method management
+  attachPaymentMethod?(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any>;
+  detachPaymentMethod?(config: GatewayConfig, paymentMethodId: string): Promise<any>;
+  addCard?(config: GatewayConfig, customerId: string, cardData: any): Promise<any>;
+  updateCard?(config: GatewayConfig, paymentMethodId: string, cardData: any): Promise<any>;
+  createBankAccount?(config: GatewayConfig, customerId: string, options: any): Promise<any>;
+  updateBank?(config: GatewayConfig, paymentMethodId: string, bankData: any, customerId: string): Promise<any>;
+  verifyBank?(config: GatewayConfig, paymentMethodId: string, amountData: any, customerId: string): Promise<any>;
+  deleteBankAccount?(config: GatewayConfig, customerId: string, bankAccountId: string): Promise<any>;
+
+  // Provider-specific functionality
+  generateClientToken?(config: GatewayConfig): Promise<string>;
+  createOrder?(config: GatewayConfig, orderData: any): Promise<any>;
+
+  // Subscription plan management
+  createSubscriptionPlan?(config: GatewayConfig, planData: any): Promise<string>;
+  createSubscriptionWithPlan?(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult>;
+
+  // Transaction lookup
+  getCharge?(config: GatewayConfig, chargeId: string): Promise<any>;
+
+  // Token-based payment methods (for secure card handling)
+  createSetupIntent?(config: GatewayConfig, customerId?: string): Promise<any>;
+  createPaymentMethod?(config: GatewayConfig, paymentMethodData: any): Promise<any>;
+  confirmSetupIntent?(config: GatewayConfig, setupIntentId: string, paymentMethodId: string): Promise<any>;
 
   // Event logging
   logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;

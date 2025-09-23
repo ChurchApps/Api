@@ -14,7 +14,7 @@ export class FundController extends GivingCrudController {
 
   protected crudSettings = {
     repoKey: "fund",
-    permissions: { view: Permissions.donations.viewSummary, edit: Permissions.donations.edit },
+    permissions: { view: null, edit: Permissions.donations.edit },
     routes: ["getById", "getAll", "post", "delete"] as const
   };
 

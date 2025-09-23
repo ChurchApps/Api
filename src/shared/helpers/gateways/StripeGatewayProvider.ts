@@ -133,4 +133,67 @@ export class StripeGatewayProvider implements IGatewayProvider {
   async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
     return await StripeHelper.logDonation(config.privateKey, churchId, eventData, repos);
   }
+
+  // Customer management
+  async createCustomer(config: GatewayConfig, email: string, name: string): Promise<string> {
+    return await StripeHelper.createCustomer(config.privateKey, email, name);
+  }
+
+  async getCustomerSubscriptions(config: GatewayConfig, customerId: string): Promise<any> {
+    return await StripeHelper.getCustomerSubscriptions(config.privateKey, customerId);
+  }
+
+  async getCustomerPaymentMethods(config: GatewayConfig, customer: any): Promise<any> {
+    return await StripeHelper.getCustomerPaymentMethods(config.privateKey, customer);
+  }
+
+  // Payment method management
+  async attachPaymentMethod(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any> {
+    return await StripeHelper.attachPaymentMethod(config.privateKey, paymentMethodId, options);
+  }
+
+  async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string): Promise<any> {
+    return await StripeHelper.detachPaymentMethod(config.privateKey, paymentMethodId);
+  }
+
+  async updateCard(config: GatewayConfig, paymentMethodId: string, cardData: any): Promise<any> {
+    return await StripeHelper.updateCard(config.privateKey, paymentMethodId, cardData);
+  }
+
+  async createBankAccount(config: GatewayConfig, customerId: string, options: any): Promise<any> {
+    return await StripeHelper.createBankAccount(config.privateKey, customerId, options);
+  }
+
+  async updateBank(config: GatewayConfig, paymentMethodId: string, bankData: any, customerId: string): Promise<any> {
+    return await StripeHelper.updateBank(config.privateKey, paymentMethodId, bankData, customerId);
+  }
+
+  async verifyBank(config: GatewayConfig, paymentMethodId: string, amountData: any, customerId: string): Promise<any> {
+    return await StripeHelper.verifyBank(config.privateKey, paymentMethodId, amountData, customerId);
+  }
+
+  async deleteBankAccount(config: GatewayConfig, customerId: string, bankAccountId: string): Promise<any> {
+    return await StripeHelper.deleteBankAccount(config.privateKey, customerId, bankAccountId);
+  }
+
+  async addCard(config: GatewayConfig, customerId: string, cardData: any): Promise<any> {
+    return await StripeHelper.addCard(config.privateKey, customerId, cardData);
+  }
+
+  async getCharge(config: GatewayConfig, chargeId: string): Promise<any> {
+    return await StripeHelper.getCharge(config.privateKey, chargeId);
+  }
+
+  // Token-based payment methods
+  async createSetupIntent(config: GatewayConfig, customerId?: string): Promise<any> {
+    return await StripeHelper.createSetupIntent(config.privateKey, customerId);
+  }
+
+  async createPaymentMethod(config: GatewayConfig, paymentMethodData: any): Promise<any> {
+    return await StripeHelper.createPaymentMethod(config.privateKey, paymentMethodData);
+  }
+
+  async confirmSetupIntent(config: GatewayConfig, setupIntentId: string, paymentMethodId: string): Promise<any> {
+    return await StripeHelper.confirmSetupIntent(config.privateKey, setupIntentId, paymentMethodId);
+  }
 }

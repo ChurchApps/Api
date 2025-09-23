@@ -10,7 +10,7 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
     return {
       tableName: "gateways",
       hasSoftDelete: false,
-      columns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees"]
+      columns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees", "settings", "environment"]
     };
   }
 
@@ -18,8 +18,29 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
   protected async create(gateway: Gateway): Promise<Gateway> {
     gateway.id = this.createId();
     await TypedDB.query("DELETE FROM gateways WHERE churchId=? AND id<>?;", [gateway.churchId, gateway.id]); // enforce a single record per church (for now)
-    const sql = "INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees];
+    const sql = "INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees, settings, environment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const settings = gateway.settings ? JSON.stringify(gateway.settings) : null;
+    const params = [gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees, settings, gateway.environment];
+    await TypedDB.query(sql, params);
+    return gateway;
+  }
+
+  protected async update(gateway: Gateway): Promise<Gateway> {
+    const sql =
+      "UPDATE gateways SET provider=?, publicKey=?, privateKey=?, webhookKey=?, productId=?, payFees=?, settings=?, environment=? WHERE id=? AND churchId=?";
+    const settings = gateway.settings ? JSON.stringify(gateway.settings) : null;
+    const params = [
+      gateway.provider,
+      gateway.publicKey,
+      gateway.privateKey,
+      gateway.webhookKey,
+      gateway.productId,
+      gateway.payFees,
+      settings,
+      gateway.environment,
+      gateway.id,
+      gateway.churchId
+    ];
     await TypedDB.query(sql, params);
     return gateway;
   }
@@ -27,11 +48,17 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
   protected rowToModel(data: any): Gateway {
     return {
       id: data.id,
+      churchId: data.churchId,
       provider: data.provider,
       publicKey: data.publicKey,
+      privateKey: data.privateKey,
       webhookKey: data.webhookKey,
       productId: data.productId,
-      payFees: data.payFees
+      payFees: data.payFees,
+      settings: this.parseJson(data.settings),
+      environment: data.environment,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
     };
   }
 
@@ -41,5 +68,17 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
 
   public convertAllToModel(churchId: string, data: any) {
     return this.mapToModels(data);
+  }
+
+  private parseJson(value: unknown) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "string") {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+    return value as Record<string, unknown>;
   }
 }

@@ -4,6 +4,7 @@ export { FundDonationRepo } from "./FundDonationRepo";
 export { FundRepo } from "./FundRepo";
 export { GatewayRepo } from "./GatewayRepo";
 export { CustomerRepo } from "./CustomerRepo";
+export { GatewayPaymentMethodRepo } from "./GatewayPaymentMethodRepo";
 export { EventLogRepo } from "./EventLogRepo";
 export { SubscriptionRepo } from "./SubscriptionRepo";
 export { SubscriptionFundsRepo } from "./SubscriptionFundsRepo";
