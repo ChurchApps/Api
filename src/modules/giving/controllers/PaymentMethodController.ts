@@ -45,8 +45,6 @@ export class PaymentMethodController extends GivingCrudController {
     if (!customer) return [];
     const rawPaymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);
 
-    // Debug logging
-    console.log("Raw payment methods from gateway:", JSON.stringify(rawPaymentMethods, null, 2));
 
     // Normalize payment methods to consistent format
     const normalizedMethods: any[] = [];
@@ -119,7 +117,7 @@ export class PaymentMethodController extends GivingCrudController {
       const rawPaymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);
 
       // Debug logging
-      console.log("Raw payment methods from gateway:", JSON.stringify(rawPaymentMethods, null, 2));
+      //console.log("Raw payment methods from gateway:", JSON.stringify(rawPaymentMethods, null, 2));
 
       // Normalize payment methods to consistent format
       const normalizedMethods: any[] = [];
