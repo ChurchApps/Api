@@ -16,7 +16,7 @@ export class PaymentMethodController extends GivingCrudController {
   @httpGet("/test/personid/:id")
   public async testGetPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     // Test endpoint without auth for debugging - initialize repos manually
-    const RepoManager = require("../../../shared/infrastructure/RepoManager").RepoManager;
+    const { RepoManager } = await import("../../../shared/infrastructure/RepoManager");
     this.repos = await RepoManager.getRepos("giving");
 
     const churchId = "AOjIt0W-SeY"; // hardcoded for testing

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { controller, httpPost, httpGet } from "inversify-express-utils";
 import { GivingBaseController } from "../../modules/giving/controllers/GivingBaseController";
-import { IGatewayProvider, GatewayConfig } from "../../shared/helpers/gateways/IGatewayProvider";
+import { IGatewayProvider } from "../../shared/helpers/gateways/IGatewayProvider";
 import { StripeGatewayProvider } from "../../shared/helpers/gateways/StripeGatewayProvider";
 import { PayPalGatewayProvider } from "../../shared/helpers/gateways/PayPalGatewayProvider";
 import { SquareGatewayProvider } from "../../shared/helpers/gateways/SquareGatewayProvider";
@@ -40,7 +40,7 @@ export class PlaygroundController extends GivingBaseController {
       const htmlContent = fs.readFileSync(htmlPath, "utf8");
       res.setHeader("Content-Type", "text/html");
       res.send(htmlContent);
-    } catch (error) {
+    } catch (_error) {
       res.status(404).json({ error: "Playground page not found" });
     }
   }
@@ -69,7 +69,7 @@ export class PlaygroundController extends GivingBaseController {
         res.setHeader("Content-Type", "application/javascript");
         res.send(jsContent);
       }
-    } catch (error) {
+    } catch (_error) {
       res.status(404).json({ error: "Playground script not found" });
     }
   }
@@ -89,7 +89,7 @@ export class PlaygroundController extends GivingBaseController {
       const mapContent = fs.readFileSync(mapPath, "utf8");
       res.setHeader("Content-Type", "application/json");
       res.send(mapContent);
-    } catch (error) {
+    } catch (_error) {
       res.status(404).json({ error: "Source map not found" });
     }
   }

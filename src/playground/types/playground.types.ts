@@ -89,12 +89,12 @@ export interface PlaygroundState {
 }
 
 export type ResponseElementId =
-  | 'feesResponse'
-  | 'chargeResponse'
-  | 'customerResponse'
-  | 'subscriptionResponse'
-  | 'tokenResponse'
-  | 'webhookResponse'
-  | 'updateSubResponse'
-  | 'cancelSubResponse'
-  | 'productResponse';
+  | "feesResponse"
+  | "chargeResponse"
+  | "customerResponse"
+  | "subscriptionResponse"
+  | "tokenResponse"
+  | "webhookResponse"
+  | "updateSubResponse"
+  | "cancelSubResponse"
+  | "productResponse";
