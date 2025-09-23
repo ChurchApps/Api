@@ -66,7 +66,7 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
       }
     });
 
-    const sql = `INSERT INTO ${this.table()} (${cols.join(", ")}) VALUES (${placeholders.join(", ")});`;
+    const sql = `INSERT INTO \`${this.table()}\` (${cols.join(", ")}) VALUES (${placeholders.join(", ")});`;
     return { sql, params };
   }
 
@@ -89,7 +89,7 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
 
     const where = ` WHERE ${this.idColumn}=? and ${this.churchIdColumn}=?`;
     params.push((model as any)[this.idColumn], (model as any)[this.churchIdColumn]);
-    const sql = `UPDATE ${this.table()} SET ${sets.join(", ")} ${where}`;
+    const sql = `UPDATE \`${this.table()}\` SET ${sets.join(", ")} ${where}`;
     return { sql, params };
   }
 
@@ -102,7 +102,7 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
   public async delete(churchId: string, id: string) {
     const cfg = this.repoConfig;
     if (cfg.hasSoftDelete === false) {
-      const sql = `DELETE FROM ${this.table()} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
+      const sql = `DELETE FROM \`${this.table()}\` WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
       return TypedDB.query(sql, [id, churchId]);
     }
     return this.deleteSoft(churchId, id);

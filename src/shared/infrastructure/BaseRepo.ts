@@ -79,7 +79,7 @@ export abstract class BaseRepo<T> {
    */
   public async deleteSoft(churchId: string, id: string) {
     if (!this.getHasSoftDelete()) throw new Error("Soft delete not enabled for this repository");
-    const sql = `UPDATE ${this.table()} SET ${this.removedColumn}=1 WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
+    const sql = `UPDATE \`${this.table()}\` SET ${this.removedColumn}=1 WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
     return TypedDB.query(sql, [id, churchId]);
   }
 
@@ -88,7 +88,7 @@ export abstract class BaseRepo<T> {
    */
   public async delete(churchId: string, id: string) {
     if (this.getHasSoftDelete()) return this.deleteSoft(churchId, id);
-    const sql = `DELETE FROM ${this.tableName} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
+    const sql = `DELETE FROM \`${this.tableName}\` WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?;`;
     return TypedDB.query(sql, [id, churchId]);
   }
 
@@ -97,7 +97,7 @@ export abstract class BaseRepo<T> {
    */
   public async loadOne(churchId: string, id: string, includeRemoved = false) {
     const removedClause = this.getHasSoftDelete() && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
-    const sql = `SELECT * FROM ${this.table()} WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?${removedClause};`;
+    const sql = `SELECT * FROM \`${this.table()}\` WHERE ${this.idColumn}=? AND ${this.churchIdColumn}=?${removedClause};`;
     return TypedDB.queryOne(sql, [id, churchId]);
   }
 
@@ -108,7 +108,7 @@ export abstract class BaseRepo<T> {
     const removedClause = this.getHasSoftDelete() && !includeRemoved ? ` AND ${this.removedColumn}=0` : "";
     const order = orderBy || this.getDefaultOrderBy();
     const orderClause = order ? ` ORDER BY ${order}` : "";
-    const sql = `SELECT * FROM ${this.table()} WHERE ${this.churchIdColumn}=?${removedClause}${orderClause};`;
+    const sql = `SELECT * FROM \`${this.table()}\` WHERE ${this.churchIdColumn}=?${removedClause}${orderClause};`;
     const result = await TypedDB.query(sql, [churchId]);
     return rowsToArray(result);
   }
