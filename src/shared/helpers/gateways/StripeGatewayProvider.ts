@@ -17,28 +17,13 @@ export class StripeGatewayProvider implements IGatewayProvider {
   }
 
   async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any): Promise<WebhookResult> {
-    console.log("=== StripeGatewayProvider.verifyWebhookSignature DEBUG ===");
-    console.log("Config webhookKey length:", config.webhookKey ? config.webhookKey.length : 0);
-    console.log("Config privateKey length:", config.privateKey ? config.privateKey.length : 0);
-    console.log("Headers stripe-signature:", headers["stripe-signature"]);
-    console.log("Body type:", typeof body);
-    console.log("Body length:", body ? body.length : "undefined");
-
     try {
       const sig = headers["stripe-signature"]?.toString();
-      console.log("Extracted signature:", sig);
       if (!sig) {
-        console.log("No stripe-signature header found");
         return { success: false, shouldProcess: false };
       }
 
-      console.log("About to call StripeHelper.verifySignature with:");
-      console.log("- privateKey length:", config.privateKey ? config.privateKey.length : 0);
-      console.log("- webhookKey length:", config.webhookKey ? config.webhookKey.length : 0);
-      console.log("- signature:", sig);
-
       const stripeEvent = await StripeHelper.verifySignature(config.privateKey, { body } as any, sig, config.webhookKey);
-      console.log("StripeHelper.verifySignature successful, event type:", stripeEvent.type);
       const eventData = stripeEvent.data.object as any;
       const subscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
 
@@ -52,13 +37,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
         eventData,
         eventId: stripeEvent.id
       };
-    } catch (error) {
-      console.error("StripeGatewayProvider.verifyWebhookSignature error:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        type: error.constructor.name
-      });
+    } catch (_error) {
       return { success: false, shouldProcess: false };
     }
   }
