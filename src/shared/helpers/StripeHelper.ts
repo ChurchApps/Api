@@ -209,7 +209,7 @@ export class StripeHelper {
     let message = billing_reason + " " + status;
     if (!billing_reason) message = failure_message ? failure_message + " " + outcome.seller_message : outcome.seller_message;
     const eventLog: EventLog = {
-      id: givingRepos.eventLog.generateId(),
+      id: "", // Let the repository create() method generate the ID
       churchId,
       customerId: customer,
       provider: "Stripe",

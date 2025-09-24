@@ -246,7 +246,7 @@ export class SquareHelper {
   // Event Logging
   static async logEvent(churchId: string, squareEvent: any, eventData: any, givingRepos: any): Promise<any> {
     const eventLog: EventLog = {
-      id: givingRepos.eventLog.generateId(),
+      id: "", // Let the repository create() method generate the ID
       churchId,
       customerId: eventData.customer_id || "",
       provider: "Square",

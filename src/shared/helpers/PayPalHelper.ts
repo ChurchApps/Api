@@ -274,7 +274,7 @@ export class PayPalHelper {
     const status = eventData.status || eventType;
     const message = eventData.status || "";
     const eventLog: EventLog = {
-      id: givingRepos.eventLog.generateId(),
+      id: "", // Let the repository create() method generate the ID
       churchId,
       customerId: eventData.subscriber?.payer_id || eventData.payer?.payer_id || "",
       provider: "PayPal",
