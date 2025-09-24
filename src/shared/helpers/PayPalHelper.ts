@@ -274,16 +274,17 @@ export class PayPalHelper {
     const status = eventData.status || eventType;
     const message = eventData.status || "";
     const eventLog: EventLog = {
-      id: eventId,
+      id: givingRepos.eventLog.generateId(),
       churchId,
       customerId: eventData.subscriber?.payer_id || eventData.payer?.payer_id || "",
       provider: "PayPal",
+      providerId: eventId, // Store the PayPal event ID here
       eventType,
       status,
       message,
       created: new Date(createTime)
     };
-    return givingRepos.eventLog.create(eventLog);
+    return givingRepos.eventLog.save(eventLog);
   }
 
   static async logDonation(clientId: string, clientSecret: string, churchId: string, eventData: any, givingRepos: any) {

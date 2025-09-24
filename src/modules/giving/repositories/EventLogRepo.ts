@@ -10,8 +10,8 @@ export class EventLogRepo extends ConfiguredRepo<EventLog> {
     return {
       tableName: "eventLogs",
       hasSoftDelete: false,
-      idColumn: "id", // External ID from payment provider events
-      insertColumns: ["customerId", "provider", "eventType", "message", "status", "created"],
+      idColumn: "id", // Now char(11) generated ID
+      insertColumns: ["customerId", "provider", "providerId", "eventType", "message", "status", "created"],
       updateColumns: ["resolved"],
       insertLiterals: {
         resolved: "FALSE" // Always false on insert
@@ -19,18 +19,32 @@ export class EventLogRepo extends ConfiguredRepo<EventLog> {
     };
   }
 
-  // Override create to use external ID and handle resolved field
+  // Override create to handle generated ID and providerId field
   protected async create(model: EventLog): Promise<EventLog> {
-    const sql = "INSERT INTO eventLogs (id, churchId, customerId, provider, eventType, message, status, created, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [model.id, model.churchId, model.customerId, model.provider, model.eventType, model.message, model.status, model.created, false];
+    const sql = "INSERT INTO eventLogs (id, churchId, customerId, provider, providerId, eventType, message, status, created, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [model.id, model.churchId, model.customerId, model.provider, model.providerId, model.eventType, model.message, model.status, model.created, false];
     await TypedDB.query(sql, params);
     return model;
   }
 
-  // Override save to check if event already exists (idempotency)
+  // Override save to check if event already exists by providerId (idempotency)
   public async save(eventLog: EventLog) {
-    const event = await this.load(eventLog.churchId as string, eventLog.id);
-    return event ? this.update(eventLog) : this.create(eventLog);
+    if (eventLog.providerId) {
+      const existingEvent = await this.loadByProviderId(eventLog.churchId as string, eventLog.providerId);
+      if (existingEvent) {
+        return this.update({ ...eventLog, id: existingEvent.id });
+      }
+    }
+    return this.create(eventLog);
+  }
+
+  // Load event by provider ID (for idempotency checks)
+  public async loadByProviderId(churchId: string, providerId: string): Promise<EventLog | null> {
+    const rows = await TypedDB.query(
+      "SELECT * FROM eventLogs WHERE churchId=? AND providerId=? LIMIT 1;",
+      [churchId, providerId]
+    );
+    return rows.length > 0 ? this.rowToModel(rows[0]) : null;
   }
 
   public async loadByType(churchId: string, status: string) {

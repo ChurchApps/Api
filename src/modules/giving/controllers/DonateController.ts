@@ -189,7 +189,7 @@ export class DonateController extends GivingCrudController {
           return this.json({}, 200);
         }
 
-        const existingEvent = await this.repos.eventLog.load(churchId, webhookResult.eventId!);
+        const existingEvent = await this.repos.eventLog.loadByProviderId(churchId, webhookResult.eventId!);
 
         if (!existingEvent) {
           await GatewayService.logEvent(gateway, churchId, req.body, webhookResult.eventData, this.repos);

@@ -246,16 +246,17 @@ export class SquareHelper {
   // Event Logging
   static async logEvent(churchId: string, squareEvent: any, eventData: any, givingRepos: any): Promise<any> {
     const eventLog: EventLog = {
-      id: squareEvent.merchant_id + "_" + squareEvent.event_id,
+      id: givingRepos.eventLog.generateId(),
       churchId,
       customerId: eventData.customer_id || "",
       provider: "Square",
+      providerId: squareEvent.merchant_id + "_" + squareEvent.event_id, // Store the Square event ID here
       eventType: squareEvent.type,
       status: eventData.status || squareEvent.type,
       message: eventData.status || "",
       created: new Date(squareEvent.created_at)
     };
-    return givingRepos.eventLog.create(eventLog);
+    return givingRepos.eventLog.save(eventLog);
   }
 
   static async logDonation(accessToken: string, environment: string, churchId: string, eventData: any, givingRepos: any): Promise<any> {

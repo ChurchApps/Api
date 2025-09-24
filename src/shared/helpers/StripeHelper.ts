@@ -209,16 +209,17 @@ export class StripeHelper {
     let message = billing_reason + " " + status;
     if (!billing_reason) message = failure_message ? failure_message + " " + outcome.seller_message : outcome.seller_message;
     const eventLog: EventLog = {
-      id: stripeEvent.id,
+      id: givingRepos.eventLog.generateId(),
       churchId,
       customerId: customer,
       provider: "Stripe",
+      providerId: stripeEvent.id, // Store the Stripe event ID here
       eventType: stripeEvent.type,
       status,
       message,
       created: new Date(created * 1000)
     };
-    return givingRepos.eventLog.create(eventLog);
+    return givingRepos.eventLog.save(eventLog);
   }
 
   static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any) {
