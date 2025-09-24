@@ -64,6 +64,8 @@ export const createApp = async () => {
       // Lambda-specific body parsing for @codegenie/serverless-express
       app.use((req, res, next) => {
         const contentType = req.headers["content-type"] || "";
+        // Check if this is a webhook endpoint that needs raw body
+        const isWebhookEndpoint = req.path.includes("/donate/webhook/");
 
         // Mark request as already having body parsed to prevent further body parsing attempts
         (req as any)._body = true;
@@ -72,7 +74,8 @@ export const createApp = async () => {
         if (Buffer.isBuffer(req.body)) {
           try {
             const bodyString = req.body.toString("utf8");
-            if (contentType.includes("application/json")) {
+            // Keep raw body for webhook endpoints, parse JSON for others
+            if (!isWebhookEndpoint && contentType.includes("application/json")) {
               req.body = JSON.parse(bodyString);
             } else {
               req.body = bodyString;
@@ -85,7 +88,8 @@ export const createApp = async () => {
         else if (req.body && req.body.type === "Buffer" && Array.isArray(req.body.data)) {
           try {
             const bodyString = Buffer.from(req.body.data).toString("utf8");
-            if (contentType.includes("application/json")) {
+            // Keep raw body for webhook endpoints, parse JSON for others
+            if (!isWebhookEndpoint && contentType.includes("application/json")) {
               req.body = JSON.parse(bodyString);
             } else {
               req.body = bodyString;
@@ -97,7 +101,8 @@ export const createApp = async () => {
         // Handle string JSON bodies
         else if (typeof req.body === "string" && req.body.length > 0) {
           try {
-            if (contentType.includes("application/json")) {
+            // Keep raw body for webhook endpoints, parse JSON for others
+            if (!isWebhookEndpoint && contentType.includes("application/json")) {
               req.body = JSON.parse(req.body);
             }
           } catch {
@@ -113,6 +118,13 @@ export const createApp = async () => {
       });
     } else {
       // Local development - use standard body-parser middleware
+      // Add raw body parser for webhook endpoints (Stripe requires raw body for signature verification)
+      app.use(
+        "/giving/donate/webhook/*",
+        bodyParser.raw({ type: "application/json" })
+      );
+
+      // Standard JSON parsing for all other endpoints
       app.use(bodyParser.json({ limit: "50mb" }));
       app.use(bodyParser.urlencoded({ extended: true, limit: "50mb" }));
     }

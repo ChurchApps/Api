@@ -36,12 +36,15 @@ type GatewayResolutionReason = "not-found" | "ambiguous" | null;
 
 export class GatewayService {
   static getGatewayConfig(gateway: any): GatewayConfig {
-    const decryptIfPresent = (value: string | null | undefined) => {
+    const decryptIfPresent = (value: string | null | undefined, fieldName: string = "unknown") => {
+      console.log(`Decrypting ${fieldName}:`, value ? `${value.substring(0, 20)}...` : "null/undefined");
       if (!value) return "";
       try {
-        return EncryptionHelper.decrypt(value);
+        const decrypted = EncryptionHelper.decrypt(value);
+        console.log(`Successfully decrypted ${fieldName}, length:`, decrypted.length);
+        return decrypted;
       } catch (err) {
-        console.error("Failed to decrypt gateway secret", { provider: gateway?.provider, gatewayId: gateway?.id, err });
+        console.error(`Failed to decrypt gateway ${fieldName}`, { provider: gateway?.provider, gatewayId: gateway?.id, err });
         return "";
       }
     };
@@ -50,8 +53,8 @@ export class GatewayService {
       gatewayId: gateway.id,
       churchId: gateway.churchId,
       publicKey: gateway.publicKey,
-      privateKey: decryptIfPresent(gateway.privateKey),
-      webhookKey: decryptIfPresent(gateway.webhookKey),
+      privateKey: decryptIfPresent(gateway.privateKey, "privateKey"),
+      webhookKey: decryptIfPresent(gateway.webhookKey, "webhookKey"),
       productId: gateway.productId,
       settings: gateway.settings ?? null,
       environment: gateway.environment ?? null
@@ -75,9 +78,34 @@ export class GatewayService {
   }
 
   static async verifyWebhook(gateway: any, headers: any, body: any) {
+    console.log("=== GatewayService.verifyWebhook DEBUG ===");
+    console.log("Gateway provider:", gateway.provider);
+    console.log("Gateway webhookKey (encrypted):", gateway.webhookKey ? `${gateway.webhookKey.substring(0, 20)}...` : "null");
+
     const provider = this.getProviderFromGateway(gateway);
+    console.log("Provider instance:", provider.constructor.name);
+
     const config = this.getGatewayConfig(gateway);
-    return await provider.verifyWebhookSignature(config, headers, body);
+    console.log("Decrypted config:", {
+      gatewayId: config.gatewayId,
+      churchId: config.churchId,
+      publicKey: config.publicKey ? `${config.publicKey.substring(0, 10)}...` : "null",
+      privateKey: config.privateKey ? `${config.privateKey.substring(0, 10)}...` : "null",
+      webhookKey: config.webhookKey ? `${config.webhookKey.substring(0, 20)}...` : "null",
+      webhookKeyLength: config.webhookKey ? config.webhookKey.length : 0,
+      environment: config.environment
+    });
+
+    console.log("Headers for verification:", {
+      'stripe-signature': headers['stripe-signature'],
+      'user-agent': headers['user-agent'],
+      'content-type': headers['content-type']
+    });
+
+    const result = await provider.verifyWebhookSignature(config, headers, body);
+    console.log("Provider verification result:", result);
+    console.log("=== GatewayService.verifyWebhook DEBUG END ===");
+    return result;
   }
 
   static async processCharge(gateway: any, donationData: any) {

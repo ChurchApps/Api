@@ -139,24 +139,49 @@ export class DonateController extends GivingCrudController {
   @httpPost("/webhook/:provider")
   public async webhook(req: express.Request<{ provider: string }, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      console.log("=== WEBHOOK DEBUG START ===");
+      console.log("Raw headers:", JSON.stringify(req.headers, null, 2));
+      console.log("Raw body type:", typeof req.body);
+
+      if (typeof req.body === "string") {
+        console.log("Raw body length:", req.body.length);
+        console.log("Body preview:", req.body.substring(0, 200));
+      } else if (typeof req.body === "object") {
+        console.log("Body is parsed object:", JSON.stringify(req.body, null, 2).substring(0, 500));
+      } else {
+        console.log("Body is:", req.body);
+      }
+
       const churchId = req.query.churchId?.toString();
+      console.log("Church ID:", churchId);
       if (!churchId) return this.json({ error: "Missing churchId parameter" }, 400);
 
       const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
+      console.log("Found gateways:", gateways.length);
       if (!gateways.length) return this.json({ error: "No gateway configured" }, 401);
 
       const provider = req.params.provider?.toLowerCase();
+      console.log("Provider:", provider);
       const gateway = gateways.find(g => g.provider.toLowerCase() === provider);
+      console.log("Matched gateway:", gateway ? { id: gateway.id, provider: gateway.provider, hasWebhookKey: !!gateway.webhookKey } : null);
 
       if (!gateway) {
         return this.json({ error: `No ${provider} gateway configured` }, 404);
       }
 
       try {
+        console.log("About to verify webhook with gateway:", {
+          id: gateway.id,
+          provider: gateway.provider,
+          webhookKeyLength: gateway.webhookKey ? gateway.webhookKey.length : 0,
+          environment: gateway.environment
+        });
+
         const webhookResult = await GatewayService.verifyWebhook(gateway, req.headers, req.body);
+        console.log("Webhook verification result:", webhookResult);
 
         if (!webhookResult.success) {
-          console.error(`${provider} webhook verification failed`);
+          console.error(`${provider} webhook verification failed - result:`, webhookResult);
           return this.json({ error: `Invalid ${provider} webhook signature` }, 401);
         }
 
