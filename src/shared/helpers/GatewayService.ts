@@ -97,9 +97,9 @@ export class GatewayService {
     });
 
     console.log("Headers for verification:", {
-      'stripe-signature': headers['stripe-signature'],
-      'user-agent': headers['user-agent'],
-      'content-type': headers['content-type']
+      "stripe-signature": headers["stripe-signature"],
+      "user-agent": headers["user-agent"],
+      "content-type": headers["content-type"]
     });
 
     const result = await provider.verifyWebhookSignature(config, headers, body);
