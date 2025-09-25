@@ -20,7 +20,7 @@ export class CrudHelper {
     save: (item: TInput) => Promise<TModel>,
     convertAll: (churchId: string, rows: any[]) => TModel[]
   ): Promise<TModel[] | {}> {
-    if (!au.checkAccess(editPermission)) return {};
+    if (editPermission && !au.checkAccess(editPermission)) return {};
     const promises: Promise<TModel>[] = [];
     items.forEach((item) => {
       setChurchId(item, au.churchId);
@@ -102,7 +102,7 @@ export class CrudHelper {
     setChurchId?: (item: TInput, churchId: string) => void
   ) {
     return (ctrl as any).actionWrapper(req, res, async (au: any) => {
-      if (!au.checkAccess(editPermission)) {
+      if (editPermission && !au.checkAccess(editPermission)) {
         return (ctrl as any).json({ error: `User lacks ${editPermission} permission` }, 401);
       }
       return CrudHelper.saveManyAuto(
@@ -125,7 +125,7 @@ export class CrudHelper {
     remover: (repos: any, au: any) => Promise<any>
   ) {
     return (ctrl as any).actionWrapper(req, res, async (au: any) => {
-      if (!au.checkAccess(editPermission)) {
+      if (editPermission && !au.checkAccess(editPermission)) {
         return (ctrl as any).json({ error: `User lacks ${editPermission} permission` }, 401);
       }
       return CrudHelper.remove(au, editPermission, () => remover(ctrl.repos, au));
