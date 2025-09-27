@@ -49,6 +49,37 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
+  @httpGet("/messages/:contentType/:contentId")
+  public async forContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      console.log(au);
+      const conversations = (await this.repos.conversation.loadForContent(au.churchId, contentType, contentId)) as Conversation[];
+      const messageIds: string[] = [];
+      conversations.forEach((c) => {
+        if (messageIds.indexOf(c.firstPostId) === -1) messageIds.push(c.firstPostId);
+        if (messageIds.indexOf(c.lastPostId) === -1) messageIds.push(c.lastPostId);
+      });
+      if (messageIds.length > 0) {
+        const allMessages = await this.repos.message.loadByIds(au.churchId, messageIds);
+        conversations.forEach((c) => {
+          c.messages = [];
+          let msg = ArrayHelper.getOne(allMessages, "id", c.firstPostId);
+          if (msg) c.messages.push(msg);
+          if (c.lastPostId !== c.firstPostId) {
+            msg = ArrayHelper.getOne(allMessages, "id", c.lastPostId);
+            if (msg) c.messages.push(msg);
+          }
+        });
+      }
+
+      for (let i = conversations.length - 1; i >= 0; i--) {
+        if (conversations[i].messages.length === 0) conversations.splice(i, 1);
+      }
+
+      return conversations;
+    }) as any;
+  }
+
   @httpGet("/:churchId/:contentType/:contentId")
   public async loadByContent(
     @requestParam("churchId") churchId: string,
@@ -151,35 +182,6 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
-  @httpGet("/:contentType/:contentId")
-  public async forContent(@requestParam("contentType") contentType: string, @requestParam("contentId") contentId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const conversations = (await this.repos.conversation.loadForContent(au.churchId, contentType, contentId)) as Conversation[];
-      const messageIds: string[] = [];
-      conversations.forEach((c) => {
-        if (messageIds.indexOf(c.firstPostId) === -1) messageIds.push(c.firstPostId);
-        if (messageIds.indexOf(c.lastPostId) === -1) messageIds.push(c.lastPostId);
-      });
-      if (messageIds.length > 0) {
-        const allMessages = await this.repos.message.loadByIds(au.churchId, messageIds);
-        conversations.forEach((c) => {
-          c.messages = [];
-          let msg = ArrayHelper.getOne(allMessages, "id", c.firstPostId);
-          if (msg) c.messages.push(msg);
-          if (c.lastPostId !== c.firstPostId) {
-            msg = ArrayHelper.getOne(allMessages, "id", c.lastPostId);
-            if (msg) c.messages.push(msg);
-          }
-        });
-      }
-
-      for (let i = conversations.length - 1; i >= 0; i--) {
-        if (conversations[i].messages.length === 0) conversations.splice(i, 1);
-      }
-
-      return conversations;
-    }) as any;
-  }
 
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {

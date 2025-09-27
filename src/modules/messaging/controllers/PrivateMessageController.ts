@@ -37,7 +37,7 @@ export class PrivateMessageController extends MessagingBaseController {
       const privateMessages: PrivateMessage[] = await this.repos.privateMessage.loadByPersonId(au.churchId, au.personId);
       const messageIds: string[] = [];
       privateMessages.forEach((pm) => {
-        if (pm.conversation.lastPostId && messageIds.indexOf(pm.conversation.lastPostId) === -1) {
+        if (pm.conversation && pm.conversation.lastPostId && messageIds.indexOf(pm.conversation.lastPostId) === -1) {
           messageIds.push(pm.conversation.lastPostId);
         }
       });
