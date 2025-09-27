@@ -17,7 +17,9 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
 
   public loadForGroup(churchId: string, groupId: string) {
     const sql =
-      "SELECT gm.*, p.photoUpdated, p.displayName, p.email" +
+      "SELECT gm.*, " +
+      "p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, " +
+      "p.householdId, p.householdRole" +
       " FROM groupMembers gm" +
       " INNER JOIN people p on p.id=gm.personId" +
       " WHERE gm.churchId=? AND gm.groupId=?" +
@@ -70,7 +72,14 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
         id: result.personId,
         photoUpdated: row.photoUpdated,
         name: { display: row.displayName },
-        contactInfo: { email: row.email }
+        contactInfo: { 
+          email: row.email,
+          homePhone: row.homePhone,
+          mobilePhone: row.mobilePhone,
+          workPhone: row.workPhone
+        },
+        householdId: row.householdId,
+        householdRole: row.householdRole,
       };
       result.person.photo = PersonHelper.getPhotoPath(row.churchId, result.person);
     }
