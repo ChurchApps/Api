@@ -2,9 +2,12 @@ import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB";
 import { SongDetail } from "../models";
 import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 
 @injectable()
 export class SongDetailRepo extends ConfiguredRepo<SongDetail> {
+  protected churchIdColumn = "";
+
   protected get repoConfig(): RepoConfig<SongDetail> {
     return {
       tableName: "songDetails",
@@ -53,6 +56,55 @@ export class SongDetailRepo extends ConfiguredRepo<SongDetail> {
       " WHERE s.churchId=?" +
       " ORDER BY sd.title, sd.artist;";
     return TypedDB.query(sql, [churchId]);
+  }
+
+  protected async create(songDetail: SongDetail) {
+    songDetail.id = UniqueIdHelper.shortId();
+    const sql =
+      "INSERT INTO songDetails (id, praiseChartsId, title, artist, album, language, thumbnail, releaseDate, bpm, keySignature, seconds, meter, tones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [
+      songDetail.id,
+      songDetail.praiseChartsId,
+      songDetail.title,
+      songDetail.artist,
+      songDetail.album,
+      songDetail.language,
+      songDetail.thumbnail,
+      songDetail.releaseDate,
+      songDetail.bpm,
+      songDetail.keySignature,
+      songDetail.seconds,
+      songDetail.meter,
+      songDetail.tones
+    ];
+    await TypedDB.query(sql, params);
+    return songDetail;
+  }
+
+  protected async update(songDetail: SongDetail) {
+    const sql =
+      "UPDATE songDetails SET praiseChartsId=?, title=?, artist=?, album=?, language=?, thumbnail=?, releaseDate=?, bpm=?, keySignature=?, seconds=?, meter=?, tones=? WHERE id=?";
+    const params = [
+      songDetail.praiseChartsId,
+      songDetail.title,
+      songDetail.artist,
+      songDetail.album,
+      songDetail.language,
+      songDetail.thumbnail,
+      songDetail.releaseDate,
+      songDetail.bpm,
+      songDetail.keySignature,
+      songDetail.seconds,
+      songDetail.meter,
+      songDetail.tones,
+      songDetail.id
+    ];
+    await TypedDB.query(sql, params);
+    return songDetail;
+  }
+  
+  public save(songDetail: SongDetail) {
+    return songDetail.id ? this.update(songDetail) : this.create(songDetail);
   }
 
   protected rowToModel(row: any): SongDetail {
