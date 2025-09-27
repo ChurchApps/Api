@@ -10,5 +10,6 @@ export class Donation {
   public method?: string;
   public methodDetails?: string;
   public notes?: string;
+  public entryTime?: Date;
   public fund?: Fund;
 }
