@@ -17,11 +17,14 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
 
   public loadForGroup(churchId: string, groupId: string) {
     const sql =
-      "SELECT gm.*, p.photoUpdated, p.displayName, p.email" +
-      " FROM groupMembers gm" +
-      " INNER JOIN people p on p.id=gm.personId" +
-      " WHERE gm.churchId=? AND gm.groupId=?" +
-      " ORDER BY gm.leader desc, p.lastName, p.firstName;";
+      "SELECT gm.*, " +
+      "p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, " +
+      "p.address1, p.address2, p.city, p.state, p.zip, " +
+      "p.householdId, p.householdRole " +
+      "FROM groupMembers gm " +
+      "INNER JOIN people p on p.id=gm.personId " +
+      "WHERE gm.churchId=? AND gm.groupId=? " +
+      "ORDER BY gm.leader DESC, p.lastName, p.firstName;";
     return TypedDB.query(sql, [churchId, groupId]);
   }
 
@@ -70,7 +73,19 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
         id: result.personId,
         photoUpdated: row.photoUpdated,
         name: { display: row.displayName },
-        contactInfo: { email: row.email }
+        contactInfo: { 
+          email: row.email,
+          homePhone: row.homePhone,
+          mobilePhone: row.mobilePhone,
+          workPhone: row.workPhone,
+          address1: row.address1,
+          address2: row.address2,
+          city: row.city,
+          state: row.state,
+          zip: row.zip
+        },
+        householdId: row.householdId,
+        householdRole: row.householdRole
       };
       result.person.photo = PersonHelper.getPhotoPath(row.churchId, result.person);
     }
@@ -78,6 +93,7 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
 
     return result;
   }
+
 
   public convertAllToBasicModel(churchId: string, data: any[]) {
     const result: GroupMember[] = [];
