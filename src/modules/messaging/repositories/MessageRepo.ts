@@ -29,6 +29,27 @@ export class MessageRepo extends ConfiguredRepo<Message> {
     return result || [];
   }
 
+  public async loadForConversationPaginated(
+    churchId: string,
+    conversationId: string,
+    page: number = 1,
+    limit: number = 20
+  ) {
+    const offset = (page - 1) * limit;
+
+    const sql = `
+      SELECT *
+      FROM messages
+      WHERE churchId=? AND conversationId=?
+      ORDER BY timeSent
+      LIMIT ${limit} OFFSET ${offset};
+    `;
+
+    const result: any = await TypedDB.query(sql, [churchId, conversationId]);
+    return result || [];
+  }
+
+
   public delete(churchId: string, id: string) {
     return TypedDB.query("DELETE FROM messages WHERE id=? AND churchId=?;", [id, churchId]);
   }
