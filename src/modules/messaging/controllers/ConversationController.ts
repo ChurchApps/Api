@@ -51,17 +51,13 @@ export class ConversationController extends MessagingBaseController {
 
   @httpGet("/messages/:contentType/:contentId")
   public async forContent(
-    // @requestParam("contentType") contentType: string,
-    // @requestParam("contentId") contentId: string,
+    @requestParam("contentType") contentType: string,
+    @requestParam("contentId") contentId: string,
     req: express.Request,
     res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // const churchId = au.churchId;
-      const churchId = "CHU00000001";
-      const contentId = "GRP00000001";
-      const contentType = "group";
-
+      const churchId = au.churchId;
       const pageNumber = parseInt((req.query.page as string) || "1", 10);
       const pageSize = parseInt((req.query.limit as string) || "20", 10);
 
