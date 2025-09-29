@@ -10,6 +10,7 @@ CREATE TABLE `donations` (
   `method` varchar(50) DEFAULT NULL,
   `methodDetails` varchar(255) DEFAULT NULL,
   `notes` text,
+  `entryTime` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `id_UNIQUE` (`id`),
   KEY `idx_church_donation_date` (`churchId`, `donationDate`),
