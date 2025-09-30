@@ -41,7 +41,7 @@ export class MessageRepo extends ConfiguredRepo<Message> {
       SELECT *
       FROM messages
       WHERE churchId=? AND conversationId=?
-      ORDER BY timeSent
+      ORDER BY timeSent DESC
       LIMIT ${limit} OFFSET ${offset};
     `;
 
