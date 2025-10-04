@@ -60,7 +60,7 @@ export class MessageController extends MessagingBaseController {
   public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       const message = await this.repos.message.loadById(au.churchId, id);
-      if (message) {
+      if (Object.keys(message).length !== 0) {
         await this.repos.message.delete(au.churchId, id);
 
         // Send real-time delete notification
@@ -70,6 +70,10 @@ export class MessageController extends MessagingBaseController {
           action: "deleteMessage",
           data: { id }
         })) as any;
+
+        return this.json({ message: "Message deleted successfully" }, 200);
+      } else {
+        return this.json({ error: "Message not found" }, 404);
       }
     }) as any;
   }
