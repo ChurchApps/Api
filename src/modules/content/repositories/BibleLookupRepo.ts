@@ -34,8 +34,8 @@ export class BibleLookupRepo extends BaseRepo<BibleLookup> {
   public async getStats(startDate: Date, endDate: Date) {
     const sql =
       "SELECT bt.abbreviation, count(distinct(bl.ipAddress)) as lookups" +
-      " FROM bibletranslations bt" +
-      " INNER JOIN biblelookups bl ON bl.translationKey = bt.abbreviation" +
+      " FROM bibleTranslations bt" +
+      " INNER JOIN bibleLookups bl ON bl.translationKey = bt.abbreviation" +
       " WHERE bl.lookupTime BETWEEN ? AND ?" +
       " GROUP BY bt.abbreviation" +
       " ORDER BY bt.abbreviation;";
