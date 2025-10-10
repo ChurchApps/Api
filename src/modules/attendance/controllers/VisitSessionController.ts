@@ -32,7 +32,7 @@ export class VisitSessionController extends AttendanceBaseController {
             const st: ServiceTime = await this.repos.serviceTime.load(au.churchId, session.serviceTimeId);
             (visit as any).serviceId = st.serviceId;
           }
-          await this.repos.visit.save(visit);
+          visit = await this.repos.visit.save(visit);
           newVisit = true;
         }
         let existingSession: VisitSession = null;
