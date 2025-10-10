@@ -16,7 +16,7 @@ export class VisitSessionController extends AttendanceBaseController {
         const personId = (req.body as Visit).personId;
 
         let newVisit = false;
-        let visit: Visit = await this.repos.visitSession.loadForSessionPerson(au.churchId, sessionId, personId);
+        let visit: Visit = await this.repos.visit.loadForSessionPerson(au.churchId, sessionId, personId);
         if (visit == null) {
           const session: Session = await this.repos.session.load(au.churchId, sessionId);
           visit = {
