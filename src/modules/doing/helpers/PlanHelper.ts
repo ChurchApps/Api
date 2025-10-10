@@ -15,6 +15,7 @@ export class PlanHelper {
     blockoutDates: BlockoutDate[],
     teams: { positionId: string; personIds: string[] }[],
     lastServed: { personId: string; serviceDate: Date }[],
+    assignmentsOnSameDate?: Assignment[],
     repositories?: Repos
   ) {
     const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
@@ -22,6 +23,12 @@ export class PlanHelper {
     assignments.forEach((a) => {
       if (unavailablePeople.indexOf(a.personId) === -1) unavailablePeople.push(a.personId);
     });
+    // Add people already assigned to other plans on the same date
+    if (assignmentsOnSameDate) {
+      assignmentsOnSameDate.forEach((a) => {
+        if (unavailablePeople.indexOf(a.personId) === -1) unavailablePeople.push(a.personId);
+      });
+    }
 
     const neededPositions: NeededPosition[] = [];
     positions.forEach((p) => {

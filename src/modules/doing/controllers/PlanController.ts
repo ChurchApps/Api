@@ -59,8 +59,9 @@ export class PlanController extends DoingBaseController {
       const assignments = (await this.repos.assignment.loadByPlanId(au.churchId, id)) as any[];
       const blockoutDates = (await this.repos.blockoutDate.loadUpcoming(au.churchId)) as any[];
       const lastServed = (await this.repos.assignment.loadLastServed(au.churchId)) as any[];
+      const assignmentsOnSameDate = (await this.repos.assignment.loadByServiceDate(au.churchId, plan.serviceDate || new Date(), id)) as any[];
 
-      await PlanHelper.autofill(positions, assignments, blockoutDates, req.body.teams, lastServed);
+      await PlanHelper.autofill(positions, assignments, blockoutDates, req.body.teams, lastServed, assignmentsOnSameDate);
 
       return plan;
     });
