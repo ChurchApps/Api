@@ -39,7 +39,7 @@
       "keyName": "groups",
       "db": "membership",
       "sqlLines": [
-        "SELECT id, name as groupName from groups where churchId=:churchId"
+        "SELECT id, name as groupName from `groups` where churchId=:churchId"
       ],
       "joinConditions": [
         {

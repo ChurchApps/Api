@@ -25,7 +25,7 @@
         "keyName": "groups",
         "db": "membership",
         "sqlLines": [
-          "SELECT id, name as groupName FROM groups WHERE churchId=:churchId AND id IN ('', :groupIds)"
+          "SELECT id, name as groupName FROM `groups` WHERE churchId=:churchId AND id IN ('', :groupIds)"
         ]
       },
       {

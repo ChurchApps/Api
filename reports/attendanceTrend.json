@@ -8,7 +8,7 @@
       "keyName": "groups",
       "db": "membership",
       "sqlLines": [
-        "SELECT id from groups WHERE churchId=:churchId AND removed=0 AND trackAttendance=1 AND id=COALESCE(NULLIF(:groupId,''), id)"
+        "SELECT id from `groups` WHERE churchId=:churchId AND removed=0 AND trackAttendance=1 AND id=COALESCE(NULLIF(:groupId,''), id)"
       ]
     },
     {
