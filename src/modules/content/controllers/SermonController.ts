@@ -262,7 +262,7 @@ export class SermonController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {
-        await this.repos.sermon.delete(id, au.churchId);
+        await this.repos.sermon.delete(au.churchId, id);
         return null;
       }
     });
