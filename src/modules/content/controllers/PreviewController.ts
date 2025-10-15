@@ -7,8 +7,8 @@ import { Link } from "../models";
 @controller("/content/preview")
 export class PreviewController extends ContentBaseController {
   @httpGet("/data/:key")
-  public async loadData(@requestParam("key") key: string): Promise<any> {
-    try {
+  public async loadData(@requestParam("key") key: string, req: any, res: any): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
       const churchId = await SubDomainHelper.getId(key);
       let tabs: Link[] = null;
       let links: Link[] = null;
@@ -23,10 +23,7 @@ export class PreviewController extends ContentBaseController {
       await Promise.all(promises);
 
       const result = StreamingConfigHelper.generateJson(churchId, tabs, links, services, sermons);
-      return this.json(result, 200);
-    } catch (e) {
-      this.logger.error(e);
-      return this.internalServerError(e);
-    }
+      return result;
+    });
   }
 }
