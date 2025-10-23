@@ -226,7 +226,7 @@ export class PersonRepo extends ConfiguredRepo<Person> {
       nametagNotes: row.nametagNotes,
       donorNumber: row.donorNumber,
       membershipStatus: row.membershipStatus,
-      photoUpdated: row.photoUpdated,
+      photoUpdated: row.photoUpdated ? new Date(row.photoUpdated) : undefined,
       id: row.id,
       churchId: row.churchId,
       importKey: row.importKey,
@@ -256,7 +256,7 @@ export class PersonRepo extends ConfiguredRepo<Person> {
       name: { display: data.displayName },
       contactInfo: {},
       photo: data.photo,
-      photoUpdated: data.photoUpdated,
+      photoUpdated: data.photoUpdated ? new Date(data.photoUpdated) : undefined,
       membershipStatus: data.membershipStatus,
       id: data.id
     };
