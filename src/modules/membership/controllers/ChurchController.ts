@@ -316,6 +316,7 @@ export class ChurchController extends MembershipBaseController {
       }
 
       let church = req.body;
+      const appName = church.appName;
       church.subDomain = await ChurchHelper.selectSubDomain(church.name);
 
       const errors = await this.validateRegister(church, au);
@@ -333,16 +334,16 @@ export class ChurchController extends MembershipBaseController {
           await EmailHelper.sendTemplatedEmail(
             Environment.supportEmail,
             Environment.supportEmail,
-            church.appName,
+            appName,
             null,
             "New Church Registration",
-            "<h2>" + church.name + "</h2><h3>App: " + (church.appName || "unknown") + "</h3>"
+            "<h2>" + church.name + "</h2><h3>App: " + (appName || "unknown") + "</h3>"
           );
         }
 
         try {
           if (Environment.hubspotKey)
-            await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, church.appName);
+            await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName);
         } catch (_ex) {
           // Hubspot registration failed - continuing without error
         }
