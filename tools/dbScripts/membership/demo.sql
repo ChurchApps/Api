@@ -400,7 +400,7 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 
 -- Create Demo User
 INSERT INTO users (id, email, password, displayName, firstName, lastName, registrationDate) VALUES
-('USR00000001', 'demo@chums.org', '$2a$10$qBWddIw2QMUlRrX9/6Cdz.nW.L5FqE45R1NTLF.V71LyhjY6I0lFu', 'Demo User', 'Demo', 'User', '2024-01-01 00:00:00');
+('USR00000001', 'demo@b1.church', '$2a$10$qBWddIw2QMUlRrX9/6Cdz.nW.L5FqE45R1NTLF.V71LyhjY6I0lFu', 'Demo User', 'Demo', 'User', '2024-01-01 00:00:00');
 
 -- Create Domain Admin Role
 INSERT INTO roles (id, churchId, name) VALUES
@@ -416,7 +416,7 @@ INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
 
 -- Create Demo User Person Record and Family
 INSERT INTO people (id, churchId, displayName, firstName, middleName, lastName, prefix, suffix, gender, maritalStatus, birthDate, email, householdId, householdRole, membershipStatus, homePhone, mobilePhone, workPhone, address1, city, state, zip, removed) VALUES
-('PER00000082', 'CHU00000001', 'Demo User', 'Demo', NULL, 'User', 'Mr.', NULL, 'Male', 'Married', '1990-01-01', 'demo@chums.org', 'HOU00000026', 'Head', 'Member', '(217) 555-2601', '(217) 555-2602', '(217) 555-2603', '123 Demo Street', 'Springfield', 'IL', '62701', 0),
+('PER00000082', 'CHU00000001', 'Demo User', 'Demo', NULL, 'User', 'Mr.', NULL, 'Male', 'Married', '1990-01-01', 'demo@b1.church', 'HOU00000026', 'Head', 'Member', '(217) 555-2601', '(217) 555-2602', '(217) 555-2603', '123 Demo Street', 'Springfield', 'IL', '62701', 0),
 ('PER00000083', 'CHU00000001', 'Jane User', 'Jane', 'Marie', 'User', 'Mrs.', NULL, 'Female', 'Married', '1992-05-15', 'jane.user@email.com', 'HOU00000026', 'Spouse', 'Member', '(217) 555-2601', '(217) 555-2604', NULL, '123 Demo Street', 'Springfield', 'IL', '62701', 0),
 ('PER00000084', 'CHU00000001', 'Alex User', 'Alex', 'James', 'User', NULL, NULL, 'Male', 'Single', '2015-08-20', NULL, 'HOU00000026', 'Child', 'Member', '(217) 555-2601', NULL, NULL, '123 Demo Street', 'Springfield', 'IL', '62701', 0),
 ('PER00000085', 'CHU00000001', 'Emma User', 'Emma', 'Grace', 'User', NULL, NULL, 'Female', 'Single', '2018-03-12', NULL, 'HOU00000026', 'Child', 'Member', '(217) 555-2601', NULL, NULL, '123 Demo Street', 'Springfield', 'IL', '62701', 0);
