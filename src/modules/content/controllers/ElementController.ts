@@ -90,7 +90,8 @@ export class ElementController extends ContentBaseController {
           elementType: "carousel",
           sort: i + 1,
           parentId: row.id,
-          answersJSON: JSON.stringify(answers)
+          answersJSON: JSON.stringify(answers),
+          elements: []
         };
         await this.repos.element.save(column);
       }
@@ -166,7 +167,8 @@ export class ElementController extends ContentBaseController {
           elementType: "column",
           sort: i + 1,
           parentId: row.id,
-          answersJSON: JSON.stringify(answers)
+          answersJSON: JSON.stringify(answers),
+          elements: []
         };
         await this.repos.element.save(column);
         // populate row.elements here too, so it's available in the POST response.
