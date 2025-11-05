@@ -121,7 +121,7 @@ export class FormSubmissionController extends MembershipBaseController {
           const contents = "<table role=\"presentation\" style=\"text-align: left;\" cellspacing=\"8\" width=\"80%\"><tablebody>" + contentRows.join(" ") + "</tablebody></table>";
           const promises: Promise<any>[] = [];
           (people as any[]).forEach((p: Person) => {
-            promises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, p.email, church.name, Environment.chumsRoot, "New Submissions for " + form.name, contents));
+            promises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, p.email, church.name, Environment.b1AdminRoot, "New Submissions for " + form.name, contents));
           });
           promises.push(this.sendNotifications(churchId, form, ids));
           await Promise.all(promises);

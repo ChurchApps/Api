@@ -9,7 +9,7 @@
   "mailSystem": "SES",
   "s3Bucket": "demo-churchapps-content",
   "supportEmail": "support@churchapps.org",
-  "chumsRoot": "https://demo.b1.church",
+  "b1AdminRoot": "https://demo.b1.church",
   "messagingApi": "https://api.demo.churchapps.org/messaging",
   "aiProvider": "openrouter"
 }

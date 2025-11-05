@@ -28,7 +28,7 @@ export class Environment extends EnvironmentBase {
   static jwtExpiration: string;
   static emailOnRegistration: boolean;
   static supportEmail: string;
-  static chumsRoot: string;
+  static b1AdminRoot: string;
   static hubspotKey: string;
   static caddyHost: string;
   static caddyPort: string;
@@ -220,7 +220,7 @@ export class Environment extends EnvironmentBase {
     this.jwtExpiration = "2 days";
     this.emailOnRegistration = process.env.EMAIL_ON_REGISTRATION === "true" || config.emailOnRegistration === true;
     this.supportEmail = process.env.SUPPORT_EMAIL || config.supportEmail || "support@churchapps.org";
-    this.chumsRoot = process.env.CHUMS_ROOT || config.chumsRoot || "https://app.staging.chums.org";
+    this.b1AdminRoot = process.env.B1ADMIN_ROOT || config.b1AdminRoot || "https://admin.staging.b1.church";
     this.mailSystem = process.env.MAIL_SYSTEM || config.mailSystem || "";
 
     // AI provider configuration (shared)

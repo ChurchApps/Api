@@ -87,7 +87,7 @@ export class ArrangementController extends ContentBaseController {
       const existingArrangements = await this.repos.arrangement.loadAll(au.churchId);
       const existingFreeShowIds = existingArrangements.map((a: Arrangement) => a.freeShowId).filter((id: string | undefined) => id);
 
-      // Return array of IDs that don't exist in Chums
+      // Return array of IDs that don't exist in B1
       const missingIds = freeShowIds.filter((id) => !existingFreeShowIds.includes(id));
 
       return this.json(missingIds);
