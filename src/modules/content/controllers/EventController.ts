@@ -2,7 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import * as ics from "ics";
 import { ContentBaseController } from "./ContentBaseController";
-import { Event, EventException } from "../models";
+import { Event } from "../models";
 import { CalendarHelper, Permissions } from "../helpers";
 
 @controller("/content/events")
