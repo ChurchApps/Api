@@ -2,7 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController";
 import { CuratedEvent } from "../models";
-import { Permissions } from "../helpers";
+import { CalendarHelper, Permissions } from "../helpers";
 
 @controller("/content/curatedEvents")
 export class CuratedEventController extends ContentBaseController {
@@ -12,7 +12,9 @@ export class CuratedEventController extends ContentBaseController {
       if (req.query?.withoutEvents) {
         return await this.repos.curatedEvent.loadByCuratedCalendarId(au.churchId, curatedCalendarId);
       }
-      return await this.repos.curatedEvent.loadForEvents(curatedCalendarId, au.churchId);
+      const result = await this.repos.curatedEvent.loadForEvents(curatedCalendarId, au.churchId);
+      await CalendarHelper.addExceptionDates(result, this.repos);
+      return result;
     });
   }
 
@@ -24,7 +26,9 @@ export class CuratedEventController extends ContentBaseController {
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repos.curatedEvent.loadForEvents(curatedCalendarId, churchId);
+      const result = await this.repos.curatedEvent.loadForEvents(curatedCalendarId, churchId);
+      await CalendarHelper.addExceptionDates(result, this.repos);
+      return result;
     });
   }
 

@@ -12,6 +12,7 @@ export { SongHelper } from "./SongHelper";
 export { StreamingConfigHelper } from "./StreamingConfigHelper";
 export { SubDomainHelper } from "./SubDomainHelper";
 export { PollyHelper } from "./PollyHelper";
+export { CalendarHelper } from "./CalendarHelper";
 
 // Re-export from shared helpers for convenience
 export { Environment } from "../../../shared/helpers/Environment";
