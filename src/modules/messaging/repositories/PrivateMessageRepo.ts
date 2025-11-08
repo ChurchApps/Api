@@ -16,11 +16,9 @@ export class PrivateMessageRepo extends ConfiguredRepo<PrivateMessage> {
     return TypedDB.queryOne("SELECT * FROM privateMessages WHERE id=? and churchId=?;", [id, churchId]);
   }
 
-  public loadByPersonId(churchId: string, personId: string) {
-    return TypedDB.query(
-      "SELECT pm.*, c.title FROM privateMessages pm INNER JOIN conversations c on c.id=pm.conversationId WHERE pm.churchId=? AND (pm.fromPersonId=? OR pm.toPersonId=?) ORDER BY c.dateCreated DESC",
-      [churchId, personId, personId]
-    );
+  public async loadByPersonId(churchId: string, personId: string) {
+    const result = await TypedDB.query("SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, pm.deliveryMethod, m.timeSent as lastMessageTime FROM privateMessages pm INNER JOIN conversations c on c.id=pm.conversationId LEFT JOIN messages m on m.id=c.lastPostId WHERE pm.churchId=? AND (pm.fromPersonId=? OR pm.toPersonId=?) ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC", [churchId, personId, personId] );
+    return this.mapToModels(result);
   }
 
   public loadByChurchId(churchId: string) {
@@ -32,15 +30,32 @@ export class PrivateMessageRepo extends ConfiguredRepo<PrivateMessage> {
   }
 
   protected rowToModel(data: any): PrivateMessage {
-    return {
-      id: data.id,
+    const result: PrivateMessage = {
+      id: data.pmId || data.id,
       churchId: data.churchId,
       fromPersonId: data.fromPersonId,
       toPersonId: data.toPersonId,
-      conversationId: data.conversationId,
+      conversationId: data.pmId ? data.id : data.conversationId,
       notifyPersonId: data.notifyPersonId,
-      deliveryMethod: data.deliveryMethod
+      deliveryMethod: data.deliveryMethod,
+
+      conversation: {
+        id: data.id,
+        churchId: data.churchId,
+        contentType: data.contentType,
+        contentId: data.contentId,
+        title: data.title,
+        dateCreated: data.dateCreated,
+        groupId: data.groupId,
+        visibility: data.visibility,
+        firstPostId: data.firstPostId,
+        lastPostId: data.lastPostId,
+        postCount: data.postCount,
+        allowAnonymousPosts: data.allowAnonymousPosts
+      }
     };
+
+    return result;
   }
 
   public convertToModel(data: any) {
