@@ -105,7 +105,7 @@ function getApiGatewayManagementClient(event: APIGatewayProxyEvent): ApiGatewayM
     return new ApiGatewayManagementApiClient({ apiVersion: "2020-04-16", endpoint: endpoint });
   }
 
-  console.log(`Using fallback client`);
+  console.log("Using fallback client");
   return gwManagement;
 }
 
@@ -126,7 +126,7 @@ async function handleMessage(event: APIGatewayProxyEvent, _context: Context): Pr
 
     try {
       const apiGwClient = getApiGatewayManagementClient(event);
-      console.log(`Using API Gateway endpoint from event context`);
+      console.log("Using API Gateway endpoint from event context");
 
       const command = new PostToConnectionCommand({
         ConnectionId: connectionId,
