@@ -227,7 +227,7 @@ export class NotificationHelper {
         const notifications: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
         const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
-        if (emailData) promises.push(this.sendEmailNotification(emailData.email, notifications, pms));
+        if (emailData && (notifications.length > 0 || pms.length > 0)) promises.push(this.sendEmailNotification(emailData.email, notifications, pms));
       });
     }
     await Promise.all(promises);
