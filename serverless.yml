@@ -63,6 +63,9 @@ provider:
     GOOGLE_RECAPTCHA_SECRET_KEY: ${ssm:/${self:custom.envLower}/recaptcha-secret-key, ''}
     OPENROUTER_API_KEY: ${ssm:/${self:custom.envLower}/openRouterApiKey, ''}
     OPENAI_API_KEY: ${ssm:/${self:custom.envLower}/openAiApiKey, ''}
+
+    WEBSOCKET_API_ID:
+      Ref: WebsocketsApi
   iam:
     role: arn:aws:iam::428019619026:role/ChurchAppsRole
 

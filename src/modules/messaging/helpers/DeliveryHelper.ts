@@ -68,20 +68,40 @@ export class DeliveryHelper {
     }
   };
 
+  private static getApiGatewayEndpoint(): string {
+    // Construct endpoint from auto-detected/configured values
+    const apiGatewayId = process.env.WEBSOCKET_API_ID;
+    const region = process.env.AWS_REGION || "us-east-2";
+    const stage = process.env.STAGE || process.env.ENVIRONMENT || "dev";
+
+    if (!apiGatewayId) {
+      console.error("DeliveryHelper: WEBSOCKET_API_ID not available. Ensure it's set via CloudFormation output or environment variable.");
+      return "https://unconfigured-websocket-endpoint";
+    }
+
+    const stageName = stage.charAt(0).toUpperCase() + stage.slice(1);
+    const endpoint = `https://${apiGatewayId}.execute-api.${region}.amazonaws.com/${stageName}`;
+
+    console.log(`DeliveryHelper: Using WebSocket endpoint: ${endpoint}`);
+    return endpoint;
+  }
+
   static sendAws = async (connection: Connection, payload: PayloadInterface) => {
     try {
+      const endpoint = DeliveryHelper.getApiGatewayEndpoint();
       const gwManagement = new ApiGatewayManagementApiClient({
         apiVersion: "2020-04-16",
-        endpoint: Environment.socketUrl
+        endpoint: endpoint
       });
       const command = new PostToConnectionCommand({
         ConnectionId: connection.socketId,
-        Data: JSON.stringify(payload)
+        Data: Buffer.from(JSON.stringify(payload))
       });
       await gwManagement.send(command);
       return true;
     } catch (e) {
-      throw new Error(`[${connection.churchId}] DeliveryHelper.sendAws: ${e}`);
+      console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, e);
+      return false;
     }
   };
 

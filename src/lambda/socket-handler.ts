@@ -15,11 +15,9 @@ const initEnv = async () => {
   if (!Environment.currentEnvironment) {
     await Environment.init(process.env.ENVIRONMENT || "dev");
 
-    // Pools now auto-initialize on first use
-
     gwManagement = new ApiGatewayManagementApiClient({
       apiVersion: "2020-04-16",
-      endpoint: Environment.socketUrl
+      endpoint: Environment.socketUrl || "ws://localhost:8087"
     });
 
     // Initialize messaging module repositories and helpers in messaging context
@@ -96,6 +94,21 @@ async function handleDisconnect(event: APIGatewayProxyEvent, _context: Context):
   }
 }
 
+function getApiGatewayManagementClient(event: APIGatewayProxyEvent): ApiGatewayManagementApiClient {
+  const requestContext = event.requestContext as any;
+
+  if (requestContext && requestContext.apiId && requestContext.stage) {
+    const { apiId, stage } = requestContext;
+    const region = process.env.AWS_REGION || "us-east-2";
+    const endpoint = `https://${apiId}.execute-api.${region}.amazonaws.com/${stage}`;
+    console.log(`Using API Gateway endpoint: ${endpoint} (region: ${region})`);
+    return new ApiGatewayManagementApiClient({ apiVersion: "2020-04-16", endpoint: endpoint });
+  }
+
+  console.log(`Using fallback client`);
+  return gwManagement;
+}
+
 async function handleMessage(event: APIGatewayProxyEvent, _context: Context): Promise<APIGatewayProxyResult> {
   const connectionId = event.requestContext.connectionId;
   if (!connectionId) {
@@ -112,12 +125,18 @@ async function handleMessage(event: APIGatewayProxyEvent, _context: Context): Pr
     };
 
     try {
+      const apiGwClient = getApiGatewayManagementClient(event);
+      console.log(`Using API Gateway endpoint from event context`);
+
       const command = new PostToConnectionCommand({
         ConnectionId: connectionId,
-        Data: JSON.stringify(payload)
+        Data: Buffer.from(JSON.stringify(payload))
       });
-      await gwManagement.send(command);
+
+      await apiGwClient.send(command);
+      console.log(`Successfully sent socketId response to connection ${connectionId}`);
     } catch (e) {
+      console.error(`Failed to send socketId response to connection ${connectionId}:`, e);
       await logMessage(e instanceof Error ? e.message : String(e));
     }
 
