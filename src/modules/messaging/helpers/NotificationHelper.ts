@@ -219,6 +219,7 @@ export class NotificationHelper {
       if (!pref) pref = await this.createNotificationPref(notifications[0]?.churchId || pms[0]?.churchId, personId);
       if (pref.emailFrequency === "never") promises = promises.concat(this.markMethod(notifications, pms, "none"));
       else if (pref.emailFrequency === frequency) todoPrefs.push(pref);
+      else promises = promises.concat(this.markMethod(notifications, pms, "none"));
     });
 
     if (todoPrefs.length > 0) {
@@ -268,16 +269,21 @@ export class NotificationHelper {
   };
 
   static sendEmailNotification = async (email: string, notifications: Notification[], privateMessages: PrivateMessage[]) => {
-    let title = notifications.length + " New Notifications";
+    let title = "";
     let content = "";
-    if (notifications.length === 1 && privateMessages.length === 0) {
+
+    const notifCount = notifications.length;
+    const pmCount = privateMessages.length;
+    const totalCount = notifCount + pmCount;
+
+    if (notifCount === 1 && pmCount === 0) {
       if (notifications[0].message.includes("Volunteer Requests:")) {
         const match = notifications[0].message.match(/Volunteer Requests:(.*).Please log in and confirm/);
         title = "New Notification: Volunteer Request";
         content = `
           <h3>New Notification</h3>
           <h4>Volunteer Request</h4>
-          <h4>${match[1]}</h4>
+          <h4>${match ? match[1] : notifications[0].message}</h4>
           ${
             notifications[0].link
               ? "<a href='" +
@@ -291,9 +297,12 @@ export class NotificationHelper {
         title = "New Notification: " + notifications[0].message;
         content = "New Notification: " + notifications[0].message;
       }
-    } else if (notifications.length === 0 && privateMessages.length === 1) title = "New Private Message";
+    } else if (notifCount === 0 && pmCount === 1) title = "New Private Message";
+    else if (notifCount > 0 && pmCount > 0) title = `${totalCount} New Notifications and Messages`;
+    else if (notifCount > 0) title = `${notifCount} New Notification${notifCount > 1 ? "s" : ""}`;
+    else if (pmCount > 0) title = `${pmCount} New Private Message${pmCount > 1 ? "s" : ""}`;
 
-    await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "CHUMS", "https://chums.org", title, content, "ChurchEmailTemplate.html");
+    await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html");
     const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "email");
     await Promise.all(promises);
   };
