@@ -32,7 +32,7 @@ export class StreamingServiceController extends ContentBaseController {
             promises.push(axios.post(Environment.messagingApi + "/blockedIps/clear", [{ serviceId: s.id, churchId: s.churchId }]));
             allServices.splice(index, 1);
           } else {
-            s.serviceTime.setDate(s.serviceTime.getDate() + 7);
+            while (s.serviceTime < DateHelper.subtractHoursFromNow(6)) s.serviceTime.setDate(s.serviceTime.getDate() + 7);
             promises.push(this.repos.streamingService.save(s));
           }
         }

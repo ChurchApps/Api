@@ -46,6 +46,12 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
 
     await AutomationHelper.remindServiceRequests();
 
+    // Advance recurring streaming services
+    await TypedDB.runWithContext("content", async () => {
+      const repos = await RepoManager.getRepos<any>("content");
+      await repos.streamingService.advanceRecurringServices();
+    });
+
     // Run within messaging module context
     await TypedDB.runWithContext("messaging", async () => {
       const result = await NotificationHelper.sendEmailNotifications("daily");

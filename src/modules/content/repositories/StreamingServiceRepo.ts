@@ -58,6 +58,10 @@ export class StreamingServiceRepo extends ConfiguredRepo<StreamingService> {
     return TypedDB.query("SELECT * FROM streamingServices WHERE recurring=1 ORDER BY serviceTime;", []);
   }
 
+  public async advanceRecurringServices(): Promise<void> {
+    await TypedDB.query("UPDATE streamingServices SET serviceTime = DATE_ADD(serviceTime, INTERVAL CEIL(TIMESTAMPDIFF(DAY, serviceTime, DATE_ADD(NOW(), INTERVAL 6 HOUR)) / 7) * 7 DAY) WHERE recurring = 1 AND serviceTime < DATE_SUB(NOW(), INTERVAL 6 HOUR)", []);
+  }
+
   protected rowToModel(row: any): StreamingService {
     return {
       id: row.id,
