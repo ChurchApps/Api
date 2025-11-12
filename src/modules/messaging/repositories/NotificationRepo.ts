@@ -59,8 +59,15 @@ export class NotificationRepo extends ConfiguredRepo<Notification> {
     return TypedDB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? AND isNew=1 ORDER BY timeSent DESC", [churchId, personId]);
   }
 
-  public loadNewCounts(churchId: string, personId: string) {
-    return TypedDB.queryOne("SELECT COUNT(*) as count FROM notifications WHERE churchId=? AND personId=? AND isNew=1", [churchId, personId]);
+  public async loadNewCounts(churchId: string, personId: string) {
+    const sql =
+      "SELECT (" +
+      "  SELECT COUNT(*) FROM notifications where churchId=? and personId=? and isNew=1" +
+      ") AS notificationCount, (" +
+      "  SELECT COUNT(*) FROM privateMessages where churchId=? and notifyPersonId=?" +
+      ") AS pmCount";
+    const result: any = await TypedDB.queryOne(sql, [churchId, personId, churchId, personId]);
+    return result.rows || result || {};
   }
 
   protected rowToModel(data: any): Notification {

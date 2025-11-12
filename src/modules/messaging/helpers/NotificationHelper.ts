@@ -129,7 +129,7 @@ export class NotificationHelper {
       await DeliveryHelper.sendMessages(connections, {
         churchId,
         conversationId: "alert",
-        action: "notification",
+        action: "privateMessage",
         data: {}
       });
     }
