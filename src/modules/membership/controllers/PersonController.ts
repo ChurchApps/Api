@@ -322,7 +322,7 @@ export class PersonController extends MembershipBaseController {
               break;
             case "yearsMarried":
               data.forEach((p) => {
-                p.yearsMarried = PersonHelper.getAge(p.anniversaryDate);
+                p.yearsMarried = PersonHelper.getAge(p.anniversary);
               });
               data = ArrayHelper.getAllOperator(data, "yearsMarried", c.value, c.operator, "number");
               break;
@@ -334,9 +334,12 @@ export class PersonController extends MembershipBaseController {
               break;
             case "anniversaryMonth":
               data.forEach((p) => {
-                p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversaryDate);
+                p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversary);
               });
               data = ArrayHelper.getAllOperator(data, "anniversaryMonth", c.value, c.operator, "number");
+              break;
+            case "anniversary":
+              data = ArrayHelper.getAllOperator(data, "anniversary", c.value, c.operator);
               break;
             case "phone":
               data = ArrayHelper.getAllOperator(data, "homePhone", c.value, c.operator)

@@ -28,7 +28,7 @@ export class QueryController extends MembershipBaseController {
                 break;
               case "yearsMarried":
                 peopleData.forEach((p) => {
-                  p.yearsMarried = PersonHelper.getAge(p.anniversaryDate);
+                  p.yearsMarried = PersonHelper.getAge(p.anniversary);
                 });
                 peopleData = ArrayHelper.getAllOperator(peopleData, "yearsMarried", resp.value, resp.operator, "number");
                 break;
@@ -40,9 +40,12 @@ export class QueryController extends MembershipBaseController {
                 break;
               case "anniversaryMonth":
                 peopleData.forEach((p) => {
-                  p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversaryMonth);
+                  p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversary);
                 });
                 peopleData = ArrayHelper.getAllOperator(peopleData, "anniversaryMonth", resp.value, resp.operator, "number");
+                break;
+              case "anniversary":
+                peopleData = ArrayHelper.getAllOperator(peopleData, "anniversary", resp.value, resp.operator);
                 break;
               // case "phone"
               default:
