@@ -74,4 +74,9 @@ export class PrivateMessageRepo extends ConfiguredRepo<PrivateMessage> {
     const sql = "SELECT * FROM privateMessages WHERE notifyPersonId IS NOT NULL AND (deliveryMethod IS NULL OR deliveryMethod='')";
     return TypedDB.query(sql, []);
   }
+
+  public async markAllRead(churchId: string, personId: string) {
+    const sql = "UPDATE privateMessages SET notifyPersonId=NULL WHERE churchId=? AND notifyPersonId=?";
+    return TypedDB.query(sql, [churchId, personId]);
+  }
 }

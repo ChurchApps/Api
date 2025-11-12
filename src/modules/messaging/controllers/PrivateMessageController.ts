@@ -57,8 +57,7 @@ export class PrivateMessageController extends MessagingBaseController {
         });
       }
 
-      // TODO: Implement markAllRead functionality in PrivateMessageRepository
-      // await this.repos.privateMessage.markAllRead(au.churchId, au.personId);
+      await this.repos.privateMessage.markAllRead(au.churchId, au.personId);
 
       return privateMessages;
     });
