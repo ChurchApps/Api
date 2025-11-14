@@ -5,10 +5,14 @@ import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/Confi
 
 @injectable()
 export class SongDetailLinkRepo extends ConfiguredRepo<SongDetailLink> {
+  // This table doesn't have a churchId column - it's a global table
+  protected churchIdColumn = "";
+
   protected get repoConfig(): RepoConfig<SongDetailLink> {
     return {
       tableName: "songDetailLinks",
       hasSoftDelete: false,
+      churchIdColumn: "", // No churchId column in this table
       columns: ["songDetailId", "service", "serviceKey", "url"]
     };
   }

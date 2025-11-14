@@ -49,7 +49,7 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
     const cfg = this.repoConfig;
     // Use insertColumns override if provided, otherwise use columns, fallback to insertColumns for backward compatibility
     const insertCols = cfg.insertColumns || cfg.columns || [];
-    const cols: string[] = [this.idColumn, this.churchIdColumn, ...insertCols.map(String)];
+    const cols: string[] = [this.idColumn, ...(this.churchIdColumn ? [this.churchIdColumn] : []), ...insertCols.map(String)];
     const literals = cfg.insertLiterals || {};
     Object.keys(literals).forEach((c) => {
       if (!cols.includes(c)) cols.push(c);
@@ -87,8 +87,11 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
       sets.push(`${c}=${literals[c]}`);
     });
 
-    const where = ` WHERE ${this.idColumn}=? and ${this.churchIdColumn}=?`;
-    params.push((model as any)[this.idColumn], (model as any)[this.churchIdColumn]);
+    const where = this.churchIdColumn
+      ? ` WHERE ${this.idColumn}=? and ${this.churchIdColumn}=?`
+      : ` WHERE ${this.idColumn}=?`;
+    params.push((model as any)[this.idColumn]);
+    if (this.churchIdColumn) params.push((model as any)[this.churchIdColumn]);
     const sql = `UPDATE \`${this.table()}\` SET ${sets.join(", ")} ${where}`;
     return { sql, params };
   }
