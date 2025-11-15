@@ -74,7 +74,7 @@ export class PersonController extends MembershipBaseController {
         const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
         const data = (await this.repos.person.loadRecent(au.churchId, filterOptedOut)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -164,7 +164,7 @@ export class PersonController extends MembershipBaseController {
         const phoneNumber: string = req.query.number.toString();
         const data = (await this.repos.person.searchPhone(au.churchId, phoneNumber)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -182,7 +182,7 @@ export class PersonController extends MembershipBaseController {
         const peopleIds = ArrayHelper.getIds(members as any[], "personId");
         data = (await this.repos.person.loadByIds(au.churchId, peopleIds)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -202,7 +202,7 @@ export class PersonController extends MembershipBaseController {
           data = await this.repos.person.search(au.churchId, term, filterOptedOut);
         }
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -215,7 +215,7 @@ export class PersonController extends MembershipBaseController {
       idList.forEach((id) => ids.push(id));
       const data = (await this.repos.person.loadByIds(au.churchId, ids)) as any[];
       const result = this.repos.person.convertAllToBasicModel(au.churchId, data);
-      return this.filterPeople(result, au);
+      return await this.filterPeople(result, au);
     });
   }
 
@@ -256,7 +256,7 @@ export class PersonController extends MembershipBaseController {
         idList.forEach((id) => ids.push(id));
         const data = (await this.repos.person.loadByIds(au.churchId, ids)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -280,9 +280,15 @@ export class PersonController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
       else {
-        const data = au.checkAccess(Permissions.people.view) ? ((await this.repos.person.loadAll(au.churchId)) as any[]) : ((await this.repos.person.loadMembers(au.churchId)) as any[]);
+        let data: any[];
+        if (au.checkAccess(Permissions.people.view)) {
+          data = (await this.repos.person.loadAll(au.churchId)) as any[];
+        } else {
+          const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
+          data = (await this.repos.person.loadMembersByVisibility(au.churchId, directoryVisibility)) as any[];
+        }
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -301,7 +307,7 @@ export class PersonController extends MembershipBaseController {
           data = await this.repos.person.search(au.churchId, term);
         }
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -356,7 +362,7 @@ export class PersonController extends MembershipBaseController {
           }
         });
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        return this.filterPeople(result, au);
+        return await this.filterPeople(result, au);
       }
     });
   }
@@ -428,15 +434,38 @@ export class PersonController extends MembershipBaseController {
     }
   }
 
-  private filterPeople(people: Person[], au: AuthenticatedUser) {
+  private async filterPeople(people: Person[], au: AuthenticatedUser) {
     if (au.checkAccess(Permissions.people.view)) return people;
     else {
+      const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
       const result: Person[] = [];
       people.forEach((p) => {
-        if (p.membershipStatus === "Member" || p.membershipStatus === "Staff") result.push(p);
+        if (this.shouldShowInDirectory(p.membershipStatus, directoryVisibility)) result.push(p);
       });
       return result;
     }
+  }
+
+  private shouldShowInDirectory(membershipStatus: string, directoryVisibility: string): boolean {
+    switch (directoryVisibility) {
+      case "Staff":
+        return membershipStatus === "Staff";
+      case "Members":
+        return membershipStatus === "Member" || membershipStatus === "Staff";
+      case "Regular Attendees":
+        return membershipStatus === "Regular Attendee" || membershipStatus === "Member" || membershipStatus === "Staff";
+      case "Everyone":
+        return membershipStatus === "Visitor" || membershipStatus === "Regular Attendee" || membershipStatus === "Member" || membershipStatus === "Staff";
+      default:
+        return membershipStatus === "Member" || membershipStatus === "Staff";
+    }
+  }
+
+  private async getDirectoryVisibilitySetting(churchId: string): Promise<string> {
+    const churchSettings = this.repos.setting.convertAllToModel(churchId, (await this.repos.setting.loadPublicSettings(churchId)) as any[]);
+    const publicSettings: any = {};
+    churchSettings?.forEach((s: any) => { publicSettings[s.keyName] = s.value; });
+    return publicSettings?.directoryVisibility || "Members";
   }
 
   private async isMember(membershipStatus: string): Promise<boolean> {
