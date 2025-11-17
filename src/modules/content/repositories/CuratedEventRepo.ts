@@ -39,7 +39,8 @@ export class CuratedEventRepo extends ConfiguredRepo<CuratedEvent> {
 
   public loadForEvents(curatedCalendarId: string, churchId: string) {
     const sql =
-      "SELECT * " +
+      "SELECT ce.id, ce.churchId, ce.curatedCalendarId, ce.groupId as curatedGroupId, ce.eventId, " +
+      " e.groupId, e.title, e.description, e.start, e.end, e.allDay, e.recurrenceRule, e.visibility " +
       " FROM curatedEvents ce" +
       " INNER JOIN events e ON " +
       " (CASE" +
