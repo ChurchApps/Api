@@ -2,6 +2,8 @@ service: api
 
 frameworkVersion: "3"
 
+disableSchemaValidation: true
+
 custom:
   env: ${opt:stage, 'dev'}
   # Simple mapping to ensure lowercase - add more as needed
