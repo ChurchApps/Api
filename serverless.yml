@@ -29,7 +29,7 @@ custom:
 
 provider:
   name: aws
-  runtime: nodejs20.x
+  runtime: nodejs22.x
   stage: ${opt:stage, 'dev'}
   region: us-east-2
   memorySize: 1024
@@ -94,7 +94,7 @@ layers:
     name: ${self:service}-dependencies-${self:custom.env}
     description: Dependencies layer for ${self:service}
     compatibleRuntimes:
-      - nodejs20.x
+      - nodejs22.x
     retain: false
 
 functions:
