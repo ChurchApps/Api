@@ -1,11 +1,11 @@
-import { controller, httpDelete, httpPost } from "inversify-express-utils";
+import { controller, httpDelete, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import bcrypt from "bcryptjs";
 import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch } from "../models";
 import { AuthenticatedUser } from "../auth";
 import { MembershipBaseController } from "./MembershipBaseController";
-import { EmailHelper, UserHelper, UniqueIdHelper, Environment } from "../helpers";
+import { EmailHelper, UserHelper, UniqueIdHelper, Environment, Permissions } from "../helpers";
 import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers";
 import { ArrayHelper } from "@churchapps/apihelper";
@@ -370,6 +370,26 @@ export class UserController extends MembershipBaseController {
       }
       user.password = null;
       return this.json(user, 200);
+    });
+  }
+
+  @httpGet("/search")
+  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+
+      const term = req.query.term ? req.query.term.toString() : "";
+      if (!term || term.trim().length < 2) {
+        return this.json([], 200);
+      }
+
+      const users = await this.repos.user.search(term.trim());
+      users.forEach((user) => {
+        user.password = null;
+        user.authGuid = null;
+      });
+
+      return this.json(users, 200);
     });
   }
 

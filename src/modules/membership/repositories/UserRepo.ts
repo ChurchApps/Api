@@ -54,4 +54,11 @@ export class UserRepo extends BaseRepo<User> {
     const data = (await TypedDB.queryOne("SELECT COUNT(*) as count FROM users", [])) as { count: string };
     return parseInt(data.count, 0);
   }
+
+  public async search(term: string): Promise<User[]> {
+    const searchTerm = `%${term}%`;
+    const sql = "SELECT id, email, firstName, lastName FROM users WHERE email LIKE ? OR firstName LIKE ? OR lastName LIKE ? LIMIT 50";
+    const params = [searchTerm, searchTerm, searchTerm];
+    return TypedDB.query(sql, params) as Promise<User[]>;
+  }
 }

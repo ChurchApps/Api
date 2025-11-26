@@ -40,6 +40,36 @@ export class UserChurchRepo extends ConfiguredRepo<UserChurch> {
     return TypedDB.queryOne(sql, params);
   }
 
+  public async loadForUser(userId: string): Promise<any[]> {
+    const sql =
+      "SELECT uc.*, c.id as churchId, c.name as churchName, c.subDomain, p.name_first, p.name_last, p.name_display " +
+      "FROM userChurches uc " +
+      "INNER JOIN churches c ON c.id = uc.churchId AND c.archivedDate IS NULL " +
+      "LEFT JOIN people p ON p.id = uc.personId AND p.churchId = uc.churchId " +
+      "WHERE uc.userId = ?";
+    const rows = (await TypedDB.query(sql, [userId])) as any[];
+    return rows.map((row: any) => ({
+      id: row.id,
+      userId: row.userId,
+      personId: row.personId,
+      church: {
+        id: row.churchId,
+        name: row.churchName,
+        subDomain: row.subDomain
+      },
+      person: row.personId
+        ? {
+            id: row.personId,
+            name: {
+              first: row.name_first,
+              last: row.name_last,
+              display: row.name_display
+            }
+          }
+        : null
+    }));
+  }
+
   protected rowToModel(row: any): UserChurch {
     return {
       id: row.id,

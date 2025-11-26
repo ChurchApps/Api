@@ -2,6 +2,7 @@ import { controller, httpDelete, httpGet, httpPatch, httpPost, requestParam } fr
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController";
 import { UserChurch } from "../models";
+import { Permissions } from "../helpers";
 
 @controller("/membership/userchurch")
 export class UserChurchController extends MembershipBaseController {
@@ -55,6 +56,16 @@ export class UserChurchController extends MembershipBaseController {
     return this.actionWrapper(req, res, async ({ churchId }) => {
       const record = await this.repos.userChurch.loadByUserId(userId, churchId);
       return this.repos.userChurch.convertToModel(churchId, record);
+    });
+  }
+
+  @httpGet("/user/:userId")
+  public async loadForUser(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+
+      const userChurches = await this.repos.userChurch.loadForUser(userId);
+      return this.json(userChurches, 200);
     });
   }
 
