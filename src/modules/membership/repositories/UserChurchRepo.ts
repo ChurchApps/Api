@@ -42,7 +42,7 @@ export class UserChurchRepo extends ConfiguredRepo<UserChurch> {
 
   public async loadForUser(userId: string): Promise<any[]> {
     const sql =
-      "SELECT uc.*, c.id as churchId, c.name as churchName, c.subDomain, p.name_first, p.name_last, p.name_display " +
+      "SELECT uc.*, c.id as churchId, c.name as churchName, c.subDomain, p.firstName, p.lastName, p.displayName " +
       "FROM userChurches uc " +
       "INNER JOIN churches c ON c.id = uc.churchId AND c.archivedDate IS NULL " +
       "LEFT JOIN people p ON p.id = uc.personId AND p.churchId = uc.churchId " +
@@ -61,9 +61,9 @@ export class UserChurchRepo extends ConfiguredRepo<UserChurch> {
         ? {
             id: row.personId,
             name: {
-              first: row.name_first,
-              last: row.name_last,
-              display: row.name_display
+              first: row.firstName,
+              last: row.lastName,
+              display: row.displayName
             }
           }
         : null
