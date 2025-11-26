@@ -15,7 +15,8 @@ export class DateHelper {
   /**
    * Convert date to MySQL format
    */
-  static toMySqlFormat(date: Date | string): string {
+  static toMySqlFormat(date: Date | string | null | undefined): string | null {
+    if (date === null || date === undefined) return null;
     return moment(date).format("YYYY-MM-DD HH:mm:ss");
   }
 
@@ -87,7 +88,7 @@ export class DateHelper {
   /**
    * Legacy alias for toMySqlFormat (backward compatibility)
    */
-  static toMysqlDate(date: Date | string): string {
+  static toMysqlDate(date: Date | string | null | undefined): string | null {
     return this.toMySqlFormat(date);
   }
 }
