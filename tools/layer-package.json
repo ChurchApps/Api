@@ -13,7 +13,6 @@
     "@codegenie/serverless-express": "^4.15.0",
     "@hubspot/api-client": "^13.1.0",
     "@paypal/checkout-server-sdk": "^1.0.3",
-    "@sentry/aws-serverless": "^10.27.0",
     "@stripe/stripe-js": "^4.10.0",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",

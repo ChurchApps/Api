@@ -66,9 +66,6 @@ provider:
     OPENROUTER_API_KEY: ${ssm:/${self:custom.envLower}/openRouterApiKey, ''}
     OPENAI_API_KEY: ${ssm:/${self:custom.envLower}/openAiApiKey, ''}
 
-    # Sentry error tracking
-    SENTRY_DSN: "https://15d37b1878f2bb1f6a94e8e47495625f@o4510432524107776.ingest.us.sentry.io/4510433937915904"
-
     WEBSOCKET_API_ID:
       Ref: WebsocketsApi
   iam:
