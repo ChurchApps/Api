@@ -10,15 +10,13 @@ import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper";
 const initEnv = async () => {
   if (!Environment.currentEnvironment) {
     await Environment.init(process.env.ENVIRONMENT || "dev");
-
-    // Pools now auto-initialize on first use
-
-    // Initialize messaging helpers within the messaging module context
-    await TypedDB.runWithContext("messaging", async () => {
-      const repos = await RepoManager.getRepos<any>("messaging");
-      NotificationHelper.init(repos);
-    });
   }
+
+  // Always initialize messaging helpers (repos may be undefined on warm starts)
+  await TypedDB.runWithContext("messaging", async () => {
+    const repos = await RepoManager.getRepos<any>("messaging");
+    NotificationHelper.init(repos);
+  });
 };
 
 export const handle15MinTimer = async (_event: ScheduledEvent, _context: Context): Promise<void> => {
