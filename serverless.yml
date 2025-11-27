@@ -67,7 +67,6 @@ provider:
     OPENAI_API_KEY: ${ssm:/${self:custom.envLower}/openAiApiKey, ''}
 
     # Sentry error tracking
-    NODE_OPTIONS: "--import @sentry/aws-serverless/awslambda-auto"
     SENTRY_DSN: "https://15d37b1878f2bb1f6a94e8e47495625f@o4510432524107776.ingest.us.sentry.io/4510433937915904"
 
     WEBSOCKET_API_ID:

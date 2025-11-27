@@ -1,4 +1,13 @@
 const serverlessExpress = require("@codegenie/serverless-express");
+const Sentry = require("@sentry/aws-serverless");
+
+// Initialize Sentry
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.STAGE || "dev",
+  });
+}
 
 // Import Environment from the shared helpers
 const { Environment } = require("./dist/shared/helpers/Environment");
@@ -179,9 +188,9 @@ const timerScheduledTasks = async function (event, context) {
   }
 };
 
-// Export handlers
-module.exports.web = web;
-module.exports.socket = socket;
-module.exports.timer15Min = timer15Min;
-module.exports.timerMidnight = timerMidnight;
-module.exports.timerScheduledTasks = timerScheduledTasks;
+// Export handlers wrapped with Sentry
+module.exports.web = Sentry.wrapHandler(web);
+module.exports.socket = Sentry.wrapHandler(socket);
+module.exports.timer15Min = Sentry.wrapHandler(timer15Min);
+module.exports.timerMidnight = Sentry.wrapHandler(timerMidnight);
+module.exports.timerScheduledTasks = Sentry.wrapHandler(timerScheduledTasks);
