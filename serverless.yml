@@ -108,7 +108,7 @@ functions:
     handler: lambda.web
     layers:
       - { Ref: DependenciesLambdaLayer }
-      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
     memorySize: 1024
     timeout: 30
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -132,7 +132,7 @@ functions:
     handler: lambda.socket
     layers:
       - { Ref: DependenciesLambdaLayer }
-      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
     memorySize: 1024
     timeout: 30
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -152,7 +152,7 @@ functions:
     handler: lambda.timer15Min
     layers:
       - { Ref: DependenciesLambdaLayer }
-      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
     memorySize: 256
     timeout: 300
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -169,7 +169,7 @@ functions:
     handler: lambda.timerMidnight
     layers:
       - { Ref: DependenciesLambdaLayer }
-      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
     memorySize: 256
     timeout: 300
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -186,7 +186,7 @@ functions:
     handler: lambda.timerScheduledTasks
     layers:
       - { Ref: DependenciesLambdaLayer }
-      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
     memorySize: 256
     timeout: 300
     vpc: ${self:custom.vpcSettings.current, ''}
