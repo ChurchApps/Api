@@ -66,6 +66,10 @@ provider:
     OPENROUTER_API_KEY: ${ssm:/${self:custom.envLower}/openRouterApiKey, ''}
     OPENAI_API_KEY: ${ssm:/${self:custom.envLower}/openAiApiKey, ''}
 
+    # Sentry error tracking
+    NODE_OPTIONS: "--import @sentry/aws-serverless/awslambda-auto"
+    SENTRY_DSN: "https://15d37b1878f2bb1f6a94e8e47495625f@o4510432524107776.ingest.us.sentry.io/4510433937915904"
+
     WEBSOCKET_API_ID:
       Ref: WebsocketsApi
   iam:
@@ -104,6 +108,7 @@ functions:
     handler: lambda.web
     layers:
       - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
     memorySize: 1024
     timeout: 30
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -127,6 +132,7 @@ functions:
     handler: lambda.socket
     layers:
       - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
     memorySize: 1024
     timeout: 30
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -146,6 +152,7 @@ functions:
     handler: lambda.timer15Min
     layers:
       - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
     memorySize: 256
     timeout: 300
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -162,6 +169,7 @@ functions:
     handler: lambda.timerMidnight
     layers:
       - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
     memorySize: 256
     timeout: 300
     vpc: ${self:custom.vpcSettings.current, ''}
@@ -178,6 +186,7 @@ functions:
     handler: lambda.timerScheduledTasks
     layers:
       - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDK:316
     memorySize: 256
     timeout: 300
     vpc: ${self:custom.vpcSettings.current, ''}
