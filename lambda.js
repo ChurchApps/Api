@@ -167,7 +167,7 @@ const timerMidnight = async function (event, context) {
     throw error;
   }
 };
-
+/*
 const timerScheduledTasks = async function (event, context) {
   try {
     await initializeEnvironment();
@@ -177,11 +177,11 @@ const timerScheduledTasks = async function (event, context) {
     console.error("Error in scheduled tasks timer:", error);
     throw error;
   }
-};
+};*/
 
 // Export handlers
 module.exports.web = web;
 module.exports.socket = socket;
 module.exports.timer15Min = timer15Min;
 module.exports.timerMidnight = timerMidnight;
-module.exports.timerScheduledTasks = timerScheduledTasks;
+//module.exports.timerScheduledTasks = timerScheduledTasks;

@@ -59,6 +59,9 @@ export class NotificationHelper {
       notifications.push(notification);
     });
 
+    // Return early if no notifications to create
+    if (notifications.length === 0) return [];
+
     // don't notify people a second time about the same type of event.
     const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[];
     for (let i = notifications.length - 1; i >= 0; i--) {
@@ -272,30 +275,35 @@ export class NotificationHelper {
     let title = "";
     let content = "";
 
-    const notifCount = notifications.length;
-    const pmCount = privateMessages.length;
+    const notifCount = notifications?.length || 0;
+    const pmCount = privateMessages?.length || 0;
     const totalCount = notifCount + pmCount;
 
-    if (notifCount === 1 && pmCount === 0) {
-      if (notifications[0].message.includes("Volunteer Requests:")) {
-        const match = notifications[0].message.match(/Volunteer Requests:(.*).Please log in and confirm/);
+    // Early return if nothing to send
+    if (totalCount === 0) return;
+
+    const firstNotification = notifications?.[0];
+
+    if (notifCount === 1 && pmCount === 0 && firstNotification) {
+      if (firstNotification.message.includes("Volunteer Requests:")) {
+        const match = firstNotification.message.match(/Volunteer Requests:(.*).Please log in and confirm/);
         title = "New Notification: Volunteer Request";
         content = `
           <h3>New Notification</h3>
           <h4>Volunteer Request</h4>
-          <h4>${match ? match[1] : notifications[0].message}</h4>
+          <h4>${match ? match[1] : firstNotification.message}</h4>
           ${
-            notifications[0].link
+            firstNotification.link
               ? "<a href='" +
-                notifications[0].link +
+                firstNotification.link +
                 "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
               : ""
           }
           <p>Please log in and confirm</p>
         `;
       } else {
-        title = "New Notification: " + notifications[0].message;
-        content = "New Notification: " + notifications[0].message;
+        title = "New Notification: " + firstNotification.message;
+        content = "New Notification: " + firstNotification.message;
       }
     } else if (notifCount === 0 && pmCount === 1) title = "New Private Message";
     else if (notifCount > 0 && pmCount > 0) title = `${totalCount} New Notifications and Messages`;
