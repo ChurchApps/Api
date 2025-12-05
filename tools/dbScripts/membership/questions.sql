@@ -5,7 +5,7 @@ CREATE TABLE `questions` (
   `churchId` char(11) DEFAULT NULL,
   `formId` char(11) DEFAULT NULL,
   `parentId` char(11) DEFAULT NULL,
-  `title` varchar(50) DEFAULT NULL,
+  `title` varchar(255) DEFAULT NULL,
   `description` varchar(255) DEFAULT NULL,
   `fieldType` varchar(50) DEFAULT NULL,
   `placeholder` varchar(50) DEFAULT NULL,
