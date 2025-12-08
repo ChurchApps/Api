@@ -63,9 +63,9 @@ export class NotificationHelper {
     if (notifications.length === 0) return [];
 
     // don't notify people a second time about the same type of event.
-    const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[];
+    const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[] || [];
     for (let i = notifications.length - 1; i >= 0; i--) {
-      if (ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) notifications.splice(i, 1);
+      if (existing.length > 0 && ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) notifications.splice(i, 1);
     }
     if (notifications.length > 0) {
       const promises: Promise<Notification>[] = [];
@@ -114,8 +114,9 @@ export class NotificationHelper {
           method = "push";
           // Only log significant events or errors, not routine operations
         }
-      } catch (_error) {
-        // Don't throw the error - we still want to return the method if socket delivery worked
+      } catch (error) {
+        // Log the error but don't throw - we still want to return the method if socket delivery worked
+        console.error("Push notification failed for notifyUser:", error);
       }
     }
 
@@ -150,8 +151,9 @@ export class NotificationHelper {
           await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, messageContent, "privateMessage", conversationId);
           method = "push";
         }
-      } catch (_error) {
-        // Don't throw the error - we still want to return the method if socket delivery worked
+      } catch (error) {
+        // Log the error but don't throw - we still want to return the method if socket delivery worked
+        console.error("Push notification failed for private message:", error);
       }
     }
 
@@ -195,8 +197,9 @@ export class NotificationHelper {
           await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, notificationMessage, "notification", notificationId);
           method = "push";
         }
-      } catch (_error) {
-        // Don't throw the error - we still want to return the method if socket delivery worked
+      } catch (error) {
+        // Log the error but don't throw - we still want to return the method if socket delivery worked
+        console.error("Push notification failed for general notification:", error);
       }
     }
 
@@ -214,8 +217,7 @@ export class NotificationHelper {
 
     const notificationPrefs = (await NotificationHelper.repos.notificationPreference.loadByPersonIds(peopleIds)) as any[];
     const todoPrefs: NotificationPreference[] = [];
-    peopleIds.forEach(async (personId) => {
-      // Removed per-person logging to reduce CloudWatch noise
+    for (const personId of peopleIds) {
       const notifications: Notification[] = ArrayHelper.getAll(allNotifications, "personId", personId);
       const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", personId);
       let pref = ArrayHelper.getOne(notificationPrefs, "personId", personId);
@@ -223,7 +225,7 @@ export class NotificationHelper {
       if (pref.emailFrequency === "never") promises = promises.concat(this.markMethod(notifications, pms, "none"));
       else if (pref.emailFrequency === frequency) todoPrefs.push(pref);
       else promises = promises.concat(this.markMethod(notifications, pms, "none"));
-    });
+    }
 
     if (todoPrefs.length > 0) {
       const allEmailData = await this.getEmailData(todoPrefs);
