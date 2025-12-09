@@ -60,13 +60,15 @@ export class YouVersionHelper {
     const url = this.baseUrl + "/bibles/" + translationKey + "/books";
     const data = await this.getContent(url);
 
-    if (data.data) {
-      data.data.forEach((d: any, i: number) => {
+    // YouVersion returns: { data: [{ id: "GEN", title: "Genesis", full_title: "Genesis", abbreviation: "Gen", canon: "old_testament", chapters: [...] }, ...] }
+    const books = data.data || data;
+    if (Array.isArray(books)) {
+      books.forEach((d: any, i: number) => {
         result.push({
           translationKey,
-          keyName: d.usfm,
-          abbreviation: d.abbreviation || d.usfm,
-          name: d.name,
+          keyName: d.id,  // USFM code like "GEN", "EXO", "REV"
+          abbreviation: d.abbreviation || d.id,
+          name: d.title || d.full_title || d.id,
           sort: i
         });
       });
@@ -79,14 +81,19 @@ export class YouVersionHelper {
     const url = this.baseUrl + "/bibles/" + translationKey + "/books/" + bookKey + "/chapters";
     const data = await this.getContent(url);
 
+    // YouVersion returns: { data: [{ id: 1, passage_id: "GEN.1", title: "1", verses: [...] }, ...] }
     if (data.data) {
       data.data.forEach((d: any) => {
-        result.push({
-          translationKey,
-          bookKey,
-          keyName: bookKey + "." + d.number,
-          number: parseInt(d.number, 10) || 0
-        });
+        // Skip intro chapters (id like "INTRO1")
+        const chapterNum = typeof d.id === "number" ? d.id : parseInt(d.id, 10);
+        if (!isNaN(chapterNum)) {
+          result.push({
+            translationKey,
+            bookKey,
+            keyName: bookKey + "." + chapterNum,
+            number: chapterNum
+          });
+        }
       });
     }
     return result;
@@ -101,14 +108,18 @@ export class YouVersionHelper {
     const url = this.baseUrl + "/bibles/" + translationKey + "/books/" + bookKey + "/chapters/" + chapterNumber + "/verses";
     const data = await this.getContent(url);
 
+    // YouVersion returns: { data: [{ id: "1", passage_id: "GEN.1.1", title: "1" }, ...] }
     if (data.data) {
       data.data.forEach((d: any) => {
-        result.push({
-          translationKey,
-          chapterKey,
-          keyName: bookKey + "." + chapterNumber + "." + d.number,
-          number: parseInt(d.number, 10) || 0
-        });
+        const verseNum = typeof d.id === "number" ? d.id : parseInt(d.id, 10);
+        if (!isNaN(verseNum)) {
+          result.push({
+            translationKey,
+            chapterKey,
+            keyName: bookKey + "." + chapterNumber + "." + verseNum,
+            number: verseNum
+          });
+        }
       });
     }
     return result;
@@ -120,28 +131,48 @@ export class YouVersionHelper {
     const startParts = startVerseKey.split(".");
     const endParts = endVerseKey.split(".");
     const bookKey = startParts[0];
-    const chapterNumber = startParts[1];
+    const chapterNumber = parseInt(startParts[1], 10);
     const startVerse = parseInt(startParts[2], 10);
     const endVerse = parseInt(endParts[2], 10);
 
-    const url = this.baseUrl + "/bibles/" + translationKey + "/books/" + bookKey + "/chapters/" + chapterNumber + "/verses";
+    // YouVersion uses passages endpoint for verse text: /passages/{passage_id}
+    // passage_id format: BOOK.CHAPTER.VERSE or BOOK.CHAPTER.START_VERSE-BOOK.CHAPTER.END_VERSE
+    const passageId = startVerseKey === endVerseKey
+      ? startVerseKey
+      : `${startVerseKey}-${endVerseKey}`;
+
+    const url = this.baseUrl + "/bibles/" + translationKey + "/passages/" + passageId + "?format=text";
     const data = await this.getContent(url);
 
-    if (data.data) {
-      data.data.forEach((d: any) => {
-        const verseNum = parseInt(d.number, 10);
-        if (verseNum >= startVerse && verseNum <= endVerse) {
+    // Response: { id: "GEN.1.1", content: "In the beginning...", reference: "Genesis 1:1" }
+    if (data.content) {
+      // For a single verse or range, we get one content block
+      // Split by verse if it's a range, otherwise return as single verse
+      if (startVerse === endVerse) {
+        result.push({
+          translationKey,
+          verseKey: startVerseKey,
+          bookKey,
+          chapterNumber,
+          verseNumber: startVerse,
+          content: data.content,
+          newParagraph: false
+        });
+      } else {
+        // For ranges, YouVersion returns combined text - we return it as first verse
+        // since splitting accurately by verse boundaries is complex
+        for (let v = startVerse; v <= endVerse; v++) {
           result.push({
             translationKey,
-            verseKey: bookKey + "." + chapterNumber + "." + d.number,
+            verseKey: `${bookKey}.${chapterNumber}.${v}`,
             bookKey,
-            chapterNumber: parseInt(chapterNumber, 10),
-            verseNumber: verseNum,
-            content: d.content || d.text || "",
+            chapterNumber,
+            verseNumber: v,
+            content: v === startVerse ? data.content : "", // Full text on first verse
             newParagraph: false
           });
         }
-      });
+      }
     }
     return result;
   }
