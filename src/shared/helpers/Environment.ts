@@ -41,6 +41,7 @@ export class Environment extends EnvironmentBase {
   static pexelsKey: string;
   static vimeoToken: string;
   static apiBibleKey: string;
+  static youVersionApiKey: string;
   static praiseChartsConsumerKey: string;
   static praiseChartsConsumerSecret: string;
 
@@ -234,6 +235,7 @@ export class Environment extends EnvironmentBase {
     this.pexelsKey = process.env.PEXELS_KEY || "";
     this.vimeoToken = process.env.VIMEO_TOKEN || "";
     this.apiBibleKey = process.env.API_BIBLE_KEY || "";
+    this.youVersionApiKey = process.env.YOUVERSION_API_KEY || "";
     this.praiseChartsConsumerKey = process.env.PRAISECHARTS_CONSUMER_KEY || "";
     this.praiseChartsConsumerSecret = process.env.PRAISECHARTS_CONSUMER_SECRET || "";
     this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || "";

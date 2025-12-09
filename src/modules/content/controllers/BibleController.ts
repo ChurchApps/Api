@@ -1,7 +1,7 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController";
-import { ApiBibleHelper } from "../helpers/ApiBibleHelper";
+import { BibleSourceFactory } from "../helpers/BibleSourceFactory";
 import { BibleTranslation, BibleVerseText } from "../models";
 import { ArrayHelper } from "@churchapps/apihelper";
 
@@ -19,7 +19,9 @@ export class BibleController extends ContentBaseController {
   public async search(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const query = req.query.query as string;
-      const result = await ApiBibleHelper.search(translationKey, query);
+      const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
+      const source = translation?.source || "api.bible";
+      const result = await BibleSourceFactory.search(source, translationKey, query);
       return result;
     });
   }
@@ -39,7 +41,7 @@ export class BibleController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const translations = await this.repos.bibleTranslation.loadNeedingCopyrights();
       for (const translation of translations) {
-        const copyright = await ApiBibleHelper.getCopyright(translation.sourceKey);
+        const copyright = await BibleSourceFactory.getCopyright(translation.source || "api.bible", translation.sourceKey);
         translation.copyright = copyright || "";
         await this.repos.bibleTranslation.save(translation);
       }
@@ -50,8 +52,8 @@ export class BibleController extends ContentBaseController {
   @httpGet("/:translationKey/updateCopyright")
   public async updateCopyright(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const copyright = await ApiBibleHelper.getCopyright(translationKey);
-      const bible = await this.repos.bibleTranslation.loadBySourceKey("api.bible", translationKey);
+      const bible = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
+      const copyright = await BibleSourceFactory.getCopyright(bible?.source || "api.bible", translationKey);
       bible.copyright = copyright || "";
       await this.repos.bibleTranslation.save(bible);
       return bible;
@@ -63,7 +65,9 @@ export class BibleController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repos.bibleBook.loadAll(translationKey);
       if (result.length === 0) {
-        result = await ApiBibleHelper.getBooks(translationKey);
+        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
+        const source = translation?.source || "api.bible";
+        result = await BibleSourceFactory.getBooks(source, translationKey);
         await this.repos.bibleBook.saveAll(result);
       }
       return result;
@@ -75,7 +79,9 @@ export class BibleController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repos.bibleChapter.loadByBook(translationKey, bookKey);
       if (result.length === 0) {
-        result = await ApiBibleHelper.getChapters(translationKey, bookKey);
+        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
+        const source = translation?.source || "api.bible";
+        result = await BibleSourceFactory.getChapters(source, translationKey, bookKey);
         await this.repos.bibleChapter.saveAll(result);
       }
       return result;
@@ -92,7 +98,9 @@ export class BibleController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repos.bibleVerse.loadByChapter(translationKey, chapterKey);
       if (result.length === 0) {
-        result = await ApiBibleHelper.getVerses(translationKey, chapterKey);
+        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
+        const source = translation?.source || "api.bible";
+        result = await BibleSourceFactory.getVerses(source, translationKey, chapterKey);
         await this.repos.bibleVerse.saveAll(result);
       }
       return result;
@@ -115,7 +123,9 @@ export class BibleController extends ContentBaseController {
 
       if (canCache) result = await this.repos.bibleVerseText.loadRange(translationKey, startVerseKey, endVerseKey);
       if (result.length === 0) {
-        result = await ApiBibleHelper.getVerseText(translationKey, startVerseKey, endVerseKey);
+        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
+        const source = translation?.source || "api.bible";
+        result = await BibleSourceFactory.getVerseText(source, translationKey, startVerseKey, endVerseKey);
         if (canCache) {
           result.forEach((r: BibleVerseText) => {
             const parts = r.verseKey.split(".");
@@ -130,15 +140,37 @@ export class BibleController extends ContentBaseController {
     });
   }
 
+  @httpGet("/updateTranslations/:source")
+  public async updateTranslationsFromSource(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const dbResult = await this.repos.bibleTranslation.loadAll();
+      const apiResult = await BibleSourceFactory.getTranslations(source);
+      const toSave: BibleTranslation[] = [];
+
+      apiResult.forEach((r: BibleTranslation) => {
+        const existing = dbResult.find((d: BibleTranslation) => d.source === r.source && d.sourceKey === r.sourceKey);
+        if (!existing) {
+          r.countryList = r.countries?.split(",").map((c: string) => c.trim());
+          delete r.countries;
+          toSave.push(r);
+        }
+      });
+
+      await this.repos.bibleTranslation.saveAll(toSave);
+
+      return toSave;
+    });
+  }
+
   @httpGet("/updateTranslations")
   public async updateTranslations(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const dbResult = await this.repos.bibleTranslation.loadAll();
-      const apiResult = await ApiBibleHelper.getTranslations();
+      const apiResult = await BibleSourceFactory.getAllTranslations();
       const toSave: BibleTranslation[] = [];
 
       apiResult.forEach((r: BibleTranslation) => {
-        const existing = ArrayHelper.getOne(dbResult, "sourceKey", r.sourceKey);
+        const existing = dbResult.find((d: BibleTranslation) => d.source === r.source && d.sourceKey === r.sourceKey);
         if (!existing) {
           r.countryList = r.countries?.split(",").map((c: string) => c.trim());
           delete r.countries;
@@ -157,7 +189,7 @@ export class BibleController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repos.bibleTranslation.loadAll();
       if (result.length === 0) {
-        result = await ApiBibleHelper.getTranslations();
+        result = await BibleSourceFactory.getAllTranslations();
         await this.repos.bibleTranslation.saveAll(result);
       }
       result.forEach((r: BibleTranslation) => {

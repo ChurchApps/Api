@@ -14,8 +14,11 @@ export class BibleTranslationRepo extends GlobalConfiguredRepo<BibleTranslation>
     };
   }
 
-  public loadBySourceKey(source: string, sourceKey: string) {
-    return TypedDB.queryOne("SELECT * FROM bibleTranslations WHERE source=? and sourceKey=?;", [source, sourceKey]);
+  public loadBySourceKey(source: string | null, sourceKey: string) {
+    if (source) {
+      return TypedDB.queryOne("SELECT * FROM bibleTranslations WHERE source=? and sourceKey=?;", [source, sourceKey]);
+    }
+    return TypedDB.queryOne("SELECT * FROM bibleTranslations WHERE sourceKey=?;", [sourceKey]);
   }
 
   public loadAll() {
