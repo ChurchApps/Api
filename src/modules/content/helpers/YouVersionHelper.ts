@@ -135,45 +135,30 @@ export class YouVersionHelper {
     const startVerse = parseInt(startParts[2], 10);
     const endVerse = parseInt(endParts[2], 10);
 
-    // YouVersion uses passages endpoint for verse text: /passages/{passage_id}
-    // passage_id format: BOOK.CHAPTER.VERSE or BOOK.CHAPTER.START_VERSE-BOOK.CHAPTER.END_VERSE
-    const passageId = startVerseKey === endVerseKey
-      ? startVerseKey
-      : `${startVerseKey}-${endVerseKey}`;
+    // Fetch each verse individually using the passages endpoint
+    // YouVersion passages endpoint: /passages/{passage_id} where passage_id is like GEN.1.1
+    for (let v = startVerse; v <= endVerse; v++) {
+      const verseKey = `${bookKey}.${chapterNumber}.${v}`;
+      const url = this.baseUrl + "/bibles/" + translationKey + "/passages/" + verseKey + "?format=text";
 
-    const url = this.baseUrl + "/bibles/" + translationKey + "/passages/" + passageId + "?format=text";
-    const data = await this.getContent(url);
-
-    // Response: { id: "GEN.1.1", content: "In the beginning...", reference: "Genesis 1:1" }
-    if (data.content) {
-      // For a single verse or range, we get one content block
-      // Split by verse if it's a range, otherwise return as single verse
-      if (startVerse === endVerse) {
-        result.push({
-          translationKey,
-          verseKey: startVerseKey,
-          bookKey,
-          chapterNumber,
-          verseNumber: startVerse,
-          content: data.content,
-          newParagraph: false
-        });
-      } else {
-        // For ranges, YouVersion returns combined text - we return it as first verse
-        // since splitting accurately by verse boundaries is complex
-        for (let v = startVerse; v <= endVerse; v++) {
+      try {
+        const data = await this.getContent(url);
+        if (data.content) {
           result.push({
             translationKey,
-            verseKey: `${bookKey}.${chapterNumber}.${v}`,
+            verseKey,
             bookKey,
             chapterNumber,
             verseNumber: v,
-            content: v === startVerse ? data.content : "", // Full text on first verse
+            content: data.content,
             newParagraph: false
           });
         }
+      } catch (e: any) {
+        console.log(`Failed to fetch verse ${verseKey}:`, e.message);
       }
     }
+
     return result;
   }
 
