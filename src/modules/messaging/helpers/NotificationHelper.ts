@@ -159,7 +159,7 @@ export class NotificationHelper {
     const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
       method = "socket";
-      const deliveryCount = await DeliveryHelper.sendMessages(connections, {
+      await DeliveryHelper.sendMessages(connections, {
         churchId,
         conversationId: "alert",
         action: "privateMessage",
