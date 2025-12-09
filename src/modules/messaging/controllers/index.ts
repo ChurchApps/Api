@@ -1,5 +1,6 @@
 export { MessagingBaseController } from "./MessagingBaseController";
 export { BlockedIpController } from "./BlockedIpController";
+export { DeliveryLogController } from "./DeliveryLogController";
 export { ConnectionController } from "./ConnectionController";
 export { ConversationController } from "./ConversationController";
 export { DeviceController } from "./DeviceController";

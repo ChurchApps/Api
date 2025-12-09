@@ -1,9 +1,10 @@
-import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeviceRepo, DeviceContentRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, PrivateMessageRepo } from ".";
+import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, PrivateMessageRepo } from ".";
 
 export class Repos {
   public blockedIp: BlockedIpRepo;
   public connection: ConnectionRepo;
   public conversation: ConversationRepo;
+  public deliveryLog: DeliveryLogRepo;
   public device: DeviceRepo;
   public deviceContent: DeviceContentRepo;
   public message: MessageRepo;
@@ -17,6 +18,7 @@ export class Repos {
     this.blockedIp = new BlockedIpRepo();
     this.connection = new ConnectionRepo();
     this.conversation = new ConversationRepo();
+    this.deliveryLog = new DeliveryLogRepo();
     this.device = new DeviceRepo();
     this.deviceContent = new DeviceContentRepo();
     this.message = new MessageRepo();

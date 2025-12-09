@@ -12,7 +12,8 @@ export class BibleSourceFactory {
   static async getAllTranslations(): Promise<BibleTranslation[]> {
     const [apiBible, youVersion] = await Promise.all([
       ApiBibleHelper.getTranslations().catch(() => []),
-      YouVersionHelper.getAllTranslations().catch(() => [])
+      // YouVersionHelper.getAllTranslations().catch(() => [])  // Temporarily disabled
+      Promise.resolve([])
     ]);
     return [...apiBible, ...youVersion];
   }

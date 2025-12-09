@@ -1,5 +1,5 @@
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
-import { Conversation, Device, Message, PrivateMessage, Notification, NotificationPreference } from "../models";
+import { Conversation, DeliveryLog, Device, Message, PrivateMessage, Notification, NotificationPreference } from "../models";
 import { Repos } from "../repositories";
 import { DeliveryHelper } from "./DeliveryHelper";
 import { ExpoPushHelper } from "./ExpoPushHelper";
@@ -12,6 +12,33 @@ export class NotificationHelper {
   static init(repos: Repos) {
     NotificationHelper.repos = repos;
   }
+
+  private static logDelivery = async (
+    churchId: string,
+    personId: string,
+    contentType: string,
+    contentId: string,
+    deliveryMethod: string,
+    success: boolean,
+    deliveryAddress?: string,
+    errorMessage?: string
+  ) => {
+    try {
+      const log: DeliveryLog = {
+        churchId,
+        personId,
+        contentType,
+        contentId,
+        deliveryMethod,
+        success,
+        deliveryAddress,
+        errorMessage
+      };
+      await NotificationHelper.repos.deliveryLog.save(log);
+    } catch (e) {
+      console.error("Failed to log delivery attempt:", e);
+    }
+  };
 
   static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string) => {
     switch (conversation.contentType) {
@@ -123,19 +150,24 @@ export class NotificationHelper {
     return method;
   };
 
-  static notifyUserForPrivateMessage = async (churchId: string, personId: string, senderName: string, messageContent: string, conversationId: string) => {
+  static notifyUserForPrivateMessage = async (churchId: string, personId: string, senderName: string, messageContent: string, conversationId: string, privateMessageId?: string) => {
     let method = "";
+    const contentType = "privateMessage";
+    const contentId = privateMessageId || conversationId;
 
     // Handle web socket notifications
     const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
       method = "socket";
-      await DeliveryHelper.sendMessages(connections, {
+      const deliveryCount = await DeliveryHelper.sendMessages(connections, {
         churchId,
         conversationId: "alert",
         action: "privateMessage",
         data: {}
       });
+      for (const conn of connections) {
+        await this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId);
+      }
     }
 
     // Handle push notifications
@@ -143,17 +175,24 @@ export class NotificationHelper {
 
     if (devices.length > 0) {
       try {
-        // Filter out any invalid tokens and get unique tokens
         const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
 
         if (expoPushTokens.length > 0) {
           const title = `New Message from ${senderName}`;
-          await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, messageContent, "privateMessage", conversationId);
+          const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, messageContent, "privateMessage", conversationId);
           method = "push";
+          for (let i = 0; i < expoPushTokens.length; i++) {
+            const ticket = tickets?.[i];
+            const success = ticket?.status === "ok";
+            const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
+            await this.logDelivery(churchId, personId, contentType, contentId, "push", success, expoPushTokens[i], errorMsg);
+          }
         }
       } catch (error) {
-        // Log the error but don't throw - we still want to return the method if socket delivery worked
         console.error("Push notification failed for private message:", error);
+        for (const token of [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))]) {
+          await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
+        }
       }
     }
 
@@ -162,6 +201,7 @@ export class NotificationHelper {
 
   static notifyUserForGeneralNotification = async (churchId: string, personId: string, notificationMessage: string, notificationId: string) => {
     let method = "";
+    const contentType = "notification";
 
     // Handle web socket notifications
     const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
@@ -173,6 +213,9 @@ export class NotificationHelper {
         action: "notification",
         data: {}
       });
+      for (const conn of connections) {
+        await this.logDelivery(churchId, personId, contentType, notificationId, "socket", true, conn.socketId);
+      }
     }
 
     // Handle push notifications
@@ -180,11 +223,9 @@ export class NotificationHelper {
 
     if (devices.length > 0) {
       try {
-        // Filter out any invalid tokens and get unique tokens
         const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
 
         if (expoPushTokens.length > 0) {
-          // Extract title from notification message or use default
           let title = "New Notification";
           if (notificationMessage.includes("Volunteer Requests:")) {
             title = "New Plan Assignment";
@@ -194,12 +235,20 @@ export class NotificationHelper {
             title = notificationMessage;
           }
 
-          await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, notificationMessage, "notification", notificationId);
+          const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, notificationMessage, "notification", notificationId);
           method = "push";
+          for (let i = 0; i < expoPushTokens.length; i++) {
+            const ticket = tickets?.[i];
+            const success = ticket?.status === "ok";
+            const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
+            await this.logDelivery(churchId, personId, contentType, notificationId, "push", success, expoPushTokens[i], errorMsg);
+          }
         }
       } catch (error) {
-        // Log the error but don't throw - we still want to return the method if socket delivery worked
         console.error("Push notification failed for general notification:", error);
+        for (const token of [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))]) {
+          await this.logDelivery(churchId, personId, contentType, notificationId, "push", false, token, String(error));
+        }
       }
     }
 
@@ -312,8 +361,29 @@ export class NotificationHelper {
     else if (notifCount > 0) title = `${notifCount} New Notification${notifCount > 1 ? "s" : ""}`;
     else if (pmCount > 0) title = `${pmCount} New Private Message${pmCount > 1 ? "s" : ""}`;
 
-    await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html");
-    const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "email");
-    await Promise.all(promises);
+    let emailSuccess = true;
+    let emailError: string | undefined;
+    try {
+      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html");
+    } catch (error) {
+      emailSuccess = false;
+      emailError = String(error);
+      console.error("Email notification failed:", error);
+    }
+
+    // Log email delivery for each notification
+    for (const notification of notifications) {
+      await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", emailSuccess, email, emailError);
+    }
+
+    // Log email delivery for each private message
+    for (const pm of privateMessages) {
+      await this.logDelivery(pm.churchId, pm.notifyPersonId, "privateMessage", pm.id, "email", emailSuccess, email, emailError);
+    }
+
+    if (emailSuccess) {
+      const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "email");
+      await Promise.all(promises);
+    }
   };
 }

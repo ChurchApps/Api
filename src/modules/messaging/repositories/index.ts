@@ -1,4 +1,5 @@
 export { BlockedIpRepo } from "./BlockedIpRepo";
+export { DeliveryLogRepo } from "./DeliveryLogRepo";
 export { ConnectionRepo } from "./ConnectionRepo";
 export { ConversationRepo } from "./ConversationRepo";
 export { DeviceRepo } from "./DeviceRepo";
