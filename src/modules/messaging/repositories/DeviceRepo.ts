@@ -45,6 +45,10 @@ export class DeviceRepo extends ConfiguredRepo<Device> {
     return TypedDB.query("SELECT * FROM devices WHERE churchId=? AND personId=?", [churchId, personId]);
   }
 
+  public deleteByFcmToken(fcmToken: string) {
+    return TypedDB.query("DELETE FROM devices WHERE fcmToken=?", [fcmToken]);
+  }
+
   protected rowToModel(row: any): Device {
     return {
       id: row.id,

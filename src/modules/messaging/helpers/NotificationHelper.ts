@@ -40,6 +40,15 @@ export class NotificationHelper {
     }
   };
 
+  private static deleteInvalidToken = async (fcmToken: string) => {
+    try {
+      await NotificationHelper.repos.device.deleteByFcmToken(fcmToken);
+      console.log(`Deleted invalid push token: ${fcmToken}`);
+    } catch (e) {
+      console.error("Failed to delete invalid token:", e);
+    }
+  };
+
   static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string) => {
     switch (conversation.contentType) {
       case "streamingLive":
@@ -186,6 +195,7 @@ export class NotificationHelper {
             const success = ticket?.status === "ok";
             const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
             await this.logDelivery(churchId, personId, contentType, contentId, "push", success, expoPushTokens[i], errorMsg);
+            if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
           }
         }
       } catch (error) {
@@ -242,6 +252,7 @@ export class NotificationHelper {
             const success = ticket?.status === "ok";
             const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
             await this.logDelivery(churchId, personId, contentType, notificationId, "push", success, expoPushTokens[i], errorMsg);
+            if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
           }
         }
       } catch (error) {
