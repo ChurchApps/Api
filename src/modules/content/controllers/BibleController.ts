@@ -3,7 +3,6 @@ import express from "express";
 import { ContentBaseController } from "./ContentBaseController";
 import { BibleSourceFactory } from "../helpers/BibleSourceFactory";
 import { BibleTranslation, BibleVerseText } from "../models";
-import { ArrayHelper } from "@churchapps/apihelper";
 
 @controller("/content/bibles")
 export class BibleController extends ContentBaseController {
