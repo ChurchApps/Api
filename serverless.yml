@@ -60,6 +60,7 @@ provider:
     PEXELS_KEY: ${ssm:/${self:custom.envLower}/pexelsKey, ''}
     VIMEO_TOKEN: ${ssm:/${self:custom.envLower}/vimeoToken, ''}
     API_BIBLE_KEY: ${ssm:/${self:custom.envLower}/apiBibleKey, ''}
+    YOUVERSION_API_KEY: ${ssm:/${self:custom.envLower}/youVersionApiKey, ''}
     PRAISECHARTS_CONSUMER_KEY: ${ssm:/${self:custom.envLower}/praiseChartsConsumerKey, ''}
     PRAISECHARTS_CONSUMER_SECRET: ${ssm:/${self:custom.envLower}/praiseChartsConsumerSecret, ''}
     GOOGLE_RECAPTCHA_SECRET_KEY: ${ssm:/${self:custom.envLower}/recaptcha-secret-key, ''}
