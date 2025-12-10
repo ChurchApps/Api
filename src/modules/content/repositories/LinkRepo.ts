@@ -14,7 +14,7 @@ const DEFAULT_B1TAB_LINKS: Partial<Link>[] = [
   { linkType: "directory", text: "Directory", icon: "people", visibility: "members", sort: 7 },
   { linkType: "lessons", text: "Lessons", icon: "school", visibility: "visitors", sort: 8 },
   { linkType: "plans", text: "Serving", icon: "assignment", visibility: "team", sort: 9 },
-  { linkType: "checkin", text: "Check-in", icon: "how_to_reg", visibility: "visitors", sort: 10 },
+  { linkType: "checkin", text: "Check-in", icon: "how_to_reg", visibility: "visitors", sort: 10 }
 ];
 
 @injectable()
