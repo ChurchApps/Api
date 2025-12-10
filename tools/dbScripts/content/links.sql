@@ -12,6 +12,8 @@ CREATE TABLE `links` (
   `sort` float DEFAULT NULL,
   `photo` varchar(255) DEFAULT NULL,
   `parentId` char(11) DEFAULT NULL,
+  `visibility` varchar(45) DEFAULT 'everyone',
+  `groupIds` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `churchId` (`churchId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;

@@ -10,4 +10,6 @@ export class Link {
   text: string;
   sort: number;
   parentId?: string;
+  visibility?: string;
+  groupIds?: string;
 }
