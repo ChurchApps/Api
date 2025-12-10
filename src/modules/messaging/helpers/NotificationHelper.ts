@@ -58,11 +58,8 @@ export class NotificationHelper {
         const pm: PrivateMessage = await NotificationHelper.repos.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
         await NotificationHelper.repos.privateMessage.save(pm);
-        const _method = await this.notifyUserForPrivateMessage(message.churchId, pm.notifyPersonId, message.displayName, message.content, conversation.id);
-        if (_method) {
-          pm.deliveryMethod = _method;
-          await NotificationHelper.repos.privateMessage.save(pm);
-        }
+        // Send immediate push/socket notification (don't set deliveryMethod - let email timer handle that)
+        await this.notifyUserForPrivateMessage(message.churchId, pm.notifyPersonId, message.displayName, message.content, conversation.id);
         break;
       }
       default: {
@@ -107,9 +104,8 @@ export class NotificationHelper {
       const promises: Promise<Notification>[] = [];
       notifications.forEach((n) => {
         const promise = NotificationHelper.repos.notification.save(n).then(async (notification) => {
-          const method = await NotificationHelper.notifyUserForGeneralNotification(n.churchId, n.personId, n.message, notification.id);
-          notification.deliveryMethod = method;
-          await NotificationHelper.repos.notification.save(notification);
+          // Send immediate push/socket notification (don't set deliveryMethod - let email timer handle that)
+          await NotificationHelper.notifyUserForGeneralNotification(n.churchId, n.personId, n.message, notification.id);
           return notification;
         });
         promises.push(promise);
@@ -284,7 +280,7 @@ export class NotificationHelper {
       if (!pref) pref = await this.createNotificationPref(notifications[0]?.churchId || pms[0]?.churchId, personId);
       if (pref.emailFrequency === "never") promises = promises.concat(this.markMethod(notifications, pms, "none"));
       else if (pref.emailFrequency === frequency) todoPrefs.push(pref);
-      else promises = promises.concat(this.markMethod(notifications, pms, "none"));
+      // else: leave for the other timer (don't mark as "none")
     }
 
     if (todoPrefs.length > 0) {
@@ -299,14 +295,14 @@ export class NotificationHelper {
     await Promise.all(promises);
   };
 
-  static markMethod = (notifications: Notification[], privateMessages: PrivateMessage[], _method: string) => {
+  static markMethod = (notifications: Notification[], privateMessages: PrivateMessage[], method: string) => {
     const promises: Promise<any>[] = [];
     notifications.forEach((notification) => {
-      notification.deliveryMethod = "none";
+      notification.deliveryMethod = method;
       promises.push(NotificationHelper.repos.notification.save(notification));
     });
     privateMessages.forEach((pm) => {
-      pm.deliveryMethod = "none";
+      pm.deliveryMethod = method;
       promises.push(NotificationHelper.repos.privateMessage.save(pm));
     });
     return promises;
