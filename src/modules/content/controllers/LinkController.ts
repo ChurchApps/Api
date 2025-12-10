@@ -12,6 +12,60 @@ export class LinkController extends ContentCrudController {
     permissions: { view: undefined, edit: Permissions.content.edit },
     routes: ["getById", "getAll", "post", "delete"] as const
   };
+
+  // Authenticated access - filters links by visibility based on user context
+  // Note: "team" visibility is handled client-side since group tags aren't in the JWT
+  @httpGet("/church/:churchId/filtered")
+  public async loadFiltered(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const category = req.query.category?.toString();
+      const links = category
+        ? await this.repos.link.loadByCategory(churchId, category)
+        : await this.repos.link.loadAll(churchId);
+
+      // Filter links based on visibility (except "team" which needs client-side check)
+      return links.filter((link: Link) => this.isLinkVisible(link, au));
+    });
+  }
+
+  private isLinkVisible(link: Link, au: any): boolean {
+    const visibility = link.visibility || "everyone";
+
+    switch (visibility) {
+      case "everyone":
+        return true;
+
+      case "visitors":
+        return !!au.personId;
+
+      case "members": {
+        const status = au.membershipStatus?.toLowerCase();
+        return status === "member" || status === "staff";
+      }
+
+      case "staff":
+        return au.membershipStatus?.toLowerCase() === "staff";
+
+      case "team":
+        // Pass through to client - client will check group tags
+        return true;
+
+      case "groups": {
+        if (!link.groupIds) return false;
+        try {
+          const linkGroupIds: string[] = JSON.parse(link.groupIds);
+          if (!linkGroupIds.length) return false;
+          return linkGroupIds.some(gid => au.groupIds?.includes(gid));
+        } catch {
+          return false;
+        }
+      }
+
+      default:
+        return true;
+    }
+  }
+
   // Anonymous access
   @httpGet("/church/:churchId")
   public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {

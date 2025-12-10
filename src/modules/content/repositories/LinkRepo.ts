@@ -39,8 +39,8 @@ export class LinkRepo extends ConfiguredRepo<Link> {
     return TypedDB.query("DELETE FROM links WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
-  public async loadByCategory(churchId: string, category: string) {
-    let links = await TypedDB.query<Link>("SELECT * FROM links WHERE churchId=? and category=? order by sort", [churchId, category]);
+  public async loadByCategory(churchId: string, category: string): Promise<Link[]> {
+    let links = await TypedDB.query<Link[]>("SELECT * FROM links WHERE churchId=? and category=? order by sort", [churchId, category]);
 
     // Create default b1Tab links if none exist
     if (category === "b1Tab" && links.length === 0) {
