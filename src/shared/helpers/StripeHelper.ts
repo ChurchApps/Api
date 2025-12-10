@@ -238,7 +238,21 @@ export class StripeHelper {
       donationDate: new Date(eventData.created * 1000),
       notes: eventData?.metadata?.notes
     };
-    const funds = eventData.metadata.funds ? JSON.parse(eventData.metadata.funds) : await givingRepos.subscriptionFund.loadForSubscriptionLog(churchId, eventData.subscription);
+
+    // Get funds from metadata, subscription, or fallback to general fund
+    let funds: FundDonation[] = [];
+    if (eventData.metadata?.funds) {
+      funds = JSON.parse(eventData.metadata.funds);
+    } else if (eventData.subscription && givingRepos.subscriptionFunds) {
+      funds = await givingRepos.subscriptionFunds.loadForSubscriptionLog(churchId, eventData.subscription);
+    }
+
+    // If no funds found, allocate entire amount to general fund
+    if (!funds || funds.length === 0) {
+      const generalFund = await givingRepos.fund.getOrCreateGeneral(churchId);
+      funds = [{ id: generalFund.id, amount }];
+    }
+
     const donation: Donation = await givingRepos.donation.save(donationData);
     const promises: Promise<FundDonation>[] = [];
     funds.forEach((fund: FundDonation) => {
