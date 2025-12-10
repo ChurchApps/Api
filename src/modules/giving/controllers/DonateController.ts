@@ -3,7 +3,8 @@ import express from "express";
 import { GivingCrudController } from "./GivingCrudController";
 import { Permissions } from "../../../shared/helpers/Permissions";
 import { GatewayService } from "../../../shared/helpers/GatewayService";
-import { EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
+import { StripeHelper } from "../../../shared/helpers/StripeHelper";
+import { EncryptionHelper, EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models";
 import { Environment } from "../../../shared/helpers/Environment";
 import Axios from "axios";
@@ -198,6 +199,139 @@ export class DonateController extends GivingCrudController {
       paypal: ["BILLING.SUBSCRIPTION.CANCELLED"]
     };
     return cancellationEvents[provider as keyof typeof cancellationEvents]?.includes(eventType) || false;
+  }
+
+  @httpPost("/replay-stripe-events")
+  public async replayStripeEvents(
+    req: express.Request<{}, {}, { startDate: string; endDate: string; dryRun?: boolean }>,
+    res: express.Response
+  ): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const { startDate, endDate, dryRun = true } = req.body;
+      if (!startDate || !endDate) {
+        return this.json({ error: "startDate and endDate are required" }, 400);
+      }
+
+      const startTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
+      const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
+
+      if (isNaN(startTimestamp) || isNaN(endTimestamp)) {
+        return this.json({ error: "Invalid date format" }, 400);
+      }
+
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
+
+      if (!stripeGateway) {
+        return this.json({ error: "No Stripe gateway configured" }, 404);
+      }
+
+      const secretKey = EncryptionHelper.decrypt(stripeGateway.privateKey);
+
+      try {
+        const events = await StripeHelper.listEvents(secretKey, {
+          startDate: startTimestamp,
+          endDate: endTimestamp,
+          types: ["charge.succeeded", "invoice.paid"]
+        });
+
+        const results: {
+          eventId: string;
+          type: string;
+          amount: number;
+          created: Date;
+          customer: string;
+          status: "new" | "already_imported" | "imported" | "skipped" | "error";
+          error?: string;
+        }[] = [];
+
+        for (const event of events) {
+          const eventData = event.data.object as any;
+
+          // Skip subscription events (they're handled separately)
+          const isSubscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
+          if (event.type === "charge.succeeded" && isSubscriptionEvent) {
+            results.push({
+              eventId: event.id,
+              type: event.type,
+              amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+              created: new Date(event.created * 1000),
+              customer: eventData.customer || "",
+              status: "skipped",
+              error: "Subscription event - handled by invoice.paid"
+            });
+            continue;
+          }
+
+          // Check if already processed
+          const existingEvent = await this.repos.eventLog.loadByProviderId(au.churchId, event.id);
+
+          if (existingEvent) {
+            results.push({
+              eventId: event.id,
+              type: event.type,
+              amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+              created: new Date(event.created * 1000),
+              customer: eventData.customer || "",
+              status: "already_imported"
+            });
+            continue;
+          }
+
+          if (dryRun) {
+            results.push({
+              eventId: event.id,
+              type: event.type,
+              amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+              created: new Date(event.created * 1000),
+              customer: eventData.customer || "",
+              status: "new"
+            });
+          } else {
+            // Actually import the event
+            try {
+              await StripeHelper.logEvent(au.churchId, event, eventData, this.repos);
+              await StripeHelper.logDonation(secretKey, au.churchId, eventData, this.repos);
+
+              results.push({
+                eventId: event.id,
+                type: event.type,
+                amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+                created: new Date(event.created * 1000),
+                customer: eventData.customer || "",
+                status: "imported"
+              });
+            } catch (err: any) {
+              results.push({
+                eventId: event.id,
+                type: event.type,
+                amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+                created: new Date(event.created * 1000),
+                customer: eventData.customer || "",
+                status: "error",
+                error: err.message || "Unknown error"
+              });
+            }
+          }
+        }
+
+        const summary = {
+          total: results.length,
+          new: results.filter((r) => r.status === "new").length,
+          alreadyImported: results.filter((r) => r.status === "already_imported").length,
+          imported: results.filter((r) => r.status === "imported").length,
+          skipped: results.filter((r) => r.status === "skipped").length,
+          errors: results.filter((r) => r.status === "error").length
+        };
+
+        return { dryRun, summary, results };
+      } catch (err: any) {
+        console.error("Error replaying Stripe events:", err);
+        return this.json({ error: err.message || "Failed to fetch Stripe events" }, 500);
+      }
+    });
   }
 
   @httpPost("/charge")

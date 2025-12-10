@@ -248,6 +248,38 @@ export class StripeHelper {
     return await Promise.all(promises);
   }
 
+  static async listEvents(secretKey: string, options: {
+    startDate: number;
+    endDate: number;
+    types: string[];
+  }): Promise<Stripe.Event[]> {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    const allEvents: Stripe.Event[] = [];
+    let hasMore = true;
+    let startingAfter: string | undefined;
+
+    while (hasMore) {
+      const params: Stripe.EventListParams = {
+        created: {
+          gte: options.startDate,
+          lte: options.endDate
+        },
+        types: options.types,
+        limit: 100
+      };
+      if (startingAfter) params.starting_after = startingAfter;
+
+      const response = await stripe.events.list(params);
+      allEvents.push(...response.data);
+      hasMore = response.has_more;
+      if (response.data.length > 0) {
+        startingAfter = response.data[response.data.length - 1].id;
+      }
+    }
+
+    return allEvents;
+  }
+
   private static getStripeObj = (secretKey: string) => {
     return new Stripe(secretKey, { apiVersion: "2025-02-24.acacia" });
   };
