@@ -265,7 +265,7 @@ export class DonateController extends GivingCrudController {
             continue;
           }
 
-          // Check if already processed
+          // Check if already processed via event log
           const existingEvent = await this.repos.eventLog.loadByProviderId(au.churchId, event.id);
 
           if (existingEvent) {
@@ -280,12 +280,33 @@ export class DonateController extends GivingCrudController {
             continue;
           }
 
+          // Secondary check: look for matching donation by amount, date, and person
+          const amount = (eventData.amount || eventData.amount_paid || 0) / 100;
+          const donationDate = new Date(eventData.created * 1000);
+          const customerData = eventData.customer ? await this.repos.customer.load(au.churchId, eventData.customer) as any : null;
+          const personId = customerData?.personId || null;
+
+          const existingDonation = await this.repos.donation.findMatchingDonation(au.churchId, amount, donationDate, personId);
+
+          if (existingDonation) {
+            results.push({
+              eventId: event.id,
+              type: event.type,
+              amount,
+              created: donationDate,
+              customer: eventData.customer || "",
+              status: "already_imported",
+              error: "Matched existing donation by amount/date/person"
+            });
+            continue;
+          }
+
           if (dryRun) {
             results.push({
               eventId: event.id,
               type: event.type,
-              amount: (eventData.amount || eventData.amount_paid || 0) / 100,
-              created: new Date(event.created * 1000),
+              amount,
+              created: donationDate,
               customer: eventData.customer || "",
               status: "new"
             });
@@ -298,8 +319,8 @@ export class DonateController extends GivingCrudController {
               results.push({
                 eventId: event.id,
                 type: event.type,
-                amount: (eventData.amount || eventData.amount_paid || 0) / 100,
-                created: new Date(event.created * 1000),
+                amount,
+                created: donationDate,
                 customer: eventData.customer || "",
                 status: "imported"
               });
@@ -307,8 +328,8 @@ export class DonateController extends GivingCrudController {
               results.push({
                 eventId: event.id,
                 type: event.type,
-                amount: (eventData.amount || eventData.amount_paid || 0) / 100,
-                created: new Date(event.created * 1000),
+                amount,
+                created: donationDate,
                 customer: eventData.customer || "",
                 status: "error",
                 error: err.message || "Unknown error"

@@ -65,6 +65,27 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     return TypedDB.query(sql, [churchId, personId]);
   }
 
+  public async findMatchingDonation(churchId: string, amount: number, donationDate: Date, personId?: string | null): Promise<Donation | null> {
+    const startOfDay = new Date(donationDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(donationDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const startStr = DateHelper.toMysqlDate(startOfDay);
+    const endStr = DateHelper.toMysqlDate(endOfDay);
+
+    const sql = personId
+      ? "SELECT * FROM donations WHERE churchId = ? AND amount = ? AND donationDate >= ? AND donationDate <= ? AND personId = ? LIMIT 1"
+      : "SELECT * FROM donations WHERE churchId = ? AND amount = ? AND donationDate >= ? AND donationDate <= ? AND personId IS NULL LIMIT 1";
+
+    const params = personId
+      ? [churchId, amount, startStr, endStr, personId]
+      : [churchId, amount, startStr, endStr];
+
+    const rows = await TypedDB.query(sql, params);
+    return rows.length > 0 ? this.rowToModel(rows[0]) : null;
+  }
+
   public loadSummary(churchId: string, startDate: Date, endDate: Date) {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
