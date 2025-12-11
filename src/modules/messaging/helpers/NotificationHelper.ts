@@ -275,34 +275,34 @@ export class NotificationHelper {
 
   static sendEmailNotifications = async (frequency: string) => {
     const startTime = Date.now();
-    console.log(`[NotificationHelper.sendEmailNotifications] ========== START ==========`);
-    console.log(`[NotificationHelper.sendEmailNotifications] Frequency: ${frequency}, Timestamp: ${new Date().toISOString()}`);
+    console.log("[NotificationHelper.sendEmailNotifications] ========== START ==========");
+    console.log("[NotificationHelper.sendEmailNotifications] Frequency: " + frequency + ", Timestamp: " + new Date().toISOString());
 
     this.ensureInitialized();
-    console.log(`[NotificationHelper.sendEmailNotifications] Repos initialized check passed (${Date.now() - startTime}ms)`);
+    console.log("[NotificationHelper.sendEmailNotifications] Repos initialized check passed (" + (Date.now() - startTime) + "ms)");
 
     let promises: Promise<any>[] = [];
 
-    console.log(`[NotificationHelper.sendEmailNotifications] Loading undelivered notifications...`);
+    console.log("[NotificationHelper.sendEmailNotifications] Loading undelivered notifications...");
     const allNotifications: Notification[] = (await NotificationHelper.repos.notification.loadUndelivered()) as any[];
-    console.log(`[NotificationHelper.sendEmailNotifications] Loaded notifications (${Date.now() - startTime}ms)`);
+    console.log("[NotificationHelper.sendEmailNotifications] Loaded notifications (" + (Date.now() - startTime) + "ms)");
 
-    console.log(`[NotificationHelper.sendEmailNotifications] Loading undelivered PMs...`);
+    console.log("[NotificationHelper.sendEmailNotifications] Loading undelivered PMs...");
     const allPMs: PrivateMessage[] = (await NotificationHelper.repos.privateMessage.loadUndelivered()) as any[];
-    console.log(`[NotificationHelper.sendEmailNotifications] Loaded PMs (${Date.now() - startTime}ms)`);
+    console.log("[NotificationHelper.sendEmailNotifications] Loaded PMs (" + (Date.now() - startTime) + "ms)");
 
-    console.log(`[NotificationHelper.sendEmailNotifications] Found ${allNotifications.length} undelivered notifications, ${allPMs.length} undelivered PMs`);
+    console.log("[NotificationHelper.sendEmailNotifications] Found " + allNotifications.length + " undelivered notifications, " + allPMs.length + " undelivered PMs");
 
     if (allNotifications.length === 0 && allPMs.length === 0) {
-      console.log(`[NotificationHelper.sendEmailNotifications] No undelivered items found, returning early`);
+      console.log("[NotificationHelper.sendEmailNotifications] No undelivered items found, returning early");
       return;
     }
 
     const peopleIds = ArrayHelper.getIds(allNotifications, "personId").concat(ArrayHelper.getIds(allPMs, "notifyPersonId"));
-    console.log(`[NotificationHelper.sendEmailNotifications] Processing ${peopleIds.length} unique people`);
+    console.log("[NotificationHelper.sendEmailNotifications] Processing " + peopleIds.length + " unique people");
 
     const notificationPrefs = (await NotificationHelper.repos.notificationPreference.loadByPersonIds(peopleIds)) as any[];
-    console.log(`[NotificationHelper.sendEmailNotifications] Found ${notificationPrefs.length} existing notification preferences`);
+    console.log("[NotificationHelper.sendEmailNotifications] Found " + notificationPrefs.length + " existing notification preferences");
 
     const todoPrefs: NotificationPreference[] = [];
     for (const personId of peopleIds) {
@@ -310,46 +310,46 @@ export class NotificationHelper {
       const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", personId);
       let pref = ArrayHelper.getOne(notificationPrefs, "personId", personId);
       if (!pref) {
-        console.log(`[NotificationHelper.sendEmailNotifications] Creating default pref for person ${personId}`);
+        console.log("[NotificationHelper.sendEmailNotifications] Creating default pref for person " + personId);
         pref = await this.createNotificationPref(notifications[0]?.churchId || pms[0]?.churchId, personId);
       }
-      console.log(`[NotificationHelper.sendEmailNotifications] Person ${personId}: emailFrequency=${pref.emailFrequency}, notifications=${notifications.length}, pms=${pms.length}`);
+      console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + ": emailFrequency=" + pref.emailFrequency + ", notifications=" + notifications.length + ", pms=" + pms.length);
       if (pref.emailFrequency === "never") {
-        console.log(`[NotificationHelper.sendEmailNotifications] Person ${personId} has email disabled, marking as 'none'`);
+        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " has email disabled, marking as 'none'");
         promises = promises.concat(this.markMethod(notifications, pms, "none"));
       } else if (pref.emailFrequency === frequency) {
-        console.log(`[NotificationHelper.sendEmailNotifications] Person ${personId} matches frequency '${frequency}', adding to todo`);
+        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " matches frequency '" + frequency + "', adding to todo");
         todoPrefs.push(pref);
       } else {
-        console.log(`[NotificationHelper.sendEmailNotifications] Person ${personId} has frequency '${pref.emailFrequency}', skipping for '${frequency}' run`);
+        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " has frequency '" + pref.emailFrequency + "', skipping for '" + frequency + "' run");
       }
       // else: leave for the other timer (don't mark as "none")
     }
 
-    console.log(`[NotificationHelper.sendEmailNotifications] ${todoPrefs.length} people to process for '${frequency}' frequency`);
+    console.log("[NotificationHelper.sendEmailNotifications] " + todoPrefs.length + " people to process for '" + frequency + "' frequency");
 
     if (todoPrefs.length > 0) {
-      console.log(`[NotificationHelper.sendEmailNotifications] Fetching email addresses from membership API...`);
+      console.log("[NotificationHelper.sendEmailNotifications] Fetching email addresses from membership API...");
       const allEmailData = await this.getEmailData(todoPrefs);
-      console.log(`[NotificationHelper.sendEmailNotifications] Got ${allEmailData?.length || 0} email addresses`);
+      console.log("[NotificationHelper.sendEmailNotifications] Got " + (allEmailData?.length || 0) + " email addresses");
 
       todoPrefs.forEach((pref) => {
         const notifications: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
         const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
-        console.log(`[NotificationHelper.sendEmailNotifications] Person ${pref.personId}: email=${emailData?.email || 'NOT FOUND'}, notifications=${notifications.length}, pms=${pms.length}`);
+        console.log("[NotificationHelper.sendEmailNotifications] Person " + pref.personId + ": email=" + (emailData?.email || "NOT FOUND") + ", notifications=" + notifications.length + ", pms=" + pms.length);
         if (emailData?.email && (notifications.length > 0 || pms.length > 0)) {
-          console.log(`[NotificationHelper.sendEmailNotifications] Queuing email to ${emailData.email}`);
+          console.log("[NotificationHelper.sendEmailNotifications] Queuing email to " + emailData.email);
           promises.push(this.sendEmailNotification(emailData.email, notifications, pms));
         } else {
-          console.log(`[NotificationHelper.sendEmailNotifications] Skipping person ${pref.personId} - no email or no items`);
+          console.log("[NotificationHelper.sendEmailNotifications] Skipping person " + pref.personId + " - no email or no items");
         }
       });
     }
-    console.log(`[NotificationHelper.sendEmailNotifications] Waiting for ${promises.length} promises to complete...`);
+    console.log("[NotificationHelper.sendEmailNotifications] Waiting for " + promises.length + " promises to complete...");
     await Promise.all(promises);
-    console.log(`[NotificationHelper.sendEmailNotifications] ========== COMPLETE ==========`);
-    console.log(`[NotificationHelper.sendEmailNotifications] Total execution time: ${Date.now() - startTime}ms`);
+    console.log("[NotificationHelper.sendEmailNotifications] ========== COMPLETE ==========");
+    console.log("[NotificationHelper.sendEmailNotifications] Total execution time: " + (Date.now() - startTime) + "ms");
     return { frequency, notificationsProcessed: allNotifications.length, pmsProcessed: allPMs.length, emailsSent: promises.length };
   };
 
@@ -379,28 +379,28 @@ export class NotificationHelper {
 
   static getEmailData = async (notificationPrefs: NotificationPreference[]) => {
     const peopleIds = ArrayHelper.getIds(notificationPrefs, "personId");
-    console.log(`[NotificationHelper.getEmailData] Fetching emails for ${peopleIds.length} people`);
-    console.log(`[NotificationHelper.getEmailData] PeopleIds: ${JSON.stringify(peopleIds)}`);
+    console.log("[NotificationHelper.getEmailData] Fetching emails for " + peopleIds.length + " people");
+    console.log("[NotificationHelper.getEmailData] PeopleIds: " + JSON.stringify(peopleIds));
     const data = {
       peopleIds,
       jwtSecret: Environment.jwtSecret
     };
     const url = Environment.membershipApi + "/people/apiEmails";
-    console.log(`[NotificationHelper.getEmailData] Calling API: ${url}`);
+    console.log("[NotificationHelper.getEmailData] Calling API: " + url);
     try {
       const result = await axios.post(url, data);
-      console.log(`[NotificationHelper.getEmailData] API response status: ${result.status}`);
-      console.log(`[NotificationHelper.getEmailData] API response data: ${JSON.stringify(result.data)}`);
+      console.log("[NotificationHelper.getEmailData] API response status: " + result.status);
+      console.log("[NotificationHelper.getEmailData] API response data: " + JSON.stringify(result.data));
       return result.data;
     } catch (error: any) {
-      console.error(`[NotificationHelper.getEmailData] API call FAILED:`, error.message);
-      console.error(`[NotificationHelper.getEmailData] Error response:`, error.response?.data);
+      console.error("[NotificationHelper.getEmailData] API call FAILED:", error.message);
+      console.error("[NotificationHelper.getEmailData] Error response:", error.response?.data);
       throw error;
     }
   };
 
   static sendEmailNotification = async (email: string, notifications: Notification[], privateMessages: PrivateMessage[]) => {
-    console.log(`[NotificationHelper.sendEmailNotification] Starting email send to: ${email}`);
+    console.log("[NotificationHelper.sendEmailNotification] Starting email send to: " + email);
     let title = "";
     let content = "";
 
@@ -408,11 +408,11 @@ export class NotificationHelper {
     const pmCount = privateMessages?.length || 0;
     const totalCount = notifCount + pmCount;
 
-    console.log(`[NotificationHelper.sendEmailNotification] Items: ${notifCount} notifications, ${pmCount} private messages`);
+    console.log("[NotificationHelper.sendEmailNotification] Items: " + notifCount + " notifications, " + pmCount + " private messages");
 
     // Early return if nothing to send
     if (totalCount === 0) {
-      console.log(`[NotificationHelper.sendEmailNotification] No items to send, returning early`);
+      console.log("[NotificationHelper.sendEmailNotification] No items to send, returning early");
       return;
     }
 
@@ -422,40 +422,32 @@ export class NotificationHelper {
       if (firstNotification.message.includes("Volunteer Requests:")) {
         const match = firstNotification.message.match(/Volunteer Requests:(.*).Please log in and confirm/);
         title = "New Notification: Volunteer Request";
-        content = `
-          <h3>New Notification</h3>
-          <h4>Volunteer Request</h4>
-          <h4>${match ? match[1] : firstNotification.message}</h4>
-          ${
-            firstNotification.link
-              ? "<a href='" +
-                firstNotification.link +
-                "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
-              : ""
-          }
-          <p>Please log in and confirm</p>
-        `;
+        content = "<h3>New Notification</h3><h4>Volunteer Request</h4><h4>" + (match ? match[1] : firstNotification.message) + "</h4>" +
+          (firstNotification.link
+            ? "<a href='" + firstNotification.link + "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
+            : "") +
+          "<p>Please log in and confirm</p>";
       } else {
         title = "New Notification: " + firstNotification.message;
         content = "New Notification: " + firstNotification.message;
       }
     } else if (notifCount === 0 && pmCount === 1) title = "New Private Message";
-    else if (notifCount > 0 && pmCount > 0) title = `${totalCount} New Notifications and Messages`;
-    else if (notifCount > 0) title = `${notifCount} New Notification${notifCount > 1 ? "s" : ""}`;
-    else if (pmCount > 0) title = `${pmCount} New Private Message${pmCount > 1 ? "s" : ""}`;
+    else if (notifCount > 0 && pmCount > 0) title = totalCount + " New Notifications and Messages";
+    else if (notifCount > 0) title = notifCount + " New Notification" + (notifCount > 1 ? "s" : "");
+    else if (pmCount > 0) title = pmCount + " New Private Message" + (pmCount > 1 ? "s" : "");
 
-    console.log(`[NotificationHelper.sendEmailNotification] Email title: ${title}`);
-    console.log(`[NotificationHelper.sendEmailNotification] Calling EmailHelper.sendTemplatedEmail...`);
+    console.log("[NotificationHelper.sendEmailNotification] Email title: " + title);
+    console.log("[NotificationHelper.sendEmailNotification] Calling EmailHelper.sendTemplatedEmail...");
 
     let emailSuccess = true;
     let emailError: string | undefined;
     try {
       await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html");
-      console.log(`[NotificationHelper.sendEmailNotification] Email sent successfully to ${email}`);
+      console.log("[NotificationHelper.sendEmailNotification] Email sent successfully to " + email);
     } catch (error) {
       emailSuccess = false;
       emailError = String(error);
-      console.error(`[NotificationHelper.sendEmailNotification] Email FAILED to ${email}:`, error);
+      console.error("[NotificationHelper.sendEmailNotification] Email FAILED to " + email + ":", error);
     }
 
     // Log email delivery for each notification
@@ -469,12 +461,12 @@ export class NotificationHelper {
     }
 
     if (emailSuccess) {
-      console.log(`[NotificationHelper.sendEmailNotification] Marking ${notifications.length} notifications and ${privateMessages.length} PMs as delivered via email`);
+      console.log("[NotificationHelper.sendEmailNotification] Marking " + notifications.length + " notifications and " + privateMessages.length + " PMs as delivered via email");
       const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "email");
       await Promise.all(promises);
-      console.log(`[NotificationHelper.sendEmailNotification] Delivery method updated successfully`);
+      console.log("[NotificationHelper.sendEmailNotification] Delivery method updated successfully");
     } else {
-      console.log(`[NotificationHelper.sendEmailNotification] Email failed, NOT marking items as delivered`);
+      console.log("[NotificationHelper.sendEmailNotification] Email failed, NOT marking items as delivered");
     }
   };
 }
