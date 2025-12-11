@@ -90,7 +90,12 @@ export class NotificationController extends MessagingBaseController {
   @httpGet("/tmpEmail")
   public async tmpEmail(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await NotificationHelper.sendEmailNotifications("daily");
+      console.log("[tmpEmail] Endpoint called, initializing NotificationHelper...");
+      NotificationHelper.init(this.repos);
+      console.log("[tmpEmail] Calling sendEmailNotifications('daily')...");
+      const result = await NotificationHelper.sendEmailNotifications("daily");
+      console.log("[tmpEmail] Complete, result:", JSON.stringify(result));
+      return result;
     }) as any;
   }
 
