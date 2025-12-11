@@ -284,21 +284,36 @@ export class NotificationHelper {
     let promises: Promise<any>[] = [];
 
     console.log("[NotificationHelper.sendEmailNotifications] Loading undelivered notifications...");
-    const allNotifications: Notification[] = (await NotificationHelper.repos.notification.loadUndelivered()) as any[];
+    const rawNotifications = await NotificationHelper.repos.notification.loadUndelivered();
+    console.log("[NotificationHelper.sendEmailNotifications] Raw notifications type: " + typeof rawNotifications);
+    console.log("[NotificationHelper.sendEmailNotifications] Raw notifications isArray: " + Array.isArray(rawNotifications));
+    console.log("[NotificationHelper.sendEmailNotifications] Raw notifications sample: " + JSON.stringify(rawNotifications?.slice?.(0, 2) || rawNotifications));
+    const allNotifications: Notification[] = (rawNotifications || []) as any[];
     console.log("[NotificationHelper.sendEmailNotifications] Loaded notifications (" + (Date.now() - startTime) + "ms)");
 
     console.log("[NotificationHelper.sendEmailNotifications] Loading undelivered PMs...");
-    const allPMs: PrivateMessage[] = (await NotificationHelper.repos.privateMessage.loadUndelivered()) as any[];
+    const rawPMs = await NotificationHelper.repos.privateMessage.loadUndelivered();
+    console.log("[NotificationHelper.sendEmailNotifications] Raw PMs type: " + typeof rawPMs);
+    console.log("[NotificationHelper.sendEmailNotifications] Raw PMs sample: " + JSON.stringify(rawPMs?.slice?.(0, 2) || rawPMs));
+    const allPMs: PrivateMessage[] = (rawPMs || []) as any[];
     console.log("[NotificationHelper.sendEmailNotifications] Loaded PMs (" + (Date.now() - startTime) + "ms)");
 
     console.log("[NotificationHelper.sendEmailNotifications] Found " + allNotifications.length + " undelivered notifications, " + allPMs.length + " undelivered PMs");
+    if (allNotifications.length > 0) {
+      console.log("[NotificationHelper.sendEmailNotifications] First notification keys: " + Object.keys(allNotifications[0] || {}).join(", "));
+      console.log("[NotificationHelper.sendEmailNotifications] First notification personId: " + (allNotifications[0] as any)?.personId);
+    }
 
     if (allNotifications.length === 0 && allPMs.length === 0) {
       console.log("[NotificationHelper.sendEmailNotifications] No undelivered items found, returning early");
       return;
     }
 
-    const peopleIds = ArrayHelper.getIds(allNotifications, "personId").concat(ArrayHelper.getIds(allPMs, "notifyPersonId"));
+    const notifPersonIds = ArrayHelper.getIds(allNotifications, "personId");
+    const pmPersonIds = ArrayHelper.getIds(allPMs, "notifyPersonId");
+    console.log("[NotificationHelper.sendEmailNotifications] notifPersonIds from ArrayHelper: " + JSON.stringify(notifPersonIds));
+    console.log("[NotificationHelper.sendEmailNotifications] pmPersonIds from ArrayHelper: " + JSON.stringify(pmPersonIds));
+    const peopleIds = notifPersonIds.concat(pmPersonIds);
     console.log("[NotificationHelper.sendEmailNotifications] Processing " + peopleIds.length + " unique people");
 
     const notificationPrefs = (await NotificationHelper.repos.notificationPreference.loadByPersonIds(peopleIds)) as any[];
