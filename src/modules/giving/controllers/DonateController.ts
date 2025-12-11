@@ -512,6 +512,9 @@ export class DonateController extends GivingCrudController {
     billingCycleAnchor?: number,
     donationType: "recurring" | "one-time" = "recurring"
   ) => {
+    // Skip email if no recipient address
+    if (!to) return;
+
     const contentRows: any[] = [];
     let totalFundAmount = 0;
 

@@ -13,6 +13,12 @@ export class NotificationHelper {
     NotificationHelper.repos = repos;
   }
 
+  private static ensureInitialized() {
+    if (!NotificationHelper.repos) {
+      throw new Error("NotificationHelper not initialized. Call NotificationHelper.init(repos) first.");
+    }
+  }
+
   private static logDelivery = async (
     churchId: string,
     personId: string,
@@ -50,6 +56,7 @@ export class NotificationHelper {
   };
 
   static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string) => {
+    this.ensureInitialized();
     switch (conversation.contentType) {
       case "streamingLive":
         // don't send notifications for live stream chat room.
@@ -77,6 +84,7 @@ export class NotificationHelper {
   };
 
   static createNotifications = async (peopleIds: string[], churchId: string, contentType: string, contentId: string, message: string, link?: string) => {
+    this.ensureInitialized();
     const notifications: Notification[] = [];
     peopleIds.forEach((personId: string) => {
       const notification: Notification = {
@@ -116,6 +124,7 @@ export class NotificationHelper {
   };
 
   static notifyUser = async (churchId: string, personId: string, title: string = "New Notification") => {
+    this.ensureInitialized();
     // Removed excessive logging to reduce CloudWatch costs
     let method = "";
     const _deliveryCount = 0;
@@ -156,6 +165,7 @@ export class NotificationHelper {
   };
 
   static notifyUserForPrivateMessage = async (churchId: string, personId: string, senderName: string, messageContent: string, conversationId: string, privateMessageId?: string) => {
+    this.ensureInitialized();
     let method = "";
     const contentType = "privateMessage";
     const contentId = privateMessageId || conversationId;
@@ -206,6 +216,7 @@ export class NotificationHelper {
   };
 
   static notifyUserForGeneralNotification = async (churchId: string, personId: string, notificationMessage: string, notificationId: string) => {
+    this.ensureInitialized();
     let method = "";
     const contentType = "notification";
 
@@ -263,6 +274,7 @@ export class NotificationHelper {
   };
 
   static sendEmailNotifications = async (frequency: string) => {
+    this.ensureInitialized();
     let promises: Promise<any>[] = [];
     const allNotifications: Notification[] = (await NotificationHelper.repos.notification.loadUndelivered()) as any[];
     const allPMs: PrivateMessage[] = (await NotificationHelper.repos.privateMessage.loadUndelivered()) as any[];
@@ -289,7 +301,7 @@ export class NotificationHelper {
         const notifications: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
         const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
-        if (emailData && (notifications.length > 0 || pms.length > 0)) promises.push(this.sendEmailNotification(emailData.email, notifications, pms));
+        if (emailData?.email && (notifications.length > 0 || pms.length > 0)) promises.push(this.sendEmailNotification(emailData.email, notifications, pms));
       });
     }
     await Promise.all(promises);
