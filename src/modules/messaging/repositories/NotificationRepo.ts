@@ -94,7 +94,7 @@ export class NotificationRepo extends ConfiguredRepo<Notification> {
   }
 
   public loadUndelivered() {
-    const sql = "SELECT * FROM notifications WHERE isNew=1 AND (deliveryMethod IS NULL OR deliveryMethod='')";
+    const sql = "SELECT * FROM notifications WHERE isNew=1 AND (deliveryMethod IS NULL OR deliveryMethod='' OR deliveryMethod='push' OR deliveryMethod='socket')";
     return TypedDB.query(sql, []);
   }
 
