@@ -76,11 +76,13 @@ export class BibleController extends ContentBaseController {
   @httpGet("/:translationKey/:bookKey/chapters")
   public async getChapters(@requestParam("translationKey") translationKey: string, @requestParam("bookKey") bookKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      let result = await this.repos.bibleChapter.loadByBook(translationKey, bookKey);
+      const resolvedBookKey = await this.resolveBookKey(bookKey);
+
+      let result = await this.repos.bibleChapter.loadByBook(translationKey, resolvedBookKey);
       if (result.length === 0) {
         const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
         const source = translation?.source || "api.bible";
-        result = await BibleSourceFactory.getChapters(source, translationKey, bookKey);
+        result = await BibleSourceFactory.getChapters(source, translationKey, resolvedBookKey);
         await this.repos.bibleChapter.saveAll(result);
       }
       return result;
@@ -207,6 +209,17 @@ export class BibleController extends ContentBaseController {
       endVerseKey
     };
     await this.repos.bibleLookup.save(lookup);
+  }
+
+  // Resolve book key from either ID or keyName
+  // Book keys are 3 chars: LLL (e.g. GEN) or NLL (e.g. 1CO, 2TI)
+  private async resolveBookKey(bookKeyOrId: string): Promise<string> {
+    const isBookKey = /^([A-Z]{3}|[0-9][A-Z]{2})$/.test(bookKeyOrId);
+    if (isBookKey) {
+      return bookKeyOrId;
+    }
+    const book = await this.repos.bibleBook.load(bookKeyOrId);
+    return book?.keyName || bookKeyOrId;
   }
 
   /*Start Old Code*/

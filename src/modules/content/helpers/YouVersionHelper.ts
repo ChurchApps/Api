@@ -22,7 +22,7 @@ export class YouVersionHelper {
           description: d.info || "",
           language: d.language_tag || languageTag,
           source: "youversion",
-          sourceKey: d.id.toString(),
+          sourceKey: "YOUVERSION-" + d.id.toString(),
           countryList: [],
           copyright: d.copyright_short || d.copyright_long || ""
         };
