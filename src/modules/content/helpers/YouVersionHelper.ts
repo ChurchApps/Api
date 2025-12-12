@@ -135,31 +135,105 @@ export class YouVersionHelper {
     const startVerse = parseInt(startParts[2], 10);
     const endVerse = parseInt(endParts[2], 10);
 
-    // Fetch each verse individually using the passages endpoint
-    // YouVersion passages endpoint: /passages/{passage_id} where passage_id is like GEN.1.1
-    for (let v = startVerse; v <= endVerse; v++) {
-      const verseKey = `${bookKey}.${chapterNumber}.${v}`;
-      const url = this.baseUrl + "/bibles/" + translationKey + "/passages/" + verseKey + "?format=text";
+    // Fetch entire chapter at once using HTML format
+    const chapterKey = `${bookKey}.${chapterNumber}`;
+    const url = this.baseUrl + "/bibles/" + translationKey + "/passages/" + chapterKey + "?format=html";
 
-      try {
-        const data = await this.getContent(url);
-        if (data.content) {
-          result.push({
-            translationKey,
-            verseKey,
-            bookKey,
-            chapterNumber,
-            verseNumber: v,
-            content: data.content,
-            newParagraph: false
-          });
+    try {
+      const data = await this.getContent(url);
+      if (data.content) {
+        const verses = this.parseChapterHtml(data.content, bookKey, chapterNumber, translationKey);
+        // Filter to only return requested verse range
+        for (const verse of verses) {
+          if (verse.verseNumber >= startVerse && verse.verseNumber <= endVerse) {
+            result.push(verse);
+          }
         }
-      } catch (e: any) {
-        console.log(`Failed to fetch verse ${verseKey}:`, e.message);
+      }
+    } catch (e: any) {
+      console.log(`Failed to fetch chapter ${chapterKey}:`, e.message);
+    }
+
+    return result;
+  }
+
+  // Parse HTML content from YouVersion passages API to extract individual verses
+  // HTML format: <div><div class="pi"><span class="yv-v" v="1"></span><span class="yv-vlbl">1</span>Verse text... <span class="yv-v" v="2"></span>...
+  static parseChapterHtml(html: string, bookKey: string, chapterNumber: number, translationKey: string): BibleVerseText[] {
+    const result: BibleVerseText[] = [];
+
+    // Match verse markers: <span class="yv-v" v="N"></span>
+    // The text after each marker (until the next marker or end) is the verse content
+    const verseMarkerRegex = /<span class="yv-v" v="(\d+)"><\/span>/g;
+
+    // Find all verse marker positions
+    const markers: { verseNum: number; index: number }[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = verseMarkerRegex.exec(html)) !== null) {
+      markers.push({
+        verseNum: parseInt(match[1], 10),
+        index: match.index + match[0].length
+      });
+    }
+
+    // Extract text between markers
+    for (let i = 0; i < markers.length; i++) {
+      const startIdx = markers[i].index;
+
+      // Find the end position (next verse marker or end of content)
+      let rawText = "";
+      if (i + 1 < markers.length) {
+        // Find the position of the next <span class="yv-v" marker
+        const nextMarkerMatch = html.substring(startIdx).match(/<span class="yv-v" v="\d+"><\/span>/);
+        if (nextMarkerMatch && nextMarkerMatch.index !== undefined) {
+          rawText = html.substring(startIdx, startIdx + nextMarkerMatch.index);
+        } else {
+          rawText = html.substring(startIdx);
+        }
+      } else {
+        rawText = html.substring(startIdx);
+      }
+
+      // Remove HTML tags and clean up
+      const verseText = this.stripHtml(rawText);
+
+      if (verseText.trim()) {
+        const verseNum = markers[i].verseNum;
+        // Check if this verse starts a new paragraph (inside a <div class="pi"> or similar)
+        const beforeMarker = html.substring(Math.max(0, markers[i].index - 100), markers[i].index);
+        const newParagraph = beforeMarker.includes('<div class="pi">') || beforeMarker.includes('<div class="p">');
+
+        result.push({
+          translationKey,
+          verseKey: `${bookKey}.${chapterNumber}.${verseNum}`,
+          bookKey,
+          chapterNumber,
+          verseNumber: verseNum,
+          content: verseText.trim(),
+          newParagraph
+        });
       }
     }
 
     return result;
+  }
+
+  // Strip HTML tags and decode entities
+  static stripHtml(html: string): string {
+    // Remove verse label spans like <span class="yv-vlbl">1</span>
+    let text = html.replace(/<span class="yv-vlbl">\d+<\/span>/g, "");
+    // Remove all other HTML tags
+    text = text.replace(/<[^>]*>/g, "");
+    // Decode common HTML entities
+    text = text.replace(/&amp;/g, "&");
+    text = text.replace(/&lt;/g, "<");
+    text = text.replace(/&gt;/g, ">");
+    text = text.replace(/&quot;/g, '"');
+    text = text.replace(/&#39;/g, "'");
+    text = text.replace(/&nbsp;/g, " ");
+    // Clean up whitespace
+    text = text.replace(/\s+/g, " ");
+    return text;
   }
 
   static async getCopyright(translationKey: string) {
