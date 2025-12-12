@@ -157,83 +157,64 @@ export class YouVersionHelper {
     return result;
   }
 
-  // Parse HTML content from YouVersion passages API to extract individual verses
-  // HTML format: <div><div class="pi"><span class="yv-v" v="1"></span><span class="yv-vlbl">1</span>Verse text... <span class="yv-v" v="2"></span>...
-  static parseChapterHtml(html: string, bookKey: string, chapterNumber: number, translationKey: string): BibleVerseText[] {
-    const result: BibleVerseText[] = [];
+  // Parse YouVersion HTML and return array of verses with their numbers and text
+  // HTML format: <span class="yv-v" v="1"></span><span class="yv-vlbl">1</span>Text...<span class="yv-v" v="2"></span>...
+  static parseVersesFromHtml(html: string): { verseNumber: number; text: string }[] {
+    const result: { verseNumber: number; text: string }[] = [];
 
-    // Match verse markers: <span class="yv-v" v="N"></span>
-    // The text after each marker (until the next marker or end) is the verse content
-    const verseMarkerRegex = /<span class="yv-v" v="(\d+)"><\/span>/g;
+    // Split by verse markers, keeping the marker in the result
+    // Each verse starts with <span class="yv-v" v="N"></span>
+    const parts = html.split(/(?=<span class="yv-v" v="\d+"><\/span>)/);
 
-    // Find all verse marker positions
-    const markers: { verseNum: number; index: number }[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = verseMarkerRegex.exec(html)) !== null) {
-      markers.push({
-        verseNum: parseInt(match[1], 10),
-        index: match.index + match[0].length
-      });
-    }
+    for (const part of parts) {
+      // Extract verse number from the marker
+      const verseMatch = part.match(/<span class="yv-v" v="(\d+)"><\/span>/);
+      if (!verseMatch) continue;
 
-    // Extract text between markers
-    for (let i = 0; i < markers.length; i++) {
-      const startIdx = markers[i].index;
+      const verseNumber = parseInt(verseMatch[1], 10);
 
-      // Find the end position (next verse marker or end of content)
-      let rawText = "";
-      if (i + 1 < markers.length) {
-        // Find the position of the next <span class="yv-v" marker
-        const nextMarkerMatch = html.substring(startIdx).match(/<span class="yv-v" v="\d+"><\/span>/);
-        if (nextMarkerMatch && nextMarkerMatch.index !== undefined) {
-          rawText = html.substring(startIdx, startIdx + nextMarkerMatch.index);
-        } else {
-          rawText = html.substring(startIdx);
-        }
-      } else {
-        rawText = html.substring(startIdx);
-      }
+      // Get content after the verse marker
+      let content = part.substring(verseMatch[0].length);
 
-      // Remove HTML tags and clean up
-      const verseText = this.stripHtml(rawText);
+      // Remove verse label spans like <span class="yv-vlbl">1</span>
+      content = content.replace(/<span class="yv-vlbl">\d+<\/span>/g, "");
 
-      if (verseText.trim()) {
-        const verseNum = markers[i].verseNum;
-        // Check if this verse starts a new paragraph (inside a <div class="pi"> or similar)
-        const beforeMarker = html.substring(Math.max(0, markers[i].index - 100), markers[i].index);
-        const newParagraph = beforeMarker.includes('<div class="pi">') || beforeMarker.includes('<div class="p">');
+      // Remove all HTML tags
+      content = content.replace(/<[^>]*>/g, "");
 
-        result.push({
-          translationKey,
-          verseKey: `${bookKey}.${chapterNumber}.${verseNum}`,
-          bookKey,
-          chapterNumber,
-          verseNumber: verseNum,
-          content: verseText.trim(),
-          newParagraph
-        });
+      // Decode HTML entities
+      content = content
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, " ");
+
+      // Normalize whitespace
+      content = content.replace(/\s+/g, " ").trim();
+
+      if (content) {
+        result.push({ verseNumber, text: content });
       }
     }
 
     return result;
   }
 
-  // Strip HTML tags and decode entities
-  static stripHtml(html: string): string {
-    // Remove verse label spans like <span class="yv-vlbl">1</span>
-    let text = html.replace(/<span class="yv-vlbl">\d+<\/span>/g, "");
-    // Remove all other HTML tags
-    text = text.replace(/<[^>]*>/g, "");
-    // Decode common HTML entities
-    text = text.replace(/&amp;/g, "&");
-    text = text.replace(/&lt;/g, "<");
-    text = text.replace(/&gt;/g, ">");
-    text = text.replace(/&quot;/g, '"');
-    text = text.replace(/&#39;/g, "'");
-    text = text.replace(/&nbsp;/g, " ");
-    // Clean up whitespace
-    text = text.replace(/\s+/g, " ");
-    return text;
+  // Build BibleVerseText objects from parsed verses
+  static parseChapterHtml(html: string, bookKey: string, chapterNumber: number, translationKey: string): BibleVerseText[] {
+    const verses = this.parseVersesFromHtml(html);
+
+    return verses.map(v => ({
+      translationKey,
+      verseKey: `${bookKey}.${chapterNumber}.${v.verseNumber}`,
+      bookKey,
+      chapterNumber,
+      verseNumber: v.verseNumber,
+      content: v.text,
+      newParagraph: false
+    }));
   }
 
   static async getCopyright(translationKey: string) {
