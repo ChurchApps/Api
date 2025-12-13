@@ -56,7 +56,7 @@ export class NotificationRepo extends ConfiguredRepo<Notification> {
   }
 
   public loadForPerson(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? AND isNew=1 ORDER BY timeSent DESC", [churchId, personId]);
+    return TypedDB.query("SELECT * FROM notifications WHERE churchId=? AND personId=? ORDER BY timeSent DESC", [churchId, personId]);
   }
 
   public async loadNewCounts(churchId: string, personId: string) {
