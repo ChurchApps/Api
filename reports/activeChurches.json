@@ -12,7 +12,7 @@
         "from accessLogs al",
         "inner join churches c on c.id=al.churchId",
         "where al.loginTime>:startDate",
-        "and al.appName=:appName",
+        "and (al.appName=:appName OR (:appName IN ('Chums', 'B1Admin') AND al.appName IN ('Chums', 'B1Admin')))",
         "group by c.id, c.name, c.city, c.state",
         "order by c.name"
       ]
@@ -33,7 +33,7 @@
       "sourceKey": "provided",
       "options": [
         {
-          "text": "CHUMS",
+          "text": "B1 Admin (formerly CHUMS)",
           "value": "Chums"
         },
         {

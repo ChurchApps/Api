@@ -16,6 +16,6 @@ export class AccessLogRepo extends ConfiguredRepo<AccessLog> {
   // For compatibility with existing controllers
   public async create(log: AccessLog) {
     log.id = this.createId();
-    return super.save(log);
+    return super.create(log);
   }
 }

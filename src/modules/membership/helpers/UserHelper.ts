@@ -57,7 +57,7 @@ export class UserHelper {
   }
 
   static sendWelcomeEmail(email: string, loginLink: string, appName: string, appUrl: string): Promise<any> {
-    if (!appName) appName = "Church Apps";
+    if (!appName) appName = "ChurchApps";
     if (!appUrl) appUrl = Environment.b1AdminRoot;
 
     const contents =
@@ -70,7 +70,7 @@ export class UserHelper {
   }
 
   static sendForgotEmail(email: string, loginLink: string, appName: string, appUrl: string): Promise<any> {
-    if (!appName) appName = "Live Church Solutions";
+    if (!appName) appName = "ChurchApps";
     if (!appUrl) appUrl = Environment.b1AdminRoot;
 
     const contents =
