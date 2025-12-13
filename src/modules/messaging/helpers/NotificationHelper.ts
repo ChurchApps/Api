@@ -521,14 +521,32 @@ export class NotificationHelper {
       const allEmailData = await this.getEmailData(todoPrefs);
       console.log("[NotificationHelper.sendEmailNotifications] Got " + (allEmailData?.length || 0) + " email addresses");
 
+      // Collect sender personIds from PMs to fetch their emails for reply-to
+      const senderPersonIds = [...new Set(allPMs.map(pm => pm.fromPersonId).filter(id => id))];
+      let senderEmailData: any[] = [];
+      if (senderPersonIds.length > 0) {
+        console.log("[NotificationHelper.sendEmailNotifications] Fetching sender emails for reply-to...");
+        const senderPrefs = senderPersonIds.map(personId => ({ personId } as NotificationPreference));
+        senderEmailData = await this.getEmailData(senderPrefs);
+        console.log("[NotificationHelper.sendEmailNotifications] Got " + (senderEmailData?.length || 0) + " sender email addresses");
+      }
+
       todoPrefs.forEach((pref) => {
         const notifications: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
         const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
-        console.log("[NotificationHelper.sendEmailNotifications] Person " + pref.personId + ": email=" + (emailData?.email || "NOT FOUND") + ", notifications=" + notifications.length + ", pms=" + pms.length);
+
+        // Get sender email for reply-to (use first PM's sender if multiple)
+        let senderEmail: string | undefined;
+        if (pms.length > 0 && pms[0].fromPersonId) {
+          const senderData = ArrayHelper.getOne(senderEmailData, "id", pms[0].fromPersonId);
+          senderEmail = senderData?.email;
+        }
+
+        console.log("[NotificationHelper.sendEmailNotifications] Person " + pref.personId + ": email=" + (emailData?.email || "NOT FOUND") + ", notifications=" + notifications.length + ", pms=" + pms.length + ", replyTo=" + (senderEmail || "none"));
         if (emailData?.email && (notifications.length > 0 || pms.length > 0)) {
           console.log("[NotificationHelper.sendEmailNotifications] Queuing email to " + emailData.email);
-          promises.push(this.sendEmailNotification(emailData.email, notifications, pms));
+          promises.push(this.sendEmailNotification(emailData.email, notifications, pms, senderEmail));
         } else {
           console.log("[NotificationHelper.sendEmailNotifications] Skipping person " + pref.personId + " - no email or no items");
         }
@@ -587,8 +605,8 @@ export class NotificationHelper {
     }
   };
 
-  static sendEmailNotification = async (email: string, notifications: Notification[], privateMessages: PrivateMessage[]) => {
-    console.log("[NotificationHelper.sendEmailNotification] Starting email send to: " + email);
+  static sendEmailNotification = async (email: string, notifications: Notification[], privateMessages: PrivateMessage[], senderEmail?: string) => {
+    console.log("[NotificationHelper.sendEmailNotification] Starting email send to: " + email + (senderEmail ? " (reply-to: " + senderEmail + ")" : ""));
     let title = "";
     let content = "";
 
@@ -627,10 +645,13 @@ export class NotificationHelper {
     console.log("[NotificationHelper.sendEmailNotification] Email title: " + title);
     console.log("[NotificationHelper.sendEmailNotification] Calling EmailHelper.sendTemplatedEmail...");
 
+    // Use reply-to for PM emails (so recipient can reply directly to sender)
+    const replyTo = pmCount > 0 && senderEmail ? senderEmail : undefined;
+
     let emailSuccess = true;
     let emailError: string | undefined;
     try {
-      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html");
+      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html", replyTo);
       console.log("[NotificationHelper.sendEmailNotification] Email sent successfully to " + email);
     } catch (error) {
       emailSuccess = false;
