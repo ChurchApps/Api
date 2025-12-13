@@ -99,6 +99,25 @@ export class NotificationController extends MessagingBaseController {
     }) as any;
   }
 
+  /*
+  @httpGet("/tmp15Min")
+  public async tmp15Min(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      console.log("[tmp15Min] Endpoint called, initializing NotificationHelper...");
+      NotificationHelper.init(this.repos);
+
+      console.log("[tmp15Min] Step 1: Escalating unread notifications...");
+      const escalationResult = await NotificationHelper.escalateDelivery();
+      console.log("[tmp15Min] escalateDelivery result:", JSON.stringify(escalationResult));
+
+      console.log("[tmp15Min] Step 2: Processing individual email notifications...");
+      const emailResult = await NotificationHelper.sendEmailNotifications("individual");
+      console.log("[tmp15Min] sendEmailNotifications result:", JSON.stringify(emailResult));
+
+      return { escalationResult, emailResult };
+    }) as any;
+  }*/
+
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
