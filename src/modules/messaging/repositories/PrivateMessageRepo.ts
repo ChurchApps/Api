@@ -71,7 +71,7 @@ export class PrivateMessageRepo extends ConfiguredRepo<PrivateMessage> {
   }
 
   public loadUndelivered() {
-    const sql = "SELECT * FROM privateMessages WHERE notifyPersonId IS NOT NULL AND (deliveryMethod IS NULL OR deliveryMethod='' OR deliveryMethod='push' OR deliveryMethod='socket')";
+    const sql = "SELECT * FROM privateMessages WHERE notifyPersonId IS NOT NULL AND (deliveryMethod IS NULL OR deliveryMethod='' OR deliveryMethod='push' OR deliveryMethod='socket' OR deliveryMethod='email')";
     return TypedDB.query(sql, []);
   }
 
