@@ -55,6 +55,146 @@ export class NotificationHelper {
     }
   };
 
+  // Escalation levels: 0=socket, 1=push, 2=email
+  static attemptDeliveryWithEscalation = async (
+    churchId: string,
+    personId: string,
+    startLevel: number,
+    title: string,
+    body: string,
+    contentType: string,
+    contentId: string
+  ): Promise<string> => {
+    this.ensureInitialized();
+
+    // Load user preferences
+    let pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
+    if (!pref) {
+      pref = await this.createNotificationPref(churchId, personId);
+    }
+
+    // Level 0: Try Socket
+    if (startLevel <= 0) {
+      const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
+      if (connections.length > 0) {
+        await DeliveryHelper.sendMessages(connections, {
+          churchId,
+          conversationId: "alert",
+          action: contentType === "privateMessage" ? "privateMessage" : "notification",
+          data: {}
+        });
+        for (const conn of connections) {
+          await this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId);
+        }
+        return "socket"; // Stop here, let 15-min timer escalate if unread
+      }
+    }
+
+    // Level 1: Try Push
+    if (startLevel <= 1) {
+      if (pref.allowPush) {
+        const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
+        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
+
+        if (expoPushTokens.length > 0) {
+          try {
+            const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, body, contentType, contentId);
+            for (let i = 0; i < expoPushTokens.length; i++) {
+              const ticket = tickets?.[i];
+              const success = ticket?.status === "ok";
+              const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
+              await this.logDelivery(churchId, personId, contentType, contentId, "push", success, expoPushTokens[i], errorMsg);
+              if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
+            }
+            return "push"; // Stop here, let 15-min timer escalate if unread
+          } catch (error) {
+            console.error("Push notification failed:", error);
+            for (const token of expoPushTokens) {
+              await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
+            }
+          }
+        }
+      }
+    }
+
+    // Level 2: Email
+    if (pref.emailFrequency === "never") {
+      return "complete"; // End of line, no email wanted
+    } else if (pref.emailFrequency === "individual") {
+      // Send email immediately - the sendEmailNotifications will handle this
+      // For now, mark as "email" to indicate it's ready for immediate send
+      return "email";
+    } else {
+      // daily - wait for midnight timer
+      return "email";
+    }
+  };
+
+  static escalateDelivery = async () => {
+    this.ensureInitialized();
+    console.log("[NotificationHelper.escalateDelivery] Starting escalation check...");
+
+    // Load notifications pending escalation
+    const pendingNotifications: Notification[] = (await NotificationHelper.repos.notification.loadPendingEscalation()) as any[];
+    console.log("[NotificationHelper.escalateDelivery] Found " + pendingNotifications.length + " notifications pending escalation");
+
+    // Load private messages pending escalation
+    const pendingPMs: PrivateMessage[] = (await NotificationHelper.repos.privateMessage.loadPendingEscalation()) as any[];
+    console.log("[NotificationHelper.escalateDelivery] Found " + pendingPMs.length + " PMs pending escalation");
+
+    // Escalate notifications
+    for (const notification of pendingNotifications) {
+      const currentLevel = notification.deliveryMethod === "socket" ? 0 : 1;
+      const nextLevel = currentLevel + 1;
+
+      let title = "New Notification";
+      if (notification.message.includes("Volunteer Requests:")) {
+        title = "New Plan Assignment";
+      } else if (notification.message.startsWith("New message:")) {
+        title = notification.message;
+      } else {
+        title = notification.message;
+      }
+
+      const newMethod = await this.attemptDeliveryWithEscalation(
+        notification.churchId,
+        notification.personId,
+        nextLevel,
+        title,
+        notification.message,
+        "notification",
+        notification.id
+      );
+
+      notification.deliveryMethod = newMethod;
+      await NotificationHelper.repos.notification.save(notification);
+      console.log("[NotificationHelper.escalateDelivery] Notification " + notification.id + " escalated from " + (currentLevel === 0 ? "socket" : "push") + " to " + newMethod);
+    }
+
+    // Escalate private messages
+    for (const pm of pendingPMs) {
+      const currentLevel = pm.deliveryMethod === "socket" ? 0 : 1;
+      const nextLevel = currentLevel + 1;
+
+      const newMethod = await this.attemptDeliveryWithEscalation(
+        pm.churchId,
+        pm.notifyPersonId,
+        nextLevel,
+        "New Private Message",
+        "You have a new private message",
+        "privateMessage",
+        pm.id
+      );
+
+      pm.deliveryMethod = newMethod;
+      await NotificationHelper.repos.privateMessage.save(pm);
+      console.log("[NotificationHelper.escalateDelivery] PM " + pm.id + " escalated from " + (currentLevel === 0 ? "socket" : "push") + " to " + newMethod);
+    }
+
+    console.log("[NotificationHelper.escalateDelivery] Escalation complete");
+    return { notificationsEscalated: pendingNotifications.length, pmsEscalated: pendingPMs.length };
+  };
+
   static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string) => {
     this.ensureInitialized();
     switch (conversation.contentType) {
@@ -64,9 +204,20 @@ export class NotificationHelper {
       case "privateMessage": {
         const pm: PrivateMessage = await NotificationHelper.repos.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
+
+        // Use escalation logic - start at level 0 (socket)
+        const deliveryMethod = await this.attemptDeliveryWithEscalation(
+          message.churchId,
+          pm.notifyPersonId,
+          0, // Start at socket level
+          `New Message from ${message.displayName}`,
+          message.content,
+          "privateMessage",
+          pm.id || conversation.id
+        );
+
+        pm.deliveryMethod = deliveryMethod;
         await NotificationHelper.repos.privateMessage.save(pm);
-        // Send immediate push/socket notification (don't set deliveryMethod - let email timer handle that)
-        await this.notifyUserForPrivateMessage(message.churchId, pm.notifyPersonId, message.displayName, message.content, conversation.id);
         break;
       }
       default: {
@@ -112,8 +263,30 @@ export class NotificationHelper {
       const promises: Promise<Notification>[] = [];
       notifications.forEach((n) => {
         const promise = NotificationHelper.repos.notification.save(n).then(async (notification) => {
-          // Send immediate push/socket notification (don't set deliveryMethod - let email timer handle that)
-          await NotificationHelper.notifyUserForGeneralNotification(n.churchId, n.personId, n.message, notification.id);
+          // Use escalation logic - start at level 0 (socket)
+          let title = "New Notification";
+          if (n.message.includes("Volunteer Requests:")) {
+            title = "New Plan Assignment";
+          } else if (n.message.startsWith("New message:")) {
+            title = n.message;
+          } else {
+            title = n.message;
+          }
+
+          const deliveryMethod = await NotificationHelper.attemptDeliveryWithEscalation(
+            n.churchId,
+            n.personId,
+            0, // Start at socket level
+            title,
+            n.message,
+            "notification",
+            notification.id
+          );
+
+          // Save the delivery method
+          notification.deliveryMethod = deliveryMethod;
+          await NotificationHelper.repos.notification.save(notification);
+
           return notification;
         });
         promises.push(promise);
@@ -330,8 +503,8 @@ export class NotificationHelper {
       }
       console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + ": emailFrequency=" + pref.emailFrequency + ", notifications=" + notifications.length + ", pms=" + pms.length);
       if (pref.emailFrequency === "never") {
-        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " has email disabled, marking as 'none'");
-        promises = promises.concat(this.markMethod(notifications, pms, "none"));
+        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " has email disabled, marking as 'complete'");
+        promises = promises.concat(this.markMethod(notifications, pms, "complete"));
       } else if (pref.emailFrequency === frequency) {
         console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " matches frequency '" + frequency + "', adding to todo");
         todoPrefs.push(pref);
@@ -476,10 +649,10 @@ export class NotificationHelper {
     }
 
     if (emailSuccess) {
-      console.log("[NotificationHelper.sendEmailNotification] Marking " + notifications.length + " notifications and " + privateMessages.length + " PMs as delivered via email");
-      const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "email");
+      console.log("[NotificationHelper.sendEmailNotification] Marking " + notifications.length + " notifications and " + privateMessages.length + " PMs as complete");
+      const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "complete");
       await Promise.all(promises);
-      console.log("[NotificationHelper.sendEmailNotification] Delivery method updated successfully");
+      console.log("[NotificationHelper.sendEmailNotification] Delivery method updated to complete");
     } else {
       console.log("[NotificationHelper.sendEmailNotification] Email failed, NOT marking items as delivered");
     }

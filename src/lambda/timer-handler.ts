@@ -36,13 +36,17 @@ export const handle15MinTimer = async (_event: ScheduledEvent, _context: Context
     await initEnv();
     console.log("[handle15MinTimer] initEnv completed in", Date.now() - startTime, "ms");
 
-    console.log("[handle15MinTimer] Processing individual email notifications...");
-
     // Run within messaging module context
     await TypedDB.runWithContext("messaging", async () => {
-      console.log("[handle15MinTimer] Inside messaging context, calling sendEmailNotifications('individual')...");
-      const result = await NotificationHelper.sendEmailNotifications("individual");
-      console.log("[handle15MinTimer] sendEmailNotifications result:", JSON.stringify(result));
+      // Step 1: Escalate notifications that haven't been read
+      console.log("[handle15MinTimer] Escalating unread notifications...");
+      const escalationResult = await NotificationHelper.escalateDelivery();
+      console.log("[handle15MinTimer] escalateDelivery result:", JSON.stringify(escalationResult));
+
+      // Step 2: Process individual email notifications (for users with "individual" email frequency)
+      console.log("[handle15MinTimer] Processing individual email notifications...");
+      const emailResult = await NotificationHelper.sendEmailNotifications("individual");
+      console.log("[handle15MinTimer] sendEmailNotifications result:", JSON.stringify(emailResult));
     });
     console.log("[handle15MinTimer] ========== TIMER COMPLETE ==========");
     console.log("[handle15MinTimer] Total execution time:", Date.now() - startTime, "ms");

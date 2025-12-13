@@ -44,13 +44,13 @@ export class NotificationRepo extends ConfiguredRepo<Notification> {
   }
 
   public async markRead(churchId: string, personId: string) {
-    const sql = "UPDATE notifications SET isNew=0 WHERE churchId=? AND personId=?;";
+    const sql = "UPDATE notifications SET isNew=0, deliveryMethod='complete' WHERE churchId=? AND personId=?;";
     const params = [churchId, personId];
     await TypedDB.query(sql, params);
   }
 
   public async markAllRead(churchId: string, personId: string) {
-    const sql = "UPDATE notifications SET isNew=0 WHERE churchId=? AND personId=?;";
+    const sql = "UPDATE notifications SET isNew=0, deliveryMethod='complete' WHERE churchId=? AND personId=?;";
     const params = [churchId, personId];
     await TypedDB.query(sql, params);
   }
@@ -101,5 +101,10 @@ export class NotificationRepo extends ConfiguredRepo<Notification> {
   public loadExistingUnread(churchId: string, contentType: string, contentId: string) {
     const sql = "SELECT * FROM notifications WHERE churchId=? AND contentType=? AND contentId=? AND isNew=1";
     return TypedDB.query(sql, [churchId, contentType, contentId]);
+  }
+
+  public loadPendingEscalation() {
+    const sql = "SELECT * FROM notifications WHERE isNew=1 AND deliveryMethod IN ('socket', 'push')";
+    return TypedDB.query(sql, []);
   }
 }
