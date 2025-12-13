@@ -8,12 +8,34 @@ export class DeviceController extends MessagingBaseController {
   @httpPost("/enroll")
   public async enroll(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      let result = await this.repos.device.loadByDeviceId(req.body.deviceId);
+      // Look up existing device by fcmToken and churchId (for mobile app registration)
+      let result = await this.repos.device.loadByFcmToken(au.churchId, req.body.fcmToken);
+
+      // Fall back to deviceId lookup for pairing code flow
+      if (!result && req.body.deviceId) {
+        result = await this.repos.device.loadByDeviceId(req.body.deviceId);
+      }
+
       if (result) {
-        result.pairingCode = req.body.pairingCode;
-        result.personId = null;
+        // Update existing device
+        result.fcmToken = req.body.fcmToken || result.fcmToken;
+        result.personId = req.body.personId || null;
+        result.label = req.body.label || result.label;
+        result.deviceInfo = req.body.deviceInfo || result.deviceInfo;
+        result.pairingCode = req.body.pairingCode || result.pairingCode;
+        result.lastActiveDate = new Date();
         await this.repos.device.save(result);
-      } else result = await this.repos.device.save(req.body);
+      } else {
+        // Create new device
+        const device: Device = {
+          ...req.body,
+          churchId: au.churchId,
+          appName: req.body.appName || "B1Mobile",
+          registrationDate: new Date(),
+          lastActiveDate: new Date()
+        };
+        result = await this.repos.device.save(device);
+      }
       return result;
     });
   }
