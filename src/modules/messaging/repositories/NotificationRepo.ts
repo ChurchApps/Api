@@ -9,8 +9,8 @@ export class NotificationRepo extends ConfiguredRepo<Notification> {
     return {
       tableName: "notifications",
       hasSoftDelete: false,
-      insertColumns: ["personId", "contentType", "contentId", "message", "link", "deliveryMethod"],
-      updateColumns: ["contentType", "contentId", "isNew", "message", "link", "deliveryMethod"],
+      insertColumns: ["personId", "contentType", "contentId", "message", "link", "deliveryMethod", "triggeredByPersonId"],
+      updateColumns: ["contentType", "contentId", "isNew", "message", "link", "deliveryMethod", "triggeredByPersonId"],
       insertLiterals: { timeSent: "NOW()", isNew: "1" }
     };
   }
@@ -81,7 +81,8 @@ export class NotificationRepo extends ConfiguredRepo<Notification> {
       isNew: data.isNew,
       message: data.message,
       link: data.link,
-      deliveryMethod: data.deliveryMethod
+      deliveryMethod: data.deliveryMethod,
+      triggeredByPersonId: data.triggeredByPersonId
     };
   }
 

@@ -76,14 +76,14 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/create")
   public async create(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return await NotificationHelper.createNotifications(req.body.peopleIds, au.churchId, req.body.contentType, req.body.contentId, req.body.message, req.body?.link);
+      return await NotificationHelper.createNotifications(req.body.peopleIds, au.churchId, req.body.contentType, req.body.contentId, req.body.message, req.body?.link, au.personId);
     }) as any;
   }
 
   @httpPost("/ping")
   public async ping(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await NotificationHelper.createNotifications([req.body.personId], req.body.churchId, req.body.contentType, req.body.contentId, req.body.message);
+      return await NotificationHelper.createNotifications([req.body.personId], req.body.churchId, req.body.contentType, req.body.contentId, req.body.message, undefined, req.body.triggeredByPersonId);
     }) as any;
   }
 

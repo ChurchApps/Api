@@ -9,4 +9,5 @@ export class Notification {
   public message?: string;
   public link?: string;
   public deliveryMethod?: string;
+  public triggeredByPersonId?: string;
 }

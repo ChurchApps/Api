@@ -227,14 +227,14 @@ export class NotificationHelper {
           for (let i = peopleIds.length - 1; i >= 0; i--) {
             if (peopleIds[i] === senderPersonId) peopleIds.splice(i, 1);
           }
-          await this.createNotifications(peopleIds, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + conversation.title);
+          await this.createNotifications(peopleIds, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + conversation.title, undefined, senderPersonId);
         }
         break;
       }
     }
   };
 
-  static createNotifications = async (peopleIds: string[], churchId: string, contentType: string, contentId: string, message: string, link?: string) => {
+  static createNotifications = async (peopleIds: string[], churchId: string, contentType: string, contentId: string, message: string, link?: string, triggeredByPersonId?: string) => {
     this.ensureInitialized();
     const notifications: Notification[] = [];
     peopleIds.forEach((personId: string) => {
@@ -246,7 +246,8 @@ export class NotificationHelper {
         timeSent: new Date(),
         isNew: true,
         message,
-        link
+        link,
+        triggeredByPersonId
       };
       notifications.push(notification);
     });
@@ -521,14 +522,22 @@ export class NotificationHelper {
       const allEmailData = await this.getEmailData(todoPrefs);
       console.log("[NotificationHelper.sendEmailNotifications] Got " + (allEmailData?.length || 0) + " email addresses");
 
-      // Collect sender personIds from PMs to fetch their emails for reply-to
-      const senderPersonIds = [...new Set(allPMs.map(pm => pm.fromPersonId).filter(id => id))];
-      let senderEmailData: any[] = [];
-      if (senderPersonIds.length > 0) {
-        console.log("[NotificationHelper.sendEmailNotifications] Fetching sender emails for reply-to...");
-        const senderPrefs = senderPersonIds.map(personId => ({ personId } as NotificationPreference));
-        senderEmailData = await this.getEmailData(senderPrefs);
-        console.log("[NotificationHelper.sendEmailNotifications] Got " + (senderEmailData?.length || 0) + " sender email addresses");
+      // Collect sender personIds from PMs and triggeredByPersonIds from notifications for reply-to
+      console.log("[NotificationHelper.sendEmailNotifications] allPMs sample for sender lookup: " + JSON.stringify(allPMs.slice(0, 2).map(pm => ({ id: pm.id, fromPersonId: pm.fromPersonId, notifyPersonId: pm.notifyPersonId }))));
+      const pmSenderIds = allPMs.map(pm => pm.fromPersonId).filter(id => id);
+      const notifTriggerIds = allNotifications.map(n => n.triggeredByPersonId).filter(id => id);
+      const allTriggerPersonIds = [...new Set([...pmSenderIds, ...notifTriggerIds])];
+      console.log("[NotificationHelper.sendEmailNotifications] allTriggerPersonIds (PM senders + notification triggers): " + JSON.stringify(allTriggerPersonIds));
+
+      let triggerEmailData: any[] = [];
+      if (allTriggerPersonIds.length > 0) {
+        console.log("[NotificationHelper.sendEmailNotifications] Fetching trigger/sender emails for reply-to...");
+        const triggerPrefs = allTriggerPersonIds.map(personId => ({ personId } as NotificationPreference));
+        triggerEmailData = await this.getEmailData(triggerPrefs);
+        console.log("[NotificationHelper.sendEmailNotifications] Got " + (triggerEmailData?.length || 0) + " trigger email addresses");
+        console.log("[NotificationHelper.sendEmailNotifications] triggerEmailData: " + JSON.stringify(triggerEmailData));
+      } else {
+        console.log("[NotificationHelper.sendEmailNotifications] No trigger personIds found, skipping reply-to lookup");
       }
 
       todoPrefs.forEach((pref) => {
@@ -536,11 +545,15 @@ export class NotificationHelper {
         const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
 
-        // Get sender email for reply-to (use first PM's sender if multiple)
+        // Get sender/trigger email for reply-to
+        // Priority: PM sender > notification triggeredBy
         let senderEmail: string | undefined;
         if (pms.length > 0 && pms[0].fromPersonId) {
-          const senderData = ArrayHelper.getOne(senderEmailData, "id", pms[0].fromPersonId);
+          const senderData = ArrayHelper.getOne(triggerEmailData, "id", pms[0].fromPersonId);
           senderEmail = senderData?.email;
+        } else if (notifications.length > 0 && notifications[0].triggeredByPersonId) {
+          const triggerData = ArrayHelper.getOne(triggerEmailData, "id", notifications[0].triggeredByPersonId);
+          senderEmail = triggerData?.email;
         }
 
         console.log("[NotificationHelper.sendEmailNotifications] Person " + pref.personId + ": email=" + (emailData?.email || "NOT FOUND") + ", notifications=" + notifications.length + ", pms=" + pms.length + ", replyTo=" + (senderEmail || "none"));
@@ -645,8 +658,8 @@ export class NotificationHelper {
     console.log("[NotificationHelper.sendEmailNotification] Email title: " + title);
     console.log("[NotificationHelper.sendEmailNotification] Calling EmailHelper.sendTemplatedEmail...");
 
-    // Use reply-to for PM emails (so recipient can reply directly to sender)
-    const replyTo = pmCount > 0 && senderEmail ? senderEmail : undefined;
+    // Use reply-to for PM/notification emails (so recipient can reply directly to sender/trigger)
+    const replyTo = senderEmail || undefined;
 
     let emailSuccess = true;
     let emailError: string | undefined;

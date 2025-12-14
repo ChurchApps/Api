@@ -70,9 +70,10 @@ export class PrivateMessageRepo extends ConfiguredRepo<PrivateMessage> {
     return TypedDB.queryOne("SELECT * FROM privateMessages WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
   }
 
-  public loadUndelivered() {
+  public async loadUndelivered() {
     const sql = "SELECT * FROM privateMessages WHERE notifyPersonId IS NOT NULL AND (deliveryMethod IS NULL OR deliveryMethod='' OR deliveryMethod='push' OR deliveryMethod='socket' OR deliveryMethod='email')";
-    return TypedDB.query(sql, []);
+    const result = await TypedDB.query(sql, []);
+    return this.mapToModels(result);
   }
 
   public async markAllRead(churchId: string, personId: string) {
