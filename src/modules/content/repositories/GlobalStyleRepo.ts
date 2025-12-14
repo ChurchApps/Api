@@ -9,7 +9,7 @@ export class GlobalStyleRepo extends ConfiguredRepo<GlobalStyle> {
     return {
       tableName: "globalStyles",
       hasSoftDelete: false,
-      columns: ["fonts", "palette", "customCss", "customJS"]
+      columns: ["fonts", "palette", "typography", "spacing", "borderRadius", "customCss", "customJS"]
     };
   }
 
@@ -35,6 +35,9 @@ export class GlobalStyleRepo extends ConfiguredRepo<GlobalStyle> {
       churchId: row.churchId,
       fonts: row.fonts,
       palette: row.palette,
+      typography: row.typography,
+      spacing: row.spacing,
+      borderRadius: row.borderRadius,
       customCss: row.customCss,
       customJS: row.customJS
     };
