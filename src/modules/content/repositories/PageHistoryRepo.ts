@@ -31,11 +31,7 @@ export class PageHistoryRepo extends ConfiguredRepo<PageHistory> {
   }
 
   public async deleteOldHistory(churchId: string, pageId: string, daysToKeep: number = 30) {
-    // Delete entries older than the specified number of days
-    await TypedDB.query(
-      `DELETE FROM pageHistory WHERE churchId=? AND pageId=? AND createdDate < DATE_SUB(NOW(), INTERVAL ? DAY);`,
-      [churchId, pageId, daysToKeep]
-    );
+    await TypedDB.query("DELETE FROM pageHistory WHERE churchId=? AND pageId=? AND createdDate < DATE_SUB(NOW(), INTERVAL ? DAY);", [churchId, pageId, daysToKeep]);
   }
 
   protected rowToModel(row: any): PageHistory {
