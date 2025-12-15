@@ -9,6 +9,8 @@ import { Environment } from "../../../shared/helpers/Environment";
 
 export class DeliveryHelper {
   private static repos: Repos;
+  private static awsClient: ApiGatewayManagementApiClient | null = null;
+  private static awsEndpoint: string | null = null;
 
   static init(repos: Repos) {
     DeliveryHelper.repos = repos;
@@ -68,39 +70,69 @@ export class DeliveryHelper {
     }
   };
 
-  private static getApiGatewayEndpoint(): string {
+  private static getApiGatewayEndpoint(): string | null {
+    // Return cached endpoint if available
+    if (DeliveryHelper.awsEndpoint !== null) {
+      return DeliveryHelper.awsEndpoint;
+    }
+
     // Construct endpoint from auto-detected/configured values
     const apiGatewayId = process.env.WEBSOCKET_API_ID;
     const region = process.env.AWS_REGION || "us-east-2";
     const stage = process.env.STAGE || process.env.ENVIRONMENT || "dev";
 
     if (!apiGatewayId) {
-      console.error("DeliveryHelper: WEBSOCKET_API_ID not available. Ensure it's set via CloudFormation output or environment variable.");
-      return "https://unconfigured-websocket-endpoint";
+      console.error("DeliveryHelper: WEBSOCKET_API_ID not available. WebSocket delivery disabled.");
+      DeliveryHelper.awsEndpoint = ""; // Cache empty string to avoid repeated lookups
+      return null;
     }
 
     const stageName = stage.charAt(0).toUpperCase() + stage.slice(1);
-    const endpoint = `https://${apiGatewayId}.execute-api.${region}.amazonaws.com/${stageName}`;
+    DeliveryHelper.awsEndpoint = `https://${apiGatewayId}.execute-api.${region}.amazonaws.com/${stageName}`;
 
-    console.log(`DeliveryHelper: Using WebSocket endpoint: ${endpoint}`);
-    return endpoint;
+    console.log(`DeliveryHelper: Using WebSocket endpoint: ${DeliveryHelper.awsEndpoint}`);
+    return DeliveryHelper.awsEndpoint;
+  }
+
+  private static getAwsClient(): ApiGatewayManagementApiClient | null {
+    const endpoint = DeliveryHelper.getApiGatewayEndpoint();
+    if (!endpoint) return null;
+
+    if (!DeliveryHelper.awsClient) {
+      DeliveryHelper.awsClient = new ApiGatewayManagementApiClient({
+        apiVersion: "2020-04-16",
+        endpoint: endpoint
+      });
+    }
+    return DeliveryHelper.awsClient;
   }
 
   static sendAws = async (connection: Connection, payload: PayloadInterface) => {
     try {
-      const endpoint = DeliveryHelper.getApiGatewayEndpoint();
-      const gwManagement = new ApiGatewayManagementApiClient({
-        apiVersion: "2020-04-16",
-        endpoint: endpoint
-      });
+      const client = DeliveryHelper.getAwsClient();
+      if (!client) {
+        // No WebSocket endpoint configured - skip delivery silently
+        return false;
+      }
+
       const command = new PostToConnectionCommand({
         ConnectionId: connection.socketId,
         Data: Buffer.from(JSON.stringify(payload))
       });
-      await gwManagement.send(command);
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("WebSocket delivery timeout")), 5000);
+      });
+
+      await Promise.race([client.send(command), timeoutPromise]);
       return true;
-    } catch (e) {
-      console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, e);
+    } catch (e: any) {
+      // GoneException means connection is stale - this is expected, don't log as error
+      if (e.name === "GoneException" || e.$metadata?.httpStatusCode === 410) {
+        return false;
+      }
+      console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, e.message || e);
       return false;
     }
   };
