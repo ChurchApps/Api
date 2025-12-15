@@ -87,8 +87,8 @@ export class DeliveryHelper {
       return null;
     }
 
-    const stageName = stage.charAt(0).toUpperCase() + stage.slice(1);
-    DeliveryHelper.awsEndpoint = `https://${apiGatewayId}.execute-api.${region}.amazonaws.com/${stageName}`;
+    // Use stage name as-is (lowercase) to match WebSocket API Gateway stage
+    DeliveryHelper.awsEndpoint = `https://${apiGatewayId}.execute-api.${region}.amazonaws.com/${stage}`;
 
     console.log(`DeliveryHelper: Using WebSocket endpoint: ${DeliveryHelper.awsEndpoint}`);
     return DeliveryHelper.awsEndpoint;
@@ -132,7 +132,15 @@ export class DeliveryHelper {
       if (e.name === "GoneException" || e.$metadata?.httpStatusCode === 410) {
         return false;
       }
-      console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, e.message || e);
+      // Log detailed error info for debugging
+      console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, {
+        name: e.name,
+        message: e.message,
+        code: e.code,
+        statusCode: e.$metadata?.httpStatusCode,
+        connectionId: connection.socketId,
+        endpoint: DeliveryHelper.awsEndpoint
+      });
       return false;
     }
   };
