@@ -9,6 +9,7 @@ export { BlockController } from "./BlockController";
 export { LinkController } from "./LinkController";
 export { GlobalStyleController } from "./GlobalStyleController";
 export { FileController } from "./FileController";
+export { PageHistoryController } from "./PageHistoryController";
 
 // Media controllers
 export { SermonController } from "./SermonController";

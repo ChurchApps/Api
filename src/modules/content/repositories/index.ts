@@ -1,6 +1,7 @@
 export { BlockRepo } from "./BlockRepo";
 export { ElementRepo } from "./ElementRepo";
 export { PageRepo } from "./PageRepo";
+export { PageHistoryRepo } from "./PageHistoryRepo";
 export { SectionRepo } from "./SectionRepo";
 export { LinkRepo } from "./LinkRepo";
 export { FileRepo } from "./FileRepo";

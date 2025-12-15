@@ -1,6 +1,7 @@
 export { Block } from "./Block";
 export { Element } from "./Element";
 export { Page } from "./Page";
+export { PageHistory } from "./PageHistory";
 export { Section } from "./Section";
 export { Link } from "./Link";
 export { GlobalStyle } from "./GlobalStyle";

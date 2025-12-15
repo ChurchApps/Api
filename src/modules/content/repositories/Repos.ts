@@ -2,6 +2,7 @@ import {
   BlockRepo,
   ElementRepo,
   PageRepo,
+  PageHistoryRepo,
   SectionRepo,
   LinkRepo,
   FileRepo,
@@ -31,6 +32,7 @@ export class Repos {
   public block: BlockRepo;
   public element: ElementRepo;
   public page: PageRepo;
+  public pageHistory: PageHistoryRepo;
   public section: SectionRepo;
   public link: LinkRepo;
   public file: FileRepo;
@@ -61,6 +63,7 @@ export class Repos {
     this.block = new BlockRepo();
     this.element = new ElementRepo();
     this.page = new PageRepo();
+    this.pageHistory = new PageHistoryRepo();
     this.section = new SectionRepo();
     this.link = new LinkRepo();
     this.file = new FileRepo();

@@ -118,4 +118,11 @@ export abstract class ConfiguredRepo<T extends { [key: string]: any }> extends B
     });
     return Promise.all(promises);
   }
+
+  /**
+   * Force insert a model, even if it has an id (bypasses save() update logic)
+   */
+  public insert(model: T): Promise<T> {
+    return this.create(model);
+  }
 }
