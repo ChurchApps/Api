@@ -15,6 +15,63 @@ export class MessageController extends MessagingBaseController {
     });
   }
 
+  @httpGet("/catchup/:churchId/:conversationId")
+  public async catchup(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message[]> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const messages: Message[] = await this.repos.message.loadForConversation(churchId, conversationId);
+      return this.repos.message.convertAllToModel(messages);
+    }) as any;
+  }
+
+  @httpPost("/send")
+  public async send(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<Message[]> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const promises: Promise<Message>[] = [];
+      req.body.forEach((message) => {
+        promises.push(
+          this.repos.message.save(message).then(async (savedMessage) => {
+            const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
+            const conv = this.repos.conversation.convertToModel(conversation);
+            await this.repos.conversation.updateStats(message.conversationId);
+
+            // Send real-time updates
+            (await DeliveryHelper.sendConversationMessages({
+              churchId: message.churchId,
+              conversationId: message.conversationId,
+              action: "message",
+              data: savedMessage
+            })) as any;
+
+            // Handle notifications
+            await NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous");
+
+            return savedMessage;
+          })
+        );
+      }) as any;
+      const result = await Promise.all(promises);
+      return this.repos.message.convertAllToModel(result as any[]);
+    }) as any;
+  }
+
+  @httpPost("/setCallout")
+  public async setCallout(req: express.Request<{}, {}, Message>, res: express.Response): Promise<Message> {
+    return this.actionWrapper(req, res, async (au) => {
+      const message = req.body;
+      if (!message.churchId && au?.churchId) message.churchId = au.churchId;
+
+      // Send real-time callout update
+      await DeliveryHelper.sendConversationMessages({
+        churchId: message.churchId,
+        conversationId: message.conversationId,
+        action: "callout",
+        data: message
+      });
+
+      return message;
+    }) as any;
+  }
+
   @httpGet("/:churchId/:id")
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message> {
     return this.actionWrapperAnon(req, res, async () => {
