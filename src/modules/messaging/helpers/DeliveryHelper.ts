@@ -17,8 +17,11 @@ export class DeliveryHelper {
   }
 
   static sendConversationMessages = async (payload: PayloadInterface) => {
+    console.log("[DeliveryHelper.sendConversationMessages] Starting - churchId:", payload.churchId, "conversationId:", payload.conversationId, "action:", payload.action);
     const connections = DeliveryHelper.repos.connection.convertAllToModel(await DeliveryHelper.repos.connection.loadForConversation(payload.churchId, payload.conversationId));
+    console.log("[DeliveryHelper.sendConversationMessages] Found connections:", connections.length, "socketIds:", connections.map(c => c.socketId));
     const deliveryCount = await this.sendMessages(connections, payload);
+    console.log("[DeliveryHelper.sendConversationMessages] Delivered to:", deliveryCount, "of", connections.length);
     if (deliveryCount !== connections.length) DeliveryHelper.sendAttendance(payload.churchId, payload.conversationId);
   };
 
@@ -36,9 +39,11 @@ export class DeliveryHelper {
   };
 
   static sendMessage = async (connection: Connection, payload: PayloadInterface) => {
+    console.log("[DeliveryHelper.sendMessage] Sending to socketId:", connection.socketId, "provider:", Environment.deliveryProvider);
     let success = true;
     if (Environment.deliveryProvider === "aws") success = await DeliveryHelper.sendAws(connection, payload);
     else success = await DeliveryHelper.sendLocal(connection, payload);
+    console.log("[DeliveryHelper.sendMessage] Result:", success);
     if (!success) await DeliveryHelper.repos.connection.delete(connection.churchId, connection.id);
     return success;
   };
