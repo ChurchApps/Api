@@ -60,7 +60,9 @@ export class FileController extends ContentBaseController {
         const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, req.body.contentType, req.body.contentId);
         if (totalBytes?.size > 100000000) return this.json({}, 401);
         else {
-          const key = "/" + au.churchId + "/files/" + req.body.fileName;
+          let key = "/" + au.churchId + "/files/" + req.body.fileName;
+          if  (req.body.contentId) key = "/" + au.churchId + "/files/" + req.body.contentType + "/" + req.body.contentId + "/" + req.body.fileName;
+          //https://content.churchapps.org/Hchi650pfrH/files/Screenshot_20251213-175855.png?dt=1765856127662
           const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key) : {};
           return result;
         }
