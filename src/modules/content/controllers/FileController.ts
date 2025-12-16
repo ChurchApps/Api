@@ -62,7 +62,6 @@ export class FileController extends ContentBaseController {
         else {
           let key = "/" + au.churchId + "/files/" + req.body.fileName;
           if  (req.body.contentId) key = "/" + au.churchId + "/files/" + req.body.contentType + "/" + req.body.contentId + "/" + req.body.fileName;
-          //https://content.churchapps.org/Hchi650pfrH/files/Screenshot_20251213-175855.png?dt=1765856127662
           const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key) : {};
           return result;
         }
