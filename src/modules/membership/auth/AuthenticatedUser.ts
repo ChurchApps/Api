@@ -37,7 +37,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     const groupIds: string[] = [];
     userChurch.groups?.forEach((g) => groupIds.push(g.id));
     const leaderGroupIds: string[] = [];
-    userChurch.groups?.forEach((g) => leaderGroupIds.push(g.id));
+    userChurch.groups?.forEach((g) => { if (g.leader) leaderGroupIds.push(g.id); });
     const options: SignOptions = { expiresIn: Environment.jwtExpiration as any };
     return jwt.sign(
       {
@@ -62,7 +62,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     const groupIds: string[] = [];
     userChurch.groups?.forEach((g) => groupIds.push(g.id));
     const leaderGroupIds: string[] = [];
-    userChurch.groups?.forEach((g) => leaderGroupIds.push(g.id));
+    userChurch.groups?.forEach((g) => { if (g.leader) leaderGroupIds.push(g.id); });
     const options: SignOptions = { expiresIn: Environment.jwtExpiration as any };
     return jwt.sign(
       {

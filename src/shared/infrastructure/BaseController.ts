@@ -1,4 +1,4 @@
-import { CustomBaseController } from "@churchapps/apihelper";
+import { AuthenticatedUser, CustomBaseController } from "@churchapps/apihelper";
 import { RepoManager } from "./RepoManager";
 import express from "express";
 
@@ -15,7 +15,7 @@ export class BaseController extends CustomBaseController {
   }
 
   // Ensure repositories are hydrated per request without duplicating code in module controllers
-  public actionWrapper(req: express.Request, res: express.Response, action: (au: any) => Promise<any>) {
+  public actionWrapper(req: express.Request, res: express.Response, action: (au: AuthenticatedUser) => Promise<any>) {
     return super.actionWrapper(req, res, async (au) => {
       (this as any).repos = await this.getRepos<any>();
       const result = await action(au);

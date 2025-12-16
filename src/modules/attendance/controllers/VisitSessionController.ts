@@ -10,15 +10,18 @@ export class VisitSessionController extends AttendanceBaseController {
   @httpPost("/log")
   public async log(req: express.Request<{}, {}, Visit>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
-      else {
-        const sessionId = (req.body as Visit).visitSessions[0].sessionId;
-        const personId = (req.body as Visit).personId;
+      const sessionId = (req.body as Visit).visitSessions[0].sessionId;
+      const personId = (req.body as Visit).personId;
 
+      // Check if user is a leader of the group this session belongs to
+      const session: Session = await this.repos.session.load(au.churchId, sessionId);
+      const isGroupLeader = session?.groupId && au.leaderGroupIds?.includes(session.groupId);
+
+      if (!au.checkAccess(Permissions.attendance.edit) && !isGroupLeader) return this.json({}, 401);
+      else {
         let newVisit = false;
         let visit: Visit = await this.repos.visit.loadForSessionPerson(au.churchId, sessionId, personId);
         if (visit == null) {
-          const session: Session = await this.repos.session.load(au.churchId, sessionId);
           visit = {
             addedBy: au.id,
             checkinTime: new Date(),
@@ -101,10 +104,18 @@ export class VisitSessionController extends AttendanceBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.attendance.view)) return this.json([], 401);
+      const sessionId = req.query.sessionId === undefined ? "" : req.query.sessionId.toString();
+
+      // Check if user is a leader of the group this session belongs to
+      let isGroupLeader = false;
+      if (sessionId !== "") {
+        const session: Session = await this.repos.session.load(au.churchId, sessionId);
+        isGroupLeader = session?.groupId && au.leaderGroupIds?.includes(session.groupId);
+      }
+
+      if (!au.checkAccess(Permissions.attendance.view) && !isGroupLeader) return this.json([], 401);
       else {
         let data;
-        const sessionId = req.query.sessionId === undefined ? "" : req.query.sessionId.toString();
         if (sessionId !== "") data = await this.repos.visitSession.loadForSession(au.churchId, sessionId);
         else data = await this.repos.visitSession.loadAll(au.churchId);
         return this.repos.visitSession.convertAllToModel(au.churchId, data as any) || [];
@@ -142,10 +153,15 @@ export class VisitSessionController extends AttendanceBaseController {
   @httpDelete("/")
   public async deleteSessionPerson(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
+      const personId = req.query.personId.toString();
+      const sessionId = req.query.sessionId.toString();
+
+      // Check if user is a leader of the group this session belongs to
+      const session: Session = await this.repos.session.load(au.churchId, sessionId);
+      const isGroupLeader = session?.groupId && au.leaderGroupIds?.includes(session.groupId);
+
+      if (!au.checkAccess(Permissions.attendance.edit) && !isGroupLeader) return this.json({}, 401);
       else {
-        const personId = req.query.personId.toString();
-        const sessionId = req.query.sessionId.toString();
         const visit: Visit = await this.repos.visit.loadForSessionPerson(au.churchId, sessionId, personId);
         if (visit !== null) {
           const existingSession = await this.repos.visitSession.loadByVisitIdSessionId(au.churchId, visit.id, sessionId);
