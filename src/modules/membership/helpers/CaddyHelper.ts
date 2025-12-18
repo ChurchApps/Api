@@ -9,117 +9,136 @@ export interface HostDial {
 }
 
 export class CaddyHelper {
-  static async updateCaddy() {
-    if (Environment.caddyHost && Environment.caddyPort) {
-      const adminUrl = "https://" + Environment.caddyHost + ":" + Environment.caddyPort + "/load";
-      const jsonData = await this.generateJsonData();
-      await axios.post(adminUrl, jsonData);
-    }
+  private static getAdminBaseUrl() {
+    return "http://" + Environment.caddyHost + ":" + Environment.caddyPort;
   }
 
-  static async generateJsonData() {
+  // Call once after Caddy restarts to set up storage and server structure
+  static async initializeCaddy() {
+    if (!Environment.caddyHost || !Environment.caddyPort) return;
+
+    const baseUrl = this.getAdminBaseUrl();
+
+    // Configure S3 storage for certificates
+    await axios.put(baseUrl + "/config/storage", {
+      module: "s3",
+      bucket: "churchapps-caddy-certs",
+      region: "us-east-2",
+      prefix: "certs"
+    });
+
+    // Create proxy server on :443 with empty routes (will be populated by updateCaddy)
+    await axios.put(baseUrl + "/config/apps/http/servers/proxy", {
+      listen: [":443"],
+      routes: []
+    });
+
+    // Create HTTP to HTTPS redirect server on :80
+    await axios.put(baseUrl + "/config/apps/http/servers/http_redirect", {
+      listen: [":80"],
+      routes: [
+        {
+          handle: [
+            {
+              handler: "static_response",
+              status_code: 308,
+              headers: {
+                Location: ["https://{http.request.host}{http.request.uri}"]
+              }
+            }
+          ]
+        }
+      ]
+    });
+  }
+
+  // Updates only the routes array on the proxy server - safe to call repeatedly
+  static async updateCaddy() {
+    if (!Environment.caddyHost || !Environment.caddyPort) return;
+
+    const adminUrl = this.getAdminBaseUrl() + "/config/apps/http/servers/proxy/routes";
+    const routes = await this.generateRoutes();
+    await axios.patch(adminUrl, routes);
+  }
+
+  // Generates the full routes array from the database
+  static async generateRoutes() {
     const repos = await RepoManager.getRepos<Repos>("membership");
     const hostDials: HostDial[] = (await repos.domain.loadPairs()) as HostDial[];
     const routes: any[] = [];
+
+    // Add exact host routes first (order matters in Caddy)
     hostDials.forEach((hd) => {
-      routes.push(this.getRoute(hd.host, hd.dial, true));
-    });
-    hostDials.forEach((hd) => {
-      routes.push(this.getWwwRoute(hd.host, hd.dial, true));
+      routes.push(this.getRoute(hd.host, hd.dial));
     });
 
-    const result = {
+    // Add www redirect routes after
+    hostDials.forEach((hd) => {
+      routes.push(this.getWwwRoute(hd.host));
+    });
+
+    return routes;
+  }
+
+  // Legacy method for backwards compatibility (used by /caddy and /test endpoints)
+  static async generateJsonData() {
+    const routes = await this.generateRoutes();
+    return {
       apps: {
         http: {
           servers: {
-            srv0: {
-              listen: [":" + Environment.caddyPort],
-              routes: [this.getRoute(Environment.caddyHost, "localhost:2019", false)]
-            },
-            srv1: {
-              listen: [":443", ":80"],
+            proxy: {
+              listen: [":443"],
               routes
             }
           }
         }
       }
     };
-    return result;
   }
 
-  private static getReverseProxyHandler(host: string, dial: string) {
+  private static getRoute(host: string, dial: string) {
+    // Parse the dial to get a clean upstream host
+    const upstreamHost = dial.includes(":")
+      ? dial
+      : dial + ":443";
+
     return {
-      handler: "reverse_proxy",
-      headers: {
-        request: {
-          set: { Host: ["{http.reverse_proxy.upstream.hostport}"] }
-        }
-      },
-      upstreams: [{ dial }]
-    };
-  }
-
-  private static getRewrite(host: string, dial: string) {
-    const dialKey = dial.replace(".b1.church:443", "");
-    const hostKey = host.replace("https://", "").replace("http://", "").replace("www.", "").replace(".com", "").replace(".org", "").replace(".net", "").replace(".church", "").replace("/", "");
-
-    if (hostKey === dialKey || dialKey.indexOf(":") !== -1) return {};
-    else
-      return {
-        uri_substring: [
-          {
-            find: "/" + hostKey + "/",
-            replace: "/" + dialKey + "/"
-          },
-          {
-            find: "/" + hostKey + ".json",
-            replace: "/" + dialKey + ".json"
-          },
-          {
-            find: "=" + hostKey,
-            replace: "=" + dialKey
-          }
-        ]
-      };
-  }
-
-  private static getRoute(host: string, dial: string, useHttps: boolean) {
-    const rewrite = this.getRewrite(host, dial);
-    const handle: any = this.getReverseProxyHandler(host, dial);
-    if (rewrite) handle.rewrite = rewrite;
-    if (useHttps) handle.transport = { protocol: "http", tls: {} };
-
-    const result: any = {
+      match: [{ host: [host] }],
       handle: [
         {
-          handler: "subroute",
-          routes: [{ handle: [handle] }]
+          handler: "reverse_proxy",
+          upstreams: [{ dial: upstreamHost }],
+          transport: {
+            protocol: "http",
+            tls: {}
+          },
+          headers: {
+            request: {
+              set: {
+                Host: ["{http.reverse_proxy.upstream.hostport}"]
+              }
+            }
+          }
         }
       ],
-      match: [{ host: [host] }],
       terminal: true
     };
-
-    // if (useHttps) result.handle[0].routes[0].handle[0].transport = { protocol: "http", tls: {} }
-    return result;
   }
 
-  private static getWwwRoute(host: string, _dial: string, _useHttps: boolean) {
-    const result: any = {
+  private static getWwwRoute(host: string) {
+    return {
+      match: [{ host: ["www." + host] }],
       handle: [
         {
           handler: "static_response",
+          status_code: 302,
           headers: {
             Location: ["https://" + host + "{http.request.uri}"]
-          },
-          status_code: "302"
+          }
         }
       ],
-      match: [{ host: ["www." + host] }],
       terminal: true
     };
-
-    // if (useHttps) result.handle[0].routes[0].handle[0].transport = { protocol: "http", tls: {} }
-    return result;
   }
 }

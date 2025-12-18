@@ -2,7 +2,7 @@ import { controller, httpPost, httpGet, requestParam } from "inversify-express-u
 import express from "express";
 import { MembershipCrudController } from "./MembershipCrudController";
 import { Domain } from "../models";
-import { CaddyHelper, Environment, Permissions } from "../helpers";
+import { CaddyHelper, Permissions } from "../helpers";
 
 @controller("/membership/domains")
 export class DomainController extends MembershipCrudController {
@@ -28,11 +28,11 @@ export class DomainController extends MembershipCrudController {
     });
   }
 
-  @httpGet("/test2")
-  public async test2(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  @httpGet("/caddy/init")
+  public async caddyInit(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const adminUrl = "https://" + Environment.caddyHost + ":" + Environment.caddyPort + "/load";
-      return { adminUrl };
+      await CaddyHelper.initializeCaddy();
+      return { success: true };
     });
   }
 
