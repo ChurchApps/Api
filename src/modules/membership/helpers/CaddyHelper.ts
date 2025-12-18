@@ -160,29 +160,35 @@ export class CaddyHelper {
   }
 
   private static getRoute(host: string, dial: string) {
-    // Parse the dial to get host and port separately
-    const dialHost = dial.includes(":") ? dial.split(":")[0] : dial;
-    const dialPort = dial.includes(":") ? dial.split(":")[1] : "443";
+    // Ensure dial has port
+    const dialWithPort = dial.includes(":") ? dial : dial + ":443";
 
     return {
       match: [{ host: [host] }],
       handle: [
         {
-          handler: "reverse_proxy",
-          upstreams: [{ dial: `${dialHost}:${dialPort}` }],
-          transport: {
-            protocol: "http",
-            tls: {
-              server_name: dialHost
+          handler: "subroute",
+          routes: [
+            {
+              handle: [
+                {
+                  handler: "reverse_proxy",
+                  upstreams: [{ dial: dialWithPort }],
+                  transport: {
+                    protocol: "http",
+                    tls: {}
+                  },
+                  headers: {
+                    request: {
+                      set: {
+                        Host: ["{http.reverse_proxy.upstream.hostport}"]
+                      }
+                    }
+                  }
+                }
+              ]
             }
-          },
-          headers: {
-            request: {
-              set: {
-                Host: [dialHost]
-              }
-            }
-          }
+          ]
         }
       ],
       terminal: true
