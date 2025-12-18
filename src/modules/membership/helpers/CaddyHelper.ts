@@ -13,57 +13,105 @@ export class CaddyHelper {
     return "http://" + Environment.caddyHost + ":" + Environment.caddyPort;
   }
 
+  private static sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Helper to PUT config, ignoring 409 conflict if key already exists
+  private static async putConfig(url: string, data: any) {
+    try {
+      await axios.put(url, data, { timeout: 10000 });
+    } catch (err: any) {
+      // 409 means key already exists - that's fine, use PATCH to update
+      if (err?.response?.status === 409) {
+        await axios.patch(url, data, { timeout: 10000 });
+      } else {
+        throw err;
+      }
+    }
+  }
+
   // Call once after Caddy restarts to set up storage and server structure
   static async initializeCaddy() {
     if (!Environment.caddyHost || !Environment.caddyPort) return;
 
     const baseUrl = this.getAdminBaseUrl();
+    const results: string[] = [];
 
-    // Configure S3 storage for certificates
-    await axios.put(baseUrl + "/config/storage", {
-      module: "s3",
-      bucket: "churchapps-caddy-certs",
-      region: "us-east-2",
-      prefix: "certs"
-    });
+    try {
+      // Configure S3 storage for certificates
+      await this.putConfig(baseUrl + "/config/storage", {
+        module: "s3",
+        bucket: "churchapps-caddy-certs",
+        region: "us-east-2",
+        prefix: "certs"
+      });
+      results.push("storage: ok");
+      await this.sleep(500); // Let Caddy stabilize after storage change
 
-    // Create proxy server on :443 with empty routes (will be populated by updateCaddy)
-    await axios.put(baseUrl + "/config/apps/http/servers/proxy", {
-      listen: [":443"],
-      routes: []
-    });
-
-    // Create HTTP to HTTPS redirect server on :80
-    await axios.put(baseUrl + "/config/apps/http/servers/http_redirect", {
-      listen: [":80"],
-      routes: [
+      // Configure TLS automation with ACME email for Let's Encrypt
+      await this.putConfig(baseUrl + "/config/apps/tls/automation/policies", [
         {
-          match: [
+          issuers: [
             {
-              path: ["/.well-known/acme-challenge/*"]
-            }
-          ],
-          handle: [
-            {
-              handler: "static_response",
-              status_code: 200
-            }
-          ]
-        },
-        {
-          handle: [
-            {
-              handler: "static_response",
-              status_code: 308,
-              headers: {
-                Location: ["https://{http.request.host}{http.request.uri}"]
-              }
+              module: "acme",
+              email: "support@livecs.org"
             }
           ]
         }
-      ]
-    });
+      ]);
+      results.push("tls: ok");
+      await this.sleep(500);
 
+      // Create proxy server on :443 with empty routes (will be populated by updateCaddy)
+      await this.putConfig(baseUrl + "/config/apps/http/servers/proxy", {
+        listen: [":443"],
+        routes: []
+      });
+      results.push("proxy: ok");
+      await this.sleep(500);
+
+      // Create HTTP to HTTPS redirect server on :80
+      await this.putConfig(baseUrl + "/config/apps/http/servers/http_redirect", {
+        listen: [":80"],
+        routes: [
+          {
+            match: [
+              {
+                path: ["/.well-known/acme-challenge/*"]
+              }
+            ],
+            handle: [
+              {
+                handler: "static_response",
+                status_code: 200
+              }
+            ]
+          },
+          {
+            handle: [
+              {
+                handler: "static_response",
+                status_code: 308,
+                headers: {
+                  Location: ["https://{http.request.host}{http.request.uri}"]
+                }
+              }
+            ]
+          }
+        ]
+      });
+      results.push("http_redirect: ok");
+
+      return { success: true, results };
+    } catch (err: any) {
+      return {
+        success: false,
+        results,
+        error: err?.message || "Unknown error",
+        step: results.length
+      };
+    }
   }
 
   // Updates only the routes array on the proxy server - safe to call repeatedly

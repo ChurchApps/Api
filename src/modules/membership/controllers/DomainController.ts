@@ -31,8 +31,7 @@ export class DomainController extends MembershipCrudController {
   @httpGet("/caddy/init")
   public async caddyInit(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      await CaddyHelper.initializeCaddy();
-      return { success: true };
+      return await CaddyHelper.initializeCaddy();
     });
   }
 
