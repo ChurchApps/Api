@@ -38,6 +38,19 @@ export class CaddyHelper {
       listen: [":80"],
       routes: [
         {
+          match: [
+            {
+              path: ["/.well-known/acme-challenge/*"]
+            }
+          ],
+          handle: [
+            {
+              handler: "static_response",
+              status_code: 200
+            }
+          ]
+        },
+        {
           handle: [
             {
               handler: "static_response",
@@ -50,6 +63,7 @@ export class CaddyHelper {
         }
       ]
     });
+
   }
 
   // Updates only the routes array on the proxy server - safe to call repeatedly
