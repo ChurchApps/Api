@@ -3,6 +3,7 @@ import express from "express";
 import { MembershipCrudController } from "./MembershipCrudController";
 import { Domain } from "../models";
 import { CaddyHelper, Permissions } from "../helpers";
+import { DomainHealthHelper } from "../helpers/DomainHealthHelper";
 
 @controller("/membership/domains")
 export class DomainController extends MembershipCrudController {
@@ -63,6 +64,13 @@ export class DomainController extends MembershipCrudController {
         await CaddyHelper.updateCaddy();
         return result;
       }
+    });
+  }
+
+  @httpGet("/health/check")
+  public async runHealthCheck(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await DomainHealthHelper.checkUncheckedDomains();
     });
   }
 }

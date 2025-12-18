@@ -10,7 +10,7 @@ export class DomainRepo extends ConfiguredRepo<Domain> {
     return {
       tableName: "domains",
       hasSoftDelete: false,
-      columns: ["domainName"]
+      columns: ["domainName", "lastChecked", "isStale"]
     };
   }
 
@@ -30,11 +30,17 @@ export class DomainRepo extends ConfiguredRepo<Domain> {
     return TypedDB.query(sql, [churchId]);
   }
 
+  public loadUnchecked() {
+    return TypedDB.query("SELECT * FROM `domains` WHERE lastChecked IS NULL OR lastChecked < DATE_SUB(NOW(), INTERVAL 24 HOUR);", []);
+  }
+
   protected rowToModel(row: any): Domain {
     return {
       id: row.id,
       churchId: row.churchId,
-      domainName: row.domainName
+      domainName: row.domainName,
+      lastChecked: row.lastChecked,
+      isStale: row.isStale
     };
   }
 }
