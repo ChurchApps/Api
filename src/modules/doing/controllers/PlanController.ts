@@ -44,6 +44,13 @@ export class PlanController extends DoingBaseController {
     });
   }
 
+  @httpGet("/public/current/:planTypeId")
+  public async getCurrentByPlanType(@requestParam("planTypeId") planTypeId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await this.repos.plan.loadCurrentByPlanTypeId(planTypeId);
+    });
+  }
+
   private adjustTime(time: Date, serviceDate: Date, oldServiceDate: Date) {
     const dayDiff = serviceDate.getDate() - oldServiceDate.getDate();
     const result = new Date(time);

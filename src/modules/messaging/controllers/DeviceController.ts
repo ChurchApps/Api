@@ -49,11 +49,56 @@ export class DeviceController extends MessagingBaseController {
         existing.personId = au.personId;
         existing.churchId = au.churchId;
         existing.pairingCode = "";
+        if (req.query.contentType) existing.contentType = req.query.contentType as string;
+        if (req.query.contentId) existing.contentId = req.query.contentId as string;
         await this.repos.device.save(existing);
         success = true;
       }
       return { success };
     });
+  }
+
+  @httpPost("/enrollAnon")
+  public async enrollAnon(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const pairingCode = this.generatePairingCode();
+      let device = await this.repos.device.loadByDeviceId(req.body.deviceId);
+      if (device) {
+        device.pairingCode = pairingCode;
+        device.contentType = undefined;
+        device.contentId = undefined;
+        device.lastActiveDate = new Date();
+      } else {
+        device = {
+          deviceId: req.body.deviceId,
+          appName: req.body.appName || "LessonsApp",
+          pairingCode,
+          registrationDate: new Date(),
+          lastActiveDate: new Date()
+        };
+      }
+      return await this.repos.device.save(device);
+    });
+  }
+
+  @httpGet("/status/:deviceId")
+  public async status(@requestParam("deviceId") deviceId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const device = await this.repos.device.loadByDeviceId(deviceId);
+      if (!device) return { paired: false };
+      return {
+        paired: !!device.contentType,
+        contentType: device.contentType,
+        contentId: device.contentId,
+        churchId: device.churchId,
+        pairingCode: device.pairingCode
+      };
+    });
+  }
+
+  private generatePairingCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
   }
 
   @httpGet("/:churchId")

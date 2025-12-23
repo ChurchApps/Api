@@ -62,4 +62,8 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
   public loadByPlanTypeId(churchId: string, planTypeId: string) {
     return TypedDB.query("SELECT * FROM plans WHERE churchId=? AND planTypeId=? order by serviceDate desc;", [churchId, planTypeId]);
   }
+
+  public loadCurrentByPlanTypeId(planTypeId: string) {
+    return TypedDB.queryOne("SELECT * FROM plans WHERE planTypeId=? AND serviceDate <= CURDATE() ORDER BY serviceDate DESC LIMIT 1", [planTypeId]);
+  }
 }

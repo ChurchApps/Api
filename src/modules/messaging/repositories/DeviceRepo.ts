@@ -8,8 +8,8 @@ export class DeviceRepo extends ConfiguredRepo<Device> {
     return {
       tableName: "devices",
       hasSoftDelete: false,
-      insertColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress"],
-      updateColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress"]
+      insertColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"],
+      updateColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"]
     };
   }
 
@@ -63,7 +63,9 @@ export class DeviceRepo extends ConfiguredRepo<Device> {
       deviceInfo: row.deviceInfo,
       admId: row.admId,
       pairingCode: row.pairingCode,
-      ipAddress: row.ipAddress
+      ipAddress: row.ipAddress,
+      contentType: row.contentType,
+      contentId: row.contentId
     };
   }
 }

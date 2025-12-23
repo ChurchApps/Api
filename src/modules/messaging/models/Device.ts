@@ -12,4 +12,6 @@ export class Device {
   public admId?: string;
   public pairingCode?: string;
   public ipAddress?: string;
+  public contentType?: string;
+  public contentId?: string;
 }
