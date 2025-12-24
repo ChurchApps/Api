@@ -4,12 +4,15 @@ import { Device } from "../models";
 import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
 
 export class DeviceRepo extends ConfiguredRepo<Device> {
+  // Override churchIdColumn to undefined since devices can exist without a church (anonymous pairing)
+  protected churchIdColumn: string = undefined;
+
   protected get repoConfig(): RepoConfig<Device> {
     return {
       tableName: "devices",
       hasSoftDelete: false,
-      insertColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"],
-      updateColumns: ["appName", "deviceId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"]
+      insertColumns: ["appName", "deviceId", "churchId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"],
+      updateColumns: ["appName", "deviceId", "churchId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"]
     };
   }
 
