@@ -55,7 +55,7 @@ export class YouVersionHelper {
     const results: BibleTranslation[] = [];
     const seenKeys = new Set<string>();
 
-    const lang="*"
+    const lang = "*";
     //for (const lang of languages) {
       try {
         const translations = await this.getTranslations(lang);
