@@ -23,7 +23,7 @@ export class YouVersionHelper {
         data.data.forEach((d: any) => {
           const translation: BibleTranslation = {
             attributionRequired: true,
-            attributionString: d.copyright_short || d.copyright_long || "",
+            attributionString: d.copyright || "",
             name: d.title || d.abbreviation,
             nameLocal: d.localized_title || d.title || d.abbreviation,
             abbreviation: d.localized_abbreviation || d.abbreviation,
@@ -32,7 +32,7 @@ export class YouVersionHelper {
             source: "youversion",
             sourceKey: "YOUVERSION-" + d.id.toString(),
             countryList: [],
-            copyright: d.copyright_short || d.copyright_long || ""
+            copyright: d.copyright || ""
           };
 
           result.push(translation);
