@@ -141,6 +141,18 @@ export class BibleController extends ContentBaseController {
     });
   }
 
+  @httpGet("/availableTranslations/:source")
+  public async getAvailableTranslations(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const available = await BibleSourceFactory.getAvailableTranslations(source);
+      return available.map((t: BibleTranslation) => ({
+        abbreviation: t.abbreviation,
+        name: t.name,
+        language: t.language
+      }));
+    });
+  }
+
   @httpGet("/updateTranslations/:source")
   public async updateTranslationsFromSource(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

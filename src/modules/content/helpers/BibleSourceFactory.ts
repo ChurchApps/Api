@@ -4,6 +4,11 @@ import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText }
 
 export class BibleSourceFactory {
 
+  // Strip YOUVERSION- prefix from sourceKey to get the raw YouVersion API key
+  private static stripYouVersionPrefix(translationKey: string): string {
+    return translationKey.replace(/^YOUVERSION-/, "");
+  }
+
   static async getTranslations(source: string): Promise<BibleTranslation[]> {
     if (source === "youversion") return YouVersionHelper.getAllTranslations();
     return ApiBibleHelper.getTranslations();
@@ -19,32 +24,37 @@ export class BibleSourceFactory {
   }
 
   static async getBooks(source: string, translationKey: string): Promise<BibleBook[]> {
-    if (source === "youversion") return YouVersionHelper.getBooks(translationKey);
+    if (source === "youversion") return YouVersionHelper.getBooks(this.stripYouVersionPrefix(translationKey));
     return ApiBibleHelper.getBooks(translationKey);
   }
 
   static async getChapters(source: string, translationKey: string, bookKey: string): Promise<BibleChapter[]> {
-    if (source === "youversion") return YouVersionHelper.getChapters(translationKey, bookKey);
+    if (source === "youversion") return YouVersionHelper.getChapters(this.stripYouVersionPrefix(translationKey), bookKey);
     return ApiBibleHelper.getChapters(translationKey, bookKey);
   }
 
   static async getVerses(source: string, translationKey: string, chapterKey: string): Promise<BibleVerse[]> {
-    if (source === "youversion") return YouVersionHelper.getVerses(translationKey, chapterKey);
+    if (source === "youversion") return YouVersionHelper.getVerses(this.stripYouVersionPrefix(translationKey), chapterKey);
     return ApiBibleHelper.getVerses(translationKey, chapterKey);
   }
 
   static async getVerseText(source: string, translationKey: string, startVerseKey: string, endVerseKey: string): Promise<BibleVerseText[]> {
-    if (source === "youversion") return YouVersionHelper.getVerseText(translationKey, startVerseKey, endVerseKey);
+    if (source === "youversion") return YouVersionHelper.getVerseText(this.stripYouVersionPrefix(translationKey), startVerseKey, endVerseKey);
     return ApiBibleHelper.getVerseText(translationKey, startVerseKey, endVerseKey);
   }
 
   static async getCopyright(source: string, translationKey: string): Promise<string> {
-    if (source === "youversion") return YouVersionHelper.getCopyright(translationKey);
+    if (source === "youversion") return YouVersionHelper.getCopyright(this.stripYouVersionPrefix(translationKey));
     return ApiBibleHelper.getCopyright(translationKey);
   }
 
   static async search(source: string, translationKey: string, query: string): Promise<any> {
-    if (source === "youversion") return YouVersionHelper.search(translationKey, query);
+    if (source === "youversion") return YouVersionHelper.search(this.stripYouVersionPrefix(translationKey), query);
     return ApiBibleHelper.search(translationKey, query);
+  }
+
+  static async getAvailableTranslations(source: string): Promise<BibleTranslation[]> {
+    if (source === "youversion") return YouVersionHelper.getAvailableTranslations();
+    return [];
   }
 }

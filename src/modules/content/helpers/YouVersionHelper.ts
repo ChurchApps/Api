@@ -5,7 +5,12 @@ import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText }
 export class YouVersionHelper {
   static baseUrl: string = "https://api.youversion.com/v1";
 
-  static async getTranslations(languageTag: string = "en") {
+  //Import these
+  static includedAbbreviations: string[] = ["BDO1573", "BDS", "CARS", "CARSA", "CARST", "CPDV", "CSLAV", "DELUT", "ELB", "ELB71", "FMAR", "GANTP", "GNV", "Hfa", "JA1955", "JCB", "KLB", "LSG", "NBV-P", "NIrV", "NIV", "NIVUK", "NVIs", "OL", "OST", "RVES", "TKW", "WEBUS", "НРП", "PdDpt", "AKNA", "AL", "APB", "ASNA", "BDSC", "BEN", "BIU", "BPH", "CCB", "CCL", "EEEE", "EIV", "FAYH", "GAW", "GKY", "APD", "BMYO"];
+  // Don't import these (Duplicates)
+  static excludedAbbreviations: string[] = ["ASV", "BSB", "DB1885", "FBV", "LSV", "NVI", "TCENT", "TOJB2011", "WEBBE", "WMB", "WMBBE", "ELBBK", "NTBnBL2025", "JND", "WBTP", "BLT", "VBL", "Abt", "ASD", "ABT", "BCV"];
+
+  static async getTranslations(languageTag: string = "*") {
     const result: BibleTranslation[] = [];
     // API requires language_ranges[] parameter
     const url = this.baseUrl + "/bibles?language_ranges[]=" + languageTag;
@@ -33,26 +38,44 @@ export class YouVersionHelper {
     return result;
   }
 
-  static async getAllTranslations() {
+  // Fetches all translations from YouVersion API (raw, unfiltered)
+  static async fetchAllTranslations() {
     // Use ISO 639-1 two-letter language codes
-    const languages = ["en", "es", "pt", "fr", "de", "it", "zh", "ko", "ja", "ru"];
     const results: BibleTranslation[] = [];
     const seenKeys = new Set<string>();
 
-    for (const lang of languages) {
-      try {
-        const translations = await this.getTranslations(lang);
-        for (const t of translations) {
-          if (!seenKeys.has(t.sourceKey)) {
-            seenKeys.add(t.sourceKey);
-            results.push(t);
-          }
+    
+    try {
+      const translations = await this.getTranslations();
+      for (const t of translations) {
+        if (!seenKeys.has(t.sourceKey)) {
+          seenKeys.add(t.sourceKey);
+          results.push(t);
         }
-      } catch (e) {
-        console.log(`Failed to fetch YouVersion translations for ${lang}:`, e.message);
       }
+    } catch (e) {
+      console.log("Failed to fetch YouVersion translations:", e.message);
     }
+    
     return results;
+  }
+
+  // Returns only translations that are in the included list
+  static async getAllTranslations() {
+    if (this.includedAbbreviations.length === 0) {
+      return [];
+    }
+    const allTranslations = await this.fetchAllTranslations();
+    return allTranslations.filter(t => this.includedAbbreviations.includes(t.abbreviation));
+  }
+
+  // Returns translations that are not in either the included or excluded lists
+  static async getAvailableTranslations() {
+    const allTranslations = await this.fetchAllTranslations();
+    return allTranslations.filter(t =>
+      !this.includedAbbreviations.includes(t.abbreviation) &&
+      !this.excludedAbbreviations.includes(t.abbreviation)
+    );
   }
 
   static async getBooks(translationKey: string) {
