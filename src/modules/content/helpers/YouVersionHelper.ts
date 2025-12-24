@@ -10,7 +10,7 @@ export class YouVersionHelper {
   // Don't import these (Duplicates)
   static excludedAbbreviations: string[] = ["ASV", "BSB", "DB1885", "FBV", "LSV", "NVI", "TCENT", "TOJB2011", "WEBBE", "WMB", "WMBBE", "ELBBK", "NTBnBL2025", "JND", "WBTP", "BLT", "VBL", "Abt", "ASD", "ABT", "BCV"];
 
-  static async getTranslations(languageTag: string = "*") {
+  static async getTranslations(languageTag: string = "en") {
     const result: BibleTranslation[] = [];
     // API requires language_ranges[] parameter
     const url = this.baseUrl + "/bibles?language_ranges[]=" + languageTag;
@@ -41,22 +41,23 @@ export class YouVersionHelper {
   // Fetches all translations from YouVersion API (raw, unfiltered)
   static async fetchAllTranslations() {
     // Use ISO 639-1 two-letter language codes
+    const languages = ["en", "es", "pt", "fr", "de", "it", "zh", "ko", "ja", "ru"];
     const results: BibleTranslation[] = [];
     const seenKeys = new Set<string>();
 
-    
-    try {
-      const translations = await this.getTranslations();
-      for (const t of translations) {
-        if (!seenKeys.has(t.sourceKey)) {
-          seenKeys.add(t.sourceKey);
-          results.push(t);
+    for (const lang of languages) {
+      try {
+        const translations = await this.getTranslations(lang);
+        for (const t of translations) {
+          if (!seenKeys.has(t.sourceKey)) {
+            seenKeys.add(t.sourceKey);
+            results.push(t);
+          }
         }
+      } catch (e) {
+        console.log(`Failed to fetch YouVersion translations for ${lang}:`, e.message);
       }
-    } catch (e) {
-      console.log("Failed to fetch YouVersion translations:", e.message);
     }
-    
     return results;
   }
 
