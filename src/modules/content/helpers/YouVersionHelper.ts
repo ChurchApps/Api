@@ -13,27 +13,37 @@ export class YouVersionHelper {
   static async getTranslations(languageTag: string = "en") {
     const result: BibleTranslation[] = [];
     // API requires language_ranges[] parameter
-    const url = this.baseUrl + "/bibles?language_ranges[]=" + languageTag;
-    const data = await this.getContent(url);
+    let url = this.baseUrl + "/bibles?language_ranges[]=" + languageTag;
+    let hasMore = true;
 
-    if (data.data) {
-      data.data.forEach((d: any) => {
-        const translation: BibleTranslation = {
-          attributionRequired: true,
-          attributionString: d.copyright_short || d.copyright_long || "",
-          name: d.title || d.abbreviation,
-          nameLocal: d.localized_title || d.title || d.abbreviation,
-          abbreviation: d.localized_abbreviation || d.abbreviation,
-          description: d.info || "",
-          language: d.language_tag || languageTag,
-          source: "youversion",
-          sourceKey: "YOUVERSION-" + d.id.toString(),
-          countryList: [],
-          copyright: d.copyright_short || d.copyright_long || ""
-        };
+    while (hasMore) {
+      const data = await this.getContent(url);
 
-        result.push(translation);
-      });
+      if (data.data) {
+        data.data.forEach((d: any) => {
+          const translation: BibleTranslation = {
+            attributionRequired: true,
+            attributionString: d.copyright_short || d.copyright_long || "",
+            name: d.title || d.abbreviation,
+            nameLocal: d.localized_title || d.title || d.abbreviation,
+            abbreviation: d.localized_abbreviation || d.abbreviation,
+            description: d.info || "",
+            language: d.language_tag || languageTag,
+            source: "youversion",
+            sourceKey: "YOUVERSION-" + d.id.toString(),
+            countryList: [],
+            copyright: d.copyright_short || d.copyright_long || ""
+          };
+
+          result.push(translation);
+        });
+      }
+
+      if (data.next_page_token) {
+        url = this.baseUrl + "/bibles?language_ranges[]=" + languageTag + "&page_token=" + encodeURIComponent(data.next_page_token);
+      } else {
+        hasMore = false;
+      }
     }
     return result;
   }
@@ -41,11 +51,12 @@ export class YouVersionHelper {
   // Fetches all translations from YouVersion API (raw, unfiltered)
   static async fetchAllTranslations() {
     // Use ISO 639-1 two-letter language codes
-    const languages = ["en", "es", "pt", "fr", "de", "it", "zh", "ko", "ja", "ru"];
+    //const languages = ["en", "es", "pt", "fr", "de", "it", "zh", "ko", "ja", "ru"];
     const results: BibleTranslation[] = [];
     const seenKeys = new Set<string>();
 
-    for (const lang of languages) {
+    const lang="*"
+    //for (const lang of languages) {
       try {
         const translations = await this.getTranslations(lang);
         for (const t of translations) {
@@ -57,7 +68,7 @@ export class YouVersionHelper {
       } catch (e) {
         console.log(`Failed to fetch YouVersion translations for ${lang}:`, e.message);
       }
-    }
+    //}
     return results;
   }
 
