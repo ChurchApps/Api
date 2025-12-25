@@ -75,19 +75,23 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/copy/:id")
-  public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan>, res: express.Response): Promise<any> {
+  public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan & { copyMode?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const copyMode = req.body.copyMode || "all"; // "positions" | "all" (positions + assignments)
       const oldPlan = (await this.repos.plan.load(au.churchId, id)) as Plan;
       const times: Time[] = (await this.repos.time.loadByPlanId(au.churchId, id)) as Time[];
       const positions: Position[] = (await this.repos.position.loadByPlanId(au.churchId, id)) as Position[];
       const planItems: PlanItem[] = (await this.repos.planItem.loadForPlan(au.churchId, id)) as PlanItem[];
 
       const p = { ...req.body } as Plan;
+      delete (p as any).copyMode; // Remove copyMode from plan data
       p.churchId = au.churchId;
       p.serviceDate = new Date(req.body.serviceDate || new Date());
       const plan = await this.repos.plan.save(p);
 
       const promises: Promise<any>[] = [];
+      const positionIdMap = new Map<string, string>(); // oldPositionId -> newPositionId
+
       times.forEach((time) => {
         time.id = null as any;
         time.planId = plan.id;
@@ -95,11 +99,30 @@ export class PlanController extends DoingBaseController {
         time.endTime = this.adjustTime(time.endTime || new Date(), plan.serviceDate || new Date(), oldPlan.serviceDate || new Date());
         promises.push(this.repos.time.save(time));
       });
-      positions.forEach((position) => {
+
+      // Save positions and track old->new id mapping
+      for (const position of positions) {
+        const oldPositionId = position.id;
         position.id = null as any;
         position.planId = plan.id;
-        promises.push(this.repos.position.save(position));
-      });
+        const savedPosition = await this.repos.position.save(position);
+        if (oldPositionId) positionIdMap.set(oldPositionId, savedPosition.id || "");
+      }
+
+      // Copy assignments if copyMode is "all"
+      if (copyMode === "all") {
+        const assignments = await this.repos.assignment.loadByPlanId(au.churchId, id);
+        for (const assignment of assignments) {
+          const newPositionId = positionIdMap.get(assignment.positionId || "");
+          if (newPositionId) {
+            assignment.id = null as any;
+            assignment.planId = plan.id;
+            assignment.positionId = newPositionId;
+            assignment.status = "Unconfirmed"; // Reset status for new assignments
+            promises.push(this.repos.assignment.save(assignment));
+          }
+        }
+      }
 
       const idMap = new Map<string, string>(); // oldId -> newId
       const piPromises: Promise<any>[] = [];
