@@ -1,7 +1,7 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import { PlanHelper } from "../helpers/PlanHelper";
-import { Plan, PlanItem, Position, Time } from "../models";
+import { Plan, Position, Time } from "../models";
 import { DoingBaseController } from "./DoingBaseController";
 
 @controller("/doing/plans")
@@ -81,7 +81,6 @@ export class PlanController extends DoingBaseController {
       const oldPlan = (await this.repos.plan.load(au.churchId, id)) as Plan;
       const times: Time[] = (await this.repos.time.loadByPlanId(au.churchId, id)) as Time[];
       const positions: Position[] = (await this.repos.position.loadByPlanId(au.churchId, id)) as Position[];
-      const planItems: PlanItem[] = (await this.repos.planItem.loadForPlan(au.churchId, id)) as PlanItem[];
 
       const p = { ...req.body } as Plan;
       delete (p as any).copyMode; // Remove copyMode from plan data
@@ -123,33 +122,6 @@ export class PlanController extends DoingBaseController {
           }
         }
       }
-
-      const idMap = new Map<string, string>(); // oldId -> newId
-      const piPromises: Promise<any>[] = [];
-
-      for (const pi of planItems) {
-        const oldId = pi.id;
-        pi.id = null as any;
-        pi.planId = plan.id;
-        piPromises.push(
-          this.repos.planItem.save(pi).then((saved) => {
-            if (oldId) idMap.set(oldId, saved.id || "");
-            return saved;
-          })
-        );
-      }
-
-      const newPlanItems = (await Promise.all(piPromises)) as PlanItem[];
-      const updatePromises: Promise<any>[] = [];
-      for (const pi of newPlanItems) {
-        if (pi.parentId && idMap.has(pi.parentId)) {
-          const newParentId = idMap.get(pi.parentId);
-          if (newParentId) pi.parentId = newParentId;
-          updatePromises.push(this.repos.planItem.save(pi));
-        }
-      }
-
-      await Promise.all(updatePromises);
 
       await Promise.all(promises);
       return plan;
