@@ -10,7 +10,7 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
     return {
       tableName: "gateways",
       hasSoftDelete: false,
-      columns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees", "settings", "environment"]
+      columns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees", "currency", "settings", "environment"]
     };
   }
 
@@ -18,16 +18,16 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
   protected async create(gateway: Gateway): Promise<Gateway> {
     gateway.id = this.createId();
     await TypedDB.query("DELETE FROM gateways WHERE churchId=? AND id<>?;", [gateway.churchId, gateway.id]); // enforce a single record per church (for now)
-    const sql = "INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees, settings, environment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const sql = "INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees, currency, settings, environment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const settings = gateway.settings ? JSON.stringify(gateway.settings) : null;
-    const params = [gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees, settings, gateway.environment];
+    const params = [gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees, gateway.currency, settings, gateway.environment];
     await TypedDB.query(sql, params);
     return gateway;
   }
 
   protected async update(gateway: Gateway): Promise<Gateway> {
     const sql =
-      "UPDATE gateways SET provider=?, publicKey=?, privateKey=?, webhookKey=?, productId=?, payFees=?, settings=?, environment=? WHERE id=? AND churchId=?";
+      "UPDATE gateways SET provider=?, publicKey=?, privateKey=?, webhookKey=?, productId=?, payFees=?, currency=?, settings=?, environment=? WHERE id=? AND churchId=?";
     const settings = gateway.settings ? JSON.stringify(gateway.settings) : null;
     const params = [
       gateway.provider,
@@ -36,6 +36,7 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
       gateway.webhookKey,
       gateway.productId,
       gateway.payFees,
+      gateway.currency,
       settings,
       gateway.environment,
       gateway.id,
@@ -55,6 +56,7 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
       webhookKey: data.webhookKey,
       productId: data.productId,
       payFees: data.payFees,
+      currency: data.currency,
       settings: this.parseJson(data.settings),
       environment: data.environment,
       createdAt: data.createdAt,

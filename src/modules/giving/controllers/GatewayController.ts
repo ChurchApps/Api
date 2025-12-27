@@ -67,7 +67,8 @@ export class GatewayController extends GivingCrudController {
                 settings: validatedSettings,
                 environment,
                 churchId: au.churchId,
-                payFees: gateway.payFees ?? false
+                payFees: gateway.payFees ?? false,
+                currency: gateway.currency ?? "USD"
               };
 
               if (req.hostname !== "localhost") {

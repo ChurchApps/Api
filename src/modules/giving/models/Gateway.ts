@@ -7,6 +7,7 @@ export class Gateway {
   public webhookKey?: string;
   public productId?: string;
   public payFees?: boolean;
+  public currency?: string;
   public settings?: Record<string, unknown> | null;
   public environment?: string | null;
   public createdAt?: Date;

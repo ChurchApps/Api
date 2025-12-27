@@ -34,7 +34,9 @@ export class DonateController extends GivingCrudController {
         id: gateway.id,
         provider: gateway.provider,
         publicKey: gateway.publicKey,
-        productId: gateway.productId
+        productId: gateway.productId,
+        payFees: gateway.payFees,
+        currency: gateway.currency
       }));
 
       return { gateways: publicGateways };
