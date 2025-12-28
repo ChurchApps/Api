@@ -1,0 +1,114 @@
+name: Rollback Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      versions_back:
+        description: 'Number of versions to roll back (default: 1 = previous version)'
+        required: false
+        default: '1'
+        type: string
+
+env:
+  AWS_REGION: us-east-2
+  FUNCTION_NAME: api-Prod-web
+
+jobs:
+  rollback:
+    name: Rollback Prod Lambda
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get Lambda versions
+        id: versions
+        run: |
+          echo "Fetching Lambda versions for ${{ env.FUNCTION_NAME }}..."
+
+          # Get all versions sorted by version number descending, exclude $LATEST
+          VERSIONS=$(aws lambda list-versions-by-function \
+            --function-name ${{ env.FUNCTION_NAME }} \
+            --query 'Versions[?Version!=`$LATEST`].Version' \
+            --output text | tr '\t' '\n' | sort -rn)
+
+          echo "Available versions:"
+          echo "$VERSIONS" | head -10
+
+          # Get current version (the latest numbered version)
+          CURRENT_VERSION=$(echo "$VERSIONS" | head -1)
+          echo "Current version: $CURRENT_VERSION"
+
+          # Get target version (N versions back)
+          VERSIONS_BACK=${{ inputs.versions_back }}
+          TARGET_VERSION=$(echo "$VERSIONS" | sed -n "$((VERSIONS_BACK + 1))p")
+
+          if [ -z "$TARGET_VERSION" ]; then
+            echo "Error: Cannot roll back $VERSIONS_BACK versions - not enough versions available"
+            exit 1
+          fi
+
+          echo "Target rollback version: $TARGET_VERSION"
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "target_version=$TARGET_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get version details
+        run: |
+          echo "=== Current Version (${{ steps.versions.outputs.current_version }}) ==="
+          aws lambda get-function \
+            --function-name ${{ env.FUNCTION_NAME }}:${{ steps.versions.outputs.current_version }} \
+            --query 'Configuration.{LastModified:LastModified,CodeSize:CodeSize,Description:Description}' \
+            --output table
+
+          echo ""
+          echo "=== Target Version (${{ steps.versions.outputs.target_version }}) ==="
+          aws lambda get-function \
+            --function-name ${{ env.FUNCTION_NAME }}:${{ steps.versions.outputs.target_version }} \
+            --query 'Configuration.{LastModified:LastModified,CodeSize:CodeSize,Description:Description}' \
+            --output table
+
+      - name: Download previous version code
+        run: |
+          echo "Downloading code from version ${{ steps.versions.outputs.target_version }}..."
+
+          # Get the code location
+          CODE_URL=$(aws lambda get-function \
+            --function-name ${{ env.FUNCTION_NAME }}:${{ steps.versions.outputs.target_version }} \
+            --query 'Code.Location' \
+            --output text)
+
+          curl -o function.zip "$CODE_URL"
+          echo "Downloaded function code package"
+
+      - name: Update Lambda function code
+        run: |
+          echo "Updating Lambda function with code from version ${{ steps.versions.outputs.target_version }}..."
+
+          aws lambda update-function-code \
+            --function-name ${{ env.FUNCTION_NAME }} \
+            --zip-file fileb://function.zip \
+            --publish
+
+          echo "Lambda function updated successfully!"
+
+      - name: Verify rollback
+        run: |
+          echo "Verifying rollback..."
+          sleep 5
+
+          # Get the new current version
+          NEW_VERSION=$(aws lambda list-versions-by-function \
+            --function-name ${{ env.FUNCTION_NAME }} \
+            --query 'Versions[?Version!=`$LATEST`].Version' \
+            --output text | tr '\t' '\n' | sort -rn | head -1)
+
+          echo "New current version: $NEW_VERSION"
+          echo ""
+          echo "Rollback complete!"
+          echo "Rolled back from version ${{ steps.versions.outputs.current_version }} to code from version ${{ steps.versions.outputs.target_version }}"
+          echo "(This created new version $NEW_VERSION with the old code)"
