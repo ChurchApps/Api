@@ -102,7 +102,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
     await StripeHelper.deleteSubscription(config.privateKey, subscriptionId);
   }
 
-  async calculateFees(amount: number, churchId: string): Promise<number> {
+  async calculateFees(amount: number, churchId: string, currency: string = "USD"): Promise<number> {
     let customFixedFee: number | null = null;
     let customPercentFee: number | null = null;
 
@@ -116,9 +116,31 @@ export class StripeGatewayProvider implements IGatewayProvider {
         customPercentFee = +data.transFeeCC / 100;
       }
     }
+  
+    // Stripe currency-specific fees
+    const STRIPE_FEES: Record<string, { percent: number; fixed: number }> = {
+      usd: { percent: 0.029, fixed: 0.30 },
+      eur: { percent: 0.029, fixed: 0.25 },
+      gbp: { percent: 0.029, fixed: 0.20 },
+      cad: { percent: 0.029, fixed: 0.30 },
+      aud: { percent: 0.029, fixed: 0.30 },
+      inr: { percent: 0.029, fixed: 3.00 },
+      jpy: { percent: 0.029, fixed: 30 },
+      sgd: { percent: 0.029, fixed: 0.50 },
+      hkd: { percent: 0.029, fixed: 2.35 },
+      sek: { percent: 0.029, fixed: 2.50 },
+      nok: { percent: 0.029, fixed: 2.00 },
+      dkk: { percent: 0.029, fixed: 1.80 },
+      chf: { percent: 0.029, fixed: 0.30 },
+      mxn: { percent: 0.029, fixed: 3.00 },
+      brl: { percent: 0.039, fixed: 0.50 }
+    };
+  
+    const currencyKey = currency.toLowerCase();
+    const stripeFee = STRIPE_FEES[currencyKey] || STRIPE_FEES.usd; // Default to USD if currency not found
+    const fixedFee = customFixedFee ?? stripeFee.fixed;
+    const fixedPercent = customPercentFee ?? stripeFee.percent;
 
-    const fixedFee = customFixedFee ?? 0.3;
-    const fixedPercent = customPercentFee ?? 0.029;
     return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   }
 
