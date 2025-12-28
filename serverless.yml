@@ -202,7 +202,6 @@ functions:
           enabled: true
 
 plugins:
-  - serverless-aws-alias
   - serverless-offline
 
 resources:
