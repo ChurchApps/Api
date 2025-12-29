@@ -620,6 +620,12 @@ export class NotificationHelper {
 
   static sendEmailNotification = async (email: string, notifications: Notification[], privateMessages: PrivateMessage[], senderEmail?: string) => {
     console.log("[NotificationHelper.sendEmailNotification] Starting email send to: " + email + (senderEmail ? " (reply-to: " + senderEmail + ")" : ""));
+
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      console.error("[NotificationHelper.sendEmailNotification] Invalid email address: " + email + ", skipping send");
+      return;
+    }
+
     let title = "";
     let content = "";
 
