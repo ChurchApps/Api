@@ -371,6 +371,10 @@ export class DonateController extends GivingCrudController {
       const gateway = await this.getGateway(churchId, donationData.provider, donationData.gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
+      const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
+      const normalizedCurrency = rawCurrency.toLowerCase();
+      donationData.currency = normalizedCurrency;
+
       try {
         const chargeResult = await GatewayService.processCharge(gateway, donationData);
 
