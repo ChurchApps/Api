@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Household } from "../models";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Household } from "../models/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class HouseholdRepo extends ConfiguredRepo<Household> {

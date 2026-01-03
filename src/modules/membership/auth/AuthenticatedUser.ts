@@ -1,8 +1,8 @@
 import { Principal, AuthenticatedUser as BaseAuthenticatedUser } from "@churchapps/apihelper";
-import { Api, LoginResponse, LoginUserChurch, User } from "../models";
+import { Api, LoginResponse, LoginUserChurch, User } from "../models/index.js";
 import jwt, { SignOptions, JwtPayload } from "jsonwebtoken";
-import { Repos } from "../repositories";
-import { Environment } from "../helpers";
+import { Repos } from "../repositories/index.js";
+import { Environment } from "../helpers/index.js";
 
 export class AuthenticatedUser extends BaseAuthenticatedUser {
   public static async login(allUserChurches: LoginUserChurch[], user: User) {

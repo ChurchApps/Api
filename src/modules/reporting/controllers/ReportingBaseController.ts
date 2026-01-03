@@ -1,5 +1,5 @@
-import { BaseController } from "../../../shared/infrastructure";
-import { Repos } from "../repositories/Repos";
+import { BaseController } from "../../../shared/infrastructure/index.js";
+import { Repos } from "../repositories/Repos.js";
 
 export class ReportingBaseController extends BaseController {
   constructor() {

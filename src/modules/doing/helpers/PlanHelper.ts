@@ -1,6 +1,6 @@
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Position, Assignment, BlockoutDate } from "../models";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Position, Assignment, BlockoutDate } from "../models/index.js";
 
 interface NeededPosition {
   position: Position;

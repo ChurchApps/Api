@@ -1,4 +1,4 @@
-// import { Group } from "./";
+// import { Group } from "./index.js";
 
 export class ServiceTime {
   public id?: string;

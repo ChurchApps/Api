@@ -1,12 +1,17 @@
 import { Request, Response } from "express";
 import { controller, httpPost, httpGet } from "inversify-express-utils";
-import { GivingBaseController } from "../../modules/giving/controllers/GivingBaseController";
-import { IGatewayProvider } from "../../shared/helpers/gateways/IGatewayProvider";
-import { StripeGatewayProvider } from "../../shared/helpers/gateways/StripeGatewayProvider";
-import { PayPalGatewayProvider } from "../../shared/helpers/gateways/PayPalGatewayProvider";
-import { SquareGatewayProvider } from "../../shared/helpers/gateways/SquareGatewayProvider";
-import { EPayMintsGatewayProvider } from "../../shared/helpers/gateways/EPayMintsGatewayProvider";
-import { Environment } from "../../shared/helpers/Environment";
+import path from "path";
+import { fileURLToPath } from "url";
+import { GivingBaseController } from "../../modules/giving/controllers/GivingBaseController.js";
+import { IGatewayProvider } from "../../shared/helpers/gateways/IGatewayProvider.js";
+import { StripeGatewayProvider } from "../../shared/helpers/gateways/StripeGatewayProvider.js";
+import { PayPalGatewayProvider } from "../../shared/helpers/gateways/PayPalGatewayProvider.js";
+import { SquareGatewayProvider } from "../../shared/helpers/gateways/SquareGatewayProvider.js";
+import { EPayMintsGatewayProvider } from "../../shared/helpers/gateways/EPayMintsGatewayProvider.js";
+import { Environment } from "../../shared/helpers/Environment.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 @controller("/playground")
 export class PlaygroundController extends GivingBaseController {

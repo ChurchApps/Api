@@ -1,7 +1,7 @@
 import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
-import { AttendanceBaseController } from "./AttendanceBaseController";
-import { Permissions } from "../../../shared/helpers";
+import { AttendanceBaseController } from "./AttendanceBaseController.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/attendance/attendancerecords")
 export class AttendanceRecordController extends AttendanceBaseController {

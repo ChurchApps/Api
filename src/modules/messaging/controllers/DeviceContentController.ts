@@ -1,7 +1,7 @@
 import { controller, httpPost, requestParam, httpDelete, httpGet } from "inversify-express-utils";
 import express from "express";
-import { MessagingBaseController } from "./MessagingBaseController";
-import { DeviceContent } from "../models";
+import { MessagingBaseController } from "./MessagingBaseController.js";
+import { DeviceContent } from "../models/index.js";
 
 @controller("/messaging/devicecontents")
 export class DeviceContentController extends MessagingBaseController {

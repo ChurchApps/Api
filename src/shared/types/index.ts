@@ -3,4 +3,4 @@
  * Provides a single import point for common type definitions
  */
 
-export * from "./common";
+export * from "./common.js";

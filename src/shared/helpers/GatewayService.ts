@@ -1,7 +1,7 @@
-import { GatewayFactory, IGatewayProvider, GatewayConfig } from "./gateways";
-import { validateGatewaySettings } from "./gateways/GatewaySettings";
-import { GatewayRepo } from "../../modules/giving/repositories/GatewayRepo";
-import { Gateway } from "../../modules/giving/models";
+import { GatewayFactory, IGatewayProvider, GatewayConfig } from "./gateways/index.js";
+import { validateGatewaySettings } from "./gateways/GatewaySettings.js";
+import { GatewayRepo } from "../../modules/giving/repositories/GatewayRepo.js";
+import { Gateway } from "../../modules/giving/models/index.js";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
 export interface ProviderCapabilities {

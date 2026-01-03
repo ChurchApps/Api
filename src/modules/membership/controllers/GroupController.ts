@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { MembershipCrudController } from "./MembershipCrudController";
-import { Group } from "../models";
-import { Permissions } from "../helpers";
+import { MembershipCrudController } from "./MembershipCrudController.js";
+import { Group } from "../models/index.js";
+import { Permissions } from "../helpers/index.js";
 import { ArrayHelper, SlugHelper } from "@churchapps/apihelper";
 
 @controller("/membership/groups")

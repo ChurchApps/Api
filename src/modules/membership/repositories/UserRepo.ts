@@ -1,7 +1,7 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { User } from "../models";
-import { DateHelper } from "../helpers";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { User } from "../models/index.js";
+import { DateHelper } from "../helpers/index.js";
+import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 import { injectable } from "inversify";
 
 @injectable()

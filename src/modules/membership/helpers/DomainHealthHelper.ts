@@ -1,7 +1,7 @@
 import axios from "axios";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Repos } from "../repositories";
-import { Domain } from "../models";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Repos } from "../repositories/index.js";
+import { Domain } from "../models/index.js";
 
 export class DomainHealthHelper {
 

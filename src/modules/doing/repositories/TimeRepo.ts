@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Time } from "../models";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Time } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class TimeRepo extends ConfiguredRepo<Time> {

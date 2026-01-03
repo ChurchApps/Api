@@ -1,8 +1,8 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { File } from "../models";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { File } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 export class FileRepo extends ConfiguredRepo<File> {
   protected get repoConfig(): RepoConfig<File> {

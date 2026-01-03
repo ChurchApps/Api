@@ -1,7 +1,7 @@
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 import axios from "axios";
-import { Environment } from "../../../shared/helpers";
+import { Environment } from "../../../shared/helpers/index.js";
 
 export interface HostDial {
   host: string;

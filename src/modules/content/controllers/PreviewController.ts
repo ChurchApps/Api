@@ -1,8 +1,8 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
-import { Sermon, StreamingService } from "../models";
-import { StreamingConfigHelper, SubDomainHelper } from "../helpers";
-import { ContentBaseController } from "./ContentBaseController";
-import { Link } from "../models";
+import { Sermon, StreamingService } from "../models/index.js";
+import { StreamingConfigHelper, SubDomainHelper } from "../helpers/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Link } from "../models/index.js";
 
 @controller("/content/preview")
 export class PreviewController extends ContentBaseController {

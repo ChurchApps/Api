@@ -1,11 +1,15 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
-import { Setting } from "../models";
-import { PraiseChartsHelper } from "../helpers/PraiseChartsHelper";
 import * as path from "path";
 import * as fs from "fs";
+import { fileURLToPath } from "url";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Setting } from "../models/index.js";
+import { PraiseChartsHelper } from "../helpers/PraiseChartsHelper.js";
 import { AwsHelper } from "@churchapps/apihelper";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 @controller("/content/praiseCharts")
 export class PraiseChartsController extends ContentBaseController {

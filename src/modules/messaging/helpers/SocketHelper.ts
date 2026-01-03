@@ -1,13 +1,13 @@
 import { UniqueIdHelper } from "@churchapps/apihelper";
-import WebSocket from "ws";
-import { PayloadInterface, SocketConnectionInterface } from "./Interfaces";
-import { Repos } from "../repositories";
-import { Connection } from "../models";
-import { DeliveryHelper } from "./DeliveryHelper";
-import { Environment } from "../../../shared/helpers/Environment";
+import WebSocket, { WebSocketServer } from "ws";
+import { PayloadInterface, SocketConnectionInterface } from "./Interfaces.js";
+import { Repos } from "../repositories/index.js";
+import { Connection } from "../models/index.js";
+import { DeliveryHelper } from "./DeliveryHelper.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class SocketHelper {
-  private static wss: WebSocket.Server = null;
+  private static wss: WebSocketServer = null;
   private static connections: SocketConnectionInterface[] = [];
   private static repos: Repos;
 
@@ -20,7 +20,7 @@ export class SocketHelper {
     if (port > 0 && Environment.deliveryProvider === "local") {
       try {
         console.log(`Starting WebSocket server on port ${port}...`);
-        SocketHelper.wss = new WebSocket.Server({ port });
+        SocketHelper.wss = new WebSocketServer({ port });
 
         SocketHelper.wss.on("connection", (socket) => {
           const sc: SocketConnectionInterface = { id: UniqueIdHelper.shortId(), socket };

@@ -1,7 +1,7 @@
 import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
-import { MessagingCrudController } from "./MessagingCrudController";
-import { NotificationHelper } from "../helpers/NotificationHelper";
+import { MessagingCrudController } from "./MessagingCrudController.js";
+import { NotificationHelper } from "../helpers/NotificationHelper.js";
 
 @controller("/messaging/notificationpreferences")
 export class NotificationPreferenceController extends MessagingCrudController {

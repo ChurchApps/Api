@@ -1,7 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { DoingBaseController } from "./DoingBaseController";
-import { Time } from "../models";
+import { DoingBaseController } from "./DoingBaseController.js";
+import { Time } from "../models/index.js";
 
 @controller("/doing/times")
 export class TimeController extends DoingBaseController {

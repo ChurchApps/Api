@@ -1,10 +1,10 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete, httpPatch } from "inversify-express-utils";
 import express from "express";
-import { GivingCrudController } from "./GivingCrudController";
-import { Gateway } from "../models";
-import { GatewayService } from "../../../shared/helpers/GatewayService";
+import { GivingCrudController } from "./GivingCrudController.js";
+import { Gateway } from "../models/index.js";
+import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { EncryptionHelper } from "@churchapps/apihelper";
-import { Permissions } from "../../../shared/helpers/Permissions";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 @controller("/giving/gateways")
 export class GatewayController extends GivingCrudController {

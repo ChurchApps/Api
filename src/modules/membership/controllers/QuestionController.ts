@@ -1,7 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { Question } from "../models";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { Question } from "../models/index.js";
 
 @controller("/membership/questions")
 export class QuestionController extends MembershipBaseController {

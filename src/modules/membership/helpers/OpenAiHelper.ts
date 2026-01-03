@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import axios from "axios";
-import { Environment } from "../../../shared/helpers";
-// import MEMBERS_API_SCHEMA from "../../tools/schemas/apiSchema";
+import { Environment } from "../../../shared/helpers/index.js";
+// import MEMBERS_API_SCHEMA from "../../tools/schemas/apiSchema.js";
 
 export class OpenAiHelper {
   private static openai: OpenAI | null = null;

@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
-import { EventException } from "../models";
-import { Permissions } from "../helpers";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { EventException } from "../models/index.js";
+import { Permissions } from "../helpers/index.js";
 
 @controller("/content/eventExceptions")
 export class EventExceptionController extends ContentBaseController {

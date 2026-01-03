@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { DateHelper } from "@churchapps/apihelper";
-import { AttendanceRecord } from "../models";
-import { BaseRepo } from "../../../shared/infrastructure";
+import { AttendanceRecord } from "../models/index.js";
+import { BaseRepo } from "../../../shared/infrastructure/index.js";
 
 @injectable()
 export class AttendanceRepo extends BaseRepo<AttendanceRecord> {

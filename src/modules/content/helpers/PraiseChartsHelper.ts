@@ -1,8 +1,8 @@
-import { Setting, SongDetail, SongDetailLink } from "../models";
+import { Setting, SongDetail, SongDetailLink } from "../models/index.js";
 import OAuth from "oauth";
-import { Environment } from "../../../shared/helpers/Environment";
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
+import { Environment } from "../../../shared/helpers/Environment.js";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 import https from "https";
 
 export class PraiseChartsHelper {

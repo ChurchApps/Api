@@ -1,6 +1,6 @@
 import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
-import { Environment } from "../helpers";
+import { Environment } from "../helpers/index.js";
 
 @controller("/health")
 export class HealthController {

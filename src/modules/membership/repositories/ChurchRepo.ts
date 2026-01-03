@@ -1,6 +1,6 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Church, Api, LoginUserChurch } from "../models";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Church, Api, LoginUserChurch } from "../models/index.js";
+import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 import { injectable } from "inversify";
 
 @injectable()

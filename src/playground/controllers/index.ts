@@ -1,1 +1,1 @@
-export { PlaygroundController } from "./PlaygroundController";
+export { PlaygroundController } from "./PlaygroundController.js";

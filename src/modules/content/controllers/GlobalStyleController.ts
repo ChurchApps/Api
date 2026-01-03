@@ -1,8 +1,8 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { Permissions } from "../helpers";
-import { ContentCrudController } from "./ContentCrudController";
-import { GlobalStyle } from "../models";
+import { Permissions } from "../helpers/index.js";
+import { ContentCrudController } from "./ContentCrudController.js";
+import { GlobalStyle } from "../models/index.js";
 
 @controller("/content/globalStyles")
 export class GlobalStyleController extends ContentCrudController {

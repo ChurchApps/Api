@@ -1,9 +1,9 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
-import { Donation, DonationSummary } from "../models";
-import { CollectionHelper } from "../../../shared/helpers";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { Donation, DonationSummary } from "../models/index.js";
+import { CollectionHelper } from "../../../shared/helpers/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class DonationRepo extends ConfiguredRepo<Donation> {

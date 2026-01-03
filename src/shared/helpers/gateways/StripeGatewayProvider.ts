@@ -1,8 +1,8 @@
 import express from "express";
 import Axios from "axios";
-import { StripeHelper } from "../StripeHelper";
-import { Environment } from "../Environment";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider";
+import { StripeHelper } from "../StripeHelper.js";
+import { Environment } from "../Environment.js";
+import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider.js";
 
 export class StripeGatewayProvider implements IGatewayProvider {
   readonly name = "stripe";

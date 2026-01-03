@@ -1,9 +1,9 @@
-import { Repos as DoingRepos } from "../../doing/repositories/Repos";
-import { Repos as MessagingRepos } from "../../messaging/repositories/Repos";
-import { Repos as MembershipRepos } from "../../membership/repositories/Repos";
-import { Notification } from "../../messaging/models/Notification";
-import { Position } from "../../doing";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { Repos as DoingRepos } from "../../doing/repositories/Repos.js";
+import { Repos as MessagingRepos } from "../../messaging/repositories/Repos.js";
+import { Repos as MembershipRepos } from "../../membership/repositories/Repos.js";
+import { Notification } from "../../messaging/models/Notification.js";
+import { Position } from "../../doing/index.js";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 
 export class AutomationHelper {
   private static subdomainCache: { [key: string]: string } = {};

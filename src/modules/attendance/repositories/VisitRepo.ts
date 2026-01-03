@@ -1,8 +1,8 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
-import { Visit } from "../models";
+import { Visit } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 export class VisitRepo extends ConfiguredRepo<Visit> {
   protected get repoConfig(): RepoConfig<Visit> {

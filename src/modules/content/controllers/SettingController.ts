@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { Setting } from "../models";
-import { ContentBaseController } from "./ContentBaseController";
-import { Permissions, Environment } from "../helpers";
+import { Setting } from "../models/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Permissions, Environment } from "../helpers/index.js";
 import { FileStorageHelper } from "@churchapps/apihelper";
 
 @controller("/content/settings")

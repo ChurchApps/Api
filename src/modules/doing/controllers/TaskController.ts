@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { FileStorageHelper } from "@churchapps/apihelper";
-import { DoingBaseController } from "./DoingBaseController";
-import { Task } from "../models";
-import { Environment } from "../helpers";
+import { DoingBaseController } from "./DoingBaseController.js";
+import { Task } from "../models/index.js";
+import { Environment } from "../helpers/index.js";
 
 @controller("/doing/tasks")
 export class TaskController extends DoingBaseController {

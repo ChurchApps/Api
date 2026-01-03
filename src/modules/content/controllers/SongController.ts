@@ -1,9 +1,9 @@
 import { controller, httpDelete, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { Song } from "../models";
-import { ContentBaseController } from "./ContentBaseController";
-import { Permissions } from "../helpers";
-import { FreeShowSong, SongHelper } from "../helpers/SongHelper";
+import { Song } from "../models/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Permissions } from "../helpers/index.js";
+import { FreeShowSong, SongHelper } from "../helpers/SongHelper.js";
 
 @controller("/content/songs")
 export class SongController extends ContentBaseController {

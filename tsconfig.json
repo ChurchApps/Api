@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "NodeNext",
     "target": "es2022",
     "lib": ["es2022", "dom"],
     "sourceMap": true,
@@ -25,7 +25,7 @@
     "emitDecoratorMetadata": true,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "NodeNext",
     "allowJs": true,
     "declaration": true,
     "declarationMap": true,

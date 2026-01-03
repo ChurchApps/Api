@@ -1,4 +1,4 @@
-import { Fund } from "./Fund";
+import { Fund } from "./Fund.js";
 
 export class DonationSummaryDonation {
   public totalAmount: number = 0;

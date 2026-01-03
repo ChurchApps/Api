@@ -4,15 +4,15 @@
  */
 
 // Explicit exports to avoid naming conflicts
-export { Environment } from "./helpers/Environment";
-export { Permissions, permissionsList, type IPermission, type ApiName, type DisplaySection, type Actions } from "./helpers/Permissions";
-export { UniqueIdHelper } from "./helpers/UniqueIdHelper";
-export { DateHelper } from "./helpers/DateHelper";
-export { ValidationHelper } from "./helpers/ValidationHelper";
-export { StripeHelper } from "./helpers/StripeHelper";
+export { Environment } from "./helpers/Environment.js";
+export { Permissions, permissionsList, type IPermission, type ApiName, type DisplaySection, type Actions } from "./helpers/Permissions.js";
+export { UniqueIdHelper } from "./helpers/UniqueIdHelper.js";
+export { DateHelper } from "./helpers/DateHelper.js";
+export { ValidationHelper } from "./helpers/ValidationHelper.js";
+export { StripeHelper } from "./helpers/StripeHelper.js";
 
 // Infrastructure
-export * from "./infrastructure";
+export * from "./infrastructure/index.js";
 
 // Types (but not Environment type to avoid conflict)
 export type {
@@ -45,4 +45,4 @@ export type {
   AuditLog,
   Notification,
   ContentType
-} from "./types/common";
+} from "./types/common.js";

@@ -1,8 +1,8 @@
 import express from "express";
 import Axios from "axios";
-import { PayPalHelper } from "../PayPalHelper";
-import { Environment } from "../Environment";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider";
+import { PayPalHelper } from "../PayPalHelper.js";
+import { Environment } from "../Environment.js";
+import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider.js";
 
 export class PayPalGatewayProvider implements IGatewayProvider {
   readonly name = "paypal";

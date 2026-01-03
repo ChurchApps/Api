@@ -1,5 +1,5 @@
-import { TypedDB } from "./TypedDB";
-import { BaseRepo } from "./BaseRepo";
+import { TypedDB } from "./TypedDB.js";
+import { BaseRepo } from "./BaseRepo.js";
 
 export interface RepoConfig<T> {
   tableName: string;

@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { Environment } from "../helpers/Environment";
+import { Environment } from "../helpers/Environment.js";
 
 export class ConnectionManager {
   private static pools: Map<string, mysql.Pool> = new Map();

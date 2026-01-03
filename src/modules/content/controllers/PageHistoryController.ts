@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
-import { PageHistory, Section, Element } from "../models";
-import { Permissions } from "../helpers";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { PageHistory, Section, Element } from "../models/index.js";
+import { Permissions } from "../helpers/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
 @controller("/content/pageHistory")

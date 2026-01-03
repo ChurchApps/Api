@@ -1,6 +1,6 @@
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Condition } from "../models";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Condition } from "../models/index.js";
 
 export class ConditionHelper {
   public static async getPeopleIdsMatchingConditions(conditions: Condition[], repositories?: Repos) {

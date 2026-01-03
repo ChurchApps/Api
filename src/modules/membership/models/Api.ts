@@ -1,4 +1,4 @@
-import { RolePermission } from "./RolePermission";
+import { RolePermission } from "./RolePermission.js";
 
 export class Api {
   public id?: string;

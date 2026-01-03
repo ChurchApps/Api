@@ -1,4 +1,4 @@
-import { DB } from "./DB";
+import { DB } from "./DB.js";
 
 export class TypedDB {
   static async query<T = any>(sql: string, params: unknown[]): Promise<T> {

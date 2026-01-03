@@ -12,7 +12,7 @@ import {
   TaskRepo,
   TimeRepo,
   MembershipRepo
-} from ".";
+} from "./index.js";
 
 export class Repos {
   public action: ActionRepo;

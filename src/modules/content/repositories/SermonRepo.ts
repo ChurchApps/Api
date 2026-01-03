@@ -1,7 +1,7 @@
 import { DateHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Sermon } from "../models";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Sermon } from "../models/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
 
 @injectable()

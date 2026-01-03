@@ -1,7 +1,7 @@
 import { controller, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { VisibilityPreference } from "../models";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { VisibilityPreference } from "../models/index.js";
 
 @controller("/membership/visibilityPreferences")
 export class VisibilityPreferenceController extends MembershipBaseController {

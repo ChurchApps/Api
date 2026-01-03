@@ -1,8 +1,8 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
+import { ContentBaseController } from "./ContentBaseController.js";
 import Pexels from "pexels";
-import { Environment } from "../helpers";
+import { Environment } from "../helpers/index.js";
 
 @controller("/content/stock")
 export class StockController extends ContentBaseController {

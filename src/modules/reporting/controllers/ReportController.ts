@@ -1,11 +1,11 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { ReportingBaseController } from "./ReportingBaseController";
-import { Report, ReportResult, Permission } from "../models";
+import { ReportingBaseController } from "./ReportingBaseController.js";
+import { Report, ReportResult, Permission } from "../models/index.js";
 import fs from "fs";
 import path from "path";
 import { ArrayHelper, AuthenticatedUser, IPermission } from "@churchapps/apihelper";
-import { ReportResultHelper, RunReportHelper } from "../helpers";
+import { ReportResultHelper, RunReportHelper } from "../helpers/index.js";
 
 @controller("/reporting/reports")
 export class ReportController extends ReportingBaseController {

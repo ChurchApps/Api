@@ -1,7 +1,7 @@
 import paypal from "@paypal/checkout-server-sdk";
 import express from "express";
-import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models";
-import { Environment } from "./Environment";
+import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
+import { Environment } from "./Environment.js";
 
 export class PayPalHelper {
   private static getClient(clientId: string, clientSecret: string): paypal.core.PayPalHttpClient {

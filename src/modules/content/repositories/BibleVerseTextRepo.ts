@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { BibleVerseText } from "../models";
-import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { BibleVerseText } from "../models/index.js";
+import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo.js";
 
 @injectable()
 export class BibleVerseTextRepo extends GlobalConfiguredRepo<BibleVerseText> {

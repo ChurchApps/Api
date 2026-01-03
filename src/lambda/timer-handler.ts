@@ -1,11 +1,11 @@
 import { ScheduledEvent, Context } from "aws-lambda";
 
-import { Environment } from "../shared/helpers/Environment";
-import { TypedDB } from "../shared/infrastructure/TypedDB";
+import { Environment } from "../shared/helpers/Environment.js";
+import { TypedDB } from "../shared/infrastructure/TypedDB.js";
 
-import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper";
-import { RepoManager } from "../shared/infrastructure/RepoManager";
-import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper";
+import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper.js";
+import { RepoManager } from "../shared/infrastructure/RepoManager.js";
+import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper.js";
 
 const initEnv = async () => {
   console.log("[initEnv] Starting environment initialization...");

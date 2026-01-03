@@ -1,7 +1,7 @@
 // EPayMints integration helper
 // Note: ePayMints may use REST/SOAP APIs depending on their service offering
 
-import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models";
+import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
 
 export class EPayMintsHelper {
   private static getBaseUrl(environment: string): string {

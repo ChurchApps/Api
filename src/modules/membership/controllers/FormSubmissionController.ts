@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { FormSubmission, Answer, Form, Church } from "../models";
-import { Permissions, EmailHelper, Environment } from "../helpers";
-import { MemberPermission, Person } from "../models";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { FormSubmission, Answer, Form, Church } from "../models/index.js";
+import { Permissions, EmailHelper, Environment } from "../helpers/index.js";
+import { MemberPermission, Person } from "../models/index.js";
 import axios from "axios";
 
 @controller("/membership/formsubmissions")

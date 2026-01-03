@@ -1,2 +1,2 @@
-export { ReportController } from "./ReportController";
-export { ReportingBaseController } from "./ReportingBaseController";
+export { ReportController } from "./ReportController.js";
+export { ReportingBaseController } from "./ReportingBaseController.js";

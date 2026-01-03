@@ -1,7 +1,7 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { injectable } from "inversify";
-import { PlanItem } from "../models";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { PlanItem } from "../models/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class PlanItemRepo extends ConfiguredRepo<PlanItem> {

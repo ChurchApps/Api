@@ -1,5 +1,5 @@
-import { TypedDB } from "./TypedDB";
-import { rowsToArray } from "../helpers/DbArrayHelper";
+import { TypedDB } from "./TypedDB.js";
+import { rowsToArray } from "../helpers/DbArrayHelper.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
 /**

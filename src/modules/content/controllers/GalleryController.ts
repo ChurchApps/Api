@@ -1,8 +1,8 @@
 import { AwsHelper, FileStorageHelper } from "@churchapps/apihelper";
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
-import { Environment, Permissions } from "../helpers";
-import { ContentBaseController } from "./ContentBaseController";
+import { Environment, Permissions } from "../helpers/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
 
 @controller("/content/gallery")
 export class GalleryController extends ContentBaseController {

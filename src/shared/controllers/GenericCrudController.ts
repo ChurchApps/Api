@@ -1,7 +1,7 @@
 import { httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { BaseController } from "../infrastructure";
-import { CrudHelper } from "./CrudHelper";
+import { BaseController } from "../infrastructure/index.js";
+import { CrudHelper } from "./CrudHelper.js";
 
 export interface CrudPermissions {
   view?: any;

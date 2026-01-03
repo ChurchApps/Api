@@ -1,7 +1,7 @@
-import { Section, Element, Block } from "../models";
+import { Section, Element, Block } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 
 export class TreeHelper {
   public static getChildElements(element: Element, allElements: Element[]) {

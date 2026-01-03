@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { Setting } from "../models";
-import { Permissions, FileStorageHelper, Environment } from "../helpers";
-import { MembershipBaseController } from "./MembershipBaseController";
+import { Setting } from "../models/index.js";
+import { Permissions, FileStorageHelper, Environment } from "../helpers/index.js";
+import { MembershipBaseController } from "./MembershipBaseController.js";
 
 @controller("/membership/settings")
 export class MembershipSettingController extends MembershipBaseController {

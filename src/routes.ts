@@ -31,7 +31,7 @@ export const createModuleContextMiddleware = (moduleName: string) => {
   return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
       // Import TypedDB to set up request context
-      const { TypedDB } = await import("./shared/infrastructure/TypedDB");
+      const { TypedDB } = await import("./shared/infrastructure/TypedDB.js");
 
       // Add module information to request for debugging/logging
       (req as any).module = moduleName;

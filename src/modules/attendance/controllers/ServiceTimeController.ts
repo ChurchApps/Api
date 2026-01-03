@@ -1,8 +1,8 @@
 import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
-import { AttendanceCrudController } from "./AttendanceCrudController";
-import { ServiceTime, GroupServiceTime } from "../models";
-import { Permissions } from "../../../shared/helpers";
+import { AttendanceCrudController } from "./AttendanceCrudController.js";
+import { ServiceTime, GroupServiceTime } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/attendance/servicetimes")
 export class ServiceTimeController extends AttendanceCrudController {

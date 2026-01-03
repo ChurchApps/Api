@@ -1,6 +1,6 @@
 import { controller } from "inversify-express-utils";
-import { MembershipCrudController } from "./MembershipCrudController";
-import { Permissions } from "../helpers";
+import { MembershipCrudController } from "./MembershipCrudController.js";
+import { Permissions } from "../helpers/index.js";
 
 @controller("/membership/households")
 export class HouseholdController extends MembershipCrudController {

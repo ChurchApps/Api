@@ -1,5 +1,5 @@
 // Login-related models
-import { Church } from "./Church";
+import { Church } from "./Church.js";
 
 export interface LoginRequest {
   email: string;

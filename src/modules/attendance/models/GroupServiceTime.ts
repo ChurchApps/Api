@@ -1,4 +1,4 @@
-import { ServiceTime } from "./";
+import { ServiceTime } from "./index.js";
 
 export class GroupServiceTime {
   public id?: string;

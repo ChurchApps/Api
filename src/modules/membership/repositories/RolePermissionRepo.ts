@@ -1,7 +1,7 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { RolePermission, Api, LoginUserChurch } from "../models";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { RolePermission, Api, LoginUserChurch } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
 
 @injectable()

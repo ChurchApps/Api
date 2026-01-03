@@ -1,4 +1,4 @@
-import { Condition } from "./Condition";
+import { Condition } from "./Condition.js";
 
 export class Conjunction {
   public id?: string;

@@ -1,7 +1,7 @@
 import { controller } from "inversify-express-utils";
 import express from "express";
-import { GivingCrudController } from "./GivingCrudController";
-import { Permissions } from "../../../shared/helpers/Permissions";
+import { GivingCrudController } from "./GivingCrudController.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 @controller("/giving/donationbatches")
 export class DonationBatchController extends GivingCrudController {

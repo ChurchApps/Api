@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { Playlist, Sermon } from "../models";
-import { ContentBaseController } from "./ContentBaseController";
-import { Permissions } from "../../../shared/helpers/Permissions";
-import { YouTubeHelper, Environment, VimeoHelper, OpenAiHelper } from "../helpers";
+import { Playlist, Sermon } from "../models/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { YouTubeHelper, Environment, VimeoHelper, OpenAiHelper } from "../helpers/index.js";
 import { FileStorageHelper } from "@churchapps/apihelper";
 
 @controller("/content/sermons")

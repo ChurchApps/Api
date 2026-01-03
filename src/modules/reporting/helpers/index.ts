@@ -1,2 +1,2 @@
-export { ReportResultHelper } from "./ReportResultHelper";
-export { RunReportHelper } from "./RunReportHelper";
+export { ReportResultHelper } from "./ReportResultHelper.js";
+export { RunReportHelper } from "./RunReportHelper.js";

@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken } from "../models";
-import { Permissions, UniqueIdHelper } from "../helpers";
-import { AuthenticatedUser } from "../auth";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken } from "../models/index.js";
+import { Permissions, UniqueIdHelper } from "../helpers/index.js";
+import { AuthenticatedUser } from "../auth/index.js";
 
 @controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {

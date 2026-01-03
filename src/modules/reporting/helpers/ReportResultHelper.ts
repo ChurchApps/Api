@@ -1,5 +1,5 @@
 import { ArrayHelper } from "@churchapps/apihelper";
-import { Query, Report } from "../models";
+import { Query, Report } from "../models/index.js";
 
 export class ReportResultHelper {
   public static combineResults(report: Report) {

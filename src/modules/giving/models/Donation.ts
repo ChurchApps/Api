@@ -1,4 +1,4 @@
-import { Fund } from "./";
+import { Fund } from "./index.js";
 
 export class Donation {
   public id?: string;

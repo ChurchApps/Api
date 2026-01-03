@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import * as ics from "ics";
-import { ContentBaseController } from "./ContentBaseController";
-import { Event } from "../models";
-import { CalendarHelper, Permissions } from "../helpers";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Event } from "../models/index.js";
+import { CalendarHelper, Permissions } from "../helpers/index.js";
 
 @controller("/content/events")
 export class EventController extends ContentBaseController {

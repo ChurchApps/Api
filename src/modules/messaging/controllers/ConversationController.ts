@@ -1,7 +1,7 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MessagingBaseController } from "./MessagingBaseController";
-import { Conversation, Message } from "../models";
+import { MessagingBaseController } from "./MessagingBaseController.js";
+import { Conversation, Message } from "../models/index.js";
 import { ArrayHelper, EncryptionHelper } from "@churchapps/apihelper";
 
 @controller("/messaging/conversations")

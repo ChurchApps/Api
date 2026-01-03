@@ -1,5 +1,5 @@
 import { AuthenticatedUser, CustomBaseController } from "@churchapps/apihelper";
-import { RepoManager } from "./RepoManager";
+import { RepoManager } from "./RepoManager.js";
 import express from "express";
 
 export class BaseController extends CustomBaseController {

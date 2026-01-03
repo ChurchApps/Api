@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { GivingCrudController } from "./GivingCrudController";
-import { GatewayService } from "../../../shared/helpers/GatewayService";
-import { Permissions } from "../../../shared/helpers/Permissions";
-import { GatewayPaymentMethod } from "../models";
+import { GivingCrudController } from "./GivingCrudController.js";
+import { GatewayService } from "../../../shared/helpers/GatewayService.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { GatewayPaymentMethod } from "../models/index.js";
 
 @controller("/giving/paymentmethods")
 export class PaymentMethodController extends GivingCrudController {
@@ -16,7 +16,7 @@ export class PaymentMethodController extends GivingCrudController {
   @httpGet("/test/personid/:id")
   public async testGetPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     // Test endpoint without auth for debugging - initialize repos manually
-    const { RepoManager } = await import("../../../shared/infrastructure/RepoManager");
+    const { RepoManager } = await import("../../../shared/infrastructure/RepoManager.js");
     this.repos = await RepoManager.getRepos("giving");
 
     const churchId = "AOjIt0W-SeY"; // hardcoded for testing

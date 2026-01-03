@@ -1,9 +1,9 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
-import { Permissions } from "../helpers";
-import { TreeHelper } from "../helpers/TreeHelper";
-import { Element, Page, Section } from "../models";
-import { ContentBaseController } from "./ContentBaseController";
+import { Permissions } from "../helpers/index.js";
+import { TreeHelper } from "../helpers/TreeHelper.js";
+import { Element, Page, Section } from "../models/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
 
 @controller("/content/pages")
 export class PageController2 extends ContentBaseController {

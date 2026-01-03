@@ -1,8 +1,8 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
-import { MessagingBaseController } from "./MessagingBaseController";
-import { BlockedIp } from "../models";
-import { DeliveryHelper } from "../helpers/DeliveryHelper";
+import { MessagingBaseController } from "./MessagingBaseController.js";
+import { BlockedIp } from "../models/index.js";
+import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
 
 @controller("/messaging/blockedips")
 export class BlockedIpController extends MessagingBaseController {

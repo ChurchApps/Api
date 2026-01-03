@@ -1,11 +1,11 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
-import { RegistrationRequest, Church, RolePermission, Api, RegisterChurchRequest, LoginUserChurch, Group, RoleMember, User } from "../models";
+import { RegistrationRequest, Church, RolePermission, Api, RegisterChurchRequest, LoginUserChurch, Group, RoleMember, User } from "../models/index.js";
 import express from "express";
 import { body, validationResult } from "express-validator";
-import { AuthenticatedUser } from "../auth";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { Utils, Permissions, ChurchHelper, RoleHelper, Environment, HubspotHelper, GeoHelper, PersonHelper, UserHelper } from "../helpers";
-import { Repos } from "../repositories";
+import { AuthenticatedUser } from "../auth/index.js";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { Utils, Permissions, ChurchHelper, RoleHelper, Environment, HubspotHelper, GeoHelper, PersonHelper, UserHelper } from "../helpers/index.js";
+import { Repos } from "../repositories/index.js";
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
 
 const churchRegisterValidation = [

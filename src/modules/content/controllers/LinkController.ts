@@ -1,9 +1,9 @@
 import { controller, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { Permissions } from "../helpers";
-import { ContentCrudController } from "./ContentCrudController";
-import { Link } from "../models";
-import { CrudHelper } from "../../../shared/controllers";
+import { Permissions } from "../helpers/index.js";
+import { ContentCrudController } from "./ContentCrudController.js";
+import { Link } from "../models/index.js";
+import { CrudHelper } from "../../../shared/controllers/index.js";
 
 @controller("/content/links")
 export class LinkController extends ContentCrudController {

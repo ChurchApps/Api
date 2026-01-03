@@ -1,4 +1,4 @@
-import { Visit, Session } from "./";
+import { Visit, Session } from "./index.js";
 
 export class VisitSession {
   public id?: string;

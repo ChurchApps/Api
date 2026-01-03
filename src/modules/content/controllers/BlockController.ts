@@ -1,9 +1,9 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { ContentCrudController } from "./ContentCrudController";
-import { Block, Element, Section } from "../models";
-import { Permissions } from "../helpers";
-import { TreeHelper } from "../helpers/TreeHelper";
+import { ContentCrudController } from "./ContentCrudController.js";
+import { Block, Element, Section } from "../models/index.js";
+import { Permissions } from "../helpers/index.js";
+import { TreeHelper } from "../helpers/TreeHelper.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
 @controller("/content/blocks")

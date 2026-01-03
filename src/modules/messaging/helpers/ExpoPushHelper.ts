@@ -1,5 +1,5 @@
 import { Expo, ExpoPushMessage, ExpoPushTicket } from "expo-server-sdk";
-import { Environment } from "../../../shared/helpers/Environment";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class ExpoPushHelper {
   private static expo: Expo;

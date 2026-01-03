@@ -1,8 +1,8 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
-import { BibleSourceFactory } from "../helpers/BibleSourceFactory";
-import { BibleTranslation, BibleVerseText } from "../models";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { BibleSourceFactory } from "../helpers/BibleSourceFactory.js";
+import { BibleTranslation, BibleVerseText } from "../models/index.js";
 
 @controller("/content/bibles")
 export class BibleController extends ContentBaseController {

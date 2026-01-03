@@ -1,4 +1,4 @@
-import { Group, Person } from "./";
+import { Group, Person } from "./index.js";
 
 export class GroupMember {
   public id?: string;

@@ -1,8 +1,8 @@
 import express from "express";
 import Axios from "axios";
-import { EPayMintsHelper } from "../EPayMintsHelper";
-import { Environment } from "../Environment";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider";
+import { EPayMintsHelper } from "../EPayMintsHelper.js";
+import { Environment } from "../Environment.js";
+import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider.js";
 
 export class EPayMintsGatewayProvider implements IGatewayProvider {
   readonly name = "epaymints";

@@ -1,10 +1,10 @@
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
-import { Conversation, DeliveryLog, Device, Message, PrivateMessage, Notification, NotificationPreference } from "../models";
-import { Repos } from "../repositories";
-import { DeliveryHelper } from "./DeliveryHelper";
-import { ExpoPushHelper } from "./ExpoPushHelper";
+import { Conversation, DeliveryLog, Device, Message, PrivateMessage, Notification, NotificationPreference } from "../models/index.js";
+import { Repos } from "../repositories/index.js";
+import { DeliveryHelper } from "./DeliveryHelper.js";
+import { ExpoPushHelper } from "./ExpoPushHelper.js";
 import axios from "axios";
-import { Environment } from "../../../shared/helpers/Environment";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class NotificationHelper {
   private static repos: Repos;

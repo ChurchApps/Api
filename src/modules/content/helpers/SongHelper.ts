@@ -1,7 +1,7 @@
-import { SongDetail, Song, Arrangement, SongDetailLink, ArrangementKey } from "../models";
-import { PraiseChartsHelper } from "./PraiseChartsHelper";
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
+import { SongDetail, Song, Arrangement, SongDetailLink, ArrangementKey } from "../models/index.js";
+import { PraiseChartsHelper } from "./PraiseChartsHelper.js";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 
 export interface FreeShowSong {
   freeShowId: string;

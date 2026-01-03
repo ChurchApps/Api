@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { FormSubmission } from "../models";
-import { DateHelper } from "../helpers";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { FormSubmission } from "../models/index.js";
+import { DateHelper } from "../helpers/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class FormSubmissionRepo extends ConfiguredRepo<FormSubmission> {

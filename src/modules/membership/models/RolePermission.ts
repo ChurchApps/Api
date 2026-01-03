@@ -1,4 +1,4 @@
-import { ApiName, ContentType, Actions } from "../helpers";
+import { ApiName, ContentType, Actions } from "../helpers/index.js";
 
 export class RolePermission {
   public id?: string;

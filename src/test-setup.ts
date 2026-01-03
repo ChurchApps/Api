@@ -1,5 +1,5 @@
-import { Environment } from "./shared/helpers/Environment";
-import { ConnectionManager } from "./shared/infrastructure/ConnectionManager";
+import { Environment } from "./shared/helpers/Environment.js";
+import { ConnectionManager } from "./shared/infrastructure/ConnectionManager.js";
 
 // Global test setup
 beforeAll(async () => {

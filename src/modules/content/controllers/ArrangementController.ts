@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { Arrangement } from "../models";
-import { ContentBaseController } from "./ContentBaseController";
-import { Permissions } from "../helpers";
+import { Arrangement } from "../models/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Permissions } from "../helpers/index.js";
 
 @controller("/content/arrangements")
 export class ArrangementController extends ContentBaseController {

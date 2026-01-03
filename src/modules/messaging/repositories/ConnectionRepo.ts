@@ -1,7 +1,7 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Connection } from "../models";
-import { ViewerInterface } from "../helpers/Interfaces";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Connection } from "../models/index.js";
+import { ViewerInterface } from "../helpers/Interfaces.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
 
 @injectable()

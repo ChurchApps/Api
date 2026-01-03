@@ -1,13 +1,13 @@
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk/client-apigatewaymanagementapi";
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
 
-import { Environment } from "../shared/helpers/Environment";
-import { TypedDB } from "../shared/infrastructure/TypedDB";
+import { Environment } from "../shared/helpers/Environment.js";
+import { TypedDB } from "../shared/infrastructure/TypedDB.js";
 
-import { Logger } from "../modules/messaging/helpers/Logger";
-import { SocketHelper } from "../modules/messaging/helpers/SocketHelper";
-import { initializeMessagingModule } from "../modules/messaging";
-import { RepoManager } from "../shared/infrastructure/RepoManager";
+import { Logger } from "../modules/messaging/helpers/Logger.js";
+import { SocketHelper } from "../modules/messaging/helpers/SocketHelper.js";
+import { initializeMessagingModule } from "../modules/messaging/index.js";
+import { RepoManager } from "../shared/infrastructure/RepoManager.js";
 
 let gwManagement: ApiGatewayManagementApiClient;
 

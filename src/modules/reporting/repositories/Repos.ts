@@ -1,4 +1,4 @@
-import { ReportRepo } from ".";
+import { ReportRepo } from "./index.js";
 
 export class Repos {
   public report: ReportRepo;

@@ -2,14 +2,14 @@ import "reflect-metadata";
 import express from "express";
 import { Container } from "inversify";
 import { InversifyExpressServer } from "inversify-express-utils";
-import { Environment } from "./shared/helpers/Environment";
-import { CustomAuthProvider } from "./shared/infrastructure/CustomAuthProvider";
-import { RepoManager } from "./shared/infrastructure/RepoManager";
+import { Environment } from "./shared/helpers/Environment.js";
+import { CustomAuthProvider } from "./shared/infrastructure/CustomAuthProvider.js";
+import { RepoManager } from "./shared/infrastructure/RepoManager.js";
 import cors from "cors";
 import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
-import { ConnectionManager } from "./shared/infrastructure/ConnectionManager";
-import { configureModuleRoutes, moduleRoutingLogger } from "./routes";
+import { ConnectionManager } from "./shared/infrastructure/ConnectionManager.js";
+import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
 
 export const createApp = async () => {
   // Initialize environment configuration (only if not already initialized)
@@ -207,8 +207,8 @@ export const createApp = async () => {
 
   // Initialize messaging module after server is built but before returning
   try {
-    const { initializeMessagingModule } = await import("./modules/messaging");
-    const { RepoManager } = await import("./shared/infrastructure/RepoManager");
+    const { initializeMessagingModule } = await import("./modules/messaging/index.js");
+    const { RepoManager } = await import("./shared/infrastructure/RepoManager.js");
     const messagingRepos = await RepoManager.getRepos<any>("messaging");
     initializeMessagingModule(messagingRepos);
   } catch (error) {
@@ -224,20 +224,20 @@ async function loadModuleBindings(container: Container) {
     // Load all module controllers in parallel for faster startup
     // The @controller decorators automatically register with the container
     const moduleImports: Array<{ name: string; import: Promise<any> }> = [
-      { name: "Shared", import: import("./shared/controllers/HealthController") },
-      { name: "Membership", import: import("./modules/membership/controllers") },
-      { name: "Attendance", import: import("./modules/attendance/controllers") },
-      { name: "Content", import: import("./modules/content/controllers") },
-      { name: "Doing", import: import("./modules/doing/controllers") },
-      { name: "Giving", import: import("./modules/giving/controllers") },
-      { name: "Messaging", import: import("./modules/messaging/controllers") },
-      { name: "Reporting", import: import("./modules/reporting/controllers") }
+      { name: "Shared", import: import("./shared/controllers/HealthController.js") },
+      { name: "Membership", import: import("./modules/membership/controllers/index.js") },
+      { name: "Attendance", import: import("./modules/attendance/controllers/index.js") },
+      { name: "Content", import: import("./modules/content/controllers/index.js") },
+      { name: "Doing", import: import("./modules/doing/controllers/index.js") },
+      { name: "Giving", import: import("./modules/giving/controllers/index.js") },
+      { name: "Messaging", import: import("./modules/messaging/controllers/index.js") },
+      { name: "Reporting", import: import("./modules/reporting/controllers/index.js") }
     ];
 
     // Only load playground in development environment
     const env = Environment.currentEnvironment || process.env.ENVIRONMENT || "dev";
     if (env === "dev" || env === "development" || env === "local") {
-      moduleImports.push({ name: "Playground", import: import("./playground/controllers") });
+      moduleImports.push({ name: "Playground", import: import("./playground/controllers/index.js") });
       console.log("🎮 Playground enabled (development mode)");
     }
 
@@ -273,7 +273,7 @@ process.on("SIGINT", async () => {
 
   // Close WebSocket server
   try {
-    const { SocketHelper } = await import("./modules/messaging/helpers/SocketHelper");
+    const { SocketHelper } = await import("./modules/messaging/helpers/SocketHelper.js");
     SocketHelper.shutdown();
   } catch (error) {
     console.warn("Failed to shutdown WebSocket server:", (error as any)?.message || error);

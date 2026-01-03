@@ -1,7 +1,7 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MessagingBaseController } from "./MessagingBaseController";
-import { DeliveryLog } from "../models";
+import { MessagingBaseController } from "./MessagingBaseController.js";
+import { DeliveryLog } from "../models/index.js";
 
 @controller("/messaging/deliverylogs")
 export class DeliveryLogController extends MessagingBaseController {

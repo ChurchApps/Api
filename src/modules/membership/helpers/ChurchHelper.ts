@@ -1,7 +1,7 @@
 import { ArrayHelper } from "@churchapps/apihelper";
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Church } from "../models";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Church } from "../models/index.js";
 
 export class ChurchHelper {
   static async selectSubDomain(name: string) {

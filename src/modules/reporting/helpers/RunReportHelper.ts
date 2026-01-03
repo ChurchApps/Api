@@ -1,7 +1,7 @@
 import { ArrayHelper } from "@churchapps/apihelper";
-import { Parameter, Query, Report } from "../models";
-import { Repos } from "../repositories/Repos";
-import { RepoManager } from "../../../shared/infrastructure";
+import { Parameter, Query, Report } from "../models/index.js";
+import { Repos } from "../repositories/Repos.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 
 export class RunReportHelper {
   public static async runAllQueries(report: Report) {

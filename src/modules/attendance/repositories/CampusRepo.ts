@@ -1,6 +1,6 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure";
-import { Campus } from "../models";
+import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
+import { Campus } from "../models/index.js";
 
 @injectable()
 export class CampusRepo extends ConfiguredRepo<Campus> {

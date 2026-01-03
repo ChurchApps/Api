@@ -1,6 +1,6 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { DoingCrudController } from "./DoingCrudController";
+import { DoingCrudController } from "./DoingCrudController.js";
 
 @controller("/doing/positions")
 export class PositionController extends DoingCrudController {

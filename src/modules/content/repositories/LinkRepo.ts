@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { Link } from "../models";
+import { Link } from "../models/index.js";
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 const DEFAULT_B1TAB_LINKS: Partial<Link>[] = [
   { linkType: "bible", text: "Bible", icon: "menu_book", visibility: "everyone", sort: 1 },

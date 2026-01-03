@@ -1,6 +1,6 @@
-import { Event, EventException } from "../models";
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
+import { Event, EventException } from "../models/index.js";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 
 export class CalendarHelper {
   public static async addExceptionDates(events: Event[], repos?: Repos) {

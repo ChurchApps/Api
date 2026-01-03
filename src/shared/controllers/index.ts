@@ -1,3 +1,3 @@
-export { CrudHelper } from "./CrudHelper";
-export { GenericCrudController } from "./GenericCrudController";
-export type { CrudSettings, CrudRoute, CrudPermissions } from "./GenericCrudController";
+export { CrudHelper } from "./CrudHelper.js";
+export { GenericCrudController } from "./GenericCrudController.js";
+export type { CrudSettings, CrudRoute, CrudPermissions } from "./GenericCrudController.js";

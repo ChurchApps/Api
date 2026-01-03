@@ -1,8 +1,8 @@
-export { AttendanceRecord } from "./AttendanceRecord";
-export { Campus } from "./Campus";
-export { GroupServiceTime } from "./GroupServiceTime";
-export { Service } from "./Service";
-export { ServiceTime } from "./ServiceTime";
-export { Session } from "./Session";
-export { Visit } from "./Visit";
-export { VisitSession } from "./VisitSession";
+export { AttendanceRecord } from "./AttendanceRecord.js";
+export { Campus } from "./Campus.js";
+export { GroupServiceTime } from "./GroupServiceTime.js";
+export { Service } from "./Service.js";
+export { ServiceTime } from "./ServiceTime.js";
+export { Session } from "./Session.js";
+export { Visit } from "./Visit.js";
+export { VisitSession } from "./VisitSession.js";

@@ -1,6 +1,6 @@
 import { controller, httpGet } from "inversify-express-utils";
 import express from "express";
-import { BridgeBaseController } from "./BridgeBaseController";
+import { BridgeBaseController } from "./BridgeBaseController.js";
 
 @controller("/doing/actions")
 export class ActionController extends BridgeBaseController {

@@ -1,11 +1,11 @@
 import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import axios from "axios";
-import { StreamingService } from "../models";
-import { ContentBaseController } from "./ContentBaseController";
-import { Permissions } from "../../../shared/helpers";
+import { StreamingService } from "../models/index.js";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 import { EncryptionHelper, DateHelper } from "@churchapps/apihelper";
-import { Environment } from "../helpers";
+import { Environment } from "../helpers/index.js";
 
 @controller("/content/streamingServices")
 export class StreamingServiceController extends ContentBaseController {

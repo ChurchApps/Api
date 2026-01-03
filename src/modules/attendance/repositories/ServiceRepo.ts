@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Service } from "../models";
+import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Service } from "../models/index.js";
 
 @injectable()
 export class ServiceRepo extends ConfiguredRepo<Service> {

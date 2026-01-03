@@ -1,10 +1,14 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { GivingBaseController } from "./GivingBaseController";
-import { Donation } from "../models";
-import { Permissions } from "../../../shared/helpers/Permissions";
-import { EmailHelper } from "@churchapps/apihelper";
 import path from "path";
+import { fileURLToPath } from "url";
+import { GivingBaseController } from "./GivingBaseController.js";
+import { Donation } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { EmailHelper } from "@churchapps/apihelper";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 @controller("/giving/donations")
 export class DonationController extends GivingBaseController {

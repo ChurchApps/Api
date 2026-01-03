@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "async_hooks";
-import { MultiDatabasePool } from "./MultiDatabasePool";
+import { MultiDatabasePool } from "./MultiDatabasePool.js";
 
 /**
  * Request context for storing the current module

@@ -1,8 +1,8 @@
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Automation, Condition, Conjunction } from "../models";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Automation, Condition, Conjunction } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { ConditionHelper } from "./ConditionHelper";
+import { ConditionHelper } from "./ConditionHelper.js";
 
 export class ConjunctionHelper {
   public static async getPeopleIds(automation: Automation, repositories?: Repos) {

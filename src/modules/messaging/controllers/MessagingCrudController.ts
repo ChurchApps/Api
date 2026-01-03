@@ -1,5 +1,5 @@
-import { GenericCrudController } from "../../../shared/controllers/GenericCrudController";
-import { Repos } from "../repositories";
+import { GenericCrudController } from "../../../shared/controllers/GenericCrudController.js";
+import { Repos } from "../repositories/index.js";
 
 export abstract class MessagingCrudController extends GenericCrudController {
   declare public repos: Repos;

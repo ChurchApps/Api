@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MembershipCrudController } from "./MembershipCrudController";
-import { Domain } from "../models";
-import { CaddyHelper, Permissions } from "../helpers";
-import { DomainHealthHelper } from "../helpers/DomainHealthHelper";
+import { MembershipCrudController } from "./MembershipCrudController.js";
+import { Domain } from "../models/index.js";
+import { CaddyHelper, Permissions } from "../helpers/index.js";
+import { DomainHealthHelper } from "../helpers/DomainHealthHelper.js";
 
 @controller("/membership/domains")
 export class DomainController extends MembershipCrudController {

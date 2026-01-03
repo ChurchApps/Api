@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { DoingBaseController } from "./DoingBaseController";
-import { Automation } from "../models";
-import { AutomationHelper } from "../helpers/AutomationHelper";
+import { DoingBaseController } from "./DoingBaseController.js";
+import { Automation } from "../models/index.js";
+import { AutomationHelper } from "../helpers/AutomationHelper.js";
 
 @controller("/doing/automations")
 export class AutomationController extends DoingBaseController {

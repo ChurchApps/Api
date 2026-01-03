@@ -1,5 +1,5 @@
-import { Sermon, StreamingService } from "../models";
-import { Link } from "../models";
+import { Sermon, StreamingService } from "../models/index.js";
+import { Link } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
 export class StreamingConfigHelper {

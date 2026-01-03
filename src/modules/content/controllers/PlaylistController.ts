@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { Playlist } from "../models";
-import { ContentCrudController } from "./ContentCrudController";
-import { Permissions } from "../../../shared/helpers";
-import { Environment } from "../helpers";
+import { Playlist } from "../models/index.js";
+import { ContentCrudController } from "./ContentCrudController.js";
+import { Permissions } from "../../../shared/helpers/index.js";
+import { Environment } from "../helpers/index.js";
 import { FileStorageHelper } from "@churchapps/apihelper";
 
 @controller("/content/playlists")

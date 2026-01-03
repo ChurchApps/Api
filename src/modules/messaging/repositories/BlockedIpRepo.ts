@@ -1,8 +1,8 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { BlockedIp } from "../models";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { BlockedIp } from "../models/index.js";
 import { injectable } from "inversify";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class BlockedIpRepo extends ConfiguredRepo<BlockedIp> {

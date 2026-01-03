@@ -1,8 +1,8 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { GivingCrudController } from "./GivingCrudController";
-import { Permissions } from "../../../shared/helpers/Permissions";
-import { CrudHelper } from "../../../shared/controllers";
+import { GivingCrudController } from "./GivingCrudController.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { CrudHelper } from "../../../shared/controllers/index.js";
 
 @controller("/giving/funds")
 export class FundController extends GivingCrudController {

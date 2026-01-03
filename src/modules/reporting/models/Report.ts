@@ -1,7 +1,7 @@
-import { Query } from "./Query";
-import { Parameter } from "./Parameter";
-import { Output } from "./Output";
-import { PermissionGroup } from "./PermissionGroup";
+import { Query } from "./Query.js";
+import { Parameter } from "./Parameter.js";
+import { Output } from "./Output.js";
+import { PermissionGroup } from "./PermissionGroup.js";
 
 export class Report {
   public displayName?: string;

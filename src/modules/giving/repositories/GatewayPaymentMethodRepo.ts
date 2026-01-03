@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { GatewayPaymentMethod } from "../models";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { GatewayPaymentMethod } from "../models/index.js";
 
 @injectable()
 export class GatewayPaymentMethodRepo extends ConfiguredRepo<GatewayPaymentMethod> {

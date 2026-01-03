@@ -15,8 +15,8 @@ import {
   OAuthTokenRepo,
   OAuthCodeRepo,
   OAuthClientRepo
-} from ".";
-import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo } from ".";
+} from "./index.js";
+import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo } from "./index.js";
 
 export class Repos {
   public groupMember: GroupMemberRepo;

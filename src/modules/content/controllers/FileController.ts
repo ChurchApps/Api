@@ -1,10 +1,10 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
-import { File } from "../models";
-import { Permissions } from "../../../shared/helpers";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { File } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 import { AwsHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { Environment } from "../helpers";
+import { Environment } from "../helpers/index.js";
 
 @controller("/content/files")
 export class FileController extends ContentBaseController {

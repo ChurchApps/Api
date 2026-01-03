@@ -1,6 +1,6 @@
 import { injectable } from "inversify";
-import { AccessLog } from "../models";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { AccessLog } from "../models/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class AccessLogRepo extends ConfiguredRepo<AccessLog> {

@@ -1,6 +1,6 @@
-import { ApiBibleHelper } from "./ApiBibleHelper";
-import { YouVersionHelper } from "./YouVersionHelper";
-import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models";
+import { ApiBibleHelper } from "./ApiBibleHelper.js";
+import { YouVersionHelper } from "./YouVersionHelper.js";
+import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models/index.js";
 
 export class BibleSourceFactory {
 

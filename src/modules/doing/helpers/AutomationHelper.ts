@@ -1,7 +1,7 @@
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Action, Automation, Task } from "../models";
-import { ConjunctionHelper } from "./ConjunctionHelper";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Action, Automation, Task } from "../models/index.js";
+import { ConjunctionHelper } from "./ConjunctionHelper.js";
 
 export class AutomationHelper {
   public static async checkAll(repositories?: Repos) {

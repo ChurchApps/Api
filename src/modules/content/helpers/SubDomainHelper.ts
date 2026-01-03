@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Environment } from "../../../shared/helpers/Environment";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class SubDomainHelper {
   static subDomains: any = {};

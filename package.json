@@ -1,6 +1,7 @@
 {
   "name": "api",
   "version": "1.0.0",
+  "type": "module",
   "description": "Core APIs modular monolith for church management system",
   "main": "dist/index.js",
   "scripts": {
@@ -19,7 +20,7 @@
     "populateDemo:messaging": "ts-node tools/initdb.ts --module=messaging --demo-only",
     "populateDemo:doing": "ts-node tools/initdb.ts --module=doing --demo-only",
     "reset-db": "ts-node tools/initdb.ts --reset",
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev": "npm run build && node --watch dist/index.js",
     "clean": "rimraf dist",
     "lint": "prettier --write src/**/*.ts && eslint . --fix",
     "lint:check": "eslint .",
@@ -27,7 +28,7 @@
     "copy-assets": "copyfiles -u 1 src/**/*.html src/**/*.css dist/",
     "build-ignore-errors": "npm run clean && (npx tsc || true) && npm run copy-assets",
     "build": "npm run clean && npx tsc --noEmitOnError false && npm run copy-assets && npm run build:playground",
-    "build:playground": "cd src/playground && npx tsc && cp index.html dist/",
+    "build:playground": "cd src/playground && npx tsc && copyfiles index.html dist/",
     "build:prod": "npm run clean && npx tsc -p tsconfig.prod.json --noEmitOnError false && npm run copy-assets",
     "build-layer": "rm -rf layer && mkdir -p layer/nodejs && cp tools/layer-package.json layer/nodejs/package.json && cd layer/nodejs && npm install --omit=dev --no-package-lock",
     "rebuild-layer": "npm run clean-layer && npm run build-layer",
@@ -57,7 +58,7 @@
     "@aws-sdk/client-ses": "^3.862.0",
     "@aws-sdk/client-ssm": "^3.862.0",
     "@aws-sdk/lib-storage": "^3.862.0",
-    "@churchapps/apihelper": "^0.4.46",
+    "@churchapps/apihelper": "^0.4.47",
     "@codegenie/serverless-express": "^4.15.0",
     "@hubspot/api-client": "^13.1.0",
     "@paypal/checkout-server-sdk": "^1.0.3",
@@ -146,6 +147,7 @@
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tslint": "^6.1.3",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.2",
     "webpack": "^5.97.1",
     "webpack-node-externals": "^3.0.0"

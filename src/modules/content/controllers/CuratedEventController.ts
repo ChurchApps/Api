@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
-import { CuratedEvent } from "../models";
-import { CalendarHelper, Permissions } from "../helpers";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { CuratedEvent } from "../models/index.js";
+import { CalendarHelper, Permissions } from "../helpers/index.js";
 
 @controller("/content/curatedEvents")
 export class CuratedEventController extends ContentBaseController {

@@ -1,4 +1,4 @@
-import { ConnectionManager } from "./ConnectionManager";
+import { ConnectionManager } from "./ConnectionManager.js";
 
 export class RepoManager {
   private static instances: Map<string, any> = new Map();
@@ -17,31 +17,31 @@ export class RepoManager {
 
     switch (moduleName) {
       case "attendance":
-        const { Repos: AttendanceRepos } = await import("../../modules/attendance");
+        const { Repos: AttendanceRepos } = await import("../../modules/attendance/index.js");
         return new AttendanceRepos();
 
       case "content":
-        const { Repos: ContentRepos } = await import("../../modules/content");
+        const { Repos: ContentRepos } = await import("../../modules/content/index.js");
         return new ContentRepos();
 
       case "doing":
-        const { Repos: DoingRepos } = await import("../../modules/doing");
+        const { Repos: DoingRepos } = await import("../../modules/doing/index.js");
         return new DoingRepos();
 
       case "giving":
-        const { Repos: GivingRepos } = await import("../../modules/giving");
+        const { Repos: GivingRepos } = await import("../../modules/giving/index.js");
         return new GivingRepos();
 
       case "membership":
-        const { Repos: MembershipRepos } = await import("../../modules/membership");
+        const { Repos: MembershipRepos } = await import("../../modules/membership/index.js");
         return new MembershipRepos();
 
       case "messaging":
-        const { Repos: MessagingRepos } = await import("../../modules/messaging");
+        const { Repos: MessagingRepos } = await import("../../modules/messaging/index.js");
         return new MessagingRepos();
 
       case "reporting":
-        const { Repos: ReportingRepos } = await import("../../modules/reporting");
+        const { Repos: ReportingRepos } = await import("../../modules/reporting/index.js");
         return new ReportingRepos();
 
       default:

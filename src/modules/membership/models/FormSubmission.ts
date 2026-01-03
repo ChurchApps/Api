@@ -1,4 +1,4 @@
-import { Form, Answer, Question } from "./";
+import { Form, Answer, Question } from "./index.js";
 
 export class FormSubmission {
   public id?: string;

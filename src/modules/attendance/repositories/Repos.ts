@@ -1,4 +1,4 @@
-import { AttendanceRepo, CampusRepo, GroupServiceTimeRepo, ServiceRepo, ServiceTimeRepo, SessionRepo, VisitRepo, VisitSessionRepo } from ".";
+import { AttendanceRepo, CampusRepo, GroupServiceTimeRepo, ServiceRepo, ServiceTimeRepo, SessionRepo, VisitRepo, VisitSessionRepo } from "./index.js";
 
 export class Repos {
   public attendance: AttendanceRepo;

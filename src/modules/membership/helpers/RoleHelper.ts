@@ -1,6 +1,6 @@
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Role, RoleMember, RolePermission } from "../models";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Role, RoleMember, RolePermission } from "../models/index.js";
 
 export class RoleHelper {
   private repos: Repos;

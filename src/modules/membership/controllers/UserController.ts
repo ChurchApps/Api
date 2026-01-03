@@ -2,12 +2,12 @@ import { controller, httpDelete, httpGet, httpPost } from "inversify-express-uti
 import express from "express";
 import bcrypt from "bcryptjs";
 import { body, oneOf, validationResult } from "express-validator";
-import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch } from "../models";
-import { AuthenticatedUser } from "../auth";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { EmailHelper, UserHelper, UniqueIdHelper, Environment, Permissions } from "../helpers";
+import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch } from "../models/index.js";
+import { AuthenticatedUser } from "../auth/index.js";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { EmailHelper, UserHelper, UniqueIdHelper, Environment, Permissions } from "../helpers/index.js";
 import { v4 } from "uuid";
-import { ChurchHelper } from "../helpers";
+import { ChurchHelper } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
 const emailPasswordValidation = [

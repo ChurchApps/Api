@@ -1,8 +1,8 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { DeviceContent } from "../models";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { DeviceContent } from "../models/index.js";
 import { injectable } from "inversify";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class DeviceContentRepo extends ConfiguredRepo<DeviceContent> {

@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { GroupMember } from "../models";
-import { PersonHelper } from "../helpers";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { GroupMember } from "../models/index.js";
+import { PersonHelper } from "../helpers/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {

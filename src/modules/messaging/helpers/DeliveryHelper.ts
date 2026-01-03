@@ -1,11 +1,11 @@
-import { PayloadInterface } from "./Interfaces";
+import { PayloadInterface } from "./Interfaces.js";
 import WebSocket from "ws";
-import { Repos } from "../repositories";
-import { Connection } from "../models";
-import { AttendanceInterface } from "./Interfaces";
+import { Repos } from "../repositories/index.js";
+import { Connection } from "../models/index.js";
+import { AttendanceInterface } from "./Interfaces.js";
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk/client-apigatewaymanagementapi";
-import { SocketHelper } from "./SocketHelper";
-import { Environment } from "../../../shared/helpers/Environment";
+import { SocketHelper } from "./SocketHelper.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class DeliveryHelper {
   private static repos: Repos;

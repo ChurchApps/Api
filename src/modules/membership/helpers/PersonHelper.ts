@@ -1,8 +1,8 @@
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
-import { Household, Person, UserChurch } from "../models";
-import { AuthenticatedUser } from "../auth";
-import { Permissions } from "../../../shared/helpers";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { Household, Person, UserChurch } from "../models/index.js";
+import { AuthenticatedUser } from "../auth/index.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 
 export class PersonHelper extends BasePersonHelper {

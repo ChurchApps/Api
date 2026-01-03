@@ -1,4 +1,4 @@
-import { Campus } from "./";
+import { Campus } from "./index.js";
 export class Service {
   public id?: string;
   public churchId?: string;

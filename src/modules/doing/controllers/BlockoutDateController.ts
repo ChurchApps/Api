@@ -1,7 +1,7 @@
 import { controller, httpPost, httpGet } from "inversify-express-utils";
 import express from "express";
-import { DoingCrudController } from "./DoingCrudController";
-import { BlockoutDate } from "../models";
+import { DoingCrudController } from "./DoingCrudController.js";
+import { BlockoutDate } from "../models/index.js";
 
 @controller("/doing/blockoutDates")
 export class BlockoutDateController extends DoingCrudController {

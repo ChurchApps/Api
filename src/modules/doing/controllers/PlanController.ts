@@ -1,8 +1,8 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
-import { PlanHelper } from "../helpers/PlanHelper";
-import { Plan, Position, Time } from "../models";
-import { DoingBaseController } from "./DoingBaseController";
+import { PlanHelper } from "../helpers/PlanHelper.js";
+import { Plan, Position, Time } from "../models/index.js";
+import { DoingBaseController } from "./DoingBaseController.js";
 
 @controller("/doing/plans")
 export class PlanController extends DoingBaseController {

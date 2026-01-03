@@ -1,4 +1,4 @@
-import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models";
+import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models/index.js";
 
 export interface IBibleSource {
   source: string;

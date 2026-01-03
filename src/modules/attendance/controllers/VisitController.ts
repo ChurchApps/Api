@@ -1,8 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { AttendanceBaseController } from "./AttendanceBaseController";
-import { Visit, VisitSession, Session } from "../models";
-import { Permissions } from "../../../shared/helpers";
+import { AttendanceBaseController } from "./AttendanceBaseController.js";
+import { Visit, VisitSession, Session } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 
 interface IdCache {
   [name: string]: string;

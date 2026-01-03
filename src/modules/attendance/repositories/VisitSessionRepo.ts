@@ -1,9 +1,9 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { VisitSession } from "../models";
+import { VisitSession } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class VisitSessionRepo extends ConfiguredRepo<VisitSession> {

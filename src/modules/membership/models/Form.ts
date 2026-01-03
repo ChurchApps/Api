@@ -1,4 +1,4 @@
-import { Question } from "./";
+import { Question } from "./index.js";
 
 export class Form {
   public id?: string;

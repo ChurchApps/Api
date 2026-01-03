@@ -1,5 +1,6 @@
-import { createApp } from "./app";
-import { Environment } from "./shared/helpers/Environment";
+import { createApp } from "./app.js";
+import { Environment } from "./shared/helpers/Environment.js";
+import { fileURLToPath } from "url";
 
 const startServer = async () => {
   try {
@@ -30,6 +31,7 @@ const startServer = async () => {
 };
 
 // Only start server if this file is run directly (not imported)
-if (require.main === module) {
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMainModule) {
   startServer();
 }

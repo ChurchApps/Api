@@ -9,7 +9,7 @@ import {
   EventLogRepo,
   SubscriptionRepo,
   SubscriptionFundsRepo
-} from ".";
+} from "./index.js";
 
 export class Repos {
   public donationBatch: DonationBatchRepo;

@@ -1,4 +1,4 @@
-import { Section } from "./Section";
+import { Section } from "./Section.js";
 
 export class Block {
   public id?: string;

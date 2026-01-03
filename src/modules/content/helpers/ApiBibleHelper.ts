@@ -1,6 +1,6 @@
 import axios from "axios";
-import { Environment } from "../../../shared/helpers/Environment";
-import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models";
+import { Environment } from "../../../shared/helpers/Environment.js";
+import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
 export class ApiBibleHelper {

@@ -1,7 +1,7 @@
-import { Church } from "../models";
+import { Church } from "../models/index.js";
 import NodeGeocoder from "node-geocoder";
-import { Repos } from "../repositories";
-import { RepoManager } from "../../../shared/infrastructure";
+import { Repos } from "../repositories/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 
 export class GeoHelper {
   static async updateChurchAddress(church: Church) {

@@ -26,7 +26,7 @@ import {
   SongRepo,
   ArrangementRepo,
   ArrangementKeyRepo
-} from ".";
+} from "./index.js";
 
 export class Repos {
   public block: BlockRepo;

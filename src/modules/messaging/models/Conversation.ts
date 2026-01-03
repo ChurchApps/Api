@@ -1,4 +1,4 @@
-import { Message } from "./Message";
+import { Message } from "./Message.js";
 
 export class Conversation {
   public id?: string;

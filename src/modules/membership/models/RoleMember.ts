@@ -1,4 +1,4 @@
-import { User } from "./";
+import { User } from "./index.js";
 
 export class RoleMember {
   public id?: string;

@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
-import { RoleMember, User } from "../models";
+import { RoleMember, User } from "../models/index.js";
 import express from "express";
-import { AuthenticatedUser } from "../auth";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { Permissions } from "../helpers";
+import { AuthenticatedUser } from "../auth/index.js";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { Permissions } from "../helpers/index.js";
 import { IPermission } from "@churchapps/apihelper";
 
 @controller("/membership/rolemembers")

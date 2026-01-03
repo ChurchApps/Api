@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
-import { Role } from "../models";
+import { Role } from "../models/index.js";
 import express from "express";
-import { AuthenticatedUser } from "../auth";
-import { MembershipCrudController } from "./MembershipCrudController";
-import { Permissions, IPermission } from "../helpers";
+import { AuthenticatedUser } from "../auth/index.js";
+import { MembershipCrudController } from "./MembershipCrudController.js";
+import { Permissions, IPermission } from "../helpers/index.js";
 
 @controller("/membership/roles")
 export class RoleController extends MembershipCrudController {

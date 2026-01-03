@@ -1,5 +1,5 @@
 import { controller } from "inversify-express-utils";
-import { MembershipCrudController } from "./MembershipCrudController";
+import { MembershipCrudController } from "./MembershipCrudController.js";
 
 @controller("/membership/clientErrors")
 export class ClientErrorController extends MembershipCrudController {

@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { Environment } from "../helpers/Environment";
+import { Environment } from "../helpers/Environment.js";
 
 /**
  * Multi-database pool manager for API

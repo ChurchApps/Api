@@ -1,10 +1,28 @@
-// import Hubspot from "@hubspot/api-client";
-import { AssociationSpecAssociationCategoryEnum, PublicObjectSearchRequest } from "@hubspot/api-client/lib/codegen/crm/companies";
-import { Environment } from ".";
-import { AssociationTypes } from "@hubspot/api-client";
+import { Environment } from "./index.js";
 
-// Type declarations for HubSpot client
+// Type declarations for HubSpot client and internal types
 declare const require: any;
+
+// Define types locally to avoid ESM import issues with internal HubSpot paths
+interface PublicObjectSearchRequest {
+  query: string;
+  limit: number;
+  after: string;
+  sorts: any[];
+  properties: string[];
+  filterGroups: any[];
+}
+
+enum AssociationSpecAssociationCategoryEnum {
+  HubspotDefined = "HUBSPOT_DEFINED",
+  UserDefined = "USER_DEFINED",
+  IntegratorDefined = "INTEGRATOR_DEFINED"
+}
+
+// HubSpot association type IDs
+const AssociationTypes = {
+  companyToContact: 280
+};
 
 export class HubspotHelper {
   private static getClient = () => {

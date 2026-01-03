@@ -1,8 +1,8 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
+import { MembershipBaseController } from "./MembershipBaseController.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { OpenAiHelper, Permissions, PersonHelper } from "../helpers";
+import { OpenAiHelper, Permissions, PersonHelper } from "../helpers/index.js";
 
 @controller("/membership/query")
 export class QueryController extends MembershipBaseController {

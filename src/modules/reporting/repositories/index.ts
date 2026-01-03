@@ -1,2 +1,2 @@
-export { ReportRepo } from "./ReportRepo";
-export { Repos } from "./Repos";
+export { ReportRepo } from "./ReportRepo.js";
+export { Repos } from "./Repos.js";

@@ -1,7 +1,7 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MembershipCrudController } from "./MembershipCrudController";
-import { Permissions } from "../helpers";
+import { MembershipCrudController } from "./MembershipCrudController.js";
+import { Permissions } from "../helpers/index.js";
 
 @controller("/membership/groupmembers")
 export class GroupMemberController extends MembershipCrudController {

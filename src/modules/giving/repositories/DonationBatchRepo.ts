@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { DateHelper } from "@churchapps/apihelper";
-import { DonationBatch } from "../models";
+import { DonationBatch } from "../models/index.js";
 
 @injectable()
 export class DonationBatchRepo extends ConfiguredRepo<DonationBatch> {

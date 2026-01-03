@@ -1,6 +1,6 @@
 import axios from "axios";
-import { Sermon } from "../models";
-import { Environment } from "../../../shared/helpers/Environment";
+import { Sermon } from "../models/index.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class VimeoHelper {
   public static async getSermon(videoId: string) {

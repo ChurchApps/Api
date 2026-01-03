@@ -1,7 +1,7 @@
 import axios from "axios";
 import { getSubtitles } from "youtube-captions-scraper";
-import { Sermon } from "../models";
-import { Environment } from "../../../shared/helpers/Environment";
+import { Sermon } from "../models/index.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class YouTubeHelper {
   public static async getSermon(sermonId: string) {

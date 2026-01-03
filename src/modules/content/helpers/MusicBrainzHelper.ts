@@ -1,4 +1,4 @@
-import { SongDetail, SongDetailLink } from "../models";
+import { SongDetail, SongDetailLink } from "../models/index.js";
 
 export class MusicBrainzHelper {
   static async lookup(artist: string, title: string) {

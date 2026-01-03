@@ -1,26 +1,26 @@
 export { CustomBaseController, ErrorController } from "@churchapps/apihelper";
-export { GroupController } from "./GroupController";
-export { GroupMemberController } from "./GroupMemberController";
-export { HouseholdController } from "./HouseholdController";
-export { PersonController } from "./PersonController";
-export { MemberPermissionController } from "./MemberPermissionController";
-export { FormController } from "./FormController";
-export { FormSubmissionController } from "./FormSubmissionController";
-export { QuestionController } from "./QuestionController";
-export { AnswerController } from "./AnswerController";
+export { GroupController } from "./GroupController.js";
+export { GroupMemberController } from "./GroupMemberController.js";
+export { HouseholdController } from "./HouseholdController.js";
+export { PersonController } from "./PersonController.js";
+export { MemberPermissionController } from "./MemberPermissionController.js";
+export { FormController } from "./FormController.js";
+export { FormSubmissionController } from "./FormSubmissionController.js";
+export { QuestionController } from "./QuestionController.js";
+export { AnswerController } from "./AnswerController.js";
 
-export { ChurchController } from "./ChurchController";
-export { DomainController } from "./DomainController";
-export { PermissionController } from "./PermissionController";
-export { RoleController } from "./RoleController";
-export { RoleMemberController } from "./RoleMemberController";
-export { RolePermissionController } from "./RolePermissionController";
-export { UserController } from "./UserController";
-export { UserChurchController } from "./UserChurchController";
-export { VisibilityPreferenceController } from "./VisibilityPreferenceController";
+export { ChurchController } from "./ChurchController.js";
+export { DomainController } from "./DomainController.js";
+export { PermissionController } from "./PermissionController.js";
+export { RoleController } from "./RoleController.js";
+export { RoleMemberController } from "./RoleMemberController.js";
+export { RolePermissionController } from "./RolePermissionController.js";
+export { UserController } from "./UserController.js";
+export { UserChurchController } from "./UserChurchController.js";
+export { VisibilityPreferenceController } from "./VisibilityPreferenceController.js";
 
-export { MembershipSettingController } from "./SettingController";
-export { ClientErrorController } from "./ClientErrorController";
-export { QueryController } from "./QueryController";
+export { MembershipSettingController } from "./SettingController.js";
+export { ClientErrorController } from "./ClientErrorController.js";
+export { QueryController } from "./QueryController.js";
 
-export { OAuthController } from "./OAuthController";
+export { OAuthController } from "./OAuthController.js";

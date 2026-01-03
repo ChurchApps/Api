@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import axios from "axios";
-import { Environment } from "../../../shared/helpers/Environment";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class OpenAiHelper {
   private static openai: OpenAI | null = null;

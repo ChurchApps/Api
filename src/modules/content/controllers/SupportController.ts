@@ -1,7 +1,7 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
-import { ContentBaseController } from "./ContentBaseController";
-import { PollyHelper } from "../helpers/PollyHelper";
+import { ContentBaseController } from "./ContentBaseController.js";
+import { PollyHelper } from "../helpers/PollyHelper.js";
 
 @controller("/content/support")
 export class SupportController extends ContentBaseController {

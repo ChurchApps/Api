@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Condition } from "../models";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Condition } from "../models/index.js";
+import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 
 @injectable()
 export class MembershipRepo extends BaseRepo<any> {

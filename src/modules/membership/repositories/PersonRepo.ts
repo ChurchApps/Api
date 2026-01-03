@@ -1,9 +1,9 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { injectable } from "inversify";
-import { DateHelper, PersonHelper, UniqueIdHelper } from "../helpers";
-import { Person } from "../models";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
-import { CollectionHelper } from "../../../shared/helpers";
+import { DateHelper, PersonHelper, UniqueIdHelper } from "../helpers/index.js";
+import { Person } from "../models/index.js";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { CollectionHelper } from "../../../shared/helpers/index.js";
 
 @injectable()
 export class PersonRepo extends ConfiguredRepo<Person> {

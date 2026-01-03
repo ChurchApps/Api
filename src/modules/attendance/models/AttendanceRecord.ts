@@ -1,4 +1,4 @@
-import { Campus, Service, ServiceTime } from "./";
+import { Campus, Service, ServiceTime } from "./index.js";
 
 export class AttendanceRecord {
   public campus?: Campus;

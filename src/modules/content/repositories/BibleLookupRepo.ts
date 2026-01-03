@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { BibleLookup } from "../models";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { BibleLookup } from "../models/index.js";
+import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 
 @injectable()
 export class BibleLookupRepo extends BaseRepo<BibleLookup> {

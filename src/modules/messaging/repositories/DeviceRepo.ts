@@ -1,7 +1,7 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Device } from "../models";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Device } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 export class DeviceRepo extends ConfiguredRepo<Device> {
   // Override churchIdColumn to undefined since devices can exist without a church (anonymous pairing)

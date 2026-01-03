@@ -1,5 +1,5 @@
 import { CustomAuthProvider as BaseAuthProvider } from "@churchapps/apihelper";
-import { Environment } from "../helpers/Environment";
+import { Environment } from "../helpers/Environment.js";
 
 /**
  * Shared CustomAuthProvider implementation for the monolith

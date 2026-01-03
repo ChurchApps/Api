@@ -1,7 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { DoingBaseController } from "./DoingBaseController";
-import { PlanItem } from "../models";
+import { DoingBaseController } from "./DoingBaseController.js";
+import { PlanItem } from "../models/index.js";
 
 @controller("/doing/planItems")
 export class PlanItemController extends DoingBaseController {

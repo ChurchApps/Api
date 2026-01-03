@@ -1,7 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { DoingBaseController } from "./DoingBaseController";
-import { Conjunction } from "../models";
+import { DoingBaseController } from "./DoingBaseController.js";
+import { Conjunction } from "../models/index.js";
 
 @controller("/doing/conjunctions")
 export class ConjunctionController extends DoingBaseController {

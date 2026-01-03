@@ -1,5 +1,5 @@
 import express from "express";
-import { GatewayConfig, IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult } from "./IGatewayProvider";
+import { GatewayConfig, IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult } from "./IGatewayProvider.js";
 
 /**
  * Lightweight stub for feature-flagged providers that are not yet implemented.

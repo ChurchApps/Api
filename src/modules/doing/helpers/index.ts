@@ -1,5 +1,5 @@
-export { Environment } from "./Environment";
-export { AutomationHelper } from "./AutomationHelper";
-export { ConditionHelper } from "./ConditionHelper";
-export { ConjunctionHelper } from "./ConjunctionHelper";
-export { PlanHelper } from "./PlanHelper";
+export { Environment } from "./Environment.js";
+export { AutomationHelper } from "./AutomationHelper.js";
+export { ConditionHelper } from "./ConditionHelper.js";
+export { ConjunctionHelper } from "./ConjunctionHelper.js";
+export { PlanHelper } from "./PlanHelper.js";

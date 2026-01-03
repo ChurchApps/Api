@@ -1,5 +1,5 @@
-// import { Person } from "./";
-import { VisitSession } from "./";
+// import { Person } from "./index.js";
+import { VisitSession } from "./index.js";
 
 export class Visit {
   public id?: string;

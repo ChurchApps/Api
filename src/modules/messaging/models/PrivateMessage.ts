@@ -1,4 +1,4 @@
-import { Conversation } from "./Conversation";
+import { Conversation } from "./Conversation.js";
 
 export class PrivateMessage {
   public id?: string;

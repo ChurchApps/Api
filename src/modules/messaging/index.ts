@@ -1,20 +1,20 @@
 // Export module interfaces and repositories
-export * from "./repositories";
-export * from "./models";
-export * from "./controllers";
-export * from "./helpers";
+export * from "./repositories/index.js";
+export * from "./models/index.js";
+export * from "./controllers/index.js";
+export * from "./helpers/index.js";
 
 // Re-export key classes for external use
-export { NotificationHelper } from "./helpers/NotificationHelper";
-export { SocketHelper } from "./helpers/SocketHelper";
-export { DeliveryHelper } from "./helpers/DeliveryHelper";
-export { ExpoPushHelper } from "./helpers/ExpoPushHelper";
+export { NotificationHelper } from "./helpers/NotificationHelper.js";
+export { SocketHelper } from "./helpers/SocketHelper.js";
+export { DeliveryHelper } from "./helpers/DeliveryHelper.js";
+export { ExpoPushHelper } from "./helpers/ExpoPushHelper.js";
 
 // Module initialization function
-import { Repos } from "./repositories/Repos";
-import { NotificationHelper } from "./helpers/NotificationHelper";
-import { DeliveryHelper } from "./helpers/DeliveryHelper";
-import { SocketHelper } from "./helpers/SocketHelper";
+import { Repos } from "./repositories/Repos.js";
+import { NotificationHelper } from "./helpers/NotificationHelper.js";
+import { DeliveryHelper } from "./helpers/DeliveryHelper.js";
+import { SocketHelper } from "./helpers/SocketHelper.js";
 
 export function initializeMessagingModule(repos: Repos) {
   // Initialize helpers with repositories

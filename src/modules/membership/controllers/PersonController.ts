@@ -1,11 +1,11 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { MembershipBaseController } from "./MembershipBaseController";
-import { Person, Household, SearchCondition, Group, VisibilityPreference } from "../models";
-import { Repos } from "../repositories";
-import { FormSubmission, Form } from "../models";
+import { MembershipBaseController } from "./MembershipBaseController.js";
+import { Person, Household, SearchCondition, Group, VisibilityPreference } from "../models/index.js";
+import { Repos } from "../repositories/index.js";
+import { FormSubmission, Form } from "../models/index.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { Environment, Permissions, PersonHelper } from "../helpers";
+import { Environment, Permissions, PersonHelper } from "../helpers/index.js";
 import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
 
 @controller("/membership/people")

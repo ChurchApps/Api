@@ -1,9 +1,9 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MessagingBaseController } from "./MessagingBaseController";
-import { Message } from "../models";
-import { DeliveryHelper } from "../helpers/DeliveryHelper";
-import { NotificationHelper } from "../helpers/NotificationHelper";
+import { MessagingBaseController } from "./MessagingBaseController.js";
+import { Message } from "../models/index.js";
+import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
+import { NotificationHelper } from "../helpers/NotificationHelper.js";
 
 @controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {

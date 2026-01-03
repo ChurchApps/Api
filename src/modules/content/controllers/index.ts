@@ -1,41 +1,41 @@
 // Base controller
-export { ContentBaseController } from "./ContentBaseController";
+export { ContentBaseController } from "./ContentBaseController.js";
 
 // CMS controllers
-export { PageController2 as PageController } from "./PageController";
-export { SectionController } from "./SectionController";
-export { ElementController } from "./ElementController";
-export { BlockController } from "./BlockController";
-export { LinkController } from "./LinkController";
-export { GlobalStyleController } from "./GlobalStyleController";
-export { FileController } from "./FileController";
-export { PageHistoryController } from "./PageHistoryController";
+export { PageController2 as PageController } from "./PageController.js";
+export { SectionController } from "./SectionController.js";
+export { ElementController } from "./ElementController.js";
+export { BlockController } from "./BlockController.js";
+export { LinkController } from "./LinkController.js";
+export { GlobalStyleController } from "./GlobalStyleController.js";
+export { FileController } from "./FileController.js";
+export { PageHistoryController } from "./PageHistoryController.js";
 
 // Media controllers
-export { SermonController } from "./SermonController";
-export { PlaylistController } from "./PlaylistController";
-export { StreamingServiceController } from "./StreamingServiceController";
+export { SermonController } from "./SermonController.js";
+export { PlaylistController } from "./PlaylistController.js";
+export { StreamingServiceController } from "./StreamingServiceController.js";
 
 // Event controllers
-export { EventController } from "./EventController";
-export { EventExceptionController } from "./EventExceptionController";
-export { CuratedCalendarController } from "./CuratedCalendarController";
-export { CuratedEventController } from "./CuratedEventController";
+export { EventController } from "./EventController.js";
+export { EventExceptionController } from "./EventExceptionController.js";
+export { CuratedCalendarController } from "./CuratedCalendarController.js";
+export { CuratedEventController } from "./CuratedEventController.js";
 
 // Bible controllers
-export { BibleController } from "./BibleController";
+export { BibleController } from "./BibleController.js";
 
 // Song controllers
-export { SongController } from "./SongController";
-export { SongDetailsController } from "./SongDetailsController";
-export { SongDetailLinkController } from "./SongDetailLinkController";
-export { ArrangementController } from "./ArrangementController";
-export { ArrangementKeyController } from "./ArrangementKeyController";
+export { SongController } from "./SongController.js";
+export { SongDetailsController } from "./SongDetailsController.js";
+export { SongDetailLinkController } from "./SongDetailLinkController.js";
+export { ArrangementController } from "./ArrangementController.js";
+export { ArrangementKeyController } from "./ArrangementKeyController.js";
 
 // Utility controllers
-export { ContentSettingController } from "./SettingController";
-export { GalleryController } from "./GalleryController";
-export { PreviewController } from "./PreviewController";
-export { StockController } from "./StockController";
-export { PraiseChartsController } from "./PraiseChartsController";
-export { SupportController } from "./SupportController";
+export { ContentSettingController } from "./SettingController.js";
+export { GalleryController } from "./GalleryController.js";
+export { PreviewController } from "./PreviewController.js";
+export { StockController } from "./StockController.js";
+export { PraiseChartsController } from "./PraiseChartsController.js";
+export { SupportController } from "./SupportController.js";

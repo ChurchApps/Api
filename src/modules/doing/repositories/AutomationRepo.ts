@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { Automation } from "../models";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { Automation } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class AutomationRepo extends ConfiguredRepo<Automation> {

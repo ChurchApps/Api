@@ -1,8 +1,8 @@
 import express from "express";
 import Axios from "axios";
-import { SquareHelper } from "../SquareHelper";
-import { Environment } from "../Environment";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider";
+import { SquareHelper } from "../SquareHelper.js";
+import { Environment } from "../Environment.js";
+import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider.js";
 
 export class SquareGatewayProvider implements IGatewayProvider {
   readonly name = "square";

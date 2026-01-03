@@ -1,6 +1,6 @@
-import { BaseController } from "../../../shared/infrastructure";
-import { Repos } from "../repositories";
-import { Permissions } from "../helpers";
+import { BaseController } from "../../../shared/infrastructure/index.js";
+import { Repos } from "../repositories/index.js";
+import { Permissions } from "../helpers/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 
 export class MembershipBaseController extends BaseController {

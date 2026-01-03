@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import express from "express";
-import { Donation, DonationBatch, EventLog, FundDonation, PaymentDetails } from "../../modules/giving/models";
+import { Donation, DonationBatch, EventLog, FundDonation, PaymentDetails } from "../../modules/giving/models/index.js";
 
 export class StripeHelper {
   static donate = async (secretKey: string, payment: PaymentDetails) => {

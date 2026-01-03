@@ -1,7 +1,7 @@
 // TODO: Install Square SDK with: npm install squareup
 // import { Client, ApiResponse, CreatePaymentRequest, Money, Card } from 'squareup';
 
-import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models";
+import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
 
 export class SquareHelper {
   private static getClient(_accessToken: string, _environment: string) {

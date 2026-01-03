@@ -1,9 +1,9 @@
 import { controller, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MessagingBaseController } from "./MessagingBaseController";
-import { PrivateMessage } from "../models";
+import { MessagingBaseController } from "./MessagingBaseController.js";
+import { PrivateMessage } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { NotificationHelper } from "../helpers/NotificationHelper";
+import { NotificationHelper } from "../helpers/NotificationHelper.js";
 
 @controller("/messaging/privatemessages")
 export class PrivateMessageController extends MessagingBaseController {

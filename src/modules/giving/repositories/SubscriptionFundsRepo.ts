@@ -1,10 +1,10 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB";
-import { CollectionHelper } from "../../../shared/helpers";
-import { SubscriptionFund } from "../models";
-import { FundRepo } from "./FundRepo";
+import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { CollectionHelper } from "../../../shared/helpers/index.js";
+import { SubscriptionFund } from "../models/index.js";
+import { FundRepo } from "./FundRepo.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo";
+import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
 export class SubscriptionFundsRepo extends ConfiguredRepo<SubscriptionFund> {

@@ -1,9 +1,9 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import axios from "axios";
-import { AttendanceBaseController } from "./AttendanceBaseController";
-import { VisitSession, Visit, Session, ServiceTime } from "../models";
-import { Permissions, Environment } from "../../../shared/helpers";
+import { AttendanceBaseController } from "./AttendanceBaseController.js";
+import { VisitSession, Visit, Session, ServiceTime } from "../models/index.js";
+import { Permissions, Environment } from "../../../shared/helpers/index.js";
 
 @controller("/attendance/visitsessions")
 export class VisitSessionController extends AttendanceBaseController {

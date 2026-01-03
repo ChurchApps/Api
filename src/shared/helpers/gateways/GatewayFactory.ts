@@ -1,8 +1,8 @@
-import { IGatewayProvider } from "./IGatewayProvider";
-import { StripeGatewayProvider } from "./StripeGatewayProvider";
-import { PayPalGatewayProvider } from "./PayPalGatewayProvider";
-import { SquareGatewayProvider } from "./SquareGatewayProvider";
-import { EPayMintsGatewayProvider } from "./EPayMintsGatewayProvider";
+import { IGatewayProvider } from "./IGatewayProvider.js";
+import { StripeGatewayProvider } from "./StripeGatewayProvider.js";
+import { PayPalGatewayProvider } from "./PayPalGatewayProvider.js";
+import { SquareGatewayProvider } from "./SquareGatewayProvider.js";
+import { EPayMintsGatewayProvider } from "./EPayMintsGatewayProvider.js";
 
 export interface GatewayFeatureFlags {
   enableSquare?: boolean;
