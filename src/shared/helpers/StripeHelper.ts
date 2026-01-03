@@ -5,7 +5,12 @@ import { Donation, DonationBatch, EventLog, FundDonation, PaymentDetails } from 
 export class StripeHelper {
   static donate = async (secretKey: string, payment: PaymentDetails) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
+    if(payment.currency === "jpy") {
+      payment.amount = Math.round(payment.amount * 1);
+    } else {
     payment.amount = Math.trunc(Math.round(payment.amount * 100));
+    }
+    payment.currency = payment?.currency;
     try {
       if (payment?.payment_method) return await stripe.paymentIntents.create(payment);
       if (payment?.source) return await stripe.charges.create(payment);

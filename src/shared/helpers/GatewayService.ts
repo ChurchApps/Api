@@ -104,9 +104,10 @@ export class GatewayService {
     await provider.cancelSubscription(config, subscriptionId, reason);
   }
 
-  static async calculateFees(gateway: any, amount: number, churchId: string): Promise<number> {
+  static async calculateFees(gateway: any, amount: number, churchId: string, currency?: string): Promise<number> {
     const provider = this.getProviderFromGateway(gateway);
-    return await provider.calculateFees(amount, churchId);
+    const currencyToUse = currency || gateway.currency || "USD";
+    return await provider.calculateFees(amount, churchId, currencyToUse);
   }
 
   static async createProduct(gateway: any, churchId: string): Promise<string | undefined> {

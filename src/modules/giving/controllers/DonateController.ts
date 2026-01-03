@@ -34,7 +34,9 @@ export class DonateController extends GivingCrudController {
         id: gateway.id,
         provider: gateway.provider,
         publicKey: gateway.publicKey,
-        productId: gateway.productId
+        productId: gateway.productId,
+        payFees: gateway.payFees,
+        currency: gateway.currency
       }));
 
       return { gateways: publicGateways };
@@ -369,6 +371,10 @@ export class DonateController extends GivingCrudController {
       const gateway = await this.getGateway(churchId, donationData.provider, donationData.gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
+      const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
+      const normalizedCurrency = rawCurrency.toLowerCase();
+      donationData.currency = normalizedCurrency;
+
       try {
         const chargeResult = await GatewayService.processCharge(gateway, donationData);
 
@@ -463,9 +469,9 @@ export class DonateController extends GivingCrudController {
   }
 
   @httpPost("/fee")
-  public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; gatewayId?: string; amount: number }>, res: express.Response): Promise<any> {
+  public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; gatewayId?: string; amount: number; currency?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const { type, provider, gatewayId, amount } = req.body;
+      const { type, provider, gatewayId, amount, currency } = req.body;
       const churchId = req.query.churchId?.toString();
 
       if (!churchId) {
@@ -475,6 +481,7 @@ export class DonateController extends GivingCrudController {
       try {
         let calculatedFee = 0;
         let gatewayProvider = null;
+        const currencyToUse = (currency || "USD").toUpperCase();
 
         if (provider || gatewayId) {
           // Use gateway-specific fee calculation
@@ -484,18 +491,18 @@ export class DonateController extends GivingCrudController {
             return this.json({ error: "Gateway not found" }, 404);
           }
 
-          calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId);
+          calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId, currencyToUse);
           gatewayProvider = gateway.provider;
         } else {
           // Legacy type-based calculation for backward compatibility
           if (type === "creditCard") {
-            calculatedFee = await this.getCreditCardFees(amount, churchId);
+            calculatedFee = await this.getCreditCardFees(amount, churchId, currencyToUse);
           } else if (type === "ach") {
             calculatedFee = await this.getACHFees(amount, churchId);
           }
         }
 
-        return { calculatedFee, provider: gatewayProvider };
+        return { calculatedFee, provider: gatewayProvider, currency: currencyToUse };
       } catch (error) {
         console.error("Fee calculation failed:", error);
         return { calculatedFee: 0 };
@@ -622,11 +629,11 @@ export class DonateController extends GivingCrudController {
 
 
   // Legacy fee calculation methods for backward compatibility
-  private getCreditCardFees = async (amount: number, churchId: string) => {
+  private getCreditCardFees = async (amount: number, churchId: string, currency: string = "USD") => {
     const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
     const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
     if (stripeGateway) {
-      return await GatewayService.calculateFees(stripeGateway, amount, churchId);
+      return await GatewayService.calculateFees(stripeGateway, amount, churchId, currency);
     }
 
     // Fallback to hardcoded calculation if no Stripe gateway found
