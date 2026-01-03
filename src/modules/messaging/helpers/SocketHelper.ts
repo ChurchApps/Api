@@ -1,5 +1,5 @@
 import { UniqueIdHelper } from "@churchapps/apihelper";
-import WebSocket, { WebSocketServer } from "ws";
+import { WebSocketServer } from "ws";
 import { PayloadInterface, SocketConnectionInterface } from "./Interfaces.js";
 import { Repos } from "../repositories/index.js";
 import { Connection } from "../models/index.js";

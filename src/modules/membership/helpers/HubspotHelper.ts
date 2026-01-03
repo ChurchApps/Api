@@ -1,8 +1,5 @@
 import { Environment } from "./index.js";
 
-// Type declarations for HubSpot client and internal types
-declare const require: any;
-
 // Define types locally to avoid ESM import issues with internal HubSpot paths
 interface PublicObjectSearchRequest {
   query: string;
@@ -25,14 +22,14 @@ const AssociationTypes = {
 };
 
 export class HubspotHelper {
-  private static getClient = () => {
-    const hubspot = require("@hubspot/api-client");
+  private static getClient = async () => {
+    const hubspot = await import("@hubspot/api-client");
     const client = new hubspot.Client({ accessToken: Environment.hubspotKey });
     return client;
   };
 
   static lookupCompany = async (query: string) => {
-    const client = this.getClient();
+    const client = await this.getClient();
     const req: PublicObjectSearchRequest = { query, limit: 1, after: "", sorts: [], properties: [], filterGroups: [] };
     const response = await client.crm.companies.searchApi.doSearch(req);
     return response.results[0];
@@ -52,7 +49,7 @@ export class HubspotHelper {
     initialApp: string
   ) => {
     if (Environment.hubspotKey) {
-      const client = this.getClient();
+      const client = await this.getClient();
 
       const company: any = {
         properties: {
@@ -94,7 +91,7 @@ export class HubspotHelper {
   };
 
   static setProperties = async (companyId: string, properties: any) => {
-    const client = this.getClient();
+    const client = await this.getClient();
     try {
       const response = await client.crm.companies.basicApi.update(companyId, { properties });
       return response;

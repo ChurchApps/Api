@@ -1,10 +1,14 @@
-const serverlessExpress = require("@codegenie/serverless-express");
+import serverlessExpress from "@codegenie/serverless-express";
 
 // Import Environment from the shared helpers
-const { Environment } = require("./dist/shared/helpers/Environment");
+import { Environment } from "./dist/shared/helpers/Environment.js";
 
 // Import the app creator
-const { createApp } = require("./dist/app");
+import { createApp } from "./dist/app.js";
+
+// Import socket and timer handlers
+import { handleSocket } from "./dist/lambda/socket-handler.js";
+import { handle15MinTimer, handleMidnightTimer, handleScheduledTasks } from "./dist/lambda/timer-handler.js";
 
 // Initialize environment and database pools
 const initializeEnvironment = async () => {
@@ -27,7 +31,7 @@ const initializeEnvironment = async () => {
 let cachedHandler;
 
 // Web handler for HTTP requests
-const web = async function (event, context) {
+export const web = async function (event, context) {
   try {
     console.log("Web handler invoked");
     console.log("Event httpMethod:", event.httpMethod);
@@ -127,12 +131,8 @@ const web = async function (event, context) {
   }
 };
 
-// Import socket and timer handlers
-const { handleSocket } = require("./dist/lambda/socket-handler");
-const { handle15MinTimer, handleMidnightTimer, handleScheduledTasks } = require("./dist/lambda/timer-handler");
-
 // WebSocket handler
-const socket = async function (event, context) {
+export const socket = async function (event, context) {
   try {
     await initializeEnvironment();
     return await handleSocket(event, context);
@@ -146,7 +146,7 @@ const socket = async function (event, context) {
 };
 
 // Timer handlers
-const timer15Min = async function (event, context) {
+export const timer15Min = async function (event, context) {
   try {
     await initializeEnvironment();
     await handle15MinTimer(event, context);
@@ -157,7 +157,7 @@ const timer15Min = async function (event, context) {
   }
 };
 
-const timerMidnight = async function (event, context) {
+export const timerMidnight = async function (event, context) {
   try {
     await initializeEnvironment();
     await handleMidnightTimer(event, context);
@@ -168,7 +168,7 @@ const timerMidnight = async function (event, context) {
   }
 };
 
-const timerScheduledTasks = async function (event, context) {
+export const timerScheduledTasks = async function (event, context) {
   try {
     await initializeEnvironment();
     await handleScheduledTasks(event, context);
@@ -178,10 +178,3 @@ const timerScheduledTasks = async function (event, context) {
     throw error;
   }
 };
-
-// Export handlers
-module.exports.web = web;
-module.exports.socket = socket;
-module.exports.timer15Min = timer15Min;
-module.exports.timerMidnight = timerMidnight;
-module.exports.timerScheduledTasks = timerScheduledTasks;

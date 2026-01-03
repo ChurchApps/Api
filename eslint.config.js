@@ -1,9 +1,9 @@
-const tsParser = require("@typescript-eslint/parser");
-const tsPlugin = require("@typescript-eslint/eslint-plugin");
-const importPlugin = require("eslint-plugin-import");
-const unusedImportsPlugin = require("eslint-plugin-unused-imports");
+import tsParser from "@typescript-eslint/parser";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
+import importPlugin from "eslint-plugin-import";
+import unusedImportsPlugin from "eslint-plugin-unused-imports";
 
-module.exports = [
+export default [
   {
     ignores: ["node_modules/**", "dist/**", "**/*.js", "**/*.d.ts", "tools/**", "coverage/**", "layer/**"]
   },
@@ -35,14 +35,14 @@ module.exports = [
           caughtErrorsIgnorePattern: "^_"
         }
       ],
-      
+
       // TypeScript-specific rules (matching MembershipApi)
       "@typescript-eslint/no-unused-vars": "off", // Turn off in favor of unused-imports plugin
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/no-require-imports": "error",
       "@typescript-eslint/no-inferrable-types": "off",
-      
+
       // General rules (matching MembershipApi)
       "prefer-const": "error",
       "no-unused-vars": "off", // Turn off base rule since we use unused-imports plugin

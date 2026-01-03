@@ -1,8 +1,13 @@
-import { Environment } from "../src/shared/helpers/Environment";
-import { ConnectionManager } from "../src/shared/infrastructure/ConnectionManager";
-import { MultiDatabasePool } from "../src/shared/infrastructure/MultiDatabasePool";
+import { Environment } from "../src/shared/helpers/Environment.js";
+import { ConnectionManager } from "../src/shared/infrastructure/ConnectionManager.js";
+import { MultiDatabasePool } from "../src/shared/infrastructure/MultiDatabasePool.js";
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
+import mysql from "mysql2/promise";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Module definitions with their table sections
 const moduleDefinitions = {
@@ -437,8 +442,6 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
 }
 
 async function ensureDatabaseExists(moduleName: string, dbConfig: any) {
-  const mysql = require('mysql2/promise');
-
   // Connect without specifying database to create it if needed
   const connection = await mysql.createConnection({
     host: dbConfig.host,
@@ -565,8 +568,6 @@ async function resetDatabases(options: InitOptions = {}) {
 }
 
 async function resetModuleDatabase(moduleName: string, dbConfig: any) {
-  const mysql = require('mysql2/promise');
-
   const connection = await mysql.createConnection({
     host: dbConfig.host,
     user: dbConfig.user,
@@ -620,7 +621,8 @@ function parseArguments(): InitOptions {
 }
 
 // Main execution
-if (require.main === module) {
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMainModule) {
   const options = parseArguments();
   initializeDatabases(options);
 }
