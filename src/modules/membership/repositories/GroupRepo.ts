@@ -55,6 +55,11 @@ export class GroupRepo extends ConfiguredRepo<Group> {
     ]);
   }
 
+  public loadAllForPerson(personId: string) {
+    const sql = "SELECT distinct g.*" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.id=gm.groupId" + " WHERE personId=? and g.removed=0" + " ORDER BY name";
+    return TypedDB.query(sql, [personId]);
+  }
+
   public loadForPerson(personId: string) {
     const sql = "SELECT distinct g.*" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.id=gm.groupId" + " WHERE personId=? and g.removed=0 and g.tags like '%standard%'" + " ORDER BY name";
     return TypedDB.query(sql, [personId]);
