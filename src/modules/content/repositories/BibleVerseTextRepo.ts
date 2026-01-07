@@ -62,4 +62,30 @@ export class BibleVerseTextRepo extends GlobalConfiguredRepo<BibleVerseText> {
       newParagraph: row.newParagraph
     };
   }
+
+  public async saveAll(models: BibleVerseText[]) {
+    const promises: Promise<BibleVerseText>[] = [];
+    for (const model of models) {
+      promises.push(this.save(model));
+    }
+    return Promise.all(promises);
+  }
+
+  public async save(model: BibleVerseText) {
+    if (!model.id) model.id = this.createId();
+    const sql = `INSERT INTO bibleVerseTexts (id, translationKey, verseKey, bookKey, chapterNumber, verseNumber, content, newParagraph)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE content=VALUES(content), newParagraph=VALUES(newParagraph);`;
+    await TypedDB.query(sql, [
+      model.id,
+      model.translationKey,
+      model.verseKey,
+      model.bookKey,
+      model.chapterNumber,
+      model.verseNumber,
+      model.content,
+      model.newParagraph
+    ]);
+    return model;
+  }
 }
