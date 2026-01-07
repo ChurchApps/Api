@@ -7,6 +7,23 @@ import { AuthenticatedUser } from "../auth/index.js";
 
 @controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {
+
+  private async loadPersonAndGroups(personId: string): Promise<{ membershipStatus: string; groups: Array<{ id: string; tags: string; name: string; leader: boolean }> }> {
+    const people = await this.repos.person.loadByIdsOnly([personId]);
+    const person = people.length > 0 ? people[0] : null;
+    const allGroups = await this.repos.groupMember.loadForPeople([personId]);
+
+    const groups: Array<{ id: string; tags: string; name: string; leader: boolean }> = [];
+    allGroups.forEach((g: any) => {
+      groups.push({ id: g.groupId, tags: g.tags, name: g.name, leader: g.leader });
+    });
+
+    return {
+      membershipStatus: person?.membershipStatus || "Guest",
+      groups
+    };
+  }
+
   @httpPost("/authorize")
   public async authorize(req: express.Request<{}, {}, { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -74,13 +91,15 @@ export class OAuthController extends MembershipBaseController {
         const userChurch = (await this.repos.userChurch.load(authCode.userChurchId)) as any;
         const user = (await this.repos.user.load(userChurch.userId)) as any;
         const church = (await this.repos.church.loadById(userChurch.churchId)) as any;
+        const personData = await this.loadPersonAndGroups(userChurch.personId);
         const loginUserChurch: LoginUserChurch = {
           church: { id: church.id, name: church.churchName, subDomain: church.subDomain },
           person: {
             id: userChurch.personId,
-            membershipStatus: "Guest",
+            membershipStatus: personData.membershipStatus,
             name: { first: "", last: "" }
           },
+          groups: personData.groups,
           apis: []
         };
 
@@ -116,13 +135,15 @@ export class OAuthController extends MembershipBaseController {
         const userChurch = (await this.repos.userChurch.load(oldToken.userChurchId)) as any;
         const user = (await this.repos.user.load(userChurch.userId)) as any;
         const church = (await this.repos.church.loadById(userChurch.churchId)) as any;
+        const personData = await this.loadPersonAndGroups(userChurch.personId);
         const loginUserChurch: LoginUserChurch = {
           church: { id: church.id, name: church.churchName, subDomain: church.subDomain },
           person: {
             id: userChurch.personId,
-            membershipStatus: "Guest",
+            membershipStatus: personData.membershipStatus,
             name: { first: "", last: "" }
           },
+          groups: personData.groups,
           apis: []
         };
 
