@@ -240,6 +240,7 @@ export class YouVersionHelper {
   // Build BibleVerseText objects from parsed verses
   static parseChapterHtml(html: string, bookKey: string, chapterNumber: number, translationKey: string): BibleVerseText[] {
     const verses = this.parseVersesFromHtml(html);
+    console.log("DEBUG parseChapterHtml - input translationKey:", translationKey, "output translationKey:", "YOUVERSION-" + translationKey);
 
     return verses.map(v => ({
       translationKey: "YOUVERSION-" + translationKey,

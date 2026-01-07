@@ -123,10 +123,13 @@ export class BibleController extends ContentBaseController {
       this.logLookup(ipAddress, translationKey, startVerseKey, endVerseKey);
 
       if (canCache) result = await this.repos.bibleVerseText.loadRange(translationKey, startVerseKey, endVerseKey);
+      console.log("DEBUG getVerseText - translationKey:", translationKey, "cached results:", result.length);
       if (result.length === 0) {
         const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
         const source = translation?.source || "api.bible";
+        console.log("DEBUG getVerseText - fetching from source:", source, "translation sourceKey:", translation?.sourceKey);
         result = await BibleSourceFactory.getVerseText(source, translationKey, startVerseKey, endVerseKey);
+        console.log("DEBUG getVerseText - fetched results:", result.length, "first translationKey:", result[0]?.translationKey);
         if (canCache) {
           result.forEach((r: BibleVerseText) => {
             const parts = r.verseKey.split(".");
