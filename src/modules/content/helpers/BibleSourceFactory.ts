@@ -39,7 +39,6 @@ export class BibleSourceFactory {
   }
 
   static async getVerseText(source: string, translationKey: string, startVerseKey: string, endVerseKey: string): Promise<BibleVerseText[]> {
-    console.log("DEBUG BibleSourceFactory.getVerseText - source:", source, "translationKey:", translationKey, "stripped:", this.stripYouVersionPrefix(translationKey));
     if (source === "youversion") return YouVersionHelper.getVerseText(this.stripYouVersionPrefix(translationKey), startVerseKey, endVerseKey);
     return ApiBibleHelper.getVerseText(translationKey, startVerseKey, endVerseKey);
   }
