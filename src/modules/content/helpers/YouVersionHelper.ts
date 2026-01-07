@@ -242,7 +242,7 @@ export class YouVersionHelper {
     const verses = this.parseVersesFromHtml(html);
 
     return verses.map(v => ({
-      translationKey,
+      translationKey: "YOUVERSION-" + translationKey,
       verseKey: `${bookKey}.${chapterNumber}.${v.verseNumber}`,
       bookKey,
       chapterNumber,
