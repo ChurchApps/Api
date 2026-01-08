@@ -22,6 +22,14 @@ export class GroupController extends MembershipCrudController {
     });
   }
 
+  @httpGet("/my/:tag")
+  public async getMyTag(@requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const result = this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.loadForPerson(au.personId)) as any[]);
+      return result.filter((g) => g.tags.indexOf(tag) > -1);
+    });
+  }
+
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
