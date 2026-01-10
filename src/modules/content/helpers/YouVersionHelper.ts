@@ -259,7 +259,16 @@ export class YouVersionHelper {
   }
 
   static async search(_translationKey: string, _query: string, _limit: number) {
-    return [];
+    return {
+      data: {
+        query: _query,
+        limit: _limit || 10,
+        offset: 0,
+        total: 0,
+        verseCount: 0,
+        verses:[]
+      }
+    };
     // YouVersion has not implemented yet
     //const url = this.baseUrl + "/bibles/" + translationKey + "/search?query=" + encodeURIComponent(query);
     //const data = await this.getContent(url);
