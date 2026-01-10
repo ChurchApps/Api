@@ -48,9 +48,9 @@ export class BibleSourceFactory {
     return ApiBibleHelper.getCopyright(translationKey);
   }
 
-  static async search(source: string, translationKey: string, query: string): Promise<any> {
-    if (source === "youversion") return YouVersionHelper.search(this.stripYouVersionPrefix(translationKey), query);
-    return ApiBibleHelper.search(translationKey, query);
+  static async search(source: string, translationKey: string, query: string, limit?: number): Promise<any> {
+    if (source === "youversion") return YouVersionHelper.search(this.stripYouVersionPrefix(translationKey), query, limit);
+    return ApiBibleHelper.search(translationKey, query, limit);
   }
 
   static async getAvailableTranslations(source: string): Promise<BibleTranslation[]> {

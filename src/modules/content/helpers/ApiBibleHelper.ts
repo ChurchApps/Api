@@ -52,8 +52,9 @@ export class ApiBibleHelper {
     return result;
   }
 
-  static async search(translationKey: string, query: string) {
-    const url = this.baseUrl + "/bibles/" + translationKey + "/search?query=" + encodeURIComponent(query);
+  static async search(translationKey: string, query: string, limit?: number) {
+    let url = this.baseUrl + "/bibles/" + translationKey + "/search?query=" + encodeURIComponent(query);
+    if (limit) url += "&limit=" + limit;
     const data = await this.getContent(url);
 
     return data;

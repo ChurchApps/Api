@@ -258,10 +258,12 @@ export class YouVersionHelper {
     return data.data?.copyright || "";
   }
 
-  static async search(translationKey: string, query: string) {
-    const url = this.baseUrl + "/bibles/" + translationKey + "/search?query=" + encodeURIComponent(query);
-    const data = await this.getContent(url);
-    return data;
+  static async search(translationKey: string, query: string, limit: number) {
+    return [];
+    // YouVersion has not implemented yet
+    //const url = this.baseUrl + "/bibles/" + translationKey + "/search?query=" + encodeURIComponent(query);
+    //const data = await this.getContent(url);
+    //return data;
   }
 
   static async getContent(url: string) {

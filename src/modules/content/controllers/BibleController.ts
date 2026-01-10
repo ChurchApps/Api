@@ -18,9 +18,10 @@ export class BibleController extends ContentBaseController {
   public async search(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const query = req.query.query as string;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
       const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
       const source = translation?.source || "api.bible";
-      const result = await BibleSourceFactory.search(source, translationKey, query);
+      const result = await BibleSourceFactory.search(source, translationKey, query, limit);
       return result;
     });
   }
