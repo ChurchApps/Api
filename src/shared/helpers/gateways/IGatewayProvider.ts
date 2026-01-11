@@ -79,6 +79,7 @@ export interface IGatewayProvider {
 
   // Token-based payment methods (for secure card handling)
   createSetupIntent?(config: GatewayConfig, customerId?: string): Promise<any>;
+  createACHSetupIntent?(config: GatewayConfig, customerId: string): Promise<any>;
   createPaymentMethod?(config: GatewayConfig, paymentMethodData: any): Promise<any>;
   confirmSetupIntent?(config: GatewayConfig, setupIntentId: string, paymentMethodId: string): Promise<any>;
 

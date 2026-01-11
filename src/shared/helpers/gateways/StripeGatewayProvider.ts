@@ -28,7 +28,15 @@ export class StripeGatewayProvider implements IGatewayProvider {
       const subscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
 
       // Skip processing subscription charge.succeeded events to avoid duplicates
-      const shouldProcess = !(stripeEvent.type === "charge.succeeded" && subscriptionEvent);
+      // Also skip payment_intent.succeeded for subscription invoices (handled by invoice.paid)
+      let shouldProcess = true;
+      if (stripeEvent.type === "charge.succeeded" && subscriptionEvent) {
+        shouldProcess = false;
+      }
+      if (stripeEvent.type === "payment_intent.succeeded" && eventData.invoice) {
+        // This is a subscription payment - handled by invoice.paid
+        shouldProcess = false;
+      }
 
       return {
         success: true,
@@ -59,7 +67,17 @@ export class StripeGatewayProvider implements IGatewayProvider {
       (paymentData as any).off_session = true;
     }
     if (donationData.type === "bank") {
-      (paymentData as any).source = donationData.id;
+      // Check if this is a new PaymentMethod (pm_xxx) or legacy Source (ba_xxx)
+      if (donationData.id?.startsWith("pm_")) {
+        // New PaymentMethod API flow - use Payment Intents
+        (paymentData as any).payment_method = donationData.id;
+        (paymentData as any).payment_method_types = ["us_bank_account"];
+        (paymentData as any).confirm = true;
+        (paymentData as any).off_session = true;
+      } else {
+        // Legacy Source-based flow (deprecated - will be removed after migration)
+        (paymentData as any).source = donationData.id;
+      }
     }
 
     const result = await StripeHelper.donate(config.privateKey, paymentData);
@@ -212,6 +230,11 @@ export class StripeGatewayProvider implements IGatewayProvider {
   // Token-based payment methods
   async createSetupIntent(config: GatewayConfig, customerId?: string): Promise<any> {
     return await StripeHelper.createSetupIntent(config.privateKey, customerId);
+  }
+
+  // ACH SetupIntent for Financial Connections
+  async createACHSetupIntent(config: GatewayConfig, customerId: string): Promise<any> {
+    return await StripeHelper.createACHSetupIntent(config.privateKey, customerId);
   }
 
   async createPaymentMethod(config: GatewayConfig, paymentMethodData: any): Promise<any> {

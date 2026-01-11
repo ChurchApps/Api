@@ -222,6 +222,16 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support bank account deletion`);
   }
 
+  // ACH SetupIntent for Financial Connections (Stripe only)
+  static async createACHSetupIntent(gateway: any, customerId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.createACHSetupIntent) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.createACHSetupIntent(config, customerId);
+    }
+    throw new Error(`${gateway.provider} does not support ACH SetupIntent`);
+  }
+
   // Provider-specific functionality
   static async generateClientToken(gateway: any): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);

@@ -189,7 +189,9 @@ export class DonateController extends GivingCrudController {
 
   private shouldProcessDonation(provider: string, eventType: string): boolean {
     const donationEvents = {
-      stripe: ["charge.succeeded", "invoice.paid"],
+      // payment_intent.succeeded is the new standard for ACH payments via Payment Intents API
+      // charge.succeeded is kept for backward compatibility during migration
+      stripe: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded"],
       paypal: ["PAYMENT.CAPTURE.COMPLETED"]
     };
     return donationEvents[provider as keyof typeof donationEvents]?.includes(eventType) || false;
@@ -236,7 +238,8 @@ export class DonateController extends GivingCrudController {
         const events = await StripeHelper.listEvents(secretKey, {
           startDate: startTimestamp,
           endDate: endTimestamp,
-          types: ["charge.succeeded", "invoice.paid"]
+          // Include payment_intent.succeeded for new ACH payments using Payment Intents API
+          types: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded"]
         });
 
         const results: {

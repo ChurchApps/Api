@@ -71,10 +71,26 @@ export class PaymentMethodController extends GivingCrudController {
           }
         }
 
-        // Handle Stripe bank accounts (sources)
+        // Handle Stripe bank accounts (PaymentMethod API - us_bank_account)
         if (customerData.banks?.data) {
           for (const bank of customerData.banks.data) {
-            // Stripe Source (bank_account) object structure
+            // Stripe PaymentMethod (us_bank_account) object structure
+            normalizedMethods.push({
+              id: bank.id,
+              type: "bank",
+              provider: "stripe",
+              name: bank.us_bank_account?.bank_name || "Bank Account",
+              last4: bank.us_bank_account?.last4,
+              customerId: bank.customer || customerData.customer?.id,
+              status: "active"
+            });
+          }
+        }
+
+        // Handle legacy Stripe bank accounts (Sources API - deprecated)
+        if (customerData.legacyBanks?.data) {
+          for (const bank of customerData.legacyBanks.data) {
+            // Legacy Stripe Source (bank_account) object structure
             normalizedMethods.push({
               id: bank.id,
               type: "bank",
@@ -82,7 +98,8 @@ export class PaymentMethodController extends GivingCrudController {
               name: "Bank Account",
               last4: bank.last4,
               customerId: bank.customer || customerData.customer?.id,
-              status: bank.status || "new"
+              status: bank.status || "new",
+              isLegacy: true  // Flag to identify legacy sources
             });
           }
         }
@@ -140,10 +157,26 @@ export class PaymentMethodController extends GivingCrudController {
             }
           }
 
-          // Handle Stripe bank accounts (sources)
+          // Handle Stripe bank accounts (PaymentMethod API - us_bank_account)
           if (customerData.banks?.data) {
             for (const bank of customerData.banks.data) {
-              // Stripe Source (bank_account) object structure
+              // Stripe PaymentMethod (us_bank_account) object structure
+              normalizedMethods.push({
+                id: bank.id,
+                type: "bank",
+                provider: "stripe",
+                name: bank.us_bank_account?.bank_name || "Bank Account",
+                last4: bank.us_bank_account?.last4,
+                customerId: bank.customer || customerData.customer?.id,
+                status: "active"
+              });
+            }
+          }
+
+          // Handle legacy Stripe bank accounts (Sources API - deprecated)
+          if (customerData.legacyBanks?.data) {
+            for (const bank of customerData.legacyBanks.data) {
+              // Legacy Stripe Source (bank_account) object structure
               normalizedMethods.push({
                 id: bank.id,
                 type: "bank",
@@ -151,7 +184,8 @@ export class PaymentMethodController extends GivingCrudController {
                 name: "Bank Account",
                 last4: bank.last4,
                 customerId: bank.customer || customerData.customer?.id,
-                status: bank.status || "new"
+                status: bank.status || "new",
+                isLegacy: true  // Flag to identify legacy sources
               });
             }
           }
@@ -316,6 +350,63 @@ export class PaymentMethodController extends GivingCrudController {
     });
   }
 
+  // New endpoint for ACH bank account setup using Financial Connections
+  @httpPost("/ach-setup-intent")
+  public async createACHSetupIntent(req: express.Request<any>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { personId, customerId, email, name, churchId } = req.body;
+      const cId = au?.churchId || churchId;
+      const gateway = await GatewayService.getGatewayForChurch(cId, {}, this.repos.gateway).catch(() => null);
+
+      if (!gateway) {
+        return this.json({ error: "Payment gateway not configured" }, 400);
+      }
+
+      const permission = au.checkAccess(Permissions.donations.edit) || personId === au.personId;
+      if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
+
+      // Check if provider supports ACH/bank accounts
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsACH) {
+        return this.json({ error: `${gateway.provider} does not support bank account payments` }, 400);
+      }
+
+      // Only Stripe supports this flow
+      if (gateway.provider?.toLowerCase() !== "stripe") {
+        return this.json({ error: "ACH SetupIntent only supported for Stripe" }, 400);
+      }
+
+      let customer = customerId;
+      if (!customer) {
+        try {
+          customer = await GatewayService.createCustomer(gateway, email, name);
+          if (customer) {
+            await this.repos.customer.save({ id: customer, churchId: cId, personId, provider: gateway.provider });
+          }
+        } catch (e: any) {
+          console.error("Error creating customer:", e);
+          return this.json({ error: "Failed to create customer", details: e.message }, 500);
+        }
+      }
+
+      try {
+        const setupIntent = await GatewayService.createACHSetupIntent(gateway, customer);
+        return {
+          clientSecret: setupIntent.client_secret,
+          setupIntentId: setupIntent.id,
+          customerId: customer
+        };
+      } catch (e: any) {
+        console.error("Error creating ACH SetupIntent:", e);
+        return this.json({
+          error: e.message || "Failed to create ACH SetupIntent",
+          code: e.code || "unknown_error"
+        }, e.statusCode || 500);
+      }
+    });
+  }
+
+  // Legacy endpoint for adding bank accounts via token (deprecated - use ach-setup-intent instead)
   @httpPost("/addbankaccount")
   public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

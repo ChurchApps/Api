@@ -5,14 +5,16 @@ import { Donation, DonationBatch, EventLog, FundDonation, PaymentDetails } from 
 export class StripeHelper {
   static donate = async (secretKey: string, payment: PaymentDetails) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    if(payment.currency === "jpy") {
+    if (payment.currency === "jpy") {
       payment.amount = Math.round(payment.amount * 1);
     } else {
-    payment.amount = Math.trunc(Math.round(payment.amount * 100));
+      payment.amount = Math.trunc(Math.round(payment.amount * 100));
     }
     payment.currency = payment?.currency;
     try {
+      // Use Payment Intents for all payment types (cards and ACH bank accounts)
       if (payment?.payment_method) return await stripe.paymentIntents.create(payment);
+      // Legacy source-based payments (deprecated - will be removed after migration)
       if (payment?.source) return await stripe.charges.create(payment);
     } catch (err) {
       return err;
@@ -39,16 +41,17 @@ export class StripeHelper {
     };
     // billing_cycle_anchor: (billing_cycle_anchor && billing_cycle_anchor > new Date().getTime()) ? billing_cycle_anchor / 1000 : "now",
     if (billing_cycle_anchor && billing_cycle_anchor > new Date().getTime()) subscriptionData.billing_cycle_anchor = billing_cycle_anchor / 1000;
-    if (type === "card") subscriptionData.default_payment_method = payment_method_id;
-    if (type === "bank") subscriptionData.default_source = payment_method_id;
+    // Use default_payment_method for both card and bank account types
+    // (default_source is deprecated for ACH)
+    if (type === "card" || type === "bank") subscriptionData.default_payment_method = payment_method_id;
     return await stripe.subscriptions.create(subscriptionData);
   };
 
   static updateSubscription = async (secretKey: string, sub: any) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
+    // Use default_payment_method for all payment types (default_source is deprecated)
     const paymentMethod: any = {
-      default_payment_method: sub.default_payment_method || null,
-      default_source: sub.default_source || null
+      default_payment_method: sub.default_payment_method || null
     };
     const priceData = {
       items: [
@@ -118,6 +121,34 @@ export class StripeHelper {
     return await stripe.setupIntents.create(params);
   }
 
+  // Create SetupIntent specifically for ACH bank account with Financial Connections
+  static async createACHSetupIntent(secretKey: string, customerId: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.setupIntents.create({
+      customer: customerId,
+      payment_method_types: ["us_bank_account"],
+      payment_method_options: {
+        us_bank_account: {
+          financial_connections: {
+            permissions: ["payment_method"]
+          }
+        }
+      }
+    });
+  }
+
+  // Retrieve a SetupIntent by ID
+  static async getSetupIntent(secretKey: string, setupIntentId: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.setupIntents.retrieve(setupIntentId);
+  }
+
+  // Retrieve a PaymentIntent by ID (for webhook handling)
+  static async getPaymentIntent(secretKey: string, paymentIntentId: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.paymentIntents.retrieve(paymentIntentId);
+  }
+
   static async createPaymentMethod(secretKey: string, paymentMethodData: any) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.paymentMethods.create(paymentMethodData);
@@ -157,9 +188,24 @@ export class StripeHelper {
 
   static async getCustomerPaymentMethods(secretKey: string, customer: any) {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    const paymentMethods = await stripe.paymentMethods.list({ customer: customer.id, type: "card" });
-    const bankAccounts = await stripe.customers.listSources(customer.id, { object: "bank_account" });
-    return [{ cards: paymentMethods, banks: bankAccounts, customer }];
+    // Get modern PaymentMethods (cards and us_bank_account)
+    const cards = await stripe.paymentMethods.list({ customer: customer.id, type: "card" });
+    const bankPaymentMethods = await stripe.paymentMethods.list({ customer: customer.id, type: "us_bank_account" });
+
+    // Also check for legacy bank account Sources (for backward compatibility during migration)
+    let legacyBanks: Stripe.ApiList<Stripe.CustomerSource> = { data: [], has_more: false, object: "list", url: "" };
+    try {
+      legacyBanks = await stripe.customers.listSources(customer.id, { object: "bank_account" });
+    } catch (e) {
+      // Sources API may be deprecated - ignore errors
+    }
+
+    return [{
+      cards,
+      banks: bankPaymentMethods,
+      legacyBanks,  // Will be empty after full migration
+      customer
+    }];
   }
 
   static async detachPaymentMethod(secretKey: string, paymentMethodId: string) {
@@ -181,7 +227,13 @@ export class StripeHelper {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.webhookEndpoints.create({
       url: webhookUrl,
-      enabled_events: ["invoice.paid", "charge.succeeded", "charge.failed"]
+      enabled_events: [
+        "invoice.paid",
+        "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+        "charge.succeeded",  // Keep for backward compatibility during migration
+        "charge.failed"      // Keep for backward compatibility during migration
+      ]
     });
   }
 
@@ -201,10 +253,23 @@ export class StripeHelper {
   }
 
   static async getPaymentDetails(secretKey: string, eventData: any) {
-    const { payment_method_details } = eventData.payment_method_details ? eventData : await this.getCharge(secretKey, eventData.charge);
-    const methodTypes: any = { ach_debit: "ACH Debit", card: "Card" };
-    const paymentType = payment_method_details.type;
-    return { method: methodTypes[paymentType], methodDetails: payment_method_details[paymentType].last4 };
+    let payment_method_details = eventData.payment_method_details;
+
+    // Handle PaymentIntent events (payment_intent.succeeded)
+    if (!payment_method_details && eventData.latest_charge) {
+      const charge = await this.getCharge(secretKey, eventData.latest_charge);
+      payment_method_details = charge.payment_method_details;
+    }
+    // Handle legacy Charge events (charge.succeeded)
+    else if (!payment_method_details && eventData.charge) {
+      const charge = await this.getCharge(secretKey, eventData.charge);
+      payment_method_details = charge.payment_method_details;
+    }
+
+    const methodTypes: any = { ach_debit: "ACH Debit", us_bank_account: "ACH Debit", card: "Card" };
+    const paymentType = payment_method_details?.type || "card";
+    const details = payment_method_details?.[paymentType];
+    return { method: methodTypes[paymentType] || "Card", methodDetails: details?.last4 || "" };
   }
 
   // Note: These methods use dependency injection with repository parameters
@@ -228,7 +293,9 @@ export class StripeHelper {
   }
 
   static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any) {
-    const amount = (eventData.amount || eventData.amount_paid) / 100;
+    // Handle both Charge events (amount) and PaymentIntent events (amount)
+    // PaymentIntent amounts are in cents, same as Charge events
+    const amount = (eventData.amount || eventData.amount_paid || eventData.amount_received) / 100;
     const customerData = (await givingRepos.customer.load(churchId, eventData.customer)) as any;
     const personId = customerData?.personId;
     const { method, methodDetails } = await this.getPaymentDetails(secretKey, eventData);
@@ -245,6 +312,7 @@ export class StripeHelper {
     };
 
     // Get funds from metadata, subscription, or fallback to general fund
+    // PaymentIntent metadata is in eventData.metadata, same as Charge
     let funds: FundDonation[] = [];
     if (eventData.metadata?.funds) {
       funds = JSON.parse(eventData.metadata.funds);
