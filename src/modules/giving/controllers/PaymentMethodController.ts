@@ -415,6 +415,58 @@ export class PaymentMethodController extends GivingCrudController {
     });
   }
 
+  // Anonymous endpoint for ACH bank account setup (for guest donations)
+  @httpPost("/ach-setup-intent-anon")
+  public async createACHSetupIntentAnon(req: express.Request<any>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const { email, name, churchId, gatewayId } = req.body;
+
+      if (!churchId) {
+        return this.json({ error: "Church ID is required" }, 400);
+      }
+
+      if (!email || !name) {
+        return this.json({ error: "Email and name are required" }, 400);
+      }
+
+      const gateway = await GatewayService.getGatewayForChurch(churchId, { gatewayId }, this.repos.gateway).catch(() => null);
+
+      if (!gateway) {
+        return this.json({ error: "Payment gateway not configured" }, 400);
+      }
+
+      // Check if provider supports ACH/bank accounts
+      const capabilities = GatewayService.getProviderCapabilities(gateway);
+      if (!capabilities?.supportsACH) {
+        return this.json({ error: `${gateway.provider} does not support bank account payments` }, 400);
+      }
+
+      // Only Stripe supports this flow
+      if (gateway.provider?.toLowerCase() !== "stripe") {
+        return this.json({ error: "ACH SetupIntent only supported for Stripe" }, 400);
+      }
+
+      try {
+        // Create a temporary Stripe customer (not saved to DB for guest one-time donation)
+        const stripeCustomerId = await GatewayService.createCustomer(gateway, email, name);
+
+        // Create ACH SetupIntent
+        const setupIntent = await GatewayService.createACHSetupIntent(gateway, stripeCustomerId);
+        return {
+          clientSecret: setupIntent.client_secret,
+          setupIntentId: setupIntent.id,
+          customerId: stripeCustomerId
+        };
+      } catch (e: any) {
+        console.error("Error creating anonymous ACH SetupIntent:", e);
+        return this.json({
+          error: e.message || "Failed to create ACH SetupIntent",
+          code: e.code || "unknown_error"
+        }, e.statusCode || 500);
+      }
+    });
+  }
+
   // Legacy endpoint for adding bank accounts via token (deprecated - use ach-setup-intent instead)
   @httpPost("/addbankaccount")
   public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
