@@ -378,14 +378,23 @@ export class PaymentMethodController extends GivingCrudController {
 
       let customer = customerId;
       if (!customer) {
-        try {
-          customer = await GatewayService.createCustomer(gateway, email, name);
-          if (customer) {
-            await this.repos.customer.save({ id: customer, churchId: cId, personId, provider: gateway.provider });
+        // First, check if a customer already exists in the database for this person
+        const existingCustomer = await this.repos.customer.loadByPersonAndProvider(cId, personId, gateway.provider)
+          || await this.repos.customer.loadByPersonId(cId, personId);
+
+        if (existingCustomer?.id) {
+          customer = existingCustomer.id;
+        } else {
+          // No existing customer, create a new one
+          try {
+            customer = await GatewayService.createCustomer(gateway, email, name);
+            if (customer) {
+              await this.repos.customer.save({ id: customer, churchId: cId, personId, provider: gateway.provider });
+            }
+          } catch (e: any) {
+            console.error("Error creating customer:", e);
+            return this.json({ error: "Failed to create customer", details: e.message }, 500);
           }
-        } catch (e: any) {
-          console.error("Error creating customer:", e);
-          return this.json({ error: "Failed to create customer", details: e.message }, 500);
         }
       }
 

@@ -32,9 +32,20 @@ export class CustomerRepo extends ConfiguredRepo<Customer> {
     const existing = await this.loadByPersonId(model.churchId!, model.personId!);
 
     if (existing) {
-      // Customer exists, update it
-      if (!model.id) model.id = existing.id;
-      return await this.update(model);
+      // Customer exists - update with new Stripe customer ID if provided
+      const oldId = existing.id;
+      const newId = model.id || existing.id;
+
+      // If the customer ID changed (new Stripe customer), we need to update the primary key
+      if (newId !== oldId) {
+        // Delete old record and create new one with new ID
+        await this.delete(model.churchId!, oldId!);
+        return await this.create(model);
+      } else {
+        // Same ID, just update other fields
+        model.id = existing.id;
+        return await this.update(model);
+      }
     } else {
       // Customer doesn't exist, create it
       return await this.create(model);
@@ -50,6 +61,10 @@ export class CustomerRepo extends ConfiguredRepo<Customer> {
     const params = [model.personId, provider, metadata, model.id, model.churchId];
     await TypedDB.query(sql, params);
     return model;
+  }
+
+  public async delete(churchId: string, id: string): Promise<void> {
+    await TypedDB.query("DELETE FROM customers WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
   public async loadByPersonId(churchId: string, personId: string) {
