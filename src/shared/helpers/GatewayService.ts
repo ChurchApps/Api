@@ -124,10 +124,17 @@ export class GatewayService {
     await provider.logEvent(churchId, event, eventData, repos);
   }
 
-  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any): Promise<any> {
+  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any, status: "pending" | "complete" = "complete"): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
-    return await provider.logDonation(config, churchId, eventData, repos);
+    return await provider.logDonation(config, churchId, eventData, repos, status);
+  }
+
+  static async updateDonationStatus(gateway: any, churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.updateDonationStatus) {
+      await provider.updateDonationStatus(churchId, transactionId, status, repos);
+    }
   }
 
   // Customer management

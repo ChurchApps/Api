@@ -229,6 +229,7 @@ export class StripeHelper {
       url: webhookUrl,
       enabled_events: [
         "invoice.paid",
+        "payment_intent.processing",  // ACH payments start in processing state
         "payment_intent.succeeded",
         "payment_intent.payment_failed",
         "charge.succeeded",  // Keep for backward compatibility during migration
@@ -292,7 +293,7 @@ export class StripeHelper {
     return givingRepos.eventLog.save(eventLog);
   }
 
-  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any) {
+  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any, status: "pending" | "complete" = "complete") {
     // Handle both Charge events (amount) and PaymentIntent events (amount)
     // PaymentIntent amounts are in cents, same as Charge events
     const amount = (eventData.amount || eventData.amount_paid || eventData.amount_received) / 100;
@@ -300,6 +301,10 @@ export class StripeHelper {
     const personId = customerData?.personId;
     const { method, methodDetails } = await this.getPaymentDetails(secretKey, eventData);
     const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
+
+    // Get transaction ID for tracking (PaymentIntent ID or Charge ID)
+    const transactionId = eventData.id;
+
     const donationData: Donation = {
       batchId: batch.id,
       amount,
@@ -308,7 +313,9 @@ export class StripeHelper {
       method,
       methodDetails,
       donationDate: new Date(eventData.created * 1000),
-      notes: eventData?.metadata?.notes
+      notes: eventData?.metadata?.notes,
+      status,
+      transactionId
     };
 
     // Get funds from metadata, subscription, or fallback to general fund
@@ -333,6 +340,10 @@ export class StripeHelper {
       promises.push(givingRepos.fundDonation.save(fundDonation));
     });
     return await Promise.all(promises);
+  }
+
+  static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", givingRepos: any) {
+    await givingRepos.donation.updateStatus(churchId, transactionId, status);
   }
 
   static async listEvents(secretKey: string, options: {

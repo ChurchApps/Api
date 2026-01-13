@@ -173,7 +173,27 @@ export class DonateController extends GivingCrudController {
           await GatewayService.logEvent(gateway, churchId, req.body, webhookResult.eventData, this.repos);
 
           if (this.shouldProcessDonation(provider, webhookResult.eventType!)) {
-            await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos);
+            const isPending = this.isPendingPayment(provider, webhookResult.eventType!);
+            const isCompleted = this.isCompletedPayment(provider, webhookResult.eventType!);
+            const transactionId = webhookResult.eventData?.id;
+
+            if (isCompleted && transactionId) {
+              // Check if a pending donation already exists for this transaction
+              const existingDonation = await this.repos.donation.loadByTransactionId(churchId, transactionId);
+              if (existingDonation) {
+                // Update existing pending donation to complete
+                await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
+              } else {
+                // No pending donation found, create a new complete donation
+                await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
+              }
+            } else if (isPending) {
+              // Create a new pending donation for ACH payments
+              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "pending");
+            } else {
+              // Regular completed donation (card payments, etc.)
+              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
+            }
           } else if (this.shouldCancelSubscription(provider, webhookResult.eventType!)) {
             await this.repos.subscription.delete(churchId, webhookResult.eventData.id);
           }
@@ -189,12 +209,23 @@ export class DonateController extends GivingCrudController {
 
   private shouldProcessDonation(provider: string, eventType: string): boolean {
     const donationEvents = {
+      // payment_intent.processing is for ACH payments that are pending
       // payment_intent.succeeded is the new standard for ACH payments via Payment Intents API
       // charge.succeeded is kept for backward compatibility during migration
-      stripe: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded"],
+      stripe: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded", "payment_intent.processing"],
       paypal: ["PAYMENT.CAPTURE.COMPLETED"]
     };
     return donationEvents[provider as keyof typeof donationEvents]?.includes(eventType) || false;
+  }
+
+  private isPendingPayment(provider: string, eventType: string): boolean {
+    // ACH payments start in "processing" state and later transition to "succeeded"
+    return provider === "stripe" && eventType === "payment_intent.processing";
+  }
+
+  private isCompletedPayment(provider: string, eventType: string): boolean {
+    // Check if this is a payment completion event (for updating pending -> complete)
+    return provider === "stripe" && eventType === "payment_intent.succeeded";
   }
 
   private shouldCancelSubscription(provider: string, eventType: string): boolean {

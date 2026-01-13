@@ -85,5 +85,6 @@ export interface IGatewayProvider {
 
   // Event logging
   logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;
-  logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any>;
+  logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status?: "pending" | "complete"): Promise<any>;
+  updateDonationStatus?(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void>;
 }

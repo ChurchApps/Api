@@ -173,8 +173,12 @@ export class StripeGatewayProvider implements IGatewayProvider {
     await StripeHelper.logEvent(churchId, event, eventData, repos);
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
-    return await StripeHelper.logDonation(config.privateKey, churchId, eventData, repos);
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status: "pending" | "complete" = "complete"): Promise<any> {
+    return await StripeHelper.logDonation(config.privateKey, churchId, eventData, repos, status);
+  }
+
+  async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void> {
+    await StripeHelper.updateDonationStatus(churchId, transactionId, status, repos);
   }
 
   // Customer management

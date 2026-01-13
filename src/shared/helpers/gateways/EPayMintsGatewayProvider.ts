@@ -148,7 +148,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     return `epaymints-terminal-${churchId}`;
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, _status?: "pending" | "complete"): Promise<any> {
     const settings = this.parseSettings(config);
     this.requireTerminalId(settings, config.gatewayId);
     const environment = this.resolveEnvironment(config, settings);

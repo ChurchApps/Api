@@ -96,7 +96,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     return `paypal-product-${churchId}`;
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, _status?: "pending" | "complete"): Promise<any> {
     return await PayPalHelper.logDonation(config.publicKey, config.privateKey, churchId, eventData, repos);
   }
 

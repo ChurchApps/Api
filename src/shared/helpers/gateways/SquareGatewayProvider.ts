@@ -167,7 +167,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     return `square-catalog-${churchId}`;
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, _status?: "pending" | "complete"): Promise<any> {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
     return await SquareHelper.logDonation(

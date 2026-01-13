@@ -11,7 +11,7 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     return {
       tableName: "donations",
       hasSoftDelete: false,
-      columns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes", "entryTime"]
+      columns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes", "entryTime", "status", "transactionId"]
     };
   }
   // Override save to handle empty personId conversion
@@ -24,10 +24,11 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
   protected async create(donation: Donation): Promise<Donation> {
     donation.id = UniqueIdHelper.shortId();
     donation.entryTime = new Date();
+    if (!donation.status) donation.status = "complete";
     const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
     const entryTime = DateHelper.toMysqlDate(donation.entryTime);
-    const sql = "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes, entryTime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, entryTime];
+    const sql = "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes, entryTime, status, transactionId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const params = [donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId];
     await TypedDB.query(sql, params);
     return donation;
   }
@@ -36,8 +37,8 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
   protected async update(donation: Donation): Promise<Donation> {
     const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
     const entryTime = DateHelper.toMysqlDate(donation.entryTime as Date);
-    const sql = "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, method=?, methodDetails=?, notes=?, entryTime=? WHERE id=? and churchId=?";
-    const params = [donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, entryTime, donation.id, donation.churchId];
+    const sql = "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, method=?, methodDetails=?, notes=?, entryTime=?, status=?, transactionId=? WHERE id=? and churchId=?";
+    const params = [donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId, donation.id, donation.churchId];
     await TypedDB.query(sql, params);
     return donation;
   }
@@ -124,10 +125,23 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
       method: row.method,
       methodDetails: row.methodDetails,
       notes: row.notes,
-      entryTime: row.entryTime
+      entryTime: row.entryTime,
+      status: row.status || "complete",
+      transactionId: row.transactionId
     };
     if (row.fundName !== undefined) result.fund = { id: row.fundId, name: row.fundName, amount: row.fundAmount };
     return result;
+  }
+
+  public async loadByTransactionId(churchId: string, transactionId: string): Promise<Donation | null> {
+    const sql = "SELECT * FROM donations WHERE churchId = ? AND transactionId = ? LIMIT 1";
+    const rows = await TypedDB.query(sql, [churchId, transactionId]);
+    return rows.length > 0 ? this.rowToModel(rows[0]) : null;
+  }
+
+  public async updateStatus(churchId: string, transactionId: string, status: string): Promise<void> {
+    const sql = "UPDATE donations SET status = ? WHERE churchId = ? AND transactionId = ?";
+    await TypedDB.query(sql, [status, churchId, transactionId]);
   }
 
   public convertToModel(churchId: string, data: any) {
