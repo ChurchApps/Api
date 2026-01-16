@@ -48,9 +48,9 @@ export class ChurchRepo extends BaseRepo<Church> {
 
   public async loadForUser(userId: string) {
     const sql =
-      "select c.*, uc.personId, p.membershipStatus from userChurches uc " +
+      "select c.*, p.id as personId, p.membershipStatus from userChurches uc " +
       " inner join churches c on c.id=uc.churchId and c.archivedDate IS NULL" +
-      " LEFT JOIN people p on p.id=uc.personId" +
+      " LEFT JOIN people p on p.id=uc.personId AND (p.removed=0 OR p.removed IS NULL)" +
       " where uc.userId=?";
     const rows = (await TypedDB.query(sql, [userId])) as any[];
     const result: LoginUserChurch[] = [];

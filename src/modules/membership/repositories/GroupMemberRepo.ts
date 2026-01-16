@@ -22,7 +22,7 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
       "p.address1, p.address2, p.city, p.state, p.zip, " +
       "p.householdId, p.householdRole " +
       "FROM groupMembers gm " +
-      "INNER JOIN people p on p.id=gm.personId " +
+      "INNER JOIN people p on p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL) " +
       "WHERE gm.churchId=? AND gm.groupId=? " +
       "ORDER BY gm.leader DESC, p.lastName, p.firstName;";
     return TypedDB.query(sql, [churchId, groupId]);
@@ -32,7 +32,7 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
     const sql =
       "SELECT gm.*, p.photoUpdated, p.displayName" +
       " FROM groupMembers gm" +
-      " INNER JOIN people p on p.id=gm.personId" +
+      " INNER JOIN people p on p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL)" +
       " WHERE gm.churchId=? AND gm.groupId=? and gm.leader=1" +
       " ORDER BY p.lastName, p.firstName;";
     return TypedDB.query(sql, [churchId, groupId]);
@@ -42,7 +42,7 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
     const sql =
       "SELECT gm.*, p.photoUpdated, p.displayName, p.email" +
       " FROM groupMembers gm" +
-      " INNER JOIN people p on p.id=gm.personId" +
+      " INNER JOIN people p on p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL)" +
       " WHERE gm.churchId=? AND gm.groupId IN (?)" +
       " ORDER BY gm.leader desc, p.lastName, p.firstName;";
     return TypedDB.query(sql, [churchId, groupIds]);

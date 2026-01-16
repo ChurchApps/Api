@@ -42,24 +42,24 @@ export class UserChurchRepo extends ConfiguredRepo<UserChurch> {
 
   public async loadForUser(userId: string): Promise<any[]> {
     const sql =
-      "SELECT uc.*, c.id as churchId, c.name as churchName, c.subDomain, p.firstName, p.lastName, p.displayName " +
+      "SELECT uc.*, c.id as churchId, c.name as churchName, c.subDomain, p.id as activePersonId, p.firstName, p.lastName, p.displayName " +
       "FROM userChurches uc " +
       "INNER JOIN churches c ON c.id = uc.churchId AND c.archivedDate IS NULL " +
-      "LEFT JOIN people p ON p.id = uc.personId AND p.churchId = uc.churchId " +
+      "LEFT JOIN people p ON p.id = uc.personId AND p.churchId = uc.churchId AND (p.removed = 0 OR p.removed IS NULL) " +
       "WHERE uc.userId = ?";
     const rows = (await TypedDB.query(sql, [userId])) as any[];
     return rows.map((row: any) => ({
       id: row.id,
       userId: row.userId,
-      personId: row.personId,
+      personId: row.activePersonId,
       church: {
         id: row.churchId,
         name: row.churchName,
         subDomain: row.subDomain
       },
-      person: row.personId
+      person: row.activePersonId
         ? {
-            id: row.personId,
+            id: row.activePersonId,
             name: {
               first: row.firstName,
               last: row.lastName,

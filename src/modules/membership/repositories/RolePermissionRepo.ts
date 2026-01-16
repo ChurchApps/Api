@@ -28,16 +28,16 @@ export class RolePermissionRepo extends ConfiguredRepo<RolePermission> {
 
   public async loadForUser(userId: string, removeUniversal: boolean): Promise<LoginUserChurch[]> {
     const query =
-      "SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, uc.personId AS personId, p.membershipStatus, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country" +
+      "SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id AS personId, p.membershipStatus, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country" +
       " FROM roleMembers rm" +
       " INNER JOIN roles r on r.id=rm.roleId" +
       " INNER JOIN rolePermissions rp on (rp.roleId=r.id or (rp.roleId IS NULL AND rp.churchId=rm.churchId))" +
       " LEFT JOIN churches c on c.id=r.churchId" +
       " LEFT JOIN userChurches uc on uc.churchId=r.churchId AND uc.userId = rm.userId" +
-      " LEFT JOIN people p on p.id = uc.personId AND p.churchId=uc.churchId" +
+      " LEFT JOIN people p on p.id = uc.personId AND p.churchId=uc.churchId AND (p.removed=0 OR p.removed IS NULL)" +
       " WHERE rm.userId=?" +
-      " GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, uc.personId, p.membershipStatus, c.archivedDate" +
-      " ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, uc.personId, p.membershipStatus, c.archivedDate";
+      " GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate" +
+      " ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate";
     const data = (await TypedDB.query(query, [userId])) as any[];
 
     const result: LoginUserChurch[] = [];

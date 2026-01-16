@@ -29,7 +29,7 @@ export class MemberPermissionRepo extends ConfiguredRepo<MemberPermission> {
     const sql =
       "SELECT mp.*, p.displayName as personName" +
       " FROM memberPermissions mp" +
-      " INNER JOIN `people` p on p.id=mp.memberId" +
+      " INNER JOIN `people` p on p.id=mp.memberId AND (p.removed=0 OR p.removed IS NULL)" +
       " WHERE mp.churchId=? AND mp.memberId=?" +
       " ORDER BY mp.action, mp.emailNotification desc;";
     return TypedDB.query(sql, [churchId, personId]);
@@ -39,7 +39,7 @@ export class MemberPermissionRepo extends ConfiguredRepo<MemberPermission> {
     const sql =
       "SELECT mp.*, p.displayName as personName" +
       " FROM memberPermissions mp" +
-      " INNER JOIN `people` p on p.id=mp.memberId" +
+      " INNER JOIN `people` p on p.id=mp.memberId AND (p.removed=0 OR p.removed IS NULL)" +
       " WHERE mp.churchId=? AND mp.contentId=?" +
       " ORDER BY mp.action, mp.emailNotification desc;";
     return TypedDB.query(sql, [churchId, formId]);
