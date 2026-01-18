@@ -14,7 +14,8 @@ import {
   VisibilityPreferenceRepo,
   OAuthTokenRepo,
   OAuthCodeRepo,
-  OAuthClientRepo
+  OAuthClientRepo,
+  OAuthDeviceCodeRepo
 } from "./index.js";
 import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo } from "./index.js";
 
@@ -43,6 +44,7 @@ export class Repos {
   public oAuthToken: OAuthTokenRepo;
   public oAuthCode: OAuthCodeRepo;
   public oAuthClient: OAuthClientRepo;
+  public oAuthDeviceCode: OAuthDeviceCodeRepo;
 
   public clientError: ClientErrorRepo;
 
@@ -73,6 +75,7 @@ export class Repos {
     this.oAuthToken = new OAuthTokenRepo();
     this.oAuthCode = new OAuthCodeRepo();
     this.oAuthClient = new OAuthClientRepo();
+    this.oAuthDeviceCode = new OAuthDeviceCodeRepo();
 
     this.clientError = new ClientErrorRepo();
   }

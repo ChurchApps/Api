@@ -25,3 +25,4 @@ export { ClientErrorRepo } from "./ClientErrorRepo.js";
 export { OAuthTokenRepo } from "./OAuthTokenRepo.js";
 export { OAuthCodeRepo } from "./OAuthCodeRepo.js";
 export { OAuthClientRepo } from "./OAuthClientRepo.js";
+export { OAuthDeviceCodeRepo } from "./OAuthDeviceCodeRepo.js";

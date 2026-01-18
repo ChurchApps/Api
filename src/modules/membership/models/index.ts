@@ -32,5 +32,6 @@ export { VisibilityPreference } from "./VisibilityPreference.js";
 export { OAuthToken } from "./OAuthToken.js";
 export { OAuthClient } from "./OAuthClient.js";
 export { OAuthCode } from "./OAuthCode.js";
+export { OAuthDeviceCode } from "./OAuthDeviceCode.js";
 
 export * from "./LoginModels.js";

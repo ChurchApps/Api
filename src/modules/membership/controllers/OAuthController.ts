@@ -1,9 +1,11 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken } from "../models/index.js";
+import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken, OAuthDeviceCode } from "../models/index.js";
 import { Permissions, UniqueIdHelper } from "../helpers/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
+import { OAuthDeviceCodeRepo } from "../repositories/index.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 @controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {
@@ -64,16 +66,23 @@ export class OAuthController extends MembershipBaseController {
         grant_type: string;
         code?: string;
         refresh_token?: string;
+        device_code?: string;
         client_id: string;
-        client_secret: string;
+        client_secret?: string;
         redirect_uri?: string;
       }
     >,
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const { grant_type, code, refresh_token, client_id, client_secret, redirect_uri } = req.body;
+      const { grant_type, code, refresh_token, device_code, client_id, client_secret, redirect_uri } = req.body;
 
+      // Device code grant type doesn't require client_secret
+      if (grant_type === "urn:ietf:params:oauth:grant-type:device_code") {
+        return this.handleDeviceCodeGrant(device_code, client_id, res);
+      }
+
+      // All other grant types require client_secret validation
       const client = (await this.repos.oAuthClient.loadByClientIdAndSecret(client_id, client_secret)) as any;
       if (!client) return this.json({ error: "invalid_client" }, 400);
 
@@ -169,6 +178,221 @@ export class OAuthController extends MembershipBaseController {
           scope: token.scopes
         });
       } else return this.json({ error: "unsupported_grant_type" }, 400);
+    });
+  }
+
+  /**
+   * RFC 8628 Section 3.1: Device Authorization Request
+   * POST /oauth/device/authorize
+   */
+  @httpPost("/device/authorize")
+  public async deviceAuthorize(req: express.Request<{}, {}, { client_id: string; scope?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const { client_id, scope } = req.body;
+
+      // Validate client_id
+      if (!client_id) {
+        return this.json({ error: "invalid_request", error_description: "client_id required" }, 400);
+      }
+
+      const client = await this.repos.oAuthClient.loadByClientId(client_id);
+      if (!client) {
+        return this.json({ error: "invalid_client" }, 400);
+      }
+
+      // Generate codes
+      const deviceCode = OAuthDeviceCodeRepo.generateDeviceCode();
+      const userCode = OAuthDeviceCodeRepo.generateUserCode();
+
+      // Set expiration (15 minutes per RFC recommendation)
+      const expiresIn = 900; // seconds
+      const expiresAt = new Date(Date.now() + expiresIn * 1000);
+
+      // Store device code
+      const dc: OAuthDeviceCode = {
+        deviceCode,
+        userCode,
+        clientId: client_id,
+        scopes: scope || "content offline_access",
+        expiresAt,
+        pollInterval: 5,
+        status: "pending"
+      };
+      await this.repos.oAuthDeviceCode.save(dc);
+
+      // Return per RFC 8628 Section 3.2
+      return this.json({
+        device_code: deviceCode,
+        user_code: userCode,
+        verification_uri: `${Environment.b1AdminRoot}/device`,
+        verification_uri_complete: `${Environment.b1AdminRoot}/device?code=${userCode}`,
+        expires_in: expiresIn,
+        interval: 5
+      });
+    });
+  }
+
+  /**
+   * Handle device_code grant type (called from /token endpoint)
+   */
+  private async handleDeviceCodeGrant(deviceCode: string, clientId: string, res: express.Response): Promise<any> {
+    if (!deviceCode) {
+      return this.json({ error: "invalid_request", error_description: "device_code required" }, 400);
+    }
+
+    const dc = await this.repos.oAuthDeviceCode.loadByDeviceCode(deviceCode);
+
+    if (!dc || dc.clientId !== clientId) {
+      return this.json({ error: "invalid_grant" }, 400);
+    }
+
+    // Check expiration
+    if (new Date() > dc.expiresAt) {
+      dc.status = "expired";
+      await this.repos.oAuthDeviceCode.save(dc);
+      return this.json({ error: "expired_token" }, 400);
+    }
+
+    // Check status
+    switch (dc.status) {
+      case "pending":
+        return this.json({ error: "authorization_pending" }, 400);
+
+      case "denied":
+        await this.repos.oAuthDeviceCode.delete(dc.id);
+        return this.json({ error: "access_denied" }, 400);
+
+      case "approved":
+        // Generate tokens using the stored userChurchId
+        const userChurch = (await this.repos.userChurch.load(dc.userChurchId)) as any;
+        if (!userChurch) {
+          return this.json({ error: "server_error" }, 500);
+        }
+
+        const user = (await this.repos.user.load(userChurch.userId)) as any;
+        const church = (await this.repos.church.loadById(userChurch.churchId)) as any;
+        const personData = await this.loadPersonAndGroups(userChurch.personId);
+
+        if (!user || !church) {
+          return this.json({ error: "server_error" }, 500);
+        }
+
+        const loginUserChurch: LoginUserChurch = {
+          church: { id: church.id, name: church.churchName, subDomain: church.subDomain },
+          person: {
+            id: userChurch.personId,
+            membershipStatus: personData.membershipStatus,
+            name: { first: "", last: "" }
+          },
+          groups: personData.groups,
+          apis: []
+        };
+
+        // Create access token
+        const accessToken = AuthenticatedUser.getChurchJwt(user, loginUserChurch);
+        const refreshToken = UniqueIdHelper.shortId();
+
+        // Store the refresh token for later use
+        const token: OAuthToken = {
+          clientId: dc.clientId,
+          userChurchId: dc.userChurchId,
+          accessToken,
+          refreshToken,
+          scopes: dc.scopes,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000 * 12) // 12 hours
+        };
+        await this.repos.oAuthToken.save(token);
+
+        // Clean up device code
+        await this.repos.oAuthDeviceCode.delete(dc.id);
+
+        return this.json({
+          access_token: accessToken,
+          token_type: "Bearer",
+          expires_in: 3600 * 12, // 12 hours
+          refresh_token: refreshToken,
+          scope: dc.scopes
+        });
+
+      default:
+        return this.json({ error: "server_error" }, 500);
+    }
+  }
+
+  /**
+   * Get pending device code info (for admin approval UI)
+   * GET /oauth/device/pending/:userCode
+   */
+  @httpGet("/device/pending/:userCode")
+  public async getPendingDevice(@requestParam("userCode") userCode: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const dc = await this.repos.oAuthDeviceCode.loadByUserCode(userCode);
+
+      if (!dc) {
+        return this.json({ error: "not_found" }, 404);
+      }
+
+      // Return limited info for security
+      return this.json({
+        userCode: dc.userCode,
+        clientId: dc.clientId,
+        scopes: dc.scopes,
+        expiresIn: Math.max(0, Math.floor((dc.expiresAt.getTime() - Date.now()) / 1000))
+      });
+    });
+  }
+
+  /**
+   * Approve device authorization (called from admin UI)
+   * POST /oauth/device/approve
+   */
+  @httpPost("/device/approve")
+  public async approveDevice(req: express.Request<{}, {}, { user_code: string; church_id: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { user_code, church_id } = req.body;
+
+      const dc = await this.repos.oAuthDeviceCode.loadByUserCode(user_code);
+
+      if (!dc) {
+        return this.json({ error: "invalid_code", message: "Code not found or expired" }, 400);
+      }
+
+      // Verify user has access to the selected church
+      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, church_id)) as any;
+      if (!userChurch) {
+        return this.json({ error: "access_denied", message: "No access to selected church" }, 403);
+      }
+
+      // Approve the device code
+      dc.status = "approved";
+      dc.approvedByUserId = au.id;
+      dc.userChurchId = userChurch.id;
+      dc.churchId = church_id;
+      await this.repos.oAuthDeviceCode.save(dc);
+
+      return this.json({ success: true, message: "Device authorized successfully" });
+    });
+  }
+
+  /**
+   * Deny device authorization
+   * POST /oauth/device/deny
+   */
+  @httpPost("/device/deny")
+  public async denyDevice(req: express.Request<{}, {}, { user_code: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { user_code } = req.body;
+
+      const dc = await this.repos.oAuthDeviceCode.loadByUserCode(user_code);
+
+      if (!dc) {
+        return this.json({ error: "invalid_code" }, 400);
+      }
+
+      dc.status = "denied";
+      await this.repos.oAuthDeviceCode.save(dc);
+
+      return this.json({ success: true });
     });
   }
 
