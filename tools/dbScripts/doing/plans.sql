@@ -11,5 +11,8 @@ CREATE TABLE `plans` (
   `serviceOrder` bit(1) DEFAULT NULL,
   `contentType` varchar(50) DEFAULT NULL,
   `contentId` char(11) DEFAULT NULL,
+  `providerId` varchar(50) DEFAULT NULL,
+  `providerPlanId` varchar(100) DEFAULT NULL,
+  `providerPlanName` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
 );

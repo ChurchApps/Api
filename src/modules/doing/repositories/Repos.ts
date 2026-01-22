@@ -5,6 +5,7 @@ import {
   BlockoutDateRepo,
   ConditionRepo,
   ConjunctionRepo,
+  ContentProviderAuthRepo,
   PlanRepo,
   PlanItemRepo,
   PlanTypeRepo,
@@ -21,6 +22,7 @@ export class Repos {
   public blockoutDate: BlockoutDateRepo;
   public condition: ConditionRepo;
   public conjunction: ConjunctionRepo;
+  public contentProviderAuth: ContentProviderAuthRepo;
   public plan: PlanRepo;
   public planItem: PlanItemRepo;
   public planType: PlanTypeRepo;
@@ -42,6 +44,7 @@ export class Repos {
     this.blockoutDate = new BlockoutDateRepo();
     this.condition = new ConditionRepo();
     this.conjunction = new ConjunctionRepo();
+    this.contentProviderAuth = new ContentProviderAuthRepo();
     this.plan = new PlanRepo();
     this.planItem = new PlanItemRepo();
     this.planType = new PlanTypeRepo();

@@ -9,4 +9,7 @@ export class Plan {
   public serviceOrder?: boolean;
   public contentType?: string;
   public contentId?: string;
+  public providerId?: string;
+  public providerPlanId?: string;
+  public providerPlanName?: string;
 }
