@@ -59,6 +59,15 @@ export class UserChurchController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/personid/:personId")
+  public async getByPersonId(@requestParam("personId") personId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async ({ churchId }) => {
+      const record = await this.repos.userChurch.loadByPersonId(personId, churchId);
+      if (!record) return null;
+      return { email: record.email };
+    });
+  }
+
   @httpGet("/user/:userId")
   public async loadForUser(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

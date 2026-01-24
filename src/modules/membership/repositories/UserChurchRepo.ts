@@ -40,6 +40,13 @@ export class UserChurchRepo extends ConfiguredRepo<UserChurch> {
     return TypedDB.queryOne(sql, params);
   }
 
+  public async loadByPersonId(personId: string, churchId: string): Promise<any> {
+    const sql = "SELECT uc.*, u.email FROM userChurches uc " +
+      "INNER JOIN users u ON u.id = uc.userId " +
+      "WHERE uc.personId=? AND uc.churchId=?";
+    return TypedDB.queryOne(sql, [personId, churchId]);
+  }
+
   public async loadForUser(userId: string): Promise<any[]> {
     const sql =
       "SELECT uc.*, c.id as churchId, c.name as churchName, c.subDomain, p.id as activePersonId, p.firstName, p.lastName, p.displayName " +
