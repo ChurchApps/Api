@@ -31,7 +31,7 @@ export class OAuthDeviceCodeRepo extends BaseRepo<OAuthDeviceCode> {
 
   protected async update(deviceCode: OAuthDeviceCode): Promise<OAuthDeviceCode> {
     const expiresAt = DateHelper.toMysqlDate(deviceCode.expiresAt);
-    const sql = `UPDATE oAuthDeviceCodes SET status=?, approvedByUserId=?, userChurchId=?, churchId=?, expiresAt=? WHERE id=?;`;
+    const sql = "UPDATE oAuthDeviceCodes SET status=?, approvedByUserId=?, userChurchId=?, churchId=?, expiresAt=? WHERE id=?;";
     const params = [deviceCode.status, deviceCode.approvedByUserId, deviceCode.userChurchId, deviceCode.churchId, expiresAt, deviceCode.id];
     await TypedDB.query(sql, params);
     return deviceCode;
