@@ -1,14 +1,15 @@
-import { controller, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import express from "express";
 import { MembershipCrudController } from "./MembershipCrudController.js";
-import { Permissions } from "../helpers/index.js";
+import { Permissions, UserChurchHelper } from "../helpers/index.js";
+import { GroupMember } from "../models/index.js";
 
 @controller("/membership/groupmembers")
 export class GroupMemberController extends MembershipCrudController {
   protected crudSettings = {
     repoKey: "groupMember",
     permissions: { view: Permissions.groupMembers.view, edit: Permissions.groupMembers.edit },
-    routes: ["getById", "post", "delete"] as const
+    routes: ["getById", "delete"] as const
   };
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
@@ -52,5 +53,28 @@ export class GroupMemberController extends MembershipCrudController {
     });
   }
 
-  // Inherit POST /, GET /:id and DELETE /:id via crudSettings
+  @httpPost("/")
+  public async save(req: express.Request<{}, {}, GroupMember[]>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) {
+        return this.json({ error: "Unauthorized" }, 401);
+      }
+
+      const promises: Promise<GroupMember>[] = [];
+      req.body.forEach((gm) => {
+        gm.churchId = au.churchId;
+        promises.push(this.repos.groupMember.save(gm));
+      });
+      const result = await Promise.all(promises);
+
+      // Create userChurch records for members with matching users
+      for (const gm of result) {
+        await UserChurchHelper.createForGroupMember(au.churchId, gm.personId);
+      }
+
+      return this.repos.groupMember.convertAllToModel(au.churchId, result);
+    });
+  }
+
+  // Inherit GET /:id and DELETE /:id via crudSettings
 }

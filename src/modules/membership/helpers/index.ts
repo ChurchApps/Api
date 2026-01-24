@@ -16,4 +16,5 @@ export { OpenAiHelper } from "./OpenAiHelper.js";
 export { PersonHelper } from "./PersonHelper.js";
 export { RoleHelper } from "./RoleHelper.js";
 export { UserHelper } from "./UserHelper.js";
+export { UserChurchHelper } from "./UserChurchHelper.js";
 export { Utils } from "./Utils.js";

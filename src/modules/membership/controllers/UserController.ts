@@ -5,7 +5,7 @@ import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { EmailHelper, UserHelper, UniqueIdHelper, Environment, Permissions } from "../helpers/index.js";
+import { EmailHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions } from "../helpers/index.js";
 import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
@@ -201,6 +201,8 @@ export class UserController extends MembershipBaseController {
         user.authGuid = v4();
         user = await this.repos.user.save(user);
         await UserHelper.sendWelcomeEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, null, null);
+        // Create userChurch records for matching people in groups
+        await UserChurchHelper.createForNewUser(user.id, user.email);
       }
       user.password = null;
       return this.json(user, 200);
@@ -239,6 +241,9 @@ export class UserController extends MembershipBaseController {
         const userCount = await this.repos.user.loadCount();
 
         user = await this.repos.user.save(user);
+
+        // Create userChurch records for matching people in groups
+        await UserChurchHelper.createForNewUser(user.id, user.email);
 
         // Add first user to server admins group
         if (userCount === 0) {

@@ -5,7 +5,7 @@ import { Person, Household, SearchCondition, Group, VisibilityPreference } from 
 import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { Environment, Permissions, PersonHelper } from "../helpers/index.js";
+import { Environment, Permissions, PersonHelper, UserChurchHelper } from "../helpers/index.js";
 import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
 
 @controller("/membership/people")
@@ -385,6 +385,8 @@ export class PersonController extends MembershipBaseController {
               // const r = this.repos.person.convertToModel(au.churchId, p);
               p.churchId = au.churchId;
               if (p.photo !== undefined && p.photo.startsWith("data:image/png;base64,")) await this.savePhoto(au.churchId, p);
+              // Create userChurch record if email matches a user and person is in groups
+              if (p.email) await UserChurchHelper.createForPersonEmailUpdate(au.churchId, p.id, p.email);
               return p;
             })
           );
