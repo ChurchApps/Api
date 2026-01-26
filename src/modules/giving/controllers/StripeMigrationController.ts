@@ -73,7 +73,7 @@ export class StripeMigrationController extends GivingBaseController {
                 limit: 100
               });
               bankAccountCount += sources.data.length;
-            } catch (e) {
+            } catch (_e) {
               // Customer may not exist in Stripe
             }
           }
@@ -86,7 +86,7 @@ export class StripeMigrationController extends GivingBaseController {
               if (stripeSub.default_source && typeof stripeSub.default_source === "string" && stripeSub.default_source.startsWith("ba_")) {
                 subscriptionsUsingBankSource++;
               }
-            } catch (e) {
+            } catch (_e) {
               // Subscription may not exist in Stripe
             }
           }
