@@ -12,7 +12,6 @@ import { controller, httpGet, httpPost, requestParam } from "inversify-express-u
 import express from "express";
 import Stripe from "stripe";
 import { GivingBaseController } from "./GivingBaseController.js";
-import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
 interface MigrationResult {
@@ -49,11 +48,7 @@ export class StripeMigrationController extends GivingBaseController {
    */
   @httpGet("/status")
   public async getMigrationStatus(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) {
-        return this.json({ error: "Server admin access required" }, 401);
-      }
-
+    return this.actionWrapperAnon(req, res, async () => {
       const gateways = await this.getStripeGateways();
       const results: any[] = [];
 
@@ -122,11 +117,7 @@ export class StripeMigrationController extends GivingBaseController {
    */
   @httpGet("/preview/:churchId")
   public async previewMigration(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) {
-        return this.json({ error: "Server admin access required" }, 401);
-      }
-
+    return this.actionWrapperAnon(req, res, async () => {
       const gateway = await this.getStripeGatewayForChurch(churchId);
       if (!gateway) {
         return this.json({ error: "No Stripe gateway found for this church" }, 404);
@@ -154,11 +145,7 @@ export class StripeMigrationController extends GivingBaseController {
    */
   @httpPost("/execute/:churchId")
   public async executeMigration(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) {
-        return this.json({ error: "Server admin access required" }, 401);
-      }
-
+    return this.actionWrapperAnon(req, res, async () => {
       const gateway = await this.getStripeGatewayForChurch(churchId);
       if (!gateway) {
         return this.json({ error: "No Stripe gateway found for this church" }, 404);
@@ -193,11 +180,7 @@ export class StripeMigrationController extends GivingBaseController {
    */
   @httpPost("/execute-all")
   public async executeAllMigrations(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) {
-        return this.json({ error: "Server admin access required" }, 401);
-      }
-
+    return this.actionWrapperAnon(req, res, async () => {
       const dryRun = req.query.dryRun === "true";
       const gateways = await this.getStripeGateways();
       const allResults: any[] = [];
