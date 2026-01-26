@@ -72,6 +72,11 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
     return this.mapToModels(data);
   }
 
+  public async loadByProvider(provider: string): Promise<Gateway[]> {
+    const sql = "SELECT * FROM gateways WHERE LOWER(provider) = LOWER(?);";
+    return this.mapToModels(await TypedDB.query(sql, [provider]));
+  }
+
   private parseJson(value: unknown) {
     if (value === null || value === undefined) return null;
     if (typeof value === "string") {
