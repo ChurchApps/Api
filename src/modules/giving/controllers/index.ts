@@ -11,4 +11,3 @@ export { SubscriptionController } from "./SubscriptionController.js";
 export { SubscriptionFundController } from "./SubscriptionFundController.js";
 export { FundController } from "./FundController.js";
 export { DonateController } from "./DonateController.js";
-export { StripeMigrationController } from "./StripeMigrationController.js";
