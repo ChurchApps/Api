@@ -12,7 +12,6 @@ export class Conversation {
   public firstPostId?: string;
   public lastPostId?: string;
   public postCount?: number;
-  public postType?: string;
   public allowAnonymousPosts?: boolean;
 
   public messages?: Message[];

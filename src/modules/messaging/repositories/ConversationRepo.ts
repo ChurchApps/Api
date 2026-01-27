@@ -10,7 +10,7 @@ export class ConversationRepo extends ConfiguredRepo<Conversation> {
     return {
       tableName: "conversations",
       hasSoftDelete: false,
-      insertColumns: ["contentType", "contentId", "title", "groupId", "visibility", "postType", "allowAnonymousPosts"],
+      insertColumns: ["contentType", "contentId", "title", "groupId", "visibility", "allowAnonymousPosts"],
       updateColumns: ["title", "groupId", "visibility", "allowAnonymousPosts"],
       insertLiterals: { dateCreated: "NOW()", postCount: "0" }
     };
@@ -35,7 +35,7 @@ export class ConversationRepo extends ConfiguredRepo<Conversation> {
 
   public async loadPosts(churchId: string, groupIds: string[]) {
     const sql =
-      "select c.contentType, c.contentId, c.groupId, c.id, c.firstPostId, c.lastPostId, c.postCount, c.postType" +
+      "select c.contentType, c.contentId, c.groupId, c.id, c.firstPostId, c.lastPostId, c.postCount" +
       " FROM conversations c" +
       " INNER JOIN messages fp on fp.id=c.firstPostId" +
       " INNER JOIN messages lp on lp.id=c.lastPostId" +
@@ -83,8 +83,7 @@ export class ConversationRepo extends ConfiguredRepo<Conversation> {
       contentType: data.contentType,
       contentId: data.contentId,
       title: data.title,
-      dateCreated: data.dateCreated,
-      postType: data.postType
+      dateCreated: data.dateCreated
     };
   }
 

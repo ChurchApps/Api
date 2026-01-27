@@ -12,7 +12,6 @@ CREATE TABLE `conversations` (
   `firstPostId` char(11) DEFAULT NULL,
   `lastPostId` char(11) DEFAULT NULL,
   `postCount` int(11) DEFAULT NULL,
-  `postType` varchar(45) DEFAULT 'discussion',
   `allowAnonymousPosts` bit(1) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `ix_churchId` (`churchId`,`contentType`,`contentId`)
