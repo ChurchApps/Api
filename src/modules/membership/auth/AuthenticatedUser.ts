@@ -81,6 +81,41 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     );
   }
 
+  public static getCombinedApiJwt(user: User, userChurch: LoginUserChurch) {
+    const permList: string[] = [];
+
+    userChurch.apis?.forEach((api) => {
+      api.permissions?.forEach((p) => {
+        let permString = p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
+        if (p.apiName) permString = p.apiName + "_" + p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
+        permList.push(permString);
+      });
+    });
+
+    const groupIds: string[] = [];
+    userChurch.groups?.forEach((g) => groupIds.push(g.id));
+    const leaderGroupIds: string[] = [];
+    userChurch.groups?.forEach((g) => { if (g.leader) leaderGroupIds.push(g.id); });
+
+    const options: SignOptions = { expiresIn: Environment.jwtExpiration as any };
+    return jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        churchId: userChurch.church.id,
+        personId: userChurch.person.id,
+        permissions: permList,
+        groupIds,
+        leaderGroupIds,
+        membershipStatus: userChurch.person?.membershipStatus
+      },
+      Environment.jwtSecret,
+      options
+    );
+  }
+
   public static getUserJwt(user: User) {
     return jwt.sign({ id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName }, Environment.jwtSecret, { expiresIn: "180 days" });
   }

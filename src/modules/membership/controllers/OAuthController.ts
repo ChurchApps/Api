@@ -112,11 +112,17 @@ export class OAuthController extends MembershipBaseController {
           apis: []
         };
 
+        // Load permissions for all APIs
+        const permissionData = await this.repos.rolePermission.loadUserPermissionInChurch(user.id, church.id);
+        if (permissionData) {
+          loginUserChurch.apis = permissionData.apis;
+        }
+
         // Create access token
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: authCode.userChurchId,
-          accessToken: AuthenticatedUser.getChurchJwt(user, loginUserChurch),
+          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch),
           refreshToken: UniqueIdHelper.shortId(),
           scopes: authCode.scopes,
           expiresAt: new Date(Date.now() + 60 * 60 * 1000 * 12) // 12 hours
@@ -156,11 +162,17 @@ export class OAuthController extends MembershipBaseController {
           apis: []
         };
 
+        // Load permissions for all APIs
+        const permissionData = await this.repos.rolePermission.loadUserPermissionInChurch(user.id, church.id);
+        if (permissionData) {
+          loginUserChurch.apis = permissionData.apis;
+        }
+
         // Create new access token with proper JWT
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: oldToken.userChurchId,
-          accessToken: AuthenticatedUser.getChurchJwt(user, loginUserChurch),
+          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch),
           refreshToken: UniqueIdHelper.shortId(),
           scopes: oldToken.scopes,
           expiresAt: new Date(Date.now() + 60 * 60 * 1000 * 12) // 12 hours
@@ -288,8 +300,14 @@ export class OAuthController extends MembershipBaseController {
           apis: []
         };
 
+        // Load permissions for all APIs
+        const permissionData = await this.repos.rolePermission.loadUserPermissionInChurch(user.id, church.id);
+        if (permissionData) {
+          loginUserChurch.apis = permissionData.apis;
+        }
+
         // Create access token
-        const accessToken = AuthenticatedUser.getChurchJwt(user, loginUserChurch);
+        const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch);
         const refreshToken = UniqueIdHelper.shortId();
 
         // Store the refresh token for later use
