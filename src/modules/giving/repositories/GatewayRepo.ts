@@ -65,11 +65,14 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
   }
 
   public convertToModel(churchId: string, data: any) {
-    return this.rowToModel(data);
+    const model = this.rowToModel(data);
+    // Strip sensitive fields - privateKey/webhookKey should never be returned to clients
+    const { privateKey, webhookKey, ...safeModel } = model;
+    return safeModel;
   }
 
   public convertAllToModel(churchId: string, data: any) {
-    return this.mapToModels(data);
+    return data.map((row: any) => this.convertToModel(churchId, row));
   }
 
   public async loadByProvider(provider: string): Promise<Gateway[]> {
