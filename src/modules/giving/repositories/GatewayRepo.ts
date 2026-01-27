@@ -67,7 +67,7 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
   public convertToModel(churchId: string, data: any) {
     const model = this.rowToModel(data);
     // Strip sensitive fields - privateKey/webhookKey should never be returned to clients
-    const { privateKey, webhookKey, ...safeModel } = model;
+    const { privateKey: _privateKey, webhookKey: _webhookKey, ...safeModel } = model;
     return safeModel;
   }
 
