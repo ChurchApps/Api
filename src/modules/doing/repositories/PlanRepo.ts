@@ -9,14 +9,14 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
     return {
       tableName: "plans",
       hasSoftDelete: false,
-      columns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId"]
+      columns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId", "providerId", "providerPlanId", "providerPlanName"]
     };
   }
 
   protected async create(plan: Plan): Promise<Plan> {
     if (!plan.id) plan.id = this.createId();
 
-    const sql = "INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const sql = "INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId, providerId, providerPlanId, providerPlanName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
       plan.id,
       plan.churchId,
@@ -27,14 +27,17 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
       plan.notes,
       plan.serviceOrder,
       plan.contentType,
-      plan.contentId
+      plan.contentId,
+      plan.providerId,
+      plan.providerPlanId,
+      plan.providerPlanName
     ];
     await TypedDB.query(sql, params);
     return plan;
   }
 
   protected async update(plan: Plan): Promise<Plan> {
-    const sql = "UPDATE plans SET ministryId=?, planTypeId=?, name=?, serviceDate=?, notes=?, serviceOrder=?, contentType=?, contentId=? WHERE id=? and churchId=?";
+    const sql = "UPDATE plans SET ministryId=?, planTypeId=?, name=?, serviceDate=?, notes=?, serviceOrder=?, contentType=?, contentId=?, providerId=?, providerPlanId=?, providerPlanName=? WHERE id=? and churchId=?";
     const params = [
       plan.ministryId,
       plan.planTypeId,
@@ -44,6 +47,9 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
       plan.serviceOrder,
       plan.contentType,
       plan.contentId,
+      plan.providerId,
+      plan.providerPlanId,
+      plan.providerPlanName,
       plan.id,
       plan.churchId
     ];

@@ -4,6 +4,7 @@ export { AutomationRepo } from "./AutomationRepo.js";
 export { BlockoutDateRepo } from "./BlockoutDateRepo.js";
 export { ConditionRepo } from "./ConditionRepo.js";
 export { ConjunctionRepo } from "./ConjunctionRepo.js";
+export { ContentProviderAuthRepo } from "./ContentProviderAuthRepo.js";
 export { PlanRepo } from "./PlanRepo.js";
 export { PlanItemRepo } from "./PlanItemRepo.js";
 export { PlanTypeRepo } from "./PlanTypeRepo.js";

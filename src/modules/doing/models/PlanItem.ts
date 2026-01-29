@@ -10,6 +10,7 @@ export class PlanItem {
   public description?: string;
   public seconds?: number;
   public link?: string;
+  public providerId?: string;
 
   public children?: PlanItem[];
 }

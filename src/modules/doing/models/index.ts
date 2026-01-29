@@ -4,6 +4,7 @@ export { Automation } from "./Automation.js";
 export { BlockoutDate } from "./BlockoutDate.js";
 export { Condition } from "./Condition.js";
 export { Conjunction } from "./Conjunction.js";
+export { ContentProviderAuth } from "./ContentProviderAuth.js";
 export { Plan } from "./Plan.js";
 export { PlanItem } from "./PlanItem.js";
 export { PlanType } from "./PlanType.js";
