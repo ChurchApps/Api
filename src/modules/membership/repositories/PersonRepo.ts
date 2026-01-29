@@ -58,8 +58,8 @@ export class PersonRepo extends ConfiguredRepo<Person> {
   }
 
   private prepareDateFields(person: Person) {
-    (person as any).birthDate = DateHelper.toMysqlDate(person.birthDate);
-    (person as any).anniversary = DateHelper.toMysqlDate(person.anniversary);
+    (person as any).birthDate = DateHelper.toMysqlDateOnly(person.birthDate);  // date-only field
+    (person as any).anniversary = DateHelper.toMysqlDateOnly(person.anniversary);  // date-only field
     (person as any).photoUpdated = DateHelper.toMysqlDate(person.photoUpdated);
   }
 

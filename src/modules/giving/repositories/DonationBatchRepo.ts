@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
 import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DateHelper } from "@churchapps/apihelper";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DonationBatch } from "../models/index.js";
 
 @injectable()
@@ -28,7 +28,7 @@ export class DonationBatchRepo extends ConfiguredRepo<DonationBatch> {
   protected async create(batch: DonationBatch): Promise<DonationBatch> {
     const m: any = batch;
     if (!m.id) m.id = this.createId();
-    const batchDate = DateHelper.toMysqlDate(batch.batchDate as Date);
+    const batchDate = DateHelper.toMysqlDateOnly(batch.batchDate);  // date-only field
     const sql = "INSERT INTO donationBatches (id, churchId, name, batchDate) VALUES (?, ?, ?, ?);";
     const params = [batch.id, batch.churchId, batch.name, batchDate];
     await TypedDB.query(sql, params);
@@ -36,7 +36,7 @@ export class DonationBatchRepo extends ConfiguredRepo<DonationBatch> {
   }
 
   protected async update(batch: DonationBatch): Promise<DonationBatch> {
-    const batchDate = DateHelper.toMysqlDate(batch.batchDate as Date);
+    const batchDate = DateHelper.toMysqlDateOnly(batch.batchDate);  // date-only field
     const sql = "UPDATE donationBatches SET name=?, batchDate=? WHERE id=? and churchId=?";
     const params = [batch.name, batchDate, batch.id, batch.churchId];
     await TypedDB.query(sql, params);

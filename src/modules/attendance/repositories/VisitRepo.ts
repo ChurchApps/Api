@@ -1,5 +1,6 @@
 import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
+import { ArrayHelper } from "@churchapps/apihelper";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Visit } from "../models/index.js";
 
 import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
@@ -17,16 +18,16 @@ export class VisitRepo extends ConfiguredRepo<Visit> {
     // Handle date conversion before saving
     const processedVisit = { ...visit };
     if (processedVisit.visitDate) {
-      (processedVisit as any).visitDate = DateHelper.toMysqlDate(processedVisit.visitDate);
+      (processedVisit as any).visitDate = DateHelper.toMysqlDateOnly(processedVisit.visitDate);  // date-only field
     }
     if (processedVisit.checkinTime) {
-      (processedVisit as any).checkinTime = DateHelper.toMysqlDate(processedVisit.checkinTime);
+      (processedVisit as any).checkinTime = DateHelper.toMysqlDate(processedVisit.checkinTime);  // datetime field
     }
     return super.save(processedVisit);
   }
 
   public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    return TypedDB.query("SELECT * FROM visits WHERE churchId=? AND visitDate BETWEEN ? AND ?;", [churchId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]);
+    return TypedDB.query("SELECT * FROM visits WHERE churchId=? AND visitDate BETWEEN ? AND ?;", [churchId, DateHelper.toMysqlDateOnly(startDate), DateHelper.toMysqlDateOnly(endDate)]);
   }
 
   public loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
@@ -40,7 +41,7 @@ export class VisitRepo extends ConfiguredRepo<Visit> {
   }
 
   public loadByServiceDatePeopleIds(churchId: string, serviceId: string, visitDate: Date, peopleIds: string[]) {
-    const vsDate = DateHelper.toMysqlDate(visitDate);
+    const vsDate = DateHelper.toMysqlDateOnly(visitDate);  // date-only field
     const sql = "SELECT * FROM visits WHERE churchId=? AND serviceId = ? AND visitDate = ? AND personId IN (" + ArrayHelper.fillArray("?", peopleIds.length).join(", ") + ")";
     const params = [churchId, serviceId, vsDate].concat(peopleIds);
     return TypedDB.query(sql, params);

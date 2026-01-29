@@ -1,7 +1,8 @@
 import { injectable } from "inversify";
 import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DateHelper, ArrayHelper } from "@churchapps/apihelper";
+import { ArrayHelper } from "@churchapps/apihelper";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Session } from "../models/index.js";
 
 @injectable()
@@ -18,7 +19,7 @@ export class SessionRepo extends ConfiguredRepo<Session> {
   protected async create(session: Session): Promise<Session> {
     const m: any = session;
     if (!m.id) m.id = this.createId();
-    const sessionDate = DateHelper.toMysqlDate(session.sessionDate);
+    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);  // date-only field
     const sql = "INSERT INTO sessions (id, churchId, groupId, serviceTimeId, sessionDate) VALUES (?, ?, ?, ?, ?);";
     const params = [session.id, session.churchId, session.groupId, session.serviceTimeId, sessionDate];
     await TypedDB.query(sql, params);
@@ -26,7 +27,7 @@ export class SessionRepo extends ConfiguredRepo<Session> {
   }
 
   protected async update(session: Session): Promise<Session> {
-    const sessionDate = DateHelper.toMysqlDate(session.sessionDate);
+    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);  // date-only field
     const sql = "UPDATE sessions SET groupId=?, serviceTimeId=?, sessionDate=? WHERE id=? and churchId=?";
     const params = [session.groupId, session.serviceTimeId, sessionDate, session.id, session.churchId];
     await TypedDB.query(sql, params);
@@ -39,7 +40,7 @@ export class SessionRepo extends ConfiguredRepo<Session> {
   }
 
   public async loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
-    const sessDate = DateHelper.toMysqlDate(sessionDate);
+    const sessDate = DateHelper.toMysqlDateOnly(sessionDate);  // date-only field
     const result = await TypedDB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
     return result ? this.convertToModel(churchId, result) : null;
   }

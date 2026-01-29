@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
+import { DateHelper as LocalDateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Donation, DonationSummary } from "../models/index.js";
 import { CollectionHelper } from "../../../shared/helpers/index.js";
 import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
@@ -25,7 +26,7 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     donation.id = UniqueIdHelper.shortId();
     donation.entryTime = new Date();
     if (!donation.status) donation.status = "complete";
-    const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
+    const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);  // date-only field
     const entryTime = DateHelper.toMysqlDate(donation.entryTime);
     const sql = "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes, entryTime, status, transactionId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId];
@@ -35,7 +36,7 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
 
   // Override update to handle date conversion
   protected async update(donation: Donation): Promise<Donation> {
-    const donationDate = DateHelper.toMysqlDate(donation.donationDate as Date);
+    const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);  // date-only field
     const entryTime = DateHelper.toMysqlDate(donation.entryTime as Date);
     const sql = "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, method=?, methodDetails=?, notes=?, entryTime=?, status=?, transactionId=? WHERE id=? and churchId=?";
     const params = [donation.batchId, donation.personId, donationDate, donation.amount, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId, donation.id, donation.churchId];
