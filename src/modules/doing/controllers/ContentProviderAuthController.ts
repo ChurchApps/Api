@@ -1,4 +1,4 @@
-import { controller, httpGet, httpDelete, requestParam } from "inversify-express-utils";
+import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { DoingCrudController } from "./DoingCrudController.js";
 
