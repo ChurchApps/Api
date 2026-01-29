@@ -100,15 +100,15 @@ export class DateHelper {
     if (date === null || date === undefined) return null;
 
     // If already a date string, extract just the date portion
-    if (typeof date === 'string') {
+    if (typeof date === "string") {
       const match = date.match(/^(\d{4}-\d{2}-\d{2})/);
       return match ? match[1] : null;
     }
 
     // Use local date parts (not UTC) to preserve the calendar date
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   }
 }
