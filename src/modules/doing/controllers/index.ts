@@ -5,6 +5,7 @@ export { BlockoutDateController } from "./BlockoutDateController.js";
 export { ConditionController } from "./ConditionController.js";
 export { ConjunctionController } from "./ConjunctionController.js";
 export { ContentProviderAuthController } from "./ContentProviderAuthController.js";
+export { ProviderProxyController } from "./ProviderProxyController.js";
 export { DoingBaseController } from "./DoingBaseController.js";
 export { PlanController } from "./PlanController.js";
 export { PlanItemController } from "./PlanItemController.js";
