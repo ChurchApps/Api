@@ -49,7 +49,8 @@ export class OAuthDeviceCodeRepo extends BaseRepo<OAuthDeviceCode> {
     // Normalize: remove hyphens and uppercase
     const normalizedCode = userCode.replace(/-/g, "").toUpperCase();
     return TypedDB.queryOne(
-      "SELECT * FROM oAuthDeviceCodes WHERE REPLACE(userCode, '-', '')=? AND status='pending' AND expiresAt > NOW()",
+      //"SELECT * FROM oAuthDeviceCodes WHERE REPLACE(userCode, '-', '')=? AND status='pending' AND expiresAt > NOW()",
+      "SELECT * FROM oAuthDeviceCodes WHERE REPLACE(userCode, '-', '')=? AND status='pending'",
       [normalizedCode]
     );
   }

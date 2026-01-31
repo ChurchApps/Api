@@ -8,6 +8,7 @@ export { ContentProviderAuthController } from "./ContentProviderAuthController.j
 export { ProviderProxyController } from "./ProviderProxyController.js";
 export { DoingBaseController } from "./DoingBaseController.js";
 export { PlanController } from "./PlanController.js";
+export { PlanFeedController } from "./PlanFeedController.js";
 export { PlanItemController } from "./PlanItemController.js";
 export { PlanTypeController } from "./PlanTypeController.js";
 export { PositionController } from "./PositionController.js";

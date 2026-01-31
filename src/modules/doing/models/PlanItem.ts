@@ -11,6 +11,8 @@ export class PlanItem {
   public seconds?: number;
   public link?: string;
   public providerId?: string;
+  public providerPath?: string;
+  public providerContentId?: string;
 
   public children?: PlanItem[];
 }
