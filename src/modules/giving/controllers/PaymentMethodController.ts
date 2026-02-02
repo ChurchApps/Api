@@ -40,7 +40,6 @@ export class PaymentMethodController extends GivingCrudController {
       customer = await this.repos.customer.loadByPersonId(churchId, id);
     }
 
-    console.log("Customer lookup result:", customer);
 
     if (!customer) return [];
     const rawPaymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);

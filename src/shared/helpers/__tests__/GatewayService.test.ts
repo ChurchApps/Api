@@ -147,8 +147,7 @@ describe("GatewayService", () => {
 
   describe("getGatewayForChurch", () => {
     const createRepo = (gateways: any[]) => ({
-      loadAll: jest.fn().mockResolvedValue(gateways),
-      convertAllToModel: jest.fn((_churchId: string, data: any[]) => data)
+      loadAll: jest.fn().mockResolvedValue(gateways)
     });
 
     it("should throw when churchId is missing", async () => {

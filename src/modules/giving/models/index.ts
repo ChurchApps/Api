@@ -8,7 +8,7 @@ export { Gateway } from "./Gateway.js";
 export { GatewayPaymentMethod } from "./GatewayPaymentMethod.js";
 export { CheckoutDetails } from "./CheckoutDetails.js";
 export { Customer } from "./Customer.js";
-export { PaymentDetails } from "./PaymentDetails.js";
+export type { PaymentDetails } from "./PaymentDetails.js";
 export { EventLog } from "./EventLog.js";
 export { Subscription } from "./Subscription.js";
 export { SubscriptionFund } from "./SubscriptionFund.js";

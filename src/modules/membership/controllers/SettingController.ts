@@ -35,24 +35,17 @@ export class MembershipSettingController extends MembershipBaseController {
   @httpGet("/public/:churchId")
   public async publicRoute(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      console.log("MADE IT");
-      console.log("This.repos", this.repos);
-
       const publicSettings = await this.repos.setting.loadPublicSettings(churchId);
-      console.log("PUBLIC SETTINGS", publicSettings);
 
       // Handle case where publicSettings is undefined or not an array
       if (!publicSettings || !Array.isArray(publicSettings)) {
-        console.log("No public settings found for churchId:", churchId);
         return {};
       }
 
       const settings = this.repos.setting.convertAllToModel(churchId, publicSettings as any[]);
-      console.log("CONVERTED SETTINGS", settings);
 
       // Handle case where settings conversion fails
       if (!settings || !Array.isArray(settings)) {
-        console.log("Settings conversion failed");
         return {};
       }
 

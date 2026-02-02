@@ -14,8 +14,6 @@ export class SettingRepo extends ConfiguredRepo<Setting> {
   }
 
   public loadPublicSettings(churchId: string) {
-    console.log("Made it here");
-    console.log("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
     return TypedDB.query("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
   }
 

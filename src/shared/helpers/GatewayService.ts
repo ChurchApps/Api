@@ -295,15 +295,14 @@ export class GatewayService {
   static async getGatewayForChurch(
     churchId: string,
     options: GetGatewayOptions = {},
-    repo?: Pick<GatewayRepo, "loadAll" | "convertAllToModel">
+    repo?: Pick<GatewayRepo, "loadAll">
   ): Promise<Gateway> {
     if (!churchId) throw new Error("churchId is required to resolve a payment gateway");
 
     const gatewayRepo = repo ?? new GatewayRepo();
-    const rawGateways = await gatewayRepo.loadAll(churchId);
-    const gateways = typeof gatewayRepo.convertAllToModel === "function"
-      ? gatewayRepo.convertAllToModel(churchId, rawGateways)
-      : (rawGateways as Gateway[]);
+    // Load raw gateways - do NOT use convertAllToModel as it strips privateKey/webhookKey
+    // which are needed for internal gateway operations
+    const gateways = (await gatewayRepo.loadAll(churchId)) as Gateway[];
 
     if (!gateways || gateways.length === 0) {
       throw new Error(`No payment gateway configured for church ${churchId}.`);
