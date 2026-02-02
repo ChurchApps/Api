@@ -379,6 +379,9 @@ export class StripeHelper {
   }
 
   private static getStripeObj = (secretKey: string) => {
+    if (!secretKey) {
+      throw new Error("Stripe API key is not configured. Please check your gateway settings.");
+    }
     return new Stripe(secretKey, { apiVersion: "2025-02-24.acacia" });
   };
 }

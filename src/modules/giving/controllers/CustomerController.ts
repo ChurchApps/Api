@@ -23,7 +23,8 @@ export class CustomerController extends GivingCrudController {
   @httpGet("/:id/subscriptions")
   public async getSubscriptions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Subscriptions are Stripe-only currently
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       let permission = false;
       if (gateway) {
         if (au.checkAccess(Permissions.donations.viewSummary)) {

@@ -46,11 +46,22 @@ export class GatewayService {
       }
     };
 
+    const privateKey = decryptIfPresent(gateway.privateKey);
+
+    if (!privateKey && gateway.provider?.toLowerCase() === "stripe") {
+      console.error("Gateway privateKey is missing or failed to decrypt", {
+        provider: gateway.provider,
+        gatewayId: gateway.id,
+        churchId: gateway.churchId,
+        hasPrivateKey: !!gateway.privateKey
+      });
+    }
+
     return {
       gatewayId: gateway.id,
       churchId: gateway.churchId,
       publicKey: gateway.publicKey,
-      privateKey: decryptIfPresent(gateway.privateKey),
+      privateKey,
       webhookKey: decryptIfPresent(gateway.webhookKey),
       productId: gateway.productId,
       settings: gateway.settings ?? null,

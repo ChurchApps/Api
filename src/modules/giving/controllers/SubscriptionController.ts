@@ -32,7 +32,8 @@ export class SubscriptionController extends GivingCrudController {
   public async save(req: express.Request<{}, {}, any[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<any>[] = [];
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Subscriptions are Stripe-only currently
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
 
       if (!gateway) return this.json({ error: "No gateway configured" }, 400);
 
@@ -62,7 +63,8 @@ export class SubscriptionController extends GivingCrudController {
       const permission = au.checkAccess(Permissions.donations.edit) || (subscription as any)?.personId === au.personId;
       if (!permission) return this.json(null, 401);
 
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Subscriptions are Stripe-only currently
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       if (!gateway) return this.json({ error: "No gateway configured" }, 400);
 
       const capabilities = GatewayService.getProviderCapabilities(gateway);

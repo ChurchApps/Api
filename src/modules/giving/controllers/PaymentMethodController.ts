@@ -113,7 +113,8 @@ export class PaymentMethodController extends GivingCrudController {
   @httpGet("/personid/:id")
   public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Default to Stripe for payment method operations (vault requires Stripe or PayPal)
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.view) || id === au.personId);
       if (!permission) return this.json({}, 401);
 
@@ -228,9 +229,10 @@ export class PaymentMethodController extends GivingCrudController {
   @httpPost("/addcard")
   public async addCard(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { id, personId, customerId, email, name, churchId } = req.body;
+      const { id, personId, customerId, email, name, churchId, provider } = req.body;
       const cId = au?.churchId || churchId;
-      const gateway = await GatewayService.getGatewayForChurch(cId, {}, this.repos.gateway).catch(() => null);
+      // Default to Stripe for card operations, but allow frontend to specify provider
+      const gateway = await GatewayService.getGatewayForChurch(cId, { provider: provider || "stripe" }, this.repos.gateway).catch(() => null);
 
       if (!gateway) {
         return this.json({ error: "Payment gateway not configured" }, 400);
@@ -328,8 +330,8 @@ export class PaymentMethodController extends GivingCrudController {
   @httpPost("/updatecard")
   public async updateCard(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { personId, paymentMethodId, cardData } = req.body;
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      const { personId, paymentMethodId, cardData, provider } = req.body;
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: provider || "stripe" }, this.repos.gateway).catch(() => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
       try {
@@ -356,7 +358,8 @@ export class PaymentMethodController extends GivingCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const { personId, customerId, email, name, churchId } = req.body;
       const cId = au?.churchId || churchId;
-      const gateway = await GatewayService.getGatewayForChurch(cId, {}, this.repos.gateway).catch(() => null);
+      // ACH SetupIntent is Stripe-only
+      const gateway = await GatewayService.getGatewayForChurch(cId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
 
       if (!gateway) {
         return this.json({ error: "Payment gateway not configured" }, 400);
@@ -472,7 +475,8 @@ export class PaymentMethodController extends GivingCrudController {
   public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name } = req.body;
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Bank accounts are Stripe-only
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
@@ -516,7 +520,8 @@ export class PaymentMethodController extends GivingCrudController {
   public async updateBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, personId, bankData, customerId } = req.body;
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Bank operations are Stripe-only
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({}, 401);
       try {
@@ -531,7 +536,8 @@ export class PaymentMethodController extends GivingCrudController {
   public async verifyBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, customerId, amountData } = req.body;
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Bank verification is Stripe-only
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       const permission =
         gateway &&
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
@@ -549,7 +555,9 @@ export class PaymentMethodController extends GivingCrudController {
   @httpDelete("/:id/:customerid")
   public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, {}, this.repos.gateway).catch(() => null);
+      // Determine provider from payment method ID prefix (pm_ and ba_ are Stripe)
+      const isStripe = id.startsWith("pm_") || id.startsWith("ba_");
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: isStripe ? "stripe" : "paypal" }, this.repos.gateway).catch(() => null);
       const permission =
         gateway &&
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
