@@ -13,6 +13,8 @@ CREATE TABLE `planItems` (
   `seconds` int(11) DEFAULT NULL,
   `link` varchar(1000) DEFAULT NULL,
   `providerId` varchar(50) DEFAULT NULL,
+  `providerPath` varchar(500) DEFAULT NULL,
+  `providerContentPath` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_church_plan` (`churchId`, `planId`),
   KEY `idx_parent` (`parentId`)
