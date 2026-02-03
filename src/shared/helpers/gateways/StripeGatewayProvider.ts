@@ -64,7 +64,9 @@ export class StripeGatewayProvider implements IGatewayProvider {
     if (donationData.type === "card") {
       (paymentData as any).payment_method = donationData.id;
       (paymentData as any).confirm = true;
-      (paymentData as any).off_session = true;
+      // Only use off_session for recurring/saved card payments, not for on-session donations
+      // This allows 3DS authentication to work properly when the customer is present
+      if (donationData.off_session === true) (paymentData as any).off_session = true;
     }
     if (donationData.type === "bank") {
       // Check if this is a new PaymentMethod (pm_xxx) or legacy Source (ba_xxx)
@@ -81,8 +83,23 @@ export class StripeGatewayProvider implements IGatewayProvider {
     }
 
     const result = await StripeHelper.donate(config.privateKey, paymentData);
+
+    // Check if 3DS authentication is required
+    if (result?.status === "requires_action" && result?.client_secret) {
+      return {
+        success: true,
+        transactionId: result?.id || "",
+        data: {
+          ...result,
+          status: "requires_action",
+          client_secret: result.client_secret,
+          payment_intent_id: result.id
+        }
+      };
+    }
+
     return {
-      success: !!result,
+      success: !!result && (result?.status === "succeeded" || result?.status === "processing"),
       transactionId: result?.id || "",
       data: result
     };
