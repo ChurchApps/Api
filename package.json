@@ -5,6 +5,7 @@
   "description": "Core APIs modular monolith for church management system",
   "main": "dist/index.js",
   "scripts": {
+    "start": "node dist/index.js",
     "start:prod": "sh entrypoint.sh",
     "initdb": "tsx tools/initdb.ts",
     "initdb:membership": "tsx tools/initdb.ts --module=membership",
