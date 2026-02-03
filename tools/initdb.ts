@@ -386,6 +386,10 @@ async function initializeSection(moduleName: string, sectionName: string, tables
             await MultiDatabasePool.query(moduleName, cleanStatement);
           }
         } catch (error) {
+          if (shouldIgnoreInitError(error)) {
+            console.warn(`   ⚠️  Skipping existing object in ${table.file}.`);
+            continue;
+          }
           console.error(`   ❌ Failed to execute statement in ${table.file}:`, error);
           console.error(`   Statement: ${cleanStatement.substring(0, 100)}...`);
           throw error;
@@ -393,6 +397,19 @@ async function initializeSection(moduleName: string, sectionName: string, tables
       }
     }
   }
+}
+
+function shouldIgnoreInitError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const errorWithCode = error as { code?: string; sqlState?: string; message?: string };
+  return (
+    errorWithCode.code === "ER_TABLE_EXISTS_ERROR" ||
+    errorWithCode.sqlState === "42S01" ||
+    (errorWithCode.message ?? "").toLowerCase().includes("already exists")
+  );
 }
 
 async function initializeDemoData(moduleName: string, demoTables: { title: string, file: string }[], scriptsPath: string) {
