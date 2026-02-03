@@ -12,6 +12,7 @@ export interface ChargeResult {
   success: boolean;
   transactionId: string;
   data: any;
+  error?: string;
 }
 
 export interface SubscriptionResult {

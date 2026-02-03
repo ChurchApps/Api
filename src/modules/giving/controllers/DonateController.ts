@@ -413,7 +413,7 @@ export class DonateController extends GivingCrudController {
         const chargeResult = await GatewayService.processCharge(gateway, donationData);
 
         if (!chargeResult.success) {
-          return this.json({ error: "Charge processing failed" }, 400);
+          return this.json({ error: chargeResult.error || "Charge processing failed" }, 400);
         }
 
         // For PayPal, we need to log the events since it's captured immediately

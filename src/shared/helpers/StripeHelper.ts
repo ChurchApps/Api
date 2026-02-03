@@ -11,14 +11,10 @@ export class StripeHelper {
       payment.amount = Math.trunc(Math.round(payment.amount * 100));
     }
     payment.currency = payment?.currency;
-    try {
-      // Use Payment Intents for all payment types (cards and ACH bank accounts)
-      if (payment?.payment_method) return await stripe.paymentIntents.create(payment);
-      // Legacy source-based payments (deprecated - will be removed after migration)
-      if (payment?.source) return await stripe.charges.create(payment);
-    } catch (err) {
-      return err;
-    }
+    // Use Payment Intents for all payment types (cards and ACH bank accounts)
+    if (payment?.payment_method) return await stripe.paymentIntents.create(payment);
+    // Legacy source-based payments (deprecated - will be removed after migration)
+    if (payment?.source) return await stripe.charges.create(payment);
   };
 
   static createSubscription = async (secretKey: string, donationData: any) => {

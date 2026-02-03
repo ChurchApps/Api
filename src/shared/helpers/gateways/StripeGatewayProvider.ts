@@ -66,7 +66,15 @@ export class StripeGatewayProvider implements IGatewayProvider {
       (paymentData as any).confirm = true;
       // Only use off_session for recurring/saved card payments, not for on-session donations
       // This allows 3DS authentication to work properly when the customer is present
-      if (donationData.off_session === true) (paymentData as any).off_session = true;
+      if (donationData.off_session === true) {
+        (paymentData as any).off_session = true;
+      } else {
+        // For on-session payments with 3DS, Stripe requires a return_url for redirect-based authentication
+        const returnUrl = donationData.church?.churchURL || donationData.return_url;
+        if (returnUrl) {
+          (paymentData as any).return_url = returnUrl;
+        }
+      }
     }
     if (donationData.type === "bank") {
       // Check if this is a new PaymentMethod (pm_xxx) or legacy Source (ba_xxx)
@@ -82,27 +90,37 @@ export class StripeGatewayProvider implements IGatewayProvider {
       }
     }
 
-    const result = await StripeHelper.donate(config.privateKey, paymentData);
+    try {
+      const result = await StripeHelper.donate(config.privateKey, paymentData);
 
-    // Check if 3DS authentication is required
-    if (result?.status === "requires_action" && result?.client_secret) {
+      // Check if 3DS authentication is required
+      if (result?.status === "requires_action" && result?.client_secret) {
+        return {
+          success: true,
+          transactionId: result?.id || "",
+          data: {
+            ...result,
+            status: "requires_action",
+            client_secret: result.client_secret,
+            payment_intent_id: result.id
+          }
+        };
+      }
+
       return {
-        success: true,
+        success: !!result && (result?.status === "succeeded" || result?.status === "processing"),
         transactionId: result?.id || "",
-        data: {
-          ...result,
-          status: "requires_action",
-          client_secret: result.client_secret,
-          payment_intent_id: result.id
-        }
+        data: result
+      };
+    } catch (err: any) {
+      console.error("Stripe charge error:", err?.message || err);
+      return {
+        success: false,
+        transactionId: "",
+        data: null,
+        error: err?.message || "Payment processing failed"
       };
     }
-
-    return {
-      success: !!result && (result?.status === "succeeded" || result?.status === "processing"),
-      transactionId: result?.id || "",
-      data: result
-    };
   }
 
   async createSubscription(config: GatewayConfig, subscriptionData: any): Promise<SubscriptionResult> {
