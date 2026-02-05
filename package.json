@@ -59,7 +59,7 @@
     "@aws-sdk/client-ssm": "^3.862.0",
     "@aws-sdk/lib-storage": "^3.862.0",
     "@churchapps/apihelper": "^0.5.2",
-    "@churchapps/content-provider-helper": "^0.0.4",
+    "@churchapps/content-provider-helper": "^0.0.8",
     "@codegenie/serverless-express": "^4.15.0",
     "@hubspot/api-client": "^13.1.0",
     "@paypal/checkout-server-sdk": "^1.0.3",
