@@ -13,6 +13,7 @@ export class PlanItem {
   public providerId?: string;
   public providerPath?: string;
   public providerContentPath?: string;
+  public thumbnailUrl?: string;
 
   public children?: PlanItem[];
 }

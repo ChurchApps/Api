@@ -9,7 +9,7 @@ export class PlanItemRepo extends ConfiguredRepo<PlanItem> {
     return {
       tableName: "planItems",
       hasSoftDelete: false,
-      columns: ["planId", "parentId", "sort", "itemType", "relatedId", "label", "description", "seconds", "link", "providerId", "providerPath", "providerContentPath"]
+      columns: ["planId", "parentId", "sort", "itemType", "relatedId", "label", "description", "seconds", "link", "providerId", "providerPath", "providerContentPath", "thumbnailUrl"]
     };
   }
 

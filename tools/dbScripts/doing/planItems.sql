@@ -15,6 +15,7 @@ CREATE TABLE `planItems` (
   `providerId` varchar(50) DEFAULT NULL,
   `providerPath` varchar(500) DEFAULT NULL,
   `providerContentPath` varchar(50) DEFAULT NULL,
+  `thumbnailUrl` varchar(1024) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_church_plan` (`churchId`, `planId`),
   KEY `idx_parent` (`parentId`)
