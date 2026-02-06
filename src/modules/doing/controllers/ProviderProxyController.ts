@@ -1,7 +1,7 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { getProvider, ContentProviderAuthData } from "@churchapps/content-provider-helper";
+import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, ContentProviderConfig } from "@churchapps/content-provider-helper";
 import { ContentProviderAuth } from "../models/index.js";
 
 interface ProxyRequestBody {
@@ -48,7 +48,28 @@ export class ProviderProxyController extends DoingBaseController {
   private async getAuthForProvider(churchId: string, ministryId: string, providerId: string): Promise<ContentProviderAuthData | null> {
     const authRecord = await this.repos.contentProviderAuth.loadByMinistryAndProvider(churchId, ministryId, providerId);
     if (!authRecord) return null;
-    return this.convertAuthToProviderFormat(authRecord);
+
+    let auth = this.convertAuthToProviderFormat(authRecord);
+    if (!auth) return null;
+
+    // Check if token is expired and refresh if needed
+    const tokenHelper = new TokenHelper();
+    if (tokenHelper.isTokenExpired(auth) && auth.refresh_token) {
+      const config = getProviderConfig(providerId) as ContentProviderConfig | null;
+      if (config) {
+        const refreshedAuth = await tokenHelper.refreshToken(config, auth);
+        if (refreshedAuth) {
+          // Update database with new tokens
+          authRecord.accessToken = refreshedAuth.access_token;
+          authRecord.refreshToken = refreshedAuth.refresh_token;
+          authRecord.expiresAt = new Date((refreshedAuth.created_at + refreshedAuth.expires_in) * 1000);
+          await this.repos.contentProviderAuth.save(authRecord);
+          auth = refreshedAuth;
+        }
+      }
+    }
+
+    return auth;
   }
 
   private getProviderOrError(providerId: string): Provider {
