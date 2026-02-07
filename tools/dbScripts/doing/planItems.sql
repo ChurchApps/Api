@@ -8,7 +8,7 @@ CREATE TABLE `planItems` (
   `sort` float DEFAULT NULL,
   `itemType` varchar(45) DEFAULT NULL,
   `relatedId` char(11) DEFAULT NULL,
-  `label` varchar(45) DEFAULT NULL,
+  `label` varchar(100) DEFAULT NULL,
   `description` varchar(1000) DEFAULT NULL,
   `seconds` int(11) DEFAULT NULL,
   `link` varchar(1000) DEFAULT NULL,
