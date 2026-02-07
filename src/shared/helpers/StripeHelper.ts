@@ -304,6 +304,7 @@ export class StripeHelper {
     const donationData: Donation = {
       batchId: batch.id,
       amount,
+      currency: eventData.currency,
       churchId,
       personId,
       method,

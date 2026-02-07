@@ -7,6 +7,7 @@ CREATE TABLE `donations` (
   `personId` char(11) DEFAULT NULL,
   `donationDate` datetime DEFAULT NULL,
   `amount` double DEFAULT NULL,
+  `currency` varchar(10) DEFAULT NULL,
   `method` varchar(50) DEFAULT NULL,
   `methodDetails` varchar(255) DEFAULT NULL,
   `notes` text,
