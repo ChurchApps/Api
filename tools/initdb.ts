@@ -1,3 +1,12 @@
+/**
+ * @deprecated Use `npm run migrate` instead. This script will be removed in a future release.
+ * See tools/migrate.ts for the Kysely-based migration system.
+ */
+console.warn(
+  "\n⚠️  DEPRECATED: initdb.ts is deprecated. Use 'npm run migrate' instead.\n" +
+  "   See tools/migrate.ts for the Kysely-based migration system.\n"
+);
+
 import { Environment } from "../src/shared/helpers/Environment.js";
 import { ConnectionManager } from "../src/shared/infrastructure/ConnectionManager.js";
 import { MultiDatabasePool } from "../src/shared/infrastructure/MultiDatabasePool.js";
