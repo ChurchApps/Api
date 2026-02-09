@@ -140,6 +140,9 @@ export class TaskRepo extends ConfiguredRepo<Task> {
       case "monthly":
         result = (await this.loadByAutomationIdContentMonthly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
         break;
+      case "weekly":
+        result = (await this.loadByAutomationIdContentWeekly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
+        break;
       default:
         result = (await this.loadByAutomationIdContentNoRepeat(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
         break;
@@ -180,6 +183,13 @@ export class TaskRepo extends ConfiguredRepo<Task> {
       associatedWithIds,
       threshold
     ]);
+    return result;
+  }
+
+  private async loadByAutomationIdContentWeekly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
+    const threshold = new Date();
+    threshold.setDate(threshold.getDate() - 7);
+    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [churchId, automationId, associatedWithType, associatedWithIds, threshold]);
     return result;
   }
 
