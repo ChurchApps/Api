@@ -127,7 +127,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
     const paymentData = {
       payment_method_id: subscriptionData.id,
       amount: subscriptionData.amount,
-      currency: "usd",
+      currency: subscriptionData.currency,
       customer: subscriptionData.customerId,
       type: subscriptionData.type,
       billing_cycle_anchor: subscriptionData.billing_cycle_anchor,
