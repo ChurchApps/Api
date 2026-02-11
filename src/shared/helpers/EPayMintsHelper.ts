@@ -55,21 +55,14 @@ export class EPayMintsHelper {
       // Instead, they might use terminal-based or merchant-based identification
 
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
-        "X-Terminal-ID": customerData.terminalId || ""
-      };
+      const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": customerData.terminalId || "" };
 
       // Mock implementation - replace with actual API call
       const result = await EPayMintsHelper.makeRequest(
         `${baseUrl}/customers`,
         "POST",
         headers,
-        {
-          email: customerData.email,
-          name: customerData.name,
-          phone: customerData.phone
-        }
+        { email: customerData.email, name: customerData.name, phone: customerData.phone }
       );
 
       return result.customer_id || `epm_customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -104,10 +97,7 @@ export class EPayMintsHelper {
   ): Promise<any> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
-        "X-Terminal-ID": paymentData.terminalId
-      };
+      const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": paymentData.terminalId };
 
       const requestBody: any = {
         amount: Math.round(paymentData.amount * 100), // Convert to cents
@@ -117,10 +107,7 @@ export class EPayMintsHelper {
       };
 
       if (paymentData.paymentMethod === "card" && paymentData.cardData) {
-        requestBody.payment_method = {
-          type: "card",
-          card: paymentData.cardData
-        };
+        requestBody.payment_method = { type: "card", card: paymentData.cardData };
       } else if (paymentData.paymentMethod === "ach" && paymentData.achData) {
         requestBody.payment_method = {
           type: "ach",
@@ -184,10 +171,7 @@ export class EPayMintsHelper {
   ): Promise<any> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
-        "X-Terminal-ID": terminalId
-      };
+      const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": terminalId };
 
       // TODO: Replace with actual ePayMints transaction status API
       const result = await EPayMintsHelper.makeRequest(
@@ -257,10 +241,7 @@ export class EPayMintsHelper {
   ): Promise<any> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
-        "X-Terminal-ID": terminalId
-      };
+      const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": terminalId };
 
       const queryParams = date ? `?date=${date}` : "";
 

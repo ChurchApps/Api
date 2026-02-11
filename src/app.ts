@@ -83,9 +83,7 @@ export const createApp = async () => {
           } catch {
             req.body = {};
           }
-        }
-        // Handle Buffer-like objects
-        else if (req.body && req.body.type === "Buffer" && Array.isArray(req.body.data)) {
+        } else if (req.body && req.body.type === "Buffer" && Array.isArray(req.body.data)) {
           try {
             const bodyString = Buffer.from(req.body.data).toString("utf8");
             // Keep raw body for webhook endpoints, parse JSON for others
@@ -97,9 +95,7 @@ export const createApp = async () => {
           } catch {
             req.body = {};
           }
-        }
-        // Handle string JSON bodies
-        else if (typeof req.body === "string" && req.body.length > 0) {
+        } else if (typeof req.body === "string" && req.body.length > 0) {
           try {
             // Keep raw body for webhook endpoints, parse JSON for others
             if (!isWebhookEndpoint && contentType.includes("application/json")) {
@@ -108,9 +104,7 @@ export const createApp = async () => {
           } catch {
             // Silently ignore JSON parse errors
           }
-        }
-        // If no body was provided, ensure body is set to prevent parsing attempts
-        else if (!req.body) {
+        } else if (!req.body) {
           req.body = {};
         }
 

@@ -209,11 +209,12 @@ export class TaskRepo extends ConfiguredRepo<Task> {
 
   public async loadForGroups(churchId: string, groupIds: string[], status: string) {
     if (groupIds.length === 0) return [];
-    else
+    else {
       return TypedDB.query(
         "SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;",
         [churchId, groupIds, groupIds, status]
       );
+    }
   }
 
   public async loadForDirectoryUpdate(churchId: string, personId: string) {

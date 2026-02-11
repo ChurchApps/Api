@@ -6,9 +6,13 @@ export class YouVersionHelper {
   static baseUrl: string = "https://api.youversion.com/v1";
 
   //Import these
-  static includedAbbreviations: string[] = ["BDO1573", "BDS", "CARS", "CARSA", "CARST", "CPDV", "CSLAV", "DELUT", "ELB", "ELB71", "FMAR", "GANTP", "GNV", "Hfa", "JA1955", "JCB", "KLB", "LSG", "NBV-P", "NIrV", "NIV", "NIVUK", "NVIs", "OL", "OST", "RVES", "TKW", "WEBUS", "НРП", "PdDpt", "AKNA", "AL", "APB", "ASNA", "BDSC", "BEN", "BIU", "BPH", "CCB", "CCL", "EEEE", "EIV", "FAYH", "GAW", "GKY", "APD", "BMYO"];
+  static includedAbbreviations: string[] = [
+    "BDO1573", "BDS", "CARS", "CARSA", "CARST", "CPDV", "CSLAV", "DELUT", "ELB", "ELB71", "FMAR", "GANTP", "GNV", "Hfa", "JA1955", "JCB", "KLB", "LSG", "NBV-P", "NIrV", "NIV", "NIVUK", "NVIs", "OL", "OST", "RVES", "TKW", "WEBUS", "НРП", "PdDpt", "AKNA", "AL", "APB", "ASNA", "BDSC", "BEN", "BIU", "BPH", "CCB", "CCL", "EEEE", "EIV", "FAYH", "GAW", "GKY", "APD", "BMYO"
+  ];
   // Don't import these (Duplicates)
-  static excludedAbbreviations: string[] = ["ASV", "BSB", "DB1885", "FBV", "LSV", "NVI", "TCENT", "TOJB2011", "WEBBE", "WMB", "WMBBE", "ELBBK", "NTBnBL2025", "JND", "WBTP", "BLT", "VBL", "Abt", "ASD", "ABT", "BCV"];
+  static excludedAbbreviations: string[] = [
+    "ASV", "BSB", "DB1885", "FBV", "LSV", "NVI", "TCENT", "TOJB2011", "WEBBE", "WMB", "WMBBE", "ELBBK", "NTBnBL2025", "JND", "WBTP", "BLT", "VBL", "Abt", "ASD", "ABT", "BCV"
+  ];
 
   static async getTranslations(languageTag: string = "en") {
     const result: BibleTranslation[] = [];
@@ -57,17 +61,17 @@ export class YouVersionHelper {
 
     const lang = "*";
     //for (const lang of languages) {
-      try {
-        const translations = await this.getTranslations(lang);
-        for (const t of translations) {
-          if (!seenKeys.has(t.sourceKey)) {
-            seenKeys.add(t.sourceKey);
-            results.push(t);
-          }
+    try {
+      const translations = await this.getTranslations(lang);
+      for (const t of translations) {
+        if (!seenKeys.has(t.sourceKey)) {
+          seenKeys.add(t.sourceKey);
+          results.push(t);
         }
-      } catch (e) {
-        console.log(`Failed to fetch YouVersion translations for ${lang}:`, e.message);
       }
+    } catch (e) {
+      console.log(`Failed to fetch YouVersion translations for ${lang}:`, e.message);
+    }
     //}
     return results;
   }
@@ -86,8 +90,7 @@ export class YouVersionHelper {
     const allTranslations = await this.fetchAllTranslations();
     return allTranslations.filter(t =>
       !this.includedAbbreviations.includes(t.abbreviation) &&
-      !this.excludedAbbreviations.includes(t.abbreviation)
-    );
+      !this.excludedAbbreviations.includes(t.abbreviation));
   }
 
   static async getBooks(translationKey: string) {
@@ -266,7 +269,7 @@ export class YouVersionHelper {
         offset: 0,
         total: 0,
         verseCount: 0,
-        verses:[]
+        verses: []
       }
     };
     // YouVersion has not implemented yet
@@ -277,9 +280,7 @@ export class YouVersionHelper {
 
   static async getContent(url: string) {
     try {
-      const resp = await axios.get(url, {
-        headers: { "X-YVP-App-Key": Environment.youVersionApiKey }
-      });
+      const resp = await axios.get(url, { headers: { "X-YVP-App-Key": Environment.youVersionApiKey } });
       return resp.data;
     } catch (error: any) {
       if (error.response) {

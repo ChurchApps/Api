@@ -10,8 +10,8 @@ export class NotificationController extends MessagingBaseController {
   public async loadByPerson(
     @requestParam("churchId") churchId: string,
     @requestParam("personId") personId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<Notification[]> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.notification.loadByPersonId(au.churchId, personId);

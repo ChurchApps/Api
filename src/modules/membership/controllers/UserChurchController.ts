@@ -83,8 +83,8 @@ export class UserChurchController extends MembershipBaseController {
     @requestParam("userId") userId: string,
     @requestParam("churchId") churchId: string,
     @requestParam("personId") personId: string,
-    req: express.Request,
-    res: express.Response
+      req: express.Request,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repos.userChurch.deleteRecord(userId, churchId, personId);

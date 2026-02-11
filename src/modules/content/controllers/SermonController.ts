@@ -281,7 +281,7 @@ export class SermonController extends ContentBaseController {
             base64Photo = s.thumbnail;
             s.thumbnail = "";
           }
-          if (s.churchId === au.churchId)
+          if (s.churchId === au.churchId) {
             promises.push(
               this.repos.sermon.save(s).then(async (sermon) => {
                 if (base64Photo) {
@@ -291,6 +291,7 @@ export class SermonController extends ContentBaseController {
                 return sermon;
               })
             );
+          }
         }
         sermons = await Promise.all(promises);
         return this.json(sermons, 200);

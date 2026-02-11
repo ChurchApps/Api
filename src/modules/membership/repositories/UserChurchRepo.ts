@@ -66,13 +66,13 @@ export class UserChurchRepo extends ConfiguredRepo<UserChurch> {
       },
       person: row.activePersonId
         ? {
-            id: row.activePersonId,
-            name: {
-              first: row.firstName,
-              last: row.lastName,
-              display: row.displayName
-            }
+          id: row.activePersonId,
+          name: {
+            first: row.firstName,
+            last: row.lastName,
+            display: row.displayName
           }
+        }
         : null
     }));
   }

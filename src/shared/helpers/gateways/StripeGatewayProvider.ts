@@ -172,7 +172,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
         customPercentFee = +data.transFeeCC / 100;
       }
     }
-  
+
     // Stripe currency-specific fees
     const STRIPE_FEES: Record<string, { percent: number; fixed: number }> = {
       usd: { percent: 0.029, fixed: 0.30 },
@@ -191,7 +191,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
       mxn: { percent: 0.029, fixed: 3.00 },
       brl: { percent: 0.039, fixed: 0.50 }
     };
-  
+
     const currencyKey = currency.toLowerCase();
     const stripeFee = STRIPE_FEES[currencyKey] || STRIPE_FEES.usd; // Default to USD if currency not found
     const fixedFee = customFixedFee ?? stripeFee.fixed;

@@ -262,9 +262,7 @@ export class PayPalHelper {
   static async cancelSubscription(clientId: string, clientSecret: string, subscriptionId: string, reason?: string): Promise<any> {
     const client = PayPalHelper.getClient(clientId, clientSecret);
     const request = new paypal.subscriptions.SubscriptionsCancelRequest(subscriptionId);
-    request.requestBody({
-      reason: reason || "Customer requested cancellation"
-    });
+    request.requestBody({ reason: reason || "Customer requested cancellation" });
     const response = await client.execute(request);
     return response.result;
   }
@@ -546,9 +544,7 @@ export class PayPalHelper {
     }
 
     if (subscriptionData.customerId) {
-      body.subscriber = {
-        payer_id: subscriptionData.customerId
-      };
+      body.subscriber = { payer_id: subscriptionData.customerId };
     }
 
     if (subscriptionData.paymentTokenId) {

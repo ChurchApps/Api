@@ -46,9 +46,7 @@ export class StripeHelper {
   static updateSubscription = async (secretKey: string, sub: any) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
     // Use default_payment_method for all payment types (default_source is deprecated)
-    const paymentMethod: any = {
-      default_payment_method: sub.default_payment_method || null
-    };
+    const paymentMethod: any = { default_payment_method: sub.default_payment_method || null };
     const priceData = {
       items: [
         {
@@ -109,9 +107,7 @@ export class StripeHelper {
     const stripe = StripeHelper.getStripeObj(secretKey);
     const params: any = {
       usage: "on_session",
-      automatic_payment_methods: {
-        enabled: true
-      }
+      automatic_payment_methods: { enabled: true }
     };
     if (customerId) params.customer = customerId;
     return await stripe.setupIntents.create(params);
@@ -123,13 +119,7 @@ export class StripeHelper {
     return await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ["us_bank_account"],
-      payment_method_options: {
-        us_bank_account: {
-          financial_connections: {
-            permissions: ["payment_method"]
-          }
-        }
-      }
+      payment_method_options: { us_bank_account: { financial_connections: { permissions: ["payment_method"] } } }
     });
   }
 
@@ -152,9 +142,7 @@ export class StripeHelper {
 
   static async confirmSetupIntent(secretKey: string, setupIntentId: string, paymentMethodId: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    return await stripe.setupIntents.confirm(setupIntentId, {
-      payment_method: paymentMethodId
-    });
+    return await stripe.setupIntents.confirm(setupIntentId, { payment_method: paymentMethodId });
   }
 
   static async updateCard(secretKey: string, paymentMethodId: string, card: any) {
@@ -196,12 +184,14 @@ export class StripeHelper {
       // Sources API may be deprecated - ignore errors
     }
 
-    return [{
-      cards,
-      banks: bankPaymentMethods,
-      legacyBanks,  // Will be empty after full migration
-      customer
-    }];
+    return [
+      {
+        cards,
+        banks: bankPaymentMethods,
+        legacyBanks,  // Will be empty after full migration
+        customer
+      }
+    ];
   }
 
   static async detachPaymentMethod(secretKey: string, paymentMethodId: string) {
@@ -256,9 +246,7 @@ export class StripeHelper {
     if (!payment_method_details && eventData.latest_charge) {
       const charge = await this.getCharge(secretKey, eventData.latest_charge);
       payment_method_details = charge.payment_method_details;
-    }
-    // Handle legacy Charge events (charge.succeeded)
-    else if (!payment_method_details && eventData.charge) {
+    } else if (!payment_method_details && eventData.charge) {
       const charge = await this.getCharge(secretKey, eventData.charge);
       payment_method_details = charge.payment_method_details;
     }

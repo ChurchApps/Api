@@ -11,9 +11,7 @@ export class FileRepo extends ConfiguredRepo<File> {
       hasSoftDelete: false,
       insertColumns: ["contentType", "contentId", "fileName", "contentPath", "fileType", "size"],
       updateColumns: ["contentType", "contentId", "fileName", "contentPath", "fileType", "size", "dateModified"],
-      insertLiterals: {
-        dateModified: "NOW()"
-      }
+      insertLiterals: { dateModified: "NOW()" }
     };
   }
 

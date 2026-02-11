@@ -10,7 +10,9 @@ export class SectionRepo extends ConfiguredRepo<Section> {
       tableName: "sections",
       hasSoftDelete: false,
       defaultOrderBy: "sort",
-      columns: ["pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"]
+      columns: [
+        "pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"
+      ]
     };
   }
 

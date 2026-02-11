@@ -267,13 +267,10 @@ export class OAuthController extends MembershipBaseController {
 
     // Check status
     switch (dc.status) {
-      case "pending":
-        return this.json({ error: "authorization_pending" }, 400);
-
+      case "pending": return this.json({ error: "authorization_pending" }, 400);
       case "denied":
         await this.repos.oAuthDeviceCode.delete(dc.id);
         return this.json({ error: "access_denied" }, 400);
-
       case "approved":
         // Generate tokens using the stored userChurchId
         const userChurch = (await this.repos.userChurch.load(dc.userChurchId)) as any;

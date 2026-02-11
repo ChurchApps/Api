@@ -9,7 +9,9 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
     return {
       tableName: "plans",
       hasSoftDelete: false,
-      columns: ["ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId", "providerId", "providerPlanId", "providerPlanName"]
+      columns: [
+        "ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId", "providerId", "providerPlanId", "providerPlanName"
+      ]
     };
   }
 

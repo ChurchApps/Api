@@ -272,10 +272,10 @@ export class PaymentMethodController extends GivingCrudController {
             const methodType = card
               ? "card"
               : paypalSource
-              ? "paypal"
-              : typeof pm?.type === "string"
-              ? pm.type
-              : "token";
+                ? "paypal"
+                : typeof pm?.type === "string"
+                  ? pm.type
+                  : "token";
 
             const displayName = card
               ? `${(card.brand || "Card").toUpperCase()} •••• ${card.last4 ?? ""}`.trim()

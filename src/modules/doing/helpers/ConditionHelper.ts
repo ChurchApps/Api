@@ -58,24 +58,12 @@ export class ConditionHelper {
   private static evalNum(val: number, operator: string, testVal: number) {
     let result = false;
     switch (operator) {
-      case "<":
-        result = val < testVal;
-        break;
-      case "<=":
-        result = val <= testVal;
-        break;
-      case "=":
-        result = val === testVal;
-        break;
-      case "!=":
-        result = val !== testVal;
-        break;
-      case ">=":
-        result = val >= testVal;
-        break;
-      case ">":
-        result = val > testVal;
-        break;
+      case "<": result = val < testVal; break;
+      case "<=": result = val <= testVal; break;
+      case "=": result = val === testVal; break;
+      case "!=": result = val !== testVal; break;
+      case ">=": result = val >= testVal; break;
+      case ">": result = val > testVal; break;
     }
     return result;
   }
@@ -83,24 +71,12 @@ export class ConditionHelper {
   private static evalDate(val: Date, operator: string, testVal: Date) {
     let result = false;
     switch (operator) {
-      case "<":
-        result = val < testVal;
-        break;
-      case "<=":
-        result = val <= testVal;
-        break;
-      case "=":
-        result = val === testVal;
-        break;
-      case "!=":
-        result = val !== testVal;
-        break;
-      case ">=":
-        result = val >= testVal;
-        break;
-      case ">":
-        result = val > testVal;
-        break;
+      case "<": result = val < testVal; break;
+      case "<=": result = val <= testVal; break;
+      case "=": result = val === testVal; break;
+      case "!=": result = val !== testVal; break;
+      case ">=": result = val >= testVal; break;
+      case ">": result = val > testVal; break;
     }
     return result;
   }

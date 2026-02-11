@@ -17,9 +17,7 @@ enum AssociationSpecAssociationCategoryEnum {
 }
 
 // HubSpot association type IDs
-const AssociationTypes = {
-  companyToContact: 280
-};
+const AssociationTypes = { companyToContact: 280 };
 
 export class HubspotHelper {
   private static getClient = async () => {

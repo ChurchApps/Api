@@ -21,18 +21,10 @@ export class MembershipRepo extends BaseRepo<any> {
     const fieldData = condition.fieldData ? JSON.parse(condition.fieldData) : {};
     let result = condition.field;
     switch (fieldData.datePart) {
-      case "dayOfWeek":
-        result = "dayOfWeek(" + condition.field + ")";
-        break;
-      case "dayOfMonth":
-        result = "dayOfMonth(" + condition.field + ")";
-        break;
-      case "month":
-        result = "month(" + condition.field + ")";
-        break;
-      case "years":
-        result = "TIMESTAMPDIFF(YEAR, " + condition.field + ", CURDATE())";
-        break;
+      case "dayOfWeek": result = "dayOfWeek(" + condition.field + ")"; break;
+      case "dayOfMonth": result = "dayOfMonth(" + condition.field + ")"; break;
+      case "month": result = "month(" + condition.field + ")"; break;
+      case "years": result = "TIMESTAMPDIFF(YEAR, " + condition.field + ", CURDATE())"; break;
     }
 
     return result;
@@ -41,9 +33,7 @@ export class MembershipRepo extends BaseRepo<any> {
   private getDBValue(condition: Condition) {
     let result = condition.value;
     switch (condition.value) {
-      case "{currentMonth}":
-        result = (new Date().getMonth() + 1).toString();
-        break;
+      case "{currentMonth}": result = (new Date().getMonth() + 1).toString(); break;
       case "{prevMonth}":
         result = new Date().getMonth().toString();
         if (result === "0") result = "12";

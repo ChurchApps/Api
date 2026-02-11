@@ -342,8 +342,7 @@ export class ChurchController extends MembershipBaseController {
         }
 
         try {
-          if (Environment.hubspotKey)
-            await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName);
+          if (Environment.hubspotKey) await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName);
         } catch (_ex) {
           // Hubspot registration failed - continuing without error
         }

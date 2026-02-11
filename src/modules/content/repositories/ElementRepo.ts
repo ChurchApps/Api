@@ -11,7 +11,9 @@ export class ElementRepo extends ConfiguredRepo<Element> {
       tableName: "elements",
       hasSoftDelete: false,
       defaultOrderBy: "sort",
-      columns: ["sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"]
+      columns: [
+        "sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"
+      ]
     };
   }
 

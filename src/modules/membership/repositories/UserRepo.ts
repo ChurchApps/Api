@@ -21,7 +21,9 @@ export class UserRepo extends BaseRepo<User> {
     const registrationDate = DateHelper.toMysqlDate(user.registrationDate);
     const lastLogin = DateHelper.toMysqlDate(user.lastLogin);
     const sql = "UPDATE users SET email=?, password=?, authGuid=?, firstName=?, lastName=?, registrationDate=?, lastLogin=? WHERE id=?;";
-    const params = [user.email, user.password, user.authGuid, user.firstName, user.lastName, registrationDate, lastLogin, user.id];
+    const params = [
+      user.email, user.password, user.authGuid, user.firstName, user.lastName, registrationDate, lastLogin, user.id
+    ];
     await TypedDB.query(sql, params);
     return user;
   }

@@ -9,8 +9,8 @@ export class DeliveryLogController extends MessagingBaseController {
   public async loadByContent(
     @requestParam("contentType") contentType: string,
     @requestParam("contentId") contentId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<DeliveryLog[]> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.deliveryLog.loadByContent(contentType, contentId);
@@ -21,8 +21,8 @@ export class DeliveryLogController extends MessagingBaseController {
   @httpGet("/person/:personId")
   public async loadByPerson(
     @requestParam("personId") personId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<DeliveryLog[]> {
     return this.actionWrapper(req, res, async (au) => {
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
@@ -44,8 +44,8 @@ export class DeliveryLogController extends MessagingBaseController {
   @httpGet("/:id")
   public async loadById(
     @requestParam("id") id: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<DeliveryLog> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.deliveryLog.loadById(au.churchId, id);

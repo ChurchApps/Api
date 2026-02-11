@@ -35,7 +35,7 @@ export class PlaylistController extends ContentCrudController {
             base64Photo = p.thumbnail;
             p.thumbnail = "";
           }
-          if (p.churchId === au.churchId)
+          if (p.churchId === au.churchId) {
             promises.push(
               this.repos.playlist.save(p).then(async (playlist: Playlist) => {
                 if (base64Photo) {
@@ -45,6 +45,7 @@ export class PlaylistController extends ContentCrudController {
                 return playlist;
               })
             );
+          }
         }
 
         playlists = await Promise.all(promises);

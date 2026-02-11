@@ -3,17 +3,9 @@ import { GatewayFactory } from "../gateways";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
 // Mock dependencies
-jest.mock("../gateways", () => ({
-  GatewayFactory: {
-    getProvider: jest.fn()
-  }
-}));
+jest.mock("../gateways", () => ({ GatewayFactory: { getProvider: jest.fn() } }));
 
-jest.mock("@churchapps/apihelper", () => ({
-  EncryptionHelper: {
-    decrypt: jest.fn((value) => `decrypted_${value}`)
-  }
-}));
+jest.mock("@churchapps/apihelper", () => ({ EncryptionHelper: { decrypt: jest.fn((value) => `decrypted_${value}`) } }));
 
 // Mock console.log to capture any unauthorized logging
 const mockConsoleLog = jest.spyOn(console, "log").mockImplementation();
@@ -110,9 +102,7 @@ describe("GatewayService", () => {
 
   describe("deleteWebhooks", () => {
     it("should call provider deleteWebhooksByChurchId without logging sensitive data", async () => {
-      const mockProvider = {
-        deleteWebhooksByChurchId: jest.fn().mockResolvedValue(undefined)
-      };
+      const mockProvider = { deleteWebhooksByChurchId: jest.fn().mockResolvedValue(undefined) };
 
       (GatewayFactory.getProvider as jest.Mock).mockReturnValue(mockProvider);
 
@@ -146,9 +136,7 @@ describe("GatewayService", () => {
   });
 
   describe("getGatewayForChurch", () => {
-    const createRepo = (gateways: any[]) => ({
-      loadAll: jest.fn().mockResolvedValue(gateways)
-    });
+    const createRepo = (gateways: any[]) => ({ loadAll: jest.fn().mockResolvedValue(gateways) });
 
     it("should throw when churchId is missing", async () => {
       const repo = createRepo([]);
@@ -214,9 +202,7 @@ describe("GatewayService", () => {
     });
 
     it("should treat provider lookups case insensitively", async () => {
-      const gateways = [
-        { id: "gateway1", provider: "Stripe", environment: "sandbox" }
-      ];
+      const gateways = [{ id: "gateway1", provider: "Stripe", environment: "sandbox" }];
       const repo = createRepo(gateways);
 
       const result = await GatewayService.getGatewayForChurch("church1", { provider: "stripe" }, repo as any);
@@ -274,7 +260,9 @@ describe("GatewayService", () => {
         requiresPlansForSubscriptions: false,
         requiresCustomerForSubscription: true,
         supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
-        supportedCurrencies: ["usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"],
+        supportedCurrencies: [
+          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
+        ],
         maxRefundWindow: 180,
         minTransactionAmount: 50,
         maxTransactionAmount: 99999999,
@@ -300,7 +288,9 @@ describe("GatewayService", () => {
         requiresPlansForSubscriptions: true,
         requiresCustomerForSubscription: false,
         supportedPaymentMethods: ["paypal", "card", "venmo", "pay_later"],
-        supportedCurrencies: ["usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"],
+        supportedCurrencies: [
+          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
+        ],
         maxRefundWindow: 180,
         minTransactionAmount: 100,
         maxTransactionAmount: 1000000,

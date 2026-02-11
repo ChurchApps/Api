@@ -10,7 +10,9 @@ export class QuestionRepo extends ConfiguredRepo<Question> {
       tableName: "questions",
       hasSoftDelete: true,
       removedColumn: "removed",
-      columns: ["formId", "parentId", "title", "description", "fieldType", "placeholder", "sort", "required", "choices"],
+      columns: [
+        "formId", "parentId", "title", "description", "fieldType", "placeholder", "sort", "required", "choices"
+      ],
       insertLiterals: { removed: "0" }
     };
   }

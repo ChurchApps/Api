@@ -92,9 +92,7 @@ export class PraiseChartsController extends ContentBaseController {
       let mimeType = "application/pdf";
       const fileType = fileName.split(".")[1].toLowerCase();
       switch (fileType) {
-        case "zip":
-          mimeType = "application/zip";
-          break;
+        case "zip": mimeType = "application/zip"; break;
       }
 
       // Ensure the file buffer is properly handled for both PDF and ZIP

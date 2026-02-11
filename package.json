@@ -22,7 +22,7 @@
     "reset-db": "tsx tools/initdb.ts --reset",
     "dev": "tsx watch src/index.ts",
     "clean": "rimraf dist",
-    "lint": "prettier --write src/**/*.ts && eslint . --fix",
+    "lint": "eslint --fix src/",
     "lint:check": "eslint .",
     "tsc": "tsc",
     "copy-assets": "copyfiles -u 1 src/**/*.html src/**/*.css dist/",

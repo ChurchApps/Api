@@ -10,7 +10,9 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
     return {
       tableName: "gateways",
       hasSoftDelete: false,
-      columns: ["provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees", "currency", "settings", "environment"]
+      columns: [
+        "provider", "publicKey", "privateKey", "webhookKey", "productId", "payFees", "currency", "settings", "environment"
+      ]
     };
   }
 
@@ -20,7 +22,9 @@ export class GatewayRepo extends ConfiguredRepo<Gateway> {
     await TypedDB.query("DELETE FROM gateways WHERE churchId=? AND id<>?;", [gateway.churchId, gateway.id]); // enforce a single record per church (for now)
     const sql = "INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees, currency, settings, environment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const settings = gateway.settings ? JSON.stringify(gateway.settings) : null;
-    const params = [gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees, gateway.currency, settings, gateway.environment];
+    const params = [
+      gateway.id, gateway.churchId, gateway.provider, gateway.publicKey, gateway.privateKey, gateway.webhookKey, gateway.productId, gateway.payFees, gateway.currency, settings, gateway.environment
+    ];
     await TypedDB.query(sql, params);
     return gateway;
   }

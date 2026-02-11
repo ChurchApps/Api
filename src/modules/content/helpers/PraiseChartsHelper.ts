@@ -189,18 +189,20 @@ export class PraiseChartsHelper {
     const result: SongDetailLink[] = [];
     if (item.details.external_ids) {
       const externalIds = item.details.external_ids;
-      if (externalIds.spotify_id)
+      if (externalIds.spotify_id) {
         result.push({
           service: "Spotify",
           serviceKey: externalIds.spotify_id,
           url: "https://open.spotify.com/track/" + externalIds.spotify_id
         });
-      if (externalIds.ccli_number)
+      }
+      if (externalIds.ccli_number) {
         result.push({
           service: "CCLI",
           serviceKey: externalIds.ccli_number,
           url: "https://songselect.ccli.com/Songs/" + externalIds.ccli_number
         });
+      }
       if (externalIds.isrc) result.push({ service: "ISRC", serviceKey: externalIds.isrc });
     }
     if (item.details.external_urls) {

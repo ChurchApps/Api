@@ -421,7 +421,9 @@ export class GatewayService {
         supportsWebhooks: true,
         supportsOrders: false,
         supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
-        supportedCurrencies: ["usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"],
+        supportedCurrencies: [
+          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
+        ],
         requiresPlansForSubscriptions: false,
         requiresCustomerForSubscription: true,
         supportsInstantCapture: true,
@@ -442,7 +444,9 @@ export class GatewayService {
         supportsWebhooks: true,
         supportsOrders: true,
         supportedPaymentMethods: ["paypal", "card", "venmo", "pay_later"],
-        supportedCurrencies: ["usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"],
+        supportedCurrencies: [
+          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
+        ],
         requiresPlansForSubscriptions: true,
         requiresCustomerForSubscription: false,
         supportsInstantCapture: true,

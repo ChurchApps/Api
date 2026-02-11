@@ -77,12 +77,12 @@ export class TaskController extends DoingBaseController {
     if (task.status === "Open") {
       const data = task.data
         ? (() => {
-            try {
-              return JSON.parse(task.data);
-            } catch {
-              return [];
-            }
-          })()
+          try {
+            return JSON.parse(task.data);
+          } catch {
+            return [];
+          }
+        })()
         : [];
       for (const d of data) {
         if (d.field === "photo" && d.value !== undefined) {

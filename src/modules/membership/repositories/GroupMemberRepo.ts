@@ -73,7 +73,7 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
         id: result.personId,
         photoUpdated: row.photoUpdated,
         name: { display: row.displayName },
-        contactInfo: { 
+        contactInfo: {
           email: row.email,
           homePhone: row.homePhone,
           mobilePhone: row.mobilePhone,

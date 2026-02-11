@@ -53,8 +53,8 @@ export class ConversationController extends MessagingBaseController {
   public async forContent(
     @requestParam("contentType") contentType: string,
     @requestParam("contentId") contentId: string,
-    req: express.Request,
-    res: express.Response
+      req: express.Request,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const churchId = au.churchId;
@@ -93,8 +93,8 @@ export class ConversationController extends MessagingBaseController {
     @requestParam("churchId") churchId: string,
     @requestParam("contentType") contentType: string,
     @requestParam("contentId") contentId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
@@ -182,8 +182,8 @@ export class ConversationController extends MessagingBaseController {
     @requestParam("churchId") churchId: string,
     @requestParam("contentType") contentType: string,
     @requestParam("contentId") contentId: string,
-    req: express.Request<{}, {}, {}>,
-    res: express.Response
+      req: express.Request<{}, {}, {}>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.getOrCreate(churchId, contentType, contentId, "public", true);

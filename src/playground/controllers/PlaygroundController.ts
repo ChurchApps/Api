@@ -584,36 +584,64 @@ export class PlaygroundController extends GivingBaseController {
           name: "stripe",
           displayName: "Stripe",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createCustomer", "createWebhookEndpoint",
-            "getCustomerSubscriptions", "getCustomerPaymentMethods", "attachPaymentMethod",
-            "detachPaymentMethod", "updateCard", "createBankAccount", "updateBank",
-            "verifyBank", "deleteBankAccount", "createProduct"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createCustomer",
+            "createWebhookEndpoint",
+            "getCustomerSubscriptions",
+            "getCustomerPaymentMethods",
+            "attachPaymentMethod",
+            "detachPaymentMethod",
+            "updateCard",
+            "createBankAccount",
+            "updateBank",
+            "verifyBank",
+            "deleteBankAccount",
+            "createProduct"
           ]
         },
         {
           name: "paypal",
           displayName: "PayPal",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createWebhookEndpoint", "generateClientToken",
-            "createOrder", "createSubscriptionPlan", "createSubscriptionWithPlan"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createWebhookEndpoint",
+            "generateClientToken",
+            "createOrder",
+            "createSubscriptionPlan",
+            "createSubscriptionWithPlan"
           ]
         },
         {
           name: "square",
           displayName: "Square",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createCustomer", "createWebhookEndpoint"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createCustomer",
+            "createWebhookEndpoint"
           ]
         },
         {
           name: "epaymints",
           displayName: "EPayMints",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createWebhookEndpoint"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createWebhookEndpoint"
           ]
         }
       ]
@@ -685,16 +713,11 @@ export class PlaygroundController extends GivingBaseController {
 
   private getGatewayProvider(provider: string): IGatewayProvider {
     switch (provider.toLowerCase()) {
-      case "stripe":
-        return new StripeGatewayProvider();
-      case "paypal":
-        return new PayPalGatewayProvider();
-      case "square":
-        return new SquareGatewayProvider();
-      case "epaymints":
-        return new EPayMintsGatewayProvider();
-      default:
-        throw new Error(`Unsupported gateway provider: ${provider}`);
+      case "stripe": return new StripeGatewayProvider();
+      case "paypal": return new PayPalGatewayProvider();
+      case "square": return new SquareGatewayProvider();
+      case "epaymints": return new EPayMintsGatewayProvider();
+      default: throw new Error(`Unsupported gateway provider: ${provider}`);
     }
   }
 }
