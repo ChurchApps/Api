@@ -1,9 +1,9 @@
 import { Setting, SongDetail, SongDetailLink } from "../models/index.js";
-import OAuth from "oauth";
+import OAuth from "oauth-1.0a";
+import crypto from "crypto";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
-import https from "https";
 
 export class PraiseChartsHelper {
   static async loadUserTokens(au: any) {
@@ -14,64 +14,81 @@ export class PraiseChartsHelper {
     return { token, secret };
   }
 
-  static getOAuth(returnUrl?: string) {
-    const requestTokenUrl = "https://api.praisecharts.com/oauth/request_token";
-    const accessTokenUrl = "https://api.praisecharts.com/oauth/access_token";
-    const oauth = new OAuth.OAuth(
-      requestTokenUrl,
-      accessTokenUrl,
-      Environment.praiseChartsConsumerKey,
-      Environment.praiseChartsConsumerSecret,
-      "1.0A",
-      returnUrl || "https://churchapps.org/",
-      "HMAC-SHA1"
-    );
-    return oauth;
+  static getOAuth() {
+    return new OAuth({
+      consumer: {
+        key: Environment.praiseChartsConsumerKey,
+        secret: Environment.praiseChartsConsumerSecret,
+      },
+      signature_method: "HMAC-SHA1",
+      hash_function(baseString, key) {
+        return crypto.createHmac("sha1", key).update(baseString).digest("base64");
+      },
+    });
   }
 
-  static getRequestToken(returnUrl: string): Promise<{ oauthToken: string; oauthTokenSecret: string }> {
-    return new Promise((resolve, reject) => {
-      const oauth = this.getOAuth(returnUrl);
-      oauth.getOAuthRequestToken((err, oauthToken, oauthTokenSecret) => {
-        if (err) return reject(err);
-        resolve({ oauthToken, oauthTokenSecret });
-      });
+  static async getRequestToken(returnUrl: string): Promise<{ oauthToken: string; oauthTokenSecret: string }> {
+    const oauth = this.getOAuth();
+    const requestData = {
+      url: "https://api.praisecharts.com/oauth/request_token",
+      method: "POST",
+      data: { oauth_callback: returnUrl },
+    };
+    const headers = oauth.toHeader(oauth.authorize(requestData));
+    const response = await fetch(requestData.url, {
+      method: "POST",
+      headers: headers as unknown as HeadersInit,
     });
+    if (!response.ok) throw new Error(`Request token failed: ${response.statusText}`);
+    const text = await response.text();
+    const params = new URLSearchParams(text);
+    return {
+      oauthToken: params.get("oauth_token") || "",
+      oauthTokenSecret: params.get("oauth_token_secret") || "",
+    };
   }
 
   static getAuthorizeUrl(oauthToken: string) {
     return `https://api.praisecharts.com/oauth/authorize?oauth_token=${oauthToken}`;
   }
 
-  static getAccessToken(oauthToken: string, oauthTokenSecret: string, oauthVerifier: string): Promise<{ accessToken: string; accessTokenSecret: string }> {
-    return new Promise((resolve, reject) => {
-      const oauth = this.getOAuth("http://localhost:3101/pingback");
-      oauth.getOAuthAccessToken(oauthToken, oauthTokenSecret, oauthVerifier, (err, accessToken, accessTokenSecret) => {
-        if (err) return reject(err);
-        resolve({ accessToken, accessTokenSecret });
-      });
+  static async getAccessToken(oauthToken: string, oauthTokenSecret: string, oauthVerifier: string): Promise<{ accessToken: string; accessTokenSecret: string }> {
+    const oauth = this.getOAuth();
+    const token = { key: oauthToken, secret: oauthTokenSecret };
+    const requestData = {
+      url: "https://api.praisecharts.com/oauth/access_token",
+      method: "POST",
+      data: { oauth_verifier: oauthVerifier },
+    };
+    const headers = oauth.toHeader(oauth.authorize(requestData, token));
+    const response = await fetch(requestData.url, {
+      method: "POST",
+      headers: headers as unknown as HeadersInit,
     });
+    if (!response.ok) throw new Error(`Access token failed: ${response.statusText}`);
+    const text = await response.text();
+    const params = new URLSearchParams(text);
+    return {
+      accessToken: params.get("oauth_token") || "",
+      accessTokenSecret: params.get("oauth_token_secret") || "",
+    };
   }
 
   static async oAuthGet(url: string, accessToken: string, accessTokenSecret: string) {
-    return new Promise((resolve, reject) => {
-      const oauth = this.getOAuth();
-      oauth.get(url, accessToken, accessTokenSecret, (err, data) => {
-        if (err) return reject(err);
-        resolve(JSON.parse(data as string));
-      });
+    const oauth = this.getOAuth();
+    const token = { key: accessToken, secret: accessTokenSecret };
+    const requestData = { url, method: "GET" };
+    const headers = oauth.toHeader(oauth.authorize(requestData, token));
+    const response = await fetch(url, {
+      headers: headers as unknown as HeadersInit,
     });
+    if (!response.ok) throw new Error(`OAuth GET failed: ${response.statusText}`);
+    return response.json();
   }
 
   static searchLibraryAuth(query: string, accessToken: string, accessTokenSecret: string) {
     const url = `https://api.praisecharts.com/v1.0/library/search?q=${encodeURIComponent(query)}`;
-    return new Promise((resolve, reject) => {
-      const oauth = this.getOAuth();
-      oauth.get(url, accessToken, accessTokenSecret, (err, data) => {
-        if (err) return reject(err);
-        resolve(JSON.parse(data as string));
-      });
-    });
+    return this.oAuthGet(url, accessToken, accessTokenSecret);
   }
 
   static async search(query: string) {
@@ -91,21 +108,14 @@ export class PraiseChartsHelper {
     let url = `https://api.praisecharts.com/v1.0/download?skus[]=${encodeURIComponent(skus.join(","))}`;
     if (keys.length > 0) url += "&keys[]=" + keys.join(",");
     const oauth = this.getOAuth();
-    const authHeader = oauth.authHeader(url, accessToken, accessTokenSecret, "GET");
-
-    return new Promise((resolve, reject) => {
-      const req = https.request(url, { method: "GET", headers: { Authorization: authHeader } }, (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () => {
-          const buffer = Buffer.concat(chunks);
-          resolve(buffer);
-        });
-      });
-
-      req.on("error", reject);
-      req.end();
+    const token = { key: accessToken, secret: accessTokenSecret };
+    const requestData = { url, method: "GET" };
+    const headers = oauth.toHeader(oauth.authorize(requestData, token));
+    const response = await fetch(url, {
+      headers: headers as unknown as HeadersInit,
     });
+    if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
+    return Buffer.from(await response.arrayBuffer());
   }
 
   static async loadArrangmentRaw(id: string, keys: string[], accessToken: string, accessTokenSecret: string) {
