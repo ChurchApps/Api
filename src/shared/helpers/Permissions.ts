@@ -40,6 +40,8 @@ export class Permissions extends BasePermissions {
   // Messaging API permissions (to be defined during migration)
   static messaging = { view: { contentType: "Messaging", action: "View" }, edit: { contentType: "Messaging", action: "Edit" }, admin: { contentType: "Messaging", action: "Admin" } };
 
+  static texting = { send: { contentType: "Texting", action: "Send" } };
+
   // Doing API permissions (to be defined during migration)
   static doing = { view: { contentType: "Doing", action: "View" }, edit: { contentType: "Doing", action: "Edit" }, admin: { contentType: "Doing", action: "Admin" } };
 
@@ -87,6 +89,9 @@ export const permissionsList: IPermission[] = [
   { apiName: "ContentApi", section: "StreamingServices", action: "Edit", displaySection: "Content", displayAction: "Edit Services" },
   { apiName: "ContentApi", section: "Chat", action: "Host", displaySection: "Content", displayAction: "Host Chat" },
 
+  // Messaging API permissions
+  { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
+
   // Lessons API permissions
   { apiName: "LessonsApi", section: "Schedules", action: "Edit", displaySection: "Lessons", displayAction: "Edit Schedules" },
   { apiName: "LessonsApi", section: "Content", action: "Edit", displaySection: "Lessons", displayAction: "Edit Content" }
@@ -102,7 +107,7 @@ export interface IPermission {
 
 export type ApiName = "MembershipApi" | "GivingApi" | "AttendanceApi" | "MessagingApi" | "DoingApi" | "ContentApi" | "LessonsApi";
 
-export type DisplaySection = "People and Groups" | "Donations" | "Attendance" | "Forms and Plans" | "Content" | "Lessons";
+export type DisplaySection = "People and Groups" | "Donations" | "Attendance" | "Forms and Plans" | "Content" | "Messaging" | "Lessons";
 
 export type ContentType =
   | "Roles"
@@ -126,6 +131,7 @@ export type ContentType =
   | "Messaging"
   | "Doing"
   | "Admin"
+  | "Texting"
   | "Schedules";
 
-export type Actions = "Admin" | "Edit" | "View" | "Edit Self" | "View Members" | "View Summary" | "Checkin" | "Host" | "Edit Settings";
+export type Actions = "Admin" | "Edit" | "View" | "Send" | "Edit Self" | "View Members" | "View Summary" | "Checkin" | "Host" | "Edit Settings";
