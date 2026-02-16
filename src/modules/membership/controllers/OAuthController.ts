@@ -2,7 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken, OAuthDeviceCode } from "../models/index.js";
-import { Permissions, UniqueIdHelper } from "../helpers/index.js";
+import { Permissions, UniqueIdHelper, UserHelper } from "../helpers/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { OAuthDeviceCodeRepo } from "../repositories/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
@@ -117,6 +117,8 @@ export class OAuthController extends MembershipBaseController {
         if (permissionData) {
           loginUserChurch.apis = permissionData.apis;
         }
+        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
+        UserHelper.addAllReportingPermissions([loginUserChurch]);
 
         // Create access token
         const token: OAuthToken = {
@@ -167,6 +169,8 @@ export class OAuthController extends MembershipBaseController {
         if (permissionData) {
           loginUserChurch.apis = permissionData.apis;
         }
+        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
+        UserHelper.addAllReportingPermissions([loginUserChurch]);
 
         // Create new access token with proper JWT
         const token: OAuthToken = {
@@ -302,6 +306,8 @@ export class OAuthController extends MembershipBaseController {
         if (permissionData) {
           loginUserChurch.apis = permissionData.apis;
         }
+        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
+        UserHelper.addAllReportingPermissions([loginUserChurch]);
 
         // Create access token
         const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch);
