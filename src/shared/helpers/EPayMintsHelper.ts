@@ -287,7 +287,7 @@ export class EPayMintsHelper {
 
   // Webhook Verification (if supported)
   static validateWebhookSignature(
-    payload: string,
+    _payload: string,
     signature: string,
     webhookSecret: string
   ): boolean {
@@ -296,7 +296,7 @@ export class EPayMintsHelper {
       // This would depend on their webhook signing mechanism
       // For now, return true as placeholder
       return signature.length > 0 && webhookSecret.length > 0;
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -322,8 +322,8 @@ export class EPayMintsHelper {
   }
 
   static async logDonation(
-    apiKey: string,
-    environment: string,
+    _apiKey: string,
+    _environment: string,
     churchId: string,
     eventData: any,
     givingRepos: any

@@ -11,7 +11,7 @@ export class AutomationHelper {
       for (const a of automations) {
         try {
           await AutomationHelper.check(a, repos);
-        } catch (_e) {
+        } catch {
           // Skip automation with error - continue processing others
         }
       }

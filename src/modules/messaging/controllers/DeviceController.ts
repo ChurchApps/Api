@@ -102,7 +102,7 @@ export class DeviceController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId")
-  public async loadByChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
+  public async loadByChurch(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.device.loadByChurchId(au.churchId);
       return this.repos.device.convertAllToModel(au.churchId, data as any[]);
@@ -110,7 +110,7 @@ export class DeviceController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/person/:personId")
-  public async loadByPerson(@requestParam("churchId") churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
+  public async loadByPerson(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.device.loadByPersonId(au.churchId, personId);
       return this.repos.device.convertAllToModel(au.churchId, data as any[]);
@@ -118,7 +118,7 @@ export class DeviceController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device> {
+  public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.device.loadById(au.churchId, id);
       return this.repos.device.convertToModel(au.churchId, data);
@@ -140,7 +140,7 @@ export class DeviceController extends MessagingBaseController {
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repos.device.delete(au.churchId, id);
     }) as any;

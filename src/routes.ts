@@ -70,7 +70,7 @@ export const configureModuleRoutes = (app: express.Application) => {
   });
 
   // Add module information endpoint
-  app.get("/modules", (req, res) => {
+  app.get("/modules", (_req, res) => {
     res.json({
       modules: Object.keys(MODULE_ROUTES).map((module) => ({
         name: module,
@@ -115,7 +115,7 @@ export const getModuleFromPath = (path: string): keyof typeof MODULE_ROUTES | nu
 /**
  * Middleware to log module routing for debugging
  */
-export const moduleRoutingLogger = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+export const moduleRoutingLogger = (req: express.Request, _res: express.Response, next: express.NextFunction) => {
   const module = getModuleFromPath(req.path);
   if (module) {
     // Suppressed per-request logging by default to reduce noise

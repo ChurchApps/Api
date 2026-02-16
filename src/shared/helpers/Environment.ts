@@ -157,7 +157,7 @@ export class Environment extends EnvironmentBase {
     this.storeApi = process.env.STORE_API_URL || config.storeApi || "";
   }
 
-  private static async initializeDatabaseConnections(config: any) {
+  private static async initializeDatabaseConnections(_config: any) {
     const modules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
     console.log(`🔍 Attempting to initialize database connections for modules: ${modules.join(", ")}`);
 

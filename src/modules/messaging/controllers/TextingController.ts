@@ -247,7 +247,7 @@ export class TextingController extends MessagingBaseController {
     };
   }
 
-  private async getGroupMemberDetails(churchId: string, groupId: string, jwt: string): Promise<GroupMemberDetail[]> {
+  private async getGroupMemberDetails(_churchId: string, groupId: string, jwt: string): Promise<GroupMemberDetail[]> {
     const url = Environment.membershipApi + "/groupmembers?groupId=" + groupId;
     const resp = await axios.get(url, { headers: { Authorization: "Bearer " + jwt } });
     const members: any[] = resp.data || [];

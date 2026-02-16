@@ -247,7 +247,7 @@ export class OAuthController extends MembershipBaseController {
   /**
    * Handle device_code grant type (called from /token endpoint)
    */
-  private async handleDeviceCodeGrant(deviceCode: string, clientId: string, res: express.Response): Promise<any> {
+  private async handleDeviceCodeGrant(deviceCode: string, clientId: string, _res: express.Response): Promise<any> {
     if (!deviceCode) {
       return this.json({ error: "invalid_request", error_description: "device_code required" }, 400);
     }
@@ -340,7 +340,7 @@ export class OAuthController extends MembershipBaseController {
    */
   @httpGet("/device/pending/:userCode")
   public async getPendingDevice(@requestParam("userCode") userCode: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(userCode);
 
       if (!dc) {
@@ -395,7 +395,7 @@ export class OAuthController extends MembershipBaseController {
    */
   @httpPost("/device/deny")
   public async denyDevice(req: express.Request<{}, {}, { user_code: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const { user_code } = req.body;
 
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(user_code);
@@ -421,7 +421,7 @@ export class OAuthController extends MembershipBaseController {
 
   @httpGet("/clients/clientId/:clientId")
   public async getClientByClientId(@requestParam("clientId") clientId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const result = (await this.repos.oAuthClient.loadByClientId(clientId)) as any;
       result.clientSecret = null;
       return result;

@@ -84,13 +84,13 @@ export class RoleMemberController extends MembershipBaseController {
 
   @httpDelete("/self/:churchId/:userId")
   public async deleteSelf(@requestParam("churchId") churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       await this.repos.roleMember.deleteSelf(churchId, userId);
       return this.json([], 200);
     });
   }
 
-  private async checkAccess(members: RoleMember[], permission: IPermission, au: AuthenticatedUser) {
+  private async checkAccess(_members: RoleMember[], permission: IPermission, au: AuthenticatedUser) {
     const hasAccess = au.checkAccess(permission);
     /*
     if (hasAccess && au.apiName !== "AccessManagement") {

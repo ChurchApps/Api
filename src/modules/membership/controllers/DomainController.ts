@@ -38,7 +38,7 @@ export class DomainController extends MembershipCrudController {
 
   @httpGet("/lookup/:domainName")
   public async getByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       return await this.repos.domain.loadByName(domainName);
     });
   }

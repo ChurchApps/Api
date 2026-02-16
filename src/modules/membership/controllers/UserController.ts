@@ -181,7 +181,7 @@ export class UserController extends MembershipBaseController {
 
   @httpPost("/loadOrCreate", ...loadOrCreateValidation)
   public async loadOrCreate(req: express.Request<{}, {}, LoadCreateUserRequest>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 

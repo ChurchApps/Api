@@ -6,7 +6,7 @@ import { Assignment } from "../models/index.js";
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
   @httpGet("/my")
-  public async getMy(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.assignment.loadByByPersonId(au.churchId, au.personId);
     });

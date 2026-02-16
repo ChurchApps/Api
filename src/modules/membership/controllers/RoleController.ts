@@ -66,7 +66,7 @@ export class RoleController extends MembershipCrudController {
     });
   }
 
-  private async checkAccess(roles: Role[], permission: IPermission, au: AuthenticatedUser) {
+  private async checkAccess(_roles: Role[], permission: IPermission, au: AuthenticatedUser) {
     const hasAccess = au.checkAccess(permission);
     if (hasAccess && au.apiName !== "AccessManagement") {
       // roles.forEach(r => { if (r.appName !== au.appName) hasAccess = false; })

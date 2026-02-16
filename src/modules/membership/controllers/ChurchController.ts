@@ -71,7 +71,7 @@ export class ChurchController extends MembershipBaseController {
       try {
         let result: Church[] = [];
         if (req.query.name !== undefined) {
-          const app = req.query.app === undefined ? "" : req.query.app.toString();
+          const _app = req.query.app === undefined ? "" : req.query.app.toString();
           const data = await this.repos.church.search(
             // decode URI encoded character e.g. replace %20 with ' '
             decodeURIComponent(
@@ -146,7 +146,7 @@ export class ChurchController extends MembershipBaseController {
 
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const data = await this.repos.church.loadById(id);
       const church = this.repos.church.convertToModel(data);
       return church;
@@ -343,7 +343,7 @@ export class ChurchController extends MembershipBaseController {
 
         try {
           if (Environment.hubspotKey) await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName);
-        } catch (_ex) {
+        } catch {
           // Hubspot registration failed - continuing without error
         }
         return church;

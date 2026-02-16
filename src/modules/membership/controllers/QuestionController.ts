@@ -7,21 +7,21 @@ import { Question } from "../models/index.js";
 export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/up")
   public async moveQuestionUp(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       return await this.repos.question.moveQuestionUp(id);
     });
   }
 
   @httpGet("/sort/:id/down")
   public async moveQuestionDown(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       return await this.repos.question.moveQuestionDown(id);
     });
   }
 
   @httpGet("/unrestricted")
   public async getUnrestricted(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!formId) return this.json({}, 401);
       else return this.repos.question.convertAllToModel("", (await this.repos.question.loadForUnrestrictedForm(formId)) as any[]);

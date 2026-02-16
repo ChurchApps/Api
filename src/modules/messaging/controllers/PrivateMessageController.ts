@@ -64,8 +64,8 @@ export class PrivateMessageController extends MessagingBaseController {
   }
 
   @httpGet("/existing/:personId")
-  public async getExisting(@requestParam("personId") personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+  public async getExisting(@requestParam("personId") _personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (_au) => {
       // TODO: Implement loadExisting functionality to find existing conversation between two people
       // const existing = await this.repos.privateMessage.loadExisting(au.churchId, au.personId, personId);
       const existing = null; // Temporary placeholder

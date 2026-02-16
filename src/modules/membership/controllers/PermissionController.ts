@@ -7,7 +7,7 @@ import { permissionsList } from "../helpers/index.js";
 export class PermissionController extends MembershipBaseController {
   @httpGet("/")
   public async loadAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       return this.json(permissionsList, 200);
     });
   }

@@ -8,7 +8,7 @@ import { NotificationHelper } from "../helpers/NotificationHelper.js";
 export class NotificationController extends MessagingBaseController {
   @httpGet("/:churchId/person/:personId")
   public async loadByPerson(
-    @requestParam("churchId") churchId: string,
+    @requestParam("churchId") _churchId: string,
     @requestParam("personId") personId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
@@ -20,7 +20,7 @@ export class NotificationController extends MessagingBaseController {
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification> {
+  public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.notification.loadById(au.churchId, id);
       return this.repos.notification.convertToModel(data);
@@ -41,7 +41,7 @@ export class NotificationController extends MessagingBaseController {
   }
 
   @httpPost("/markRead/:churchId/:personId")
-  public async markRead(@requestParam("churchId") churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async markRead(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repos.notification.markRead(au.churchId, personId);
     }) as any;
@@ -119,7 +119,7 @@ export class NotificationController extends MessagingBaseController {
   }*/
 
   @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repos.notification.delete(au.churchId, id);
     }) as any;

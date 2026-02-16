@@ -249,7 +249,7 @@ export class PersonRepo extends ConfiguredRepo<Person> {
     return result;
   }
 
-  public convertToModelWithPermissions(churchId: string, data: any, canEdit: boolean) {
+  public convertToModelWithPermissions(_churchId: string, data: any, canEdit: boolean) {
     const result = this.rowToModel(data);
     if (!canEdit) delete result.conversationId;
     return result;

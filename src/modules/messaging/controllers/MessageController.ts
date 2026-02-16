@@ -114,7 +114,7 @@ export class MessageController extends MessagingBaseController {
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       const message = await this.repos.message.loadById(au.churchId, id);
       if (Object.keys(message).length !== 0) {

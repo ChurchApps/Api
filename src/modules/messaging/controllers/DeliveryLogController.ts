@@ -12,7 +12,7 @@ export class DeliveryLogController extends MessagingBaseController {
       req: express.Request<{}, {}, null>,
       res: express.Response
   ): Promise<DeliveryLog[]> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const data = await this.repos.deliveryLog.loadByContent(contentType, contentId);
       return this.repos.deliveryLog.convertAllToModel(data as any[]);
     }) as any;

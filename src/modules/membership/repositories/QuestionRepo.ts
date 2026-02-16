@@ -31,7 +31,7 @@ export class QuestionRepo extends ConfiguredRepo<Question> {
       formId: string;
       sort: number;
     };
-    const result = await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort>?;", [question.formId, +question.sort]);
+    await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort>?;", [question.formId, +question.sort]);
     return TypedDB.query("UPDATE questions SET sort=CONCAT('d', sort), removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
@@ -48,8 +48,8 @@ export class QuestionRepo extends ConfiguredRepo<Question> {
       formId: string;
       sort: number;
     };
-    let result = await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE formId=? AND sort=?;", [question.formId, +question.sort - 1]);
-    result = await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE id=?;", [id]);
+    await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE formId=? AND sort=?;", [question.formId, +question.sort - 1]);
+    await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE id=?;", [id]);
   }
 
   public async moveQuestionDown(id: string) {
@@ -57,8 +57,8 @@ export class QuestionRepo extends ConfiguredRepo<Question> {
       formId: string;
       sort: number;
     };
-    let result = await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort=?;", [question.formId, +question.sort + 1]);
-    result = await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE id=?;", [id]);
+    await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort=?;", [question.formId, +question.sort + 1]);
+    await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE id=?;", [id]);
   }
 
   protected rowToModel(row: any): Question {

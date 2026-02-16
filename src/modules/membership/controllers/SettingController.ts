@@ -60,7 +60,7 @@ export class MembershipSettingController extends MembershipBaseController {
   // TEMPORARY DEBUG ROUTE - Remove after JWT secret issue is resolved
   // TEMPORARY DEBUG ROUTE - Remove after JWT secret issue is resolved
   @httpGet("/debug/jwt-config")
-  public async debugJwtConfig(req: express.Request, res: express.Response): Promise<any> {
+  public async debugJwtConfig(_req: express.Request, _res: express.Response): Promise<any> {
     try {
       const environment = Environment.currentEnvironment || "unknown";
       const paramStorePath = `/${environment.toLowerCase()}/jwtSecret`;

@@ -109,9 +109,7 @@ export class PraiseChartsHelper {
     const token = { key: accessToken, secret: accessTokenSecret };
     const requestData = { url, method: "GET" };
     const headers = oauth.toHeader(oauth.authorize(requestData, token));
-    const response = await fetch(url, {
-      headers: headers as unknown as HeadersInit,
-    });
+    const response = await fetch(url, { headers: headers as unknown as HeadersInit });
     if (!response.ok) throw new Error(`Download failed: ${response.statusText}`);
     return Buffer.from(await response.arrayBuffer());
   }
