@@ -18,7 +18,7 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
   public loadForGroup(churchId: string, groupId: string) {
     const sql =
       "SELECT gm.*, " +
-      "p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, " +
+      "p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, p.optedOut, " +
       "p.address1, p.address2, p.city, p.state, p.zip, " +
       "p.householdId, p.householdRole " +
       "FROM groupMembers gm " +
@@ -85,7 +85,8 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
           zip: row.zip
         },
         householdId: row.householdId,
-        householdRole: row.householdRole
+        householdRole: row.householdRole,
+        optedOut: row.optedOut
       };
       result.person.photo = PersonHelper.getPhotoPath(row.churchId, result.person);
     }
