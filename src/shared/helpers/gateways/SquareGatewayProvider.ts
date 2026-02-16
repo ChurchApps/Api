@@ -7,14 +7,14 @@ import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, Gate
 export class SquareGatewayProvider implements IGatewayProvider {
   readonly name = "square";
 
-  async createWebhookEndpoint(config: GatewayConfig, _webhookUrl: string): Promise<{ id: string }> {
+  async createWebhookEndpoint(_config: GatewayConfig, _webhookUrl: string): Promise<{ id: string }> {
     // TODO: Implement Square webhook creation when SDK is available
     // Square webhooks are configured through the Square Developer Dashboard
     // or via the Webhooks API
     return { id: `sq_webhook_${Date.now()}` };
   }
 
-  async deleteWebhooksByChurchId(config: GatewayConfig, _churchId: string): Promise<void> {
+  async deleteWebhooksByChurchId(_config: GatewayConfig, _churchId: string): Promise<void> {
     // TODO: Implement Square webhook deletion when SDK is available
     // Square webhooks would need to be identified and deleted via API
   }
@@ -40,7 +40,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
         eventData: body.data?.object || body.data,
         eventId: body.event_id || body.id
       };
-    } catch (_error) {
+    } catch {
       return { success: false, shouldProcess: false };
     }
   }
@@ -119,7 +119,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     }
   }
 
-  async updateSubscription(config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
+  async updateSubscription(_config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
     // Square subscriptions are typically updated by canceling and creating new ones
     // TODO: Implement proper update logic when Square SDK is available
     throw new Error("Square subscription updates not yet implemented");
@@ -149,7 +149,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
         if (data?.transFeeSquare != null && data.transFeeSquare !== "") {
           customPercentFee = +data.transFeeSquare / 100;
         }
-      } catch (_error) {
+      } catch {
         // Use default fees if settings fetch fails
       }
     }
@@ -161,7 +161,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     await SquareHelper.logEvent(churchId, event, eventData, repos);
   }
 
-  async createProduct(config: GatewayConfig, churchId: string): Promise<string> {
+  async createProduct(_config: GatewayConfig, churchId: string): Promise<string> {
     // Square uses catalog items/plans instead of products
     // TODO: Implement catalog item creation when Square SDK is available
     return `square-catalog-${churchId}`;
@@ -190,7 +190,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
     );
   }
 
-  async getCustomerSubscriptions(config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<any> {
     // TODO: Implement when Square SDK is available
     // Square doesn't have a direct API to list subscriptions by customer
     return [];
@@ -259,7 +259,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
   }
 
   // Subscription plan management
-  async createSubscriptionPlan(config: GatewayConfig, _planData: any): Promise<string> {
+  async createSubscriptionPlan(_config: GatewayConfig, _planData: any): Promise<string> {
     // TODO: Implement Square catalog plan creation when SDK is available
     // Square subscriptions use catalog objects (items/variations) as plans
     return `sq_plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

@@ -50,7 +50,7 @@ export const createApp = async () => {
     );
 
     // Handle preflight requests early
-    app.options("*", (req, res) => {
+    app.options("*", (_req, res) => {
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
       res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
@@ -62,7 +62,7 @@ export const createApp = async () => {
 
     if (isLambdaEnvironment) {
       // Lambda-specific body parsing for @codegenie/serverless-express
-      app.use((req, res, next) => {
+      app.use((req, _res, next) => {
         const contentType = req.headers["content-type"] || "";
         // Check if this is a webhook endpoint that needs raw body
         const isWebhookEndpoint = req.path.includes("/donate/webhook/");
@@ -139,7 +139,7 @@ export const createApp = async () => {
     configureModuleRoutes(app);
 
     // Health check endpoint
-    app.get("/health", (req, res) => {
+    app.get("/health", (_req, res) => {
       res.json({
         status: "healthy",
         timestamp: new Date().toISOString(),
@@ -149,7 +149,7 @@ export const createApp = async () => {
     });
 
     // API documentation endpoint
-    app.get("/", (req, res) => {
+    app.get("/", (_req, res) => {
       res.json({
         name: "Core API",
         version: "1.0.0",
@@ -168,7 +168,7 @@ export const createApp = async () => {
 
   server.setErrorConfig((app) => {
     // Global error handler
-    app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
       console.error("Global error handler:", error);
 
       const statusCode = error.statusCode || error.status || 500;

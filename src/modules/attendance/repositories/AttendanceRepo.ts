@@ -79,7 +79,7 @@ export class AttendanceRepo extends BaseRepo<AttendanceRecord> {
   }
 
   // Override the base convertToModel to use rowToModel
-  public convertToModel(churchId: string, data: any): AttendanceRecord {
+  public convertToModel(_churchId: string, data: any): AttendanceRecord {
     return this.rowToModel(data);
   }
 

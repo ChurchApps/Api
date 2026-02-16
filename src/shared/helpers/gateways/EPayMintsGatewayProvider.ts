@@ -7,13 +7,13 @@ import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, Gate
 export class EPayMintsGatewayProvider implements IGatewayProvider {
   readonly name = "epaymints";
 
-  async createWebhookEndpoint(config: GatewayConfig, _webhookUrl: string): Promise<{ id: string }> {
+  async createWebhookEndpoint(_config: GatewayConfig, _webhookUrl: string): Promise<{ id: string }> {
     // TODO: Implement ePayMints webhook creation if supported
     // ePayMints may not support webhooks, requiring polling instead
     return { id: `epm_webhook_${Date.now()}` };
   }
 
-  async deleteWebhooksByChurchId(config: GatewayConfig, _churchId: string): Promise<void> {
+  async deleteWebhooksByChurchId(_config: GatewayConfig, _churchId: string): Promise<void> {
     // TODO: Implement ePayMints webhook deletion if supported
     // May be a no-op if webhooks aren't supported
   }
@@ -39,7 +39,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
         eventData: body.data || body,
         eventId: body.transaction_id || body.id
       };
-    } catch (_error) {
+    } catch {
       return { success: false, shouldProcess: false };
     }
   }
@@ -98,17 +98,17 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     }
   }
 
-  async createSubscription(config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
+  async createSubscription(_config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
     // ePayMints typically doesn't support native subscriptions
     // This would need to be handled via scheduled payments or external logic
     throw new Error("ePayMints does not support native subscription creation. Use scheduled payments instead.");
   }
 
-  async updateSubscription(config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
+  async updateSubscription(_config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
     throw new Error("ePayMints does not support subscription updates");
   }
 
-  async cancelSubscription(config: GatewayConfig, _subscriptionId: string, _reason?: string): Promise<void> {
+  async cancelSubscription(_config: GatewayConfig, _subscriptionId: string, _reason?: string): Promise<void> {
     throw new Error("ePayMints does not support subscription cancellation");
   }
 
@@ -131,7 +131,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
         if (data?.preferredMethodEPayMints === "ach") {
           paymentMethod = "ach";
         }
-      } catch (_error) {
+      } catch {
         // Use default fees if settings fetch fails
       }
     }
@@ -143,7 +143,7 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     await EPayMintsHelper.logEvent(churchId, event, eventData, repos);
   }
 
-  async createProduct(config: GatewayConfig, churchId: string): Promise<string> {
+  async createProduct(_config: GatewayConfig, churchId: string): Promise<string> {
     // ePayMints doesn't use product concepts like Stripe
     return `epaymints-terminal-${churchId}`;
   }
@@ -178,12 +178,12 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     );
   }
 
-  async getCustomerSubscriptions(config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<any> {
     // ePayMints doesn't support native subscriptions
     return [];
   }
 
-  async getCustomerPaymentMethods(config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerPaymentMethods(_config: GatewayConfig, _customerId: string): Promise<any> {
     // ePayMints doesn't support stored payment methods/vault
     return [];
   }

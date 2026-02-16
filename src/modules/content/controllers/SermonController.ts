@@ -24,7 +24,7 @@ export class SermonController extends ContentBaseController {
   // }
 
   @httpGet("/public/freeshowSample")
-  public async getFreeShow(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getFreeShow(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
       const result = {
         id: "freeshow",

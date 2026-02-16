@@ -45,7 +45,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
         eventData,
         eventId: stripeEvent.id
       };
-    } catch (_error) {
+    } catch {
       return { success: false, shouldProcess: false };
     }
   }

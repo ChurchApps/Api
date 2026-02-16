@@ -180,7 +180,7 @@ export class StripeHelper {
     let legacyBanks: Stripe.ApiList<Stripe.CustomerSource> = { data: [], has_more: false, object: "list", url: "" };
     try {
       legacyBanks = await stripe.customers.listSources(customer.id, { object: "bank_account" });
-    } catch (_e) {
+    } catch {
       // Sources API may be deprecated - ignore errors
     }
 

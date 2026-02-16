@@ -6,7 +6,7 @@ import { BridgeBaseController } from "./BridgeBaseController.js";
 export class ActionController extends BridgeBaseController {
   @httpGet("/test")
   public async get(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       return [];
     });
   }

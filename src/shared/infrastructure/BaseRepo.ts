@@ -41,12 +41,12 @@ export abstract class BaseRepo<T> {
   }
 
   // Default converters to match repository usage patterns
-  public convertToModel(churchId: string, data: any): T {
+  public convertToModel(_churchId: string, data: any): T {
     if (!data) return null;
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(churchId: string, data: any): T[] {
+  public convertAllToModel(_churchId: string, data: any): T[] {
     return this.mapToModels(data);
   }
 

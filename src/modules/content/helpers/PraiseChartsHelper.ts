@@ -18,12 +18,12 @@ export class PraiseChartsHelper {
     return new OAuth({
       consumer: {
         key: Environment.praiseChartsConsumerKey,
-        secret: Environment.praiseChartsConsumerSecret,
+        secret: Environment.praiseChartsConsumerSecret
       },
       signature_method: "HMAC-SHA1",
       hash_function(baseString, key) {
         return crypto.createHmac("sha1", key).update(baseString).digest("base64");
-      },
+      }
     });
   }
 
@@ -32,19 +32,19 @@ export class PraiseChartsHelper {
     const requestData = {
       url: "https://api.praisecharts.com/oauth/request_token",
       method: "POST",
-      data: { oauth_callback: returnUrl },
+      data: { oauth_callback: returnUrl }
     };
     const headers = oauth.toHeader(oauth.authorize(requestData));
     const response = await fetch(requestData.url, {
       method: "POST",
-      headers: headers as unknown as HeadersInit,
+      headers: headers as unknown as HeadersInit
     });
     if (!response.ok) throw new Error(`Request token failed: ${response.statusText}`);
     const text = await response.text();
     const params = new URLSearchParams(text);
     return {
       oauthToken: params.get("oauth_token") || "",
-      oauthTokenSecret: params.get("oauth_token_secret") || "",
+      oauthTokenSecret: params.get("oauth_token_secret") || ""
     };
   }
 
@@ -58,19 +58,19 @@ export class PraiseChartsHelper {
     const requestData = {
       url: "https://api.praisecharts.com/oauth/access_token",
       method: "POST",
-      data: { oauth_verifier: oauthVerifier },
+      data: { oauth_verifier: oauthVerifier }
     };
     const headers = oauth.toHeader(oauth.authorize(requestData, token));
     const response = await fetch(requestData.url, {
       method: "POST",
-      headers: headers as unknown as HeadersInit,
+      headers: headers as unknown as HeadersInit
     });
     if (!response.ok) throw new Error(`Access token failed: ${response.statusText}`);
     const text = await response.text();
     const params = new URLSearchParams(text);
     return {
       accessToken: params.get("oauth_token") || "",
-      accessTokenSecret: params.get("oauth_token_secret") || "",
+      accessTokenSecret: params.get("oauth_token_secret") || ""
     };
   }
 
@@ -79,9 +79,7 @@ export class PraiseChartsHelper {
     const token = { key: accessToken, secret: accessTokenSecret };
     const requestData = { url, method: "GET" };
     const headers = oauth.toHeader(oauth.authorize(requestData, token));
-    const response = await fetch(url, {
-      headers: headers as unknown as HeadersInit,
-    });
+    const response = await fetch(url, { headers: headers as unknown as HeadersInit });
     if (!response.ok) throw new Error(`OAuth GET failed: ${response.statusText}`);
     return response.json();
   }
