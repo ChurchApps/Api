@@ -64,7 +64,7 @@ export class CrudHelper {
   }
 
   // Controller-wrapped variants (use controller's action wrappers and repositories)
-  static getByIdWrapped(ctrl: any, req: express.Request, res: express.Response, permission: any | null, _repoKey: string, id: string) {
+  static getByIdWrapped(ctrl: any, req: express.Request, res: express.Response, permission: any | null, repoKey: string, id: string) {
     return (ctrl as any).actionWrapper(req, res, async (au: any) => {
       if (permission && !au.checkAccess(permission)) {
         return (ctrl as any).json({ error: `User lacks ${permission} permission` }, 401);
