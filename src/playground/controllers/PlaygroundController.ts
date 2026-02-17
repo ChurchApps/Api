@@ -32,7 +32,7 @@ export class PlaygroundController extends GivingBaseController {
 
   // Serve the playground HTML page
   @httpGet("/")
-  public async getPlaygroundPage(req: Request, res: Response): Promise<void> {
+  public async getPlaygroundPage(_req: Request, res: Response): Promise<void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -45,14 +45,14 @@ export class PlaygroundController extends GivingBaseController {
       const htmlContent = fs.readFileSync(htmlPath, "utf8");
       res.setHeader("Content-Type", "text/html");
       res.send(htmlContent);
-    } catch (_error) {
+    } catch {
       res.status(404).json({ error: "Playground page not found" });
     }
   }
 
   // Serve the compiled playground JavaScript file
   @httpGet("/playground.js")
-  public async getPlaygroundJS(req: Request, res: Response): Promise<void> {
+  public async getPlaygroundJS(_req: Request, res: Response): Promise<void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -74,14 +74,14 @@ export class PlaygroundController extends GivingBaseController {
         res.setHeader("Content-Type", "application/javascript");
         res.send(jsContent);
       }
-    } catch (_error) {
+    } catch {
       res.status(404).json({ error: "Playground script not found" });
     }
   }
 
   // Serve the source map for debugging
   @httpGet("/playground.js.map")
-  public async getPlaygroundSourceMap(req: Request, res: Response): Promise<void> {
+  public async getPlaygroundSourceMap(_req: Request, res: Response): Promise<void> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -94,7 +94,7 @@ export class PlaygroundController extends GivingBaseController {
       const mapContent = fs.readFileSync(mapPath, "utf8");
       res.setHeader("Content-Type", "application/json");
       res.send(mapContent);
-    } catch (_error) {
+    } catch {
       res.status(404).json({ error: "Source map not found" });
     }
   }
@@ -572,7 +572,7 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   @httpGet("/gateway/providers")
-  public async getAvailableProviders(req: Request, res: Response): Promise<any> {
+  public async getAvailableProviders(_req: Request, res: Response): Promise<any> {
     if (!this.isPlaygroundEnabled()) {
       return this.sendDisabledResponse(res);
     }
@@ -584,36 +584,64 @@ export class PlaygroundController extends GivingBaseController {
           name: "stripe",
           displayName: "Stripe",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createCustomer", "createWebhookEndpoint",
-            "getCustomerSubscriptions", "getCustomerPaymentMethods", "attachPaymentMethod",
-            "detachPaymentMethod", "updateCard", "createBankAccount", "updateBank",
-            "verifyBank", "deleteBankAccount", "createProduct"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createCustomer",
+            "createWebhookEndpoint",
+            "getCustomerSubscriptions",
+            "getCustomerPaymentMethods",
+            "attachPaymentMethod",
+            "detachPaymentMethod",
+            "updateCard",
+            "createBankAccount",
+            "updateBank",
+            "verifyBank",
+            "deleteBankAccount",
+            "createProduct"
           ]
         },
         {
           name: "paypal",
           displayName: "PayPal",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createWebhookEndpoint", "generateClientToken",
-            "createOrder", "createSubscriptionPlan", "createSubscriptionWithPlan"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createWebhookEndpoint",
+            "generateClientToken",
+            "createOrder",
+            "createSubscriptionPlan",
+            "createSubscriptionWithPlan"
           ]
         },
         {
           name: "square",
           displayName: "Square",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createCustomer", "createWebhookEndpoint"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createCustomer",
+            "createWebhookEndpoint"
           ]
         },
         {
           name: "epaymints",
           displayName: "EPayMints",
           supportedMethods: [
-            "calculateFees", "processCharge", "createSubscription", "updateSubscription",
-            "cancelSubscription", "createWebhookEndpoint"
+            "calculateFees",
+            "processCharge",
+            "createSubscription",
+            "updateSubscription",
+            "cancelSubscription",
+            "createWebhookEndpoint"
           ]
         }
       ]
@@ -685,16 +713,11 @@ export class PlaygroundController extends GivingBaseController {
 
   private getGatewayProvider(provider: string): IGatewayProvider {
     switch (provider.toLowerCase()) {
-      case "stripe":
-        return new StripeGatewayProvider();
-      case "paypal":
-        return new PayPalGatewayProvider();
-      case "square":
-        return new SquareGatewayProvider();
-      case "epaymints":
-        return new EPayMintsGatewayProvider();
-      default:
-        throw new Error(`Unsupported gateway provider: ${provider}`);
+      case "stripe": return new StripeGatewayProvider();
+      case "paypal": return new PayPalGatewayProvider();
+      case "square": return new SquareGatewayProvider();
+      case "epaymints": return new EPayMintsGatewayProvider();
+      default: throw new Error(`Unsupported gateway provider: ${provider}`);
     }
   }
 }

@@ -11,8 +11,12 @@ export class DeviceRepo extends ConfiguredRepo<Device> {
     return {
       tableName: "devices",
       hasSoftDelete: false,
-      insertColumns: ["appName", "deviceId", "churchId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"],
-      updateColumns: ["appName", "deviceId", "churchId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"]
+      insertColumns: [
+        "appName", "deviceId", "churchId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"
+      ],
+      updateColumns: [
+        "appName", "deviceId", "churchId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"
+      ]
     };
   }
 

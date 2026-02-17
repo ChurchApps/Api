@@ -151,7 +151,7 @@ export class VisitSessionController extends AttendanceBaseController {
   }
 
   @httpDelete("/")
-  public async deleteSessionPerson(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+  public async deleteSessionPerson(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const personId = req.query.personId.toString();
       const sessionId = req.query.sessionId.toString();

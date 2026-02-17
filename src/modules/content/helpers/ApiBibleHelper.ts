@@ -154,9 +154,7 @@ export class ApiBibleHelper {
   }
 
   static async getContent(url: string) {
-    const resp = await axios.get(url, {
-      headers: { "api-key": Environment.apiBibleKey }
-    });
+    const resp = await axios.get(url, { headers: { "api-key": Environment.apiBibleKey } });
     const json: any = resp.data;
     return json;
   }

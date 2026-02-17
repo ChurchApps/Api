@@ -10,7 +10,9 @@ export class EventRepo extends ConfiguredRepo<Event> {
     return {
       tableName: "events",
       hasSoftDelete: false,
-      columns: ["groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule"]
+      columns: [
+        "groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule"
+      ]
     };
   }
 

@@ -56,7 +56,7 @@ export class RolePermissionController extends MembershipBaseController {
     });
   }
 
-  private async checkAccess(permissions: RolePermission[], permission: IPermission, au: AuthenticatedUser) {
+  private async checkAccess(_permissions: RolePermission[], permission: IPermission, au: AuthenticatedUser) {
     const hasAccess = au.checkAccess(permission);
     /*
     if (hasAccess) {

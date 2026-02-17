@@ -5,7 +5,7 @@ import { Environment } from "../helpers/index.js";
 @controller("/health")
 export class HealthController {
   @httpGet("/database-connections")
-  public async checkDatabaseConnections(req: express.Request, res: express.Response): Promise<any> {
+  public async checkDatabaseConnections(_req: express.Request, res: express.Response): Promise<any> {
     try {
       const connectionStatus = Environment.getConnectionStatus();
       const allDatabaseConfigs = Environment.getAllDatabaseConfigs();
@@ -50,7 +50,7 @@ export class HealthController {
   }
 
   @httpGet("/")
-  public async healthCheck(req: express.Request, res: express.Response): Promise<any> {
+  public async healthCheck(_req: express.Request, res: express.Response): Promise<any> {
     try {
       const connectionStatus = Environment.getConnectionStatus();
       const isHealthy = connectionStatus.missing.length === 0;
@@ -74,7 +74,7 @@ export class HealthController {
   }
 
   @httpGet("/environment")
-  public async environmentInfo(req: express.Request, res: express.Response): Promise<any> {
+  public async environmentInfo(_req: express.Request, res: express.Response): Promise<any> {
     try {
       return res.json({
         environment: Environment.currentEnvironment,

@@ -31,8 +31,8 @@ export class ContentProviderAuthController extends DoingCrudController {
   public async getByMinistryAndProvider(
     @requestParam("ministryId") ministryId: string,
     @requestParam("providerId") providerId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId);

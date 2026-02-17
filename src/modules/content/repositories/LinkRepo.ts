@@ -23,7 +23,9 @@ export class LinkRepo extends ConfiguredRepo<Link> {
     return {
       tableName: "links",
       hasSoftDelete: false,
-      columns: ["category", "url", "linkType", "linkData", "photo", "icon", "text", "sort", "parentId", "visibility", "groupIds"]
+      columns: [
+        "category", "url", "linkType", "linkData", "photo", "icon", "text", "sort", "parentId", "visibility", "groupIds"
+      ]
     };
   }
 
@@ -82,9 +84,7 @@ export class LinkRepo extends ConfiguredRepo<Link> {
   }
 
   protected rowToModel(row: any): Link {
-    const result = {
-      ...row
-    };
+    const result = { ...row };
     if (result.photo === undefined) {
       if (!result.photoUpdated) {
         result.photo = "";

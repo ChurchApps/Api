@@ -21,8 +21,8 @@ export class MemberPermissionRepo extends ConfiguredRepo<MemberPermission> {
     return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE churchId=? and contentType='form' and contentId=? and memberId=?;", [churchId, formId, personId]);
   }
 
-  public loadByEmailNotification(churchId: string, emailNotification: boolean) {
-    return TypedDB.query("SELECT * FROM memberPermissions WHERE churchId=? AND emailNotification=?;", [churchId, emailNotification]);
+  public loadByEmailNotification(churchId: string, contentType: string, contentId: string, emailNotification: boolean) {
+    return TypedDB.query("SELECT * FROM memberPermissions WHERE churchId=? AND contentType=? AND contentId=? AND emailNotification=?;", [churchId, contentType, contentId, emailNotification]);
   }
 
   public loadFormsByPerson(churchId: string, personId: string) {

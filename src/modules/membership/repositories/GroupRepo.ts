@@ -10,7 +10,9 @@ export class GroupRepo extends ConfiguredRepo<Group> {
       tableName: "groups",
       hasSoftDelete: true,
       removedColumn: "removed",
-      columns: ["categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"],
+      columns: [
+        "categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"
+      ],
       insertLiterals: { removed: "0" }
     };
   }
@@ -50,9 +52,7 @@ export class GroupRepo extends ConfiguredRepo<Group> {
   }
 
   public loadAll(churchId: string) {
-    return TypedDB.query("SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM `groups` g WHERE churchId=? AND removed=0 ORDER by categoryName, name;", [
-      churchId
-    ]);
+    return TypedDB.query("SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM `groups` g WHERE churchId=? AND removed=0 ORDER by categoryName, name;", [churchId]);
   }
 
   public loadAllForPerson(personId: string) {

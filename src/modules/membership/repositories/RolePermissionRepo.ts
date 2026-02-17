@@ -131,13 +131,15 @@ export class RolePermissionRepo extends ConfiguredRepo<RolePermission> {
         currentApi = { keyName: row.apiName, permissions: [] };
         result.apis.push(currentApi);
         // Apply universal permissions
-        if (univeralChurch !== null)
+        if (univeralChurch !== null) {
           univeralChurch.apis.forEach((universalApi) => {
-            if (universalApi.keyName === currentApi.keyName)
+            if (universalApi.keyName === currentApi.keyName) {
               universalApi.permissions.forEach((perm) => {
                 currentApi.permissions.push(perm);
               });
+            }
           });
+        }
       }
 
       const permission: RolePermission = { action: row.action, contentId: row.contentId, contentType: row.contentType };

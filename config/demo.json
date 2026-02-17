@@ -11,5 +11,6 @@
   "supportEmail": "support@churchapps.org",
   "b1AdminRoot": "https://demo.b1.church",
   "messagingApi": "https://api.demo.churchapps.org/messaging",
-  "aiProvider": "openrouter"
+  "aiProvider": "openrouter",
+  "storeApi": "https://api.staging.mutualministry.com"
 }

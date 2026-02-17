@@ -2,7 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken, OAuthDeviceCode } from "../models/index.js";
-import { Permissions, UniqueIdHelper } from "../helpers/index.js";
+import { Permissions, UniqueIdHelper, UserHelper } from "../helpers/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { OAuthDeviceCodeRepo } from "../repositories/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
@@ -117,6 +117,8 @@ export class OAuthController extends MembershipBaseController {
         if (permissionData) {
           loginUserChurch.apis = permissionData.apis;
         }
+        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
+        UserHelper.addAllReportingPermissions([loginUserChurch]);
 
         // Create access token
         const token: OAuthToken = {
@@ -167,6 +169,8 @@ export class OAuthController extends MembershipBaseController {
         if (permissionData) {
           loginUserChurch.apis = permissionData.apis;
         }
+        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
+        UserHelper.addAllReportingPermissions([loginUserChurch]);
 
         // Create new access token with proper JWT
         const token: OAuthToken = {
@@ -247,7 +251,7 @@ export class OAuthController extends MembershipBaseController {
   /**
    * Handle device_code grant type (called from /token endpoint)
    */
-  private async handleDeviceCodeGrant(deviceCode: string, clientId: string, res: express.Response): Promise<any> {
+  private async handleDeviceCodeGrant(deviceCode: string, clientId: string, _res: express.Response): Promise<any> {
     if (!deviceCode) {
       return this.json({ error: "invalid_request", error_description: "device_code required" }, 400);
     }
@@ -267,13 +271,10 @@ export class OAuthController extends MembershipBaseController {
 
     // Check status
     switch (dc.status) {
-      case "pending":
-        return this.json({ error: "authorization_pending" }, 400);
-
+      case "pending": return this.json({ error: "authorization_pending" }, 400);
       case "denied":
         await this.repos.oAuthDeviceCode.delete(dc.id);
         return this.json({ error: "access_denied" }, 400);
-
       case "approved":
         // Generate tokens using the stored userChurchId
         const userChurch = (await this.repos.userChurch.load(dc.userChurchId)) as any;
@@ -305,6 +306,8 @@ export class OAuthController extends MembershipBaseController {
         if (permissionData) {
           loginUserChurch.apis = permissionData.apis;
         }
+        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
+        UserHelper.addAllReportingPermissions([loginUserChurch]);
 
         // Create access token
         const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch);
@@ -343,7 +346,7 @@ export class OAuthController extends MembershipBaseController {
    */
   @httpGet("/device/pending/:userCode")
   public async getPendingDevice(@requestParam("userCode") userCode: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(userCode);
 
       if (!dc) {
@@ -398,7 +401,7 @@ export class OAuthController extends MembershipBaseController {
    */
   @httpPost("/device/deny")
   public async denyDevice(req: express.Request<{}, {}, { user_code: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const { user_code } = req.body;
 
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(user_code);
@@ -424,7 +427,7 @@ export class OAuthController extends MembershipBaseController {
 
   @httpGet("/clients/clientId/:clientId")
   public async getClientByClientId(@requestParam("clientId") clientId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const result = (await this.repos.oAuthClient.loadByClientId(clientId)) as any;
       result.clientSecret = null;
       return result;

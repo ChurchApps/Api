@@ -63,7 +63,7 @@ export class SquareHelper {
   }
 
   // Payment Methods (Cards)
-  static async createCard(accessToken: string, environment: string, cardData: {
+  static async createCard(_accessToken: string, _environment: string, cardData: {
     customerId: string;
     cardNonce: string;
     billingAddress?: any;
@@ -125,7 +125,7 @@ export class SquareHelper {
   }
 
   // Payments
-  static async createPayment(accessToken: string, environment: string, paymentData: {
+  static async createPayment(_accessToken: string, _environment: string, paymentData: {
     amount: number;
     currency?: string;
     sourceId: string; // card ID or nonce
@@ -173,7 +173,7 @@ export class SquareHelper {
   }
 
   // Subscriptions
-  static async createSubscription(accessToken: string, environment: string, subscriptionData: {
+  static async createSubscription(_accessToken: string, _environment: string, subscriptionData: {
     customerId: string;
     locationId: string;
     planId: string;
@@ -230,7 +230,7 @@ export class SquareHelper {
       // TODO: Implement Square webhook signature validation
       // Use Square's webhook signature validation logic
       return true; // Mock validation for now
-    } catch (_error) {
+    } catch {
       return false;
     }
   }
@@ -259,7 +259,7 @@ export class SquareHelper {
     return givingRepos.eventLog.save(eventLog);
   }
 
-  static async logDonation(accessToken: string, environment: string, churchId: string, eventData: any, givingRepos: any): Promise<any> {
+  static async logDonation(_accessToken: string, _environment: string, churchId: string, eventData: any, givingRepos: any): Promise<any> {
     const amount = parseFloat(eventData.amount_money?.amount || "0") / 100; // Square uses cents
     const customerId = eventData.customer_id || "";
     const customerData = customerId ? await givingRepos.customer.load(churchId, customerId) : null;

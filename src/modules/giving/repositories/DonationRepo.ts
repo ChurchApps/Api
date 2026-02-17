@@ -12,7 +12,9 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     return {
       tableName: "donations",
       hasSoftDelete: false,
-      columns: ["batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes", "entryTime", "status", "transactionId"]
+      columns: [
+        "batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes", "entryTime", "status", "transactionId"
+      ]
     };
   }
   // Override save to handle empty personId conversion
@@ -146,15 +148,15 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     await TypedDB.query(sql, [status, churchId, transactionId]);
   }
 
-  public convertToModel(churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: any) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(churchId: string, data: any) {
+  public convertAllToModel(_churchId: string, data: any) {
     return CollectionHelper.convertAll<Donation>(data, (d: any) => this.rowToModel(d));
   }
 
-  public convertAllToSummary(churchId: string, data: any[]) {
+  public convertAllToSummary(_churchId: string, data: any[]) {
     const result: DonationSummary[] = [];
     data.forEach((d) => {
       const week = d.week;
@@ -168,7 +170,7 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     return result;
   }
 
-  public convertAllToPersonSummary(churchId: string, data: any[]) {
+  public convertAllToPersonSummary(_churchId: string, data: any[]) {
     const result: { personId: string; totalAmount: number; funds: { [fundName: string]: number }[] }[] = [];
     const checkDecimals = (value: number) => {
       if (value === Math.floor(value)) {

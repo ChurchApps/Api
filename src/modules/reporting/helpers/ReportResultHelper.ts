@@ -26,7 +26,7 @@ export class ReportResultHelper {
     return result;
   }
 
-  private static findRelatedData(mainRow: any, queryData: any[], report: Report): any {
+  private static findRelatedData(_mainRow: any, queryData: any[], _report: Report): any {
     const result: any = {};
 
     queryData.forEach((data) => {

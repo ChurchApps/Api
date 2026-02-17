@@ -13,9 +13,7 @@ export class EventLogRepo extends ConfiguredRepo<EventLog> {
       idColumn: "id", // Now char(11) generated ID
       insertColumns: ["customerId", "provider", "providerId", "eventType", "message", "status", "created"],
       updateColumns: ["resolved"],
-      insertLiterals: {
-        resolved: "FALSE" // Always false on insert
-      }
+      insertLiterals: { resolved: "FALSE" }
     };
   }
 
@@ -23,7 +21,9 @@ export class EventLogRepo extends ConfiguredRepo<EventLog> {
   protected async create(model: EventLog): Promise<EventLog> {
     if (!model.id) model.id = this.createId();
     const sql = "INSERT INTO eventLogs (id, churchId, customerId, provider, providerId, eventType, message, status, created, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [model.id, model.churchId, model.customerId, model.provider, model.providerId, model.eventType, model.message, model.status, model.created, false];
+    const params = [
+      model.id, model.churchId, model.customerId, model.provider, model.providerId, model.eventType, model.message, model.status, model.created, false
+    ];
     await TypedDB.query(sql, params);
     return model;
   }

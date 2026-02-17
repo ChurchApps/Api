@@ -45,12 +45,9 @@ export const handleSocket = async (event: APIGatewayProxyEvent, context: Context
     // Run within messaging module context
     return await TypedDB.runWithContext("messaging", async () => {
       switch (eventType) {
-        case "CONNECT":
-          return await handleConnect(event, context);
-        case "DISCONNECT":
-          return await handleDisconnect(event, context);
-        case "MESSAGE":
-          return await handleMessage(event, context);
+        case "CONNECT": return await handleConnect(event, context);
+        case "DISCONNECT": return await handleDisconnect(event, context);
+        case "MESSAGE": return await handleMessage(event, context);
         default:
           console.log("Unknown eventType:", eventType);
           return { statusCode: 400, body: "Unknown event type" };

@@ -450,16 +450,11 @@ export class PersonController extends MembershipBaseController {
 
   private shouldShowInDirectory(membershipStatus: string, directoryVisibility: string): boolean {
     switch (directoryVisibility) {
-      case "Staff":
-        return membershipStatus === "Staff";
-      case "Members":
-        return membershipStatus === "Member" || membershipStatus === "Staff";
-      case "Regular Attendees":
-        return membershipStatus === "Regular Attendee" || membershipStatus === "Member" || membershipStatus === "Staff";
-      case "Everyone":
-        return membershipStatus === "Visitor" || membershipStatus === "Regular Attendee" || membershipStatus === "Member" || membershipStatus === "Staff";
-      default:
-        return membershipStatus === "Member" || membershipStatus === "Staff";
+      case "Staff": return membershipStatus === "Staff";
+      case "Members": return membershipStatus === "Member" || membershipStatus === "Staff";
+      case "Regular Attendees": return membershipStatus === "Regular Attendee" || membershipStatus === "Member" || membershipStatus === "Staff";
+      case "Everyone": return membershipStatus === "Visitor" || membershipStatus === "Regular Attendee" || membershipStatus === "Member" || membershipStatus === "Staff";
+      default: return membershipStatus === "Member" || membershipStatus === "Staff";
     }
   }
 

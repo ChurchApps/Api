@@ -9,7 +9,9 @@ export class BibleTranslationRepo extends GlobalConfiguredRepo<BibleTranslation>
     return {
       tableName: "bibleTranslations",
       hasSoftDelete: false,
-      columns: ["abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"],
+      columns: [
+        "abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"
+      ],
       defaultOrderBy: "name"
     };
   }

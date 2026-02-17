@@ -189,7 +189,7 @@ export class VisitController extends AttendanceBaseController {
     });
   }
 
-  private populateDeleteIds(existingVisits: Visit[], submittedVisits: Visit[], visitSessions: VisitSession[], deleteVisitIds: string[], deleteVisitSessionIds: string[]) {
+  private populateDeleteIds(existingVisits: Visit[], _submittedVisits: Visit[], visitSessions: VisitSession[], deleteVisitIds: string[], deleteVisitSessionIds: string[]) {
     existingVisits.forEach((existingVisit) => {
       existingVisit.visitSessions = [];
       visitSessions.forEach((vs) => {

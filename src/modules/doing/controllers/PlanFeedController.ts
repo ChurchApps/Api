@@ -91,8 +91,8 @@ export class PlanFeedController extends DoingBaseController {
   public async getForPresenter(
     @requestParam("churchId") churchId: string,
     @requestParam("planId") planId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       // First try to get existing plan items

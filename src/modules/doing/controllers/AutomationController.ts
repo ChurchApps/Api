@@ -7,7 +7,7 @@ import { AutomationHelper } from "../helpers/AutomationHelper.js";
 @controller("/doing/automations")
 export class AutomationController extends DoingBaseController {
   @httpGet("/check")
-  public async tempCheck(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async tempCheck(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       await AutomationHelper.checkAll();
       return { success: true };

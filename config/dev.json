@@ -11,5 +11,6 @@
   "supportEmail": "support@churchapps.org",
   "b1AdminRoot": "https://admin.staging.b1.church",
   "messagingApi": "https://api.staging.churchapps.org/messaging",
-  "aiProvider": "openrouter"
+  "aiProvider": "openrouter",
+  "storeApi": "http://localhost:8096"
 }

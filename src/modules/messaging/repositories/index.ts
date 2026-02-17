@@ -8,4 +8,6 @@ export { MessageRepo } from "./MessageRepo.js";
 export { NotificationRepo } from "./NotificationRepo.js";
 export { NotificationPreferenceRepo } from "./NotificationPreferenceRepo.js";
 export { PrivateMessageRepo } from "./PrivateMessageRepo.js";
+export { TextingProviderRepo } from "./TextingProviderRepo.js";
+export { SentTextRepo } from "./SentTextRepo.js";
 export { Repos } from "./Repos.js";

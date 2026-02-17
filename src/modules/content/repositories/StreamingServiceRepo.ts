@@ -10,7 +10,9 @@ export class StreamingServiceRepo extends ConfiguredRepo<StreamingService> {
     return {
       tableName: "streamingServices",
       hasSoftDelete: false,
-      columns: ["serviceTime", "earlyStart", "chatBefore", "chatAfter", "provider", "providerKey", "videoUrl", "timezoneOffset", "recurring", "label", "sermonId"]
+      columns: [
+        "serviceTime", "earlyStart", "chatBefore", "chatAfter", "provider", "providerKey", "videoUrl", "timezoneOffset", "recurring", "label", "sermonId"
+      ]
     };
   }
 

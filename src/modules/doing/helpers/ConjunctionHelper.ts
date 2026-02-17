@@ -46,10 +46,11 @@ export class ConjunctionHelper {
       peopleArrays.forEach((pa) => {
         if (pa.length === 1 && pa[0] === "*") result = ["*"];
       });
-      if (result.length === 0)
+      if (result.length === 0) {
         peopleArrays.forEach((pa) => {
           result = result.concat(pa);
         });
+      }
     } else {
       peopleArrays.forEach((pa) => {
         let allPeople = true;

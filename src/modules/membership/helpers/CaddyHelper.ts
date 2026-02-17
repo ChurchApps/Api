@@ -76,11 +76,7 @@ export class CaddyHelper {
         listen: [":80"],
         routes: [
           {
-            match: [
-              {
-                path: ["/.well-known/acme-challenge/*"]
-              }
-            ],
+            match: [{ path: ["/.well-known/acme-challenge/*"] }],
             handle: [
               {
                 handler: "static_response",
@@ -93,9 +89,7 @@ export class CaddyHelper {
               {
                 handler: "static_response",
                 status_code: 308,
-                headers: {
-                  Location: ["https://{http.request.host}{http.request.uri}"]
-                }
+                headers: { Location: ["https://{http.request.host}{http.request.uri}"] }
               }
             ]
           }
@@ -178,13 +172,7 @@ export class CaddyHelper {
                     protocol: "http",
                     tls: {}
                   },
-                  headers: {
-                    request: {
-                      set: {
-                        Host: ["{http.reverse_proxy.upstream.hostport}"]
-                      }
-                    }
-                  }
+                  headers: { request: { set: { Host: ["{http.reverse_proxy.upstream.hostport}"] } } }
                 }
               ]
             }
@@ -202,9 +190,7 @@ export class CaddyHelper {
         {
           handler: "static_response",
           status_code: 302,
-          headers: {
-            Location: ["https://" + host + "{http.request.uri}"]
-          }
+          headers: { Location: ["https://" + host + "{http.request.uri}"] }
         }
       ],
       terminal: true

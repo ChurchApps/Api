@@ -10,7 +10,9 @@ export class SermonRepo extends ConfiguredRepo<Sermon> {
     return {
       tableName: "sermons",
       hasSoftDelete: false,
-      columns: ["playlistId", "videoType", "videoData", "videoUrl", "title", "description", "publishDate", "thumbnail", "duration", "permanentUrl"]
+      columns: [
+        "playlistId", "videoType", "videoData", "videoUrl", "title", "description", "publishDate", "thumbnail", "duration", "permanentUrl"
+      ]
     };
   }
 

@@ -102,7 +102,7 @@ export class FormSubmissionController extends MembershipBaseController {
 
   private async sendEmails(formSubmission: FormSubmission, form: Form, churchId: string) {
     // send email to form members that have emailNotification set to true
-    const memberPermissions = (await this.repos.memberPermission.loadByEmailNotification(churchId, true)) as any;
+    const memberPermissions = (await this.repos.memberPermission.loadByEmailNotification(churchId, "form", form.id, true)) as any;
     const church: Church = await this.repos.church.loadById(churchId);
     if ((memberPermissions as any[])?.length > 0) {
       const ids = (memberPermissions as any[]).map((mp: MemberPermission) => mp.memberId);

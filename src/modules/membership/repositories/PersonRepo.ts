@@ -124,21 +124,11 @@ export class PersonRepo extends ConfiguredRepo<Person> {
   public loadMembersByVisibility(churchId: string, directoryVisibility: string) {
     let statusFilter: string;
     switch (directoryVisibility) {
-      case "Staff":
-        statusFilter = "('Staff')";
-        break;
-      case "Members":
-        statusFilter = "('Member', 'Staff')";
-        break;
-      case "Regular Attendees":
-        statusFilter = "('Regular Attendee', 'Member', 'Staff')";
-        break;
-      case "Everyone":
-        statusFilter = "('Visitor', 'Regular Attendee', 'Member', 'Staff')";
-        break;
-      default:
-        statusFilter = "('Member', 'Staff')";
-        break;
+      case "Staff": statusFilter = "('Staff')"; break;
+      case "Members": statusFilter = "('Member', 'Staff')"; break;
+      case "Regular Attendees": statusFilter = "('Regular Attendee', 'Member', 'Staff')"; break;
+      case "Everyone": statusFilter = "('Visitor', 'Regular Attendee', 'Member', 'Staff')"; break;
+      default: statusFilter = "('Member', 'Staff')"; break;
     }
     return TypedDB.query(`SELECT * FROM people WHERE churchId=? AND removed=0 and membershipStatus in ${statusFilter};`, [churchId]);
   }
@@ -259,7 +249,7 @@ export class PersonRepo extends ConfiguredRepo<Person> {
     return result;
   }
 
-  public convertToModelWithPermissions(churchId: string, data: any, canEdit: boolean) {
+  public convertToModelWithPermissions(_churchId: string, data: any, canEdit: boolean) {
     const result = this.rowToModel(data);
     if (!canEdit) delete result.conversationId;
     return result;

@@ -61,7 +61,7 @@ export class FileController extends ContentBaseController {
         if (totalBytes?.size > 100000000) return this.json({}, 401);
         else {
           let key = "/" + au.churchId + "/files/" + req.body.fileName;
-          if  (req.body.contentId) key = "/" + au.churchId + "/files/" + req.body.contentType + "/" + req.body.contentId + "/" + req.body.fileName;
+          if (req.body.contentId) key = "/" + au.churchId + "/files/" + req.body.contentType + "/" + req.body.contentId + "/" + req.body.fileName;
           const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key) : {};
           return result;
         }

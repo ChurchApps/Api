@@ -65,11 +65,11 @@ export class GatewayPaymentMethodRepo extends ConfiguredRepo<GatewayPaymentMetho
     };
   }
 
-  public convertToModel(churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: any) {
     return data ? this.rowToModel(data) : null;
   }
 
-  public convertAllToModel(churchId: string, data: any) {
+  public convertAllToModel(_churchId: string, data: any) {
     return this.mapToModels(data);
   }
 

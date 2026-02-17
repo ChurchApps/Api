@@ -12,7 +12,9 @@ export class SongDetailRepo extends ConfiguredRepo<SongDetail> {
     return {
       tableName: "songDetails",
       hasSoftDelete: false,
-      columns: ["praiseChartsId", "title", "artist", "album", "language", "thumbnail", "releaseDate", "bpm", "keySignature", "seconds", "meter", "tones"]
+      columns: [
+        "praiseChartsId", "title", "artist", "album", "language", "thumbnail", "releaseDate", "bpm", "keySignature", "seconds", "meter", "tones"
+      ]
     };
   }
 
@@ -102,7 +104,7 @@ export class SongDetailRepo extends ConfiguredRepo<SongDetail> {
     await TypedDB.query(sql, params);
     return songDetail;
   }
-  
+
   public save(songDetail: SongDetail) {
     return songDetail.id ? this.update(songDetail) : this.create(songDetail);
   }

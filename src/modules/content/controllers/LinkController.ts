@@ -32,24 +32,14 @@ export class LinkController extends ContentCrudController {
     const visibility = link.visibility || "everyone";
 
     switch (visibility) {
-      case "everyone":
-        return true;
-
-      case "visitors":
-        return !!au.personId;
-
+      case "everyone": return true;
+      case "visitors": return !!au.personId;
       case "members": {
         const status = au.membershipStatus?.toLowerCase();
         return status === "member" || status === "staff";
       }
-
-      case "staff":
-        return au.membershipStatus?.toLowerCase() === "staff";
-
-      case "team":
-        // Pass through to client - client will check group tags
-        return true;
-
+      case "staff": return au.membershipStatus?.toLowerCase() === "staff";
+      case "team": return true; // Pass through to client - client will check group tags
       case "groups": {
         if (!link.groupIds) return false;
         try {
@@ -60,9 +50,7 @@ export class LinkController extends ContentCrudController {
           return false;
         }
       }
-
-      default:
-        return true;
+      default: return true;
     }
   }
 

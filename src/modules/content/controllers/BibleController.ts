@@ -94,8 +94,8 @@ export class BibleController extends ContentBaseController {
   public async getVerses(
     @requestParam("translationKey") translationKey: string,
     @requestParam("chapterKey") chapterKey: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       let result = await this.repos.bibleVerse.loadByChapter(translationKey, chapterKey);
@@ -114,8 +114,8 @@ export class BibleController extends ContentBaseController {
     @requestParam("translationKey") translationKey: string,
     @requestParam("startVerseKey") startVerseKey: string,
     @requestParam("endVerseKey") endVerseKey: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const canCache = !this.noCache.includes(translationKey);
@@ -146,11 +146,7 @@ export class BibleController extends ContentBaseController {
   public async getAvailableTranslations(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const available = await BibleSourceFactory.getAvailableTranslations(source);
-      return available.map((t: BibleTranslation) => ({
-        abbreviation: t.abbreviation,
-        name: t.name,
-        language: t.language
-      }));
+      return available.map((t: BibleTranslation) => ({ abbreviation: t.abbreviation, name: t.name, language: t.language }));
     });
   }
 

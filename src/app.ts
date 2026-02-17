@@ -50,7 +50,7 @@ export const createApp = async () => {
     );
 
     // Handle preflight requests early
-    app.options("*", (req, res) => {
+    app.options("*", (_req, res) => {
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
       res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
@@ -62,7 +62,7 @@ export const createApp = async () => {
 
     if (isLambdaEnvironment) {
       // Lambda-specific body parsing for @codegenie/serverless-express
-      app.use((req, res, next) => {
+      app.use((req, _res, next) => {
         const contentType = req.headers["content-type"] || "";
         // Check if this is a webhook endpoint that needs raw body
         const isWebhookEndpoint = req.path.includes("/donate/webhook/");
@@ -83,9 +83,7 @@ export const createApp = async () => {
           } catch {
             req.body = {};
           }
-        }
-        // Handle Buffer-like objects
-        else if (req.body && req.body.type === "Buffer" && Array.isArray(req.body.data)) {
+        } else if (req.body && req.body.type === "Buffer" && Array.isArray(req.body.data)) {
           try {
             const bodyString = Buffer.from(req.body.data).toString("utf8");
             // Keep raw body for webhook endpoints, parse JSON for others
@@ -97,9 +95,7 @@ export const createApp = async () => {
           } catch {
             req.body = {};
           }
-        }
-        // Handle string JSON bodies
-        else if (typeof req.body === "string" && req.body.length > 0) {
+        } else if (typeof req.body === "string" && req.body.length > 0) {
           try {
             // Keep raw body for webhook endpoints, parse JSON for others
             if (!isWebhookEndpoint && contentType.includes("application/json")) {
@@ -108,9 +104,7 @@ export const createApp = async () => {
           } catch {
             // Silently ignore JSON parse errors
           }
-        }
-        // If no body was provided, ensure body is set to prevent parsing attempts
-        else if (!req.body) {
+        } else if (!req.body) {
           req.body = {};
         }
 
@@ -145,7 +139,7 @@ export const createApp = async () => {
     configureModuleRoutes(app);
 
     // Health check endpoint
-    app.get("/health", (req, res) => {
+    app.get("/health", (_req, res) => {
       res.json({
         status: "healthy",
         timestamp: new Date().toISOString(),
@@ -155,7 +149,7 @@ export const createApp = async () => {
     });
 
     // API documentation endpoint
-    app.get("/", (req, res) => {
+    app.get("/", (_req, res) => {
       res.json({
         name: "Core API",
         version: "1.0.0",
@@ -174,7 +168,7 @@ export const createApp = async () => {
 
   server.setErrorConfig((app) => {
     // Global error handler
-    app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
       console.error("Global error handler:", error);
 
       const statusCode = error.statusCode || error.status || 500;

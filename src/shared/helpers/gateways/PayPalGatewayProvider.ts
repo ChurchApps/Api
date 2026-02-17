@@ -27,7 +27,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
         eventData: body.resource,
         eventId: body.id
       };
-    } catch (_error) {
+    } catch {
       return { success: false, shouldProcess: false };
     }
   }
@@ -91,7 +91,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     await PayPalHelper.logEvent(churchId, event, eventData, repos);
   }
 
-  async createProduct(config: GatewayConfig, churchId: string): Promise<string> {
+  async createProduct(_config: GatewayConfig, churchId: string): Promise<string> {
     // PayPal doesn't require product creation like Stripe, return a placeholder
     return `paypal-product-${churchId}`;
   }
@@ -120,7 +120,7 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     });
   }
 
-  async getCustomerSubscriptions(config: GatewayConfig, _customerId: string): Promise<any> {
+  async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<any> {
     // PayPal doesn't provide a direct API to list subscriptions by customer
     // This would need to be tracked in the database
     return [];

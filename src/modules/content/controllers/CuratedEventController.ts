@@ -22,8 +22,8 @@ export class CuratedEventController extends ContentBaseController {
   public async getPublicForCuratedCalendar(
     @requestParam("churchId") churchId: string,
     @requestParam("curatedCalendarId") curatedCalendarId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const result = await this.repos.curatedEvent.loadForEvents(curatedCalendarId, churchId);
@@ -93,8 +93,8 @@ export class CuratedEventController extends ContentBaseController {
   public async deleteByEventId(
     @requestParam("curatedCalendarId") curatedCalendarId: string,
     @requestParam("eventId") eventId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
@@ -109,8 +109,8 @@ export class CuratedEventController extends ContentBaseController {
   public async deleteByGroupId(
     @requestParam("curatedCalendarId") curatedCalendarId: string,
     @requestParam("groupId") groupId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);

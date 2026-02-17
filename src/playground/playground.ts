@@ -139,9 +139,7 @@ async function makeAPICall<T = any>(endpoint: string, data: any = null): Promise
   try {
     const options: RequestInit = {
       method: data ? "POST" : "GET",
-      headers: {
-        "Content-Type": "application/json"
-      }
+      headers: { "Content-Type": "application/json" }
     };
 
     if (data) {

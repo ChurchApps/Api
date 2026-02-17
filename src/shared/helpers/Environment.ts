@@ -20,6 +20,7 @@ export class Environment extends EnvironmentBase {
   static givingApi: string;
   static messagingApi: string;
   static doingApi: string;
+  static storeApi: string;
 
   // Database connections per module
   static dbConnections: Map<string, any> = new Map();
@@ -153,9 +154,10 @@ export class Environment extends EnvironmentBase {
     this.givingApi = config.givingApi || config.apiUrl + "/giving";
     this.messagingApi = config.messagingApi || config.apiUrl + "/messaging";
     this.doingApi = config.doingApi || config.apiUrl + "/doing";
+    this.storeApi = process.env.STORE_API_URL || config.storeApi || "";
   }
 
-  private static async initializeDatabaseConnections(config: any) {
+  private static async initializeDatabaseConnections(_config: any) {
     const modules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
     console.log(`🔍 Attempting to initialize database connections for modules: ${modules.join(", ")}`);
 

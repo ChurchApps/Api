@@ -140,6 +140,9 @@ export class TaskRepo extends ConfiguredRepo<Task> {
       case "monthly":
         result = (await this.loadByAutomationIdContentMonthly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
         break;
+      case "weekly":
+        result = (await this.loadByAutomationIdContentWeekly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
+        break;
       default:
         result = (await this.loadByAutomationIdContentNoRepeat(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
         break;
@@ -183,6 +186,13 @@ export class TaskRepo extends ConfiguredRepo<Task> {
     return result;
   }
 
+  private async loadByAutomationIdContentWeekly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
+    const threshold = new Date();
+    threshold.setDate(threshold.getDate() - 7);
+    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [churchId, automationId, associatedWithType, associatedWithIds, threshold]);
+    return result;
+  }
+
   private async loadNextTaskNumber(churchId: string) {
     const result = await TypedDB.queryOne("select max(ifnull(taskNumber, 0)) + 1 as taskNumber from tasks where churchId=?", [churchId]);
     return (result as any).taskNumber;
@@ -199,11 +209,12 @@ export class TaskRepo extends ConfiguredRepo<Task> {
 
   public async loadForGroups(churchId: string, groupIds: string[], status: string) {
     if (groupIds.length === 0) return [];
-    else
+    else {
       return TypedDB.query(
         "SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;",
         [churchId, groupIds, groupIds, status]
       );
+    }
   }
 
   public async loadForDirectoryUpdate(churchId: string, personId: string) {

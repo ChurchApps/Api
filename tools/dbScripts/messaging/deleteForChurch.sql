@@ -10,5 +10,7 @@ BEGIN
     DELETE FROM notificationPreferences where churchId=pChurchId;
     DELETE FROM notifications where churchId=pChurchId;
     DELETE FROM privateMessages where churchId=pChurchId;
+    DELETE FROM sentTexts where churchId=pChurchId;
+    DELETE FROM textingProviders where churchId=pChurchId;
 END$$
 DELIMITER ;

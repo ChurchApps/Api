@@ -30,13 +30,13 @@ export class CrudHelper {
     return convertAll(au.churchId, result as any[]);
   }
 
-  static async remove(au: any, editPermission: any, remover: () => Promise<any>): Promise<{}> {
+  static async remove(_au: any, _editPermission: any, remover: () => Promise<any>): Promise<{}> {
     await remover();
     return {};
   }
 
   // Auto-convert variants using repository's convertToModel/convertAllToModel
-  static async getByIdAuto<TModel>(au: any, permission: any | null, loader: () => Promise<any>, repo: { convertToModel: (churchId: string, row: any) => TModel }): Promise<TModel> {
+  static async getByIdAuto<TModel>(au: any, _permission: any | null, loader: () => Promise<any>, repo: { convertToModel: (churchId: string, row: any) => TModel }): Promise<TModel> {
     const data = await loader();
     return repo.convertToModel(au.churchId, data);
   }
@@ -48,7 +48,7 @@ export class CrudHelper {
 
   static async saveManyAuto<TModel, TInput extends { churchId?: string }>(
     au: any,
-    editPermission: any,
+    _editPermission: any,
     items: TInput[],
     setChurchId: (item: TInput, churchId: string) => void,
     save: (item: TInput) => Promise<TModel>,
@@ -121,7 +121,7 @@ export class CrudHelper {
     req: express.Request,
     res: express.Response,
     editPermission: any,
-    repoKey: string,
+    _repoKey: string,
     remover: (repos: any, au: any) => Promise<any>
   ) {
     return (ctrl as any).actionWrapper(req, res, async (au: any) => {
