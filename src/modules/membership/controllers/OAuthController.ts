@@ -1,10 +1,10 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken, OAuthDeviceCode } from "../models/index.js";
+import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken, OAuthDeviceCode, OAuthRelaySession } from "../models/index.js";
 import { Permissions, UniqueIdHelper, UserHelper } from "../helpers/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
-import { OAuthDeviceCodeRepo } from "../repositories/index.js";
+import { OAuthDeviceCodeRepo, OAuthRelaySessionRepo } from "../repositories/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
 @controller("/membership/oauth")
@@ -415,6 +415,115 @@ export class OAuthController extends MembershipBaseController {
 
       return this.json({ success: true });
     });
+  }
+
+  /**
+   * Create a relay session for external OAuth providers (e.g., Dropbox).
+   * The TV app calls this to get a sessionCode and redirectUri, then builds
+   * the provider's auth URL with that redirectUri. After the user authorizes,
+   * the provider redirects to /relay/callback which stores the auth code.
+   * The TV polls /relay/sessions/:sessionCode to retrieve it.
+   */
+  @httpPost("/relay/sessions")
+  public async createRelaySession(req: express.Request<{}, {}, { provider: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const { provider } = req.body;
+      if (!provider) {
+        return this.json({ error: "invalid_request", error_description: "provider is required" }, 400);
+      }
+
+      const sessionCode = OAuthRelaySessionRepo.generateSessionCode();
+      const expiresIn = 900; // 15 minutes
+      const expiresAt = new Date(Date.now() + expiresIn * 1000);
+      const redirectUri = `${Environment.membershipApi}/oauth/relay/callback`;
+
+      const session: OAuthRelaySession = {
+        sessionCode,
+        provider,
+        redirectUri,
+        status: "pending",
+        expiresAt
+      };
+      await this.repos.oAuthRelaySession.save(session);
+
+      return this.json({
+        sessionCode,
+        redirectUri,
+        expiresIn,
+        interval: 5
+      });
+    });
+  }
+
+  /**
+   * Poll a relay session for the auth code.
+   * Returns status "pending" while waiting, or "completed" with the authCode.
+   */
+  @httpGet("/relay/sessions/:sessionCode")
+  public async getRelaySession(@requestParam("sessionCode") sessionCode: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
+      if (!session) {
+        return this.json({ error: "not_found" }, 404);
+      }
+
+      if (session.status === "completed" && session.authCode) {
+        // Return the code and clean up
+        const authCode = session.authCode;
+        await this.repos.oAuthRelaySession.delete(session.id);
+        return this.json({ status: "completed", authCode });
+      }
+
+      return this.json({
+        status: session.status,
+        expiresIn: Math.max(0, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000))
+      });
+    });
+  }
+
+  /**
+   * OAuth redirect callback. The external provider (e.g., Dropbox) redirects
+   * here with ?code=xxx&state=sessionCode. We store the code and show a
+   * simple HTML page telling the user to return to their TV.
+   */
+  @httpGet("/relay/callback")
+  public async relayCallback(req: express.Request, res: express.Response): Promise<any> {
+    const code = req.query.code as string;
+    const sessionCode = req.query.state as string;
+    const error = req.query.error as string;
+
+    if (error) {
+      res.setHeader("Content-Type", "text/html");
+      return res.send(this.relayCallbackHtml("Authorization Error", `The provider returned an error: ${error}. You can close this page.`));
+    }
+
+    if (!code || !sessionCode) {
+      res.setHeader("Content-Type", "text/html");
+      return res.send(this.relayCallbackHtml("Error", "Missing authorization code or session. Please try again from your TV."));
+    }
+
+    const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
+    if (!session) {
+      res.setHeader("Content-Type", "text/html");
+      return res.send(this.relayCallbackHtml("Session Expired", "This authorization session has expired. Please try again from your TV."));
+    }
+
+    session.authCode = code;
+    session.status = "completed";
+    await this.repos.oAuthRelaySession.save(session);
+
+    res.setHeader("Content-Type", "text/html");
+    return res.send(this.relayCallbackHtml("Success!", "Authorization complete. You can close this page and return to your TV."));
+  }
+
+  private relayCallbackHtml(title: string, message: string): string {
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title}</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#1a0f17;color:#fff}
+.card{text-align:center;padding:40px;border-radius:12px;background:rgba(255,255,255,0.05);max-width:400px}
+h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1.5}</style>
+</head><body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`;
   }
 
   @httpGet("/clients")

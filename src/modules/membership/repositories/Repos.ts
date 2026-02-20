@@ -15,7 +15,8 @@ import {
   OAuthTokenRepo,
   OAuthCodeRepo,
   OAuthClientRepo,
-  OAuthDeviceCodeRepo
+  OAuthDeviceCodeRepo,
+  OAuthRelaySessionRepo
 } from "./index.js";
 import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo } from "./index.js";
 
@@ -45,6 +46,7 @@ export class Repos {
   public oAuthCode: OAuthCodeRepo;
   public oAuthClient: OAuthClientRepo;
   public oAuthDeviceCode: OAuthDeviceCodeRepo;
+  public oAuthRelaySession: OAuthRelaySessionRepo;
 
   public clientError: ClientErrorRepo;
 
@@ -76,6 +78,7 @@ export class Repos {
     this.oAuthCode = new OAuthCodeRepo();
     this.oAuthClient = new OAuthClientRepo();
     this.oAuthDeviceCode = new OAuthDeviceCodeRepo();
+    this.oAuthRelaySession = new OAuthRelaySessionRepo();
 
     this.clientError = new ClientErrorRepo();
   }
