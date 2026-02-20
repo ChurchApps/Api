@@ -488,32 +488,34 @@ export class OAuthController extends MembershipBaseController {
    */
   @httpGet("/relay/callback")
   public async relayCallback(req: express.Request, res: express.Response): Promise<any> {
-    const code = req.query.code as string;
-    const sessionCode = req.query.state as string;
-    const error = req.query.error as string;
+    return this.actionWrapperAnon(req, res, async () => {
+      const code = req.query.code as string;
+      const sessionCode = req.query.state as string;
+      const error = req.query.error as string;
 
-    if (error) {
+      if (error) {
+        res.setHeader("Content-Type", "text/html");
+        return res.send(this.relayCallbackHtml("Authorization Error", `The provider returned an error: ${error}. You can close this page.`));
+      }
+
+      if (!code || !sessionCode) {
+        res.setHeader("Content-Type", "text/html");
+        return res.send(this.relayCallbackHtml("Error", "Missing authorization code or session. Please try again from your TV."));
+      }
+
+      const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
+      if (!session) {
+        res.setHeader("Content-Type", "text/html");
+        return res.send(this.relayCallbackHtml("Session Expired", "This authorization session has expired. Please try again from your TV."));
+      }
+
+      session.authCode = code;
+      session.status = "completed";
+      await this.repos.oAuthRelaySession.save(session);
+
       res.setHeader("Content-Type", "text/html");
-      return res.send(this.relayCallbackHtml("Authorization Error", `The provider returned an error: ${error}. You can close this page.`));
-    }
-
-    if (!code || !sessionCode) {
-      res.setHeader("Content-Type", "text/html");
-      return res.send(this.relayCallbackHtml("Error", "Missing authorization code or session. Please try again from your TV."));
-    }
-
-    const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
-    if (!session) {
-      res.setHeader("Content-Type", "text/html");
-      return res.send(this.relayCallbackHtml("Session Expired", "This authorization session has expired. Please try again from your TV."));
-    }
-
-    session.authCode = code;
-    session.status = "completed";
-    await this.repos.oAuthRelaySession.save(session);
-
-    res.setHeader("Content-Type", "text/html");
-    return res.send(this.relayCallbackHtml("Success!", "Authorization complete. You can close this page and return to your TV."));
+      return res.send(this.relayCallbackHtml("Success!", "Authorization complete. You can close this page and return to your TV."));
+    });
   }
 
   private relayCallbackHtml(title: string, message: string): string {
