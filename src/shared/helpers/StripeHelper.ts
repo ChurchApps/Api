@@ -50,9 +50,7 @@ export class StripeHelper {
   static updateSubscription = async (secretKey: string, sub: any) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
     // Use default_payment_method for all payment types (default_source is deprecated)
-    const paymentMethod: any = {
-      default_payment_method: sub.default_payment_method || null
-    };
+    const paymentMethod: any = { default_payment_method: sub.default_payment_method || null };
 
     // Preserve currency from existing subscription (price or plan)
     const existingPrice = sub.items?.data?.[0]?.price;
@@ -297,11 +295,25 @@ export class StripeHelper {
     // PaymentIntent amounts are in cents, same as Charge events
     const rawAmount = eventData.amount || eventData.amount_paid || eventData.amount_received;
     const currencyLower = (eventData.currency || "usd").toLowerCase();
-  
+
     // Zero‑decimal currencies: Stripe reports amounts in whole units already
     const ZERO_DECIMAL_CURRENCIES = new Set([
-      "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg",
-      "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"
+      "bif",
+      "clp",
+      "djf",
+      "gnf",
+      "jpy",
+      "kmf",
+      "krw",
+      "mga",
+      "pyg",
+      "rwf",
+      "ugx",
+      "vnd",
+      "vuv",
+      "xaf",
+      "xof",
+      "xpf"
     ]);
     const divisor = ZERO_DECIMAL_CURRENCIES.has(currencyLower) ? 1 : 100;
     const amount = rawAmount / divisor;

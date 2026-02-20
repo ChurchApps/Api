@@ -31,7 +31,9 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);  // date-only field
     const entryTime = DateHelper.toMysqlDate(donation.entryTime);
     const sql = "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, currency, method, methodDetails, notes, entryTime, status, transactionId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.currency, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId];
+    const params = [
+      donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.currency, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId
+    ];
     await TypedDB.query(sql, params);
     return donation;
   }
@@ -41,7 +43,9 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);  // date-only field
     const entryTime = DateHelper.toMysqlDate(donation.entryTime as Date);
     const sql = "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, currency=?, method=?, methodDetails=?, notes=?, entryTime=?, status=?, transactionId=? WHERE id=? and churchId=?";
-    const params = [donation.batchId, donation.personId, donationDate, donation.amount, donation.currency, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId, donation.id, donation.churchId];
+    const params = [
+      donation.batchId, donation.personId, donationDate, donation.amount, donation.currency, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId, donation.id, donation.churchId
+    ];
     await TypedDB.query(sql, params);
     return donation;
   }
