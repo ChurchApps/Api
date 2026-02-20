@@ -20,7 +20,7 @@ export class OAuthRelaySessionRepo extends BaseRepo<OAuthRelaySession> {
       session.sessionCode,
       session.provider,
       session.redirectUri,
-      session.status || "pending"  ,
+      session.status || "pending",
       expiresAt
     ];
     await TypedDB.query(sql, params);
