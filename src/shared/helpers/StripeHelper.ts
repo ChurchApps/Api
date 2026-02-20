@@ -19,17 +19,21 @@ export class StripeHelper {
 
   static createSubscription = async (secretKey: string, donationData: any) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    const { customer, metadata, productId, interval, amount, payment_method_id, type, billing_cycle_anchor } = donationData;
+    const { customer, metadata, productId, interval, amount, payment_method_id, type, billing_cycle_anchor, currency } = donationData;
+
+    const currencyLower = (currency || "usd").toLowerCase();
+    const unitAmount = currencyLower === "jpy" ? Math.round(amount * 1) : Math.trunc(Math.round(amount * 100));
+
     const subscriptionData: any = {
       customer,
       metadata,
       items: [
         {
           price_data: {
-            currency: "usd",
+            currency: currencyLower,
             product: productId,
             recurring: interval,
-            unit_amount: Math.trunc(Math.round(amount * 100))
+            unit_amount: unitAmount
           }
         }
       ],
@@ -46,15 +50,26 @@ export class StripeHelper {
   static updateSubscription = async (secretKey: string, sub: any) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
     // Use default_payment_method for all payment types (default_source is deprecated)
-    const paymentMethod: any = { default_payment_method: sub.default_payment_method || null };
+    const paymentMethod: any = {
+      default_payment_method: sub.default_payment_method || null
+    };
+
+    // Preserve currency from existing subscription (price or plan)
+    const existingPrice = sub.items?.data?.[0]?.price;
+    const currency = (existingPrice?.currency || sub.plan?.currency || "usd").toLowerCase();
+
+    // unit_amount from Stripe is already in cents (or whole for zero-decimal); keep as-is
+    const planAmount = sub.plan?.unit_amount ?? sub.plan?.amount;
+    const unitAmount = typeof planAmount === "number" ? Math.round(planAmount) : Math.trunc(Math.round((sub.plan?.amount || 0) * 100));
+
     const priceData = {
       items: [
         {
           id: sub.items.data[0].id,
           price_data: {
             product: sub.plan.product,
-            unit_amount: Math.trunc(Math.round(sub.plan.amount)),
-            currency: "usd",
+            unit_amount: unitAmount,
+            currency: currency,
             recurring: {
               interval: sub.plan.interval,
               interval_count: sub.plan.interval_count
@@ -280,7 +295,17 @@ export class StripeHelper {
   static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any, status: "pending" | "complete" = "complete") {
     // Handle both Charge events (amount) and PaymentIntent events (amount)
     // PaymentIntent amounts are in cents, same as Charge events
-    const amount = (eventData.amount || eventData.amount_paid || eventData.amount_received) / 100;
+    const rawAmount = eventData.amount || eventData.amount_paid || eventData.amount_received;
+    const currencyLower = (eventData.currency || "usd").toLowerCase();
+  
+    // Zero‑decimal currencies: Stripe reports amounts in whole units already
+    const ZERO_DECIMAL_CURRENCIES = new Set([
+      "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg",
+      "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"
+    ]);
+    const divisor = ZERO_DECIMAL_CURRENCIES.has(currencyLower) ? 1 : 100;
+    const amount = rawAmount / divisor;
+
     const customerData = (await givingRepos.customer.load(churchId, eventData.customer)) as any;
     const personId = customerData?.personId;
     const { method, methodDetails } = await this.getPaymentDetails(secretKey, eventData);
@@ -292,6 +317,7 @@ export class StripeHelper {
     const donationData: Donation = {
       batchId: batch.id,
       amount,
+      currency: eventData.currency,
       churchId,
       personId,
       method,

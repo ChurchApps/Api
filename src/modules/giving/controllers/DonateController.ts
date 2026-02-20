@@ -435,7 +435,7 @@ export class DonateController extends GivingCrudController {
   @httpPost("/subscribe")
   public async subscribe(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID, provider, gatewayId } = req.body;
+      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID, provider, gatewayId, currency } = req.body;
       const churchId = au.churchId || CHURCH_ID;
 
       // Validate required parameters
@@ -452,10 +452,14 @@ export class DonateController extends GivingCrudController {
         return this.json({ error: `${gateway.provider} does not support recurring subscriptions` }, 400);
       }
 
+      const rawCurrency: string = currency || gateway?.currency || "USD";
+      const normalizedCurrency = rawCurrency.toLowerCase();
+
       try {
         const subscriptionData = {
           id,
           amount,
+          currency: normalizedCurrency,
           customerId,
           type,
           billing_cycle_anchor,

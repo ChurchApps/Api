@@ -9,6 +9,7 @@ export class Donation {
   public personId?: string;
   public donationDate?: Date;
   public amount?: number;
+  public currency?: string;
   public method?: string;
   public methodDetails?: string;
   public notes?: string;
