@@ -35,6 +35,33 @@ export class PersonHelper extends BasePersonHelper {
     return person;
   }
 
+  public static async registerGuestHousehold(churchId: string, members: { firstName: string, lastName: string, email?: string, phone?: string }[]) {
+    if (!members || members.length === 0) throw new Error("At least one member is required");
+    const repos = await this.repos();
+
+    const household: Household = { churchId, name: members[0].lastName };
+    await repos.household.save(household);
+
+    const people: Person[] = [];
+    for (let i = 0; i < members.length; i++) {
+      const m = members[i];
+      const person: Person = {
+        churchId,
+        householdId: household.id,
+        householdRole: i === 0 ? "Head" : "Other",
+        name: { first: m.firstName, last: m.lastName },
+        membershipStatus: "Guest",
+        contactInfo: {}
+      };
+      if (m.email) person.contactInfo.email = m.email;
+      if (m.phone) person.contactInfo.mobilePhone = m.phone;
+      const saved = await repos.person.save(person);
+      people.push(saved);
+    }
+
+    return { householdId: household.id, people: people.map(p => ({ id: p.id, name: { first: p.name?.first, last: p.name?.last } })) };
+  }
+
   public static async claim(au: AuthenticatedUser, churchId: string) {
     if (au?.email) {
       let person: Person = null;

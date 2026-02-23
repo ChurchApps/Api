@@ -10,6 +10,20 @@ import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
 
 @controller("/membership/people")
 export class PersonController extends MembershipBaseController {
+  @httpPost("/guest-register")
+  public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: { firstName: string, lastName: string, email?: string, phone?: string }[] }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const { churchId, members } = req.body;
+      if (!churchId) return this.json({ error: "churchId is required" }, 400);
+      if (!members || !Array.isArray(members) || members.length === 0) return this.json({ error: "At least one member is required" }, 400);
+      if (members.length > 10) return this.json({ error: "Maximum 10 members per registration" }, 400);
+      for (const m of members) {
+        if (!m.firstName || !m.lastName) return this.json({ error: "firstName and lastName are required for each member" }, 400);
+      }
+      return PersonHelper.registerGuestHousehold(churchId, members);
+    });
+  }
+
   @httpPost("/apiEmails")
   public async apiEmails(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
