@@ -10,7 +10,7 @@ export class PositionRepo extends ConfiguredRepo<Position> {
     return {
       tableName: "positions",
       hasSoftDelete: false,
-      columns: ["planId", "categoryName", "name", "count", "groupId"]
+      columns: ["planId", "categoryName", "name", "count", "groupId", "allowSelfSignup", "description"]
     };
   }
 
@@ -30,6 +30,10 @@ export class PositionRepo extends ConfiguredRepo<Position> {
     return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId in (?);", [churchId, planIds]);
   }
 
+  public loadSignupByPlanId(churchId: string, planId: string) {
+    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId=? AND allowSelfSignup=1 ORDER BY categoryName, name;", [churchId, planId]);
+  }
+
   protected rowToModel(row: any): Position {
     return {
       id: row.id,
@@ -38,7 +42,9 @@ export class PositionRepo extends ConfiguredRepo<Position> {
       categoryName: row.categoryName,
       name: row.name,
       count: row.count,
-      groupId: row.groupId
+      groupId: row.groupId,
+      allowSelfSignup: row.allowSelfSignup,
+      description: row.description
     };
   }
 }

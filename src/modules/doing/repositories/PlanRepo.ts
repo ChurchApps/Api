@@ -10,7 +10,8 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
       tableName: "plans",
       hasSoftDelete: false,
       columns: [
-        "ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId", "providerId", "providerPlanId", "providerPlanName"
+        "ministryId", "planTypeId", "name", "serviceDate", "notes", "serviceOrder", "contentType", "contentId", "providerId", "providerPlanId", "providerPlanName",
+        "signupDeadlineHours", "showVolunteerNames"
       ]
     };
   }
@@ -18,7 +19,7 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
   protected async create(plan: Plan): Promise<Plan> {
     if (!plan.id) plan.id = this.createId();
 
-    const sql = "INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId, providerId, providerPlanId, providerPlanName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+    const sql = "INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId, providerId, providerPlanId, providerPlanName, signupDeadlineHours, showVolunteerNames) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
     const params = [
       plan.id,
       plan.churchId,
@@ -32,14 +33,16 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
       plan.contentId,
       plan.providerId,
       plan.providerPlanId,
-      plan.providerPlanName
+      plan.providerPlanName,
+      plan.signupDeadlineHours,
+      plan.showVolunteerNames
     ];
     await TypedDB.query(sql, params);
     return plan;
   }
 
   protected async update(plan: Plan): Promise<Plan> {
-    const sql = "UPDATE plans SET ministryId=?, planTypeId=?, name=?, serviceDate=?, notes=?, serviceOrder=?, contentType=?, contentId=?, providerId=?, providerPlanId=?, providerPlanName=? WHERE id=? and churchId=?";
+    const sql = "UPDATE plans SET ministryId=?, planTypeId=?, name=?, serviceDate=?, notes=?, serviceOrder=?, contentType=?, contentId=?, providerId=?, providerPlanId=?, providerPlanName=?, signupDeadlineHours=?, showVolunteerNames=? WHERE id=? and churchId=?";
     const params = [
       plan.ministryId,
       plan.planTypeId,
@@ -52,6 +55,8 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
       plan.providerId,
       plan.providerPlanId,
       plan.providerPlanName,
+      plan.signupDeadlineHours,
+      plan.showVolunteerNames,
       plan.id,
       plan.churchId
     ];
@@ -75,6 +80,16 @@ export class PlanRepo extends ConfiguredRepo<Plan> {
     return TypedDB.queryOne(
       "SELECT * FROM plans WHERE planTypeId=? AND serviceDate>=CURDATE() ORDER by serviceDate LIMIT 1",
       [planTypeId]
+    );
+  }
+
+  public loadSignupPlans(churchId: string) {
+    return TypedDB.query(
+      "SELECT DISTINCT p.* FROM plans p"
+      + " INNER JOIN positions pos ON pos.planId = p.id AND pos.churchId = p.churchId"
+      + " WHERE p.churchId = ? AND pos.allowSelfSignup = 1 AND p.serviceDate >= CURDATE()"
+      + " ORDER BY p.serviceDate ASC",
+      [churchId]
     );
   }
 }

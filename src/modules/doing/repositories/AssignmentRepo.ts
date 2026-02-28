@@ -61,6 +61,13 @@ export class AssignmentRepo extends ConfiguredRepo<Assignment> {
     return TypedDB.query(sql, params);
   }
 
+  public countByPositionId(churchId: string, positionId: string) {
+    return TypedDB.queryOne(
+      "SELECT COUNT(*) as cnt FROM assignments WHERE churchId=? AND positionId=? AND status IN ('Accepted','Unconfirmed')",
+      [churchId, positionId]
+    );
+  }
+
   public loadByServiceDate(churchId: string, serviceDate: Date, excludePlanId?: string) {
     let sql = "SELECT a.* FROM assignments a" + " INNER JOIN positions p ON p.id = a.positionId" + " INNER JOIN plans pl ON pl.id = p.planId" + " WHERE a.churchId = ? AND DATE(pl.serviceDate) = DATE(?)";
     const params: any[] = [churchId, serviceDate];

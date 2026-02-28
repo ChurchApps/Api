@@ -8,6 +8,8 @@ CREATE TABLE `positions` (
   `name` varchar(45) DEFAULT NULL,
   `count` int(11) DEFAULT NULL,
   `groupId` char(11) DEFAULT NULL,
+  `allowSelfSignup` bit(1) DEFAULT b'0',
+  `description` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_church_plan` (`churchId`, `planId`),
   KEY `idx_group` (`groupId`)

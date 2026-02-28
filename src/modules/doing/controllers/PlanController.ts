@@ -1,7 +1,7 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import { PlanHelper } from "../helpers/PlanHelper.js";
-import { Plan, PlanItem, Position, Time } from "../models/index.js";
+import { Assignment, Plan, PlanItem, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
 
 @controller("/doing/plans")
@@ -48,6 +48,30 @@ export class PlanController extends DoingBaseController {
   public async getCurrentByPlanType(@requestParam("planTypeId") planTypeId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.plan.loadCurrentByPlanTypeId(planTypeId);
+    });
+  }
+
+  @httpGet("/public/signup/:churchId")
+  public async getSignupPlans(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const plans: Plan[] = (await this.repos.plan.loadSignupPlans(churchId)) as Plan[];
+      if (plans.length === 0) return [];
+
+      const planIds = plans.map(p => p.id);
+      const allPositions: Position[] = (await this.repos.position.loadByPlanIds(churchId, planIds)) as Position[];
+      const allAssignments: Assignment[] = (await this.repos.assignment.loadByPlanIds(churchId, planIds)) as Assignment[];
+      const allTimes: Time[] = (await this.repos.time.loadByPlanIds(churchId, planIds)) as Time[];
+
+      return plans.map(plan => {
+        const positions = allPositions
+          .filter(p => p.planId === plan.id && p.allowSelfSignup)
+          .map(p => {
+            const filledCount = allAssignments.filter(a => a.positionId === p.id && (a.status === "Accepted" || a.status === "Unconfirmed")).length;
+            return { ...p, filledCount };
+          });
+        const times = allTimes.filter(t => t.planId === plan.id);
+        return { plan, positions, times };
+      });
     });
   }
 

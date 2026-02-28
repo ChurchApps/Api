@@ -14,5 +14,7 @@ CREATE TABLE `plans` (
   `providerId` varchar(50) DEFAULT NULL,
   `providerPlanId` varchar(100) DEFAULT NULL,
   `providerPlanName` varchar(255) DEFAULT NULL,
+  `signupDeadlineHours` int(11) DEFAULT NULL,
+  `showVolunteerNames` bit(1) DEFAULT b'1',
   PRIMARY KEY (`id`)
 );

@@ -1,7 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { Assignment } from "../models/index.js";
+import { Assignment, Plan, Position } from "../models/index.js";
 
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
@@ -56,6 +56,63 @@ export class AssignmentController extends DoingBaseController {
         assignment.status = "Declined";
         return await this.repos.assignment.save(assignment);
       }
+    });
+  }
+
+  @httpPost("/signup")
+  public async signup(req: express.Request<{}, {}, { positionId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { positionId } = req.body;
+      if (!positionId) throw new Error("positionId is required");
+
+      const position = (await this.repos.position.load(au.churchId, positionId)) as Position;
+      if (!position || !position.allowSelfSignup) throw new Error("Self-signup is not enabled for this position");
+
+      // Check signup deadline
+      const plan = (await this.repos.plan.load(au.churchId, position.planId)) as Plan;
+      if (plan.signupDeadlineHours) {
+        const deadline = new Date(plan.serviceDate);
+        deadline.setHours(deadline.getHours() - plan.signupDeadlineHours);
+        if (new Date() > deadline) throw new Error("Signup deadline has passed");
+      }
+
+      // Check capacity
+      const countResult = await this.repos.assignment.countByPositionId(au.churchId, positionId);
+      if (countResult.cnt >= position.count) throw new Error("Position is full");
+
+      // Check duplicate
+      const existing = await this.repos.assignment.loadByPlanId(au.churchId, position.planId) as Assignment[];
+      const alreadyAssigned = existing.find(a => a.positionId === positionId && a.personId === au.personId);
+      if (alreadyAssigned) throw new Error("Already signed up for this position");
+
+      const assignment = new Assignment();
+      assignment.churchId = au.churchId;
+      assignment.positionId = positionId;
+      assignment.personId = au.personId;
+      assignment.status = "Accepted";
+      return await this.repos.assignment.save(assignment);
+    });
+  }
+
+  @httpDelete("/signup/:id")
+  public async signupRemove(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
+      if (!assignment || assignment.personId !== au.personId) throw new Error("Invalid assignment");
+
+      const position = (await this.repos.position.load(au.churchId, assignment.positionId)) as Position;
+      if (!position || !position.allowSelfSignup) throw new Error("Self-signup is not enabled for this position");
+
+      // Check removal deadline
+      const plan = (await this.repos.plan.load(au.churchId, position.planId)) as Plan;
+      if (plan.signupDeadlineHours) {
+        const deadline = new Date(plan.serviceDate);
+        deadline.setHours(deadline.getHours() - plan.signupDeadlineHours);
+        if (new Date() > deadline) throw new Error("Removal deadline has passed");
+      }
+
+      await this.repos.assignment.delete(au.churchId, id);
+      return {};
     });
   }
 

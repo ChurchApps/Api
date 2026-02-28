@@ -6,4 +6,6 @@ export class Position {
   public name?: string;
   public count?: number;
   public groupId?: string;
+  public allowSelfSignup?: boolean;
+  public description?: string;
 }
