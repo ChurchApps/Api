@@ -1,4 +1,4 @@
-import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
+import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, EmailTemplateRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
 
 export class Repos {
   public blockedIp: BlockedIpRepo;
@@ -7,6 +7,7 @@ export class Repos {
   public deliveryLog: DeliveryLogRepo;
   public device: DeviceRepo;
   public deviceContent: DeviceContentRepo;
+  public emailTemplate: EmailTemplateRepo;
   public message: MessageRepo;
   public notification: NotificationRepo;
   public notificationPreference: NotificationPreferenceRepo;
@@ -23,6 +24,7 @@ export class Repos {
     this.deliveryLog = new DeliveryLogRepo();
     this.device = new DeviceRepo();
     this.deviceContent = new DeviceContentRepo();
+    this.emailTemplate = new EmailTemplateRepo();
     this.message = new MessageRepo();
     this.notification = new NotificationRepo();
     this.notificationPreference = new NotificationPreferenceRepo();

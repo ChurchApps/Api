@@ -10,3 +10,4 @@ export { NotificationController } from "./NotificationController.js";
 export { NotificationPreferenceController } from "./NotificationPreferenceController.js";
 export { PrivateMessageController } from "./PrivateMessageController.js";
 export { TextingController } from "./TextingController.js";
+export { EmailTemplateController } from "./EmailTemplateController.js";

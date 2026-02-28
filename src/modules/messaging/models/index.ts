@@ -11,3 +11,4 @@ export { BlockedIp } from "./BlockedIp.js";
 export { DeliveryLog } from "./DeliveryLog.js";
 export { TextingProvider } from "./TextingProvider.js";
 export { SentText } from "./SentText.js";
+export { EmailTemplate } from "./EmailTemplate.js";
