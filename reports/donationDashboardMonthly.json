@@ -1,0 +1,83 @@
+{
+  "keyName": "donationDashboardMonthly",
+  "displayName": "Giving Dashboard - Monthly",
+  "description": "Monthly giving trends by fund",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "giving",
+      "sqlLines": [
+        "SELECT DATE_FORMAT(d.donationDate, '%Y-%m-01') AS week, SUM(fd.amount) as totalAmount, f.name as fundName",
+        " FROM donations d",
+        " INNER JOIN fundDonations fd on fd.donationId = d.id",
+        " INNER JOIN funds f on f.id = fd.fundId",
+        " WHERE d.churchId=:churchId",
+        " AND d.donationDate BETWEEN :startDate AND :endDate",
+        " AND (:fundId='' OR fd.fundId = :fundId)",
+        " GROUP BY DATE_FORMAT(d.donationDate, '%Y-%m'), f.name",
+        " ORDER BY DATE_FORMAT(d.donationDate, '%Y-%m'), f.name"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "startDate",
+      "displayName": "Start Date",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "lastYear"
+    },
+    {
+      "keyName": "endDate",
+      "displayName": "End Date",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "yesterday"
+    },
+    {
+      "keyName": "fundId",
+      "displayName": "Fund",
+      "source": "dropdown",
+      "sourceKey": "fund"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "barChart",
+      "columns": [
+        {
+          "header": "Month",
+          "value": "week",
+          "formatter": "date"
+        },
+        {
+          "header": "Fund Name",
+          "value": "fundName",
+          "formatter": "string"
+        },
+        {
+          "header": "Amount",
+          "value": "totalAmount",
+          "formatter": "number"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "GivingApi",
+          "contentType": "Donations",
+          "action": "View Summary"
+        }
+      ]
+    }
+  ]
+}

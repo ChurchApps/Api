@@ -1,0 +1,83 @@
+{
+  "keyName": "donationDashboardQuarterly",
+  "displayName": "Giving Dashboard - Quarterly",
+  "description": "Quarterly giving trends by fund",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "giving",
+      "sqlLines": [
+        "SELECT MAKEDATE(YEAR(d.donationDate), 1) + INTERVAL (QUARTER(d.donationDate) - 1) * 3 MONTH AS week, SUM(fd.amount) as totalAmount, f.name as fundName",
+        " FROM donations d",
+        " INNER JOIN fundDonations fd on fd.donationId = d.id",
+        " INNER JOIN funds f on f.id = fd.fundId",
+        " WHERE d.churchId=:churchId",
+        " AND d.donationDate BETWEEN :startDate AND :endDate",
+        " AND (:fundId='' OR fd.fundId = :fundId)",
+        " GROUP BY YEAR(d.donationDate), QUARTER(d.donationDate), f.name",
+        " ORDER BY YEAR(d.donationDate), QUARTER(d.donationDate), f.name"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "startDate",
+      "displayName": "Start Date",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "lastYear"
+    },
+    {
+      "keyName": "endDate",
+      "displayName": "End Date",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "yesterday"
+    },
+    {
+      "keyName": "fundId",
+      "displayName": "Fund",
+      "source": "dropdown",
+      "sourceKey": "fund"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "barChart",
+      "columns": [
+        {
+          "header": "Quarter",
+          "value": "week",
+          "formatter": "date"
+        },
+        {
+          "header": "Fund Name",
+          "value": "fundName",
+          "formatter": "string"
+        },
+        {
+          "header": "Amount",
+          "value": "totalAmount",
+          "formatter": "number"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "GivingApi",
+          "contentType": "Donations",
+          "action": "View Summary"
+        }
+      ]
+    }
+  ]
+}

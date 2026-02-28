@@ -32,6 +32,20 @@ export class DonationController extends GivingBaseController {
     });
   }
 
+  @httpGet("/kpis")
+  public async getKpis(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
+      else {
+        const startDate = req.query.startDate ? new Date(req.query.startDate.toString()) : new Date(2000, 1, 1);
+        const endDate = req.query.endDate ? new Date(req.query.endDate.toString()) : new Date();
+        const fundId = req.query.fundId?.toString() || "";
+        const result = await this.repos.donation.loadDashboardKpis(au.churchId, startDate, endDate, fundId || undefined);
+        return result || { totalGiving: 0, avgGift: 0, donorCount: 0, donationCount: 0 };
+      }
+    });
+  }
+
   @httpGet("/summary")
   public async getSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -94,6 +94,24 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     return rows.length > 0 ? this.rowToModel(rows[0]) : null;
   }
 
+  public loadDashboardKpis(churchId: string, startDate: Date, endDate: Date, fundId?: string) {
+    const sDate = DateHelper.toMysqlDate(startDate);
+    const eDate = DateHelper.toMysqlDate(endDate);
+    let sql =
+      "SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount" +
+      " FROM donations d" +
+      " INNER JOIN fundDonations fd on fd.donationId = d.id" +
+      " INNER JOIN funds f on f.id = fd.fundId" +
+      " WHERE d.churchId=?" +
+      " AND d.donationDate BETWEEN ? AND ?";
+    const params: any[] = [churchId, sDate, eDate];
+    if (fundId) {
+      sql += " AND fd.fundId = ?";
+      params.push(fundId);
+    }
+    return TypedDB.queryOne(sql, params);
+  }
+
   public loadSummary(churchId: string, startDate: Date, endDate: Date) {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
