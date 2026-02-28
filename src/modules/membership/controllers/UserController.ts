@@ -5,7 +5,7 @@ import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { EmailHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions } from "../helpers/index.js";
+import { EmailHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper } from "../helpers/index.js";
 import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
@@ -67,8 +67,12 @@ export class UserController extends MembershipBaseController {
           }
         }
 
-        if (user === null) return this.denyAccess(["Login failed"]);
-        else {
+        if (user === null) {
+          const ip = AuditLogHelper.getClientIp(req);
+          const failEmail = req.body.email || req.body.authGuid || "(jwt)";
+          AuditLogHelper.logLogin(this.repos, "", "", false, ip, { email: failEmail, reason: "Invalid Credentials" });
+          return this.denyAccess(["Login failed"]);
+        } else {
           const userChurches = await this.getUserChurches(user.id);
 
           const churchesOnly: Church[] = [];
@@ -84,6 +88,10 @@ export class UserController extends MembershipBaseController {
           else {
             user.lastLogin = new Date();
             this.repos.user.save(user);
+            const ip = AuditLogHelper.getClientIp(req);
+            userChurches.forEach((uc) => {
+              AuditLogHelper.logLogin(this.repos, uc.church.id, user.id, true, ip, { email: user.email });
+            });
             return this.json(result, 200);
           }
         }
@@ -267,6 +275,8 @@ export class UserController extends MembershipBaseController {
           const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
           user.password = hashedPass;
           await this.repos.user.save(user);
+          const ip = AuditLogHelper.getClientIp(req);
+          AuditLogHelper.log(this.repos, "", user.id, "security", "password_changed", "user", user.id, { email: user.email, method: "authGuid" }, ip);
           return { success: true };
         } else return { success: false };
       } catch (e) {
@@ -297,6 +307,8 @@ export class UserController extends MembershipBaseController {
           promises.push(this.repos.user.save(user));
           promises.push(UserHelper.sendForgotEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, req.body.appName, req.body.appUrl));
           await Promise.all(promises);
+          const ip = AuditLogHelper.getClientIp(req);
+          AuditLogHelper.log(this.repos, "", user.id, "security", "password_reset", "user", user.id, { email: user.email }, ip);
           return this.json({ emailed: true }, 200);
         }
       } catch (e) {
@@ -339,10 +351,13 @@ export class UserController extends MembershipBaseController {
 
       let user = await this.repos.user.load(workingUserId);
       if (user !== null) {
+        const oldEmail = user.email;
         const existingUser = await this.repos.user.loadByEmail(req.body.email);
         if (existingUser === null || existingUser.id === workingUserId) {
           user.email = req.body.email;
           user = await this.repos.user.save(user);
+          const ip = AuditLogHelper.getClientIp(req);
+          AuditLogHelper.log(this.repos, au.churchId, au.id, "security", "email_changed", "user", workingUserId, { oldEmail, newEmail: req.body.email }, ip);
         } else return this.denyAccess(["Access denied"]);
       }
 
@@ -372,6 +387,8 @@ export class UserController extends MembershipBaseController {
         const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
         user.password = hashedPass;
         user = await this.repos.user.save(user);
+        const ip = AuditLogHelper.getClientIp(req);
+        AuditLogHelper.log(this.repos, au.churchId, au.id, "security", "password_changed", "user", au.id, { email: user.email, method: "updatePassword" }, ip);
       }
       user.password = null;
       return this.json(user, 200);

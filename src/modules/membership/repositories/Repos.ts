@@ -18,7 +18,7 @@ import {
   OAuthDeviceCodeRepo,
   OAuthRelaySessionRepo
 } from "./index.js";
-import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo } from "./index.js";
+import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo, AuditLogRepo } from "./index.js";
 
 export class Repos {
   public groupMember: GroupMemberRepo;
@@ -48,6 +48,7 @@ export class Repos {
   public oAuthDeviceCode: OAuthDeviceCodeRepo;
   public oAuthRelaySession: OAuthRelaySessionRepo;
 
+  public auditLog: AuditLogRepo;
   public clientError: ClientErrorRepo;
 
   public static getCurrent = () => new Repos();
@@ -80,6 +81,7 @@ export class Repos {
     this.oAuthDeviceCode = new OAuthDeviceCodeRepo();
     this.oAuthRelaySession = new OAuthRelaySessionRepo();
 
+    this.auditLog = new AuditLogRepo();
     this.clientError = new ClientErrorRepo();
   }
 }

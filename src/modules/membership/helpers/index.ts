@@ -18,3 +18,4 @@ export { RoleHelper } from "./RoleHelper.js";
 export { UserHelper } from "./UserHelper.js";
 export { UserChurchHelper } from "./UserChurchHelper.js";
 export { Utils } from "./Utils.js";
+export { AuditLogHelper } from "./AuditLogHelper.js";

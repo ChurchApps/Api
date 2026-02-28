@@ -10,6 +10,7 @@ export { MemberPermissionRepo } from "./MemberPermissionRepo.js";
 export { Repos } from "./Repos.js";
 
 export { AccessLogRepo } from "./AccessLogRepo.js";
+export { AuditLogRepo } from "./AuditLogRepo.js";
 export { ChurchRepo } from "./ChurchRepo.js";
 export { DomainRepo } from "./DomainRepo.js";
 export { RoleRepo } from "./RoleRepo.js";
