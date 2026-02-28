@@ -74,18 +74,13 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  // Send email using template to a group
+  // Send email to a group or specific people
   @httpPost("/send")
-  public async send(req: express.Request<{}, {}, { templateId: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<any> {
+  public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { templateId, groupId, personIds } = req.body;
-      if (!templateId) return this.json({ error: "templateId is required" }, 400);
+      const { subject, htmlContent, groupId, personIds } = req.body;
+      if (!subject || !htmlContent) return this.json({ error: "subject and htmlContent are required" }, 400);
       if (!groupId && (!personIds || personIds.length === 0)) return this.json({ error: "groupId or personIds is required" }, 400);
-
-      // Load template
-      const templateRow = await this.repos.emailTemplate.loadById(au.churchId, templateId);
-      if (!templateRow) return this.json({ error: "Template not found" }, 404);
-      const template = this.repos.emailTemplate.convertToModel(templateRow);
 
       // Load church name for merge fields
       let churchName = "";
@@ -118,8 +113,8 @@ export class EmailTemplateController extends MessagingBaseController {
           displayName: member.displayName,
           email: member.email
         };
-        const resolvedSubject = MergeFieldHelper.resolve(template.subject, person, church);
-        const resolvedBody = MergeFieldHelper.resolve(template.htmlContent, person, church);
+        const resolvedSubject = MergeFieldHelper.resolve(subject, person, church);
+        const resolvedBody = MergeFieldHelper.resolve(htmlContent, person, church);
 
         try {
           await EmailHelper.sendTemplatedEmail(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
@@ -128,8 +123,7 @@ export class EmailTemplateController extends MessagingBaseController {
           const log: DeliveryLog = {
             churchId: au.churchId,
             personId: member.personId,
-            contentType: "emailTemplate",
-            contentId: template.id,
+            contentType: "email",
             deliveryMethod: "email",
             deliveryAddress: member.email,
             success: true
@@ -140,8 +134,7 @@ export class EmailTemplateController extends MessagingBaseController {
           const log: DeliveryLog = {
             churchId: au.churchId,
             personId: member.personId,
-            contentType: "emailTemplate",
-            contentId: template.id,
+            contentType: "email",
             deliveryMethod: "email",
             deliveryAddress: member.email,
             success: false,
