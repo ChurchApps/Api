@@ -16,6 +16,8 @@ export { EventException } from "./EventException.js";
 export { CuratedCalendar } from "./CuratedCalendar.js";
 export { CuratedEvent } from "./CuratedEvent.js";
 
+export { Registration, RegistrationMember } from "./Registration.js";
+
 export { Setting } from "./Setting.js";
 
 export { BibleTranslation } from "./BibleTranslation.js";

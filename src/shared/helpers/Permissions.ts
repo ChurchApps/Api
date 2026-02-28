@@ -37,6 +37,8 @@ export class Permissions extends BasePermissions {
 
   static chat = { host: { contentType: "Chat", action: "Host" } };
 
+  static registrations = { view: { contentType: "Registrations", action: "View" }, edit: { contentType: "Registrations", action: "Edit" } };
+
   // Messaging API permissions (to be defined during migration)
   static messaging = { view: { contentType: "Messaging", action: "View" }, edit: { contentType: "Messaging", action: "Edit" }, admin: { contentType: "Messaging", action: "Admin" } };
 
@@ -88,6 +90,8 @@ export const permissionsList: IPermission[] = [
   { apiName: "ContentApi", section: "Settings", action: "Edit", displaySection: "Content", displayAction: "Edit Settings" },
   { apiName: "ContentApi", section: "StreamingServices", action: "Edit", displaySection: "Content", displayAction: "Edit Services" },
   { apiName: "ContentApi", section: "Chat", action: "Host", displaySection: "Content", displayAction: "Host Chat" },
+  { apiName: "ContentApi", section: "Registrations", action: "View", displaySection: "Content", displayAction: "View Registrations" },
+  { apiName: "ContentApi", section: "Registrations", action: "Edit", displaySection: "Content", displayAction: "Edit Registrations" },
 
   // Messaging API permissions
   { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
@@ -132,6 +136,7 @@ export type ContentType =
   | "Doing"
   | "Admin"
   | "Texting"
+  | "Registrations"
   | "Schedules";
 
 export type Actions = "Admin" | "Edit" | "View" | "Send" | "Edit Self" | "View Members" | "View Summary" | "Checkin" | "Host" | "Edit Settings";

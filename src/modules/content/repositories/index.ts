@@ -16,6 +16,9 @@ export { EventExceptionRepo } from "./EventExceptionRepo.js";
 export { CuratedCalendarRepo } from "./CuratedCalendarRepo.js";
 export { CuratedEventRepo } from "./CuratedEventRepo.js";
 
+export { RegistrationRepo } from "./RegistrationRepo.js";
+export { RegistrationMemberRepo } from "./RegistrationMemberRepo.js";
+
 export { SettingRepo } from "./SettingRepo.js";
 
 export { BibleTranslationRepo } from "./BibleTranslationRepo.js";

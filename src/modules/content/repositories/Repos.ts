@@ -14,6 +14,8 @@ import {
   EventExceptionRepo,
   CuratedCalendarRepo,
   CuratedEventRepo,
+  RegistrationRepo,
+  RegistrationMemberRepo,
   SettingRepo,
   BibleTranslationRepo,
   BibleBookRepo,
@@ -44,6 +46,8 @@ export class Repos {
   public eventException: EventExceptionRepo;
   public curatedCalendar: CuratedCalendarRepo;
   public curatedEvent: CuratedEventRepo;
+  public registration: RegistrationRepo;
+  public registrationMember: RegistrationMemberRepo;
   public setting: SettingRepo;
   public bibleTranslation: BibleTranslationRepo;
   public bibleBook: BibleBookRepo;
@@ -75,6 +79,8 @@ export class Repos {
     this.eventException = new EventExceptionRepo();
     this.curatedCalendar = new CuratedCalendarRepo();
     this.curatedEvent = new CuratedEventRepo();
+    this.registration = new RegistrationRepo();
+    this.registrationMember = new RegistrationMemberRepo();
     this.setting = new SettingRepo();
     this.bibleTranslation = new BibleTranslationRepo();
     this.bibleBook = new BibleBookRepo();

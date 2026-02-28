@@ -13,6 +13,7 @@ export { StreamingConfigHelper } from "./StreamingConfigHelper.js";
 export { SubDomainHelper } from "./SubDomainHelper.js";
 export { PollyHelper } from "./PollyHelper.js";
 export { CalendarHelper } from "./CalendarHelper.js";
+export { RegistrationHelper } from "./RegistrationHelper.js";
 
 // Re-export from shared helpers for convenience
 export { Environment } from "../../../shared/helpers/Environment.js";

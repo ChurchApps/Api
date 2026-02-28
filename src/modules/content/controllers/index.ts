@@ -22,6 +22,9 @@ export { EventExceptionController } from "./EventExceptionController.js";
 export { CuratedCalendarController } from "./CuratedCalendarController.js";
 export { CuratedEventController } from "./CuratedEventController.js";
 
+// Registration controllers
+export { RegistrationController } from "./RegistrationController.js";
+
 // Bible controllers
 export { BibleController } from "./BibleController.js";
 

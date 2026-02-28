@@ -10,4 +10,10 @@ export class Event {
   visibility?: string;
   recurrenceRule?: string;
   exceptionDates?: Date[];
+  registrationEnabled?: boolean;
+  capacity?: number;
+  registrationOpenDate?: Date;
+  registrationCloseDate?: Date;
+  tags?: string;
+  formId?: string;
 }

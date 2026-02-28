@@ -23,6 +23,13 @@ export class EventController extends ContentBaseController {
     });
   }
 
+  @httpGet("/registerable")
+  public async getRegisterable(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      return await this.repos.event.loadRegistrationEnabled(au.churchId);
+    });
+  }
+
   @httpGet("/subscribe")
   public async subscribe(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -58,6 +65,27 @@ export class EventController extends ContentBaseController {
       const result = await this.repos.event.loadForGroup(au.churchId, groupId);
       await CalendarHelper.addExceptionDates(result, this.repos);
       return result;
+    });
+  }
+
+  @httpGet("/public/tag/:churchId/:tag")
+  public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await this.repos.event.loadByTag(churchId, tag);
+    });
+  }
+
+  @httpGet("/public/registerable/:churchId")
+  public async getPublicRegisterable(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await this.repos.event.loadRegistrationEnabled(churchId);
+    });
+  }
+
+  @httpGet("/public/:churchId/:id")
+  public async getPublicById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return await this.repos.event.load(churchId, id);
     });
   }
 

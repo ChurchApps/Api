@@ -11,7 +11,8 @@ export class EventRepo extends ConfiguredRepo<Event> {
       tableName: "events",
       hasSoftDelete: false,
       columns: [
-        "groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule"
+        "groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule",
+        "registrationEnabled", "capacity", "registrationOpenDate", "registrationCloseDate", "tags", "formId"
       ]
     };
   }
@@ -27,6 +28,12 @@ export class EventRepo extends ConfiguredRepo<Event> {
     if (m.end) {
       m.end = DateHelper.toMysqlDate(m.end);
     }
+    if (m.registrationOpenDate) {
+      m.registrationOpenDate = DateHelper.toMysqlDate(m.registrationOpenDate);
+    }
+    if (m.registrationCloseDate) {
+      m.registrationCloseDate = DateHelper.toMysqlDate(m.registrationCloseDate);
+    }
     const { sql, params } = this.buildInsert(model);
     await TypedDB.query(sql, params);
     return model;
@@ -40,6 +47,12 @@ export class EventRepo extends ConfiguredRepo<Event> {
     }
     if (m.end) {
       m.end = DateHelper.toMysqlDate(m.end);
+    }
+    if (m.registrationOpenDate) {
+      m.registrationOpenDate = DateHelper.toMysqlDate(m.registrationOpenDate);
+    }
+    if (m.registrationCloseDate) {
+      m.registrationCloseDate = DateHelper.toMysqlDate(m.registrationCloseDate);
     }
     const { sql, params } = this.buildUpdate(model);
     await TypedDB.query(sql, params);
@@ -95,6 +108,14 @@ export class EventRepo extends ConfiguredRepo<Event> {
     return TypedDB.query("SELECT * FROM events WHERE groupId=? AND churchId=? and visibility='public' order by start;", [groupId, churchId]);
   }
 
+  public async loadByTag(churchId: string, tag: string): Promise<Event[]> {
+    return TypedDB.query("SELECT * FROM events WHERE churchId=? AND tags LIKE ? ORDER BY start;", [churchId, "%" + tag + "%"]);
+  }
+
+  public async loadRegistrationEnabled(churchId: string): Promise<Event[]> {
+    return TypedDB.query("SELECT * FROM events WHERE churchId=? AND registrationEnabled=1 ORDER BY start;", [churchId]);
+  }
+
   protected rowToModel(row: any): Event {
     return {
       id: row.id,
@@ -106,7 +127,13 @@ export class EventRepo extends ConfiguredRepo<Event> {
       title: row.title,
       description: row.description,
       visibility: row.visibility,
-      recurrenceRule: row.recurrenceRule
+      recurrenceRule: row.recurrenceRule,
+      registrationEnabled: row.registrationEnabled,
+      capacity: row.capacity,
+      registrationOpenDate: row.registrationOpenDate,
+      registrationCloseDate: row.registrationCloseDate,
+      tags: row.tags,
+      formId: row.formId
     };
   }
 }
