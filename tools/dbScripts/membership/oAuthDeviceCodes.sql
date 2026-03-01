@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `oAuthDeviceCodes`;
+
 CREATE TABLE `oAuthDeviceCodes` (
   `id` char(11) NOT NULL,
   `deviceCode` varchar(64) NOT NULL,

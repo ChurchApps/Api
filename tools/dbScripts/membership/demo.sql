@@ -6,17 +6,24 @@ CREATE PROCEDURE resetDemoData()
 BEGIN
 
     -- Truncate all tables in correct order (respecting foreign key constraints)
+    SET FOREIGN_KEY_CHECKS = 0;
+    TRUNCATE TABLE answers;
+    TRUNCATE TABLE questions;
+    TRUNCATE TABLE formSubmissions;
+    TRUNCATE TABLE forms;
+    TRUNCATE TABLE visibilityPreferences;
     TRUNCATE TABLE roleMembers;
-TRUNCATE TABLE rolePermissions;
-TRUNCATE TABLE roles;
-TRUNCATE TABLE users;
-TRUNCATE TABLE userChurches;
-TRUNCATE TABLE groupMembers;
-TRUNCATE TABLE notes;
-TRUNCATE TABLE `groups`;
-TRUNCATE TABLE people;
-TRUNCATE TABLE households;
-TRUNCATE TABLE churches;
+    TRUNCATE TABLE rolePermissions;
+    TRUNCATE TABLE roles;
+    TRUNCATE TABLE users;
+    TRUNCATE TABLE userChurches;
+    TRUNCATE TABLE groupMembers;
+    TRUNCATE TABLE notes;
+    TRUNCATE TABLE `groups`;
+    TRUNCATE TABLE people;
+    TRUNCATE TABLE households;
+    TRUNCATE TABLE churches;
+    SET FOREIGN_KEY_CHECKS = 1;
 
 -- Demo Church
 INSERT INTO churches (id, name, subDomain, address1, city, state, zip, country, latitude, longitude) VALUES 
@@ -186,42 +193,42 @@ INSERT INTO people (id, churchId, displayName, firstName, middleName, lastName, 
 -- Notes for various people
 INSERT INTO notes (id, churchId, contentType, contentId, noteType, addedBy, createdAt, contents, updatedAt) VALUES
 -- Pastoral Notes
-('NOT00000001', 'CHU00000001', 'person', 'PER00000001', 'Pastoral', 'PER00000001', '2024-01-15 14:30:00', 'Met with John to discuss his interest in leading the men''s Bible study group. Very enthusiastic and well-prepared.', '2024-01-15 14:30:00'),
-('NOT00000002', 'CHU00000001', 'person', 'PER00000031', 'Pastoral', 'PER00000001', '2024-02-01 10:15:00', 'Follow-up meeting with Sofia regarding her divorce support group participation. She''s making good progress and has been a great support to others.', '2024-02-01 10:15:00'),
-('NOT00000003', 'CHU00000001', 'person', 'PER00000054', 'Pastoral', 'PER00000001', '2024-02-10 15:45:00', 'Home visit with William. Discussed his recent health concerns and arranged for meal delivery service.', '2024-02-10 15:45:00'),
+('NOT00000001', 'CHU00000001', 'person', 'PER00000001', 'Pastoral', 'PER00000001', '2025-09-15 14:30:00', 'Met with John to discuss his interest in leading the men''s Bible study group. Very enthusiastic and well-prepared.', '2025-09-15 14:30:00'),
+('NOT00000002', 'CHU00000001', 'person', 'PER00000031', 'Pastoral', 'PER00000001', '2025-10-01 10:15:00', 'Follow-up meeting with Sofia regarding her divorce support group participation. She''s making good progress and has been a great support to others.', '2025-10-01 10:15:00'),
+('NOT00000003', 'CHU00000001', 'person', 'PER00000054', 'Pastoral', 'PER00000001', '2025-10-10 15:45:00', 'Home visit with William. Discussed his recent health concerns and arranged for meal delivery service.', '2025-10-10 15:45:00'),
 
 -- Prayer Requests
-('NOT00000004', 'CHU00000001', 'person', 'PER00000036', 'Prayer', 'PER00000036', '2024-02-15 09:00:00', 'Prayer request for Miguel''s job interview next week. Hoping for a position that would allow more time with family.', '2024-02-15 09:00:00'),
-('NOT00000005', 'CHU00000001', 'person', 'PER00000070', 'Prayer', 'PER00000070', '2024-02-16 11:20:00', 'Michelle requested prayer for her children''s transition to new school district.', '2024-02-16 11:20:00'),
-('NOT00000006', 'CHU00000001', 'person', 'PER00000021', 'Prayer', 'PER00000021', '2024-02-17 14:00:00', 'Carlos asked for prayer for his father Antonio''s upcoming surgery.', '2024-02-17 14:00:00'),
+('NOT00000004', 'CHU00000001', 'person', 'PER00000036', 'Prayer', 'PER00000036', '2025-10-15 09:00:00', 'Prayer request for Miguel''s job interview next week. Hoping for a position that would allow more time with family.', '2025-10-15 09:00:00'),
+('NOT00000005', 'CHU00000001', 'person', 'PER00000070', 'Prayer', 'PER00000070', '2025-10-16 11:20:00', 'Michelle requested prayer for her children''s transition to new school district.', '2025-10-16 11:20:00'),
+('NOT00000006', 'CHU00000001', 'person', 'PER00000021', 'Prayer', 'PER00000021', '2025-10-17 14:00:00', 'Carlos asked for prayer for his father Antonio''s upcoming surgery.', '2025-10-17 14:00:00'),
 
 -- General Notes
-('NOT00000007', 'CHU00000001', 'person', 'PER00000049', 'General', 'PER00000001', '2024-02-18 16:30:00', 'James expressed interest in volunteering for the youth ministry. Has experience working with teens.', '2024-02-18 16:30:00'),
-('NOT00000008', 'CHU00000001', 'person', 'PER00000063', 'General', 'PER00000001', '2024-02-19 13:15:00', 'Marcus mentioned he''s available to help with the church''s tech setup. Has IT background.', '2024-02-19 13:15:00'),
+('NOT00000007', 'CHU00000001', 'person', 'PER00000049', 'General', 'PER00000001', '2025-10-18 16:30:00', 'James expressed interest in volunteering for the youth ministry. Has experience working with teens.', '2025-10-18 16:30:00'),
+('NOT00000008', 'CHU00000001', 'person', 'PER00000063', 'General', 'PER00000001', '2025-10-19 13:15:00', 'Marcus mentioned he''s available to help with the church''s tech setup. Has IT background.', '2025-10-19 13:15:00'),
 
 -- Family Notes
-('NOT00000009', 'CHU00000001', 'person', 'PER00000016', 'Family', 'PER00000001', '2024-02-20 10:00:00', 'Thomas and Rebecca''s family adjusting well to blended family situation. Kids getting along better.', '2024-02-20 10:00:00'),
-('NOT00000010', 'CHU00000001', 'person', 'PER00000044', 'Family', 'PER00000001', '2024-02-21 11:45:00', 'Roberto''s mother Rosa moved in with family. All adjusting well to multi-generational living.', '2024-02-21 11:45:00'),
+('NOT00000009', 'CHU00000001', 'person', 'PER00000016', 'Family', 'PER00000001', '2025-10-20 10:00:00', 'Thomas and Rebecca''s family adjusting well to blended family situation. Kids getting along better.', '2025-10-20 10:00:00'),
+('NOT00000010', 'CHU00000001', 'person', 'PER00000044', 'Family', 'PER00000001', '2025-10-21 11:45:00', 'Roberto''s mother Rosa moved in with family. All adjusting well to multi-generational living.', '2025-10-21 11:45:00'),
 
 -- Ministry Notes
-('NOT00000011', 'CHU00000001', 'person', 'PER00000027', 'Ministry', 'PER00000001', '2024-02-22 09:30:00', 'Michael interested in starting a young families small group. Good leadership potential.', '2024-02-22 09:30:00'),
-('NOT00000012', 'CHU00000001', 'person', 'PER00000042', 'Ministry', 'PER00000001', '2024-02-23 14:20:00', 'David and Laura offered to help with the church''s social media presence.', '2024-02-23 14:20:00'),
+('NOT00000011', 'CHU00000001', 'person', 'PER00000027', 'Ministry', 'PER00000001', '2025-10-22 09:30:00', 'Michael interested in starting a young families small group. Good leadership potential.', '2025-10-22 09:30:00'),
+('NOT00000012', 'CHU00000001', 'person', 'PER00000042', 'Ministry', 'PER00000001', '2025-10-23 14:20:00', 'David and Laura offered to help with the church''s social media presence.', '2025-10-23 14:20:00'),
 
 -- Health Notes
-('NOT00000013', 'CHU00000001', 'person', 'PER00000073', 'Health', 'PER00000001', '2024-02-24 15:00:00', 'George recovering well from knee surgery. Church meals team providing support.', '2024-02-24 15:00:00'),
-('NOT00000014', 'CHU00000001', 'person', 'PER00000034', 'Health', 'PER00000001', '2024-02-25 10:30:00', 'Jose and Carmen both received flu shots. Reminder to check in during flu season.', '2024-02-25 10:30:00'),
+('NOT00000013', 'CHU00000001', 'person', 'PER00000073', 'Health', 'PER00000001', '2025-10-24 15:00:00', 'George recovering well from knee surgery. Church meals team providing support.', '2025-10-24 15:00:00'),
+('NOT00000014', 'CHU00000001', 'person', 'PER00000034', 'Health', 'PER00000001', '2025-10-25 10:30:00', 'Jose and Carmen both received flu shots. Reminder to check in during flu season.', '2025-10-25 10:30:00'),
 
 -- Financial Notes
-('NOT00000015', 'CHU00000001', 'person', 'PER00000068', 'Financial', 'PER00000001', '2024-02-26 11:00:00', 'Kevin and Rachel started tithing regularly. Very faithful in their giving.', '2024-02-26 11:00:00'),
-('NOT00000016', 'CHU00000001', 'person', 'PER00000056', 'Financial', 'PER00000001', '2024-02-27 13:45:00', 'Christopher and Amanda received financial counseling. Working on budget plan.', '2024-02-27 13:45:00'),
+('NOT00000015', 'CHU00000001', 'person', 'PER00000068', 'Financial', 'PER00000001', '2025-10-26 11:00:00', 'Kevin and Rachel started tithing regularly. Very faithful in their giving.', '2025-10-26 11:00:00'),
+('NOT00000016', 'CHU00000001', 'person', 'PER00000056', 'Financial', 'PER00000001', '2025-10-27 13:45:00', 'Christopher and Amanda received financial counseling. Working on budget plan.', '2025-10-27 13:45:00'),
 
 -- Discipleship Notes
-('NOT00000017', 'CHU00000001', 'person', 'PER00000079', 'Discipleship', 'PER00000001', '2024-02-28 09:15:00', 'Brian completed new members class. Interested in baptism.', '2024-02-28 09:15:00'),
-('NOT00000018', 'CHU00000001', 'person', 'PER00000060', 'Discipleship', 'PER00000001', '2024-02-29 14:30:00', 'Jessica started leading a small group Bible study for young professionals.', '2024-02-29 14:30:00'),
+('NOT00000017', 'CHU00000001', 'person', 'PER00000079', 'Discipleship', 'PER00000001', '2025-10-28 09:15:00', 'Brian completed new members class. Interested in baptism.', '2025-10-28 09:15:00'),
+('NOT00000018', 'CHU00000001', 'person', 'PER00000060', 'Discipleship', 'PER00000001', '2025-10-29 14:30:00', 'Jessica started leading a small group Bible study for young professionals.', '2025-10-29 14:30:00'),
 
 -- Outreach Notes
-('NOT00000019', 'CHU00000001', 'person', 'PER00000075', 'Outreach', 'PER00000001', '2024-03-01 10:45:00', 'Steven and Melissa volunteered for community food drive. Great community connections.', '2024-03-01 10:45:00'),
-('NOT00000020', 'CHU00000001', 'person', 'PER00000061', 'Outreach', 'PER00000001', '2024-03-02 11:30:00', 'Robert and Patricia hosting neighborhood Bible study in their home.', '2024-03-02 11:30:00');
+('NOT00000019', 'CHU00000001', 'person', 'PER00000075', 'Outreach', 'PER00000001', '2025-11-01 10:45:00', 'Steven and Melissa volunteered for community food drive. Great community connections.', '2025-11-01 10:45:00'),
+('NOT00000020', 'CHU00000001', 'person', 'PER00000061', 'Outreach', 'PER00000001', '2025-11-02 11:30:00', 'Robert and Patricia hosting neighborhood Bible study in their home.', '2025-11-02 11:30:00');
 
 INSERT INTO `groups` (id, churchId, categoryName, name, trackAttendance, parentPickup, printNametag, about, meetingTime, meetingLocation, tags, labels, slug, removed) VALUES
 -- Ministries
@@ -464,10 +471,10 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 
 -- Add notes for the Demo User Family
 INSERT INTO notes (id, churchId, contentType, contentId, noteType, addedBy, createdAt, contents, updatedAt) VALUES
-('NOT00000021', 'CHU00000001', 'person', 'PER00000082', 'General', 'PER00000001', '2024-03-01 12:00:00', 'Demo user account created for system testing and demonstrations.', '2024-03-01 12:00:00'),
-('NOT00000022', 'CHU00000001', 'person', 'PER00000083', 'General', 'PER00000001', '2024-03-01 12:15:00', 'Jane is very active in women''s ministry and has a heart for worship.', '2024-03-01 12:15:00'),
-('NOT00000023', 'CHU00000001', 'person', 'PER00000084', 'General', 'PER00000001', '2024-03-01 12:30:00', 'Alex is doing well in elementary Sunday school and loves to sing in children''s choir.', '2024-03-01 12:30:00'),
-('NOT00000024', 'CHU00000001', 'person', 'PER00000085', 'General', 'PER00000001', '2024-03-01 12:45:00', 'Emma is a bright and energetic preschooler who enjoys Bible stories.', '2024-03-01 12:45:00');
+('NOT00000021', 'CHU00000001', 'person', 'PER00000082', 'General', 'PER00000001', '2025-11-01 12:00:00', 'Demo user account created for system testing and demonstrations.', '2025-11-01 12:00:00'),
+('NOT00000022', 'CHU00000001', 'person', 'PER00000083', 'General', 'PER00000001', '2025-11-01 12:15:00', 'Jane is very active in women''s ministry and has a heart for worship.', '2025-11-01 12:15:00'),
+('NOT00000023', 'CHU00000001', 'person', 'PER00000084', 'General', 'PER00000001', '2025-11-01 12:30:00', 'Alex is doing well in elementary Sunday school and loves to sing in children''s choir.', '2025-11-01 12:30:00'),
+('NOT00000024', 'CHU00000001', 'person', 'PER00000085', 'General', 'PER00000001', '2025-11-01 12:45:00', 'Emma is a bright and energetic preschooler who enjoys Bible stories.', '2025-11-01 12:45:00');
 
 -- Band Members Group Assignments (20 adults)
 INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VALUES
@@ -495,6 +502,82 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 ('GME00000118', 'CHU00000001', 'GRP0000000b', 'PER00000050', '2024-01-01', 0), -- Sarah Wilson
 ('GME00000119', 'CHU00000001', 'GRP0000000b', 'PER00000057', '2024-01-01', 0), -- Amanda Thomas
 ('GME00000120', 'CHU00000001', 'GRP0000000b', 'PER00000082', '2024-01-01', 0); -- Demo User
+
+-- ========================================
+-- Forms
+-- ========================================
+INSERT INTO forms (id, churchId, name, contentType, createdTime, modifiedTime, restricted, archived, removed, thankYouMessage) VALUES
+('FRM00000001', 'CHU00000001', 'Visitor Information Card', 'person', '2025-06-01 10:00:00', '2025-06-01 10:00:00', b'0', b'0', b'0', 'Thank you for visiting Grace Community Church! We look forward to connecting with you.'),
+('FRM00000002', 'CHU00000001', 'VBS Registration', 'group', '2025-07-01 10:00:00', '2025-07-01 10:00:00', b'0', b'0', b'0', 'Your child is registered for Vacation Bible School! You will receive a confirmation email.'),
+('FRM00000003', 'CHU00000001', 'Small Group Interest Survey', 'group', '2025-08-15 10:00:00', '2025-08-15 10:00:00', b'0', b'0', b'0', 'Thanks for your interest in small groups! A group leader will reach out to you soon.');
+
+-- ========================================
+-- Questions
+-- ========================================
+INSERT INTO questions (id, churchId, formId, parentId, title, description, fieldType, placeholder, sort, choices, removed, required) VALUES
+-- Visitor Information Card
+('QST00000001', 'CHU00000001', 'FRM00000001', NULL, 'First Name', NULL, 'textField', 'Enter first name', 1, NULL, b'0', b'1'),
+('QST00000002', 'CHU00000001', 'FRM00000001', NULL, 'Last Name', NULL, 'textField', 'Enter last name', 2, NULL, b'0', b'1'),
+('QST00000003', 'CHU00000001', 'FRM00000001', NULL, 'Email Address', NULL, 'textField', 'Enter email', 3, NULL, b'0', b'1'),
+('QST00000004', 'CHU00000001', 'FRM00000001', NULL, 'Phone Number', NULL, 'textField', 'Enter phone', 4, NULL, b'0', b'0'),
+('QST00000005', 'CHU00000001', 'FRM00000001', NULL, 'How did you hear about us?', NULL, 'dropdown', NULL, 5, 'Friend or Family,Online Search,Social Media,Drive By,Community Event,Other', b'0', b'0'),
+-- VBS Registration
+('QST00000006', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Full Name', NULL, 'textField', 'Enter child name', 1, NULL, b'0', b'1'),
+('QST00000007', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Age', NULL, 'textField', 'Enter age', 2, NULL, b'0', b'1'),
+('QST00000008', 'CHU00000001', 'FRM00000002', NULL, 'Allergies or Special Needs', 'Please list any allergies or special needs we should know about.', 'textArea', NULL, 3, NULL, b'0', b'0'),
+('QST00000009', 'CHU00000001', 'FRM00000002', NULL, 'Emergency Contact Phone', NULL, 'textField', 'Enter phone', 4, NULL, b'0', b'1'),
+-- Small Group Interest Survey
+('QST00000010', 'CHU00000001', 'FRM00000003', NULL, 'What day of the week works best?', NULL, 'dropdown', NULL, 1, 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday', b'0', b'1'),
+('QST00000011', 'CHU00000001', 'FRM00000003', NULL, 'What topics interest you most?', 'Select all that apply.', 'checkboxes', NULL, 2, 'Bible Study,Prayer,Fellowship,Community Service,Parenting,Marriage', b'0', b'0'),
+('QST00000012', 'CHU00000001', 'FRM00000003', NULL, 'Any additional comments?', NULL, 'textArea', 'Share your thoughts...', 3, NULL, b'0', b'0');
+
+-- ========================================
+-- Form Submissions
+-- ========================================
+INSERT INTO formSubmissions (id, churchId, formId, contentType, contentId, submissionDate, submittedBy) VALUES
+('FSB00000001', 'CHU00000001', 'FRM00000001', 'person', 'PER00000079', '2025-09-15 10:30:00', 'PER00000079'),
+('FSB00000002', 'CHU00000001', 'FRM00000001', 'person', 'PER00000060', '2025-09-22 11:00:00', 'PER00000060'),
+('FSB00000003', 'CHU00000001', 'FRM00000002', 'group', 'GRP00000030', '2025-07-10 09:00:00', 'PER00000036'),
+('FSB00000004', 'CHU00000001', 'FRM00000002', 'group', 'GRP00000030', '2025-07-12 14:30:00', 'PER00000027'),
+('FSB00000005', 'CHU00000001', 'FRM00000003', 'group', 'GRP00000014', '2025-08-20 16:00:00', 'PER00000068');
+
+-- ========================================
+-- Answers
+-- ========================================
+INSERT INTO answers (id, churchId, formSubmissionId, questionId, value) VALUES
+-- Brian Harris visitor card (FSB00000001)
+('ANS00000001', 'CHU00000001', 'FSB00000001', 'QST00000001', 'Brian'),
+('ANS00000002', 'CHU00000001', 'FSB00000001', 'QST00000002', 'Harris'),
+('ANS00000003', 'CHU00000001', 'FSB00000001', 'QST00000003', 'brian.harris@email.com'),
+('ANS00000004', 'CHU00000001', 'FSB00000001', 'QST00000004', '(217) 555-2402'),
+('ANS00000005', 'CHU00000001', 'FSB00000001', 'QST00000005', 'Friend or Family'),
+-- Jessica Taylor visitor card (FSB00000002)
+('ANS00000006', 'CHU00000001', 'FSB00000002', 'QST00000001', 'Jessica'),
+('ANS00000007', 'CHU00000001', 'FSB00000002', 'QST00000002', 'Taylor'),
+('ANS00000008', 'CHU00000001', 'FSB00000002', 'QST00000003', 'jessica.taylor@email.com'),
+('ANS00000009', 'CHU00000001', 'FSB00000002', 'QST00000005', 'Online Search'),
+-- Miguel Hernandez VBS registration for Diego (FSB00000003)
+('ANS00000010', 'CHU00000001', 'FSB00000003', 'QST00000006', 'Diego Hernandez'),
+('ANS00000011', 'CHU00000001', 'FSB00000003', 'QST00000007', '8'),
+('ANS00000012', 'CHU00000001', 'FSB00000003', 'QST00000008', 'No allergies'),
+('ANS00000013', 'CHU00000001', 'FSB00000003', 'QST00000009', '(217) 555-1101'),
+-- Michael Davis VBS registration (FSB00000004)
+('ANS00000014', 'CHU00000001', 'FSB00000004', 'QST00000006', 'Olivia Davis'),
+('ANS00000015', 'CHU00000001', 'FSB00000004', 'QST00000007', '7'),
+('ANS00000016', 'CHU00000001', 'FSB00000004', 'QST00000008', 'Peanut allergy'),
+('ANS00000017', 'CHU00000001', 'FSB00000004', 'QST00000009', '(217) 555-0801'),
+-- Kevin Martin small group survey (FSB00000005)
+('ANS00000018', 'CHU00000001', 'FSB00000005', 'QST00000010', 'Wednesday'),
+('ANS00000019', 'CHU00000001', 'FSB00000005', 'QST00000011', 'Bible Study,Fellowship'),
+('ANS00000020', 'CHU00000001', 'FSB00000005', 'QST00000012', 'We are new to the area and looking to build community.');
+
+-- ========================================
+-- Visibility Preferences
+-- ========================================
+INSERT INTO visibilityPreferences (id, churchId, personId, address, phoneNumber, email) VALUES
+('VIS00000001', 'CHU00000001', 'PER00000031', 'hidden', 'hidden', 'visible'),
+('VIS00000002', 'CHU00000001', 'PER00000060', 'hidden', 'visible', 'visible'),
+('VIS00000003', 'CHU00000001', 'PER00000079', 'visible', 'visible', 'hidden');
 
 END $$
 DELIMITER ;

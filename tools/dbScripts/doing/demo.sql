@@ -10,6 +10,7 @@ BEGIN
 
     -- Truncate all tables in correct order (respecting foreign key constraints)
     SET FOREIGN_KEY_CHECKS = 0;
+    TRUNCATE TABLE conjunctions;
     TRUNCATE TABLE assignments;
     TRUNCATE TABLE blockoutDates;
     TRUNCATE TABLE notes;
@@ -154,6 +155,14 @@ BEGIN
     -- Birthday Card Tasks
     ('TSK00000008', 'CHU00000001', 8, 'Automation', DATE_SUB(NOW(), INTERVAL 6 DAY), NULL, 'Person', 'PER00000028', 'Emily Davis', 'Automation', 'AUT00000001', 'Birthday Card Automation', 'Person', 'PER00000069', 'Rachel Martin', 'Send Birthday Card to Emily Davis', 'Pending', 'AUT00000001', NULL, CONCAT('{"description": "Send birthday card to Emily Davis for their upcoming birthday. Address: 123 Main St, Anytown, USA", "dueDate": "', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 12 DAY), '%Y-%m-%d'), '"}')),
     ('TSK00000009', 'CHU00000001', 9, 'Automation', DATE_SUB(NOW(), INTERVAL 6 DAY), NULL, 'Person', 'PER00000029', 'Michael Wilson', 'Automation', 'AUT00000001', 'Birthday Card Automation', 'Person', 'PER00000069', 'Rachel Martin', 'Send Birthday Card to Michael Wilson', 'Pending', 'AUT00000001', NULL, CONCAT('{"description": "Send birthday card to Michael Wilson for their upcoming birthday. Address: 456 Oak Ave, Anytown, USA", "dueDate": "', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 17 DAY), '%Y-%m-%d'), '"}'));
+
+    -- ========================================
+    -- Conjunctions (Boolean logic for automation conditions)
+    -- ========================================
+    INSERT INTO conjunctions (id, churchId, automationId, parentId, groupType) VALUES
+    ('CNJ00000001', 'CHU00000001', 'AUT00000001', NULL, 'AND'),
+    ('CNJ00000002', 'CHU00000001', 'AUT00000001', 'CNJ00000001', 'OR');
+
 END //
 DELIMITER ;
 

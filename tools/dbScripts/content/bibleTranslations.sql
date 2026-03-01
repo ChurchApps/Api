@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `bibleTranslations`;
+
 CREATE TABLE `bibleTranslations` (
   `id` char(11)   NOT NULL,
   `abbreviation` varchar(10)   DEFAULT NULL,

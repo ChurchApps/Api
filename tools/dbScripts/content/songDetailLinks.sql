@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `songDetailLinks`;
+
 CREATE TABLE `songDetailLinks` (
   `id` char(11) NOT NULL,
   `songDetailId` char(11) DEFAULT NULL,

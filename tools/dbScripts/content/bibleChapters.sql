@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `bibleChapters`;
+
 CREATE TABLE `bibleChapters` (
   `id` char(11) NOT NULL,
   `translationKey` varchar(45) DEFAULT NULL,

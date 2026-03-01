@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `notifications`;
+
 CREATE TABLE `notifications` (
   `id` char(11) NOT NULL,
   `churchId` char(11) DEFAULT NULL,

@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `oAuthTokens`;
+
 CREATE TABLE `oAuthTokens` (
   `id` char(11) NOT NULL,
   `clientId` char(11) DEFAULT NULL,

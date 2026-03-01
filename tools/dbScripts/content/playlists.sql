@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `playlists`;
+
 CREATE TABLE `playlists` (
   `id` char(11) NOT NULL,
   `churchId` char(11) DEFAULT NULL,

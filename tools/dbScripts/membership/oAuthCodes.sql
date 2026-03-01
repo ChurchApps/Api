@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `oAuthCodes`;
+
 CREATE TABLE `oAuthCodes` (
   `id` char(11) NOT NULL,
   `userChurchId` char(11) DEFAULT NULL,

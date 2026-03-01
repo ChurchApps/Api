@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `oAuthRelaySessions`;
+
 CREATE TABLE `oAuthRelaySessions` (
   `id` char(11) NOT NULL,
   `sessionCode` varchar(16) NOT NULL,

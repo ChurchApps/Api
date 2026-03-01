@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `devices`;
+
 CREATE TABLE `devices` (
   `id` char(11) NOT NULL,
   `appName` varchar(20) DEFAULT NULL,

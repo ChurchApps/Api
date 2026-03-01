@@ -6,6 +6,8 @@ CREATE PROCEDURE resetDemoData()
 BEGIN
 
 -- Truncate all tables in correct order (respecting foreign key constraints)
+SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE gatewayPaymentMethods;
 TRUNCATE TABLE subscriptionFunds;
 TRUNCATE TABLE subscriptions;
 TRUNCATE TABLE fundDonations;
@@ -16,6 +18,7 @@ TRUNCATE TABLE eventLogs;
 TRUNCATE TABLE gateways;
 TRUNCATE TABLE funds;
 TRUNCATE TABLE settings;
+SET FOREIGN_KEY_CHECKS = 1;
 
 
 -- Funds
@@ -412,6 +415,21 @@ INSERT INTO subscriptionFunds (id, churchId, subscriptionId, fundId, amount) VAL
 ('SFU00000008', 'CHU00000001', 'SUB00000004', 'FUN00000005', 40.00),  -- Carlos Garcia: Food Pantry
 ('SFU00000009', 'CHU00000001', 'SUB00000005', 'FUN00000001', 320.00), -- Richard Miller: General Fund
 ('SFU00000010', 'CHU00000001', 'SUB00000005', 'FUN00000006', 80.00);  -- Richard Miller: Benevolence Fund
+
+-- ========================================
+-- Gateway Payment Methods (Stored payment methods in vault)
+-- ========================================
+INSERT INTO gatewayPaymentMethods (id, churchId, gatewayId, customerId, externalId, methodType, displayName, metadata, createdAt, updatedAt) VALUES
+('GPM00000001', 'CHU00000001', 'GAT00000001', 'cus_demo_001', 'pm_demo_001', 'card', 'Visa ending in 4242',
+  '{"brand": "visa", "last4": "4242", "expMonth": 12, "expYear": 2027}', '2025-09-01 10:00:00', '2025-09-01 10:00:00'),
+('GPM00000002', 'CHU00000001', 'GAT00000001', 'cus_demo_002', 'pm_demo_002', 'card', 'Mastercard ending in 5555',
+  '{"brand": "mastercard", "last4": "5555", "expMonth": 6, "expYear": 2028}', '2025-09-15 10:00:00', '2025-09-15 10:00:00'),
+('GPM00000003', 'CHU00000001', 'GAT00000001', 'cus_demo_003', 'pm_demo_003', 'card', 'Amex ending in 1234',
+  '{"brand": "amex", "last4": "1234", "expMonth": 3, "expYear": 2027}', '2025-10-01 10:00:00', '2025-10-01 10:00:00'),
+('GPM00000004', 'CHU00000001', 'GAT00000001', 'cus_demo_004', 'pm_demo_004', 'bank_account', 'Chase Checking ****6789',
+  '{"bankName": "Chase", "last4": "6789", "routingNumber": "021000021"}', '2025-10-15 10:00:00', '2025-10-15 10:00:00'),
+('GPM00000005', 'CHU00000001', 'GAT00000001', 'cus_demo_005', 'pm_demo_005', 'card', 'Visa ending in 9876',
+  '{"brand": "visa", "last4": "9876", "expMonth": 9, "expYear": 2028}', '2025-11-01 10:00:00', '2025-11-01 10:00:00');
 
 END //
 DELIMITER ;

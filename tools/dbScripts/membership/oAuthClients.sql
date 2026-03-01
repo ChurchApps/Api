@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `oAuthClients`;
+
 CREATE TABLE `oAuthClients` (
   `id` char(11) NOT NULL,
   `name` varchar(45) DEFAULT NULL,

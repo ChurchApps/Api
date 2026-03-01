@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `songs`;
+
 CREATE TABLE `songs` (
   `id` char(11) NOT NULL,
   `churchId` char(11) DEFAULT NULL,

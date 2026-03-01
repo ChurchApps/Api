@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `pageHistory`;
+
 CREATE TABLE `pageHistory` (
   `id` char(11) NOT NULL,
   `churchId` char(11) DEFAULT NULL,

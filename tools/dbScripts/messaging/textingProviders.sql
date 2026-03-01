@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `textingProviders`;
+
 CREATE TABLE `textingProviders` (
   `id` char(11) NOT NULL,
   `churchId` char(11) NOT NULL,

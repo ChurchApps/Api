@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `curatedEvents`;
+
 CREATE TABLE `curatedEvents` (
   `id` char(11) NOT NULL,
   `churchId` char(11) DEFAULT NULL,

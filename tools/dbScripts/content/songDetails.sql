@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `songDetails`;
+
 CREATE TABLE `songDetails` (
   `id` char(11) NOT NULL,
   `praiseChartsId` varchar(45) DEFAULT NULL,

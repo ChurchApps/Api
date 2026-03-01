@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `deliveryLogs`;
+
 CREATE TABLE `deliveryLogs` (
   `id` char(11) NOT NULL,
   `churchId` char(11),

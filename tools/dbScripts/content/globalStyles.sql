@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS `globalStyles`;
+
 CREATE TABLE `globalStyles` (
   `id` char(11) NOT NULL,
   `churchId` char(11) DEFAULT NULL,

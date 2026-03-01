@@ -149,6 +149,13 @@ const moduleDefinitions = {
           { title: "Song Details", file: "songDetails.sql" },
           { title: "Songs", file: "songs.sql" },
         ]
+      },
+      {
+        name: "Registrations",
+        tables: [
+          { title: "Registrations", file: "registrations.sql" },
+          { title: "Registration Members", file: "registrationMembers.sql" },
+        ]
       }
     ],
     demoTables: [
@@ -193,6 +200,10 @@ const moduleDefinitions = {
           { title: "Notifications", file: "notifications.sql" },
           { title: "Notification Preferences", file: "notificationPreferences.sql" },
           { title: "Private Messages", file: "privateMessages.sql" },
+          { title: "Sent Texts", file: "sentTexts.sql" },
+          { title: "Delivery Logs", file: "deliveryLogs.sql" },
+          { title: "Email Templates", file: "emailTemplates.sql" },
+          { title: "Texting Providers", file: "textingProviders.sql" },
           { title: "Blocked IPs", file: "blockedIps.sql" },
           { title: "Cleanup Procedure", file: "cleanup.sql" },
           { title: "Update Conversation Stats", file: "updateConversationStats.sql" },
@@ -325,13 +336,10 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
         await initializeSection(moduleName, section.name, section.tables, scriptsPath);
       }
     } else {
-      // Run schema sections and demo data (default behavior)
+      // Run schema sections only (default behavior)
       for (const section of moduleConfig.sections) {
         await initializeSection(moduleName, section.name, section.tables, scriptsPath);
       }
-
-      // Run demo data after schema
-      await initializeDemoData(moduleName, moduleConfig.demoTables, scriptsPath);
     }
 
     console.log(`   ✅ ${moduleName} database initialized successfully`);
