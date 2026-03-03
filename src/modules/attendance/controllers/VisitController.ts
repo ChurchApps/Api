@@ -92,9 +92,6 @@ export class VisitController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
       else {
-        const deleteVisitIds: string[] = [];
-        const deleteVisitSessionIds: string[] = [];
-
         const currentDate = new Date();
         currentDate.setHours(0, 0, 0, 0);
 
@@ -102,6 +99,18 @@ export class VisitController extends AttendanceBaseController {
         const peopleIdList = req.query.peopleIds.toString().split(",");
         const peopleIds: string[] = [];
         peopleIdList.forEach((id) => peopleIds.push(id));
+
+        const checkDuplicates = req.query.checkDuplicates === "true";
+
+        const existingVisits: Visit[] =
+          peopleIds.length === 0 ? [] : this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any);
+
+        if (checkDuplicates && existingVisits.length > 0) {
+          return { duplicates: existingVisits.map(v => v.personId) };
+        }
+
+        const deleteVisitIds: string[] = [];
+        const deleteVisitSessionIds: string[] = [];
 
         const submittedVisits = [...req.body];
         submittedVisits.forEach((sv) => {
@@ -116,8 +125,6 @@ export class VisitController extends AttendanceBaseController {
         });
 
         const existingVisitIds: string[] = [];
-        const existingVisits: Visit[] =
-          peopleIds.length === 0 ? [] : this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByServiceDatePeopleIds(au.churchId, serviceId, currentDate, peopleIds)) as any);
         if (existingVisits.length > 0) {
           existingVisits.forEach((v) => existingVisitIds.push(v.id));
           const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(au.churchId, (await this.repos.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any);
