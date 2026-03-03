@@ -107,12 +107,7 @@ export class EmailTemplateController extends MessagingBaseController {
       const from = Environment.supportEmail;
 
       for (const member of eligible) {
-        const person = {
-          firstName: member.firstName,
-          lastName: member.lastName,
-          displayName: member.displayName,
-          email: member.email
-        };
+        const person = { firstName: member.firstName, lastName: member.lastName, displayName: member.displayName, email: member.email };
         const resolvedSubject = MergeFieldHelper.resolve(subject, person, church);
         const resolvedBody = MergeFieldHelper.resolve(htmlContent, person, church);
 

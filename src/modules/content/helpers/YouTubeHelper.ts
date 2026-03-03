@@ -52,10 +52,7 @@ export class YouTubeHelper {
   public static async getVideoPage(churchId: string, channelId: string, pageToken: string) {
     const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=50&order=date&type=video&key=${Environment.youTubeApiKey}&pageToken=${pageToken}`;
     const json: any = (await axios.get(url)).data;
-    const result = {
-      sermons: YouTubeHelper.convertToSermons(churchId, json),
-      nextPageToken: json.nextPageToken
-    };
+    const result = { sermons: YouTubeHelper.convertToSermons(churchId, json), nextPageToken: json.nextPageToken };
     return result;
   }
 

@@ -88,15 +88,10 @@ export function validateGatewaySettings(provider: string, settings: Record<strin
   if (!settings) return null;
 
   switch (provider.toLowerCase()) {
-    case "stripe":
-      return isStripeSettings(settings) ? settings : null;
-    case "paypal":
-      return isPayPalSettings(settings) ? settings : null;
-    case "square":
-      return isSquareSettings(settings) ? settings : null;
-    case "epaymints":
-      return isEPayMintsSettings(settings) ? settings : null;
-    default:
-      return null;
+    case "stripe": return isStripeSettings(settings) ? settings : null;
+    case "paypal": return isPayPalSettings(settings) ? settings : null;
+    case "square": return isSquareSettings(settings) ? settings : null;
+    case "epaymints": return isEPayMintsSettings(settings) ? settings : null;
+    default: return null;
   }
 }

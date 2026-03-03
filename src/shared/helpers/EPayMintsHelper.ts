@@ -204,10 +204,7 @@ export class EPayMintsHelper {
   ): Promise<any> {
     try {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
-      const headers = {
-        Authorization: `Bearer ${apiKey}`,
-        "X-Terminal-ID": refundData.terminalId
-      };
+      const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": refundData.terminalId };
 
       // TODO: Replace with actual ePayMints refund API
       const result = await EPayMintsHelper.makeRequest(

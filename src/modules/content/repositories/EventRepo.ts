@@ -11,8 +11,20 @@ export class EventRepo extends ConfiguredRepo<Event> {
       tableName: "events",
       hasSoftDelete: false,
       columns: [
-        "groupId", "allDay", "start", "end", "title", "description", "visibility", "recurrenceRule",
-        "registrationEnabled", "capacity", "registrationOpenDate", "registrationCloseDate", "tags", "formId"
+        "groupId",
+        "allDay",
+        "start",
+        "end",
+        "title",
+        "description",
+        "visibility",
+        "recurrenceRule",
+        "registrationEnabled",
+        "capacity",
+        "registrationOpenDate",
+        "registrationCloseDate",
+        "tags",
+        "formId"
       ]
     };
   }

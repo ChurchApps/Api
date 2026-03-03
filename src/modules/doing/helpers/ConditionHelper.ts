@@ -14,12 +14,8 @@ export class ConditionHelper {
     const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
     condition.matchingIds = [];
     switch (condition.field) {
-      case "today":
-        condition.matchingIds = this.evalSimpleCondition(condition) ? ["*"] : [];
-        break;
-      default:
-        condition.matchingIds = await repos.membership.loadIdsMatchingCondition(condition);
-        break;
+      case "today": condition.matchingIds = this.evalSimpleCondition(condition) ? ["*"] : []; break;
+      default: condition.matchingIds = await repos.membership.loadIdsMatchingCondition(condition); break;
     }
     return condition;
   }

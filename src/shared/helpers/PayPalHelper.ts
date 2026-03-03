@@ -319,11 +319,7 @@ export class PayPalHelper {
   ): Promise<string> {
     const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
 
-    const experienceContext = {
-      payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED",
-      return_url: customerData.returnUrl || "https://example.com/return",
-      cancel_url: customerData.cancelUrl || "https://example.com/cancel"
-    };
+    const experienceContext = { payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED", return_url: customerData.returnUrl || "https://example.com/return", cancel_url: customerData.cancelUrl || "https://example.com/cancel" };
 
     const body: any = {
       payment_source: {

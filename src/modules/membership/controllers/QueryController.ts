@@ -44,13 +44,9 @@ export class QueryController extends MembershipBaseController {
                 });
                 peopleData = ArrayHelper.getAllOperator(peopleData, "anniversaryMonth", resp.value, resp.operator, "number");
                 break;
-              case "anniversary":
-                peopleData = ArrayHelper.getAllOperator(peopleData, "anniversary", resp.value, resp.operator);
-                break;
+              case "anniversary": peopleData = ArrayHelper.getAllOperator(peopleData, "anniversary", resp.value, resp.operator); break;
               // case "phone"
-              default:
-                peopleData = ArrayHelper.getAllOperator(peopleData, resp.field, resp.value, resp.operator);
-                break;
+              default: peopleData = ArrayHelper.getAllOperator(peopleData, resp.field, resp.value, resp.operator); break;
             }
           });
           const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, peopleData, au.checkAccess(Permissions.people.edit));

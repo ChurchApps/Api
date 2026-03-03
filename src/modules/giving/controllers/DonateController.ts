@@ -229,10 +229,7 @@ export class DonateController extends GivingCrudController {
   }
 
   private shouldCancelSubscription(provider: string, eventType: string): boolean {
-    const cancellationEvents = {
-      stripe: ["customer.subscription.deleted"],
-      paypal: ["BILLING.SUBSCRIPTION.CANCELLED"]
-    };
+    const cancellationEvents = { stripe: ["customer.subscription.deleted"], paypal: ["BILLING.SUBSCRIPTION.CANCELLED"] };
     return cancellationEvents[provider as keyof typeof cancellationEvents]?.includes(eventType) || false;
   }
 

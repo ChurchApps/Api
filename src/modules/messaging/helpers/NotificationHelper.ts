@@ -600,10 +600,7 @@ export class NotificationHelper {
     const peopleIds = ArrayHelper.getIds(notificationPrefs, "personId");
     console.log("[NotificationHelper.getEmailData] Fetching emails for " + peopleIds.length + " people");
     console.log("[NotificationHelper.getEmailData] PeopleIds: " + JSON.stringify(peopleIds));
-    const data = {
-      peopleIds,
-      jwtSecret: Environment.jwtSecret
-    };
+    const data = { peopleIds, jwtSecret: Environment.jwtSecret };
     const url = Environment.membershipApi + "/people/apiEmails";
     console.log("[NotificationHelper.getEmailData] Calling API: " + url);
     try {

@@ -114,12 +114,7 @@ async function handleMessage(event: APIGatewayProxyEvent, _context: Context): Pr
   const _body = event.body || "";
 
   try {
-    const payload = {
-      churchId: "",
-      conversationId: "",
-      action: "socketId",
-      data: connectionId
-    };
+    const payload = { churchId: "", conversationId: "", action: "socketId", data: connectionId };
 
     try {
       const apiGwClient = getApiGatewayManagementClient(event);

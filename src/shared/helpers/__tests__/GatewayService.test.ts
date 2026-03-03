@@ -30,33 +30,18 @@ describe("GatewayService", () => {
 
   describe("getGatewayConfig", () => {
     it("should return decrypted gateway configuration", () => {
-      const mockGateway = {
-        publicKey: "public_test_key",
-        privateKey: "encrypted_private_key",
-        webhookKey: "encrypted_webhook_key",
-        productId: "test_product_id"
-      };
+      const mockGateway = { publicKey: "public_test_key", privateKey: "encrypted_private_key", webhookKey: "encrypted_webhook_key", productId: "test_product_id" };
 
       const result = GatewayService.getGatewayConfig(mockGateway);
 
-      expect(result).toEqual({
-        publicKey: "public_test_key",
-        privateKey: "decrypted_encrypted_private_key",
-        webhookKey: "decrypted_encrypted_webhook_key",
-        productId: "test_product_id"
-      });
+      expect(result).toEqual({ publicKey: "public_test_key", privateKey: "decrypted_encrypted_private_key", webhookKey: "decrypted_encrypted_webhook_key", productId: "test_product_id" });
 
       expect(EncryptionHelper.decrypt).toHaveBeenCalledWith("encrypted_private_key");
       expect(EncryptionHelper.decrypt).toHaveBeenCalledWith("encrypted_webhook_key");
     });
 
     it("should not log any sensitive information", () => {
-      const mockGateway = {
-        publicKey: "public_test_key",
-        privateKey: "encrypted_private_key",
-        webhookKey: "encrypted_webhook_key",
-        productId: "test_product_id"
-      };
+      const mockGateway = { publicKey: "public_test_key", privateKey: "encrypted_private_key", webhookKey: "encrypted_webhook_key", productId: "test_product_id" };
 
       GatewayService.getGatewayConfig(mockGateway);
 
@@ -69,12 +54,7 @@ describe("GatewayService", () => {
     });
 
     it("should not log private keys, secrets, or configuration objects", () => {
-      const mockGateway = {
-        publicKey: "public_test_key",
-        privateKey: "secret_private_key",
-        webhookKey: "secret_webhook_key",
-        productId: "test_product_id"
-      };
+      const mockGateway = { publicKey: "public_test_key", privateKey: "secret_private_key", webhookKey: "secret_webhook_key", productId: "test_product_id" };
 
       GatewayService.getGatewayConfig(mockGateway);
 
@@ -106,23 +86,12 @@ describe("GatewayService", () => {
 
       (GatewayFactory.getProvider as jest.Mock).mockReturnValue(mockProvider);
 
-      const mockGateway = {
-        provider: "stripe",
-        publicKey: "public_key",
-        privateKey: "encrypted_private_key",
-        webhookKey: "encrypted_webhook_key",
-        productId: "product_id"
-      };
+      const mockGateway = { provider: "stripe", publicKey: "public_key", privateKey: "encrypted_private_key", webhookKey: "encrypted_webhook_key", productId: "product_id" };
 
       await GatewayService.deleteWebhooks(mockGateway, "church123");
 
       expect(mockProvider.deleteWebhooksByChurchId).toHaveBeenCalledWith(
-        expect.objectContaining({
-          publicKey: "public_key",
-          privateKey: "decrypted_encrypted_private_key",
-          webhookKey: "decrypted_encrypted_webhook_key",
-          productId: "product_id"
-        }),
+        expect.objectContaining({ publicKey: "public_key", privateKey: "decrypted_encrypted_private_key", webhookKey: "decrypted_encrypted_webhook_key", productId: "product_id" }),
         "church123"
       );
 
@@ -388,110 +357,49 @@ describe("GatewayService", () => {
     });
 
     it("should validate stripe settings correctly", () => {
-      const gateway = {
-        provider: "stripe",
-        settings: {
-          webhookEnabled: true,
-          testMode: false,
-          statementDescriptor: "CHURCH DONATION",
-          paymentMethodTypes: ["card", "ach_debit"]
-        }
-      };
+      const gateway = { provider: "stripe", settings: { webhookEnabled: true, testMode: false, statementDescriptor: "CHURCH DONATION", paymentMethodTypes: ["card", "ach_debit"] } };
 
       const result = GatewayService.validateSettings(gateway);
-      expect(result).toEqual({
-        webhookEnabled: true,
-        testMode: false,
-        statementDescriptor: "CHURCH DONATION",
-        paymentMethodTypes: ["card", "ach_debit"]
-      });
+      expect(result).toEqual({ webhookEnabled: true, testMode: false, statementDescriptor: "CHURCH DONATION", paymentMethodTypes: ["card", "ach_debit"] });
     });
 
     it("should validate paypal settings correctly", () => {
-      const gateway = {
-        provider: "paypal",
-        settings: {
-          webhookEnabled: true,
-          brandName: "My Church",
-          landingPage: "LOGIN",
-          userAction: "PAY_NOW"
-        }
-      };
+      const gateway = { provider: "paypal", settings: { webhookEnabled: true, brandName: "My Church", landingPage: "LOGIN", userAction: "PAY_NOW" } };
 
       const result = GatewayService.validateSettings(gateway);
-      expect(result).toEqual({
-        webhookEnabled: true,
-        brandName: "My Church",
-        landingPage: "LOGIN",
-        userAction: "PAY_NOW"
-      });
+      expect(result).toEqual({ webhookEnabled: true, brandName: "My Church", landingPage: "LOGIN", userAction: "PAY_NOW" });
     });
 
     it("should validate square settings correctly", () => {
-      const gateway = {
-        provider: "square",
-        settings: {
-          webhookEnabled: false,
-          locationId: "loc123",
-          applicationId: "app456"
-        }
-      };
+      const gateway = { provider: "square", settings: { webhookEnabled: false, locationId: "loc123", applicationId: "app456" } };
 
       const result = GatewayService.validateSettings(gateway);
-      expect(result).toEqual({
-        webhookEnabled: false,
-        locationId: "loc123",
-        applicationId: "app456"
-      });
+      expect(result).toEqual({ webhookEnabled: false, locationId: "loc123", applicationId: "app456" });
     });
 
     it("should validate epaymints settings correctly", () => {
-      const gateway = {
-        provider: "epaymints",
-        settings: {
-          merchantId: "merchant123",
-          terminalId: "term456",
-          testMode: true
-        }
-      };
+      const gateway = { provider: "epaymints", settings: { merchantId: "merchant123", terminalId: "term456", testMode: true } };
 
       const result = GatewayService.validateSettings(gateway);
-      expect(result).toEqual({
-        merchantId: "merchant123",
-        terminalId: "term456",
-        testMode: true
-      });
+      expect(result).toEqual({ merchantId: "merchant123", terminalId: "term456", testMode: true });
     });
 
     it("should return null for unknown provider", () => {
-      const gateway = {
-        provider: "unknown",
-        settings: { webhookEnabled: true }
-      };
+      const gateway = { provider: "unknown", settings: { webhookEnabled: true } };
 
       const result = GatewayService.validateSettings(gateway);
       expect(result).toBeNull();
     });
 
     it("should handle provider names case insensitively", () => {
-      const gateway = {
-        provider: "STRIPE",
-        settings: { webhookEnabled: true }
-      };
+      const gateway = { provider: "STRIPE", settings: { webhookEnabled: true } };
 
       const result = GatewayService.validateSettings(gateway);
       expect(result).toEqual({ webhookEnabled: true });
     });
 
     it("should not log any sensitive information during validation", () => {
-      const gateway = {
-        provider: "stripe",
-        settings: {
-          webhookEnabled: true,
-          testMode: false,
-          statementDescriptor: "SECRET_DESCRIPTOR"
-        }
-      };
+      const gateway = { provider: "stripe", settings: { webhookEnabled: true, testMode: false, statementDescriptor: "SECRET_DESCRIPTOR" } };
 
       GatewayService.validateSettings(gateway);
 

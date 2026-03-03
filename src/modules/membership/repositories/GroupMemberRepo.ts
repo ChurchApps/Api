@@ -103,12 +103,7 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
   }
 
   public convertToBasicModel(_churchId: string, data: any) {
-    const result = {
-      id: data.id,
-      groupId: data.groupId,
-      personId: data.personId,
-      displayName: data.displayName
-    };
+    const result = { id: data.id, groupId: data.groupId, personId: data.personId, displayName: data.displayName };
     return result;
   }
 }

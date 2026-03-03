@@ -54,12 +54,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
 
     const currency = donationData?.currency || "usd";
 
-    const paymentData = {
-      amount: donationData.amount,
-      currency,
-      customer: donationData.customerId,
-      metadata: { funds: JSON.stringify(donationData.funds), notes: donationData.notes }
-    };
+    const paymentData = { amount: donationData.amount, currency, customer: donationData.customerId, metadata: { funds: JSON.stringify(donationData.funds), notes: donationData.notes } };
 
     if (donationData.type === "card") {
       (paymentData as any).payment_method = donationData.id;

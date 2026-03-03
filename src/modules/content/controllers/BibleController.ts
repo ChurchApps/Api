@@ -211,12 +211,7 @@ export class BibleController extends ContentBaseController {
   }
 
   private async logLookup(ipAddress: string, translationKey: string, startVerseKey: string, endVerseKey: string) {
-    const lookup = {
-      translationKey,
-      ipAddress,
-      startVerseKey,
-      endVerseKey
-    };
+    const lookup = { translationKey, ipAddress, startVerseKey, endVerseKey };
     await this.repos.bibleLookup.save(lookup);
   }
 

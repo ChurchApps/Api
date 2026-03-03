@@ -36,11 +36,7 @@ export class VimeoHelper {
     const axiosConfig = { headers: { Authorization: "Bearer " + Environment.vimeoToken } };
     const json: any = (await axios.get(url, axiosConfig)).data;
     const urlParams = new URLSearchParams(json.paging.last);
-    const result = {
-      sermons: this.convertToSermons(churchId, json),
-      nextPage: Number(json.page + 1),
-      lastPage: Number(urlParams.get("page"))
-    };
+    const result = { sermons: this.convertToSermons(churchId, json), nextPage: Number(json.page + 1), lastPage: Number(urlParams.get("page")) };
     return result;
   }
 

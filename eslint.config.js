@@ -5,7 +5,7 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 
 export default [
   {
-    ignores: ["node_modules/", "dist/", "build/", "coverage/", "layer/", "*.config.js"]
+    ignores: ["node_modules/", "dist/", "build/", ".next/", "coverage/", "*.config.js"]
   },
   {
     files: ["src/**/*.ts"],
@@ -26,9 +26,9 @@ export default [
       "prefer-const": "error",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": ["warn", {
-        args: "none",
-        varsIgnorePattern: "^_",
-        caughtErrors: "none"
+        args: "all",
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_"
       }],
       "unused-imports/no-unused-imports": "error",
 
@@ -70,7 +70,7 @@ export default [
       "function-paren-newline": ["error", "consistent"],
       "function-call-argument-newline": ["error", "consistent"],
 
-      // Generous line length
+      // Line length
       "max-len": ["warn", {
         code: 250,
         ignoreStrings: true,

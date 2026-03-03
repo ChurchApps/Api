@@ -11,8 +11,14 @@ export class RegistrationRepo extends ConfiguredRepo<Registration> {
       tableName: "registrations",
       hasSoftDelete: false,
       columns: [
-        "eventId", "personId", "householdId", "status", "formSubmissionId",
-        "notes", "registeredDate", "cancelledDate"
+        "eventId",
+        "personId",
+        "householdId",
+        "status",
+        "formSubmissionId",
+        "notes",
+        "registeredDate",
+        "cancelledDate"
       ]
     };
   }
@@ -84,10 +90,19 @@ export class RegistrationRepo extends ConfiguredRepo<Registration> {
       FROM dual
       WHERE (SELECT COUNT(*) FROM registrations WHERE eventId=? AND churchId=? AND status IN ('pending','confirmed')) < ?`;
     const params = [
-      m.id, m.churchId, m.eventId, m.personId || null, m.householdId || null,
-      m.status || "confirmed", m.formSubmissionId || null, m.notes || null,
-      m.registeredDate || null, m.cancelledDate || null,
-      m.eventId, m.churchId, capacity
+      m.id,
+      m.churchId,
+      m.eventId,
+      m.personId || null,
+      m.householdId || null,
+      m.status || "confirmed",
+      m.formSubmissionId || null,
+      m.notes || null,
+      m.registeredDate || null,
+      m.cancelledDate || null,
+      m.eventId,
+      m.churchId,
+      capacity
     ];
     const result: any = await TypedDB.query(sql, params);
     if (result?.affectedRows > 0) {

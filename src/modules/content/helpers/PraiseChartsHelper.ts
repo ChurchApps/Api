@@ -29,11 +29,7 @@ export class PraiseChartsHelper {
 
   static async getRequestToken(returnUrl: string): Promise<{ oauthToken: string; oauthTokenSecret: string }> {
     const oauth = this.getOAuth();
-    const requestData = {
-      url: "https://api.praisecharts.com/oauth/request_token",
-      method: "POST",
-      data: { oauth_callback: returnUrl }
-    };
+    const requestData = { url: "https://api.praisecharts.com/oauth/request_token", method: "POST", data: { oauth_callback: returnUrl } };
     const headers = oauth.toHeader(oauth.authorize(requestData));
     const response = await fetch(requestData.url, {
       method: "POST",
@@ -55,11 +51,7 @@ export class PraiseChartsHelper {
   static async getAccessToken(oauthToken: string, oauthTokenSecret: string, oauthVerifier: string): Promise<{ accessToken: string; accessTokenSecret: string }> {
     const oauth = this.getOAuth();
     const token = { key: oauthToken, secret: oauthTokenSecret };
-    const requestData = {
-      url: "https://api.praisecharts.com/oauth/access_token",
-      method: "POST",
-      data: { oauth_verifier: oauthVerifier }
-    };
+    const requestData = { url: "https://api.praisecharts.com/oauth/access_token", method: "POST", data: { oauth_verifier: oauthVerifier } };
     const headers = oauth.toHeader(oauth.authorize(requestData, token));
     const response = await fetch(requestData.url, {
       method: "POST",

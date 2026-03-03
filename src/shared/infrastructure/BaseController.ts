@@ -17,7 +17,7 @@ export class BaseController extends CustomBaseController {
     "/membership/groups": { category: "group", entityType: "group" },
     "/membership/forms": { category: "form", entityType: "form" },
     "/membership/settings": { category: "settings", entityType: "setting" },
-    "/giving/donations": { category: "donation", entityType: "donation" },
+    "/giving/donations": { category: "donation", entityType: "donation" }
   };
 
   constructor(moduleName: string) {

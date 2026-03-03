@@ -9,9 +9,7 @@ export class RegistrationMemberRepo extends ConfiguredRepo<RegistrationMember> {
     return {
       tableName: "registrationMembers",
       hasSoftDelete: false,
-      columns: [
-        "registrationId", "personId", "firstName", "lastName"
-      ]
+      columns: ["registrationId", "personId", "firstName", "lastName"]
     };
   }
 
