@@ -63,6 +63,59 @@ export class VisitRepo extends ConfiguredRepo<Visit> {
     return TypedDB.query("SELECT * FROM visits WHERE churchId=? AND personId=?", [churchId, personId]);
   }
 
+  public async loadConsecutiveWeekStreaks(churchId: string, personIds: string[]): Promise<Record<string, number>> {
+    if (personIds.length === 0) return {};
+    const sql = "SELECT personId, YEARWEEK(visitDate, 3) AS yw FROM visits WHERE churchId = ? AND personId IN ("
+      + ArrayHelper.fillArray("?", personIds.length).join(", ")
+      + ") GROUP BY personId, yw ORDER BY personId, yw DESC";
+    const rows: any[] = await TypedDB.query(sql, [churchId, ...personIds]) as any[];
+
+    const byPerson: Record<string, number[]> = {};
+    for (const row of rows) {
+      if (!byPerson[row.personId]) byPerson[row.personId] = [];
+      byPerson[row.personId].push(row.yw);
+    }
+
+    const currentYw = this.getIsoYearWeek(new Date());
+    const result: Record<string, number> = {};
+    for (const personId of personIds) {
+      const weeks = byPerson[personId] || [];
+      result[personId] = this.countConsecutiveWeeks(weeks, currentYw);
+    }
+    return result;
+  }
+
+  private getIsoYearWeek(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return d.getUTCFullYear() * 100 + weekNo;
+  }
+
+  private countConsecutiveWeeks(sortedWeeksDesc: number[], currentYw: number): number {
+    if (sortedWeeksDesc.length === 0 || sortedWeeksDesc[0] !== currentYw) return 0;
+    let streak = 1;
+    let expectedYw = currentYw;
+    for (let i = 1; i < sortedWeeksDesc.length; i++) {
+      expectedYw = this.previousIsoWeek(expectedYw);
+      if (sortedWeeksDesc[i] === expectedYw) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  private previousIsoWeek(yw: number): number {
+    const year = Math.floor(yw / 100);
+    const week = yw % 100;
+    if (week > 1) return year * 100 + (week - 1);
+    const dec28 = new Date(Date.UTC(year - 1, 11, 28));
+    dec28.setUTCDate(dec28.getUTCDate() + 4 - (dec28.getUTCDay() || 7));
+    const lastYearStart = new Date(Date.UTC(dec28.getUTCFullYear(), 0, 1));
+    const lastWeek = Math.ceil((((dec28.getTime() - lastYearStart.getTime()) / 86400000) + 1) / 7);
+    return (year - 1) * 100 + lastWeek;
+  }
+
   protected rowToModel(row: any): Visit {
     return {
       id: row.id,

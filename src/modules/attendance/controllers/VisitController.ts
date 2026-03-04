@@ -141,7 +141,9 @@ export class VisitController extends AttendanceBaseController {
         });
 
         await Promise.all(promises);
-        return [];
+
+        const streaks = await this.repos.visit.loadConsecutiveWeekStreaks(au.churchId, peopleIds);
+        return { streaks };
       }
     });
   }
