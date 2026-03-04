@@ -10,7 +10,7 @@ export class LinkController extends ContentCrudController {
   protected crudSettings = {
     repoKey: "link",
     permissions: { view: undefined, edit: Permissions.content.edit },
-    routes: ["getById", "getAll", "post", "delete"] as const
+    routes: ["getById", "getAll", "post"] as const
   };
 
   // Authenticated access - filters links by visibility based on user context
@@ -79,7 +79,7 @@ export class LinkController extends ContentCrudController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await this.repos.link.delete(id, au.churchId);
+        await this.repos.link.delete(au.churchId, id);
         return this.json({});
       }
     });

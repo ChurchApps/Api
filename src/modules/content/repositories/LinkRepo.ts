@@ -37,7 +37,7 @@ export class LinkRepo extends ConfiguredRepo<Link> {
     return TypedDB.queryOne("SELECT * FROM links WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
-  public async delete(id: string, churchId: string): Promise<any> {
+  public async delete(churchId: string, id: string): Promise<any> {
     return TypedDB.query("DELETE FROM links WHERE id=? AND churchId=?;", [id, churchId]);
   }
 
