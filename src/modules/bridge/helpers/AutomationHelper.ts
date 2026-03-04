@@ -53,7 +53,7 @@ export class AutomationHelper {
             timeSent: new Date(),
             isNew: true,
             message: `Reminder: Please confirm your volunteer request on ${serviceDateStr}`,
-            link: `https://${subDomain}.b1.church/my/plans/${position.planId}`
+            link: `https://${subDomain}.b1.church/my/plans?id=${position.planId}`
           };
 
           notifications.push(notification);

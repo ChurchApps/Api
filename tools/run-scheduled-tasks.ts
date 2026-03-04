@@ -68,7 +68,7 @@ async function runScheduledTasks() {
           timeSent: new Date(),
           isNew: true,
           message: `Reminder: Please confirm your volunteer request for ${assignment.planName} on ${serviceDateStr}`,
-          link: `https://${subDomain}.b1.church/my/plans/${assignment.planId}`
+          link: `https://${subDomain}.b1.church/my/plans?id=${assignment.planId}`
         };
         
         notifications.push(notification);
