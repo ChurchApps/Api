@@ -2,7 +2,7 @@ import { controller, httpDelete, httpGet, httpPost } from "inversify-express-uti
 import express from "express";
 import bcrypt from "bcryptjs";
 import { body, oneOf, validationResult } from "express-validator";
-import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch } from "../models/index.js";
+import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { EmailHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper } from "../helpers/index.js";
@@ -253,6 +253,18 @@ export class UserController extends MembershipBaseController {
         // Create userChurch records for matching people in groups
         await UserChurchHelper.createForNewUser(user.id, user.email);
 
+        // Link pre-selected church from People record match (even if person isn't in a group)
+        if (register.churchId) {
+          const existingUC = await this.repos.userChurch.loadByUserId(user.id, register.churchId);
+          if (!existingUC) {
+            const matchingPeople = await this.repos.person.searchEmail(register.churchId, user.email);
+            const exactMatch = matchingPeople.find((p: Person) => p.contactInfo?.email?.toLowerCase() === user.email.toLowerCase());
+            if (exactMatch) {
+              await this.repos.userChurch.save({ userId: user.id, churchId: register.churchId, personId: exactMatch.id });
+            }
+          }
+        }
+
         // Add first user to server admins group
         if (userCount === 0) {
           this.repos.role.loadAll().then((roles) => {
@@ -318,6 +330,39 @@ export class UserController extends MembershipBaseController {
         this.logger.error(e);
         return this.error([e.toString()]);
       }
+    });
+  }
+
+  @httpPost("/checkEmail", body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }))
+  public async checkEmail(req: express.Request<{}, {}, { email: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const email = req.body.email;
+      const user = await this.repos.user.loadByEmail(email);
+
+      if (user) {
+        return this.json({ exists: true, peopleMatches: [] }, 200);
+      }
+
+      const churches = await this.repos.church.loadAll();
+      const matches: Array<{ firstName: string; lastName: string; churchId: string; churchName: string }> = [];
+
+      for (const church of churches) {
+        const matchingPeople = await this.repos.person.searchEmail(church.id, email);
+        const exactMatches = matchingPeople.filter((p: Person) => p.contactInfo?.email?.toLowerCase() === email.toLowerCase());
+        for (const person of exactMatches) {
+          matches.push({
+            firstName: person.name?.first || "",
+            lastName: person.name?.last || "",
+            churchId: church.id,
+            churchName: church.name
+          });
+        }
+      }
+
+      return this.json({ exists: false, peopleMatches: matches }, 200);
     });
   }
 
