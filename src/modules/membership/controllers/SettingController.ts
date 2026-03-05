@@ -41,8 +41,7 @@ export class MembershipSettingController extends MembershipBaseController {
       if (!settings || !Array.isArray(settings)) return {};
       const themeSetting = settings.find((s: Setting) => s.keyName === "checkinTheme");
       if (!themeSetting?.value) return {};
-      try { return JSON.parse(themeSetting.value); }
-      catch { return {}; }
+      try { return JSON.parse(themeSetting.value); } catch { return {}; }
     });
   }
 
