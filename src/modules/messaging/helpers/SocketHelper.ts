@@ -50,11 +50,15 @@ export class SocketHelper {
   static handleDisconnect = async (socketId: string) => {
     if (!SocketHelper.repos) return;
 
-    const connections = await SocketHelper.repos.connection.loadBySocketId(socketId);
-    await SocketHelper.repos.connection.deleteForSocket(socketId);
-    connections.forEach((c: Connection) => {
-      DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
-    });
+    try {
+      const connections = await SocketHelper.repos.connection.loadBySocketId(socketId);
+      await SocketHelper.repos.connection.deleteForSocket(socketId);
+      connections.forEach((c: Connection) => {
+        DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
+      });
+    } catch (ex) {
+      console.warn("SocketHelper.handleDisconnect error (non-fatal):", (ex as Error).message);
+    }
   };
 
   static getConnection = (id: string) => {
