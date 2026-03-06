@@ -58,18 +58,19 @@ export class AuditLogRepo extends ConfiguredRepo<AuditLog> {
       params.push(filter.endDate);
     }
 
-    const limit = filter.limit || 100;
-    const offset = filter.offset || 0;
-    const sql = `SELECT * FROM auditLogs WHERE ${conditions.join(" AND ")} ORDER BY created DESC LIMIT ? OFFSET ?;`;
-    params.push(limit, offset);
+    const limit = Math.max(1, Math.min(filter.limit || 100, 1000));
+    const offset = Math.max(0, filter.offset || 0);
+    const sql = `SELECT * FROM auditLogs WHERE ${conditions.join(" AND ")} ORDER BY created DESC LIMIT ${limit} OFFSET ${offset};`;
     return rowsToArray(await TypedDB.query(sql, params));
   }
 
   public async loadForPerson(churchId: string, personId: string, limit: number = 100, offset: number = 0): Promise<AuditLog[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 1000));
+    const safeOffset = Math.max(0, offset);
     const sql = `SELECT al.* FROM auditLogs al
       WHERE al.churchId=? AND (al.userId=? OR (al.entityType='person' AND al.entityId=?))
-      ORDER BY al.created DESC LIMIT ? OFFSET ?;`;
-    return rowsToArray(await TypedDB.query(sql, [churchId, personId, personId, limit, offset]));
+      ORDER BY al.created DESC LIMIT ${safeLimit} OFFSET ${safeOffset};`;
+    return rowsToArray(await TypedDB.query(sql, [churchId, personId, personId]));
   }
 
   public async loadCount(churchId: string, filter: AuditLogFilter): Promise<number> {
