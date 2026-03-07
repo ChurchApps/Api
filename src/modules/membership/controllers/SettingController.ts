@@ -32,6 +32,19 @@ export class MembershipSettingController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/public/:churchId/app-theme")
+  public async appTheme(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const publicSettings = await this.repos.setting.loadPublicSettings(churchId);
+      if (!publicSettings || !Array.isArray(publicSettings)) return {};
+      const settings = this.repos.setting.convertAllToModel(churchId, publicSettings as any[]);
+      if (!settings || !Array.isArray(settings)) return {};
+      const themeSetting = settings.find((s: Setting) => s.keyName === "appTheme");
+      if (!themeSetting?.value) return {};
+      try { return JSON.parse(themeSetting.value); } catch { return {}; }
+    });
+  }
+
   @httpGet("/public/:churchId/checkin-theme")
   public async checkinTheme(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
