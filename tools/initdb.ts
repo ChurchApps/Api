@@ -58,12 +58,15 @@ const moduleDefinitions = {
         tables: [
           { title: "OAuth Clients", file: "oAuthClients.sql" },
           { title: "OAuth Codes", file: "oAuthCodes.sql" },
+          { title: "OAuth Device Codes", file: "oAuthDeviceCodes.sql" },
+          { title: "OAuth Relay Sessions", file: "oAuthRelaySessions.sql" },
           { title: "OAuth Tokens", file: "oAuthTokens.sql" },
         ]
       },
       {
         name: "Misc",
         tables: [
+          { title: "Audit Logs", file: "auditLogs.sql" },
           { title: "Client Errors", file: "clientErrors.sql" },
           { title: "Settings", file: "settings.sql" },
           { title: "Usage Trends", file: "usageTrends.sql" },
