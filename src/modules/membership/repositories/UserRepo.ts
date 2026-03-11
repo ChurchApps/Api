@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, sql, inArray, like, or } from "drizzle-orm";
+import { eq, and, inArray, like, or, count } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { users } from "../../../db/schema/membership.js";
@@ -60,7 +60,7 @@ export class UserRepo extends GlobalDrizzleRepo<typeof users> {
 
   public loadByEmailPassword(email: string, hashedPassword: string): Promise<User> {
     return this.db.select().from(users)
-      .where(sql`email = ${email} AND password = ${hashedPassword}`)
+      .where(and(eq(users.email, email), eq(users.password, hashedPassword)))
       .then(r => (r[0] as User) ?? null);
   }
 
@@ -70,8 +70,8 @@ export class UserRepo extends GlobalDrizzleRepo<typeof users> {
   }
 
   public async loadCount() {
-    const rows = await this.executeRows(sql`SELECT COUNT(*) as count FROM users`);
-    return parseInt(rows[0].count, 10);
+    const rows = await this.db.select({ count: count() }).from(users);
+    return rows[0]?.count || 0;
   }
 
   public async search(term: string): Promise<User[]> {

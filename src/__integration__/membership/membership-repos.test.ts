@@ -1,8 +1,6 @@
 import { initTestDb, teardownTestDb } from "../db-helper";
-import { AnswerRepo } from "../../modules/membership/repositories/AnswerRepo";
 import { DomainRepo } from "../../modules/membership/repositories/DomainRepo";
 import { FormRepo } from "../../modules/membership/repositories/FormRepo";
-import { FormSubmissionRepo } from "../../modules/membership/repositories/FormSubmissionRepo";
 import { GroupRepo } from "../../modules/membership/repositories/GroupRepo";
 import { GroupMemberRepo } from "../../modules/membership/repositories/GroupMemberRepo";
 import { HouseholdRepo } from "../../modules/membership/repositories/HouseholdRepo";
@@ -17,8 +15,6 @@ import { VisibilityPreferenceRepo } from "../../modules/membership/repositories/
 import { AccessLogRepo } from "../../modules/membership/repositories/AccessLogRepo";
 import { AuditLogRepo } from "../../modules/membership/repositories/AuditLogRepo";
 import { UserChurchRepo } from "../../modules/membership/repositories/UserChurchRepo";
-import { ChurchRepo } from "../../modules/membership/repositories/ChurchRepo";
-import { UserRepo } from "../../modules/membership/repositories/UserRepo";
 import { getDrizzleDb } from "../../db/drizzle";
 import { sql } from "drizzle-orm";
 

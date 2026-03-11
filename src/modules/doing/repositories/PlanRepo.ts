@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, inArray, desc, asc, gte, between, sql } from "drizzle-orm";
+import { eq, and, inArray, desc, asc, gte, between } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
@@ -30,7 +30,7 @@ export class PlanRepo extends DrizzleRepo<typeof plans> {
 
   public load7Days(churchId: string) {
     return this.db.select().from(plans)
-      .where(and(eq(plans.churchId, churchId), between(plans.serviceDate, sql`CURDATE()`, sql`CURDATE() + INTERVAL 7 DAY`)))
+      .where(and(eq(plans.churchId, churchId), between(plans.serviceDate, DateHelper.startOfToday(), DateHelper.daysFromNow(7))))
       .orderBy(desc(plans.serviceDate));
   }
 
@@ -42,7 +42,7 @@ export class PlanRepo extends DrizzleRepo<typeof plans> {
 
   public loadCurrentByPlanTypeId(planTypeId: string) {
     return this.db.select().from(plans)
-      .where(and(eq(plans.planTypeId, planTypeId), gte(plans.serviceDate, sql`CURDATE()`)))
+      .where(and(eq(plans.planTypeId, planTypeId), gte(plans.serviceDate, DateHelper.startOfToday())))
       .orderBy(asc(plans.serviceDate))
       .limit(1)
       .then(r => r[0] ?? null);
@@ -52,7 +52,7 @@ export class PlanRepo extends DrizzleRepo<typeof plans> {
     const result = await this.db.selectDistinct({ plans })
       .from(plans)
       .innerJoin(positions, and(eq(positions.planId, plans.id), eq(positions.churchId, plans.churchId)))
-      .where(and(eq(plans.churchId, churchId), eq(positions.allowSelfSignup, true), gte(plans.serviceDate, sql`CURDATE()`)))
+      .where(and(eq(plans.churchId, churchId), eq(positions.allowSelfSignup, true), gte(plans.serviceDate, DateHelper.startOfToday())))
       .orderBy(asc(plans.serviceDate));
     return result.map(r => r.plans);
   }

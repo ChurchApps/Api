@@ -32,7 +32,7 @@ export class EmailTemplateRepo extends DrizzleRepo<typeof emailTemplates> {
       subject: emailTemplates.subject,
       category: emailTemplates.category,
       dateCreated: emailTemplates.dateCreated,
-      dateModified: emailTemplates.dateModified,
+      dateModified: emailTemplates.dateModified
     })
       .from(emailTemplates)
       .where(eq(emailTemplates.churchId, churchId))

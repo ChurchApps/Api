@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { eq, and, sql, inArray, gte, desc } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { conversations } from "../../../db/schema/messaging.js";
 
@@ -33,7 +34,7 @@ export class ConversationRepo extends DrizzleRepo<typeof conversations> {
       id: conversations.id,
       firstPostId: conversations.firstPostId,
       lastPostId: conversations.lastPostId,
-      postCount: conversations.postCount,
+      postCount: conversations.postCount
     })
       .from(conversations)
       .where(and(eq(conversations.churchId, churchId), inArray(conversations.id, ids)));
@@ -48,7 +49,7 @@ export class ConversationRepo extends DrizzleRepo<typeof conversations> {
       INNER JOIN messages fp ON fp.id = c.firstPostId
       INNER JOIN messages lp ON lp.id = c.lastPostId
       WHERE c.churchId = ${churchId} AND c.groupId IN (${sql.join(groupIds.map(id => sql`${id}`), sql`, `)})
-      AND lp.timeSent > DATE_SUB(NOW(), INTERVAL 365 DAY)
+      AND lp.timeSent > ${DateHelper.daysFromNow(-365)}
     `);
   }
 

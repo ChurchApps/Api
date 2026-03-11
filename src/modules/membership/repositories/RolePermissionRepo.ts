@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { rolePermissions } from "../../../db/schema/membership.js";
+import { rolePermissions, churches } from "../../../db/schema/membership.js";
 import { RolePermission, Api, LoginUserChurch } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
@@ -214,12 +214,19 @@ export class RolePermissionRepo extends DrizzleRepo<typeof rolePermissions> {
 
   // permissions applied to all the members of church
   public loadForEveryone(churchId: string) {
-    return this.executeRows(sql`
-      SELECT rp.id, rp.churchId, rp.roleId, rp.apiName, rp.contentType, rp.contentId, rp.action,
-        c.name AS churchName, c.subDomain
-      FROM rolePermissions rp
-      LEFT JOIN churches c on c.id=rp.churchId
-      WHERE rp.churchId=${churchId} AND rp.roleId IS NULL
-    `);
+    return this.db.select({
+      id: rolePermissions.id,
+      churchId: rolePermissions.churchId,
+      roleId: rolePermissions.roleId,
+      apiName: rolePermissions.apiName,
+      contentType: rolePermissions.contentType,
+      contentId: rolePermissions.contentId,
+      action: rolePermissions.action,
+      churchName: churches.name,
+      subDomain: churches.subDomain
+    })
+      .from(rolePermissions)
+      .leftJoin(churches, eq(churches.id, rolePermissions.churchId))
+      .where(and(eq(rolePermissions.churchId, churchId), isNull(rolePermissions.roleId)));
   }
 }

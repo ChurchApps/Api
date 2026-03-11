@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
 import { eq, and, asc, like, sql } from "drizzle-orm";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { events } from "../../../db/schema/content.js";
 
@@ -34,7 +35,7 @@ export class EventRepo extends DrizzleRepo<typeof events> {
       SELECT *, 'event' as postType, id as postId FROM events
       WHERE churchId = ${churchId} AND ((
         groupId = ${groupId}
-        AND (end > CURDATE() OR recurrenceRule IS NOT NULL)
+        AND (end > ${DateHelper.startOfToday()} OR recurrenceRule IS NOT NULL)
       )${eventIdPlaceholders})
     `);
   }
@@ -50,7 +51,7 @@ export class EventRepo extends DrizzleRepo<typeof events> {
           OR groupId IN (SELECT groupId FROM curatedEvents WHERE churchId = ${churchId} AND eventId IS NULL)
           OR id IN (SELECT eventId FROM curatedEvents WHERE churchId = ${churchId})
         )
-        AND (end > CURDATE() OR recurrenceRule IS NOT NULL)
+        AND (end > ${DateHelper.startOfToday()} OR recurrenceRule IS NOT NULL)
       )${eventIdFragment})
     `);
   }

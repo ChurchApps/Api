@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, sql, count, inArray } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { registrations } from "../../../db/schema/content.js";
@@ -23,9 +23,13 @@ export class RegistrationRepo extends DrizzleRepo<typeof registrations> {
   }
 
   public async countActiveForEvent(churchId: string, eventId: string): Promise<number> {
-    const rows = await this.executeRows(sql`
-      SELECT COUNT(*) as cnt FROM registrations WHERE churchId = ${churchId} AND eventId = ${eventId} AND status IN ('pending','confirmed')
-    `);
+    const rows = await this.db.select({ cnt: count() })
+      .from(registrations)
+      .where(and(
+        eq(registrations.churchId, churchId),
+        eq(registrations.eventId, eventId),
+        inArray(registrations.status, ["pending", "confirmed"])
+      ));
     return rows[0]?.cnt || 0;
   }
 

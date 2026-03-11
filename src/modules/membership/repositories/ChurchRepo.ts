@@ -1,9 +1,10 @@
 import { injectable } from "inversify";
-import { eq, sql, inArray, isNull, like, asc } from "drizzle-orm";
+import { eq, sql, inArray, isNull, like, asc, and, count } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { churches } from "../../../db/schema/membership.js";
 import { Church, Api, LoginUserChurch } from "../models/index.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 @injectable()
 export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
@@ -44,8 +45,8 @@ export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
   }
 
   public async loadCount() {
-    const rows = await this.executeRows(sql`SELECT COUNT(*) as count FROM churches`);
-    return parseInt(rows[0].count, 10);
+    const rows = await this.db.select({ count: count() }).from(churches);
+    return rows[0]?.count || 0;
   }
 
   public loadAll() {
@@ -64,7 +65,7 @@ export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
         .limit(limitVal);
     } else {
       return this.db.select().from(churches)
-        .where(sql`name LIKE ${searchTerm} AND archivedDate IS NULL`)
+        .where(and(like(churches.name, searchTerm), isNull(churches.archivedDate)))
         .orderBy(asc(churches.name))
         .limit(limitVal);
     }
@@ -72,12 +73,12 @@ export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
 
   public loadContainingSubDomain(subDomain: string) {
     return this.db.select().from(churches)
-      .where(sql`subDomain LIKE ${subDomain + "%"} AND archivedDate IS NULL`);
+      .where(and(like(churches.subDomain, subDomain + "%"), isNull(churches.archivedDate)));
   }
 
   public loadBySubDomain(subDomain: string) {
     return this.db.select().from(churches)
-      .where(sql`subDomain = ${subDomain} AND archivedDate IS NULL`)
+      .where(and(eq(churches.subDomain, subDomain), isNull(churches.archivedDate)))
       .then(r => r[0] ?? null);
   }
 
@@ -125,10 +126,11 @@ export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
   }
 
   public async getAbandoned(noMonths = 6) {
+    const cutoff = DateHelper.monthsFromNow(-noMonths);
     return this.executeRows(sql`
       SELECT churchId FROM (
         SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId
-      ) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL ${noMonths} MONTH)
+      ) groupedChurches WHERE lastAccessed <= ${cutoff}
     `);
   }
 

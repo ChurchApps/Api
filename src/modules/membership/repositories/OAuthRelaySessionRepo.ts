@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, lt, gt } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { oAuthRelaySessions } from "../../../db/schema/membership.js";
@@ -47,15 +47,14 @@ export class OAuthRelaySessionRepo extends GlobalDrizzleRepo<typeof oAuthRelaySe
     return this.db.select().from(oAuthRelaySessions).where(eq(oAuthRelaySessions.id, id)).then(r => (r[0] as OAuthRelaySession) ?? null);
   }
 
-  public async loadBySessionCode(sessionCode: string): Promise<OAuthRelaySession> {
-    const rows = await this.executeRows(
-      sql`SELECT * FROM oAuthRelaySessions WHERE sessionCode=${sessionCode} AND expiresAt > NOW()`
-    );
-    return (rows[0] as OAuthRelaySession) ?? null;
+  public loadBySessionCode(sessionCode: string): Promise<OAuthRelaySession> {
+    return this.db.select().from(oAuthRelaySessions)
+      .where(and(eq(oAuthRelaySessions.sessionCode, sessionCode), gt(oAuthRelaySessions.expiresAt, new Date())))
+      .then(r => (r[0] as OAuthRelaySession) ?? null);
   }
 
   public deleteExpired() {
-    return this.db.execute(sql`DELETE FROM oAuthRelaySessions WHERE expiresAt < NOW()`);
+    return this.db.delete(oAuthRelaySessions).where(lt(oAuthRelaySessions.expiresAt, new Date()));
   }
 
   public static generateSessionCode(): string {

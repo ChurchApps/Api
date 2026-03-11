@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { sql } from "drizzle-orm";
-import { DateHelper } from "@churchapps/apihelper";
+import { eq, and, sql, between, desc, asc } from "drizzle-orm";
 import { getDrizzleDb } from "../../../db/drizzle.js";
+import { campuses, services, serviceTimes, sessions, visits, visitSessions } from "../../../db/schema/attendance.js";
 import { AttendanceRecord } from "../models/index.js";
 
 @injectable()
@@ -14,16 +14,22 @@ export class AttendanceRepo {
   }
 
   public loadTree(churchId: string) {
-    return this.executeRows(sql`
-      SELECT c.id as campusId, IFNULL(c.name, 'Unassigned') as campusName,
-        s.id as serviceId, s.name as serviceName,
-        st.id as serviceTimeId, st.name as serviceTimeName
-      FROM campuses c
-      LEFT JOIN services s ON s.campusId = c.id AND IFNULL(s.removed, 0) = 0
-      LEFT JOIN serviceTimes st ON st.serviceId = s.id AND IFNULL(st.removed, 0) = 0
-      WHERE (c.id IS NULL OR c.churchId = ${churchId}) AND IFNULL(c.removed, 0) = 0
-      ORDER BY campusName, serviceName, serviceTimeName
-    `);
+    return this.db.select({
+      campusId: campuses.id,
+      campusName: sql`COALESCE(${campuses.name}, 'Unassigned')`.as("campusName"),
+      serviceId: services.id,
+      serviceName: services.name,
+      serviceTimeId: serviceTimes.id,
+      serviceTimeName: serviceTimes.name
+    })
+      .from(campuses)
+      .leftJoin(services, and(eq(services.campusId, campuses.id), sql`COALESCE(${services.removed}, 0) = 0`))
+      .leftJoin(serviceTimes, and(eq(serviceTimes.serviceId, services.id), sql`COALESCE(${serviceTimes.removed}, 0) = 0`))
+      .where(and(
+        sql`(${campuses.id} IS NULL OR ${campuses.churchId} = ${churchId})`,
+        sql`COALESCE(${campuses.removed}, 0) = 0`
+      ))
+      .orderBy(sql`campusName`, sql`serviceName`, sql`serviceTimeName`);
   }
 
   public loadTrend(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, groupId: string) {
@@ -48,86 +54,119 @@ export class AttendanceRepo {
   }
 
   public loadGroups(churchId: string, serviceId: string, week: Date) {
-    return this.executeRows(sql`
-      SELECT ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId
-      FROM visits v
-      INNER JOIN visitSessions vs ON vs.churchId = v.churchId AND vs.visitId = v.id
-      INNER JOIN sessions s ON s.id = vs.sessionId
-      INNER JOIN serviceTimes st ON st.id = s.serviceTimeId
-      INNER JOIN services ser ON ser.id = st.serviceId
-      WHERE v.churchId = ${churchId}
-        AND ${serviceId} IN (0, ser.id)
-        AND s.sessionDate BETWEEN ${week} AND DATE_ADD(${week}, INTERVAL 7 DAY)
-      ORDER BY ser.name, st.name
-    `);
+    const weekEnd = new Date(week);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    return this.db.select({
+      serviceName: services.name,
+      serviceTimeName: serviceTimes.name,
+      groupId: sessions.groupId,
+      personId: visits.personId
+    })
+      .from(visits)
+      .innerJoin(visitSessions, and(eq(visitSessions.churchId, visits.churchId), eq(visitSessions.visitId, visits.id)))
+      .innerJoin(sessions, eq(sessions.id, visitSessions.sessionId))
+      .innerJoin(serviceTimes, eq(serviceTimes.id, sessions.serviceTimeId))
+      .innerJoin(services, eq(services.id, serviceTimes.serviceId))
+      .where(and(
+        eq(visits.churchId, churchId),
+        sql`${serviceId} IN (0, ${services.id})`,
+        between(sessions.sessionDate, week, weekEnd)
+      ))
+      .orderBy(asc(services.name), asc(serviceTimes.name));
   }
 
   public loadForPerson(churchId: string, personId: string) {
-    return this.executeRows(sql`
-      SELECT v.visitDate, c.id as campusId, c.name as campusName,
-        ser.id as serviceId, ser.name as serviceName,
-        st.id as serviceTimeId, st.name as serviceTimeName, s.groupId
-      FROM visits v
-      INNER JOIN visitSessions vs ON vs.visitId = v.id
-      INNER JOIN sessions s ON s.id = vs.sessionId
-      LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId
-      LEFT OUTER JOIN services ser ON ser.id = st.serviceId
-      LEFT OUTER JOIN campuses c ON c.id = ser.campusId
-      WHERE v.churchId = ${churchId} AND v.personId = ${personId}
-      ORDER BY v.visitDate DESC, c.name, ser.name, st.name
-    `);
+    return this.db.select({
+      visitDate: visits.visitDate,
+      campusId: campuses.id,
+      campusName: campuses.name,
+      serviceId: services.id,
+      serviceName: services.name,
+      serviceTimeId: serviceTimes.id,
+      serviceTimeName: serviceTimes.name,
+      groupId: sessions.groupId
+    })
+      .from(visits)
+      .innerJoin(visitSessions, eq(visitSessions.visitId, visits.id))
+      .innerJoin(sessions, eq(sessions.id, visitSessions.sessionId))
+      .leftJoin(serviceTimes, eq(serviceTimes.id, sessions.serviceTimeId))
+      .leftJoin(services, eq(services.id, serviceTimes.serviceId))
+      .leftJoin(campuses, eq(campuses.id, services.campusId))
+      .where(and(eq(visits.churchId, churchId), eq(visits.personId, personId)))
+      .orderBy(desc(visits.visitDate), asc(campuses.name), asc(services.name), asc(serviceTimes.name));
   }
 
   public loadByCampusId(churchId: string, campusId: string, startDate: Date, endDate: Date) {
-    const sDate = DateHelper.toMysqlDate(startDate);
-    const eDate = DateHelper.toMysqlDate(endDate);
-    return this.executeRows(sql`
-      SELECT v.*, c.id as campusId, c.name as campusName
-      FROM visits v
-      INNER JOIN services ser ON ser.id = v.serviceId
-      INNER JOIN campuses c ON c.id = ser.campusId
-      WHERE v.churchId = ${churchId} AND ser.campusId = ${campusId}
-        AND v.visitDate BETWEEN ${sDate} AND ${eDate}
-    `);
+    return this.db.select({
+      id: visits.id,
+      churchId: visits.churchId,
+      personId: visits.personId,
+      serviceId: visits.serviceId,
+      groupId: visits.groupId,
+      visitDate: visits.visitDate,
+      checkinTime: visits.checkinTime,
+      addedBy: visits.addedBy,
+      campusId: campuses.id,
+      campusName: campuses.name
+    })
+      .from(visits)
+      .innerJoin(services, eq(services.id, visits.serviceId))
+      .innerJoin(campuses, eq(campuses.id, services.campusId))
+      .where(and(eq(visits.churchId, churchId), eq(services.campusId, campusId), between(visits.visitDate, startDate, endDate)));
   }
 
   public loadByServiceId(churchId: string, serviceId: string, startDate: Date, endDate: Date) {
-    const sDate = DateHelper.toMysqlDate(startDate);
-    const eDate = DateHelper.toMysqlDate(endDate);
-    return this.executeRows(sql`
-      SELECT v.*, ser.name as serviceName
-      FROM visits v
-      INNER JOIN services ser ON ser.id = v.serviceId
-      WHERE v.churchId = ${churchId} AND v.serviceId = ${serviceId}
-        AND v.visitDate BETWEEN ${sDate} AND ${eDate}
-    `);
+    return this.db.select({
+      id: visits.id,
+      churchId: visits.churchId,
+      personId: visits.personId,
+      serviceId: visits.serviceId,
+      groupId: visits.groupId,
+      visitDate: visits.visitDate,
+      checkinTime: visits.checkinTime,
+      addedBy: visits.addedBy,
+      serviceName: services.name
+    })
+      .from(visits)
+      .innerJoin(services, eq(services.id, visits.serviceId))
+      .where(and(eq(visits.churchId, churchId), eq(visits.serviceId, serviceId), between(visits.visitDate, startDate, endDate)));
   }
 
   public loadByServiceTimeId(churchId: string, serviceTimeId: string, startDate: Date, endDate: Date) {
-    const sDate = DateHelper.toMysqlDate(startDate);
-    const eDate = DateHelper.toMysqlDate(endDate);
-    return this.executeRows(sql`
-      SELECT v.*, st.name as serviceTimeName
-      FROM visits v
-      INNER JOIN visitSessions vs ON vs.visitId = v.id
-      INNER JOIN sessions s ON s.id = vs.sessionId
-      LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId
-      WHERE v.churchId = ${churchId} AND st.id = ${serviceTimeId}
-        AND v.visitDate BETWEEN ${sDate} AND ${eDate}
-    `);
+    return this.db.select({
+      id: visits.id,
+      churchId: visits.churchId,
+      personId: visits.personId,
+      serviceId: visits.serviceId,
+      groupId: visits.groupId,
+      visitDate: visits.visitDate,
+      checkinTime: visits.checkinTime,
+      addedBy: visits.addedBy,
+      serviceTimeName: serviceTimes.name
+    })
+      .from(visits)
+      .innerJoin(visitSessions, eq(visitSessions.visitId, visits.id))
+      .innerJoin(sessions, eq(sessions.id, visitSessions.sessionId))
+      .leftJoin(serviceTimes, eq(serviceTimes.id, sessions.serviceTimeId))
+      .where(and(eq(visits.churchId, churchId), eq(serviceTimes.id, serviceTimeId), between(visits.visitDate, startDate, endDate)));
   }
 
   public loadByGroupId(churchId: string, groupId: string, startDate: Date, endDate: Date) {
-    const sDate = DateHelper.toMysqlDate(startDate);
-    const eDate = DateHelper.toMysqlDate(endDate);
-    return this.executeRows(sql`
-      SELECT v.*
-      FROM visits v
-      INNER JOIN visitSessions vs ON vs.visitId = v.id
-      INNER JOIN sessions s ON s.id = vs.sessionId
-      WHERE v.churchId = ${churchId} AND s.groupId = ${groupId}
-        AND v.visitDate BETWEEN ${sDate} AND ${eDate}
-    `);
+    return this.db.select({
+      id: visits.id,
+      churchId: visits.churchId,
+      personId: visits.personId,
+      serviceId: visits.serviceId,
+      groupId: visits.groupId,
+      visitDate: visits.visitDate,
+      checkinTime: visits.checkinTime,
+      addedBy: visits.addedBy
+    })
+      .from(visits)
+      .innerJoin(visitSessions, eq(visitSessions.visitId, visits.id))
+      .innerJoin(sessions, eq(sessions.id, visitSessions.sessionId))
+      .where(and(eq(visits.churchId, churchId), eq(sessions.groupId, groupId), between(visits.visitDate, startDate, endDate)));
   }
 
   public convertToModel(_churchId: string, data: any): AttendanceRecord {

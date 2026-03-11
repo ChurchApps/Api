@@ -1,9 +1,9 @@
 import { injectable } from "inversify";
-import { eq, and, desc, sql, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, isNull, between, sum, avg, countDistinct } from "drizzle-orm";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { DateHelper as LocalDateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { donations } from "../../../db/schema/giving.js";
+import { donations, fundDonations, funds } from "../../../db/schema/giving.js";
 import { Donation, DonationSummary } from "../models/index.js";
 import { CollectionHelper } from "../../../shared/helpers/index.js";
 
@@ -66,15 +66,33 @@ export class DonationRepo extends DrizzleRepo<typeof donations> {
   }
 
   public loadByPersonId(churchId: string, personId: string) {
-    return this.executeRows(sql`
-      SELECT d.*, f.id as fundId, IFNULL(f.name, 'Unkown') as fundName, fd.amount as fundAmount
-      FROM donations d
-      INNER JOIN fundDonations fd ON fd.donationId = d.id
-      LEFT JOIN funds f ON f.id = fd.fundId
-      WHERE d.churchId = ${churchId} AND d.personId = ${personId}
-        AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)
-      ORDER BY d.donationDate DESC
-    `);
+    return this.db.select({
+      id: donations.id,
+      churchId: donations.churchId,
+      batchId: donations.batchId,
+      personId: donations.personId,
+      donationDate: donations.donationDate,
+      amount: donations.amount,
+      currency: donations.currency,
+      method: donations.method,
+      methodDetails: donations.methodDetails,
+      notes: donations.notes,
+      entryTime: donations.entryTime,
+      status: donations.status,
+      transactionId: donations.transactionId,
+      fundId: funds.id,
+      fundName: sql`COALESCE(${funds.name}, 'Unkown')`.as("fundName"),
+      fundAmount: fundDonations.amount
+    })
+      .from(donations)
+      .innerJoin(fundDonations, eq(fundDonations.donationId, donations.id))
+      .leftJoin(funds, eq(funds.id, fundDonations.fundId))
+      .where(and(
+        eq(donations.churchId, churchId),
+        eq(donations.personId, personId),
+        sql`(${funds.taxDeductible} = 1 OR ${funds.taxDeductible} IS NULL)`
+      ))
+      .orderBy(desc(donations.donationDate));
   }
 
   public async findMatchingDonation(churchId: string, amount: number, donationDate: Date, personId?: string | null): Promise<Donation | null> {
@@ -83,14 +101,10 @@ export class DonationRepo extends DrizzleRepo<typeof donations> {
     const endOfDay = new Date(donationDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const startStr = DateHelper.toMysqlDate(startOfDay);
-    const endStr = DateHelper.toMysqlDate(endOfDay);
-
     const baseCondition = and(
       eq(donations.churchId, churchId!),
       eq(donations.amount, amount),
-      sql`${donations.donationDate} >= ${startStr}`,
-      sql`${donations.donationDate} <= ${endStr}`
+      between(donations.donationDate, startOfDay, endOfDay)
     );
 
     const condition = personId
@@ -102,18 +116,22 @@ export class DonationRepo extends DrizzleRepo<typeof donations> {
   }
 
   public async loadDashboardKpis(churchId: string, startDate: Date, endDate: Date, fundId?: string) {
-    const sDate = DateHelper.toMysqlDate(startDate);
-    const eDate = DateHelper.toMysqlDate(endDate);
-    const fundFilter = fundId ? sql` AND fd.fundId = ${fundId}` : sql``;
-    const rows = await this.executeRows(sql`
-      SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
-      FROM donations d
-      INNER JOIN fundDonations fd ON fd.donationId = d.id
-      INNER JOIN funds f ON f.id = fd.fundId
-      WHERE d.churchId = ${churchId}
-        AND d.donationDate BETWEEN ${sDate} AND ${eDate}
-        ${fundFilter}
-    `);
+    const conditions = [
+      eq(donations.churchId, churchId),
+      between(donations.donationDate, startDate, endDate)
+    ];
+    if (fundId) conditions.push(eq(fundDonations.fundId, fundId));
+
+    const rows = await this.db.select({
+      totalGiving: sum(fundDonations.amount),
+      avgGift: avg(donations.amount),
+      donorCount: countDistinct(donations.personId),
+      donationCount: countDistinct(donations.id)
+    })
+      .from(donations)
+      .innerJoin(fundDonations, eq(fundDonations.donationId, donations.id))
+      .innerJoin(funds, eq(funds.id, fundDonations.fundId))
+      .where(and(...conditions));
     return rows[0] ?? null;
   }
 
@@ -134,14 +152,17 @@ export class DonationRepo extends DrizzleRepo<typeof donations> {
   }
 
   public loadPersonBasedSummary(churchId: string, startDate: Date, endDate: Date) {
-    return this.executeRows(sql`
-      SELECT d.personId, d.amount as donationAmount, fd.fundId, fd.amount as fundAmount, f.name as fundName
-      FROM donations d
-      INNER JOIN fundDonations fd ON fd.donationId = d.id
-      INNER JOIN funds f ON f.id = fd.fundId AND f.taxDeductible = 1
-      WHERE d.churchId = ${churchId}
-        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
-    `);
+    return this.db.select({
+      personId: donations.personId,
+      donationAmount: donations.amount,
+      fundId: fundDonations.fundId,
+      fundAmount: fundDonations.amount,
+      fundName: funds.name
+    })
+      .from(donations)
+      .innerJoin(fundDonations, eq(fundDonations.donationId, donations.id))
+      .innerJoin(funds, and(eq(funds.id, fundDonations.fundId), eq(funds.taxDeductible, true)))
+      .where(and(eq(donations.churchId, churchId), between(donations.donationDate, startDate, endDate)));
   }
 
   public async loadByTransactionId(churchId: string, transactionId: string): Promise<Donation | null> {

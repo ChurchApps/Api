@@ -1,9 +1,9 @@
 import { injectable } from "inversify";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, count, sum } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
-import { donationBatches } from "../../../db/schema/giving.js";
+import { donationBatches, donations } from "../../../db/schema/giving.js";
 import { DonationBatch } from "../models/index.js";
 
 /** Normalize a date-only value to midnight UTC Date for consistent storage. */
@@ -46,18 +46,28 @@ export class DonationBatchRepo extends DrizzleRepo<typeof donationBatches> {
   }
 
   public override async loadAll(churchId: string) {
-    const result = await this.executeRows(sql`
-      SELECT db.*, IFNULL(d.donationCount, 0) AS donationCount, IFNULL(d.totalAmount, 0) AS totalAmount
-      FROM donationBatches db
-      LEFT JOIN (
-        SELECT batchId, COUNT(*) AS donationCount, SUM(amount) AS totalAmount
-        FROM donations
-        WHERE churchId = ${churchId}
-        GROUP BY batchId
-      ) d ON db.id = d.batchId
-      WHERE db.churchId = ${churchId}
-      ORDER BY db.batchDate DESC
-    `);
+    const donationStats = this.db.select({
+      batchId: donations.batchId,
+      donationCount: count().as("donationCount"),
+      totalAmount: sum(donations.amount).as("totalAmount")
+    })
+      .from(donations)
+      .where(eq(donations.churchId, churchId))
+      .groupBy(donations.batchId)
+      .as("donationStats");
+
+    const result = await this.db.select({
+      id: donationBatches.id,
+      churchId: donationBatches.churchId,
+      name: donationBatches.name,
+      batchDate: donationBatches.batchDate,
+      donationCount: sql`COALESCE(${donationStats.donationCount}, 0)`.as("donationCount"),
+      totalAmount: sql`COALESCE(${donationStats.totalAmount}, 0)`.as("totalAmount")
+    })
+      .from(donationBatches)
+      .leftJoin(donationStats, eq(donationBatches.id, donationStats.batchId))
+      .where(eq(donationBatches.churchId, churchId))
+      .orderBy(desc(donationBatches.batchDate));
     return this.convertAllToModel(churchId, result);
   }
 

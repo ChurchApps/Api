@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { pageHistory } from "../../../db/schema/content.js";
 
@@ -23,8 +24,10 @@ export class PageHistoryRepo extends DrizzleRepo<typeof pageHistory> {
   }
 
   public async deleteOldHistory(churchId: string, pageId: string, daysToKeep: number = 30) {
-    await this.db.execute(sql`
-      DELETE FROM pageHistory WHERE churchId = ${churchId} AND pageId = ${pageId} AND createdDate < DATE_SUB(NOW(), INTERVAL ${daysToKeep} DAY)
-    `);
+    await this.db.delete(pageHistory).where(and(
+      eq(pageHistory.churchId, churchId),
+      eq(pageHistory.pageId, pageId),
+      lt(pageHistory.createdDate, DateHelper.daysFromNow(-daysToKeep))
+    ));
   }
 }

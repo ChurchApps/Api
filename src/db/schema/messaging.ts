@@ -5,7 +5,7 @@ export const blockedIps = mysqlTable("blockedIps", {
   churchId: char("churchId", { length: 11 }),
   conversationId: char("conversationId", { length: 11 }),
   serviceId: char("serviceId", { length: 11 }),
-  ipAddress: varchar("ipAddress", { length: 45 }),
+  ipAddress: varchar("ipAddress", { length: 45 })
 });
 
 export const connections = mysqlTable("connections", {
@@ -16,10 +16,8 @@ export const connections = mysqlTable("connections", {
   displayName: varchar("displayName", { length: 45 }),
   timeJoined: datetime("timeJoined"),
   socketId: varchar("socketId", { length: 45 }),
-  ipAddress: varchar("ipAddress", { length: 45 }),
-}, (t) => [
-  index("ix_churchId").on(t.churchId, t.conversationId),
-]);
+  ipAddress: varchar("ipAddress", { length: 45 })
+}, (t) => [index("ix_churchId").on(t.churchId, t.conversationId)]);
 
 export const conversations = mysqlTable("conversations", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -33,10 +31,8 @@ export const conversations = mysqlTable("conversations", {
   firstPostId: char("firstPostId", { length: 11 }),
   lastPostId: char("lastPostId", { length: 11 }),
   postCount: int("postCount"),
-  allowAnonymousPosts: boolean("allowAnonymousPosts"),
-}, (t) => [
-  index("ix_churchId").on(t.churchId, t.contentType, t.contentId),
-]);
+  allowAnonymousPosts: boolean("allowAnonymousPosts")
+}, (t) => [index("ix_churchId").on(t.churchId, t.contentType, t.contentId)]);
 
 export const deliveryLogs = mysqlTable("deliveryLogs", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -48,11 +44,11 @@ export const deliveryLogs = mysqlTable("deliveryLogs", {
   success: boolean("success"),
   errorMessage: varchar("errorMessage", { length: 500 }),
   deliveryAddress: varchar("deliveryAddress", { length: 255 }),
-  attemptTime: datetime("attemptTime"),
+  attemptTime: datetime("attemptTime")
 }, (t) => [
   index("ix_content").on(t.contentType, t.contentId),
   index("ix_personId").on(t.personId, t.attemptTime),
-  index("ix_churchId_time").on(t.churchId, t.attemptTime),
+  index("ix_churchId_time").on(t.churchId, t.attemptTime)
 ]);
 
 export const deviceContents = mysqlTable("deviceContents", {
@@ -60,7 +56,7 @@ export const deviceContents = mysqlTable("deviceContents", {
   churchId: char("churchId", { length: 11 }),
   deviceId: char("deviceId", { length: 11 }),
   contentType: varchar("contentType", { length: 45 }),
-  contentId: char("contentId", { length: 11 }),
+  contentId: char("contentId", { length: 11 })
 });
 
 export const devices = mysqlTable("devices", {
@@ -78,12 +74,12 @@ export const devices = mysqlTable("devices", {
   pairingCode: varchar("pairingCode", { length: 45 }),
   ipAddress: varchar("ipAddress", { length: 45 }),
   contentType: varchar("contentType", { length: 45 }),
-  contentId: char("contentId", { length: 11 }),
+  contentId: char("contentId", { length: 11 })
 }, (t) => [
   index("appName_deviceId").on(t.appName, t.deviceId),
   index("personId_lastActiveDate").on(t.personId, t.lastActiveDate),
   index("fcmToken").on(t.fcmToken),
-  index("pairingCode").on(t.pairingCode),
+  index("pairingCode").on(t.pairingCode)
 ]);
 
 export const emailTemplates = mysqlTable("emailTemplates", {
@@ -94,10 +90,8 @@ export const emailTemplates = mysqlTable("emailTemplates", {
   htmlContent: text("htmlContent").notNull(),
   category: varchar("category", { length: 100 }),
   dateCreated: datetime("dateCreated"),
-  dateModified: datetime("dateModified"),
-}, (t) => [
-  index("ix_churchId").on(t.churchId),
-]);
+  dateModified: datetime("dateModified")
+}, (t) => [index("ix_churchId").on(t.churchId)]);
 
 export const messages = mysqlTable("messages", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -108,11 +102,11 @@ export const messages = mysqlTable("messages", {
   messageType: varchar("messageType", { length: 45 }),
   content: text("content"),
   personId: char("personId", { length: 11 }),
-  timeUpdated: datetime("timeUpdated"),
+  timeUpdated: datetime("timeUpdated")
 }, (t) => [
   index("ix_churchId").on(t.churchId, t.conversationId),
   index("ix_timeSent").on(t.timeSent),
-  index("ix_personId").on(t.personId),
+  index("ix_personId").on(t.personId)
 ]);
 
 export const notificationPreferences = mysqlTable("notificationPreferences", {
@@ -120,7 +114,7 @@ export const notificationPreferences = mysqlTable("notificationPreferences", {
   churchId: char("churchId", { length: 11 }),
   personId: char("personId", { length: 11 }),
   allowPush: boolean("allowPush"),
-  emailFrequency: varchar("emailFrequency", { length: 10 }),
+  emailFrequency: varchar("emailFrequency", { length: 10 })
 });
 
 export const notifications = mysqlTable("notifications", {
@@ -134,10 +128,10 @@ export const notifications = mysqlTable("notifications", {
   message: text("message"),
   link: varchar("link", { length: 100 }),
   deliveryMethod: varchar("deliveryMethod", { length: 10 }),
-  triggeredByPersonId: char("triggeredByPersonId", { length: 11 }),
+  triggeredByPersonId: char("triggeredByPersonId", { length: 11 })
 }, (t) => [
   index("churchId_personId_timeSent").on(t.churchId, t.personId, t.timeSent),
-  index("isNew").on(t.isNew),
+  index("isNew").on(t.isNew)
 ]);
 
 export const privateMessages = mysqlTable("privateMessages", {
@@ -147,12 +141,12 @@ export const privateMessages = mysqlTable("privateMessages", {
   toPersonId: char("toPersonId", { length: 11 }),
   conversationId: char("conversationId", { length: 11 }),
   notifyPersonId: char("notifyPersonId", { length: 11 }),
-  deliveryMethod: varchar("deliveryMethod", { length: 10 }),
+  deliveryMethod: varchar("deliveryMethod", { length: 10 })
 }, (t) => [
   index("IX_churchFrom").on(t.churchId, t.fromPersonId),
   index("IX_churchTo").on(t.churchId, t.toPersonId),
   index("IX_notifyPersonId").on(t.churchId, t.notifyPersonId),
-  index("IX_conversationId").on(t.conversationId),
+  index("IX_conversationId").on(t.conversationId)
 ]);
 
 export const sentTexts = mysqlTable("sentTexts", {
@@ -165,10 +159,8 @@ export const sentTexts = mysqlTable("sentTexts", {
   recipientCount: int("recipientCount").default(0),
   successCount: int("successCount").default(0),
   failCount: int("failCount").default(0),
-  timeSent: datetime("timeSent"),
-}, (t) => [
-  index("ix_churchId").on(t.churchId, t.timeSent),
-]);
+  timeSent: datetime("timeSent")
+}, (t) => [index("ix_churchId").on(t.churchId, t.timeSent)]);
 
 export const textingProviders = mysqlTable("textingProviders", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -177,7 +169,5 @@ export const textingProviders = mysqlTable("textingProviders", {
   apiKey: varchar("apiKey", { length: 500 }),
   apiSecret: varchar("apiSecret", { length: 500 }),
   fromNumber: varchar("fromNumber", { length: 20 }),
-  enabled: boolean("enabled"),
-}, (t) => [
-  index("ix_churchId").on(t.churchId),
-]);
+  enabled: boolean("enabled")
+}, (t) => [index("ix_churchId").on(t.churchId)]);

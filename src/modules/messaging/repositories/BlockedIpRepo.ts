@@ -1,6 +1,5 @@
 import { injectable } from "inversify";
 import { eq, and } from "drizzle-orm";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { blockedIps } from "../../../db/schema/messaging.js";
 

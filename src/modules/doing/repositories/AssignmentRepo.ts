@@ -1,5 +1,6 @@
 import { injectable } from "inversify";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, gte, lt, between, count } from "drizzle-orm";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { assignments, positions, plans } from "../../../db/schema/doing.js";
 
@@ -47,7 +48,17 @@ export class AssignmentRepo extends DrizzleRepo<typeof assignments> {
   }
 
   public async loadUnconfirmedByServiceDateRange(churchId?: string) {
-    const baseQuery = this.db.select({
+    const twoDaysFromNow = DateHelper.daysFromNow(2);
+    const threeDaysFromNow = DateHelper.daysFromNow(3);
+
+    const conditions = [
+      eq(assignments.status, "Unconfirmed"),
+      gte(plans.serviceDate, twoDaysFromNow),
+      lt(plans.serviceDate, threeDaysFromNow)
+    ];
+    if (churchId) conditions.push(eq(assignments.churchId, churchId));
+
+    const result = await this.db.select({
       assignments,
       serviceDate: plans.serviceDate,
       planName: plans.name
@@ -55,41 +66,34 @@ export class AssignmentRepo extends DrizzleRepo<typeof assignments> {
       .from(assignments)
       .innerJoin(positions, eq(positions.id, assignments.positionId))
       .innerJoin(plans, eq(plans.id, positions.planId))
-      .where(
-        churchId
-          ? and(
-            eq(assignments.status, "Unconfirmed"),
-            sql`${plans.serviceDate} >= DATE_ADD(CURDATE(), INTERVAL 2 DAY)`,
-            sql`${plans.serviceDate} < DATE_ADD(CURDATE(), INTERVAL 3 DAY)`,
-            eq(assignments.churchId, churchId)
-          )
-          : and(
-            eq(assignments.status, "Unconfirmed"),
-            sql`${plans.serviceDate} >= DATE_ADD(CURDATE(), INTERVAL 2 DAY)`,
-            sql`${plans.serviceDate} < DATE_ADD(CURDATE(), INTERVAL 3 DAY)`
-          )
-      );
-    const result = await baseQuery;
+      .where(and(...conditions));
     return result.map(r => ({ ...r.assignments, serviceDate: r.serviceDate, planName: r.planName }));
   }
 
   public async countByPositionId(churchId: string, positionId: string) {
-    const result = await this.db.select({ cnt: sql<number>`COUNT(*)` })
+    const result = await this.db.select({ cnt: count() })
       .from(assignments)
       .where(and(eq(assignments.churchId, churchId), eq(assignments.positionId, positionId), inArray(assignments.status, ["Accepted", "Unconfirmed"])));
     return result[0];
   }
 
   public async loadByServiceDate(churchId: string, serviceDate: Date, excludePlanId?: string) {
-    const condition = excludePlanId
-      ? and(eq(assignments.churchId, churchId), sql`DATE(${plans.serviceDate}) = DATE(${serviceDate})`, sql`${plans.id} != ${excludePlanId}`)
-      : and(eq(assignments.churchId, churchId), sql`DATE(${plans.serviceDate}) = DATE(${serviceDate})`);
+    const startOfDay = new Date(serviceDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(serviceDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const conditions = [
+      eq(assignments.churchId, churchId),
+      between(plans.serviceDate, startOfDay, endOfDay)
+    ];
+    if (excludePlanId) conditions.push(sql`${plans.id} != ${excludePlanId}`);
 
     const result = await this.db.select({ assignments })
       .from(assignments)
       .innerJoin(positions, eq(positions.id, assignments.positionId))
       .innerJoin(plans, eq(plans.id, positions.planId))
-      .where(condition);
+      .where(and(...conditions));
     return result.map(r => r.assignments);
   }
 }

@@ -91,6 +91,34 @@ export class DateHelper {
   }
 
   /**
+   * Returns a Date object N days from now (positive = future, negative = past)
+   */
+  static daysFromNow(days: number): Date {
+    return dayjs().add(days, "day").toDate();
+  }
+
+  /**
+   * Returns a Date object N hours from now (positive = future, negative = past)
+   */
+  static hoursFromNow(hours: number): Date {
+    return dayjs().add(hours, "hour").toDate();
+  }
+
+  /**
+   * Returns a Date object N months from now (positive = future, negative = past)
+   */
+  static monthsFromNow(months: number): Date {
+    return dayjs().add(months, "month").toDate();
+  }
+
+  /**
+   * Returns a Date object for the start of today (midnight)
+   */
+  static startOfToday(): Date {
+    return dayjs().startOf("day").toDate();
+  }
+
+  /**
    * Legacy alias for toMySqlFormat (backward compatibility)
    */
   static toMysqlDate(date: Date | string | null | undefined): string | null {

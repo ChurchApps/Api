@@ -34,9 +34,8 @@ export class FileRepo extends DrizzleRepo<typeof files> {
   }
 
   public async loadTotalBytes(churchId: string, contentType: string, contentId: string): Promise<any> {
-    return this.executeRows(sql`
-      SELECT IFNULL(SUM(size), 0) as size FROM files
-      WHERE churchId = ${churchId} AND contentType = ${contentType} AND contentId = ${contentId}
-    `);
+    return this.db.select({ size: sql<number>`COALESCE(SUM(${files.size}), 0)`.as("size") })
+      .from(files)
+      .where(and(eq(files.churchId, churchId), eq(files.contentType, contentType), eq(files.contentId, contentId)));
   }
 }

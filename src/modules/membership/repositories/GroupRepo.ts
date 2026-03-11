@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { eq, and, sql, inArray, like } from "drizzle-orm";
+import { eq, and, sql, inArray, like, asc, count } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { groups } from "../../../db/schema/membership.js";
+import { groups, groupMembers } from "../../../db/schema/membership.js";
 import { Group } from "../models/index.js";
 
 @injectable()
@@ -61,42 +61,114 @@ export class GroupRepo extends DrizzleRepo<typeof groups> {
   }
 
   public async loadByTag(churchId: string, tag: string) {
-    const rows = await this.executeRows(sql`
-      SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId = g.id) AS memberCount
-      FROM \`groups\` g WHERE churchId = ${churchId} AND removed = 0 AND tags LIKE ${`%${tag}%`}
-      ORDER BY categoryName, name
-    `);
+    const memberCountSq = this.db.select({
+      groupId: groupMembers.groupId,
+      memberCount: count().as("memberCount")
+    }).from(groupMembers).groupBy(groupMembers.groupId).as("mc");
+
+    const rows = await this.db.select({
+      id: groups.id,
+      churchId: groups.churchId,
+      categoryName: groups.categoryName,
+      name: groups.name,
+      trackAttendance: groups.trackAttendance,
+      parentPickup: groups.parentPickup,
+      printNametag: groups.printNametag,
+      about: groups.about,
+      photoUrl: groups.photoUrl,
+      tags: groups.tags,
+      meetingTime: groups.meetingTime,
+      meetingLocation: groups.meetingLocation,
+      labels: groups.labels,
+      slug: groups.slug,
+      removed: groups.removed,
+      memberCount: sql`COALESCE(${memberCountSq.memberCount}, 0)`.as("memberCount")
+    })
+      .from(groups)
+      .leftJoin(memberCountSq, eq(memberCountSq.groupId, groups.id))
+      .where(and(eq(groups.churchId, churchId), eq(groups.removed, false), like(groups.tags, `%${tag}%`)))
+      .orderBy(asc(groups.categoryName), asc(groups.name));
     return rows.map((r: any) => this.rowToModel(r));
   }
 
   public async loadAll(churchId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId = g.id) AS memberCount
-      FROM \`groups\` g WHERE churchId = ${churchId} AND removed = 0
-      ORDER BY categoryName, name
-    `);
+    const memberCountSq = this.db.select({
+      groupId: groupMembers.groupId,
+      memberCount: count().as("memberCount")
+    }).from(groupMembers).groupBy(groupMembers.groupId).as("mc");
+
+    const rows = await this.db.select({
+      id: groups.id,
+      churchId: groups.churchId,
+      categoryName: groups.categoryName,
+      name: groups.name,
+      trackAttendance: groups.trackAttendance,
+      parentPickup: groups.parentPickup,
+      printNametag: groups.printNametag,
+      about: groups.about,
+      photoUrl: groups.photoUrl,
+      tags: groups.tags,
+      meetingTime: groups.meetingTime,
+      meetingLocation: groups.meetingLocation,
+      labels: groups.labels,
+      slug: groups.slug,
+      removed: groups.removed,
+      memberCount: sql`COALESCE(${memberCountSq.memberCount}, 0)`.as("memberCount")
+    })
+      .from(groups)
+      .leftJoin(memberCountSq, eq(memberCountSq.groupId, groups.id))
+      .where(and(eq(groups.churchId, churchId), eq(groups.removed, false)))
+      .orderBy(asc(groups.categoryName), asc(groups.name));
     return rows.map((r: any) => this.rowToModel(r));
   }
 
   public async loadAllForPerson(personId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT DISTINCT g.*
-      FROM groupMembers gm
-      INNER JOIN \`groups\` g ON g.id = gm.groupId
-      WHERE personId = ${personId} AND g.removed = 0
-      ORDER BY name
-    `);
+    const rows = await this.db.selectDistinct({
+      id: groups.id,
+      churchId: groups.churchId,
+      categoryName: groups.categoryName,
+      name: groups.name,
+      trackAttendance: groups.trackAttendance,
+      parentPickup: groups.parentPickup,
+      printNametag: groups.printNametag,
+      about: groups.about,
+      photoUrl: groups.photoUrl,
+      tags: groups.tags,
+      meetingTime: groups.meetingTime,
+      meetingLocation: groups.meetingLocation,
+      labels: groups.labels,
+      slug: groups.slug,
+      removed: groups.removed
+    })
+      .from(groupMembers)
+      .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+      .where(and(eq(groupMembers.personId, personId), eq(groups.removed, false)))
+      .orderBy(asc(groups.name));
     return rows.map((r: any) => this.rowToModel(r));
   }
 
   public async loadForPerson(personId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT DISTINCT g.*
-      FROM groupMembers gm
-      INNER JOIN \`groups\` g ON g.id = gm.groupId
-      WHERE personId = ${personId} AND g.removed = 0 AND g.tags LIKE '%standard%'
-      ORDER BY name
-    `);
+    const rows = await this.db.selectDistinct({
+      id: groups.id,
+      churchId: groups.churchId,
+      categoryName: groups.categoryName,
+      name: groups.name,
+      trackAttendance: groups.trackAttendance,
+      parentPickup: groups.parentPickup,
+      printNametag: groups.printNametag,
+      about: groups.about,
+      photoUrl: groups.photoUrl,
+      tags: groups.tags,
+      meetingTime: groups.meetingTime,
+      meetingLocation: groups.meetingLocation,
+      labels: groups.labels,
+      slug: groups.slug,
+      removed: groups.removed
+    })
+      .from(groupMembers)
+      .innerJoin(groups, eq(groups.id, groupMembers.groupId))
+      .where(and(eq(groupMembers.personId, personId), eq(groups.removed, false), like(groups.tags, "%standard%")))
+      .orderBy(asc(groups.name));
     return rows.map((r: any) => this.rowToModel(r));
   }
 

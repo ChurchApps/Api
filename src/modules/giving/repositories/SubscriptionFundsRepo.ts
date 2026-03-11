@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { subscriptionFunds } from "../../../db/schema/giving.js";
+import { subscriptionFunds, funds } from "../../../db/schema/giving.js";
 import { SubscriptionFund } from "../models/index.js";
 import { FundRepo } from "./FundRepo.js";
 import { CollectionHelper } from "../../../shared/helpers/index.js";
@@ -22,22 +22,33 @@ export class SubscriptionFundsRepo extends DrizzleRepo<typeof subscriptionFunds>
   }
 
   public loadBySubscriptionId(churchId: string, subscriptionId: string) {
-    return this.executeRows(sql`
-      SELECT subscriptionFunds.*, funds.name
-      FROM subscriptionFunds
-      LEFT JOIN funds ON subscriptionFunds.fundId = funds.id
-      WHERE subscriptionFunds.churchId = ${churchId} AND subscriptionFunds.subscriptionId = ${subscriptionId}
-    `);
+    return this.db.select({
+      id: subscriptionFunds.id,
+      churchId: subscriptionFunds.churchId,
+      subscriptionId: subscriptionFunds.subscriptionId,
+      fundId: subscriptionFunds.fundId,
+      amount: subscriptionFunds.amount,
+      name: funds.name
+    })
+      .from(subscriptionFunds)
+      .leftJoin(funds, eq(subscriptionFunds.fundId, funds.id))
+      .where(and(eq(subscriptionFunds.churchId, churchId), eq(subscriptionFunds.subscriptionId, subscriptionId)));
   }
 
   public async loadForSubscriptionLog(churchId: string, subscriptionId: string) {
     let result;
-    const subscriptionFundRows = await this.executeRows(sql`
-      SELECT subscriptionFunds.*, funds.name, funds.removed
-      FROM subscriptionFunds
-      LEFT JOIN funds ON subscriptionFunds.fundId = funds.id
-      WHERE subscriptionFunds.churchId = ${churchId} AND subscriptionFunds.subscriptionId = ${subscriptionId}
-    `) as any[];
+    const subscriptionFundRows = await this.db.select({
+      id: subscriptionFunds.id,
+      churchId: subscriptionFunds.churchId,
+      subscriptionId: subscriptionFunds.subscriptionId,
+      fundId: subscriptionFunds.fundId,
+      amount: subscriptionFunds.amount,
+      name: funds.name,
+      removed: funds.removed
+    })
+      .from(subscriptionFunds)
+      .leftJoin(funds, eq(subscriptionFunds.fundId, funds.id))
+      .where(and(eq(subscriptionFunds.churchId, churchId), eq(subscriptionFunds.subscriptionId, subscriptionId))) as any[];
     if (subscriptionFundRows && subscriptionFundRows[0] && subscriptionFundRows[0].removed === false) {
       const { removed: _removed, ...sf } = subscriptionFundRows[0];
       result = [sf];

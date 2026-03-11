@@ -424,10 +424,16 @@ describe("TaskRepo", () => {
 
   it("should create with auto-increment taskNumber", async () => {
     const result = await repo.save({
-      churchId, taskType: "general", title: "Test Task",
-      status: "Open", associatedWithType: "person", associatedWithId: personId,
-      createdByType: "person", createdById: personId,
-      assignedToType: "person", assignedToId: personId
+      churchId,
+      taskType: "general",
+      title: "Test Task",
+      status: "Open",
+      associatedWithType: "person",
+      associatedWithId: personId,
+      createdByType: "person",
+      createdById: personId,
+      assignedToType: "person",
+      assignedToId: personId
     });
     expect(result.id).toBeDefined();
     expect(result.taskNumber).toBeDefined();
@@ -442,9 +448,14 @@ describe("TaskRepo", () => {
 
   it("should auto-increment taskNumber", async () => {
     const result = await repo.save({
-      churchId, taskType: "general", title: "Task 2", status: "Open",
-      assignedToType: "person", assignedToId: personId,
-      createdByType: "person", createdById: personId
+      churchId,
+      taskType: "general",
+      title: "Task 2",
+      status: "Open",
+      assignedToType: "person",
+      assignedToId: personId,
+      createdByType: "person",
+      createdById: personId
     });
     const first = await repo.load(churchId, taskId);
     expect(result.taskNumber).toBe(first.taskNumber + 1);

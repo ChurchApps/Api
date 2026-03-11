@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { oAuthTokens } from "../../../db/schema/membership.js";
@@ -65,6 +65,6 @@ export class OAuthTokenRepo extends GlobalDrizzleRepo<typeof oAuthTokens> {
   }
 
   public deleteExpired() {
-    return this.db.execute(sql`DELETE FROM oAuthTokens WHERE expiresAt < NOW()`);
+    return this.db.delete(oAuthTokens).where(lt(oAuthTokens.expiresAt, new Date()));
   }
 }

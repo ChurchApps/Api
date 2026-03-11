@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { groupServiceTimes } from "../../../db/schema/attendance.js";
+import { groupServiceTimes, serviceTimes, services, campuses } from "../../../db/schema/attendance.js";
 import { GroupServiceTime } from "../models/index.js";
 
 @injectable()
@@ -10,14 +10,18 @@ export class GroupServiceTimeRepo extends DrizzleRepo<typeof groupServiceTimes> 
   protected readonly moduleName = "attendance";
 
   public async loadWithServiceNames(churchId: string, groupId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT gst.*, concat(c.name, ' - ', s.name, ' - ', st.name) as serviceTimeName
-      FROM groupServiceTimes gst
-      INNER JOIN serviceTimes st ON st.id = gst.serviceTimeId
-      INNER JOIN services s ON s.id = st.serviceId
-      INNER JOIN campuses c ON c.id = s.campusId
-      WHERE gst.churchId = ${churchId} AND gst.groupId = ${groupId}
-    `);
+    const rows = await this.db.select({
+      id: groupServiceTimes.id,
+      churchId: groupServiceTimes.churchId,
+      groupId: groupServiceTimes.groupId,
+      serviceTimeId: groupServiceTimes.serviceTimeId,
+      serviceTimeName: sql`concat(${campuses.name}, ' - ', ${services.name}, ' - ', ${serviceTimes.name})`.as("serviceTimeName")
+    })
+      .from(groupServiceTimes)
+      .innerJoin(serviceTimes, eq(serviceTimes.id, groupServiceTimes.serviceTimeId))
+      .innerJoin(services, eq(services.id, serviceTimes.serviceId))
+      .innerJoin(campuses, eq(campuses.id, services.campusId))
+      .where(and(eq(groupServiceTimes.churchId, churchId), eq(groupServiceTimes.groupId, groupId)));
     return this.convertAllToModel(churchId, rows);
   }
 

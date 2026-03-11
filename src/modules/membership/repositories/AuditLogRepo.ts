@@ -1,9 +1,10 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, gte, lte, lt, or, count, desc } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { auditLogs } from "../../../db/schema/membership.js";
 import { AuditLog } from "../models/index.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 export interface AuditLogFilter {
   category?: string;
@@ -39,51 +40,50 @@ export class AuditLogRepo extends DrizzleRepo<typeof auditLogs> {
     return log;
   }
 
+  private buildFilterConditions(churchId: string, filter: AuditLogFilter) {
+    const conditions: any[] = [eq(auditLogs.churchId, churchId)];
+    if (filter.category) conditions.push(eq(auditLogs.category, filter.category));
+    if (filter.userId) conditions.push(eq(auditLogs.userId, filter.userId));
+    if (filter.entityType) conditions.push(eq(auditLogs.entityType, filter.entityType));
+    if (filter.entityId) conditions.push(eq(auditLogs.entityId, filter.entityId));
+    if (filter.startDate) conditions.push(gte(auditLogs.created, filter.startDate));
+    if (filter.endDate) conditions.push(lte(auditLogs.created, filter.endDate));
+    return conditions;
+  }
+
   public async loadFiltered(churchId: string, filter: AuditLogFilter): Promise<AuditLog[]> {
-    const conditions: any[] = [sql`churchId=${churchId}`];
-    if (filter.category) conditions.push(sql`category=${filter.category}`);
-    if (filter.userId) conditions.push(sql`userId=${filter.userId}`);
-    if (filter.entityType) conditions.push(sql`entityType=${filter.entityType}`);
-    if (filter.entityId) conditions.push(sql`entityId=${filter.entityId}`);
-    if (filter.startDate) conditions.push(sql`created>=${filter.startDate}`);
-    if (filter.endDate) conditions.push(sql`created<=${filter.endDate}`);
+    const conditions = this.buildFilterConditions(churchId, filter);
+    const limitVal = Math.max(1, Math.min(filter.limit || 100, 1000));
+    const offsetVal = Math.max(0, filter.offset || 0);
 
-    const limit = Math.max(1, Math.min(filter.limit || 100, 1000));
-    const offset = Math.max(0, filter.offset || 0);
-    const whereClause = sql.join(conditions, sql` AND `);
-
-    return this.executeRows(
-      sql`SELECT * FROM auditLogs WHERE ${whereClause} ORDER BY created DESC LIMIT ${limit} OFFSET ${offset}`
-    ) as Promise<AuditLog[]>;
+    return this.db.select().from(auditLogs)
+      .where(and(...conditions))
+      .orderBy(desc(auditLogs.created))
+      .limit(limitVal)
+      .offset(offsetVal) as Promise<AuditLog[]>;
   }
 
   public async loadForPerson(churchId: string, personId: string, limit: number = 100, offset: number = 0): Promise<AuditLog[]> {
     const safeLimit = Math.max(1, Math.min(limit, 1000));
     const safeOffset = Math.max(0, offset);
-    return this.executeRows(sql`
-      SELECT al.* FROM auditLogs al
-      WHERE al.churchId=${churchId} AND (al.userId=${personId} OR (al.entityType='person' AND al.entityId=${personId}))
-      ORDER BY al.created DESC LIMIT ${safeLimit} OFFSET ${safeOffset}
-    `) as Promise<AuditLog[]>;
+    return this.db.select().from(auditLogs)
+      .where(and(
+        eq(auditLogs.churchId, churchId),
+        or(eq(auditLogs.userId, personId), and(eq(auditLogs.entityType, "person"), eq(auditLogs.entityId, personId)))
+      ))
+      .orderBy(desc(auditLogs.created))
+      .limit(safeLimit)
+      .offset(safeOffset) as Promise<AuditLog[]>;
   }
 
   public async loadCount(churchId: string, filter: AuditLogFilter): Promise<number> {
-    const conditions: any[] = [sql`churchId=${churchId}`];
-    if (filter.category) conditions.push(sql`category=${filter.category}`);
-    if (filter.userId) conditions.push(sql`userId=${filter.userId}`);
-    if (filter.entityType) conditions.push(sql`entityType=${filter.entityType}`);
-    if (filter.entityId) conditions.push(sql`entityId=${filter.entityId}`);
-    if (filter.startDate) conditions.push(sql`created>=${filter.startDate}`);
-    if (filter.endDate) conditions.push(sql`created<=${filter.endDate}`);
-
-    const whereClause = sql.join(conditions, sql` AND `);
-    const rows = await this.executeRows(
-      sql`SELECT COUNT(*) as count FROM auditLogs WHERE ${whereClause}`
-    );
+    const conditions = this.buildFilterConditions(churchId, filter);
+    const rows = await this.db.select({ count: count() }).from(auditLogs)
+      .where(and(...conditions));
     return rows[0]?.count || 0;
   }
 
   public async deleteOld(days: number = 365): Promise<void> {
-    await this.db.execute(sql`DELETE FROM auditLogs WHERE created < DATE_SUB(NOW(), INTERVAL ${days} DAY)`);
+    await this.db.delete(auditLogs).where(lt(auditLogs.created, DateHelper.daysFromNow(-days)));
   }
 }

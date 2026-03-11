@@ -5,7 +5,7 @@ export const actions = mysqlTable("actions", {
   churchId: char("churchId", { length: 11 }),
   automationId: char("automationId", { length: 11 }),
   actionType: varchar("actionType", { length: 45 }),
-  actionData: mediumtext("actionData"),
+  actionData: mediumtext("actionData")
 });
 
 export const assignments = mysqlTable("assignments", {
@@ -14,10 +14,10 @@ export const assignments = mysqlTable("assignments", {
   positionId: char("positionId", { length: 11 }),
   personId: char("personId", { length: 11 }),
   status: varchar("status", { length: 45 }),
-  notified: datetime("notified"),
+  notified: datetime("notified")
 }, (t) => [
   index("idx_church_person").on(t.churchId, t.personId),
-  index("idx_position").on(t.positionId),
+  index("idx_position").on(t.positionId)
 ]);
 
 export const automations = mysqlTable("automations", {
@@ -25,7 +25,7 @@ export const automations = mysqlTable("automations", {
   churchId: char("churchId", { length: 11 }),
   title: varchar("title", { length: 45 }),
   recurs: varchar("recurs", { length: 45 }),
-  active: boolean("active"),
+  active: boolean("active")
 });
 
 export const blockoutDates = mysqlTable("blockoutDates", {
@@ -33,7 +33,7 @@ export const blockoutDates = mysqlTable("blockoutDates", {
   churchId: char("churchId", { length: 11 }),
   personId: char("personId", { length: 11 }),
   startDate: date("startDate"),
-  endDate: date("endDate"),
+  endDate: date("endDate")
 });
 
 export const conditions = mysqlTable("conditions", {
@@ -44,7 +44,7 @@ export const conditions = mysqlTable("conditions", {
   fieldData: mediumtext("fieldData"),
   operator: varchar("operator", { length: 45 }),
   value: varchar("value", { length: 45 }),
-  label: varchar("label", { length: 255 }),
+  label: varchar("label", { length: 255 })
 });
 
 export const conjunctions = mysqlTable("conjunctions", {
@@ -52,7 +52,7 @@ export const conjunctions = mysqlTable("conjunctions", {
   churchId: char("churchId", { length: 11 }),
   automationId: char("automationId", { length: 11 }),
   parentId: char("parentId", { length: 11 }),
-  groupType: varchar("groupType", { length: 45 }),
+  groupType: varchar("groupType", { length: 45 })
 });
 
 export const contentProviderAuths = mysqlTable("contentProviderAuths", {
@@ -64,10 +64,8 @@ export const contentProviderAuths = mysqlTable("contentProviderAuths", {
   refreshToken: text("refreshToken"),
   tokenType: varchar("tokenType", { length: 50 }),
   expiresAt: datetime("expiresAt"),
-  scope: varchar("scope", { length: 255 }),
-}, (t) => [
-  index("idx_ministry_provider").on(t.churchId, t.ministryId, t.providerId),
-]);
+  scope: varchar("scope", { length: 255 })
+}, (t) => [index("idx_ministry_provider").on(t.churchId, t.ministryId, t.providerId)]);
 
 export const notes = mysqlTable("notes", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -78,10 +76,8 @@ export const notes = mysqlTable("notes", {
   addedBy: char("addedBy", { length: 11 }),
   createdAt: datetime("createdAt"),
   updatedAt: datetime("updatedAt"),
-  contents: text("contents"),
-}, (t) => [
-  index("churchId").on(t.churchId),
-]);
+  contents: text("contents")
+}, (t) => [index("churchId").on(t.churchId)]);
 
 export const planItems = mysqlTable("planItems", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -98,10 +94,10 @@ export const planItems = mysqlTable("planItems", {
   providerId: varchar("providerId", { length: 50 }),
   providerPath: varchar("providerPath", { length: 500 }),
   providerContentPath: varchar("providerContentPath", { length: 50 }),
-  thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
+  thumbnailUrl: varchar("thumbnailUrl", { length: 1024 })
 }, (t) => [
   index("idx_church_plan").on(t.churchId, t.planId),
-  index("idx_parent").on(t.parentId),
+  index("idx_parent").on(t.parentId)
 ]);
 
 export const plans = mysqlTable("plans", {
@@ -119,14 +115,14 @@ export const plans = mysqlTable("plans", {
   providerPlanId: varchar("providerPlanId", { length: 100 }),
   providerPlanName: varchar("providerPlanName", { length: 255 }),
   signupDeadlineHours: int("signupDeadlineHours"),
-  showVolunteerNames: boolean("showVolunteerNames"),
+  showVolunteerNames: boolean("showVolunteerNames")
 });
 
 export const planTypes = mysqlTable("planTypes", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
   ministryId: char("ministryId", { length: 11 }),
-  name: varchar("name", { length: 255 }),
+  name: varchar("name", { length: 255 })
 });
 
 export const positions = mysqlTable("positions", {
@@ -138,10 +134,10 @@ export const positions = mysqlTable("positions", {
   count: int("count"),
   groupId: char("groupId", { length: 11 }),
   allowSelfSignup: boolean("allowSelfSignup"),
-  description: text("description"),
+  description: text("description")
 }, (t) => [
   index("idx_church_plan").on(t.churchId, t.planId),
-  index("idx_group").on(t.groupId),
+  index("idx_group").on(t.groupId)
 ]);
 
 export const tasks = mysqlTable("tasks", {
@@ -164,12 +160,12 @@ export const tasks = mysqlTable("tasks", {
   status: varchar("status", { length: 45 }),
   automationId: char("automationId", { length: 11 }),
   conversationId: char("conversationId", { length: 11 }),
-  data: text("data"),
+  data: text("data")
 }, (t) => [
   index("idx_church_status").on(t.churchId, t.status),
   index("idx_automation").on(t.churchId, t.automationId),
   index("idx_assigned").on(t.churchId, t.assignedToType, t.assignedToId),
-  index("idx_created").on(t.churchId, t.createdByType, t.createdById),
+  index("idx_created").on(t.churchId, t.createdByType, t.createdById)
 ]);
 
 export const times = mysqlTable("times", {
@@ -179,5 +175,5 @@ export const times = mysqlTable("times", {
   displayName: varchar("displayName", { length: 45 }),
   startTime: datetime("startTime"),
   endTime: datetime("endTime"),
-  teams: varchar("teams", { length: 1000 }),
+  teams: varchar("teams", { length: 1000 })
 });

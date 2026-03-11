@@ -1,7 +1,9 @@
 import { injectable } from "inversify";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, or, isNull, lt } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { domains } from "../../../db/schema/membership.js";
+import { domains, churches } from "../../../db/schema/membership.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { notLike } from "drizzle-orm";
 
 @injectable()
 export class DomainRepo extends DrizzleRepo<typeof domains> {
@@ -13,12 +15,13 @@ export class DomainRepo extends DrizzleRepo<typeof domains> {
   }
 
   public loadPairs() {
-    return this.executeRows(sql`
-      SELECT d.domainName AS host, CONCAT(c.subDomain, '.b1.church:443') AS dial
-      FROM domains d
-      INNER JOIN churches c ON c.id = d.churchId
-      WHERE d.domainName NOT LIKE '%www.%'
-    `);
+    return this.db.select({
+      host: domains.domainName,
+      dial: sql`concat(${churches.subDomain}, '.b1.church:443')`.as("dial")
+    })
+      .from(domains)
+      .innerJoin(churches, eq(churches.id, domains.churchId))
+      .where(notLike(domains.domainName, "%www.%"));
   }
 
   public loadByIds(churchId: string, ids: string[]) {
@@ -28,8 +31,7 @@ export class DomainRepo extends DrizzleRepo<typeof domains> {
   }
 
   public loadUnchecked() {
-    return this.executeRows(sql`
-      SELECT * FROM domains WHERE lastChecked IS NULL OR lastChecked < DATE_SUB(NOW(), INTERVAL 24 HOUR)
-    `);
+    return this.db.select().from(domains)
+      .where(or(isNull(domains.lastChecked), lt(domains.lastChecked, DateHelper.hoursFromNow(-24))));
   }
 }

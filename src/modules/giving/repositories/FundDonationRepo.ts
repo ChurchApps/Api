@@ -1,8 +1,7 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
-import { DateHelper } from "@churchapps/apihelper";
+import { eq, and, between, like, desc, asc } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { fundDonations } from "../../../db/schema/giving.js";
+import { fundDonations, donations, funds } from "../../../db/schema/giving.js";
 import { FundDonation } from "../models/index.js";
 
 @injectable()
@@ -11,14 +10,20 @@ export class FundDonationRepo extends DrizzleRepo<typeof fundDonations> {
   protected readonly moduleName = "giving";
 
   public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    return this.executeRows(sql`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
-      FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
-      WHERE fd.churchId = ${churchId}
-        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
-      ORDER BY d.donationDate DESC
-    `);
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .where(and(eq(fundDonations.churchId, churchId), between(donations.donationDate, startDate, endDate)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByDonationId(churchId: string, donationId: string) {
@@ -26,59 +31,87 @@ export class FundDonationRepo extends DrizzleRepo<typeof fundDonations> {
   }
 
   public loadByPersonId(churchId: string, personId: string) {
-    return this.executeRows(sql`
-      SELECT fd.*
-      FROM donations d
-      INNER JOIN fundDonations fd ON fd.churchId = d.churchId AND fd.donationId = d.id
-      WHERE d.churchId = ${churchId} AND d.personId = ${personId}
-      ORDER BY d.donationDate
-    `);
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount
+    })
+      .from(donations)
+      .innerJoin(fundDonations, and(eq(fundDonations.churchId, donations.churchId), eq(fundDonations.donationId, donations.id)))
+      .where(and(eq(donations.churchId, churchId), eq(donations.personId, personId)))
+      .orderBy(asc(donations.donationDate));
   }
 
   public loadByFundId(churchId: string, fundId: string) {
-    return this.executeRows(sql`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
-      FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
-      WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
-      ORDER BY d.donationDate DESC
-    `);
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .where(and(eq(fundDonations.churchId, churchId), eq(fundDonations.fundId, fundId)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByFundIdDate(churchId: string, fundId: string, startDate: Date, endDate: Date) {
-    return this.executeRows(sql`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
-      FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
-      WHERE fd.churchId = ${churchId}
-        AND fd.fundId = ${fundId}
-        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
-      ORDER BY d.donationDate DESC
-    `);
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .where(and(eq(fundDonations.churchId, churchId), eq(fundDonations.fundId, fundId), between(donations.donationDate, startDate, endDate)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByFundName(churchId: string, fundName: string) {
-    return this.executeRows(sql`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
-      FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
-      INNER JOIN funds f ON f.id = fd.fundId
-      WHERE fd.churchId = ${churchId} AND f.name LIKE ${`%${fundName}%`}
-      ORDER BY d.donationDate DESC
-    `);
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .innerJoin(funds, eq(funds.id, fundDonations.fundId))
+      .where(and(eq(fundDonations.churchId, churchId), like(funds.name, `%${fundName}%`)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date) {
-    return this.executeRows(sql`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
-      FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
-      INNER JOIN funds f ON f.id = fd.fundId
-      WHERE fd.churchId = ${churchId}
-        AND f.name LIKE ${`%${fundName}%`}
-        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
-      ORDER BY d.donationDate DESC
-    `);
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .innerJoin(funds, eq(funds.id, fundDonations.fundId))
+      .where(and(eq(fundDonations.churchId, churchId), like(funds.name, `%${fundName}%`), between(donations.donationDate, startDate, endDate)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public convertToModel(_churchId: string, data: any): FundDonation {

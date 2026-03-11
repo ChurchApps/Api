@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, between, max } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { visits } from "../../../db/schema/attendance.js";
@@ -45,11 +45,8 @@ export class VisitRepo extends DrizzleRepo<typeof visits> {
   }
 
   public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    const sDate = DateHelper.toMysqlDateOnly(startDate);
-    const eDate = DateHelper.toMysqlDateOnly(endDate);
-    return this.executeRows(sql`
-      SELECT * FROM visits WHERE churchId = ${churchId} AND visitDate BETWEEN ${sDate} AND ${eDate}
-    `);
+    return this.db.select().from(visits)
+      .where(and(eq(visits.churchId, churchId), between(visits.visitDate, startDate, endDate)));
   }
 
   public async loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
@@ -65,23 +62,26 @@ export class VisitRepo extends DrizzleRepo<typeof visits> {
 
   public loadByServiceDatePeopleIds(churchId: string, serviceId: string, visitDate: Date, peopleIds: string[]) {
     if (peopleIds.length === 0) return Promise.resolve([]);
-    const vsDate = DateHelper.toMysqlDateOnly(visitDate);
-    return this.executeRows(sql`
-      SELECT * FROM visits
-      WHERE churchId = ${churchId} AND serviceId = ${serviceId} AND visitDate = ${vsDate}
-        AND personId IN (${sql.join(peopleIds.map(id => sql`${id}`), sql`, `)})
-    `);
+    return this.db.select().from(visits)
+      .where(and(
+        eq(visits.churchId, churchId),
+        eq(visits.serviceId, serviceId),
+        eq(visits.visitDate, visitDate),
+        inArray(visits.personId, peopleIds)
+      ));
   }
 
   public async loadLastLoggedDate(churchId: string, serviceId: string, peopleIds: string[]) {
     let result = new Date();
     result.setHours(0, 0, 0, 0);
     if (peopleIds.length === 0) return result;
-    const rows = await this.executeRows(sql`
-      SELECT max(visitDate) as visitDate FROM visits
-      WHERE churchId = ${churchId} AND serviceId = ${serviceId}
-        AND personId IN (${sql.join(peopleIds.map(id => sql`${id}`), sql`, `)})
-    `);
+    const rows = await this.db.select({ visitDate: max(visits.visitDate) })
+      .from(visits)
+      .where(and(
+        eq(visits.churchId, churchId),
+        eq(visits.serviceId, serviceId),
+        inArray(visits.personId, peopleIds)
+      ));
     const data = rows[0] ?? null;
     if (data?.visitDate) result = new Date(data.visitDate);
     return result;

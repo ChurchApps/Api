@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { deliveryLogs } from "../../../db/schema/messaging.js";

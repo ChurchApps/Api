@@ -1,11 +1,11 @@
-import { mysqlTable, char, varchar, datetime, date, boolean, int, float, text, mediumtext, tinyint, mysqlEnum, index, uniqueIndex } from "drizzle-orm/mysql-core";
+import { mysqlTable, char, varchar, datetime, boolean, int, float, text, mediumtext, tinyint, mysqlEnum, index, uniqueIndex } from "drizzle-orm/mysql-core";
 
 export const accessLogs = mysqlTable("accessLogs", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   userId: char("userId", { length: 11 }),
   churchId: char("churchId", { length: 11 }),
   appName: varchar("appName", { length: 45 }),
-  loginTime: datetime("loginTime"),
+  loginTime: datetime("loginTime")
 });
 
 export const answers = mysqlTable("answers", {
@@ -13,11 +13,11 @@ export const answers = mysqlTable("answers", {
   churchId: char("churchId", { length: 11 }),
   formSubmissionId: char("formSubmissionId", { length: 11 }),
   questionId: char("questionId", { length: 11 }),
-  value: varchar("value", { length: 4000 }),
+  value: varchar("value", { length: 4000 })
 }, (t) => [
   index("churchId").on(t.churchId),
   index("formSubmissionId").on(t.formSubmissionId),
-  index("questionId").on(t.questionId),
+  index("questionId").on(t.questionId)
 ]);
 
 export const auditLogs = mysqlTable("auditLogs", {
@@ -30,12 +30,12 @@ export const auditLogs = mysqlTable("auditLogs", {
   entityId: char("entityId", { length: 11 }),
   details: text("details"),
   ipAddress: varchar("ipAddress", { length: 45 }),
-  created: datetime("created").notNull(),
+  created: datetime("created").notNull()
 }, (t) => [
   index("ix_auditLogs_church_created").on(t.churchId, t.created),
   index("ix_auditLogs_church_category").on(t.churchId, t.category),
   index("ix_auditLogs_church_userId").on(t.churchId, t.userId),
-  index("ix_auditLogs_church_entity").on(t.churchId, t.entityType, t.entityId),
+  index("ix_auditLogs_church_entity").on(t.churchId, t.entityType, t.entityId)
 ]);
 
 export const churches = mysqlTable("churches", {
@@ -51,7 +51,7 @@ export const churches = mysqlTable("churches", {
   country: varchar("country", { length: 45 }),
   archivedDate: datetime("archivedDate"),
   latitude: float("latitude"),
-  longitude: float("longitude"),
+  longitude: float("longitude")
 });
 
 export const clientErrors = mysqlTable("clientErrors", {
@@ -63,7 +63,7 @@ export const clientErrors = mysqlTable("clientErrors", {
   originUrl: varchar("originUrl", { length: 255 }),
   errorType: varchar("errorType", { length: 45 }),
   message: varchar("message", { length: 255 }),
-  details: text("details"),
+  details: text("details")
 });
 
 export const domains = mysqlTable("domains", {
@@ -71,7 +71,7 @@ export const domains = mysqlTable("domains", {
   churchId: char("churchId", { length: 11 }),
   domainName: varchar("domainName", { length: 255 }),
   lastChecked: datetime("lastChecked"),
-  isStale: tinyint("isStale").default(0),
+  isStale: tinyint("isStale").default(0)
 });
 
 export const forms = mysqlTable("forms", {
@@ -86,11 +86,11 @@ export const forms = mysqlTable("forms", {
   restricted: boolean("restricted"),
   archived: boolean("archived"),
   removed: boolean("removed"),
-  thankYouMessage: text("thankYouMessage"),
+  thankYouMessage: text("thankYouMessage")
 }, (t) => [
   index("churchId").on(t.churchId),
   index("churchId_removed_archived").on(t.churchId, t.removed, t.archived),
-  index("churchId_id").on(t.churchId, t.id),
+  index("churchId_id").on(t.churchId, t.id)
 ]);
 
 export const formSubmissions = mysqlTable("formSubmissions", {
@@ -102,10 +102,10 @@ export const formSubmissions = mysqlTable("formSubmissions", {
   submissionDate: datetime("submissionDate"),
   submittedBy: char("submittedBy", { length: 11 }),
   revisionDate: datetime("revisionDate"),
-  revisedBy: char("revisedBy", { length: 11 }),
+  revisedBy: char("revisedBy", { length: 11 })
 }, (t) => [
   index("churchId").on(t.churchId),
-  index("formId").on(t.formId),
+  index("formId").on(t.formId)
 ]);
 
 export const groupMembers = mysqlTable("groupMembers", {
@@ -114,13 +114,13 @@ export const groupMembers = mysqlTable("groupMembers", {
   groupId: char("groupId", { length: 11 }),
   personId: char("personId", { length: 11 }),
   joinDate: datetime("joinDate"),
-  leader: boolean("leader"),
+  leader: boolean("leader")
 }, (t) => [
   index("churchId").on(t.churchId),
   index("groupId").on(t.groupId),
   index("personId").on(t.personId),
   index("churchId_groupId_personId").on(t.churchId, t.groupId, t.personId),
-  index("personId_churchId").on(t.personId, t.churchId),
+  index("personId_churchId").on(t.personId, t.churchId)
 ]);
 
 export const groups = mysqlTable("groups", {
@@ -138,20 +138,18 @@ export const groups = mysqlTable("groups", {
   meetingTime: varchar("meetingTime", { length: 45 }),
   meetingLocation: varchar("meetingLocation", { length: 45 }),
   labels: varchar("labels", { length: 500 }),
-  slug: varchar("slug", { length: 45 }),
+  slug: varchar("slug", { length: 45 })
 }, (t) => [
   index("churchId").on(t.churchId),
   index("churchId_removed_tags").on(t.churchId, t.removed, t.tags),
-  index("churchId_removed_labels").on(t.churchId, t.removed, t.labels),
+  index("churchId_removed_labels").on(t.churchId, t.removed, t.labels)
 ]);
 
 export const households = mysqlTable("households", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
-  name: varchar("name", { length: 50 }),
-}, (t) => [
-  index("churchId").on(t.churchId),
-]);
+  name: varchar("name", { length: 50 })
+}, (t) => [index("churchId").on(t.churchId)]);
 
 export const memberPermissions = mysqlTable("memberPermissions", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -160,10 +158,8 @@ export const memberPermissions = mysqlTable("memberPermissions", {
   contentType: varchar("contentType", { length: 45 }),
   contentId: char("contentId", { length: 11 }),
   action: varchar("action", { length: 45 }),
-  emailNotification: boolean("emailNotification"),
-}, (t) => [
-  index("churchId_contentId_memberId").on(t.churchId, t.contentId, t.memberId),
-]);
+  emailNotification: boolean("emailNotification")
+}, (t) => [index("churchId_contentId_memberId").on(t.churchId, t.contentId, t.memberId)]);
 
 export const membershipNotes = mysqlTable("notes", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -174,10 +170,8 @@ export const membershipNotes = mysqlTable("notes", {
   addedBy: char("addedBy", { length: 11 }),
   createdAt: datetime("createdAt"),
   contents: text("contents"),
-  updatedAt: datetime("updatedAt"),
-}, (t) => [
-  index("churchId").on(t.churchId),
-]);
+  updatedAt: datetime("updatedAt")
+}, (t) => [index("churchId").on(t.churchId)]);
 
 export const oAuthClients = mysqlTable("oAuthClients", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -186,7 +180,7 @@ export const oAuthClients = mysqlTable("oAuthClients", {
   clientSecret: varchar("clientSecret", { length: 45 }),
   redirectUris: varchar("redirectUris", { length: 255 }),
   scopes: varchar("scopes", { length: 255 }),
-  createdAt: datetime("createdAt"),
+  createdAt: datetime("createdAt")
 });
 
 export const oAuthCodes = mysqlTable("oAuthCodes", {
@@ -197,7 +191,7 @@ export const oAuthCodes = mysqlTable("oAuthCodes", {
   redirectUri: varchar("redirectUri", { length: 255 }),
   scopes: varchar("scopes", { length: 255 }),
   expiresAt: datetime("expiresAt"),
-  createdAt: datetime("createdAt"),
+  createdAt: datetime("createdAt")
 });
 
 export const oAuthDeviceCodes = mysqlTable("oAuthDeviceCodes", {
@@ -212,11 +206,11 @@ export const oAuthDeviceCodes = mysqlTable("oAuthDeviceCodes", {
   approvedByUserId: char("approvedByUserId", { length: 11 }),
   userChurchId: char("userChurchId", { length: 11 }),
   churchId: char("churchId", { length: 11 }),
-  createdAt: datetime("createdAt"),
+  createdAt: datetime("createdAt")
 }, (t) => [
   uniqueIndex("deviceCode").on(t.deviceCode),
   index("userCode_status").on(t.userCode, t.status),
-  index("status_expiresAt").on(t.status, t.expiresAt),
+  index("status_expiresAt").on(t.status, t.expiresAt)
 ]);
 
 export const oAuthRelaySessions = mysqlTable("oAuthRelaySessions", {
@@ -227,10 +221,10 @@ export const oAuthRelaySessions = mysqlTable("oAuthRelaySessions", {
   redirectUri: varchar("redirectUri", { length: 512 }).notNull(),
   status: mysqlEnum("status", ["pending", "completed", "expired"]).default("pending"),
   expiresAt: datetime("expiresAt").notNull(),
-  createdAt: datetime("createdAt"),
+  createdAt: datetime("createdAt")
 }, (t) => [
   uniqueIndex("sessionCode").on(t.sessionCode),
-  index("status_expiresAt").on(t.status, t.expiresAt),
+  index("status_expiresAt").on(t.status, t.expiresAt)
 ]);
 
 export const oAuthTokens = mysqlTable("oAuthTokens", {
@@ -241,7 +235,7 @@ export const oAuthTokens = mysqlTable("oAuthTokens", {
   refreshToken: varchar("refreshToken", { length: 45 }),
   scopes: varchar("scopes", { length: 45 }),
   expiresAt: datetime("expiresAt"),
-  createdAt: datetime("createdAt"),
+  createdAt: datetime("createdAt")
 });
 
 export const people = mysqlTable("people", {
@@ -276,11 +270,11 @@ export const people = mysqlTable("people", {
   conversationId: char("conversationId", { length: 11 }),
   optedOut: boolean("optedOut"),
   nametagNotes: varchar("nametagNotes", { length: 20 }),
-  donorNumber: varchar("donorNumber", { length: 20 }),
+  donorNumber: varchar("donorNumber", { length: 20 })
 }, (t) => [
   index("churchId").on(t.churchId),
   index("userId").on(t.userId),
-  index("householdId").on(t.householdId),
+  index("householdId").on(t.householdId)
 ]);
 
 export const questions = mysqlTable("questions", {
@@ -295,10 +289,10 @@ export const questions = mysqlTable("questions", {
   sort: int("sort"),
   choices: text("choices"),
   removed: boolean("removed"),
-  required: boolean("required"),
+  required: boolean("required")
 }, (t) => [
   index("churchId").on(t.churchId),
-  index("formId").on(t.formId),
+  index("formId").on(t.formId)
 ]);
 
 export const roleMembers = mysqlTable("roleMembers", {
@@ -307,11 +301,11 @@ export const roleMembers = mysqlTable("roleMembers", {
   roleId: char("roleId", { length: 11 }),
   userId: char("userId", { length: 11 }),
   dateAdded: datetime("dateAdded"),
-  addedBy: char("addedBy", { length: 11 }),
+  addedBy: char("addedBy", { length: 11 })
 }, (t) => [
   index("userId_INDEX").on(t.userId),
   index("userId_churchId").on(t.userId, t.churchId),
-  index("roleId_churchId").on(t.roleId, t.churchId),
+  index("roleId_churchId").on(t.roleId, t.churchId)
 ]);
 
 export const rolePermissions = mysqlTable("rolePermissions", {
@@ -321,15 +315,13 @@ export const rolePermissions = mysqlTable("rolePermissions", {
   apiName: varchar("apiName", { length: 45 }),
   contentType: varchar("contentType", { length: 45 }),
   contentId: char("contentId", { length: 11 }),
-  action: varchar("action", { length: 45 }),
-}, (t) => [
-  index("roleId_churchId_INDEX").on(t.roleId, t.churchId),
-]);
+  action: varchar("action", { length: 45 })
+}, (t) => [index("roleId_churchId_INDEX").on(t.roleId, t.churchId)]);
 
 export const roles = mysqlTable("roles", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
-  name: varchar("name", { length: 255 }),
+  name: varchar("name", { length: 255 })
 });
 
 export const membershipSettings = mysqlTable("settings", {
@@ -338,10 +330,8 @@ export const membershipSettings = mysqlTable("settings", {
   userId: char("userId", { length: 11 }),
   keyName: varchar("keyName", { length: 255 }),
   value: mediumtext("value"),
-  public: boolean("public"),
-}, (t) => [
-  index("churchId").on(t.churchId),
-]);
+  public: boolean("public")
+}, (t) => [index("churchId").on(t.churchId)]);
 
 export const usageTrends = mysqlTable("usageTrends", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -355,20 +345,18 @@ export const usageTrends = mysqlTable("usageTrends", {
   lessonsUsers: int("lessonsUsers"),
   lessonsChurches: int("lessonsChurches"),
   lessonsDevices: int("lessonsDevices"),
-  freeShowDevices: int("freeShowDevices"),
-}, (t) => [
-  uniqueIndex("year_week").on(t.year, t.week),
-]);
+  freeShowDevices: int("freeShowDevices")
+}, (t) => [uniqueIndex("year_week").on(t.year, t.week)]);
 
 export const userChurches = mysqlTable("userChurches", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   userId: char("userId", { length: 11 }),
   churchId: char("churchId", { length: 11 }),
   personId: char("personId", { length: 11 }),
-  lastAccessed: datetime("lastAccessed"),
+  lastAccessed: datetime("lastAccessed")
 }, (t) => [
   index("userId").on(t.userId),
-  index("churchId").on(t.churchId),
+  index("churchId").on(t.churchId)
 ]);
 
 export const users = mysqlTable("users", {
@@ -380,10 +368,10 @@ export const users = mysqlTable("users", {
   registrationDate: datetime("registrationDate"),
   lastLogin: datetime("lastLogin"),
   firstName: varchar("firstName", { length: 45 }),
-  lastName: varchar("lastName", { length: 45 }),
+  lastName: varchar("lastName", { length: 45 })
 }, (t) => [
   uniqueIndex("email_UNIQUE").on(t.email),
-  index("authGuid_INDEX").on(t.authGuid),
+  index("authGuid_INDEX").on(t.authGuid)
 ]);
 
 export const visibilityPreferences = mysqlTable("visibilityPreferences", {
@@ -392,5 +380,5 @@ export const visibilityPreferences = mysqlTable("visibilityPreferences", {
   personId: char("personId", { length: 11 }),
   address: varchar("address", { length: 50 }),
   phoneNumber: varchar("phoneNumber", { length: 50 }),
-  email: varchar("email", { length: 50 }),
+  email: varchar("email", { length: 50 })
 });

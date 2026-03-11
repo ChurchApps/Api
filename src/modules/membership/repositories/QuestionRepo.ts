@@ -52,8 +52,10 @@ export class QuestionRepo extends DrizzleRepo<typeof questions> {
       .from(questions).where(eq(questions.id, id));
     const question = rows[0];
     if (question) {
-      await this.db.execute(sql`UPDATE questions SET sort = sort - 1 WHERE formId = ${question.formId} AND sort > ${question.sort}`);
-      await this.db.execute(sql`UPDATE questions SET removed = 1 WHERE id = ${id} AND churchId = ${churchId}`);
+      await this.db.update(questions).set({ sort: sql`sort - 1` } as any)
+        .where(and(eq(questions.formId, question.formId!), sql`${questions.sort} > ${question.sort}`));
+      await this.db.update(questions).set({ removed: true } as any)
+        .where(and(eq(questions.id, id), eq(questions.churchId, churchId)));
     }
   }
 
@@ -89,8 +91,10 @@ export class QuestionRepo extends DrizzleRepo<typeof questions> {
       .from(questions).where(eq(questions.id, id));
     const question = rows[0];
     if (question) {
-      await this.db.execute(sql`UPDATE questions SET sort = sort + 1 WHERE formId = ${question.formId} AND sort = ${+question.sort! - 1}`);
-      await this.db.execute(sql`UPDATE questions SET sort = sort - 1 WHERE id = ${id}`);
+      await this.db.update(questions).set({ sort: sql`sort + 1` } as any)
+        .where(and(eq(questions.formId, question.formId!), eq(questions.sort, +question.sort! - 1)));
+      await this.db.update(questions).set({ sort: sql`sort - 1` } as any)
+        .where(eq(questions.id, id));
     }
   }
 
@@ -99,8 +103,10 @@ export class QuestionRepo extends DrizzleRepo<typeof questions> {
       .from(questions).where(eq(questions.id, id));
     const question = rows[0];
     if (question) {
-      await this.db.execute(sql`UPDATE questions SET sort = sort - 1 WHERE formId = ${question.formId} AND sort = ${+question.sort! + 1}`);
-      await this.db.execute(sql`UPDATE questions SET sort = sort + 1 WHERE id = ${id}`);
+      await this.db.update(questions).set({ sort: sql`sort - 1` } as any)
+        .where(and(eq(questions.formId, question.formId!), eq(questions.sort, +question.sort! + 1)));
+      await this.db.update(questions).set({ sort: sql`sort + 1` } as any)
+        .where(eq(questions.id, id));
     }
   }
 

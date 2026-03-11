@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, asc } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { serviceTimes } from "../../../db/schema/attendance.js";
+import { serviceTimes, services, campuses } from "../../../db/schema/attendance.js";
 import { ServiceTime } from "../models/index.js";
 
 @injectable()
@@ -17,26 +17,32 @@ export class ServiceTimeRepo extends DrizzleRepo<typeof serviceTimes> {
   }
 
   public async loadNamesWithCampusService(churchId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName
-      FROM serviceTimes st
-      INNER JOIN services s ON s.id = st.serviceId
-      INNER JOIN campuses c ON c.id = s.campusId
-      WHERE s.churchId = ${churchId} AND st.removed = 0 AND s.removed = 0 AND c.removed = 0
-      ORDER BY c.name, s.name, st.name
-    `);
+    const rows = await this.db.select({
+      id: serviceTimes.id,
+      serviceId: serviceTimes.serviceId,
+      name: serviceTimes.name,
+      longName: sql`concat(${campuses.name}, ' - ', ${services.name}, ' - ', ${serviceTimes.name})`.as("longName")
+    })
+      .from(serviceTimes)
+      .innerJoin(services, eq(services.id, serviceTimes.serviceId))
+      .innerJoin(campuses, eq(campuses.id, services.campusId))
+      .where(and(eq(services.churchId, churchId), eq(serviceTimes.removed, false), eq(services.removed, false), eq(campuses.removed, false)))
+      .orderBy(asc(campuses.name), asc(services.name), asc(serviceTimes.name));
     return this.convertAllToModel(churchId, rows);
   }
 
   public async loadNamesByServiceId(churchId: string, serviceId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName
-      FROM serviceTimes st
-      INNER JOIN services s ON s.id = st.serviceId
-      INNER JOIN campuses c ON c.id = s.campusId
-      WHERE s.churchId = ${churchId} AND s.id = ${serviceId} AND st.removed = 0
-      ORDER BY c.name, s.name, st.name
-    `);
+    const rows = await this.db.select({
+      id: serviceTimes.id,
+      serviceId: serviceTimes.serviceId,
+      name: serviceTimes.name,
+      longName: sql`concat(${campuses.name}, ' - ', ${services.name}, ' - ', ${serviceTimes.name})`.as("longName")
+    })
+      .from(serviceTimes)
+      .innerJoin(services, eq(services.id, serviceTimes.serviceId))
+      .innerJoin(campuses, eq(campuses.id, services.campusId))
+      .where(and(eq(services.churchId, churchId), eq(services.id, serviceId), eq(serviceTimes.removed, false)))
+      .orderBy(asc(campuses.name), asc(services.name), asc(serviceTimes.name));
     return this.convertAllToModel(churchId, rows);
   }
 

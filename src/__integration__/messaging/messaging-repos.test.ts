@@ -2,7 +2,6 @@ import { initTestDb, teardownTestDb } from "../db-helper";
 import { ConnectionRepo } from "../../modules/messaging/repositories/ConnectionRepo";
 import { ConversationRepo } from "../../modules/messaging/repositories/ConversationRepo";
 import { DeliveryLogRepo } from "../../modules/messaging/repositories/DeliveryLogRepo";
-import { DeviceRepo } from "../../modules/messaging/repositories/DeviceRepo";
 import { EmailTemplateRepo } from "../../modules/messaging/repositories/EmailTemplateRepo";
 import { MessageRepo } from "../../modules/messaging/repositories/MessageRepo";
 import { NotificationRepo } from "../../modules/messaging/repositories/NotificationRepo";

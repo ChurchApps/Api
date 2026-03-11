@@ -51,11 +51,14 @@ export class SessionRepo extends DrizzleRepo<typeof sessions> {
   }
 
   public async loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
-    const sessDate = DateHelper.toMysqlDateOnly(sessionDate);
-    const rows = await this.executeRows(sql`
-      SELECT * FROM sessions
-      WHERE churchId = ${churchId} AND groupId = ${groupId} AND serviceTimeId = ${serviceTimeId} AND sessionDate = ${sessDate}
-    `);
+    const normalizedDate = toDateOnly(sessionDate);
+    const rows = await this.db.select().from(sessions)
+      .where(and(
+        eq(sessions.churchId, churchId),
+        eq(sessions.groupId, groupId),
+        eq(sessions.serviceTimeId, serviceTimeId),
+        eq(sessions.sessionDate, normalizedDate!)
+      ));
     return rows.length > 0 ? this.convertToModel(churchId, rows[0]) : null;
   }
 

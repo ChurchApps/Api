@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { connections } from "../../../db/schema/messaging.js";
@@ -27,7 +27,7 @@ export class ConnectionRepo extends DrizzleRepo<typeof connections> {
     const result = await this.db.select({
       id: connections.id,
       displayName: connections.displayName,
-      ipAddress: connections.ipAddress,
+      ipAddress: connections.ipAddress
     })
       .from(connections)
       .where(and(eq(connections.churchId, churchId), eq(connections.conversationId, conversationId)))

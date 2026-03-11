@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, desc, inArray, sql } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { sermons } from "../../../db/schema/content.js";
 

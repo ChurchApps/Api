@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql, inArray, like } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { people } from "../../../db/schema/membership.js";
@@ -118,9 +118,8 @@ export class PersonRepo extends DrizzleRepo<typeof people> {
   }
 
   public async loadMembers(churchId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT * FROM people WHERE churchId=${churchId} AND removed=0 AND membershipStatus IN ('Member', 'Staff')
-    `);
+    const rows = await this.db.select().from(people)
+      .where(and(eq(people.churchId, churchId), eq(people.removed, false), inArray(people.membershipStatus, ["Member", "Staff"])));
     return rows.map(r => this.rowToModel(r));
   }
 
@@ -177,9 +176,9 @@ export class PersonRepo extends DrizzleRepo<typeof people> {
 
   public async searchEmail(churchId: string, email: string) {
     const emailSearch = "%" + email + "%";
-    const rows = await this.executeRows(sql`
-      SELECT * FROM people WHERE churchId=${churchId} AND email LIKE ${emailSearch} AND removed=0 LIMIT 100
-    `);
+    const rows = await this.db.select().from(people)
+      .where(and(eq(people.churchId, churchId), like(people.email, emailSearch), eq(people.removed, false)))
+      .limit(100);
     return rows.map(r => this.rowToModel(r));
   }
 

@@ -1,8 +1,8 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, isNull, or } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { userChurches } from "../../../db/schema/membership.js";
+import { userChurches, users, churches, people } from "../../../db/schema/membership.js";
 import { UserChurch } from "../models/index.js";
 
 @injectable()
@@ -46,23 +46,36 @@ export class UserChurchRepo extends DrizzleRepo<typeof userChurches> {
   }
 
   public async loadByPersonId(personId: string, churchId: string): Promise<any> {
-    const rows = await this.executeRows(sql`
-      SELECT uc.*, u.email FROM userChurches uc
-      INNER JOIN users u ON u.id = uc.userId
-      WHERE uc.personId = ${personId} AND uc.churchId = ${churchId}
-    `);
+    const rows = await this.db.select({
+      id: userChurches.id,
+      userId: userChurches.userId,
+      churchId: userChurches.churchId,
+      personId: userChurches.personId,
+      lastAccessed: userChurches.lastAccessed,
+      email: users.email
+    })
+      .from(userChurches)
+      .innerJoin(users, eq(users.id, userChurches.userId))
+      .where(and(eq(userChurches.personId, personId), eq(userChurches.churchId, churchId)));
     return rows[0] ?? null;
   }
 
   public async loadForUser(userId: string): Promise<any[]> {
-    const rows = await this.executeRows(sql`
-      SELECT uc.*, c.id AS churchId, c.name AS churchName, c.subDomain,
-        p.id AS activePersonId, p.firstName, p.lastName, p.displayName
-      FROM userChurches uc
-      INNER JOIN churches c ON c.id = uc.churchId AND c.archivedDate IS NULL
-      LEFT JOIN people p ON p.id = uc.personId AND p.churchId = uc.churchId AND (p.removed = 0 OR p.removed IS NULL)
-      WHERE uc.userId = ${userId}
-    `);
+    const rows = await this.db.select({
+      id: userChurches.id,
+      userId: userChurches.userId,
+      churchId: churches.id,
+      churchName: churches.name,
+      subDomain: churches.subDomain,
+      activePersonId: people.id,
+      firstName: people.firstName,
+      lastName: people.lastName,
+      displayName: people.displayName
+    })
+      .from(userChurches)
+      .innerJoin(churches, and(eq(churches.id, userChurches.churchId), isNull(churches.archivedDate)))
+      .leftJoin(people, and(eq(people.id, userChurches.personId), eq(people.churchId, userChurches.churchId), or(eq(people.removed, false), isNull(people.removed))))
+      .where(eq(userChurches.userId, userId));
     return rows.map((row: any) => ({
       id: row.id,
       userId: row.userId,

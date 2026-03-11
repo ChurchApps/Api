@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { eq, sql } from "drizzle-orm";
+import { eq, between, asc, countDistinct } from "drizzle-orm";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { bibleLookups } from "../../../db/schema/content.js";
+import { bibleLookups, bibleTranslations } from "../../../db/schema/content.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
 @injectable()
@@ -26,13 +26,14 @@ export class BibleLookupRepo extends GlobalDrizzleRepo<typeof bibleLookups> {
   }
 
   public async getStats(startDate: Date, endDate: Date): Promise<any[]> {
-    return this.executeRows(sql`
-      SELECT bt.abbreviation, COUNT(DISTINCT(bl.ipAddress)) as lookups
-      FROM bibleTranslations bt
-      INNER JOIN bibleLookups bl ON bl.translationKey = bt.abbreviation
-      WHERE bl.lookupTime BETWEEN ${startDate} AND ${endDate}
-      GROUP BY bt.abbreviation
-      ORDER BY bt.abbreviation
-    `);
+    return this.db.select({
+      abbreviation: bibleTranslations.abbreviation,
+      lookups: countDistinct(bibleLookups.ipAddress)
+    })
+      .from(bibleTranslations)
+      .innerJoin(bibleLookups, eq(bibleLookups.translationKey, bibleTranslations.abbreviation))
+      .where(between(bibleLookups.lookupTime, startDate, endDate))
+      .groupBy(bibleTranslations.abbreviation)
+      .orderBy(asc(bibleTranslations.abbreviation));
   }
 }

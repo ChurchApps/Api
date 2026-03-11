@@ -1,8 +1,9 @@
 import { injectable } from "inversify";
-import { eq, and, sql, desc, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, gt } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { notifications } from "../../../db/schema/messaging.js";
+import { notifications, notificationPreferences } from "../../../db/schema/messaging.js";
 
 @injectable()
 export class NotificationRepo extends DrizzleRepo<typeof notifications> {
@@ -36,24 +37,36 @@ export class NotificationRepo extends DrizzleRepo<typeof notifications> {
   }
 
   public async loadForEmail(frequency: string) {
-    return this.executeRows(sql`
-      SELECT DISTINCT n.churchId, n.personId
-      FROM notifications n
-      INNER JOIN notificationPreferences np ON np.churchId = n.churchId AND np.personId = n.personId
-      WHERE n.deliveryMethod = 'email' AND np.emailFrequency = ${frequency} AND n.timeSent > DATE_SUB(NOW(), INTERVAL 24 HOUR)
-      LIMIT 200
-    `);
+    return this.db.selectDistinct({
+      churchId: notifications.churchId,
+      personId: notifications.personId
+    })
+      .from(notifications)
+      .innerJoin(notificationPreferences, and(
+        eq(notificationPreferences.churchId, notifications.churchId),
+        eq(notificationPreferences.personId, notifications.personId)
+      ))
+      .where(and(
+        eq(notifications.deliveryMethod, "email"),
+        eq(notificationPreferences.emailFrequency, frequency),
+        gt(notifications.timeSent, DateHelper.hoursFromNow(-24))
+      ))
+      .limit(200);
   }
 
   public async loadByPersonIdForEmail(churchId: string, personId: string, frequency: string) {
-    const timeCutoff = frequency === "individual"
-      ? sql`DATE_SUB(NOW(), INTERVAL 30 MINUTE)`
-      : sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)`;
-    return this.executeRows(sql`
-      SELECT * FROM notifications
-      WHERE churchId = ${churchId} AND personId = ${personId} AND deliveryMethod = 'email' AND timeSent >= ${timeCutoff}
-      ORDER BY timeSent
-    `);
+    const cutoff = frequency === "individual"
+      ? DateHelper.hoursFromNow(-0.5)  // 30 minutes ago
+      : DateHelper.hoursFromNow(-24);
+
+    return this.db.select().from(notifications)
+      .where(and(
+        eq(notifications.churchId, churchId),
+        eq(notifications.personId, personId),
+        eq(notifications.deliveryMethod, "email"),
+        gt(notifications.timeSent, cutoff)
+      ))
+      .orderBy(notifications.timeSent);
   }
 
   public async delete(churchId: string, id: string) {

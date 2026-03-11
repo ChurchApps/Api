@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, asc, sql, or } from "drizzle-orm";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { songDetails } from "../../../db/schema/content.js";
+import { songDetails, songs, arrangements } from "../../../db/schema/content.js";
 
 @injectable()
 export class SongDetailRepo extends GlobalDrizzleRepo<typeof songDetails> {
@@ -14,9 +14,11 @@ export class SongDetailRepo extends GlobalDrizzleRepo<typeof songDetails> {
 
   public async search(query: string): Promise<any[]> {
     const q = "%" + query.replace(/ /g, "%") + "%";
-    return this.executeRows(sql`
-      SELECT * FROM songDetails WHERE CONCAT(title, ' ', artist) LIKE ${q} OR CONCAT(artist, ' ', title) LIKE ${q}
-    `);
+    return this.db.select().from(songDetails)
+      .where(or(
+        sql`concat(${songDetails.title}, ' ', ${songDetails.artist}) LIKE ${q}`,
+        sql`concat(${songDetails.artist}, ' ', ${songDetails.title}) LIKE ${q}`
+      ));
   }
 
   public loadByPraiseChartsId(praiseChartsId: string): Promise<any> {
@@ -24,13 +26,28 @@ export class SongDetailRepo extends GlobalDrizzleRepo<typeof songDetails> {
   }
 
   public async loadForChurch(churchId: string): Promise<any[]> {
-    return this.executeRows(sql`
-      SELECT sd.*, s.id as songId, s.churchId
-      FROM songs s
-      INNER JOIN arrangements a ON a.songId = s.id
-      INNER JOIN songDetails sd ON sd.id = a.songDetailId
-      WHERE s.churchId = ${churchId}
-      ORDER BY sd.title, sd.artist
-    `);
+    return this.db.select({
+      id: songDetails.id,
+      praiseChartsId: songDetails.praiseChartsId,
+      musicBrainzId: songDetails.musicBrainzId,
+      title: songDetails.title,
+      artist: songDetails.artist,
+      album: songDetails.album,
+      language: songDetails.language,
+      thumbnail: songDetails.thumbnail,
+      releaseDate: songDetails.releaseDate,
+      bpm: songDetails.bpm,
+      keySignature: songDetails.keySignature,
+      seconds: songDetails.seconds,
+      meter: songDetails.meter,
+      tones: songDetails.tones,
+      songId: songs.id,
+      churchId: songs.churchId
+    })
+      .from(songs)
+      .innerJoin(arrangements, eq(arrangements.songId, songs.id))
+      .innerJoin(songDetails, eq(songDetails.id, arrangements.songDetailId))
+      .where(eq(songs.churchId, churchId))
+      .orderBy(asc(songDetails.title), asc(songDetails.artist));
   }
 }

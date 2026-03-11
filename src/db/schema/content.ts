@@ -5,7 +5,7 @@ export const arrangementKeys = mysqlTable("arrangementKeys", {
   churchId: char("churchId", { length: 11 }),
   arrangementId: char("arrangementId", { length: 11 }),
   keySignature: varchar("keySignature", { length: 10 }),
-  shortDescription: varchar("shortDescription", { length: 45 }),
+  shortDescription: varchar("shortDescription", { length: 45 })
 });
 
 export const arrangements = mysqlTable("arrangements", {
@@ -15,10 +15,8 @@ export const arrangements = mysqlTable("arrangements", {
   songDetailId: char("songDetailId", { length: 11 }),
   name: varchar("name", { length: 45 }),
   lyrics: text("lyrics"),
-  freeShowId: varchar("freeShowId", { length: 45 }),
-}, (t) => [
-  index("ix_churchId_songId").on(t.churchId, t.songId),
-]);
+  freeShowId: varchar("freeShowId", { length: 45 })
+}, (t) => [index("ix_churchId_songId").on(t.churchId, t.songId)]);
 
 export const bibleBooks = mysqlTable("bibleBooks", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -26,20 +24,16 @@ export const bibleBooks = mysqlTable("bibleBooks", {
   keyName: varchar("keyName", { length: 45 }),
   abbreviation: varchar("abbreviation", { length: 45 }),
   name: varchar("name", { length: 45 }),
-  sort: int("sort"),
-}, (t) => [
-  index("ix_translationKey").on(t.translationKey),
-]);
+  sort: int("sort")
+}, (t) => [index("ix_translationKey").on(t.translationKey)]);
 
 export const bibleChapters = mysqlTable("bibleChapters", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   translationKey: varchar("translationKey", { length: 45 }),
   bookKey: varchar("bookKey", { length: 45 }),
   keyName: varchar("keyName", { length: 45 }),
-  number: int("number"),
-}, (t) => [
-  index("ix_translationKey_bookKey").on(t.translationKey, t.bookKey),
-]);
+  number: int("number")
+}, (t) => [index("ix_translationKey_bookKey").on(t.translationKey, t.bookKey)]);
 
 export const bibleLookups = mysqlTable("bibleLookups", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -47,7 +41,7 @@ export const bibleLookups = mysqlTable("bibleLookups", {
   lookupTime: datetime("lookupTime"),
   ipAddress: varchar("ipAddress", { length: 45 }),
   startVerseKey: varchar("startVerseKey", { length: 15 }),
-  endVerseKey: varchar("endVerseKey", { length: 15 }),
+  endVerseKey: varchar("endVerseKey", { length: 15 })
 });
 
 export const bibleTranslations = mysqlTable("bibleTranslations", {
@@ -62,7 +56,7 @@ export const bibleTranslations = mysqlTable("bibleTranslations", {
   countries: varchar("countries", { length: 255 }),
   copyright: varchar("copyright", { length: 1000 }),
   attributionRequired: boolean("attributionRequired"),
-  attributionString: varchar("attributionString", { length: 1000 }),
+  attributionString: varchar("attributionString", { length: 1000 })
 });
 
 export const bibleVerses = mysqlTable("bibleVerses", {
@@ -70,10 +64,8 @@ export const bibleVerses = mysqlTable("bibleVerses", {
   translationKey: varchar("translationKey", { length: 45 }),
   chapterKey: varchar("chapterKey", { length: 45 }),
   keyName: varchar("keyName", { length: 45 }),
-  number: int("number"),
-}, (t) => [
-  index("ix_translationKey_chapterKey").on(t.translationKey, t.chapterKey),
-]);
+  number: int("number")
+}, (t) => [index("ix_translationKey_chapterKey").on(t.translationKey, t.chapterKey)]);
 
 export const bibleVerseTexts = mysqlTable("bibleVerseTexts", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -83,22 +75,20 @@ export const bibleVerseTexts = mysqlTable("bibleVerseTexts", {
   chapterNumber: int("chapterNumber"),
   verseNumber: int("verseNumber"),
   content: varchar("content", { length: 1000 }),
-  newParagraph: boolean("newParagraph"),
-}, (t) => [
-  uniqueIndex("uq_translationKey_verseKey").on(t.translationKey, t.verseKey),
-]);
+  newParagraph: boolean("newParagraph")
+}, (t) => [uniqueIndex("uq_translationKey_verseKey").on(t.translationKey, t.verseKey)]);
 
 export const blocks = mysqlTable("blocks", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
   blockType: varchar("blockType", { length: 45 }),
-  name: varchar("name", { length: 45 }),
+  name: varchar("name", { length: 45 })
 });
 
 export const curatedCalendars = mysqlTable("curatedCalendars", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
-  name: varchar("name", { length: 45 }),
+  name: varchar("name", { length: 45 })
 });
 
 export const curatedEvents = mysqlTable("curatedEvents", {
@@ -106,10 +96,8 @@ export const curatedEvents = mysqlTable("curatedEvents", {
   churchId: char("churchId", { length: 11 }),
   curatedCalendarId: char("curatedCalendarId", { length: 11 }),
   groupId: char("groupId", { length: 11 }),
-  eventId: char("eventId", { length: 11 }),
-}, (t) => [
-  index("ix_churchId_curatedCalendarId").on(t.churchId, t.curatedCalendarId),
-]);
+  eventId: char("eventId", { length: 11 })
+}, (t) => [index("ix_churchId_curatedCalendarId").on(t.churchId, t.curatedCalendarId)]);
 
 export const elements = mysqlTable("elements", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -121,17 +109,15 @@ export const elements = mysqlTable("elements", {
   parentId: char("parentId", { length: 11 }),
   answersJSON: mediumtext("answersJSON"),
   stylesJSON: mediumtext("stylesJSON"),
-  animationsJSON: mediumtext("animationsJSON"),
-}, (t) => [
-  index("ix_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort),
-]);
+  animationsJSON: mediumtext("animationsJSON")
+}, (t) => [index("ix_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort)]);
 
 export const eventExceptions = mysqlTable("eventExceptions", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
   eventId: char("eventId", { length: 11 }),
   exceptionDate: datetime("exceptionDate"),
-  recurrenceDate: datetime("recurrenceDate"),
+  recurrenceDate: datetime("recurrenceDate")
 });
 
 export const events = mysqlTable("events", {
@@ -150,10 +136,8 @@ export const events = mysqlTable("events", {
   registrationOpenDate: datetime("registrationOpenDate"),
   registrationCloseDate: datetime("registrationCloseDate"),
   tags: varchar("tags", { length: 500 }),
-  formId: char("formId", { length: 11 }),
-}, (t) => [
-  index("ix_churchId_groupId").on(t.churchId, t.groupId),
-]);
+  formId: char("formId", { length: 11 })
+}, (t) => [index("ix_churchId_groupId").on(t.churchId, t.groupId)]);
 
 export const files = mysqlTable("files", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -164,10 +148,8 @@ export const files = mysqlTable("files", {
   contentPath: varchar("contentPath", { length: 1024 }),
   fileType: varchar("fileType", { length: 45 }),
   size: int("size"),
-  dateModified: datetime("dateModified"),
-}, (t) => [
-  index("ix_churchId_id").on(t.churchId, t.id),
-]);
+  dateModified: datetime("dateModified")
+}, (t) => [index("ix_churchId_id").on(t.churchId, t.id)]);
 
 export const globalStyles = mysqlTable("globalStyles", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -178,7 +160,7 @@ export const globalStyles = mysqlTable("globalStyles", {
   spacing: text("spacing"),
   borderRadius: text("borderRadius"),
   customCss: text("customCss"),
-  customJS: text("customJS"),
+  customJS: text("customJS")
 });
 
 export const links = mysqlTable("links", {
@@ -194,10 +176,8 @@ export const links = mysqlTable("links", {
   photo: varchar("photo", { length: 255 }),
   parentId: char("parentId", { length: 11 }),
   visibility: varchar("visibility", { length: 45 }).default("everyone"),
-  groupIds: text("groupIds"),
-}, (t) => [
-  index("churchId").on(t.churchId),
-]);
+  groupIds: text("groupIds")
+}, (t) => [index("churchId").on(t.churchId)]);
 
 export const pageHistory = mysqlTable("pageHistory", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -207,10 +187,10 @@ export const pageHistory = mysqlTable("pageHistory", {
   snapshotJSON: longtext("snapshotJSON"),
   description: varchar("description", { length: 200 }),
   userId: char("userId", { length: 11 }),
-  createdDate: datetime("createdDate"),
+  createdDate: datetime("createdDate")
 }, (t) => [
   index("ix_pageId").on(t.pageId, t.createdDate),
-  index("ix_blockId").on(t.blockId, t.createdDate),
+  index("ix_blockId").on(t.blockId, t.createdDate)
 ]);
 
 export const pages = mysqlTable("pages", {
@@ -218,10 +198,8 @@ export const pages = mysqlTable("pages", {
   churchId: char("churchId", { length: 11 }),
   url: varchar("url", { length: 255 }),
   title: varchar("title", { length: 255 }),
-  layout: varchar("layout", { length: 45 }),
-}, (t) => [
-  uniqueIndex("uq_churchId_url").on(t.churchId, t.url),
-]);
+  layout: varchar("layout", { length: 45 })
+}, (t) => [uniqueIndex("uq_churchId_url").on(t.churchId, t.url)]);
 
 export const playlists = mysqlTable("playlists", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -229,7 +207,7 @@ export const playlists = mysqlTable("playlists", {
   title: varchar("title", { length: 255 }),
   description: text("description"),
   publishDate: datetime("publishDate"),
-  thumbnail: varchar("thumbnail", { length: 1024 }),
+  thumbnail: varchar("thumbnail", { length: 1024 })
 });
 
 export const registrationMembers = mysqlTable("registrationMembers", {
@@ -238,10 +216,10 @@ export const registrationMembers = mysqlTable("registrationMembers", {
   registrationId: char("registrationId", { length: 11 }).notNull(),
   personId: char("personId", { length: 11 }),
   firstName: varchar("firstName", { length: 100 }),
-  lastName: varchar("lastName", { length: 100 }),
+  lastName: varchar("lastName", { length: 100 })
 }, (t) => [
   index("ix_regMembers_registrationId").on(t.registrationId),
-  index("ix_regMembers_personId").on(t.personId),
+  index("ix_regMembers_personId").on(t.personId)
 ]);
 
 export const registrations = mysqlTable("registrations", {
@@ -254,11 +232,11 @@ export const registrations = mysqlTable("registrations", {
   formSubmissionId: char("formSubmissionId", { length: 11 }),
   notes: mediumtext("notes"),
   registeredDate: datetime("registeredDate"),
-  cancelledDate: datetime("cancelledDate"),
+  cancelledDate: datetime("cancelledDate")
 }, (t) => [
   index("ix_registrations_churchId_eventId").on(t.churchId, t.eventId),
   index("ix_registrations_personId").on(t.personId),
-  index("ix_registrations_householdId").on(t.householdId),
+  index("ix_registrations_householdId").on(t.householdId)
 ]);
 
 export const sections = mysqlTable("sections", {
@@ -275,10 +253,10 @@ export const sections = mysqlTable("sections", {
   targetBlockId: char("targetBlockId", { length: 11 }),
   answersJSON: mediumtext("answersJSON"),
   stylesJSON: mediumtext("stylesJSON"),
-  animationsJSON: mediumtext("animationsJSON"),
+  animationsJSON: mediumtext("animationsJSON")
 }, (t) => [
   index("ix_churchId_pageId_sort").on(t.churchId, t.pageId, t.sort),
-  index("ix_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort),
+  index("ix_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort)
 ]);
 
 export const sermons = mysqlTable("sermons", {
@@ -293,7 +271,7 @@ export const sermons = mysqlTable("sermons", {
   publishDate: datetime("publishDate"),
   thumbnail: varchar("thumbnail", { length: 1024 }),
   duration: int("duration"),
-  permanentUrl: boolean("permanentUrl"),
+  permanentUrl: boolean("permanentUrl")
 });
 
 export const contentSettings = mysqlTable("settings", {
@@ -302,10 +280,10 @@ export const contentSettings = mysqlTable("settings", {
   userId: char("userId", { length: 11 }),
   keyName: varchar("keyName", { length: 255 }),
   value: mediumtext("value"),
-  public: boolean("public"),
+  public: boolean("public")
 }, (t) => [
   index("churchId").on(t.churchId),
-  index("ix_churchId_keyName_userId").on(t.churchId, t.keyName, t.userId),
+  index("ix_churchId_keyName_userId").on(t.churchId, t.keyName, t.userId)
 ]);
 
 export const songDetailLinks = mysqlTable("songDetailLinks", {
@@ -313,7 +291,7 @@ export const songDetailLinks = mysqlTable("songDetailLinks", {
   songDetailId: char("songDetailId", { length: 11 }),
   service: varchar("service", { length: 45 }),
   serviceKey: varchar("serviceKey", { length: 255 }),
-  url: varchar("url", { length: 255 }),
+  url: varchar("url", { length: 255 })
 });
 
 export const songDetails = mysqlTable("songDetails", {
@@ -330,17 +308,15 @@ export const songDetails = mysqlTable("songDetails", {
   keySignature: varchar("keySignature", { length: 5 }),
   seconds: int("seconds"),
   meter: varchar("meter", { length: 10 }),
-  tones: varchar("tones", { length: 45 }),
+  tones: varchar("tones", { length: 45 })
 });
 
 export const songs = mysqlTable("songs", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
   name: varchar("name", { length: 45 }),
-  dateAdded: date("dateAdded"),
-}, (t) => [
-  index("ix_churchId_name").on(t.churchId, t.name),
-]);
+  dateAdded: date("dateAdded")
+}, (t) => [index("ix_churchId_name").on(t.churchId, t.name)]);
 
 export const streamingServices = mysqlTable("streamingServices", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
@@ -355,5 +331,5 @@ export const streamingServices = mysqlTable("streamingServices", {
   timezoneOffset: int("timezoneOffset"),
   recurring: boolean("recurring"),
   label: varchar("label", { length: 255 }),
-  sermonId: char("sermonId", { length: 11 }),
+  sermonId: char("sermonId", { length: 11 })
 });

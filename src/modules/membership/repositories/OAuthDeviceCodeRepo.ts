@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, lt, inArray, sql } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { oAuthDeviceCodes } from "../../../db/schema/membership.js";
@@ -65,7 +65,10 @@ export class OAuthDeviceCodeRepo extends GlobalDrizzleRepo<typeof oAuthDeviceCod
   }
 
   public deleteExpired() {
-    return this.db.execute(sql`DELETE FROM oAuthDeviceCodes WHERE expiresAt < NOW() AND status IN ('pending', 'expired')`);
+    return this.db.delete(oAuthDeviceCodes).where(and(
+      lt(oAuthDeviceCodes.expiresAt, new Date()),
+      inArray(oAuthDeviceCodes.status, ["pending", "expired"])
+    ));
   }
 
   public static generateDeviceCode(): string {

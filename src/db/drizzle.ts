@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import { MultiDatabasePool } from "../shared/infrastructure/MultiDatabasePool.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 const instances = new Map<string, MySql2Database<any>>();
 
 /**

@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { eventLogs, customers } from "../../../db/schema/giving.js";
@@ -62,12 +62,22 @@ export class EventLogRepo extends DrizzleRepo<typeof eventLogs> {
   }
 
   public async loadByType(churchId: string, status: string) {
-    return this.executeRows(sql`
-      SELECT eventLogs.*, personId
-      FROM customers
-      LEFT JOIN eventLogs ON customers.id = eventLogs.customerId
-      WHERE eventLogs.status = ${status} AND eventLogs.churchId = ${churchId}
-      ORDER BY eventLogs.created DESC
-    `);
+    return this.db.select({
+      id: eventLogs.id,
+      churchId: eventLogs.churchId,
+      customerId: eventLogs.customerId,
+      provider: eventLogs.provider,
+      providerId: eventLogs.providerId,
+      status: eventLogs.status,
+      eventType: eventLogs.eventType,
+      message: eventLogs.message,
+      created: eventLogs.created,
+      resolved: eventLogs.resolved,
+      personId: customers.personId
+    })
+      .from(customers)
+      .leftJoin(eventLogs, eq(customers.id, eventLogs.customerId))
+      .where(and(eq(eventLogs.status, status), eq(eventLogs.churchId, churchId)))
+      .orderBy(desc(eventLogs.created));
   }
 }

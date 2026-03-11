@@ -1,6 +1,5 @@
 import { injectable } from "inversify";
 import { eq, and } from "drizzle-orm";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { gatewayPaymentMethods } from "../../../db/schema/giving.js";
 import { GatewayPaymentMethod } from "../models/index.js";

@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { textingProviders } from "../../../db/schema/messaging.js";
 

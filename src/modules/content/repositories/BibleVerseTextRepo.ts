@@ -12,11 +12,16 @@ export class BibleVerseTextRepo extends GlobalDrizzleRepo<typeof bibleVerseTexts
 
   public async save(model: any) {
     if (!model.id) model.id = UniqueIdHelper.shortId();
-    await this.db.execute(sql`
-      INSERT INTO bibleVerseTexts (id, translationKey, verseKey, bookKey, chapterNumber, verseNumber, content, newParagraph)
-      VALUES (${model.id}, ${model.translationKey}, ${model.verseKey}, ${model.bookKey}, ${model.chapterNumber}, ${model.verseNumber}, ${model.content}, ${model.newParagraph})
-      ON DUPLICATE KEY UPDATE content = VALUES(content), newParagraph = VALUES(newParagraph)
-    `);
+    await this.db.insert(bibleVerseTexts).values({
+      id: model.id,
+      translationKey: model.translationKey,
+      verseKey: model.verseKey,
+      bookKey: model.bookKey,
+      chapterNumber: model.chapterNumber,
+      verseNumber: model.verseNumber,
+      content: model.content,
+      newParagraph: model.newParagraph
+    }).onDuplicateKeyUpdate({ set: { content: sql`VALUES(content)`, newParagraph: sql`VALUES(newParagraph)` } });
     return model;
   }
 
