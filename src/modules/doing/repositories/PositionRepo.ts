@@ -1,50 +1,32 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Position } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and, inArray, asc } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { positions } from "../../../db/schema/doing.js";
 
 @injectable()
-export class PositionRepo extends ConfiguredRepo<Position> {
-  protected get repoConfig(): RepoConfig<Position> {
-    return {
-      tableName: "positions",
-      hasSoftDelete: false,
-      columns: ["planId", "categoryName", "name", "count", "groupId", "allowSelfSignup", "description"]
-    };
-  }
+export class PositionRepo extends DrizzleRepo<typeof positions> {
+  protected readonly table = positions;
+  protected readonly moduleName = "doing";
 
   public deleteByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("DELETE FROM positions WHERE churchId=? and planId=?;", [churchId, planId]);
+    return this.db.delete(positions).where(and(eq(positions.churchId, churchId), eq(positions.planId, planId)));
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? and id in (?);", [churchId, ids]);
+    return this.db.select().from(positions).where(and(eq(positions.churchId, churchId), inArray(positions.id, ids)));
   }
 
   public loadByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId=? ORDER BY categoryName, name;", [churchId, planId]);
+    return this.db.select().from(positions).where(and(eq(positions.churchId, churchId), eq(positions.planId, planId))).orderBy(asc(positions.categoryName), asc(positions.name));
   }
 
   public loadByPlanIds(churchId: string, planIds: string[]) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId in (?);", [churchId, planIds]);
+    return this.db.select().from(positions).where(and(eq(positions.churchId, churchId), inArray(positions.planId, planIds)));
   }
 
   public loadSignupByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId=? AND allowSelfSignup=1 ORDER BY categoryName, name;", [churchId, planId]);
-  }
-
-  protected rowToModel(row: any): Position {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      planId: row.planId,
-      categoryName: row.categoryName,
-      name: row.name,
-      count: row.count,
-      groupId: row.groupId,
-      allowSelfSignup: row.allowSelfSignup,
-      description: row.description
-    };
+    return this.db.select().from(positions)
+      .where(and(eq(positions.churchId, churchId), eq(positions.planId, planId), eq(positions.allowSelfSignup, true)))
+      .orderBy(asc(positions.categoryName), asc(positions.name));
   }
 }

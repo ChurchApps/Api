@@ -1,33 +1,18 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { PlanType } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and, inArray } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { planTypes } from "../../../db/schema/doing.js";
 
 @injectable()
-export class PlanTypeRepo extends ConfiguredRepo<PlanType> {
-  protected get repoConfig(): RepoConfig<PlanType> {
-    return {
-      tableName: "planTypes",
-      hasSoftDelete: false,
-      columns: ["ministryId", "name"]
-    };
-  }
+export class PlanTypeRepo extends DrizzleRepo<typeof planTypes> {
+  protected readonly table = planTypes;
+  protected readonly moduleName = "doing";
 
   public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM planTypes WHERE churchId=? and id in (?);", [churchId, ids]);
+    return this.db.select().from(planTypes).where(and(eq(planTypes.churchId, churchId), inArray(planTypes.id, ids)));
   }
 
   public loadByMinistryId(churchId: string, ministryId: string) {
-    return TypedDB.query("SELECT * FROM planTypes WHERE churchId=? AND ministryId=?;", [churchId, ministryId]);
-  }
-
-  protected rowToModel(row: any): PlanType {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      ministryId: row.ministryId,
-      name: row.name
-    };
+    return this.db.select().from(planTypes).where(and(eq(planTypes.churchId, churchId), eq(planTypes.ministryId, ministryId)));
   }
 }
