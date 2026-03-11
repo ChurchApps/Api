@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { eq, asc, sql, or } from "drizzle-orm";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { songDetails, songs, arrangements } from "../../../db/schema/content.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class SongDetailRepo extends GlobalDrizzleRepo<typeof songDetails> {
@@ -14,10 +15,11 @@ export class SongDetailRepo extends GlobalDrizzleRepo<typeof songDetails> {
 
   public async search(query: string): Promise<any[]> {
     const q = "%" + query.replace(/ /g, "%") + "%";
+    const op = getDialect() === "postgres" ? sql.raw("ILIKE") : sql.raw("LIKE");
     return this.db.select().from(songDetails)
       .where(or(
-        sql`concat(${songDetails.title}, ' ', ${songDetails.artist}) LIKE ${q}`,
-        sql`concat(${songDetails.artist}, ' ', ${songDetails.title}) LIKE ${q}`
+        sql`concat(${songDetails.title}, ' ', ${songDetails.artist}) ${op} ${q}`,
+        sql`concat(${songDetails.artist}, ' ', ${songDetails.title}) ${op} ${q}`
       ));
   }
 

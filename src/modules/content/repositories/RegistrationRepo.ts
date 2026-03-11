@@ -45,14 +45,25 @@ export class RegistrationRepo extends DrizzleRepo<typeof registrations> {
 
     // atomicInsertWithCapacityCheck uses INSERT...SELECT which returns affectedRows, not result rows.
     // We need the raw result here, not executeRows().
-    const result: any = await this.db.execute(sql`
-      INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate)
-      SELECT ${m.id}, ${m.churchId}, ${m.eventId}, ${m.personId || null}, ${m.householdId || null}, ${m.status || "confirmed"}, ${m.formSubmissionId || null}, ${m.notes || null}, ${m.registeredDate || null}, ${m.cancelledDate || null}
-      FROM dual
-      WHERE (SELECT COUNT(*) FROM registrations WHERE eventId = ${m.eventId} AND churchId = ${m.churchId} AND status IN ('pending','confirmed')) < ${capacity}
-    `);
-    const rows: any = Array.isArray(result) ? result[0] : result;
-    const affectedRows = rows?.affectedRows ?? 0;
+    const dialect = (await import("../../../shared/helpers/Dialect.js")).getDialect();
+    let affectedRows = 0;
+    if (dialect === "postgres") {
+      const result: any = await (this.db as any).execute(sql`
+        INSERT INTO registrations (id, "churchId", "eventId", "personId", "householdId", status, "formSubmissionId", notes, "registeredDate", "cancelledDate")
+        SELECT ${m.id}, ${m.churchId}, ${m.eventId}, ${m.personId || null}, ${m.householdId || null}, ${m.status || "confirmed"}, ${m.formSubmissionId || null}, ${m.notes || null}, ${m.registeredDate || null}, ${m.cancelledDate || null}
+        WHERE (SELECT COUNT(*) FROM registrations WHERE "eventId" = ${m.eventId} AND "churchId" = ${m.churchId} AND status IN ('pending','confirmed')) < ${capacity}
+      `);
+      affectedRows = Array.isArray(result) ? result.length : 0;
+    } else {
+      const result: any = await (this.db as any).execute(sql`
+        INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate)
+        SELECT ${m.id}, ${m.churchId}, ${m.eventId}, ${m.personId || null}, ${m.householdId || null}, ${m.status || "confirmed"}, ${m.formSubmissionId || null}, ${m.notes || null}, ${m.registeredDate || null}, ${m.cancelledDate || null}
+        FROM dual
+        WHERE (SELECT COUNT(*) FROM registrations WHERE eventId = ${m.eventId} AND churchId = ${m.churchId} AND status IN ('pending','confirmed')) < ${capacity}
+      `);
+      const rows: any = Array.isArray(result) ? result[0] : result;
+      affectedRows = rows?.affectedRows ?? 0;
+    }
     if (affectedRows > 0) {
       registration.id = m.id;
       return true;

@@ -5,6 +5,7 @@ import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { sessions } from "../../../db/schema/attendance.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Session } from "../models/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 /**
  * Normalize a date-only value to midnight UTC Date.
@@ -63,6 +64,20 @@ export class SessionRepo extends DrizzleRepo<typeof sessions> {
   }
 
   public async loadByGroupIdWithNames(churchId: string, groupId: string) {
+    if (getDialect() === "postgres") {
+      const rows = await this.executeRows(sql`
+        SELECT s.id,
+          CASE
+            WHEN st.name IS NULL THEN to_char(s."sessionDate", 'MM/DD/YYYY')
+            ELSE concat(to_char(s."sessionDate", 'MM/DD/YYYY'), ' - ', st.name)
+          END AS "displayName"
+        FROM sessions s
+        LEFT OUTER JOIN "serviceTimes" st ON st.id = s."serviceTimeId"
+        WHERE s."churchId" = ${churchId} AND s."groupId" = ${groupId}
+        ORDER BY s."sessionDate" DESC
+      `);
+      return this.convertAllToModel(churchId, rows);
+    }
     const rows = await this.executeRows(sql`
       SELECT s.id,
         CASE

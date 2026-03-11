@@ -6,6 +6,7 @@ import { people } from "../../../db/schema/membership.js";
 import { Person } from "../models/index.js";
 import { DateHelper, PersonHelper } from "../helpers/index.js";
 import { CollectionHelper } from "../../../shared/helpers/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class PersonRepo extends DrizzleRepo<typeof people> {
@@ -138,6 +139,13 @@ export class PersonRepo extends DrizzleRepo<typeof people> {
   }
 
   public async loadRecent(churchId: string, filterOptedOut?: boolean) {
+    if (getDialect() === "postgres") {
+      const filter = filterOptedOut ? sql` AND ("optedOut" = FALSE OR "optedOut" IS NULL)` : sql``;
+      const rows = await this.executeRows(sql`
+        SELECT * FROM (SELECT * FROM people WHERE "churchId"=${churchId} AND removed=false${filter} ORDER BY id DESC LIMIT 25) people ORDER BY "lastName", "firstName"
+      `);
+      return rows.map(r => this.rowToModel(r));
+    }
     const filter = filterOptedOut ? sql` AND (optedOut = FALSE OR optedOut IS NULL)` : sql``;
     const rows = await this.executeRows(sql`
       SELECT * FROM (SELECT * FROM people WHERE churchId=${churchId} AND removed=0${filter} ORDER BY id DESC LIMIT 25) people ORDER BY lastName, firstName
@@ -153,6 +161,15 @@ export class PersonRepo extends DrizzleRepo<typeof people> {
 
   public async search(churchId: string, term: string, filterOptedOut?: boolean) {
     const searchTerm = "%" + term.replace(" ", "%") + "%";
+    if (getDialect() === "postgres") {
+      const filter = filterOptedOut ? sql` AND ("optedOut" = FALSE OR "optedOut" IS NULL)` : sql``;
+      const rows = await this.executeRows(sql`
+        SELECT * FROM people WHERE "churchId"=${churchId}
+        AND concat(COALESCE("firstName",''), ' ', COALESCE("middleName",''), ' ', COALESCE("nickName",''), ' ', COALESCE("lastName",''), ' ', COALESCE("donorNumber",'')) ILIKE ${searchTerm}
+        AND removed=false${filter} LIMIT 100
+      `);
+      return rows.map(r => this.rowToModel(r));
+    }
     const filter = filterOptedOut ? sql` AND (optedOut = FALSE OR optedOut IS NULL)` : sql``;
     const rows = await this.executeRows(sql`
       SELECT * FROM people WHERE churchId=${churchId}
@@ -164,6 +181,16 @@ export class PersonRepo extends DrizzleRepo<typeof people> {
 
   public async searchPhone(churchId: string, phonestring: string) {
     const phoneSearch = "%" + phonestring.replace(/ |-/g, "%") + "%";
+    if (getDialect() === "postgres") {
+      const rows = await this.executeRows(sql`
+        SELECT * FROM people WHERE "churchId"=${churchId}
+        AND (REPLACE(REPLACE("homePhone",'-',''), ' ', '') LIKE ${phoneSearch}
+          OR REPLACE(REPLACE("workPhone",'-',''), ' ', '') LIKE ${phoneSearch}
+          OR REPLACE(REPLACE("mobilePhone",'-',''), ' ', '') LIKE ${phoneSearch})
+        AND removed=false LIMIT 100
+      `);
+      return rows.map(r => this.rowToModel(r));
+    }
     const rows = await this.executeRows(sql`
       SELECT * FROM people WHERE churchId=${churchId}
       AND (REPLACE(REPLACE(HomePhone,'-',''), ' ', '') LIKE ${phoneSearch}
@@ -195,8 +222,24 @@ export class PersonRepo extends DrizzleRepo<typeof people> {
     if (!UniqueIdHelper.isMissing(groupId)) conditions.push(sql`g.id=${groupId}`);
 
     const whereClause = sql.join(conditions, sql` AND `);
+    if (getDialect() === "postgres") {
+      const rows = await this.executeRows(sql`
+        SELECT p.id, p."churchId", p."displayName", p."firstName", p."lastName", p."photoUpdated"
+        FROM "visitSessions" vs
+        INNER JOIN visits v on v.id = vs."visitId"
+        INNER JOIN sessions s on s.id = vs."sessionId"
+        INNER JOIN people p on p.id = v."personId"
+        INNER JOIN "groups" g on g.id = s."groupId"
+        LEFT OUTER JOIN "serviceTimes" st on st.id = s."serviceTimeId"
+        LEFT OUTER JOIN services ser on ser.id = st."serviceId"
+        WHERE ${whereClause}
+        GROUP BY p.id, p."displayName", p."firstName", p."lastName", p."photoUpdated"
+        ORDER BY p."lastName", p."firstName"
+      `);
+      return rows.map(r => this.rowToModel(r));
+    }
     const rows = await this.executeRows(sql`
-      SELECT p.Id, p.churchId, p.displayName, p.firstName, p.lastName, p.photoUpdated
+      SELECT p.id, p.churchId, p.displayName, p.firstName, p.lastName, p.photoUpdated
       FROM visitSessions vs
       INNER JOIN visits v on v.id = vs.visitId
       INNER JOIN sessions s on s.id = vs.sessionId

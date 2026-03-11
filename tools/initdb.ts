@@ -1,10 +1,12 @@
 import { Environment } from "../src/shared/helpers/Environment.js";
 import { ConnectionManager } from "../src/shared/infrastructure/ConnectionManager.js";
 import { MultiDatabasePool } from "../src/shared/infrastructure/MultiDatabasePool.js";
+import { getDialect } from "../src/shared/helpers/Dialect.js";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import mysql from "mysql2/promise";
+import postgres from "postgres";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -380,6 +382,7 @@ async function initializeSection(moduleName: string, sectionName: string, tables
 
     // Split SQL file by statements and handle various SQL delimiters
     const statements = splitSqlStatements(sql);
+    const isPg = getDialect() === "postgres";
 
     for (const statement of statements) {
       const cleanStatement = statement.trim();
@@ -387,11 +390,19 @@ async function initializeSection(moduleName: string, sectionName: string, tables
         try {
           // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
           const upperStatement = cleanStatement.toUpperCase();
-          if (upperStatement.startsWith('CREATE PROCEDURE') ||
+          const isStoredProc = upperStatement.startsWith('CREATE PROCEDURE') ||
             upperStatement.startsWith('CREATE FUNCTION') ||
             upperStatement.startsWith('DROP PROCEDURE') ||
             upperStatement.startsWith('DROP FUNCTION') ||
-            upperStatement.includes('CREATE DEFINER')) {
+            upperStatement.includes('CREATE DEFINER');
+
+          // Skip MySQL stored procedures on PostgreSQL — they're inlined in repo code
+          if (isPg && isStoredProc) {
+            console.log(`   ⏭️  Skipping MySQL stored procedure (PG mode)`);
+            continue;
+          }
+
+          if (isStoredProc) {
             await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
           } else {
             await MultiDatabasePool.query(moduleName, cleanStatement);
@@ -426,18 +437,25 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
 
     const sql = fs.readFileSync(filePath, 'utf8');
     const statements = splitSqlStatements(sql);
+    const isPg = getDialect() === "postgres";
 
     for (const statement of statements) {
       const cleanStatement = statement.trim();
       if (cleanStatement && !cleanStatement.startsWith('--')) {
         try {
-          // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
           const upperStatement = cleanStatement.toUpperCase();
-          if (upperStatement.startsWith('CREATE PROCEDURE') ||
+          const isStoredProc = upperStatement.startsWith('CREATE PROCEDURE') ||
             upperStatement.startsWith('CREATE FUNCTION') ||
             upperStatement.startsWith('DROP PROCEDURE') ||
             upperStatement.startsWith('DROP FUNCTION') ||
-            upperStatement.includes('CREATE DEFINER')) {
+            upperStatement.includes('CREATE DEFINER');
+
+          if (isPg && isStoredProc) {
+            console.log(`   ⏭️  Skipping MySQL stored procedure (PG mode)`);
+            continue;
+          }
+
+          if (isStoredProc) {
             await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
           } else {
             await MultiDatabasePool.query(moduleName, cleanStatement);
@@ -453,6 +471,9 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
 }
 
 async function ensureDatabaseExists(moduleName: string, dbConfig: any) {
+  if (getDialect() === "postgres") {
+    return ensurePgSchemaExists(moduleName, dbConfig);
+  }
   // Connect without specifying database to create it if needed
   const connection = await mysql.createConnection({
     host: dbConfig.host,
@@ -470,6 +491,28 @@ async function ensureDatabaseExists(moduleName: string, dbConfig: any) {
     throw error;
   } finally {
     await connection.end();
+  }
+}
+
+async function ensurePgSchemaExists(moduleName: string, dbConfig: any) {
+  const client = postgres({
+    host: dbConfig.host,
+    port: dbConfig.port || 5432,
+    user: dbConfig.user,
+    password: dbConfig.password,
+    database: dbConfig.database,
+  });
+
+  try {
+    console.log(`   🏗️  Ensuring schema '${moduleName}' exists in database '${dbConfig.database}'...`);
+    await client.unsafe(`CREATE SCHEMA IF NOT EXISTS ${moduleName}`);
+    await client.unsafe(`SET search_path TO ${moduleName}, public`);
+    console.log(`   ✅ Schema '${moduleName}' ready`);
+  } catch (error) {
+    console.error(`   ❌ Failed to ensure schema exists for ${moduleName}:`, error);
+    throw error;
+  } finally {
+    await client.end();
   }
 }
 
@@ -579,6 +622,9 @@ async function resetDatabases(options: InitOptions = {}) {
 }
 
 async function resetModuleDatabase(moduleName: string, dbConfig: any) {
+  if (getDialect() === "postgres") {
+    return resetPgSchema(moduleName, dbConfig);
+  }
   const connection = await mysql.createConnection({
     host: dbConfig.host,
     user: dbConfig.user,
@@ -599,6 +645,31 @@ async function resetModuleDatabase(moduleName: string, dbConfig: any) {
     throw error;
   } finally {
     await connection.end();
+  }
+}
+
+async function resetPgSchema(moduleName: string, dbConfig: any) {
+  const client = postgres({
+    host: dbConfig.host,
+    port: dbConfig.port || 5432,
+    user: dbConfig.user,
+    password: dbConfig.password,
+    database: dbConfig.database,
+  });
+
+  try {
+    console.log(`   🗑️  Dropping schema '${moduleName}'...`);
+    await client.unsafe(`DROP SCHEMA IF EXISTS ${moduleName} CASCADE`);
+
+    console.log(`   🏗️  Creating schema '${moduleName}'...`);
+    await client.unsafe(`CREATE SCHEMA ${moduleName}`);
+
+    console.log(`   ✅ ${moduleName} schema reset completed`);
+  } catch (error) {
+    console.error(`   ❌ Failed to reset ${moduleName} schema:`, error);
+    throw error;
+  } finally {
+    await client.end();
   }
 }
 

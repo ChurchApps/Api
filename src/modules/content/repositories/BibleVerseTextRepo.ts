@@ -4,6 +4,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { bibleVerseTexts } from "../../../db/schema/content.js";
 import { BibleVerseText } from "../models/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class BibleVerseTextRepo extends GlobalDrizzleRepo<typeof bibleVerseTexts> {
@@ -12,7 +13,7 @@ export class BibleVerseTextRepo extends GlobalDrizzleRepo<typeof bibleVerseTexts
 
   public async save(model: any) {
     if (!model.id) model.id = UniqueIdHelper.shortId();
-    await this.db.insert(bibleVerseTexts).values({
+    const values = {
       id: model.id,
       translationKey: model.translationKey,
       verseKey: model.verseKey,
@@ -21,7 +22,19 @@ export class BibleVerseTextRepo extends GlobalDrizzleRepo<typeof bibleVerseTexts
       verseNumber: model.verseNumber,
       content: model.content,
       newParagraph: model.newParagraph
-    }).onDuplicateKeyUpdate({ set: { content: sql`VALUES(content)`, newParagraph: sql`VALUES(newParagraph)` } });
+    };
+    if (getDialect() === "postgres") {
+      // PG: INSERT ... ON CONFLICT DO UPDATE (uses unique index on translationKey+verseKey)
+      await (this.db as any).insert(bibleVerseTexts).values(values)
+        .onConflictDoUpdate({
+          target: [bibleVerseTexts.translationKey, bibleVerseTexts.verseKey],
+          set: { content: sql`EXCLUDED.content`, newParagraph: sql`EXCLUDED."newParagraph"` }
+        });
+    } else {
+      // MySQL: INSERT ... ON DUPLICATE KEY UPDATE
+      await (this.db as any).insert(bibleVerseTexts).values(values)
+        .onDuplicateKeyUpdate({ set: { content: sql`VALUES(content)`, newParagraph: sql`VALUES(newParagraph)` } });
+    }
     return model;
   }
 

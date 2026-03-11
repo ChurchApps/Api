@@ -5,6 +5,7 @@ import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js
 import { churches } from "../../../db/schema/membership.js";
 import { Church, Api, LoginUserChurch } from "../models/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
@@ -92,12 +93,22 @@ export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
   }
 
   public async loadForUser(userId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT c.*, p.id AS personId, p.membershipStatus FROM userChurches uc
-      INNER JOIN churches c ON c.id = uc.churchId AND c.archivedDate IS NULL
-      LEFT JOIN people p ON p.id = uc.personId AND (p.removed = 0 OR p.removed IS NULL)
-      WHERE uc.userId = ${userId}
-    `);
+    let rows: any[];
+    if (getDialect() === "postgres") {
+      rows = await this.executeRows(sql`
+        SELECT c.*, p.id AS "personId", p."membershipStatus" FROM "userChurches" uc
+        INNER JOIN churches c ON c.id = uc."churchId" AND c."archivedDate" IS NULL
+        LEFT JOIN people p ON p.id = uc."personId" AND (p.removed = false OR p.removed IS NULL)
+        WHERE uc."userId" = ${userId}
+      `);
+    } else {
+      rows = await this.executeRows(sql`
+        SELECT c.*, p.id AS personId, p.membershipStatus FROM userChurches uc
+        INNER JOIN churches c ON c.id = uc.churchId AND c.archivedDate IS NULL
+        LEFT JOIN people p ON p.id = uc.personId AND (p.removed = 0 OR p.removed IS NULL)
+        WHERE uc.userId = ${userId}
+      `);
+    }
     const result: LoginUserChurch[] = [];
     rows.forEach((row: any) => {
       const apis: Api[] = [];
@@ -127,6 +138,13 @@ export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
 
   public async getAbandoned(noMonths = 6) {
     const cutoff = DateHelper.monthsFromNow(-noMonths);
+    if (getDialect() === "postgres") {
+      return this.executeRows(sql`
+        SELECT "churchId" FROM (
+          SELECT "churchId", MAX("lastAccessed") AS "lastAccessed" FROM "userChurches" GROUP BY "churchId"
+        ) "groupedChurches" WHERE "lastAccessed" <= ${cutoff}
+      `);
+    }
     return this.executeRows(sql`
       SELECT churchId FROM (
         SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId
@@ -135,7 +153,17 @@ export class ChurchRepo extends GlobalDrizzleRepo<typeof churches> {
   }
 
   public async deleteAbandoned(noMonths = 7) {
-    return this.db.execute(sql`
+    if (getDialect() === "postgres") {
+      return (this.db as any).execute(sql`
+        DELETE FROM churches WHERE id IN (
+          SELECT c.id FROM churches c LEFT JOIN (
+            SELECT "churchId", MAX("lastAccessed") AS "lastAccessed" FROM "userChurches" GROUP BY "churchId"
+          ) gc ON c.id = gc."churchId"
+          WHERE gc."lastAccessed" <= NOW() - INTERVAL '${sql.raw(String(noMonths))} months'
+        )
+      `);
+    }
+    return (this.db as any).execute(sql`
       DELETE churches FROM churches LEFT JOIN (
         SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId
       ) groupedChurches ON churches.id = groupedChurches.churchId

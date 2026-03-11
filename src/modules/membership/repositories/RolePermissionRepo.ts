@@ -4,6 +4,7 @@ import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { rolePermissions, churches } from "../../../db/schema/membership.js";
 import { RolePermission, Api, LoginUserChurch } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class RolePermissionRepo extends DrizzleRepo<typeof rolePermissions> {
@@ -15,19 +16,36 @@ export class RolePermissionRepo extends DrizzleRepo<typeof rolePermissions> {
   }
 
   public async loadForUser(userId: string, removeUniversal: boolean): Promise<LoginUserChurch[]> {
-    const data = await this.executeRows(sql`
-      SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action,
-        p.id AS personId, p.membershipStatus, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country
-      FROM roleMembers rm
-      INNER JOIN roles r on r.id=rm.roleId
-      INNER JOIN rolePermissions rp on (rp.roleId=r.id or (rp.roleId IS NULL AND rp.churchId=rm.churchId))
-      LEFT JOIN churches c on c.id=r.churchId
-      LEFT JOIN userChurches uc on uc.churchId=r.churchId AND uc.userId = rm.userId
-      LEFT JOIN people p on p.id = uc.personId AND p.churchId=uc.churchId AND (p.removed=0 OR p.removed IS NULL)
-      WHERE rm.userId=${userId}
-      GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate
-      ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate
-    `);
+    let data: any[];
+    if (getDialect() === "postgres") {
+      data = await this.executeRows(sql`
+        SELECT c.name AS "churchName", r."churchId", c."subDomain", rp."apiName", rp."contentType", rp."contentId", rp.action,
+          p.id AS "personId", p."membershipStatus", c."archivedDate", c.address1, c.address2, c.city, c.state, c.zip, c.country
+        FROM "roleMembers" rm
+        INNER JOIN roles r on r.id=rm."roleId"
+        INNER JOIN "rolePermissions" rp on (rp."roleId"=r.id or (rp."roleId" IS NULL AND rp."churchId"=rm."churchId"))
+        LEFT JOIN churches c on c.id=r."churchId"
+        LEFT JOIN "userChurches" uc on uc."churchId"=r."churchId" AND uc."userId" = rm."userId"
+        LEFT JOIN people p on p.id = uc."personId" AND p."churchId"=uc."churchId" AND (p.removed=false OR p.removed IS NULL)
+        WHERE rm."userId"=${userId}
+        GROUP BY c.name, r."churchId", c."subDomain", rp."apiName", rp."contentType", rp."contentId", rp.action, p.id, p."membershipStatus", c."archivedDate", c.address1, c.address2, c.city, c.state, c.zip, c.country
+        ORDER BY c.name, r."churchId", rp."apiName", rp."contentType", rp."contentId", rp.action, p.id, p."membershipStatus", c."archivedDate"
+      `);
+    } else {
+      data = await this.executeRows(sql`
+        SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action,
+          p.id AS personId, p.membershipStatus, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country
+        FROM roleMembers rm
+        INNER JOIN roles r on r.id=rm.roleId
+        INNER JOIN rolePermissions rp on (rp.roleId=r.id or (rp.roleId IS NULL AND rp.churchId=rm.churchId))
+        LEFT JOIN churches c on c.id=r.churchId
+        LEFT JOIN userChurches uc on uc.churchId=r.churchId AND uc.userId = rm.userId
+        LEFT JOIN people p on p.id = uc.personId AND p.churchId=uc.churchId AND (p.removed=0 OR p.removed IS NULL)
+        WHERE rm.userId=${userId}
+        GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate
+        ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action, p.id, p.membershipStatus, c.archivedDate
+      `);
+    }
 
     const result: LoginUserChurch[] = [];
     let currentUserChurch: LoginUserChurch = null;
@@ -78,16 +96,30 @@ export class RolePermissionRepo extends DrizzleRepo<typeof rolePermissions> {
   }
 
   public async loadForChurch(churchId: string, univeralChurch: LoginUserChurch): Promise<LoginUserChurch> {
-    const data = await this.executeRows(sql`
-      SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action,
-        c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country
-      FROM roles r
-      INNER JOIN rolePermissions rp on rp.roleId=r.id
-      LEFT JOIN churches c on c.id=r.churchId
-      WHERE c.id=${churchId}
-      GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
-      ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
-    `);
+    let data: any[];
+    if (getDialect() === "postgres") {
+      data = await this.executeRows(sql`
+        SELECT c.name AS "churchName", r."churchId", c."subDomain", rp."apiName", rp."contentType", rp."contentId", rp.action,
+          c."archivedDate", c.address1, c.address2, c.city, c.state, c.zip, c.country
+        FROM roles r
+        INNER JOIN "rolePermissions" rp on rp."roleId"=r.id
+        LEFT JOIN churches c on c.id=r."churchId"
+        WHERE c.id=${churchId}
+        GROUP BY c.name, r."churchId", c."subDomain", rp."apiName", rp."contentType", rp."contentId", rp.action, c."archivedDate", c.address1, c.address2, c.city, c.state, c.zip, c.country
+        ORDER BY c.name, r."churchId", rp."apiName", rp."contentType", rp."contentId", rp.action
+      `);
+    } else {
+      data = await this.executeRows(sql`
+        SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action,
+          c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country
+        FROM roles r
+        INNER JOIN rolePermissions rp on rp.roleId=r.id
+        LEFT JOIN churches c on c.id=r.churchId
+        WHERE c.id=${churchId}
+        GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
+        ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
+      `);
+    }
 
     let result: LoginUserChurch = null;
     let currentApi: Api = null;
@@ -137,17 +169,32 @@ export class RolePermissionRepo extends DrizzleRepo<typeof rolePermissions> {
   }
 
   public async loadUserPermissionInChurch(userId: string, churchId: string) {
-    const data = await this.executeRows(sql`
-      SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action,
-        c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country
-      FROM roleMembers rm
-      INNER JOIN roles r on r.id=rm.roleId
-      INNER JOIN rolePermissions rp on (rp.roleId=r.id or (rp.roleId IS NULL AND rp.churchId=rm.churchId))
-      LEFT JOIN churches c on c.id=r.churchId
-      WHERE rm.userId=${userId} AND rm.churchId=${churchId}
-      GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
-      ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
-    `);
+    let data: any[];
+    if (getDialect() === "postgres") {
+      data = await this.executeRows(sql`
+        SELECT c.name AS "churchName", r."churchId", c."subDomain", rp."apiName", rp."contentType", rp."contentId", rp.action,
+          c."archivedDate", c.address1, c.address2, c.city, c.state, c.zip, c.country
+        FROM "roleMembers" rm
+        INNER JOIN roles r on r.id=rm."roleId"
+        INNER JOIN "rolePermissions" rp on (rp."roleId"=r.id or (rp."roleId" IS NULL AND rp."churchId"=rm."churchId"))
+        LEFT JOIN churches c on c.id=r."churchId"
+        WHERE rm."userId"=${userId} AND rm."churchId"=${churchId}
+        GROUP BY c.name, r."churchId", c."subDomain", rp."apiName", rp."contentType", rp."contentId", rp.action, c."archivedDate", c.address1, c.address2, c.city, c.state, c.zip, c.country
+        ORDER BY c.name, r."churchId", rp."apiName", rp."contentType", rp."contentId", rp.action
+      `);
+    } else {
+      data = await this.executeRows(sql`
+        SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action,
+          c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country
+        FROM roleMembers rm
+        INNER JOIN roles r on r.id=rm.roleId
+        INNER JOIN rolePermissions rp on (rp.roleId=r.id or (rp.roleId IS NULL AND rp.churchId=rm.churchId))
+        LEFT JOIN churches c on c.id=r.churchId
+        WHERE rm.userId=${userId} AND rm.churchId=${churchId}
+        GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
+        ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action
+      `);
+    }
 
     let result: LoginUserChurch = null;
     let currentApi: Api = null;

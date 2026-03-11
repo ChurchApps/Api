@@ -5,6 +5,7 @@ import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { groupMembers } from "../../../db/schema/membership.js";
 import { GroupMember } from "../models/index.js";
 import { PersonHelper } from "../helpers/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class GroupMemberRepo extends DrizzleRepo<typeof groupMembers> {
@@ -29,61 +30,105 @@ export class GroupMemberRepo extends DrizzleRepo<typeof groupMembers> {
   }
 
   public async loadForGroup(churchId: string, groupId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT gm.*,
-        p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, p.optedOut,
-        p.address1, p.address2, p.city, p.state, p.zip,
-        p.householdId, p.householdRole
-      FROM groupMembers gm
-      INNER JOIN people p ON p.id = gm.personId AND (p.removed = 0 OR p.removed IS NULL)
-      WHERE gm.churchId = ${churchId} AND gm.groupId = ${groupId}
-      ORDER BY gm.leader DESC, p.lastName, p.firstName
-    `);
+    const rows = await this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT gm.*,
+            p."photoUpdated", p."displayName", p.email, p."homePhone", p."mobilePhone", p."workPhone", p."optedOut",
+            p.address1, p.address2, p.city, p.state, p.zip,
+            p."householdId", p."householdRole"
+          FROM "groupMembers" gm
+          INNER JOIN people p ON p.id = gm."personId" AND (p.removed = false OR p.removed IS NULL)
+          WHERE gm."churchId" = ${churchId} AND gm."groupId" = ${groupId}
+          ORDER BY gm.leader DESC, p."lastName", p."firstName"`
+        : sql`
+          SELECT gm.*,
+            p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, p.optedOut,
+            p.address1, p.address2, p.city, p.state, p.zip,
+            p.householdId, p.householdRole
+          FROM groupMembers gm
+          INNER JOIN people p ON p.id = gm.personId AND (p.removed = 0 OR p.removed IS NULL)
+          WHERE gm.churchId = ${churchId} AND gm.groupId = ${groupId}
+          ORDER BY gm.leader DESC, p.lastName, p.firstName`
+    );
     return rows.map((r: any) => this.rowToModel(r));
   }
 
   public async loadLeadersForGroup(churchId: string, groupId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT gm.*, p.photoUpdated, p.displayName
-      FROM groupMembers gm
-      INNER JOIN people p ON p.id = gm.personId AND (p.removed = 0 OR p.removed IS NULL)
-      WHERE gm.churchId = ${churchId} AND gm.groupId = ${groupId} AND gm.leader = 1
-      ORDER BY p.lastName, p.firstName
-    `);
+    const rows = await this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT gm.*, p."photoUpdated", p."displayName"
+          FROM "groupMembers" gm
+          INNER JOIN people p ON p.id = gm."personId" AND (p.removed = false OR p.removed IS NULL)
+          WHERE gm."churchId" = ${churchId} AND gm."groupId" = ${groupId} AND gm.leader = true
+          ORDER BY p."lastName", p."firstName"`
+        : sql`
+          SELECT gm.*, p.photoUpdated, p.displayName
+          FROM groupMembers gm
+          INNER JOIN people p ON p.id = gm.personId AND (p.removed = 0 OR p.removed IS NULL)
+          WHERE gm.churchId = ${churchId} AND gm.groupId = ${groupId} AND gm.leader = 1
+          ORDER BY p.lastName, p.firstName`
+    );
     return rows.map((r: any) => this.rowToModel(r));
   }
 
   public async loadForGroups(churchId: string, groupIds: string[]) {
     if (groupIds.length === 0) return [];
-    const rows = await this.executeRows(sql`
-      SELECT gm.*, p.photoUpdated, p.displayName, p.email
-      FROM groupMembers gm
-      INNER JOIN people p ON p.id = gm.personId AND (p.removed = 0 OR p.removed IS NULL)
-      WHERE gm.churchId = ${churchId} AND gm.groupId IN (${sql.join(groupIds.map(id => sql`${id}`), sql`, `)})
-      ORDER BY gm.leader DESC, p.lastName, p.firstName
-    `);
+    const idList = sql.join(groupIds.map(id => sql`${id}`), sql`, `);
+    const rows = await this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT gm.*, p."photoUpdated", p."displayName", p.email
+          FROM "groupMembers" gm
+          INNER JOIN people p ON p.id = gm."personId" AND (p.removed = false OR p.removed IS NULL)
+          WHERE gm."churchId" = ${churchId} AND gm."groupId" IN (${idList})
+          ORDER BY gm.leader DESC, p."lastName", p."firstName"`
+        : sql`
+          SELECT gm.*, p.photoUpdated, p.displayName, p.email
+          FROM groupMembers gm
+          INNER JOIN people p ON p.id = gm.personId AND (p.removed = 0 OR p.removed IS NULL)
+          WHERE gm.churchId = ${churchId} AND gm.groupId IN (${idList})
+          ORDER BY gm.leader DESC, p.lastName, p.firstName`
+    );
     return rows.map((r: any) => this.rowToModel(r));
   }
 
   public async loadForPerson(churchId: string, personId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT gm.*, g.name AS groupName
-      FROM groupMembers gm
-      INNER JOIN \`groups\` g ON g.id = gm.groupId
-      WHERE gm.churchId = ${churchId} AND gm.personId = ${personId} AND g.removed = 0
-      ORDER BY g.name
-    `);
+    const rows = await this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT gm.*, g.name AS "groupName"
+          FROM "groupMembers" gm
+          INNER JOIN "groups" g ON g.id = gm."groupId"
+          WHERE gm."churchId" = ${churchId} AND gm."personId" = ${personId} AND g.removed = false
+          ORDER BY g.name`
+        : sql`
+          SELECT gm.*, g.name AS groupName
+          FROM groupMembers gm
+          INNER JOIN \`groups\` g ON g.id = gm.groupId
+          WHERE gm.churchId = ${churchId} AND gm.personId = ${personId} AND g.removed = 0
+          ORDER BY g.name`
+    );
     return rows.map((r: any) => this.rowToModel(r));
   }
 
   public loadForPeople(peopleIds: string[]) {
     if (peopleIds.length === 0) return Promise.resolve([]);
-    return this.executeRows(sql`
-      SELECT gm.*, g.name, g.tags
-      FROM groupMembers gm
-      INNER JOIN \`groups\` g ON g.id = gm.groupId
-      WHERE gm.personId IN (${sql.join(peopleIds.map(id => sql`${id}`), sql`, `)})
-    `);
+    const idList = sql.join(peopleIds.map(id => sql`${id}`), sql`, `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT gm.*, g.name, g.tags
+          FROM "groupMembers" gm
+          INNER JOIN "groups" g ON g.id = gm."groupId"
+          WHERE gm."personId" IN (${idList})`
+        : sql`
+          SELECT gm.*, g.name, g.tags
+          FROM groupMembers gm
+          INNER JOIN \`groups\` g ON g.id = gm.groupId
+          WHERE gm.personId IN (${idList})`
+    );
   }
 
   private rowToModel(row: any): GroupMember {

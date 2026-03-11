@@ -4,6 +4,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { groups, groupMembers } from "../../../db/schema/membership.js";
 import { Group } from "../models/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class GroupRepo extends DrizzleRepo<typeof groups> {
@@ -186,6 +187,21 @@ export class GroupRepo extends DrizzleRepo<typeof groups> {
   }
 
   public search(churchId: string, campusId: string, serviceId: string, serviceTimeId: string) {
+    if (getDialect() === "postgres") {
+      return this.executeRows(sql`
+        SELECT g.id, g."categoryName", g.name
+        FROM "groups" g
+        LEFT OUTER JOIN "groupServiceTimes" gst ON gst."groupId" = g.id
+        LEFT OUTER JOIN "serviceTimes" st ON st.id = gst."serviceTimeId"
+        LEFT OUTER JOIN services s ON s.id = st."serviceId"
+        WHERE g."churchId" = ${churchId}
+          AND (${serviceTimeId} = '0' OR gst."serviceTimeId" = ${serviceTimeId})
+          AND (${serviceId} = '0' OR st."serviceId" = ${serviceId})
+          AND (${campusId} = '0' OR s."campusId" = ${campusId})
+          AND g.removed = false
+        GROUP BY g.id, g."categoryName", g.name ORDER BY g.name
+      `);
+    }
     return this.executeRows(sql`
       SELECT g.id, g.categoryName, g.name
       FROM \`groups\` g

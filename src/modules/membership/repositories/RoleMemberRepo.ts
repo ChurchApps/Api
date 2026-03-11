@@ -4,6 +4,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { roleMembers } from "../../../db/schema/membership.js";
 import { RoleMember } from "../models/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class RoleMemberRepo extends DrizzleRepo<typeof roleMembers> {
@@ -23,12 +24,19 @@ export class RoleMemberRepo extends DrizzleRepo<typeof roleMembers> {
   }
 
   public loadByRoleId(roleId: string, churchId: string): Promise<RoleMember[]> {
-    return this.executeRows(sql`
-      SELECT rm.*, uc.personId FROM roleMembers rm
-      LEFT JOIN userChurches uc ON rm.userId=uc.userId AND rm.churchId=uc.churchId
-      WHERE roleId=${roleId} AND rm.churchId=${churchId}
-      ORDER BY rm.dateAdded
-    `) as Promise<RoleMember[]>;
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT rm.*, uc."personId" FROM "roleMembers" rm
+          LEFT JOIN "userChurches" uc ON rm."userId"=uc."userId" AND rm."churchId"=uc."churchId"
+          WHERE "roleId"=${roleId} AND rm."churchId"=${churchId}
+          ORDER BY rm."dateAdded"`
+        : sql`
+          SELECT rm.*, uc.personId FROM roleMembers rm
+          LEFT JOIN userChurches uc ON rm.userId=uc.userId AND rm.churchId=uc.churchId
+          WHERE roleId=${roleId} AND rm.churchId=${churchId}
+          ORDER BY rm.dateAdded`
+    ) as Promise<RoleMember[]>;
   }
 
   public loadById(id: string, churchId: string): Promise<RoleMember> {

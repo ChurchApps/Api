@@ -3,6 +3,7 @@ import { injectable } from "inversify";
 import { eq, and, asc, inArray, sql } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { elements } from "../../../db/schema/content.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class ElementRepo extends DrizzleRepo<typeof elements> {
@@ -56,13 +57,21 @@ export class ElementRepo extends DrizzleRepo<typeof elements> {
   }
 
   public async loadForPage(churchId: string, pageId: string): Promise<any[]> {
-    return this.executeRows(sql`
-      SELECT e.*
-      FROM elements e
-      INNER JOIN sections s ON s.id = e.sectionId
-      WHERE (s.pageId = ${pageId} OR (s.pageId IS NULL AND s.blockId IS NULL)) AND e.churchId = ${churchId}
-      ORDER BY e.sort
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT e.*
+          FROM elements e
+          INNER JOIN sections s ON s.id = e."sectionId"
+          WHERE (s."pageId" = ${pageId} OR (s."pageId" IS NULL AND s."blockId" IS NULL)) AND e."churchId" = ${churchId}
+          ORDER BY e.sort`
+        : sql`
+          SELECT e.*
+          FROM elements e
+          INNER JOIN sections s ON s.id = e.sectionId
+          WHERE (s.pageId = ${pageId} OR (s.pageId IS NULL AND s.blockId IS NULL)) AND e.churchId = ${churchId}
+          ORDER BY e.sort`
+    );
   }
 
   public async insert(model: any) {

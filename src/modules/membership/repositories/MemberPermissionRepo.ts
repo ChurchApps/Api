@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { eq, and, sql } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { memberPermissions } from "../../../db/schema/membership.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class MemberPermissionRepo extends DrizzleRepo<typeof memberPermissions> {
@@ -36,22 +37,38 @@ export class MemberPermissionRepo extends DrizzleRepo<typeof memberPermissions> 
   }
 
   public loadFormsByPerson(churchId: string, personId: string) {
-    return this.executeRows(sql`
-      SELECT mp.*, p.displayName AS personName
-      FROM memberPermissions mp
-      INNER JOIN people p ON p.id = mp.memberId AND (p.removed = 0 OR p.removed IS NULL)
-      WHERE mp.churchId = ${churchId} AND mp.memberId = ${personId}
-      ORDER BY mp.action, mp.emailNotification DESC
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT mp.*, p."displayName" AS "personName"
+          FROM "memberPermissions" mp
+          INNER JOIN people p ON p.id = mp."memberId" AND (p.removed = false OR p.removed IS NULL)
+          WHERE mp."churchId" = ${churchId} AND mp."memberId" = ${personId}
+          ORDER BY mp.action, mp."emailNotification" DESC`
+        : sql`
+          SELECT mp.*, p.displayName AS personName
+          FROM memberPermissions mp
+          INNER JOIN people p ON p.id = mp.memberId AND (p.removed = 0 OR p.removed IS NULL)
+          WHERE mp.churchId = ${churchId} AND mp.memberId = ${personId}
+          ORDER BY mp.action, mp.emailNotification DESC`
+    );
   }
 
   public loadPeopleByForm(churchId: string, formId: string) {
-    return this.executeRows(sql`
-      SELECT mp.*, p.displayName AS personName
-      FROM memberPermissions mp
-      INNER JOIN people p ON p.id = mp.memberId AND (p.removed = 0 OR p.removed IS NULL)
-      WHERE mp.churchId = ${churchId} AND mp.contentId = ${formId}
-      ORDER BY mp.action, mp.emailNotification DESC
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT mp.*, p."displayName" AS "personName"
+          FROM "memberPermissions" mp
+          INNER JOIN people p ON p.id = mp."memberId" AND (p.removed = false OR p.removed IS NULL)
+          WHERE mp."churchId" = ${churchId} AND mp."contentId" = ${formId}
+          ORDER BY mp.action, mp."emailNotification" DESC`
+        : sql`
+          SELECT mp.*, p.displayName AS personName
+          FROM memberPermissions mp
+          INNER JOIN people p ON p.id = mp.memberId AND (p.removed = 0 OR p.removed IS NULL)
+          WHERE mp.churchId = ${churchId} AND mp.contentId = ${formId}
+          ORDER BY mp.action, mp.emailNotification DESC`
+    );
   }
 }

@@ -6,6 +6,7 @@ import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { donations, fundDonations, funds } from "../../../db/schema/giving.js";
 import { Donation, DonationSummary } from "../models/index.js";
 import { CollectionHelper } from "../../../shared/helpers/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 /** Normalize a date-only value to midnight UTC Date for consistent storage. */
 function toDateOnly(val: any): Date | null {
@@ -90,7 +91,9 @@ export class DonationRepo extends DrizzleRepo<typeof donations> {
       .where(and(
         eq(donations.churchId, churchId),
         eq(donations.personId, personId),
-        sql`(${funds.taxDeductible} = 1 OR ${funds.taxDeductible} IS NULL)`
+        getDialect() === "postgres"
+          ? sql`(${funds.taxDeductible} = true OR ${funds.taxDeductible} IS NULL)`
+          : sql`(${funds.taxDeductible} = 1 OR ${funds.taxDeductible} IS NULL)`
       ))
       .orderBy(desc(donations.donationDate));
   }
@@ -138,6 +141,19 @@ export class DonationRepo extends DrizzleRepo<typeof donations> {
   public loadSummary(churchId: string, startDate: Date, endDate: Date) {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
+    if (getDialect() === "postgres") {
+      return this.executeRows(sql`
+        SELECT date_trunc('week', d."donationDate") AS week,
+          SUM(fd.amount) as "totalAmount", f.name as "fundName"
+        FROM donations d
+        INNER JOIN "fundDonations" fd ON fd."donationId" = d.id
+        INNER JOIN funds f ON f.id = fd."fundId" AND f."taxDeductible" = true
+        WHERE d."churchId" = ${churchId}
+          AND d."donationDate" BETWEEN ${sDate} AND ${eDate}
+        GROUP BY date_trunc('week', d."donationDate"), f.name
+        ORDER BY date_trunc('week', d."donationDate"), f.name
+      `);
+    }
     return this.executeRows(sql`
       SELECT STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W') AS week,
         SUM(fd.amount) as totalAmount, f.name as fundName

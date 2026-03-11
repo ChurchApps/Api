@@ -5,6 +5,7 @@ import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { forms } from "../../../db/schema/membership.js";
 import { Form } from "../models/index.js";
 import { DateHelper } from "../helpers/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class FormRepo extends DrizzleRepo<typeof forms> {
@@ -68,47 +69,71 @@ export class FormRepo extends DrizzleRepo<typeof forms> {
   }
 
   public loadNonMemberForms(churchId: string) {
-    return this.executeRows(sql`
-      SELECT * FROM forms WHERE contentType <> 'form' AND churchId = ${churchId} AND removed = 0 AND archived = 0
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`SELECT * FROM forms WHERE "contentType" <> 'form' AND "churchId" = ${churchId} AND removed = false AND archived = false`
+        : sql`SELECT * FROM forms WHERE contentType <> 'form' AND churchId = ${churchId} AND removed = 0 AND archived = 0`
+    );
   }
 
   public loadNonMemberArchivedForms(churchId: string) {
-    return this.executeRows(sql`
-      SELECT * FROM forms WHERE contentType <> 'form' AND churchId = ${churchId} AND removed = 0 AND archived = 1
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`SELECT * FROM forms WHERE "contentType" <> 'form' AND "churchId" = ${churchId} AND removed = false AND archived = true`
+        : sql`SELECT * FROM forms WHERE contentType <> 'form' AND churchId = ${churchId} AND removed = 0 AND archived = 1`
+    );
   }
 
   public loadMemberForms(churchId: string, personId: string) {
-    return this.executeRows(sql`
-      SELECT f.*, mp.action FROM forms f
-      LEFT JOIN memberPermissions mp ON mp.contentId = f.id
-      WHERE mp.memberId = ${personId} AND f.churchId = ${churchId} AND f.removed = 0 AND f.archived = 0
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT f.*, mp.action FROM forms f
+          LEFT JOIN "memberPermissions" mp ON mp."contentId" = f.id
+          WHERE mp."memberId" = ${personId} AND f."churchId" = ${churchId} AND f.removed = false AND f.archived = false`
+        : sql`
+          SELECT f.*, mp.action FROM forms f
+          LEFT JOIN memberPermissions mp ON mp.contentId = f.id
+          WHERE mp.memberId = ${personId} AND f.churchId = ${churchId} AND f.removed = 0 AND f.archived = 0`
+    );
   }
 
   public loadMemberArchivedForms(churchId: string, personId: string) {
-    return this.executeRows(sql`
-      SELECT f.* FROM forms f
-      LEFT JOIN memberPermissions mp ON mp.contentId = f.id
-      WHERE mp.memberId = ${personId} AND f.churchId = ${churchId} AND f.removed = 0 AND f.archived = 1
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT f.* FROM forms f
+          LEFT JOIN "memberPermissions" mp ON mp."contentId" = f.id
+          WHERE mp."memberId" = ${personId} AND f."churchId" = ${churchId} AND f.removed = false AND f.archived = true`
+        : sql`
+          SELECT f.* FROM forms f
+          LEFT JOIN memberPermissions mp ON mp.contentId = f.id
+          WHERE mp.memberId = ${personId} AND f.churchId = ${churchId} AND f.removed = 0 AND f.archived = 1`
+    );
   }
 
   public async loadWithMemberPermissions(churchId: string, formId: string, personId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT f.*, mp.action FROM forms f
-      LEFT JOIN memberPermissions mp ON mp.contentId = f.id
-      WHERE f.id = ${formId} AND f.churchId = ${churchId} AND mp.memberId = ${personId} AND f.removed = 0 AND archived = 0
-    `);
+    const rows = await this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT f.*, mp.action FROM forms f
+          LEFT JOIN "memberPermissions" mp ON mp."contentId" = f.id
+          WHERE f.id = ${formId} AND f."churchId" = ${churchId} AND mp."memberId" = ${personId} AND f.removed = false AND archived = false`
+        : sql`
+          SELECT f.*, mp.action FROM forms f
+          LEFT JOIN memberPermissions mp ON mp.contentId = f.id
+          WHERE f.id = ${formId} AND f.churchId = ${churchId} AND mp.memberId = ${personId} AND f.removed = 0 AND archived = 0`
+    );
     return rows[0] ?? null;
   }
 
 
   public async access(id: string) {
-    const rows = await this.executeRows(sql`
-      SELECT id, name, restricted, churchId FROM forms WHERE id = ${id} AND removed = 0 AND archived = 0
-    `);
+    const rows = await this.executeRows(
+      getDialect() === "postgres"
+        ? sql`SELECT id, name, restricted, "churchId" FROM forms WHERE id = ${id} AND removed = false AND archived = false`
+        : sql`SELECT id, name, restricted, churchId FROM forms WHERE id = ${id} AND removed = 0 AND archived = 0`
+    );
     return rows[0] ?? null;
   }
 }

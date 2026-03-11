@@ -3,6 +3,7 @@ import { eq, and, asc, like, sql } from "drizzle-orm";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { events } from "../../../db/schema/content.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class EventRepo extends DrizzleRepo<typeof events> {
@@ -31,6 +32,15 @@ export class EventRepo extends DrizzleRepo<typeof events> {
 
   public async loadTimelineGroup(churchId: string, groupId: string, eventIds: string[]): Promise<any[]> {
     const eventIdPlaceholders = eventIds.length > 0 ? sql` OR id IN (${sql.join(eventIds.map(id => sql`${id}`), sql`, `)})` : sql``;
+    if (getDialect() === "postgres") {
+      return this.executeRows(sql`
+        SELECT *, 'event' as "postType", id as "postId" FROM events
+        WHERE "churchId" = ${churchId} AND ((
+          "groupId" = ${groupId}
+          AND ("end" > ${DateHelper.startOfToday()} OR "recurrenceRule" IS NOT NULL)
+        )${eventIdPlaceholders})
+      `);
+    }
     return this.executeRows(sql`
       SELECT *, 'event' as postType, id as postId FROM events
       WHERE churchId = ${churchId} AND ((
@@ -43,6 +53,19 @@ export class EventRepo extends DrizzleRepo<typeof events> {
   public async loadTimeline(churchId: string, groupIds: string[], eventIds: string[]): Promise<any[]> {
     const groupIdPlaceholders = sql.join(groupIds.map(id => sql`${id}`), sql`, `);
     const eventIdFragment = eventIds.length > 0 ? sql` OR id IN (${sql.join(eventIds.map(id => sql`${id}`), sql`, `)})` : sql``;
+    if (getDialect() === "postgres") {
+      return this.executeRows(sql`
+        SELECT *, 'event' as "postType", id as "postId" FROM events
+        WHERE "churchId" = ${churchId} AND ((
+          (
+            "groupId" IN (${groupIdPlaceholders})
+            OR "groupId" IN (SELECT "groupId" FROM "curatedEvents" WHERE "churchId" = ${churchId} AND "eventId" IS NULL)
+            OR id IN (SELECT "eventId" FROM "curatedEvents" WHERE "churchId" = ${churchId})
+          )
+          AND ("end" > ${DateHelper.startOfToday()} OR "recurrenceRule" IS NOT NULL)
+        )${eventIdFragment})
+      `);
+    }
     return this.executeRows(sql`
       SELECT *, 'event' as postType, id as postId FROM events
       WHERE churchId = ${churchId} AND ((

@@ -5,6 +5,7 @@ import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { visits } from "../../../db/schema/attendance.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Visit } from "../models/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 /** Normalize a date-only value to midnight UTC Date for consistent storage. */
 function toDateOnly(val: any): Date | null {
@@ -50,13 +51,24 @@ export class VisitRepo extends DrizzleRepo<typeof visits> {
   }
 
   public async loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT v.*
-      FROM sessions s
-      LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId
-      INNER JOIN visits v ON (v.serviceId = st.serviceId OR v.groupId = s.groupId) AND v.visitDate = s.sessionDate
-      WHERE v.churchId = ${churchId} AND s.id = ${sessionId} AND v.personId = ${personId} LIMIT 1
-    `);
+    let rows: any[];
+    if (getDialect() === "postgres") {
+      rows = await this.executeRows(sql`
+        SELECT v.*
+        FROM sessions s
+        LEFT OUTER JOIN "serviceTimes" st ON st.id = s."serviceTimeId"
+        INNER JOIN visits v ON (v."serviceId" = st."serviceId" OR v."groupId" = s."groupId") AND v."visitDate" = s."sessionDate"
+        WHERE v."churchId" = ${churchId} AND s.id = ${sessionId} AND v."personId" = ${personId} LIMIT 1
+      `);
+    } else {
+      rows = await this.executeRows(sql`
+        SELECT v.*
+        FROM sessions s
+        LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId
+        INNER JOIN visits v ON (v.serviceId = st.serviceId OR v.groupId = s.groupId) AND v.visitDate = s.sessionDate
+        WHERE v.churchId = ${churchId} AND s.id = ${sessionId} AND v.personId = ${personId} LIMIT 1
+      `);
+    }
     return rows.length > 0 ? rows[0] : null;
   }
 
@@ -93,14 +105,26 @@ export class VisitRepo extends DrizzleRepo<typeof visits> {
 
   public async loadConsecutiveWeekStreaks(churchId: string, personIds: string[]): Promise<Record<string, number>> {
     if (personIds.length === 0) return {};
-    const rows: any[] = await this.executeRows(sql`
-      SELECT personId, YEARWEEK(visitDate, 3) AS yw
-      FROM visits
-      WHERE churchId = ${churchId}
-        AND personId IN (${sql.join(personIds.map(id => sql`${id}`), sql`, `)})
-      GROUP BY personId, yw
-      ORDER BY personId, yw DESC
-    `);
+    let rows: any[];
+    if (getDialect() === "postgres") {
+      rows = await this.executeRows(sql`
+        SELECT "personId", (EXTRACT(ISOYEAR FROM "visitDate")::integer * 100 + EXTRACT(WEEK FROM "visitDate")::integer) AS yw
+        FROM visits
+        WHERE "churchId" = ${churchId}
+          AND "personId" IN (${sql.join(personIds.map(id => sql`${id}`), sql`, `)})
+        GROUP BY "personId", yw
+        ORDER BY "personId", yw DESC
+      `);
+    } else {
+      rows = await this.executeRows(sql`
+        SELECT personId, YEARWEEK(visitDate, 3) AS yw
+        FROM visits
+        WHERE churchId = ${churchId}
+          AND personId IN (${sql.join(personIds.map(id => sql`${id}`), sql`, `)})
+        GROUP BY personId, yw
+        ORDER BY personId, yw DESC
+      `);
+    }
 
     const byPerson: Record<string, number[]> = {};
     for (const row of rows) {

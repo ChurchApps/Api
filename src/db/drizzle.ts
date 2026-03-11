@@ -1,24 +1,34 @@
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle as drizzleMysql } from "drizzle-orm/mysql2";
+import { drizzle as drizzlePg } from "drizzle-orm/postgres-js";
 import type { MySql2Database } from "drizzle-orm/mysql2";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { MultiDatabasePool } from "../shared/infrastructure/MultiDatabasePool.js";
+import { getDialect } from "../shared/helpers/Dialect.js";
 
+/** Union type for both database dialects */
+export type AnyDatabase = MySql2Database<any> | PostgresJsDatabase<any>;
 
-const instances = new Map<string, MySql2Database<any>>();
+const instances = new Map<string, AnyDatabase>();
 
 /**
  * Get a Drizzle ORM instance for a module's database.
- * Reuses the existing mysql2 pools from MultiDatabasePool — zero extra connections.
+ * Returns either a MySQL or PostgreSQL Drizzle instance based on DB_DIALECT.
  *
- * Note: boolean columns use Drizzle's boolean() which maps to tinyint(1).
+ * Note: boolean columns use Drizzle's boolean() which maps to tinyint(1) in MySQL.
  * The actual DB uses BIT(1), but MultiDatabasePool's typeCast converts BIT(1)
  * to JS booleans at the driver level, so Drizzle reads correct values.
- * For schema generation/migration, use drizzle-kit introspect to verify.
+ * For PostgreSQL, boolean columns are native — no typeCast needed.
  */
-export function getDrizzleDb(moduleName: string): MySql2Database {
+export function getDrizzleDb(moduleName: string): AnyDatabase {
   let db = instances.get(moduleName);
   if (!db) {
-    const pool = MultiDatabasePool.getPool(moduleName);
-    db = drizzle(pool);
+    if (getDialect() === "postgres") {
+      const client = MultiDatabasePool.getPgClient(moduleName);
+      db = drizzlePg(client);
+    } else {
+      const pool = MultiDatabasePool.getPool(moduleName);
+      db = drizzleMysql(pool);
+    }
     instances.set(moduleName, db);
   }
   return db;

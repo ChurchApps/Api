@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { privateMessages } from "../../../db/schema/messaging.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class PrivateMessageRepo extends DrizzleRepo<typeof privateMessages> {
@@ -9,14 +10,23 @@ export class PrivateMessageRepo extends DrizzleRepo<typeof privateMessages> {
   protected readonly moduleName = "messaging";
 
   public async loadByPersonId(churchId: string, personId: string): Promise<any[]> {
-    return this.executeRows(sql`
-      SELECT c.*, pm.id AS pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, pm.deliveryMethod, m.timeSent AS lastMessageTime
-      FROM privateMessages pm
-      INNER JOIN conversations c ON c.id = pm.conversationId
-      LEFT JOIN messages m ON m.id = c.lastPostId
-      WHERE pm.churchId = ${churchId} AND (pm.fromPersonId = ${personId} OR pm.toPersonId = ${personId})
-      ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC
-    `);
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT c.*, pm.id AS "pmId", pm."fromPersonId", pm."toPersonId", pm."notifyPersonId", pm."deliveryMethod", m."timeSent" AS "lastMessageTime"
+          FROM "privateMessages" pm
+          INNER JOIN conversations c ON c.id = pm."conversationId"
+          LEFT JOIN messages m ON m.id = c."lastPostId"
+          WHERE pm."churchId" = ${churchId} AND (pm."fromPersonId" = ${personId} OR pm."toPersonId" = ${personId})
+          ORDER BY COALESCE(m."timeSent", c."dateCreated") DESC`
+        : sql`
+          SELECT c.*, pm.id AS pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, pm.deliveryMethod, m.timeSent AS lastMessageTime
+          FROM privateMessages pm
+          INNER JOIN conversations c ON c.id = pm.conversationId
+          LEFT JOIN messages m ON m.id = c.lastPostId
+          WHERE pm.churchId = ${churchId} AND (pm.fromPersonId = ${personId} OR pm.toPersonId = ${personId})
+          ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC`
+    );
   }
 
   public async loadById(churchId: string, id: string) {

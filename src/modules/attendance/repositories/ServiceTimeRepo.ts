@@ -3,6 +3,7 @@ import { eq, and, sql, asc } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { serviceTimes, services, campuses } from "../../../db/schema/attendance.js";
 import { ServiceTime } from "../models/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
 export class ServiceTimeRepo extends DrizzleRepo<typeof serviceTimes> {
@@ -47,15 +48,25 @@ export class ServiceTimeRepo extends DrizzleRepo<typeof serviceTimes> {
   }
 
   public async loadByChurchCampusService(churchId: string, campusId: string, serviceId: string) {
-    const rows = await this.executeRows(sql`
-      SELECT st.*
-      FROM serviceTimes st
-      LEFT OUTER JOIN services s ON s.id = st.serviceId
-      WHERE st.churchId = ${churchId}
-        AND (${serviceId} = '0' OR st.serviceId = ${serviceId})
-        AND (${campusId} = '0' OR s.campusId = ${campusId})
-        AND st.removed = 0
-    `);
+    const rows = await this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT st.*
+          FROM "serviceTimes" st
+          LEFT OUTER JOIN services s ON s.id = st."serviceId"
+          WHERE st."churchId" = ${churchId}
+            AND (${serviceId} = '0' OR st."serviceId" = ${serviceId})
+            AND (${campusId} = '0' OR s."campusId" = ${campusId})
+            AND st.removed = false`
+        : sql`
+          SELECT st.*
+          FROM serviceTimes st
+          LEFT OUTER JOIN services s ON s.id = st.serviceId
+          WHERE st.churchId = ${churchId}
+            AND (${serviceId} = '0' OR st.serviceId = ${serviceId})
+            AND (${campusId} = '0' OR s.campusId = ${campusId})
+            AND st.removed = 0`
+    );
     return this.convertAllToModel(churchId, rows);
   }
 
