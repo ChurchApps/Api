@@ -1,46 +1,31 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { eq, and } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { subscriptions } from "../../../db/schema/giving.js";
 import { Subscription } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
 @injectable()
-export class SubscriptionRepo extends ConfiguredRepo<Subscription> {
-  protected get repoConfig(): RepoConfig<Subscription> {
-    return {
-      tableName: "subscriptions",
-      hasSoftDelete: false,
-      idColumn: "id", // External ID from payment provider
-      columns: ["personId", "customerId"]
-    };
-  }
+export class SubscriptionRepo extends DrizzleRepo<typeof subscriptions> {
+  protected readonly table = subscriptions;
+  protected readonly moduleName = "giving";
 
-  // Override create to use external ID
-  protected async create(model: Subscription): Promise<Subscription> {
-    const sql = "INSERT INTO subscriptions (id, churchId, personId, customerId) VALUES (?, ?, ?, ?);";
-    const params = [model.id, model.churchId, model.personId, model.customerId];
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  // Override update for completeness (subscriptions rarely update)
-  protected async update(model: Subscription): Promise<Subscription> {
-    const sql = "UPDATE subscriptions SET personId=?, customerId=? WHERE id=? AND churchId=?";
-    const params = [model.personId, model.customerId, model.id, model.churchId];
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  // Override save to only create (subscriptions are typically immutable)
-  public async save(subscription: Subscription) {
-    return this.create(subscription);
+  // Subscriptions use external IDs and are typically immutable (create-only)
+  public override async save(subscription: Subscription) {
+    await this.db.insert(subscriptions).values(subscription as any);
+    return subscription;
   }
 
   public async loadByCustomerId(churchId: string, customerId: string) {
-    return TypedDB.queryOne("SELECT * FROM subscriptions WHERE customerId=? AND churchId=?;", [customerId, churchId]);
+    return this.db.select().from(subscriptions)
+      .where(and(eq(subscriptions.customerId, customerId), eq(subscriptions.churchId, churchId)))
+      .then(r => r[0] ?? null);
   }
 
-  protected rowToModel(row: any): Subscription {
-    return { id: row.id, churchId: row.churchId, personId: row.personId, customerId: row.customerId };
+  public convertToModel(_churchId: string, data: any): Subscription {
+    return { id: data.id, churchId: data.churchId, personId: data.personId, customerId: data.customerId };
+  }
+
+  public convertAllToModel(churchId: string, data: any[]) {
+    return (data || []).map((d: any) => this.convertToModel(churchId, d));
   }
 }
