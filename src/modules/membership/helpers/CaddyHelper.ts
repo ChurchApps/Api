@@ -120,7 +120,7 @@ export class CaddyHelper {
   // Generates the full routes array from the database
   static async generateRoutes() {
     const repos = await RepoManager.getRepos<Repos>("membership");
-    const hostDials: HostDial[] = (await repos.domain.loadPairs()) as HostDial[];
+    const hostDials: HostDial[] = (await repos.domain.loadPairs()) as unknown as HostDial[];
     const routes: any[] = [];
 
     // Add exact host routes first (order matters in Caddy)

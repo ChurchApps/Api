@@ -26,7 +26,7 @@ export class ChurchController extends MembershipBaseController {
       let term: string = req.query.term.toString();
       if (term === null) term = "";
       const data = await this.repos.church.search(term, true);
-      const churches = this.repos.church.convertAllToModel(data);
+      const churches = this.repos.church.convertAllToModel("", data);
       return churches;
     });
   }
@@ -53,7 +53,7 @@ export class ChurchController extends MembershipBaseController {
             ),
             false
           );
-          result = this.repos.church.convertAllToModel(data);
+          result = this.repos.church.convertAllToModel("", data);
           await ChurchHelper.appendLogos(result);
           if (result.length > 0 && this.include(req, "favicon_400x400")) await this.appendLogos(result);
         }
@@ -87,7 +87,7 @@ export class ChurchController extends MembershipBaseController {
             ),
             false
           );
-          result = this.repos.church.convertAllToModel(data);
+          result = this.repos.church.convertAllToModel("", data);
           await ChurchHelper.appendLogos(result);
           if (result.length > 0 && this.include(req, "favicon_400x400")) await this.appendLogos(result);
         }
@@ -107,13 +107,13 @@ export class ChurchController extends MembershipBaseController {
         if (req.query.subDomain !== undefined) {
           const data = await this.repos.church.loadBySubDomain(req.query.subDomain.toString());
           if (data) {
-            const church = this.repos.church.convertToModel(data);
+            const church = this.repos.church.convertToModel("", data);
             result = { id: church.id, name: church.name, subDomain: church.subDomain };
           }
         } else if (req.query.id !== undefined) {
           const data = await this.repos.church.loadById(req.query.id.toString());
           if (data) {
-            const church = this.repos.church.convertToModel(data);
+            const church = this.repos.church.convertToModel("", data);
             result = { id: church.id, name: church.name, subDomain: church.subDomain };
           }
         }
@@ -148,7 +148,7 @@ export class ChurchController extends MembershipBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
       const data = await this.repos.church.loadById(id);
-      const church = this.repos.church.convertToModel(data);
+      const church = this.repos.church.convertToModel("", data);
       return church;
     });
   }
@@ -223,7 +223,7 @@ export class ChurchController extends MembershipBaseController {
       const ids = req.body;
       if (ids.length > 0) {
         const data = await this.repos.church.loadByIds(ids);
-        result = this.repos.church.convertAllToModel(data);
+        result = this.repos.church.convertAllToModel("", data);
       }
       return this.json(result, 200);
     });

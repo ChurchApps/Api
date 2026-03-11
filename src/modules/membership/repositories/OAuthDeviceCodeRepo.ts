@@ -1,76 +1,78 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { OAuthDeviceCode } from "../models/index.js";
-import { DateHelper } from "../helpers/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 import { injectable } from "inversify";
+import { eq, sql } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { oAuthDeviceCodes } from "../../../db/schema/membership.js";
+import { OAuthDeviceCode } from "../models/index.js";
 import crypto from "crypto";
 
 @injectable()
-export class OAuthDeviceCodeRepo extends BaseRepo<OAuthDeviceCode> {
-  protected tableName = "oAuthDeviceCodes";
-  protected hasSoftDelete = false;
+export class OAuthDeviceCodeRepo extends GlobalDrizzleRepo<typeof oAuthDeviceCodes> {
+  protected readonly table = oAuthDeviceCodes;
+  protected readonly moduleName = "membership";
+
+  public async save(deviceCode: OAuthDeviceCode) {
+    if (deviceCode.id) {
+      return this.update(deviceCode);
+    } else {
+      return this.create(deviceCode);
+    }
+  }
 
   protected async create(deviceCode: OAuthDeviceCode): Promise<OAuthDeviceCode> {
-    deviceCode.id = this.createId();
-    const expiresAt = DateHelper.toMysqlDate(deviceCode.expiresAt);
-    const sql = `INSERT INTO oAuthDeviceCodes (id, deviceCode, userCode, clientId, scopes, expiresAt, pollInterval, status, createdAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW());`;
-    const params = [
-      deviceCode.id,
-      deviceCode.deviceCode,
-      deviceCode.userCode,
-      deviceCode.clientId,
-      deviceCode.scopes,
-      expiresAt,
-      deviceCode.pollInterval || 5,
-      deviceCode.status || "pending"
-    ];
-    await TypedDB.query(sql, params);
+    deviceCode.id = UniqueIdHelper.shortId();
+    const data: any = {
+      id: deviceCode.id,
+      deviceCode: deviceCode.deviceCode,
+      userCode: deviceCode.userCode,
+      clientId: deviceCode.clientId,
+      scopes: deviceCode.scopes,
+      expiresAt: deviceCode.expiresAt,
+      pollInterval: deviceCode.pollInterval || 5,
+      status: deviceCode.status || "pending",
+      createdAt: new Date()
+    };
+    await this.db.insert(oAuthDeviceCodes).values(data);
     return deviceCode;
   }
 
   protected async update(deviceCode: OAuthDeviceCode): Promise<OAuthDeviceCode> {
-    const expiresAt = DateHelper.toMysqlDate(deviceCode.expiresAt);
-    const sql = "UPDATE oAuthDeviceCodes SET status=?, approvedByUserId=?, userChurchId=?, churchId=?, expiresAt=? WHERE id=?;";
-    const params = [deviceCode.status, deviceCode.approvedByUserId, deviceCode.userChurchId, deviceCode.churchId, expiresAt, deviceCode.id];
-    await TypedDB.query(sql, params);
+    const data: any = {
+      status: deviceCode.status,
+      approvedByUserId: deviceCode.approvedByUserId,
+      userChurchId: deviceCode.userChurchId,
+      churchId: deviceCode.churchId,
+      expiresAt: deviceCode.expiresAt
+    };
+    await this.db.update(oAuthDeviceCodes).set(data).where(eq(oAuthDeviceCodes.id, deviceCode.id!));
     return deviceCode;
   }
 
   public load(id: string): Promise<OAuthDeviceCode> {
-    return TypedDB.queryOne("SELECT * FROM oAuthDeviceCodes WHERE id=?", [id]);
+    return this.db.select().from(oAuthDeviceCodes).where(eq(oAuthDeviceCodes.id, id)).then(r => (r[0] as OAuthDeviceCode) ?? null);
   }
 
   public loadByDeviceCode(deviceCode: string): Promise<OAuthDeviceCode> {
-    return TypedDB.queryOne("SELECT * FROM oAuthDeviceCodes WHERE deviceCode=?", [deviceCode]);
+    return this.db.select().from(oAuthDeviceCodes).where(eq(oAuthDeviceCodes.deviceCode, deviceCode)).then(r => (r[0] as OAuthDeviceCode) ?? null);
   }
 
-  public loadByUserCode(userCode: string): Promise<OAuthDeviceCode> {
-    // Normalize: remove hyphens and uppercase
+  public async loadByUserCode(userCode: string): Promise<OAuthDeviceCode> {
     const normalizedCode = userCode.replace(/-/g, "").toUpperCase();
-    return TypedDB.queryOne(
-      //"SELECT * FROM oAuthDeviceCodes WHERE REPLACE(userCode, '-', '')=? AND status='pending' AND expiresAt > NOW()",
-      "SELECT * FROM oAuthDeviceCodes WHERE REPLACE(userCode, '-', '')=? AND status='pending'",
-      [normalizedCode]
+    const rows = await this.executeRows(
+      sql`SELECT * FROM oAuthDeviceCodes WHERE REPLACE(userCode, '-', '')=${normalizedCode} AND status='pending'`
     );
-  }
-
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM oAuthDeviceCodes WHERE id=?", [id]);
+    return (rows[0] as OAuthDeviceCode) ?? null;
   }
 
   public deleteExpired() {
-    return TypedDB.query("DELETE FROM oAuthDeviceCodes WHERE expiresAt < NOW() AND status IN ('pending', 'expired')", []);
+    return this.db.execute(sql`DELETE FROM oAuthDeviceCodes WHERE expiresAt < NOW() AND status IN ('pending', 'expired')`);
   }
 
-  // Generate cryptographically secure device code (32 bytes, hex encoded)
   public static generateDeviceCode(): string {
     return crypto.randomBytes(32).toString("hex");
   }
 
-  // Generate user-friendly code (6 chars, no ambiguous characters)
   public static generateUserCode(): string {
-    // Characters that are easy to read on TV (excluding ambiguous: 0,O,1,I,L)
     const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
     let code = "";
     for (let i = 0; i < 6; i++) {

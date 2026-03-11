@@ -1,47 +1,56 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { OAuthCode } from "../models/index.js";
-import { DateHelper } from "../helpers/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 import { injectable } from "inversify";
+import { eq, sql } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { oAuthCodes } from "../../../db/schema/membership.js";
+import { OAuthCode } from "../models/index.js";
 
 @injectable()
-export class OAuthCodeRepo extends BaseRepo<OAuthCode> {
-  protected tableName = "oAuthCodes";
-  protected hasSoftDelete = false;
+export class OAuthCodeRepo extends GlobalDrizzleRepo<typeof oAuthCodes> {
+  protected readonly table = oAuthCodes;
+  protected readonly moduleName = "membership";
+
+  public async save(authCode: OAuthCode) {
+    if (authCode.id) {
+      return this.update(authCode);
+    } else {
+      return this.create(authCode);
+    }
+  }
+
   protected async create(authCode: OAuthCode): Promise<OAuthCode> {
-    authCode.id = this.createId();
-    const expiresAt = DateHelper.toMysqlDate(authCode.expiresAt);
-    const sql = "INSERT INTO oAuthCodes (id, code, clientId, userChurchId, redirectUri, scopes, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW());";
-    const params = [authCode.id, authCode.code, authCode.clientId, authCode.userChurchId, authCode.redirectUri, authCode.scopes, expiresAt];
-    await TypedDB.query(sql, params);
+    authCode.id = UniqueIdHelper.shortId();
+    const data: any = { ...authCode, createdAt: new Date() };
+    await this.db.insert(oAuthCodes).values(data);
     return authCode;
   }
 
   protected async update(authCode: OAuthCode): Promise<OAuthCode> {
-    const expiresAt = DateHelper.toMysqlDate(authCode.expiresAt);
-    const sql = "UPDATE oAuthCodes SET code=?, clientId=?, userChurchId=?, redirectUri=?, scopes=?, expiresAt=? WHERE id=?;";
-    const params = [authCode.code, authCode.clientId, authCode.userChurchId, authCode.redirectUri, authCode.scopes, expiresAt, authCode.id];
-    await TypedDB.query(sql, params);
+    const data: any = {
+      code: authCode.code,
+      clientId: authCode.clientId,
+      userChurchId: authCode.userChurchId,
+      redirectUri: authCode.redirectUri,
+      scopes: authCode.scopes,
+      expiresAt: authCode.expiresAt
+    };
+    await this.db.update(oAuthCodes).set(data).where(eq(oAuthCodes.id, authCode.id!));
     return authCode;
   }
 
   public load(id: string): Promise<OAuthCode> {
-    return TypedDB.queryOne("SELECT * FROM oAuthCodes WHERE id=?", [id]);
+    return this.db.select().from(oAuthCodes).where(eq(oAuthCodes.id, id)).then(r => (r[0] as OAuthCode) ?? null);
   }
 
   public loadByCode(code: string): Promise<OAuthCode> {
-    return TypedDB.queryOne("SELECT * FROM oAuthCodes WHERE code=?", [code]);
-  }
-
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM oAuthCodes WHERE id=?", [id]);
+    return this.db.select().from(oAuthCodes).where(eq(oAuthCodes.code, code)).then(r => (r[0] as OAuthCode) ?? null);
   }
 
   public deleteByCode(code: string) {
-    return TypedDB.query("DELETE FROM oAuthCodes WHERE code=?", [code]);
+    return this.db.delete(oAuthCodes).where(eq(oAuthCodes.code, code));
   }
 
   public deleteExpired() {
-    return TypedDB.query("DELETE FROM oAuthCodes WHERE expiresAt < NOW()", []);
+    return this.db.execute(sql`DELETE FROM oAuthCodes WHERE expiresAt < NOW()`);
   }
 }

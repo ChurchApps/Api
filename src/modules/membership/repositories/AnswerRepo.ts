@@ -1,33 +1,19 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Answer } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { answers } from "../../../db/schema/membership.js";
 
 @injectable()
-export class AnswerRepo extends ConfiguredRepo<Answer> {
-  protected get repoConfig(): RepoConfig<Answer> {
-    return {
-      tableName: "answers",
-      hasSoftDelete: false,
-      columns: ["formSubmissionId", "questionId", "value"]
-    };
-  }
+export class AnswerRepo extends DrizzleRepo<typeof answers> {
+  protected readonly table = answers;
+  protected readonly moduleName = "membership";
+
 
   public deleteForSubmission(churchId: string, formSubmissionId: string) {
-    return TypedDB.query("DELETE FROM answers WHERE churchId=? AND formSubmissionId=?;", [churchId, formSubmissionId]);
+    return this.db.delete(answers).where(and(eq(answers.churchId, churchId), eq(answers.formSubmissionId, formSubmissionId)));
   }
 
   public loadForFormSubmission(churchId: string, formSubmissionId: string) {
-    return TypedDB.query("SELECT * FROM answers WHERE churchId=? AND formSubmissionId=?;", [churchId, formSubmissionId]);
-  }
-
-  protected rowToModel(row: any): Answer {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      formSubmissionId: row.formSubmissionId,
-      questionId: row.questionId,
-      value: row.value
-    };
+    return this.db.select().from(answers).where(and(eq(answers.churchId, churchId), eq(answers.formSubmissionId, formSubmissionId)));
   }
 }
