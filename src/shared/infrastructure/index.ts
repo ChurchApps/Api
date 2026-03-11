@@ -9,5 +9,5 @@ export { CustomAuthProvider } from "./CustomAuthProvider.js";
 export { BaseController } from "./BaseController.js";
 export { DB, MultiDatabasePool } from "./DB.js";
 export { BaseRepo } from "./BaseRepo.js";
-export { ConfiguredRepo, type RepoConfig } from "./ConfiguredRepo.js";
 export { TypedDB } from "./TypedDB.js";
+export { DrizzleRepo, GlobalDrizzleRepo } from "./DrizzleRepo.js";
