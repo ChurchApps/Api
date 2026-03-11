@@ -1,46 +1,42 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { File } from "../models/index.js";
-import { ArrayHelper } from "@churchapps/apihelper";
+import { injectable } from "inversify";
+import { eq, and, inArray, sql } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { files } from "../../../db/schema/content.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+@injectable()
+export class FileRepo extends DrizzleRepo<typeof files> {
+  protected readonly table = files;
+  protected readonly moduleName = "content";
 
-export class FileRepo extends ConfiguredRepo<File> {
-  protected get repoConfig(): RepoConfig<File> {
-    return {
-      tableName: "files",
-      hasSoftDelete: false,
-      insertColumns: ["contentType", "contentId", "fileName", "contentPath", "fileType", "size"],
-      updateColumns: ["contentType", "contentId", "fileName", "contentPath", "fileType", "size", "dateModified"],
-      insertLiterals: { dateModified: "NOW()" }
-    };
+  public override async save(model: any) {
+    if (model.id) {
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(files).set(setData).where(and(eq(files.id, model.id), eq(files.churchId, model.churchId)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      model.dateModified = new Date();
+      await this.db.insert(files).values(model);
+    }
+    return model;
   }
 
-  public async delete(churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM files WHERE id=? AND churchId=?", [id, churchId]);
+  public loadByIds(churchId: string, ids: string[]) {
+    return this.db.select().from(files).where(and(eq(files.churchId, churchId), inArray(files.id, ids)));
   }
 
-  public async load(churchId: string, id: string): Promise<File> {
-    return TypedDB.queryOne("SELECT * FROM files WHERE id=? AND churchId=?", [id, churchId]);
+  public loadForContent(churchId: string, contentType: string, contentId: string) {
+    return this.db.select().from(files).where(and(eq(files.churchId, churchId), eq(files.contentType, contentType), eq(files.contentId, contentId)));
   }
 
-  public async loadAll(churchId: string): Promise<File[]> {
-    return TypedDB.query("SELECT * FROM files WHERE churchId=?", [churchId]);
+  public loadForWebsite(churchId: string) {
+    return this.db.select().from(files).where(and(eq(files.churchId, churchId), eq(files.contentType, "website")));
   }
 
-  public loadByIds(churchId: string, ids: string[]): Promise<File[]> {
-    const sql = "SELECT * FROM files WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length) + ")";
-    return TypedDB.query(sql, [churchId].concat(ids));
-  }
-
-  public loadForContent(churchId: string, contentType: string, contentId: string): Promise<File[]> {
-    return TypedDB.query("SELECT * FROM files WHERE churchId=? and contentType=? and contentId=?", [churchId, contentType, contentId]);
-  }
-
-  public loadForWebsite(churchId: string): Promise<File[]> {
-    return TypedDB.query("SELECT * FROM files WHERE churchId=? and contentType='website'", [churchId]);
-  }
-
-  public loadTotalBytes(churchId: string, contentType: string, contentId: string): Promise<{ size: number }> {
-    return TypedDB.query("select IFNULL(sum(size), 0) as size from files where churchId=? and contentType=? and contentId=?", [churchId, contentType, contentId]);
+  public async loadTotalBytes(churchId: string, contentType: string, contentId: string): Promise<any> {
+    return this.executeRows(sql`
+      SELECT IFNULL(SUM(size), 0) as size FROM files
+      WHERE churchId = ${churchId} AND contentType = ${contentType} AND contentId = ${contentId}
+    `);
   }
 }

@@ -1,46 +1,18 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { ArrangementKey } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { arrangementKeys } from "../../../db/schema/content.js";
 
 @injectable()
-export class ArrangementKeyRepo extends ConfiguredRepo<ArrangementKey> {
-  protected get repoConfig(): RepoConfig<ArrangementKey> {
-    return {
-      tableName: "arrangementKeys",
-      hasSoftDelete: false,
-      columns: ["arrangementId", "keySignature", "shortDescription"]
-    };
-  }
-
-  public async delete(churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM arrangementKeys WHERE id=? AND churchId=?", [id, churchId]);
-  }
-
-  public async load(churchId: string, id: string): Promise<ArrangementKey> {
-    return TypedDB.queryOne("SELECT * FROM arrangementKeys WHERE id=? AND churchId=?", [id, churchId]);
-  }
-
-  public async loadAll(churchId: string): Promise<ArrangementKey[]> {
-    return TypedDB.query("SELECT * FROM arrangementKeys WHERE churchId=?", [churchId]);
-  }
+export class ArrangementKeyRepo extends DrizzleRepo<typeof arrangementKeys> {
+  protected readonly table = arrangementKeys;
+  protected readonly moduleName = "content";
 
   public deleteForArrangement(churchId: string, arrangementId: string) {
-    return TypedDB.query("DELETE FROM arrangementKeys WHERE churchId=? and arrangementId=?;", [churchId, arrangementId]);
+    return this.db.delete(arrangementKeys).where(and(eq(arrangementKeys.churchId, churchId), eq(arrangementKeys.arrangementId, arrangementId)));
   }
 
   public loadByArrangementId(churchId: string, arrangementId: string) {
-    return TypedDB.query("SELECT * FROM arrangementKeys where churchId=? and arrangementId=?;", [churchId, arrangementId]);
-  }
-
-  protected rowToModel(row: any): ArrangementKey {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      arrangementId: row.arrangementId,
-      keySignature: row.keySignature,
-      shortDescription: row.shortDescription
-    };
+    return this.db.select().from(arrangementKeys).where(and(eq(arrangementKeys.churchId, churchId), eq(arrangementKeys.arrangementId, arrangementId)));
   }
 }

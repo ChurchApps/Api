@@ -1,30 +1,18 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { BibleVerse } from "../models/index.js";
-import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo.js";
+import { eq, and, asc } from "drizzle-orm";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { bibleVerses } from "../../../db/schema/content.js";
 
 @injectable()
-export class BibleVerseRepo extends GlobalConfiguredRepo<BibleVerse> {
-  protected get repoConfig(): GlobalRepoConfig<BibleVerse> {
-    return {
-      tableName: "bibleVerses",
-      hasSoftDelete: false,
-      columns: ["translationKey", "chapterKey", "keyName", "number"],
-      defaultOrderBy: "number"
-    };
+export class BibleVerseRepo extends GlobalDrizzleRepo<typeof bibleVerses> {
+  protected readonly table = bibleVerses;
+  protected readonly moduleName = "content";
+
+  public loadByChapter(translationKey: string, chapterKey: string): Promise<any[]> {
+    return this.db.select().from(bibleVerses).where(and(eq(bibleVerses.translationKey, translationKey), eq(bibleVerses.chapterKey, chapterKey))).orderBy(asc(bibleVerses.number));
   }
 
-  public loadByChapter(translationKey: string, chapterKey: string) {
-    return TypedDB.query("SELECT * FROM bibleVerses WHERE translationKey=? and chapterKey=? order by number;", [translationKey, chapterKey]);
-  }
-
-  protected rowToModel(row: any): BibleVerse {
-    return {
-      id: row.id,
-      translationKey: row.translationKey,
-      chapterKey: row.chapterKey,
-      keyName: row.keyName,
-      number: row.number
-    };
+  public saveAll(models: any[]) {
+    return Promise.all(models.map((m) => this.save(m)));
   }
 }

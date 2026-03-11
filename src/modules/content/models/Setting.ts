@@ -4,5 +4,5 @@ export class Setting {
   public userId?: string;
   public keyName?: string;
   public value?: string;
-  public public?: string;
+  public public?: boolean;
 }
