@@ -1,38 +1,39 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { eq, and, sql, inArray } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { groupServiceTimes } from "../../../db/schema/attendance.js";
 import { GroupServiceTime } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
 @injectable()
-export class GroupServiceTimeRepo extends ConfiguredRepo<GroupServiceTime> {
-  protected get repoConfig(): RepoConfig<GroupServiceTime> {
-    return {
-      tableName: "groupServiceTimes",
-      hasSoftDelete: false,
-      columns: ["groupId", "serviceTimeId"]
-    };
-  }
+export class GroupServiceTimeRepo extends DrizzleRepo<typeof groupServiceTimes> {
+  protected readonly table = groupServiceTimes;
+  protected readonly moduleName = "attendance";
 
-  public loadWithServiceNames(churchId: string, groupId: string) {
-    const sql =
-      "SELECT gst.*, concat(c.name, ' - ', s.name, ' - ', st.name) as serviceTimeName" +
-      " FROM groupServiceTimes gst" +
-      " INNER JOIN serviceTimes st on st.id = gst.serviceTimeId" +
-      " INNER JOIN services s on s.id = st.serviceId" +
-      " INNER JOIN campuses c on c.id = s.campusId" +
-      " WHERE gst.churchId=? AND gst.groupId=?";
-    return TypedDB.query(sql, [churchId, groupId]);
+  public async loadWithServiceNames(churchId: string, groupId: string) {
+    const rows = await this.executeRows(sql`
+      SELECT gst.*, concat(c.name, ' - ', s.name, ' - ', st.name) as serviceTimeName
+      FROM groupServiceTimes gst
+      INNER JOIN serviceTimes st ON st.id = gst.serviceTimeId
+      INNER JOIN services s ON s.id = st.serviceId
+      INNER JOIN campuses c ON c.id = s.campusId
+      WHERE gst.churchId = ${churchId} AND gst.groupId = ${groupId}
+    `);
+    return this.convertAllToModel(churchId, rows);
   }
 
   public loadByServiceTimeIds(churchId: string, serviceTimeIds: string[]) {
-    const sql = "SELECT * FROM groupServiceTimes WHERE churchId=? AND serviceTimeId IN (" + serviceTimeIds.join(",") + ")";
-    return TypedDB.query(sql, [churchId]);
+    if (serviceTimeIds.length === 0) return Promise.resolve([]);
+    return this.db.select().from(groupServiceTimes)
+      .where(and(eq(groupServiceTimes.churchId, churchId), inArray(groupServiceTimes.serviceTimeId, serviceTimeIds)));
   }
 
-  protected rowToModel(row: any): GroupServiceTime {
+  public convertToModel(_churchId: string, row: any): GroupServiceTime {
     const result: GroupServiceTime = { id: row.id, groupId: row.groupId, serviceTimeId: row.serviceTimeId };
     if (row.serviceTimeName !== undefined) result.serviceTime = { id: result.serviceTimeId, name: row.serviceTimeName };
     return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any[]) {
+    return (data || []).map((d: any) => this.convertToModel(churchId, d));
   }
 }
