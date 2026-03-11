@@ -1,71 +1,59 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DeliveryLog } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { deliveryLogs } from "../../../db/schema/messaging.js";
 
 @injectable()
-export class DeliveryLogRepo extends ConfiguredRepo<DeliveryLog> {
-  protected get repoConfig(): RepoConfig<DeliveryLog> {
-    return {
-      tableName: "deliveryLogs",
-      hasSoftDelete: false,
-      insertColumns: ["personId", "contentType", "contentId", "deliveryMethod", "success", "errorMessage", "deliveryAddress"],
-      updateColumns: ["success", "errorMessage"],
-      insertLiterals: { attemptTime: "NOW()" }
-    };
-  }
+export class DeliveryLogRepo extends DrizzleRepo<typeof deliveryLogs> {
+  protected readonly table = deliveryLogs;
+  protected readonly moduleName = "messaging";
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM deliveryLogs WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadByContent(contentType: string, contentId: string) {
-    return TypedDB.query("SELECT * FROM deliveryLogs WHERE contentType=? AND contentId=? ORDER BY attemptTime DESC", [contentType, contentId]);
-  }
-
-  public loadByPerson(churchId: string, personId: string, startDate?: Date, endDate?: Date) {
-    let sql = "SELECT * FROM deliveryLogs WHERE churchId=? AND personId=?";
-    const params: any[] = [churchId, personId];
-    if (startDate) {
-      sql += " AND attemptTime >= ?";
-      params.push(startDate);
+  public async save(model: any) {
+    if (model.id) {
+      await this.db.update(deliveryLogs).set(model)
+        .where(and(eq(deliveryLogs.id, model.id), eq(deliveryLogs.churchId, model.churchId)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      model.attemptTime = new Date();
+      await this.db.insert(deliveryLogs).values(model);
     }
-    if (endDate) {
-      sql += " AND attemptTime <= ?";
-      params.push(endDate);
-    }
-    sql += " ORDER BY attemptTime DESC";
-    return TypedDB.query(sql, params);
+    return model;
   }
 
-  public loadRecent(churchId: string, limit: number = 100) {
-    return TypedDB.query("SELECT * FROM deliveryLogs WHERE churchId=? ORDER BY attemptTime DESC LIMIT ?", [churchId, limit]);
+  public async loadById(churchId: string, id: string) {
+    return this.db.select().from(deliveryLogs)
+      .where(and(eq(deliveryLogs.id, id), eq(deliveryLogs.churchId, churchId)))
+      .then(r => r[0] ?? null);
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM deliveryLogs WHERE id=? AND churchId=?;", [id, churchId]);
+  public async loadByContent(contentType: string, contentId: string) {
+    const result = await this.db.select().from(deliveryLogs)
+      .where(and(eq(deliveryLogs.contentType, contentType), eq(deliveryLogs.contentId, contentId)))
+      .orderBy(desc(deliveryLogs.attemptTime));
+    return result || [];
   }
 
-  protected rowToModel(data: any): DeliveryLog {
-    return {
-      id: data.id,
-      churchId: data.churchId,
-      personId: data.personId,
-      contentType: data.contentType,
-      contentId: data.contentId,
-      deliveryMethod: data.deliveryMethod,
-      success: data.success,
-      errorMessage: data.errorMessage,
-      deliveryAddress: data.deliveryAddress,
-      attemptTime: data.attemptTime
-    };
+  public async loadByPerson(churchId: string, personId: string, startDate?: Date, endDate?: Date) {
+    const conditions = [eq(deliveryLogs.churchId, churchId), eq(deliveryLogs.personId, personId)];
+    if (startDate) conditions.push(gte(deliveryLogs.attemptTime, startDate));
+    if (endDate) conditions.push(lte(deliveryLogs.attemptTime, endDate));
+    const result = await this.db.select().from(deliveryLogs)
+      .where(and(...conditions))
+      .orderBy(desc(deliveryLogs.attemptTime));
+    return result || [];
   }
 
-  public convertToModel(data: any) {
-    return this.rowToModel(data);
+  public async loadRecent(churchId: string, limit: number = 100) {
+    const result = await this.db.select().from(deliveryLogs)
+      .where(eq(deliveryLogs.churchId, churchId))
+      .orderBy(desc(deliveryLogs.attemptTime))
+      .limit(limit);
+    return result || [];
   }
 
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public async delete(churchId: string, id: string) {
+    await this.db.delete(deliveryLogs)
+      .where(and(eq(deliveryLogs.id, id), eq(deliveryLogs.churchId, churchId)));
   }
 }

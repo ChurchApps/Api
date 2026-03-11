@@ -1,78 +1,80 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Device } from "../models/index.js";
+import { injectable } from "inversify";
+import { eq, and, inArray, desc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { devices } from "../../../db/schema/messaging.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+@injectable()
+export class DeviceRepo extends DrizzleRepo<typeof devices> {
+  protected readonly table = devices;
+  protected readonly moduleName = "messaging";
 
-export class DeviceRepo extends ConfiguredRepo<Device> {
-  // Override churchIdColumn to undefined since devices can exist without a church (anonymous pairing)
-  protected churchIdColumn: string = undefined;
-
-  protected get repoConfig(): RepoConfig<Device> {
-    return {
-      tableName: "devices",
-      hasSoftDelete: false,
-      insertColumns: [
-        "appName", "deviceId", "churchId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"
-      ],
-      updateColumns: [
-        "appName", "deviceId", "churchId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"
-      ]
-    };
+  public async save(model: any) {
+    if (model.id) {
+      await this.db.update(devices).set(model).where(eq(devices.id, model.id));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      await this.db.insert(devices).values(model);
+    }
+    return model;
   }
 
-  public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? AND id IN (?)", [churchId, ids]);
+  public async delete(churchId: string, id: string) {
+    await this.db.delete(devices).where(eq(devices.id, id));
   }
 
-  public loadByPersonId(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? AND personId=?", [churchId, personId]);
+  public async loadByIds(churchId: string, ids: string[]) {
+    if (!ids || ids.length === 0) return [];
+    const result = await this.db.select().from(devices)
+      .where(and(eq(devices.churchId, churchId), inArray(devices.id, ids)));
+    return result || [];
   }
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE id=? and churchId=?;", [id, churchId]);
+  public async loadByPersonId(churchId: string, personId: string) {
+    const result = await this.db.select().from(devices)
+      .where(and(eq(devices.churchId, churchId), eq(devices.personId, personId)));
+    return result || [];
+  }
+
+  public async loadById(churchId: string, id: string) {
+    return this.db.select().from(devices)
+      .where(and(eq(devices.id, id), eq(devices.churchId, churchId)))
+      .then(r => r[0] ?? null);
   }
 
   public async loadByPairingCode(pairingCode: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE pairingCode=?;", [pairingCode]);
+    return this.db.select().from(devices)
+      .where(eq(devices.pairingCode, pairingCode))
+      .then(r => r[0] ?? null);
   }
 
-  public loadByDeviceId(deviceId: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE deviceId=?;", [deviceId]);
+  public async loadByDeviceId(deviceId: string): Promise<any> {
+    return this.db.select().from(devices)
+      .where(eq(devices.deviceId, deviceId))
+      .then(r => r[0] ?? null);
   }
 
-  public loadByFcmToken(churchId: string, fcmToken: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE fcmToken=? and churchId=?;", [fcmToken, churchId]);
+  public async loadByFcmToken(churchId: string, fcmToken: string) {
+    return this.db.select().from(devices)
+      .where(and(eq(devices.fcmToken, fcmToken), eq(devices.churchId, churchId)))
+      .then(r => r[0] ?? null);
   }
 
-  public loadByChurchId(churchId: string) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? ORDER BY lastActiveDate desc", [churchId]);
+  public async loadByChurchId(churchId: string) {
+    const result = await this.db.select().from(devices)
+      .where(eq(devices.churchId, churchId))
+      .orderBy(desc(devices.lastActiveDate));
+    return result || [];
   }
 
-  public loadForPerson(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? AND personId=?", [churchId, personId]);
+  public async loadForPerson(churchId: string, personId: string) {
+    const result = await this.db.select().from(devices)
+      .where(and(eq(devices.churchId, churchId), eq(devices.personId, personId)));
+    return result || [];
   }
 
-  public deleteByFcmToken(fcmToken: string) {
-    return TypedDB.query("DELETE FROM devices WHERE fcmToken=?", [fcmToken]);
+  public async deleteByFcmToken(fcmToken: string) {
+    await this.db.delete(devices).where(eq(devices.fcmToken, fcmToken));
   }
 
-  protected rowToModel(row: any): Device {
-    return {
-      id: row.id,
-      appName: row.appName,
-      deviceId: row.deviceId,
-      churchId: row.churchId,
-      personId: row.personId,
-      fcmToken: row.fcmToken,
-      label: row.label,
-      registrationDate: row.registrationDate,
-      lastActiveDate: row.lastActiveDate,
-      deviceInfo: row.deviceInfo,
-      admId: row.admId,
-      pairingCode: row.pairingCode,
-      ipAddress: row.ipAddress,
-      contentType: row.contentType,
-      contentId: row.contentId
-    };
-  }
 }

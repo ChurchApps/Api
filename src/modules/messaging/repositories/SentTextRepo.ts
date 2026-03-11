@@ -1,48 +1,36 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { SentText } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, desc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { sentTexts } from "../../../db/schema/messaging.js";
 
 @injectable()
-export class SentTextRepo extends ConfiguredRepo<SentText> {
-  protected get repoConfig(): RepoConfig<SentText> {
-    return {
-      tableName: "sentTexts",
-      hasSoftDelete: false,
-      insertColumns: ["groupId", "recipientPersonId", "senderPersonId", "message", "recipientCount", "successCount", "failCount"],
-      updateColumns: ["recipientCount", "successCount", "failCount"],
-      insertLiterals: { timeSent: "NOW()" }
-    };
+export class SentTextRepo extends DrizzleRepo<typeof sentTexts> {
+  protected readonly table = sentTexts;
+  protected readonly moduleName = "messaging";
+
+  public async save(model: any) {
+    if (model.id) {
+      await this.db.update(sentTexts).set(model)
+        .where(and(eq(sentTexts.id, model.id), eq(sentTexts.churchId, model.churchId)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      model.timeSent = new Date();
+      await this.db.insert(sentTexts).values(model);
+    }
+    return model;
   }
 
-  public loadByChurchId(churchId: string) {
-    return TypedDB.query("SELECT * FROM sentTexts WHERE churchId=? ORDER BY timeSent DESC;", [churchId]);
+  public async loadByChurchId(churchId: string) {
+    const result = await this.db.select().from(sentTexts)
+      .where(eq(sentTexts.churchId, churchId))
+      .orderBy(desc(sentTexts.timeSent));
+    return result || [];
   }
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM sentTexts WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  protected rowToModel(data: any): SentText {
-    return {
-      id: data.id,
-      churchId: data.churchId,
-      groupId: data.groupId,
-      recipientPersonId: data.recipientPersonId,
-      senderPersonId: data.senderPersonId,
-      message: data.message,
-      recipientCount: data.recipientCount,
-      successCount: data.successCount,
-      failCount: data.failCount,
-      timeSent: data.timeSent
-    };
-  }
-
-  public convertToModel(data: any) {
-    return this.rowToModel(data);
-  }
-
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public async loadById(churchId: string, id: string) {
+    return this.db.select().from(sentTexts)
+      .where(and(eq(sentTexts.id, id), eq(sentTexts.churchId, churchId)))
+      .then(r => r[0] ?? null);
   }
 }

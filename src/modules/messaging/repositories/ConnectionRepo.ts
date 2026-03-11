@@ -1,30 +1,37 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Connection } from "../models/index.js";
-import { ViewerInterface } from "../helpers/Interfaces.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, ne, sql } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { connections } from "../../../db/schema/messaging.js";
+import { ViewerInterface } from "../helpers/Interfaces.js";
 
 @injectable()
-export class ConnectionRepo extends ConfiguredRepo<Connection> {
-  protected get repoConfig(): RepoConfig<Connection> {
-    return {
-      tableName: "connections",
-      hasSoftDelete: false,
-      insertColumns: ["conversationId", "personId", "displayName", "socketId", "ipAddress"],
-      updateColumns: ["personId", "displayName"],
-      insertLiterals: { timeJoined: "NOW()" }
-    };
+export class ConnectionRepo extends DrizzleRepo<typeof connections> {
+  protected readonly table = connections;
+  protected readonly moduleName = "messaging";
+
+  public async save(model: any) {
+    if (model.id) {
+      await this.db.update(connections).set(model)
+        .where(and(eq(connections.id, model.id), eq(connections.churchId, model.churchId)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      await this.deleteExisting(model.churchId, model.conversationId, model.socketId, model.id);
+      model.timeJoined = new Date();
+      await this.db.insert(connections).values(model);
+    }
+    return model;
   }
 
-  // Override create to handle deleteExisting logic
-  protected async create(connection: Connection): Promise<Connection> {
-    if (!connection.id) connection.id = this.createId();
-    await this.deleteExisting(connection.churchId, connection.conversationId, connection.socketId, connection.id);
-    return super.create(connection);
-  }
   public async loadAttendance(churchId: string, conversationId: string) {
-    const sql = "SELECT id, displayName, ipAddress FROM connections WHERE churchId=? AND conversationId=? ORDER BY displayName;";
-    const result: any = await TypedDB.query(sql, [churchId, conversationId]);
+    const result = await this.db.select({
+      id: connections.id,
+      displayName: connections.displayName,
+      ipAddress: connections.ipAddress,
+    })
+      .from(connections)
+      .where(and(eq(connections.churchId, churchId), eq(connections.conversationId, conversationId)))
+      .orderBy(connections.displayName);
     const data: ViewerInterface[] = result || [];
     data.forEach((d: ViewerInterface) => {
       if (d.displayName === "") d.displayName = "Anonymous";
@@ -33,57 +40,50 @@ export class ConnectionRepo extends ConfiguredRepo<Connection> {
   }
 
   public async loadById(churchId: string, id: string) {
-    const result: any = await TypedDB.queryOne("SELECT * FROM connections WHERE id=? and churchId=?;", [id, churchId]);
+    const result = await this.db.select().from(connections)
+      .where(and(eq(connections.id, id), eq(connections.churchId, churchId)))
+      .then(r => r[0] ?? null);
     return result || {};
   }
 
   public async loadForConversation(churchId: string, conversationId: string) {
-    const result: any = await TypedDB.query("SELECT * FROM connections WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
+    const result = await this.db.select().from(connections)
+      .where(and(eq(connections.churchId, churchId), eq(connections.conversationId, conversationId)));
     return result || [];
   }
 
   public async loadForNotification(churchId: string, personId: string) {
-    const result: any = await TypedDB.query("SELECT * FROM connections WHERE churchId=? AND personId=? and conversationId='alerts'", [churchId, personId]);
+    const result = await this.db.select().from(connections)
+      .where(and(
+        eq(connections.churchId, churchId),
+        eq(connections.personId, personId),
+        eq(connections.conversationId, "alerts")
+      ));
     return result || [];
   }
 
   public async loadBySocketId(socketId: string) {
-    const result: any = await TypedDB.query("SELECT * FROM connections WHERE socketId=?", [socketId]);
+    const result = await this.db.select().from(connections)
+      .where(eq(connections.socketId, socketId));
     return result || [];
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM connections WHERE id=? AND churchId=?;", [id, churchId]);
+  public async delete(churchId: string, id: string) {
+    await this.db.delete(connections)
+      .where(and(eq(connections.id, id), eq(connections.churchId, churchId)));
   }
 
-  public deleteForSocket(socketId: string) {
-    return TypedDB.query("DELETE FROM connections WHERE socketId=?;", [socketId]);
+  public async deleteForSocket(socketId: string) {
+    await this.db.delete(connections).where(eq(connections.socketId, socketId));
   }
 
-  public deleteExisting(churchId: string, conversationId: string, socketId: string, id: string) {
-    const sql = "DELETE FROM connections WHERE churchId=? AND conversationId=? AND socketId=? AND id<>?;";
-    const params = [churchId, conversationId, socketId, id];
-    return TypedDB.query(sql, params);
-  }
-
-  protected rowToModel(data: any): Connection {
-    return {
-      id: data.id,
-      churchId: data.churchId,
-      conversationId: data.conversationId,
-      personId: data.personId,
-      displayName: data.displayName,
-      timeJoined: data.timeJoined,
-      socketId: data.socketId,
-      ipAddress: data.ipAddress
-    };
-  }
-
-  public convertToModel(data: any) {
-    return this.rowToModel(data);
-  }
-
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public async deleteExisting(churchId: string, conversationId: string, socketId: string, id: string) {
+    await this.db.delete(connections)
+      .where(and(
+        eq(connections.churchId, churchId),
+        eq(connections.conversationId, conversationId),
+        eq(connections.socketId, socketId),
+        ne(connections.id, id)
+      ));
   }
 }

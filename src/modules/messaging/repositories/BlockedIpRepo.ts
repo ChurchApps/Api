@@ -1,54 +1,48 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { BlockedIp } from "../models/index.js";
 import { injectable } from "inversify";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { blockedIps } from "../../../db/schema/messaging.js";
 
 @injectable()
-export class BlockedIpRepo extends ConfiguredRepo<BlockedIp> {
-  protected get repoConfig(): RepoConfig<BlockedIp> {
-    return {
-      tableName: "blockedIps",
-      hasSoftDelete: false,
-      columns: ["conversationId", "serviceId", "ipAddress"]
-    };
+export class BlockedIpRepo extends DrizzleRepo<typeof blockedIps> {
+  protected readonly table = blockedIps;
+  protected readonly moduleName = "messaging";
+
+  // Toggle behavior: if exists delete, if not insert
+  public async save(blockedIp: any) {
+    const existing = await this.db.select({ id: blockedIps.id })
+      .from(blockedIps)
+      .where(and(
+        eq(blockedIps.churchId, blockedIp.churchId),
+        eq(blockedIps.conversationId, blockedIp.conversationId),
+        eq(blockedIps.ipAddress, blockedIp.ipAddress)
+      ));
+    if (existing[0]?.id) {
+      await this.db.delete(blockedIps).where(eq(blockedIps.id, existing[0].id));
+      return;
+    }
+    return super.save(blockedIp);
   }
+
   public async loadByConversationId(churchId: string, conversationId: string) {
-    const sql = "SELECT * FROM blockedIps WHERE churchId=? AND conversationId=?;";
-    const params = [churchId, conversationId];
-    const result: any = await TypedDB.query(sql, params);
-    const data = result || [];
-    const ips = data.map((d: BlockedIp) => d.ipAddress);
-    return ips;
+    const result = await this.db.select()
+      .from(blockedIps)
+      .where(and(eq(blockedIps.churchId, churchId), eq(blockedIps.conversationId, conversationId)));
+    return (result || []).map((d: any) => d.ipAddress);
   }
 
   public async loadByServiceId(churchId: string, serviceId: string) {
-    const result: any = await TypedDB.query("SELECT * FROM blockedIps WHERE churchId=? AND serviceId=?;", [churchId, serviceId]);
+    const result = await this.db.select()
+      .from(blockedIps)
+      .where(and(eq(blockedIps.churchId, churchId), eq(blockedIps.serviceId, serviceId)));
     return result || [];
   }
 
-  // Override save to implement toggle behavior (if exists, delete; if not, create)
-  public async save(blockedIp: BlockedIp) {
-    const result: any = await TypedDB.query("SELECT id FROM blockedIps WHERE churchId=? AND conversationId=? AND ipAddress=?;", [blockedIp.churchId, blockedIp.conversationId, blockedIp.ipAddress]);
-    const existingIp = result || [];
-    return existingIp[0]?.id ? this.deleteExisting(existingIp[0].id) : super.save(blockedIp);
+  public async deleteByServiceId(churchId: string, serviceId: string) {
+    await this.db.delete(blockedIps)
+      .where(and(eq(blockedIps.churchId, churchId), eq(blockedIps.serviceId, serviceId)));
   }
 
-  private deleteExisting(id: string) {
-    return TypedDB.query("DELETE FROM blockedIps WHERE id=?;", [id]);
-  }
 
-  public deleteByServiceId(churchId: string, serviceId: string) {
-    return TypedDB.query("DELETE FROM blockedIps WHERE churchId=? AND serviceId=?;", [churchId, serviceId]);
-  }
-
-  protected rowToModel(row: any): BlockedIp {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      conversationId: row.conversationId,
-      serviceId: row.serviceId,
-      ipAddress: row.ipAddress
-    };
-  }
 }

@@ -29,7 +29,7 @@ export class ConnectionController extends MessagingBaseController {
   public async load(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.connection.loadForConversation(churchId, conversationId);
-      const connections = this.repos.connection.convertAllToModel(data);
+      const connections = data;
       return connections;
     });
   }
@@ -71,7 +71,7 @@ export class ConnectionController extends MessagingBaseController {
       }
 
       const savedConnections = await Promise.all(promises);
-      const result = this.repos.connection.convertAllToModel(savedConnections);
+      const result = savedConnections;
 
       return result;
     });
@@ -91,7 +91,7 @@ export class ConnectionController extends MessagingBaseController {
           })
         );
       });
-      return this.repos.connection.convertAllToModel(await Promise.all(promises));
+      return await Promise.all(promises);
     });
   }
 }

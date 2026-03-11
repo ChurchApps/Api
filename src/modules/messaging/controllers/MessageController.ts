@@ -12,7 +12,7 @@ export class MessageController extends MessagingBaseController {
   public async loadByConversation(@requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const messages: Message[] = await this.repos.message.loadForConversation(au.churchId, conversationId);
-      return this.repos.message.convertAllToModel(messages);
+      return messages;
     });
   }
 
@@ -20,7 +20,7 @@ export class MessageController extends MessagingBaseController {
   public async catchup(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
       const messages: Message[] = await this.repos.message.loadForConversation(churchId, conversationId);
-      return this.repos.message.convertAllToModel(messages);
+      return messages;
     }) as any;
   }
 
@@ -32,7 +32,7 @@ export class MessageController extends MessagingBaseController {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
             const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
-            const conv = this.repos.conversation.convertToModel(conversation);
+            const conv = conversation;
             await this.repos.conversation.updateStats(message.conversationId);
 
             // Send real-time updates
@@ -51,7 +51,7 @@ export class MessageController extends MessagingBaseController {
         );
       }) as any;
       const result = await Promise.all(promises);
-      return this.repos.message.convertAllToModel(result as any[]);
+      return result;
     }) as any;
   }
 
@@ -77,7 +77,7 @@ export class MessageController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.message.loadById(churchId, id);
-      return this.repos.message.convertToModel(data);
+      return data;
     }) as any;
   }
 
@@ -92,7 +92,7 @@ export class MessageController extends MessagingBaseController {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
             const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
-            const conv = this.repos.conversation.convertToModel(conversation);
+            const conv = conversation;
             await this.repos.conversation.updateStats(message.conversationId);
 
             // Send real-time updates
@@ -111,7 +111,7 @@ export class MessageController extends MessagingBaseController {
         );
       }) as any;
       const result = await Promise.all(promises);
-      return this.repos.message.convertAllToModel(result as any[]);
+      return result;
     }) as any;
   }
 

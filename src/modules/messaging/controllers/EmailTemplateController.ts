@@ -23,7 +23,7 @@ export class EmailTemplateController extends MessagingBaseController {
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const rows = await this.repos.emailTemplate.loadByChurchId(au.churchId);
-      return this.repos.emailTemplate.convertAllToModel(rows as any[]);
+      return rows;
     });
   }
 
@@ -56,7 +56,7 @@ export class EmailTemplateController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const row = await this.repos.emailTemplate.loadById(au.churchId, id);
       if (!row) return this.json({ error: "Not found" }, 404);
-      return this.repos.emailTemplate.convertToModel(row);
+      return row;
     });
   }
 
@@ -70,7 +70,7 @@ export class EmailTemplateController extends MessagingBaseController {
           return this.repos.emailTemplate.save(template);
         })
       );
-      return this.repos.emailTemplate.convertAllToModel(saved as any[]);
+      return saved;
     });
   }
 
