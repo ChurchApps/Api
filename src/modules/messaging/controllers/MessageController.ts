@@ -4,6 +4,7 @@ import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Message } from "../models/index.js";
 import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
 import { NotificationHelper } from "../helpers/NotificationHelper.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 @controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {
@@ -113,25 +114,29 @@ export class MessageController extends MessagingBaseController {
     }) as any;
   }
 
-  @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       const message = await this.repos.message.loadById(au.churchId, id);
-      if (Object.keys(message).length !== 0) {
-        await this.repos.message.delete(au.churchId, id);
-
-        // Send real-time delete notification
-        (await DeliveryHelper.sendConversationMessages({
-          churchId: au.churchId,
-          conversationId: message.conversationId,
-          action: "deleteMessage",
-          data: { id }
-        })) as any;
-
-        return this.json({ message: "Message deleted successfully" }, 200);
-      } else {
+      if (Object.keys(message).length === 0) {
         return this.json({ error: "Message not found" }, 404);
       }
+      const isOwner = message.personId === au.personId;
+      const canEdit = au.checkAccess(Permissions.content.edit);
+      if (!isOwner && !canEdit) {
+        return this.json({ error: "Unauthorized" }, 401);
+      }
+      await this.repos.message.delete(au.churchId, id);
+
+      // Send real-time delete notification
+      (await DeliveryHelper.sendConversationMessages({
+        churchId: au.churchId,
+        conversationId: message.conversationId,
+        action: "deleteMessage",
+        data: { id }
+      })) as any;
+
+      return this.json({ message: "Message deleted successfully" }, 200);
     }) as any;
   }
 }
