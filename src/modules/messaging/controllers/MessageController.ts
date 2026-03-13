@@ -88,6 +88,7 @@ export class MessageController extends MessagingBaseController {
       req.body.forEach((message) => {
         if (!message.churchId && au?.churchId) message.churchId = au.churchId;
         if (!message.personId && au?.personId) message.personId = au.personId;
+        if (!message.displayName && au?.firstName) message.displayName = au.firstName + " " + au.lastName;
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
             const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
