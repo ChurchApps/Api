@@ -231,13 +231,16 @@ export class UserController extends MembershipBaseController {
 
       if (user) return res.status(400).json({ errors: ["user already exists"] });
       else {
+        const regStart = Date.now();
         const tempPassword = UniqueIdHelper.shortId();
         user = { email: register.email, firstName: register.firstName, lastName: register.lastName };
         user.authGuid = v4();
         user.registrationDate = new Date();
         user.password = bcrypt.hashSync(tempPassword, 10);
+        console.log("Register: bcrypt", Date.now() - regStart, "ms");
 
         try {
+          const emailStart = Date.now();
           const timestamp = Date.now();
           const emailPromises: Promise<any>[] = [];
           emailPromises.push(UserHelper.sendWelcomeEmail(register.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, register.appName, register.appUrl));
@@ -247,19 +250,25 @@ export class UserController extends MembershipBaseController {
             emailPromises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody));
           }
           await Promise.all(emailPromises);
+          console.log("Register: emails", Date.now() - emailStart, "ms");
         } catch (err) {
           return this.json({ errors: [err.toString()] });
           // return this.json({ errors: ["Email address does not exist."] })
         }
-        const userCount = await this.repos.user.loadCount();
 
+        let stepStart = Date.now();
+        const userCount = await this.repos.user.loadCount();
         user = await this.repos.user.save(user);
+        console.log("Register: save user", Date.now() - stepStart, "ms");
 
         // Create userChurch records for matching people in groups
+        stepStart = Date.now();
         await UserChurchHelper.createForNewUser(user.id, user.email);
+        console.log("Register: createForNewUser", Date.now() - stepStart, "ms");
 
         // Link pre-selected church from People record match (even if person isn't in a group)
         if (register.churchId) {
+          stepStart = Date.now();
           const existingUC = await this.repos.userChurch.loadByUserId(user.id, register.churchId);
           if (!existingUC) {
             const matchingPeople = await this.repos.person.searchEmail(register.churchId, user.email);
@@ -268,6 +277,7 @@ export class UserController extends MembershipBaseController {
               await this.repos.userChurch.save({ userId: user.id, churchId: register.churchId, personId: exactMatch.id });
             }
           }
+          console.log("Register: link churchId", Date.now() - stepStart, "ms");
         }
 
         // Add first user to server admins group
@@ -276,6 +286,7 @@ export class UserController extends MembershipBaseController {
             this.repos.roleMember.save({ roleId: roles[0].id, userId: user.id, addedBy: user.id });
           });
         }
+        console.log("Register: total", Date.now() - regStart, "ms");
       }
       user.password = null;
       return this.json(user, 200);
@@ -476,9 +487,8 @@ export class UserController extends MembershipBaseController {
       const user = await this.repos.user.loadByEmail(email);
       if (user) {
         isExistingUser = true;
-        const timestamp = Date.now();
         user.authGuid = v4();
-        loginLink = `/login?auth=${user.authGuid}&timestamp=${timestamp}`;
+        loginLink = `/login?auth=${user.authGuid}`;
         await Promise.all([
           this.repos.user.save(user),
           UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser)
