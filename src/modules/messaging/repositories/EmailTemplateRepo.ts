@@ -13,7 +13,8 @@ export class EmailTemplateRepo extends DrizzleRepo<typeof emailTemplates> {
     const now = new Date();
     if (model.id) {
       model.dateModified = now;
-      await this.db.update(emailTemplates).set(model)
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(emailTemplates).set(setData)
         .where(and(eq(emailTemplates.id, model.id), eq(emailTemplates.churchId, model.churchId)));
     } else {
       model.id = UniqueIdHelper.shortId();

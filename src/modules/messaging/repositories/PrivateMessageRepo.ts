@@ -10,7 +10,7 @@ export class PrivateMessageRepo extends DrizzleRepo<typeof privateMessages> {
   protected readonly moduleName = "messaging";
 
   public async loadByPersonId(churchId: string, personId: string): Promise<any[]> {
-    return this.executeRows(
+    const rows = await this.executeRows(
       getDialect() === "postgres"
         ? sql`
           SELECT c.*, pm.id AS "pmId", pm."fromPersonId", pm."toPersonId", pm."notifyPersonId", pm."deliveryMethod", m."timeSent" AS "lastMessageTime"
@@ -27,6 +27,33 @@ export class PrivateMessageRepo extends DrizzleRepo<typeof privateMessages> {
           WHERE pm.churchId = ${churchId} AND (pm.fromPersonId = ${personId} OR pm.toPersonId = ${personId})
           ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC`
     );
+    return rows.map(data => this.rowToModel(data));
+  }
+
+  private rowToModel(data: any): any {
+    return {
+      id: data.pmId || data.id,
+      churchId: data.churchId,
+      fromPersonId: data.fromPersonId,
+      toPersonId: data.toPersonId,
+      conversationId: data.pmId ? data.id : data.conversationId,
+      notifyPersonId: data.notifyPersonId,
+      deliveryMethod: data.deliveryMethod,
+      conversation: {
+        id: data.id,
+        churchId: data.churchId,
+        contentType: data.contentType,
+        contentId: data.contentId,
+        title: data.title,
+        dateCreated: data.dateCreated,
+        groupId: data.groupId,
+        visibility: data.visibility,
+        firstPostId: data.firstPostId,
+        lastPostId: data.lastPostId,
+        postCount: data.postCount,
+        allowAnonymousPosts: data.allowAnonymousPosts
+      }
+    };
   }
 
   public async loadById(churchId: string, id: string) {

@@ -11,7 +11,8 @@ export class DeviceRepo extends DrizzleRepo<typeof devices> {
 
   public async save(model: any) {
     if (model.id) {
-      await this.db.update(devices).set(model).where(eq(devices.id, model.id));
+      const { id: _id, ...setData } = model;
+      await this.db.update(devices).set(setData).where(eq(devices.id, model.id));
     } else {
       model.id = UniqueIdHelper.shortId();
       await this.db.insert(devices).values(model);

@@ -32,7 +32,6 @@ export class MessageController extends MessagingBaseController {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
             const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
-            const conv = conversation;
             await this.repos.conversation.updateStats(message.conversationId);
 
             // Send real-time updates
@@ -44,7 +43,7 @@ export class MessageController extends MessagingBaseController {
             })) as any;
 
             // Handle notifications
-            await NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous");
+            await NotificationHelper.checkShouldNotify(conversation, savedMessage, savedMessage.personId || "anonymous");
 
             return savedMessage;
           })
@@ -92,7 +91,6 @@ export class MessageController extends MessagingBaseController {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
             const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
-            const conv = conversation;
             await this.repos.conversation.updateStats(message.conversationId);
 
             // Send real-time updates
@@ -104,7 +102,7 @@ export class MessageController extends MessagingBaseController {
             })) as any;
 
             // Handle notifications
-            await NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous");
+            await NotificationHelper.checkShouldNotify(conversation, savedMessage, savedMessage.personId || "anonymous");
 
             return savedMessage;
           })

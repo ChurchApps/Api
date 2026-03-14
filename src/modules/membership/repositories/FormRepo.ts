@@ -54,7 +54,7 @@ export class FormRepo extends DrizzleRepo<typeof forms> {
 
   public loadAll(churchId: string) {
     return this.db.select().from(forms)
-      .where(and(eq(forms.churchId, churchId), eq(forms.removed, false), eq(forms.archived, false)));
+      .where(and(eq(forms.churchId, churchId), eq(forms.removed, false)));
   }
 
   public loadAllArchived(churchId: string) {

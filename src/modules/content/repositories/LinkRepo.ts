@@ -69,5 +69,23 @@ export class LinkRepo extends DrizzleRepo<typeof links> {
     return this.loadOne(churchId, id);
   }
 
+  public convertToModel(_churchId: string, data: any) {
+    return this.rowToModel(data);
+  }
 
+  public convertAllToModel(_churchId: string, data: any) {
+    return (Array.isArray(data) ? data : []).map((d: any) => this.rowToModel(d));
+  }
+
+  private rowToModel(row: any): Link {
+    const result = { ...row };
+    if (result.photo === undefined) {
+      if (!result.photoUpdated) {
+        result.photo = "";
+      } else {
+        result.photo = "/" + result.churchId + "/b1/tabs/" + row.id + ".png?dt=" + row.photoUpdated.getTime().toString();
+      }
+    }
+    return result;
+  }
 }

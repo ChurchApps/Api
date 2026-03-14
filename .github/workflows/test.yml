@@ -28,6 +28,7 @@ jobs:
   integration-tests-mysql:
     name: Integration Tests (MySQL)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: lint-and-typecheck
 
     services:
@@ -93,6 +94,7 @@ jobs:
   integration-tests-postgres:
     name: Integration Tests (PostgreSQL)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: lint-and-typecheck
 
     services:

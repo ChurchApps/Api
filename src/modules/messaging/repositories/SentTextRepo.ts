@@ -11,7 +11,8 @@ export class SentTextRepo extends DrizzleRepo<typeof sentTexts> {
 
   public async save(model: any) {
     if (model.id) {
-      await this.db.update(sentTexts).set(model)
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(sentTexts).set(setData)
         .where(and(eq(sentTexts.id, model.id), eq(sentTexts.churchId, model.churchId)));
     } else {
       model.id = UniqueIdHelper.shortId();

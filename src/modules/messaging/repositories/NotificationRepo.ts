@@ -12,7 +12,8 @@ export class NotificationRepo extends DrizzleRepo<typeof notifications> {
 
   public async save(model: any) {
     if (model.id) {
-      await this.db.update(notifications).set(model)
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(notifications).set(setData)
         .where(and(eq(notifications.id, model.id), eq(notifications.churchId, model.churchId)));
     } else {
       model.id = UniqueIdHelper.shortId();

@@ -14,7 +14,8 @@ export class ConversationRepo extends DrizzleRepo<typeof conversations> {
   public async save(model: any) {
     await this.cleanup();
     if (model.id) {
-      await this.db.update(conversations).set(model)
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(conversations).set(setData)
         .where(and(eq(conversations.id, model.id), eq(conversations.churchId, model.churchId)));
     } else {
       model.id = UniqueIdHelper.shortId();

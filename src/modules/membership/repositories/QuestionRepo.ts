@@ -54,7 +54,9 @@ export class QuestionRepo extends DrizzleRepo<typeof questions> {
     if (question) {
       await this.db.update(questions).set({ sort: sql`sort - 1` } as any)
         .where(and(eq(questions.formId, question.formId!), sql`${questions.sort} > ${question.sort}`));
-      await this.db.update(questions).set({ removed: true } as any)
+      // Mark sort as negative to avoid conflicting with renumbered siblings.
+      // Upstream used CONCAT('d', sort) which MySQL silently truncated to 0.
+      await this.db.update(questions).set({ sort: sql`-1 * sort`, removed: true } as any)
         .where(and(eq(questions.id, id), eq(questions.churchId, churchId)));
     }
   }

@@ -42,8 +42,13 @@ export function qi(name: string): string {
   return getDialect() === "postgres" ? `"${name}"` : `\`${name}\``;
 }
 
-/** Execute DELETE FROM table WHERE churchId = ? — handles dialect-specific quoting */
+/**
+ * Build a DELETE FROM table WHERE churchId = 'value' statement with dialect-aware quoting.
+ * Only for use in test cleanup (afterAll). Validates inputs to prevent SQL injection.
+ */
 export function cleanupSql(table: string, churchIdValue: string) {
+  if (!/^[a-zA-Z_]\w*$/.test(table)) throw new Error(`Invalid table name: ${table}`);
+  if (!/^[\w-]+$/.test(churchIdValue)) throw new Error(`Invalid churchId value: ${churchIdValue}`);
   return drizzleSql.raw(`DELETE FROM ${qi(table)} WHERE ${qi("churchId")} = '${churchIdValue}'`);
 }
 

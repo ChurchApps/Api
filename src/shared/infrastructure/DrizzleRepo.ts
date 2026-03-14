@@ -47,7 +47,7 @@ abstract class BaseDrizzleRepo<TTable extends AnyTable> {
  *
  * Set `protected readonly softDelete = true` in subclasses whose table has a
  * `removed` column.  When enabled:
- *   - `delete()` sets `removed = 1` instead of deleting the row.
+ *   - `delete()` sets `removed = true` instead of deleting the row.
  *   - `load()`, `loadOne()`, and `loadAll()` automatically exclude removed rows.
  */
 export abstract class DrizzleRepo<TTable extends AnyTable> extends BaseDrizzleRepo<TTable> {

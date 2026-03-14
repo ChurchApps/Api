@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, inArray, desc, asc, gte, between } from "drizzle-orm";
+import { eq, and, inArray, desc, asc, gte, between, sql } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
@@ -29,8 +29,10 @@ export class PlanRepo extends DrizzleRepo<typeof plans> {
   }
 
   public load7Days(churchId: string) {
+    const today = DateHelper.toMysqlDateOnly(new Date()) as string;
+    const weekOut = DateHelper.toMysqlDateOnly(DateHelper.daysFromNow(7)) as string;
     return this.db.select().from(plans)
-      .where(and(eq(plans.churchId, churchId), between(plans.serviceDate, DateHelper.startOfToday(), DateHelper.daysFromNow(7))))
+      .where(and(eq(plans.churchId, churchId), between(plans.serviceDate, sql`${today}`, sql`${weekOut}`)))
       .orderBy(desc(plans.serviceDate));
   }
 
@@ -41,8 +43,9 @@ export class PlanRepo extends DrizzleRepo<typeof plans> {
   }
 
   public loadCurrentByPlanTypeId(planTypeId: string) {
+    const today = DateHelper.toMysqlDateOnly(new Date()) as string;
     return this.db.select().from(plans)
-      .where(and(eq(plans.planTypeId, planTypeId), gte(plans.serviceDate, DateHelper.startOfToday())))
+      .where(and(eq(plans.planTypeId, planTypeId), gte(plans.serviceDate, sql`${today}`)))
       .orderBy(asc(plans.serviceDate))
       .limit(1)
       .then(r => r[0] ?? null);
@@ -52,7 +55,7 @@ export class PlanRepo extends DrizzleRepo<typeof plans> {
     const result = await this.db.selectDistinct({ plans })
       .from(plans)
       .innerJoin(positions, and(eq(positions.planId, plans.id), eq(positions.churchId, plans.churchId)))
-      .where(and(eq(plans.churchId, churchId), eq(positions.allowSelfSignup, true), gte(plans.serviceDate, DateHelper.startOfToday())))
+      .where(and(eq(plans.churchId, churchId), eq(positions.allowSelfSignup, true), gte(plans.serviceDate, sql`${DateHelper.toMysqlDateOnly(new Date())}`)))
       .orderBy(asc(plans.serviceDate));
     return result.map(r => r.plans);
   }

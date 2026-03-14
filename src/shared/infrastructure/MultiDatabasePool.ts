@@ -56,7 +56,7 @@ export class MultiDatabasePool {
       // Each module uses its own PG schema via search_path.
       // Tables created by Drizzle land in the module's schema.
       const searchPath = `${moduleName}, public`;
-      client = postgres({
+      const rawClient = postgres({
         host: dbConfig.host,
         port: dbConfig.port || 5432,
         user: dbConfig.user,
@@ -65,6 +65,16 @@ export class MultiDatabasePool {
         max: dbConfig.connectionLimit || 10,
         connection: { search_path: searchPath }
       });
+
+      // Wrap the client's unsafe() method to auto-serialize Date objects.
+      // Drizzle-ORM uses client.unsafe(query, params) which bypasses
+      // postgres.js's built-in type system, causing Date serialization failures.
+      const origUnsafe = rawClient.unsafe.bind(rawClient);
+      rawClient.unsafe = (query: string, params?: any[], ...rest: any[]) => {
+        const serialized = params?.map(p => p instanceof Date ? p.toISOString() : p);
+        return origUnsafe(query, serialized, ...rest);
+      };
+      client = rawClient;
 
       this.pgClients.set(moduleName, client);
     }

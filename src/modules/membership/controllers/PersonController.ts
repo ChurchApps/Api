@@ -237,14 +237,16 @@ export class PersonController extends MembershipBaseController {
   public async getDirectoryPeople(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (au.personId !== id && !au.checkAccess(Permissions.people.view)) {
+        if (!(await this.isMember(au.membershipStatus))) return this.json({}, 401);
         if (id === "all") {
-          return this.repos.person.convertAllToBasicModel(au.churchId, (await this.repos.person.loadAll(au.churchId)) as any[]);
+          const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
+          const data = (await this.repos.person.loadMembersByVisibility(au.churchId, directoryVisibility)) as any[];
+          return this.repos.person.convertAllToBasicModel(au.churchId, data);
         } else {
           const data = await this.repos.person.load(au.churchId, id);
           if (!data) return null;
           const result = this.repos.person.convertToModelWithPermissions(au.churchId, data, false);
           return this.repos.person.convertToPreferenceModel(au.churchId, await this.checkVisibilityPref(id, au, result, this.repos));
-          // return result;
         }
       } else {
         if (id === "all") {

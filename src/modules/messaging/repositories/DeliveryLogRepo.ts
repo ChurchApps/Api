@@ -11,7 +11,8 @@ export class DeliveryLogRepo extends DrizzleRepo<typeof deliveryLogs> {
 
   public async save(model: any) {
     if (model.id) {
-      await this.db.update(deliveryLogs).set(model)
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(deliveryLogs).set(setData)
         .where(and(eq(deliveryLogs.id, model.id), eq(deliveryLogs.churchId, model.churchId)));
     } else {
       model.id = UniqueIdHelper.shortId();

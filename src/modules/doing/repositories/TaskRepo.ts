@@ -12,7 +12,8 @@ export class TaskRepo extends DrizzleRepo<typeof tasks> {
 
   public override async save(model: Task) {
     if (model.id) {
-      await this.db.update(tasks).set(model).where(and(eq(tasks.id, model.id), eq(tasks.churchId, model.churchId)));
+      const { id: _id, churchId: _cid, taskNumber: _tn, ...setData } = model as any;
+      await this.db.update(tasks).set(setData).where(and(eq(tasks.id, model.id), eq(tasks.churchId, model.churchId)));
     } else {
       model.id = UniqueIdHelper.shortId();
       const taskNumber = await this.loadNextTaskNumber(model.churchId || "");

@@ -12,7 +12,8 @@ export class ConnectionRepo extends DrizzleRepo<typeof connections> {
 
   public async save(model: any) {
     if (model.id) {
-      await this.db.update(connections).set(model)
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(connections).set(setData)
         .where(and(eq(connections.id, model.id), eq(connections.churchId, model.churchId)));
     } else {
       model.id = UniqueIdHelper.shortId();

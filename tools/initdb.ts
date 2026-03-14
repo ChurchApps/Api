@@ -547,8 +547,12 @@ function mysqlToPgSql(sql: string): string {
   result = result.replace(/\btinyint(\(\d+\))?/gi, 'boolean');
   // int(N) → integer (must come after tinyint to avoid double-replacing)
   result = result.replace(/\bint\(\d+\)/gi, 'integer');
-  // double → double precision
-  result = result.replace(/\bdouble\b/gi, 'double precision');
+  // float → real
+  result = result.replace(/\bfloat\b/gi, 'real');
+  // double → double precision (negative lookahead avoids 'double precision precision')
+  result = result.replace(/\bdouble\b(?!\s+precision)/gi, 'double precision');
+  // decimal(N,M) → numeric(N,M)
+  result = result.replace(/\bdecimal\b/gi, 'numeric');
   // mediumtext / longtext / tinytext → text
   result = result.replace(/\b(medium|long|tiny)text\b/gi, 'text');
   // longblob / mediumblob / tinyblob → bytea
@@ -566,7 +570,6 @@ function mysqlToPgSql(sql: string): string {
   // Standalone INDEX lines (not preceded by comma, e.g. at end of CREATE TABLE)
   result = result.replace(/^\s*INDEX\s+"[^"]+"\s*\([^)]+\),?\s*$/gim, '');
   // TRUNCATE TABLE — PG needs CASCADE for FK constraints
-  result = result.replace(/^TRUNCATE\s+TABLE\s+/i, 'TRUNCATE TABLE ');
   if (/^TRUNCATE\s+TABLE\s/i.test(result) && !result.includes('CASCADE')) {
     result = result.replace(/;?\s*$/, ' CASCADE;');
   }
@@ -584,6 +587,8 @@ function mysqlToPgSql(sql: string): string {
   // MySQL binary literals b'0'/b'1' → false/true (used in INSERT values for BIT columns)
   result = result.replace(/\bb'1'/g, 'true');
   result = result.replace(/\bb'0'/g, 'false');
+  // SET FOREIGN_KEY_CHECKS — no-op in PG (uses DEFERRABLE constraints)
+  if (/^\s*SET\s+FOREIGN_KEY_CHECKS\b/i.test(result)) return '';
   return result;
 }
 
