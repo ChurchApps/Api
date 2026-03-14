@@ -16,9 +16,11 @@ export class RoleHelper {
   }
 
   public async init() {
-    await this.createDomainAdminRole();
-    await this.createAllMembersRole();
-    await this.createEveryoneRole();
+    await Promise.all([
+      this.createDomainAdminRole(),
+      this.createAllMembersRole(),
+      this.createEveryoneRole()
+    ]);
     // await this.createChumsRole()
     // await this.createB1Role()
     // await this.createLessonsRole()

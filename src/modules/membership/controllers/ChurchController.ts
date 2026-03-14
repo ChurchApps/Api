@@ -330,22 +330,21 @@ export class ChurchController extends MembershipBaseController {
         const instance = new RoleHelper(savedChurch.id, au.id);
         await instance.init(); // Setup roles and permissions
 
+        const postInitPromises: Promise<any>[] = [];
         if (Environment.emailOnRegistration) {
-          await EmailHelper.sendTemplatedEmail(
+          postInitPromises.push(EmailHelper.sendTemplatedEmail(
             Environment.supportEmail,
             Environment.supportEmail,
             appName,
             null,
             "New Church Registration",
             "<h2>" + church.name + "</h2><h3>App: " + (appName || "unknown") + "</h3>"
-          );
+          ));
         }
-
-        try {
-          if (Environment.hubspotKey) await HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName);
-        } catch {
-          // Hubspot registration failed - continuing without error
+        if (Environment.hubspotKey) {
+          postInitPromises.push(HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName).catch(() => {}));
         }
+        await Promise.all(postInitPromises);
         return church;
       }
     });

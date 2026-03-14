@@ -239,12 +239,14 @@ export class UserController extends MembershipBaseController {
 
         try {
           const timestamp = Date.now();
-          await UserHelper.sendWelcomeEmail(register.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, register.appName, register.appUrl);
+          const emailPromises: Promise<any>[] = [];
+          emailPromises.push(UserHelper.sendWelcomeEmail(register.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, register.appName, register.appUrl));
 
           if (Environment.emailOnRegistration) {
             const emailBody = "Name: " + register.firstName + " " + register.lastName + "<br/>Email: " + register.email + "<br/>App: " + register.appName;
-            await EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody);
+            emailPromises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody));
           }
+          await Promise.all(emailPromises);
         } catch (err) {
           return this.json({ errors: [err.toString()] });
           // return this.json({ errors: ["Email address does not exist."] })
