@@ -9,7 +9,7 @@
     "@aws-sdk/client-ses": "^3.862.0",
     "@aws-sdk/client-ssm": "^3.862.0",
     "@aws-sdk/lib-storage": "^3.862.0",
-    "@churchapps/apihelper": "^0.5.2",
+    "@churchapps/apihelper": "^0.5.4",
     "@churchapps/content-providers": "0.1.0",
     "@churchapps/texting": "0.1.0",
     "@codegenie/serverless-express": "^4.15.0",
