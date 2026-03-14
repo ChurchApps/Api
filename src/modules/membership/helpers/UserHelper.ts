@@ -69,6 +69,19 @@ export class UserHelper {
     return EmailHelper.sendTemplatedEmail(Environment.supportEmail, email, appName, appUrl, "Welcome to " + appName + ".", contents);
   }
 
+  static sendInviteEmail(email: string, personName: string, contextName: string, churchName: string, loginLink: string, isExistingUser: boolean): Promise<any> {
+    const appName = churchName || "ChurchApps";
+    const appUrl = Environment.b1AdminRoot;
+    const actionLabel = isExistingUser ? "Log In" : "Sign Up";
+    const subject = "You've been added to " + contextName;
+    const contents =
+      "<h2>Hello " + personName + ",</h2>" +
+      "<p>You have been added to <strong>" + contextName + "</strong> at " + appName + ".</p>" +
+      "<p>Click the button below to " + actionLabel.toLowerCase() + " and get started.</p>" +
+      `<p><a href="${appUrl}${loginLink}" class="btn btn-primary">${actionLabel}</a></p>`;
+    return EmailHelper.sendTemplatedEmail(Environment.supportEmail, email, appName, appUrl, subject, contents);
+  }
+
   static sendForgotEmail(email: string, loginLink: string, appName: string, appUrl: string): Promise<any> {
     if (!appName) appName = "ChurchApps";
     if (!appUrl) appUrl = Environment.b1AdminRoot;

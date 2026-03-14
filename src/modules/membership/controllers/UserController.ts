@@ -195,11 +195,13 @@ export class UserController extends MembershipBaseController {
 
       const { userId, userEmail, firstName, lastName } = req.body;
       let user: User;
+      let isNewUser = false;
 
       if (userId) user = await this.repos.user.load(userId);
       else user = await this.repos.user.loadByEmail(userEmail);
 
       if (!user) {
+        isNewUser = true;
         const timestamp = Date.now();
         user = { email: userEmail, firstName, lastName };
         user.registrationDate = new Date();
@@ -213,6 +215,7 @@ export class UserController extends MembershipBaseController {
         await UserChurchHelper.createForNewUser(user.id, user.email);
       }
       user.password = null;
+      (user as any).isNewUser = isNewUser;
       return this.json(user, 200);
     });
   }
@@ -457,6 +460,32 @@ export class UserController extends MembershipBaseController {
       });
 
       return this.json(users, 200);
+    });
+  }
+
+  @httpPost("/sendInviteEmail")
+  public async sendInviteEmail(req: express.Request<{}, {}, { email: string; personName: string; contextName: string; churchName: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (_au) => {
+      const { email, personName, contextName, churchName } = req.body;
+      if (!email || !contextName) return res.status(400).json({ errors: ["email and contextName are required"] });
+
+      let loginLink = "/";
+      let isExistingUser = false;
+      const user = await this.repos.user.loadByEmail(email);
+      if (user) {
+        isExistingUser = true;
+        const timestamp = Date.now();
+        user.authGuid = v4();
+        loginLink = `/login?auth=${user.authGuid}&timestamp=${timestamp}`;
+        await Promise.all([
+          this.repos.user.save(user),
+          UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser)
+        ]);
+      } else {
+        await UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser);
+      }
+
+      return this.json({ success: true }, 200);
     });
   }
 
