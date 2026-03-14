@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { visitSessions } from "../../../db/schema/attendance.js";
+import { visitSessions, sessions, serviceTimes, visits } from "../../../db/schema/attendance.js";
 import { VisitSession } from "../models/index.js";
 
 @injectable()
@@ -29,21 +29,21 @@ export class VisitSessionRepo extends DrizzleRepo<typeof visitSessions> {
 
   public async loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
     const rows = await this.executeRows(sql`
-      SELECT v.*
-      FROM sessions s
-      LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId
-      INNER JOIN visits v ON (v.serviceId = st.serviceId OR v.groupId = s.groupId) AND v.visitDate = s.sessionDate
-      WHERE v.churchId = ${churchId} AND s.id = ${sessionId} AND v.personId = ${personId} LIMIT 1
+      SELECT ${visits}.*
+      FROM ${sessions}
+      LEFT OUTER JOIN ${serviceTimes} ON ${serviceTimes.id} = ${sessions.serviceTimeId}
+      INNER JOIN ${visits} ON (${visits.serviceId} = ${serviceTimes.serviceId} OR ${visits.groupId} = ${sessions.groupId}) AND ${visits.visitDate} = ${sessions.sessionDate}
+      WHERE ${visits.churchId} = ${churchId} AND ${sessions.id} = ${sessionId} AND ${visits.personId} = ${personId} LIMIT 1
     `);
     return rows.length > 0 ? rows[0] : null;
   }
 
   public async loadForSession(churchId: string, sessionId: string) {
     return this.executeRows(sql`
-      SELECT vs.*, v.personId
-      FROM visitSessions vs
-      INNER JOIN visits v ON v.id = vs.visitId
-      WHERE vs.churchId = ${churchId} AND vs.sessionId = ${sessionId}
+      SELECT ${visitSessions}.*, ${visits.personId}
+      FROM ${visitSessions}
+      INNER JOIN ${visits} ON ${visits.id} = ${visitSessions.visitId}
+      WHERE ${visitSessions.churchId} = ${churchId} AND ${visitSessions.sessionId} = ${sessionId}
     `);
   }
 

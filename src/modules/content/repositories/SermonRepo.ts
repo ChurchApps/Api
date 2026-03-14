@@ -22,8 +22,8 @@ export class SermonRepo extends DrizzleRepo<typeof sermons> {
 
   public async loadTimeline(sermonIds: string[]): Promise<any[]> {
     return this.executeRows(sql`
-      SELECT 'sermon' as postType, id as postId, title, description, thumbnail
-      FROM sermons
+      SELECT 'sermon' as "postType", id as "postId", title, description, thumbnail
+      FROM ${sermons}
       WHERE id IN (${sql.join(sermonIds.map(id => sql`${id}`), sql`, `)})
     `);
   }

@@ -1,4 +1,4 @@
-import { initTestDb, teardownTestDb } from "../db-helper";
+import { initTestDb, teardownTestDb, cleanupSql } from "../db-helper";
 import { CampusRepo } from "../../modules/attendance/repositories/CampusRepo";
 import { ServiceRepo } from "../../modules/attendance/repositories/ServiceRepo";
 import { ServiceTimeRepo } from "../../modules/attendance/repositories/ServiceTimeRepo";
@@ -7,7 +7,6 @@ import { VisitRepo } from "../../modules/attendance/repositories/VisitRepo";
 import { VisitSessionRepo } from "../../modules/attendance/repositories/VisitSessionRepo";
 import { GroupServiceTimeRepo } from "../../modules/attendance/repositories/GroupServiceTimeRepo";
 import { getDrizzleDb } from "../../db/drizzle";
-import { sql } from "drizzle-orm";
 
 // Shared test churchId — must fit in char(11), unique per run
 const churchId = `t${Date.now().toString(36).slice(-10)}`;
@@ -19,13 +18,13 @@ beforeAll(async () => {
 afterAll(async () => {
   // Clean up test data
   const db = getDrizzleDb("attendance");
-  await db.execute(sql`DELETE FROM visitSessions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM visits WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM sessions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM groupServiceTimes WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM serviceTimes WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM services WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM campuses WHERE churchId = ${churchId}`);
+  await db.execute(cleanupSql("visitSessions", churchId));
+  await db.execute(cleanupSql("visits", churchId));
+  await db.execute(cleanupSql("sessions", churchId));
+  await db.execute(cleanupSql("groupServiceTimes", churchId));
+  await db.execute(cleanupSql("serviceTimes", churchId));
+  await db.execute(cleanupSql("services", churchId));
+  await db.execute(cleanupSql("campuses", churchId));
   await teardownTestDb();
 });
 

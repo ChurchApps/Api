@@ -303,7 +303,7 @@ export const songDetails = pgTable("songDetails", {
   album: varchar("album", { length: 45 }),
   language: varchar("language", { length: 5 }),
   thumbnail: varchar("thumbnail", { length: 255 }),
-  releaseDate: date("releaseDate"),
+  releaseDate: date("releaseDate", { mode: "date" }),
   bpm: integer("bpm"),
   keySignature: varchar("keySignature", { length: 5 }),
   seconds: integer("seconds"),
@@ -315,7 +315,7 @@ export const songs = pgTable("songs", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
   name: varchar("name", { length: 45 }),
-  dateAdded: date("dateAdded")
+  dateAdded: date("dateAdded", { mode: "date" })
 }, (t) => [index("cnt_ix_churchId_name").on(t.churchId, t.name)]);
 
 export const streamingServices = pgTable("streamingServices", {

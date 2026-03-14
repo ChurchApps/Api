@@ -1,4 +1,4 @@
-import { initTestDb, teardownTestDb } from "../db-helper";
+import { initTestDb, teardownTestDb, cleanupSql } from "../db-helper";
 import { CustomerRepo } from "../../modules/giving/repositories/CustomerRepo";
 import { DonationBatchRepo } from "../../modules/giving/repositories/DonationBatchRepo";
 import { DonationRepo } from "../../modules/giving/repositories/DonationRepo";
@@ -10,7 +10,6 @@ import { GatewayRepo } from "../../modules/giving/repositories/GatewayRepo";
 import { SubscriptionRepo } from "../../modules/giving/repositories/SubscriptionRepo";
 import { SubscriptionFundsRepo } from "../../modules/giving/repositories/SubscriptionFundsRepo";
 import { getDrizzleDb } from "../../db/drizzle";
-import { sql } from "drizzle-orm";
 
 // Shared test churchId — must fit in char(11), unique per run
 const churchId = `g${Date.now().toString(36).slice(-10)}`;
@@ -21,16 +20,16 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = getDrizzleDb("giving");
-  await db.execute(sql`DELETE FROM subscriptionFunds WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM subscriptions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM fundDonations WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM donations WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM donationBatches WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM eventLogs WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM gatewayPaymentMethods WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM gateways WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM funds WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM customers WHERE churchId = ${churchId}`);
+  await db.execute(cleanupSql("subscriptionFunds", churchId));
+  await db.execute(cleanupSql("subscriptions", churchId));
+  await db.execute(cleanupSql("fundDonations", churchId));
+  await db.execute(cleanupSql("donations", churchId));
+  await db.execute(cleanupSql("donationBatches", churchId));
+  await db.execute(cleanupSql("eventLogs", churchId));
+  await db.execute(cleanupSql("gatewayPaymentMethods", churchId));
+  await db.execute(cleanupSql("gateways", churchId));
+  await db.execute(cleanupSql("funds", churchId));
+  await db.execute(cleanupSql("customers", churchId));
   await teardownTestDb();
 });
 

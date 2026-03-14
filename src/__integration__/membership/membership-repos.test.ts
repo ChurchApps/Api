@@ -1,4 +1,4 @@
-import { initTestDb, teardownTestDb } from "../db-helper";
+import { initTestDb, teardownTestDb, cleanupSql } from "../db-helper";
 import { DomainRepo } from "../../modules/membership/repositories/DomainRepo";
 import { FormRepo } from "../../modules/membership/repositories/FormRepo";
 import { GroupRepo } from "../../modules/membership/repositories/GroupRepo";
@@ -16,7 +16,6 @@ import { AccessLogRepo } from "../../modules/membership/repositories/AccessLogRe
 import { AuditLogRepo } from "../../modules/membership/repositories/AuditLogRepo";
 import { UserChurchRepo } from "../../modules/membership/repositories/UserChurchRepo";
 import { getDrizzleDb } from "../../db/drizzle";
-import { sql } from "drizzle-orm";
 
 const churchId = `m${Date.now().toString(36).slice(-10)}`;
 
@@ -26,24 +25,24 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = getDrizzleDb("membership");
-  await db.execute(sql`DELETE FROM answers WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM formSubmissions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM questions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM forms WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM memberPermissions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM groupMembers WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM \`groups\` WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM people WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM households WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM domains WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM rolePermissions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM roleMembers WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM roles WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM settings WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM visibilityPreferences WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM accessLogs WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM auditLogs WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM userChurches WHERE churchId = ${churchId}`);
+  await db.execute(cleanupSql("answers", churchId));
+  await db.execute(cleanupSql("formSubmissions", churchId));
+  await db.execute(cleanupSql("questions", churchId));
+  await db.execute(cleanupSql("forms", churchId));
+  await db.execute(cleanupSql("memberPermissions", churchId));
+  await db.execute(cleanupSql("groupMembers", churchId));
+  await db.execute(cleanupSql("groups", churchId));
+  await db.execute(cleanupSql("people", churchId));
+  await db.execute(cleanupSql("households", churchId));
+  await db.execute(cleanupSql("domains", churchId));
+  await db.execute(cleanupSql("rolePermissions", churchId));
+  await db.execute(cleanupSql("roleMembers", churchId));
+  await db.execute(cleanupSql("roles", churchId));
+  await db.execute(cleanupSql("settings", churchId));
+  await db.execute(cleanupSql("visibilityPreferences", churchId));
+  await db.execute(cleanupSql("accessLogs", churchId));
+  await db.execute(cleanupSql("auditLogs", churchId));
+  await db.execute(cleanupSql("userChurches", churchId));
   await teardownTestDb();
 });
 

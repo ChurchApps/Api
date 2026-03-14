@@ -1,4 +1,4 @@
-import { initTestDb, teardownTestDb } from "../db-helper";
+import { initTestDb, teardownTestDb, cleanupSql } from "../db-helper";
 import { AutomationRepo } from "../../modules/doing/repositories/AutomationRepo";
 import { ActionRepo } from "../../modules/doing/repositories/ActionRepo";
 import { ConjunctionRepo } from "../../modules/doing/repositories/ConjunctionRepo";
@@ -12,7 +12,6 @@ import { TimeRepo } from "../../modules/doing/repositories/TimeRepo";
 import { BlockoutDateRepo } from "../../modules/doing/repositories/BlockoutDateRepo";
 import { TaskRepo } from "../../modules/doing/repositories/TaskRepo";
 import { getDrizzleDb } from "../../db/drizzle";
-import { sql } from "drizzle-orm";
 
 const churchId = `d${Date.now().toString(36).slice(-10)}`;
 const personId = "dprs0000001";
@@ -23,18 +22,18 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = getDrizzleDb("doing");
-  await db.execute(sql`DELETE FROM actions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM conditions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM conjunctions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM assignments WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM times WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM planItems WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM positions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM plans WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM planTypes WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM automations WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM blockoutDates WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM tasks WHERE churchId = ${churchId}`);
+  await db.execute(cleanupSql("actions", churchId));
+  await db.execute(cleanupSql("conditions", churchId));
+  await db.execute(cleanupSql("conjunctions", churchId));
+  await db.execute(cleanupSql("assignments", churchId));
+  await db.execute(cleanupSql("times", churchId));
+  await db.execute(cleanupSql("planItems", churchId));
+  await db.execute(cleanupSql("positions", churchId));
+  await db.execute(cleanupSql("plans", churchId));
+  await db.execute(cleanupSql("planTypes", churchId));
+  await db.execute(cleanupSql("automations", churchId));
+  await db.execute(cleanupSql("blockoutDates", churchId));
+  await db.execute(cleanupSql("tasks", churchId));
   await teardownTestDb();
 });
 

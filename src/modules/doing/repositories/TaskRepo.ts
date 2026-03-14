@@ -75,7 +75,7 @@ export class TaskRepo extends DrizzleRepo<typeof tasks> {
   }
 
   private async loadNextTaskNumber(churchId: string) {
-    const result = await this.db.select({ taskNumber: sql<number>`max(ifnull(taskNumber, 0)) + 1` }).from(tasks).where(eq(tasks.churchId, churchId));
+    const result = await this.db.select({ taskNumber: sql<number>`max(COALESCE(${tasks.taskNumber}, 0)) + 1` }).from(tasks).where(eq(tasks.churchId, churchId));
     return result[0]?.taskNumber ?? 1;
   }
 

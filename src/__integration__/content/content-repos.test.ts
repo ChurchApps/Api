@@ -1,4 +1,4 @@
-import { initTestDb, teardownTestDb } from "../db-helper";
+import { initTestDb, teardownTestDb, cleanupSql, qi } from "../db-helper";
 import { FileRepo } from "../../modules/content/repositories/FileRepo";
 import { RegistrationRepo } from "../../modules/content/repositories/RegistrationRepo";
 import { PageRepo } from "../../modules/content/repositories/PageRepo";
@@ -16,6 +16,7 @@ import { SongRepo } from "../../modules/content/repositories/SongRepo";
 import { StreamingServiceRepo } from "../../modules/content/repositories/StreamingServiceRepo";
 import { getDrizzleDb } from "../../db/drizzle";
 import { sql } from "drizzle-orm";
+import { getDialect } from "../../shared/helpers/Dialect";
 
 const churchId = `c${Date.now().toString(36).slice(-10)}`;
 
@@ -25,24 +26,24 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = getDrizzleDb("content");
-  await db.execute(sql`DELETE FROM registrationMembers WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM registrations WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM elements WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM sections WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM pages WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM blocks WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM curatedEvents WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM events WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM arrangementKeys WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM arrangements WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM songs WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM files WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM sermons WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM streamingServices WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM playlists WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM globalStyles WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM eventExceptions WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM curatedCalendars WHERE churchId = ${churchId}`);
+  await db.execute(cleanupSql("registrationMembers", churchId));
+  await db.execute(cleanupSql("registrations", churchId));
+  await db.execute(cleanupSql("elements", churchId));
+  await db.execute(cleanupSql("sections", churchId));
+  await db.execute(cleanupSql("pages", churchId));
+  await db.execute(cleanupSql("blocks", churchId));
+  await db.execute(cleanupSql("curatedEvents", churchId));
+  await db.execute(cleanupSql("events", churchId));
+  await db.execute(cleanupSql("arrangementKeys", churchId));
+  await db.execute(cleanupSql("arrangements", churchId));
+  await db.execute(cleanupSql("songs", churchId));
+  await db.execute(cleanupSql("files", churchId));
+  await db.execute(cleanupSql("sermons", churchId));
+  await db.execute(cleanupSql("streamingServices", churchId));
+  await db.execute(cleanupSql("playlists", churchId));
+  await db.execute(cleanupSql("globalStyles", churchId));
+  await db.execute(cleanupSql("eventExceptions", churchId));
+  await db.execute(cleanupSql("curatedCalendars", churchId));
   await teardownTestDb();
 });
 
@@ -108,7 +109,7 @@ describe("RegistrationRepo", () => {
     // (events schema defines registrationEnabled etc. but table doesn't have them yet)
     const db = getDrizzleDb("content");
     eventId = "regevt00001";
-    await db.execute(sql`INSERT INTO events (id, churchId, groupId, title, start, \`end\`) VALUES (${eventId}, ${churchId}, 'reggrp00001', 'Registration Event', NOW(), NOW())`);
+    await db.execute(sql.raw(`INSERT INTO ${qi("events")} (${qi("id")}, ${qi("churchId")}, ${qi("groupId")}, ${qi("title")}, ${qi("start")}, ${qi("end")}) VALUES ('${eventId}', '${churchId}', 'reggrp00001', 'Registration Event', NOW(), NOW())`));
   });
 
   it("should create a registration", async () => {
@@ -268,7 +269,11 @@ describe("EventExceptionRepo", () => {
 
   beforeAll(async () => {
     const db = getDrizzleDb("content");
-    await db.execute(sql`INSERT IGNORE INTO events (id, churchId, groupId, title, start, \`end\`) VALUES (${eventId}, ${churchId}, 'grp0000001', 'Exception Event', NOW(), NOW())`);
+    if (getDialect() === "postgres") {
+      await db.execute(sql.raw(`INSERT INTO ${qi("events")} (${qi("id")}, ${qi("churchId")}, ${qi("groupId")}, ${qi("title")}, ${qi("start")}, ${qi("end")}) VALUES ('${eventId}', '${churchId}', 'grp0000001', 'Exception Event', NOW(), NOW()) ON CONFLICT DO NOTHING`));
+    } else {
+      await db.execute(sql.raw(`INSERT IGNORE INTO ${qi("events")} (${qi("id")}, ${qi("churchId")}, ${qi("groupId")}, ${qi("title")}, ${qi("start")}, ${qi("end")}) VALUES ('${eventId}', '${churchId}', 'grp0000001', 'Exception Event', NOW(), NOW())`));
+    }
   });
 
   it("should create an exception", async () => {
@@ -427,7 +432,7 @@ describe("SongRepo + ArrangementRepo + ArrangementKeyRepo", () => {
     // Insert a songDetail via raw SQL since it's a global table
     const db = getDrizzleDb("content");
     const sdId = "sd" + Date.now().toString(36).slice(-9);
-    await db.execute(sql`INSERT INTO songDetails (id, title, artist) VALUES (${sdId}, 'Amazing Grace', 'Traditional')`);
+    await db.execute(sql.raw(`INSERT INTO ${qi("songDetails")} (${qi("id")}, ${qi("title")}, ${qi("artist")}) VALUES ('${sdId}', 'Amazing Grace', 'Traditional')`));
 
     const result = await arrRepo.save({ churchId, songId, songDetailId: sdId });
     expect(result.id).toBeDefined();

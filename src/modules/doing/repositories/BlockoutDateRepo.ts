@@ -1,5 +1,5 @@
 import { injectable } from "inversify";
-import { eq, and, inArray, gt } from "drizzle-orm";
+import { eq, and, inArray, gt, sql } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
@@ -38,6 +38,7 @@ export class BlockoutDateRepo extends DrizzleRepo<typeof blockoutDates> {
   }
 
   public loadUpcoming(churchId: string) {
-    return this.db.select().from(blockoutDates).where(and(eq(blockoutDates.churchId, churchId), gt(blockoutDates.endDate, new Date())));
+    const today = DateHelper.toMysqlDateOnly(new Date()) as string;
+    return this.db.select().from(blockoutDates).where(and(eq(blockoutDates.churchId, churchId), gt(blockoutDates.endDate, sql`${today}`)));
   }
 }

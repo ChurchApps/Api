@@ -53,7 +53,8 @@ export class RegistrationRepo extends DrizzleRepo<typeof registrations> {
         SELECT ${m.id}, ${m.churchId}, ${m.eventId}, ${m.personId || null}, ${m.householdId || null}, ${m.status || "confirmed"}, ${m.formSubmissionId || null}, ${m.notes || null}, ${m.registeredDate || null}, ${m.cancelledDate || null}
         WHERE (SELECT COUNT(*) FROM registrations WHERE "eventId" = ${m.eventId} AND "churchId" = ${m.churchId} AND status IN ('pending','confirmed')) < ${capacity}
       `);
-      affectedRows = Array.isArray(result) ? result.length : 0;
+      // postgres.js returns an array with a .count property for non-RETURNING queries
+      affectedRows = result?.count ?? (Array.isArray(result) ? result.length : 0);
     } else {
       const result: any = await (this.db as any).execute(sql`
         INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate)

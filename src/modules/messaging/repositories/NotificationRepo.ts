@@ -3,7 +3,7 @@ import { eq, and, sql, desc, inArray, gt } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
-import { notifications, notificationPreferences } from "../../../db/schema/messaging.js";
+import { notifications, notificationPreferences, privateMessages } from "../../../db/schema/messaging.js";
 
 @injectable()
 export class NotificationRepo extends DrizzleRepo<typeof notifications> {
@@ -96,10 +96,10 @@ export class NotificationRepo extends DrizzleRepo<typeof notifications> {
   public async loadNewCounts(churchId: string, personId: string) {
     const rows = await this.executeRows(sql`
       SELECT (
-        SELECT COUNT(*) FROM notifications WHERE churchId = ${churchId} AND personId = ${personId} AND isNew = 1
-      ) AS notificationCount, (
-        SELECT COUNT(*) FROM privateMessages WHERE churchId = ${churchId} AND notifyPersonId = ${personId}
-      ) AS pmCount
+        SELECT COUNT(*) FROM ${notifications} WHERE ${notifications.churchId} = ${churchId} AND ${notifications.personId} = ${personId} AND ${notifications.isNew} = ${true}
+      ) AS "notificationCount", (
+        SELECT COUNT(*) FROM ${privateMessages} WHERE ${privateMessages.churchId} = ${churchId} AND ${privateMessages.notifyPersonId} = ${personId}
+      ) AS "pmCount"
     `);
     return rows[0] ?? {};
   }

@@ -32,8 +32,8 @@ export const blockoutDates = pgTable("blockoutDates", {
   id: char("id", { length: 11 }).notNull().primaryKey(),
   churchId: char("churchId", { length: 11 }),
   personId: char("personId", { length: 11 }),
-  startDate: date("startDate"),
-  endDate: date("endDate")
+  startDate: date("startDate", { mode: "date" }),
+  endDate: date("endDate", { mode: "date" })
 });
 
 export const conditions = pgTable("conditions", {
@@ -106,7 +106,7 @@ export const plans = pgTable("plans", {
   ministryId: char("ministryId", { length: 11 }),
   planTypeId: char("planTypeId", { length: 11 }),
   name: varchar("name", { length: 45 }),
-  serviceDate: date("serviceDate"),
+  serviceDate: date("serviceDate", { mode: "date" }),
   notes: text("notes"),
   serviceOrder: boolean("serviceOrder"),
   contentType: varchar("contentType", { length: 50 }),

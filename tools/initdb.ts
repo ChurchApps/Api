@@ -385,7 +385,7 @@ async function initializeSection(moduleName: string, sectionName: string, tables
     const isPg = getDialect() === "postgres";
 
     for (const statement of statements) {
-      const cleanStatement = statement.trim();
+      let cleanStatement = statement.trim();
       if (cleanStatement && !cleanStatement.startsWith('--')) {
         try {
           // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
@@ -400,6 +400,11 @@ async function initializeSection(moduleName: string, sectionName: string, tables
           if (isPg && isStoredProc) {
             console.log(`   ⏭️  Skipping MySQL stored procedure (PG mode)`);
             continue;
+          }
+
+          // Translate MySQL DDL to PostgreSQL syntax
+          if (isPg) {
+            cleanStatement = mysqlToPgSql(cleanStatement);
           }
 
           if (isStoredProc) {
@@ -440,7 +445,7 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
     const isPg = getDialect() === "postgres";
 
     for (const statement of statements) {
-      const cleanStatement = statement.trim();
+      let cleanStatement = statement.trim();
       if (cleanStatement && !cleanStatement.startsWith('--')) {
         try {
           const upperStatement = cleanStatement.toUpperCase();
@@ -453,6 +458,10 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
           if (isPg && isStoredProc) {
             console.log(`   ⏭️  Skipping MySQL stored procedure (PG mode)`);
             continue;
+          }
+
+          if (isPg) {
+            cleanStatement = mysqlToPgSql(cleanStatement);
           }
 
           if (isStoredProc) {
@@ -514,6 +523,68 @@ async function ensurePgSchemaExists(moduleName: string, dbConfig: any) {
   } finally {
     await client.end();
   }
+}
+
+/**
+ * Translate MySQL DDL/DML to PostgreSQL-compatible syntax.
+ * Handles the common patterns found in the dbScripts SQL files.
+ */
+function mysqlToPgSql(sql: string): string {
+  let result = sql;
+  // Backtick-quoted identifiers → double-quoted
+  result = result.replace(/`([^`]+)`/g, '"$1"');
+  // ENGINE=InnoDB DEFAULT CHARSET=... COLLATE=... — strip everything after closing paren
+  result = result.replace(/\)\s*ENGINE\s*=\s*[^;]+;/gi, ');');
+  // datetime → timestamp
+  result = result.replace(/\bdatetime\b/gi, 'timestamp');
+  // BIT(1) DEFAULT 0/1/b'0'/b'1' → boolean DEFAULT false/true
+  result = result.replace(/\bBIT\(1\)\s+DEFAULT\s+(?:b'1'|1)/gi, 'boolean DEFAULT true');
+  result = result.replace(/\bBIT\(1\)\s+DEFAULT\s+(?:b'0'|0)/gi, 'boolean DEFAULT false');
+  result = result.replace(/\bBIT\(1\)/gi, 'boolean');
+  // tinyint(N) → boolean (all tinyint columns in this schema are boolean-like)
+  result = result.replace(/\btinyint\(\d+\)\s+DEFAULT\s+(?:1|b'1')/gi, 'boolean DEFAULT true');
+  result = result.replace(/\btinyint\(\d+\)\s+DEFAULT\s+(?:0|b'0')/gi, 'boolean DEFAULT false');
+  result = result.replace(/\btinyint(\(\d+\))?/gi, 'boolean');
+  // int(N) → integer (must come after tinyint to avoid double-replacing)
+  result = result.replace(/\bint\(\d+\)/gi, 'integer');
+  // double → double precision
+  result = result.replace(/\bdouble\b/gi, 'double precision');
+  // mediumtext / longtext / tinytext → text
+  result = result.replace(/\b(medium|long|tiny)text\b/gi, 'text');
+  // longblob / mediumblob / tinyblob → bytea
+  result = result.replace(/\b(long|medium|tiny)blob\b/gi, 'bytea');
+  // enum('a','b',...) → varchar(255)
+  result = result.replace(/\benum\s*\([^)]+\)/gi, 'varchar(255)');
+  // ON UPDATE CURRENT_TIMESTAMP — PG doesn't support this (needs trigger)
+  result = result.replace(/\s+ON\s+UPDATE\s+CURRENT_TIMESTAMP/gi, '');
+  // DELIMITER statements (MySQL stored proc syntax)
+  if (/^\s*DELIMITER\b/i.test(result)) return '';
+  // KEY/INDEX `name` (col) — strip inline index definitions (PG uses CREATE INDEX separately)
+  result = result.replace(/,\s*(?:KEY|INDEX)\s+"[^"]+"\s*\([^)]+\)/gi, '');
+  // UNIQUE KEY `name` (col) → UNIQUE (col)
+  result = result.replace(/UNIQUE\s+KEY\s+"[^"]+"\s*\(([^)]+)\)/gi, 'UNIQUE ($1)');
+  // Standalone INDEX lines (not preceded by comma, e.g. at end of CREATE TABLE)
+  result = result.replace(/^\s*INDEX\s+"[^"]+"\s*\([^)]+\),?\s*$/gim, '');
+  // TRUNCATE TABLE — PG needs CASCADE for FK constraints
+  result = result.replace(/^TRUNCATE\s+TABLE\s+/i, 'TRUNCATE TABLE ');
+  if (/^TRUNCATE\s+TABLE\s/i.test(result) && !result.includes('CASCADE')) {
+    result = result.replace(/;?\s*$/, ' CASCADE;');
+  }
+  // char(N) → varchar(N) (PG char pads with spaces, varchar is better)
+  result = result.replace(/\bchar\((\d+)\)/gi, 'varchar($1)');
+  // IFNULL → COALESCE
+  result = result.replace(/\bIFNULL\b/gi, 'COALESCE');
+  // NOW() stays the same in PG
+  // CURDATE() → CURRENT_DATE
+  result = result.replace(/\bCURDATE\(\)/gi, 'CURRENT_DATE');
+  // COLLATE utf8mb4_... — strip MySQL collation hints from DML
+  result = result.replace(/\s+COLLATE\s+\w+/gi, '');
+  // UUID() → gen_random_uuid()
+  result = result.replace(/\bUUID\(\)/gi, 'gen_random_uuid()');
+  // MySQL binary literals b'0'/b'1' → false/true (used in INSERT values for BIT columns)
+  result = result.replace(/\bb'1'/g, 'true');
+  result = result.replace(/\bb'0'/g, 'false');
+  return result;
 }
 
 function splitSqlStatements(sql: string): string[] {

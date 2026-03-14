@@ -1,4 +1,4 @@
-import { initTestDb, teardownTestDb } from "../db-helper";
+import { initTestDb, teardownTestDb, cleanupSql } from "../db-helper";
 import { ConnectionRepo } from "../../modules/messaging/repositories/ConnectionRepo";
 import { ConversationRepo } from "../../modules/messaging/repositories/ConversationRepo";
 import { DeliveryLogRepo } from "../../modules/messaging/repositories/DeliveryLogRepo";
@@ -7,7 +7,6 @@ import { MessageRepo } from "../../modules/messaging/repositories/MessageRepo";
 import { NotificationRepo } from "../../modules/messaging/repositories/NotificationRepo";
 import { SentTextRepo } from "../../modules/messaging/repositories/SentTextRepo";
 import { getDrizzleDb } from "../../db/drizzle";
-import { sql } from "drizzle-orm";
 
 const churchId = `m${Date.now().toString(36).slice(-10)}`;
 
@@ -17,14 +16,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const db = getDrizzleDb("messaging");
-  await db.execute(sql`DELETE FROM connections WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM notifications WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM messages WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM conversations WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM deliveryLogs WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM devices WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM emailTemplates WHERE churchId = ${churchId}`);
-  await db.execute(sql`DELETE FROM sentTexts WHERE churchId = ${churchId}`);
+  await db.execute(cleanupSql("connections", churchId));
+  await db.execute(cleanupSql("notifications", churchId));
+  await db.execute(cleanupSql("messages", churchId));
+  await db.execute(cleanupSql("conversations", churchId));
+  await db.execute(cleanupSql("deliveryLogs", churchId));
+  await db.execute(cleanupSql("devices", churchId));
+  await db.execute(cleanupSql("emailTemplates", churchId));
+  await db.execute(cleanupSql("sentTexts", churchId));
   await teardownTestDb();
 });
 
