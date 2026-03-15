@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1773543449050,
+      "tag": "0000_bent_puppet_master",
+      "breakpoints": true
+    }
+  ]
+}

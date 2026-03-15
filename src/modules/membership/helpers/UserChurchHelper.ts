@@ -1,6 +1,9 @@
+import { eq, and, isNull, sql as drizzleSql } from "drizzle-orm";
 import { Repos } from "../repositories/index.js";
-import { RepoManager, TypedDB } from "../../../shared/infrastructure/index.js";
+import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { UserChurch, Person } from "../models/index.js";
+import { getDrizzleDb } from "../../../db/drizzle.js";
+import { getSchema } from "../../../db/schema/resolver.js";
 
 export class UserChurchHelper {
 
@@ -28,19 +31,24 @@ export class UserChurchHelper {
   public static async createForNewUser(userId: string, email: string): Promise<void> {
     if (!email) return;
     const repos = await this.repos();
+    const db = getDrizzleDb("membership") as any;
+    const { people, churches, groupMembers, groups, userChurches } = getSchema("membership");
 
-    // Single query: find people with exact email match who are in at least one group,
+    // Find people with exact email match who are in at least one group,
     // in non-archived churches, excluding churches where a userChurch already exists.
-    const sql =
-      "SELECT p.id as personId, p.churchId" +
-      " FROM people p" +
-      " INNER JOIN churches c ON c.id = p.churchId AND c.archivedDate IS NULL" +
-      " INNER JOIN groupMembers gm ON gm.personId = p.id AND gm.churchId = p.churchId" +
-      " INNER JOIN `groups` g ON g.id = gm.groupId AND g.removed = 0" +
-      " LEFT JOIN userChurches uc ON uc.userId = ? AND uc.churchId = p.churchId" +
-      " WHERE LOWER(p.email) = LOWER(?) AND p.removed = 0 AND uc.id IS NULL" +
-      " GROUP BY p.churchId, p.id";
-    const matches: Array<{ personId: string; churchId: string }> = await TypedDB.query(sql, [userId, email]);
+    const matches = await db
+      .select({ personId: people.id, churchId: people.churchId })
+      .from(people)
+      .innerJoin(churches, and(eq(churches.id, people.churchId), isNull(churches.archivedDate)))
+      .innerJoin(groupMembers, and(eq(groupMembers.personId, people.id), eq(groupMembers.churchId, people.churchId)))
+      .innerJoin(groups, and(eq(groups.id, groupMembers.groupId), eq(groups.removed, false)))
+      .leftJoin(userChurches, and(eq(userChurches.userId, userId), eq(userChurches.churchId, people.churchId)))
+      .where(and(
+        drizzleSql`lower(${people.email}) = lower(${email})`,
+        eq(people.removed, false),
+        isNull(userChurches.id)
+      ))
+      .groupBy(people.churchId, people.id);
 
     // Pick one person per church (first match) and save userChurch records
     const seenChurches = new Set<string>();

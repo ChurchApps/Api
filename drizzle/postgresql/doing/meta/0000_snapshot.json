@@ -1,0 +1,1185 @@
+{
+  "id": "8d36761c-9721-46ce-b3cb-79d22d983df7",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.actions": {
+      "name": "actions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "automationId": {
+          "name": "automationId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actionType": {
+          "name": "actionType",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actionData": {
+          "name": "actionData",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assignments": {
+      "name": "assignments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "positionId": {
+          "name": "positionId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "personId": {
+          "name": "personId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notified": {
+          "name": "notified",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "do_idx_church_person": {
+          "name": "do_idx_church_person",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "personId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "do_idx_position": {
+          "name": "do_idx_position",
+          "columns": [
+            {
+              "expression": "positionId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.automations": {
+      "name": "automations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recurs": {
+          "name": "recurs",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.blockoutDates": {
+      "name": "blockoutDates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "personId": {
+          "name": "personId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "startDate": {
+          "name": "startDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endDate": {
+          "name": "endDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.conditions": {
+      "name": "conditions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conjunctionId": {
+          "name": "conjunctionId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "field": {
+          "name": "field",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fieldData": {
+          "name": "fieldData",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "operator": {
+          "name": "operator",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "value": {
+          "name": "value",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.conjunctions": {
+      "name": "conjunctions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "automationId": {
+          "name": "automationId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parentId": {
+          "name": "parentId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "groupType": {
+          "name": "groupType",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.contentProviderAuths": {
+      "name": "contentProviderAuths",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ministryId": {
+          "name": "ministryId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerId": {
+          "name": "providerId",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accessToken": {
+          "name": "accessToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refreshToken": {
+          "name": "refreshToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tokenType": {
+          "name": "tokenType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "do_idx_ministry_provider": {
+          "name": "do_idx_ministry_provider",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ministryId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "providerId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.notes": {
+      "name": "notes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contentType": {
+          "name": "contentType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contentId": {
+          "name": "contentId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "noteType": {
+          "name": "noteType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "addedBy": {
+          "name": "addedBy",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contents": {
+          "name": "contents",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "do_notes_churchId": {
+          "name": "do_notes_churchId",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.planItems": {
+      "name": "planItems",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "planId": {
+          "name": "planId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parentId": {
+          "name": "parentId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort": {
+          "name": "sort",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "itemType": {
+          "name": "itemType",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relatedId": {
+          "name": "relatedId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "varchar(1000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "seconds": {
+          "name": "seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link": {
+          "name": "link",
+          "type": "varchar(1000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerId": {
+          "name": "providerId",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerPath": {
+          "name": "providerPath",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerContentPath": {
+          "name": "providerContentPath",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "thumbnailUrl": {
+          "name": "thumbnailUrl",
+          "type": "varchar(1024)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "do_idx_church_plan": {
+          "name": "do_idx_church_plan",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "planId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "do_idx_parent": {
+          "name": "do_idx_parent",
+          "columns": [
+            {
+              "expression": "parentId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.planTypes": {
+      "name": "planTypes",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ministryId": {
+          "name": "ministryId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plans": {
+      "name": "plans",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ministryId": {
+          "name": "ministryId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "planTypeId": {
+          "name": "planTypeId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "serviceDate": {
+          "name": "serviceDate",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "serviceOrder": {
+          "name": "serviceOrder",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contentType": {
+          "name": "contentType",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contentId": {
+          "name": "contentId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerId": {
+          "name": "providerId",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerPlanId": {
+          "name": "providerPlanId",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providerPlanName": {
+          "name": "providerPlanName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signupDeadlineHours": {
+          "name": "signupDeadlineHours",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "showVolunteerNames": {
+          "name": "showVolunteerNames",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.positions": {
+      "name": "positions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "planId": {
+          "name": "planId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "categoryName": {
+          "name": "categoryName",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "groupId": {
+          "name": "groupId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "allowSelfSignup": {
+          "name": "allowSelfSignup",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "do_idx_pos_church_plan": {
+          "name": "do_idx_pos_church_plan",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "planId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "do_idx_group": {
+          "name": "do_idx_group",
+          "columns": [
+            {
+              "expression": "groupId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tasks": {
+      "name": "tasks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "taskNumber": {
+          "name": "taskNumber",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "taskType": {
+          "name": "taskType",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dateCreated": {
+          "name": "dateCreated",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dateClosed": {
+          "name": "dateClosed",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "associatedWithType": {
+          "name": "associatedWithType",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "associatedWithId": {
+          "name": "associatedWithId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "associatedWithLabel": {
+          "name": "associatedWithLabel",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdByType": {
+          "name": "createdByType",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdById": {
+          "name": "createdById",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdByLabel": {
+          "name": "createdByLabel",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assignedToType": {
+          "name": "assignedToType",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assignedToId": {
+          "name": "assignedToId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "assignedToLabel": {
+          "name": "assignedToLabel",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "automationId": {
+          "name": "automationId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "conversationId": {
+          "name": "conversationId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "do_idx_church_status": {
+          "name": "do_idx_church_status",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "do_idx_automation": {
+          "name": "do_idx_automation",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "automationId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "do_idx_assigned": {
+          "name": "do_idx_assigned",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "assignedToType",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "assignedToId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "do_idx_created": {
+          "name": "do_idx_created",
+          "columns": [
+            {
+              "expression": "churchId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdByType",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdById",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.times": {
+      "name": "times",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "planId": {
+          "name": "planId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "displayName": {
+          "name": "displayName",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "startTime": {
+          "name": "startTime",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "endTime": {
+          "name": "endTime",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "teams": {
+          "name": "teams",
+          "type": "varchar(1000)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -255,8 +255,8 @@ export const sections = pgTable("sections", {
   stylesJSON: text("stylesJSON"),
   animationsJSON: text("animationsJSON")
 }, (t) => [
-  index("cnt_ix_churchId_pageId_sort").on(t.churchId, t.pageId, t.sort),
-  index("cnt_ix_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort)
+  index("cnt_ix_sections_churchId_pageId_sort").on(t.churchId, t.pageId, t.sort),
+  index("cnt_ix_sections_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort)
 ]);
 
 export const sermons = pgTable("sermons", {

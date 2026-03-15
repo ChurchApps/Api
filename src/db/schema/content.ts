@@ -255,8 +255,8 @@ export const sections = mysqlTable("sections", {
   stylesJSON: mediumtext("stylesJSON"),
   animationsJSON: mediumtext("animationsJSON")
 }, (t) => [
-  index("ix_churchId_pageId_sort").on(t.churchId, t.pageId, t.sort),
-  index("ix_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort)
+  index("ix_sections_churchId_pageId_sort").on(t.churchId, t.pageId, t.sort),
+  index("ix_sections_churchId_blockId_sort").on(t.churchId, t.blockId, t.sort)
 ]);
 
 export const sermons = mysqlTable("sermons", {

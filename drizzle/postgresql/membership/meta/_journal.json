@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1773543561728,
+      "tag": "0000_quick_thundra",
+      "breakpoints": true
+    }
+  ]
+}

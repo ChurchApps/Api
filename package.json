@@ -45,6 +45,10 @@
     "test:integration:content": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.integration.config.cjs --testPathPattern=content",
     "test:integration:messaging": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.integration.config.cjs --testPathPattern=messaging",
     "test:integration:membership": "NODE_OPTIONS='--experimental-vm-modules' jest --config jest.integration.config.cjs --testPathPattern=membership",
+    "migrate": "tsx tools/migrate.ts",
+    "migrate:status": "tsx tools/migrate.ts --status",
+    "migrate:generate": "npx drizzle-kit generate",
+    "migrate:generate:all": "for m in membership attendance content giving messaging doing; do DB_MODULE=$m npx drizzle-kit generate && DB_DIALECT=postgres DB_MODULE=$m npx drizzle-kit generate; done",
     "migrate-env": "node tools/migrate-env.js",
     "scheduled-tasks": "tsx tools/run-scheduled-tasks.ts"
   },

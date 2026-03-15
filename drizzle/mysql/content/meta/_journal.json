@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1773546194953,
+      "tag": "0000_cynical_redwing",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,645 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "id": "4e10a86a-2ab8-4b28-8e2c-ac71c099fe97",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "settings": {
+      "name": "settings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "keyName": {
+          "name": "keyName",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "settings_id": {
+          "name": "settings_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "campuses": {
+      "name": "campuses",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "address1": {
+          "name": "address1",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "address2": {
+          "name": "address2",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "city": {
+          "name": "city",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "zip": {
+          "name": "zip",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "removed": {
+          "name": "removed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "campuses_id": {
+          "name": "campuses_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "groupServiceTimes": {
+      "name": "groupServiceTimes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "groupId": {
+          "name": "groupId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "serviceTimeId": {
+          "name": "serviceTimeId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        },
+        "groupId": {
+          "name": "groupId",
+          "columns": [
+            "groupId"
+          ],
+          "isUnique": false
+        },
+        "serviceTimeId": {
+          "name": "serviceTimeId",
+          "columns": [
+            "serviceTimeId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "groupServiceTimes_id": {
+          "name": "groupServiceTimes_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "serviceTimes": {
+      "name": "serviceTimes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "serviceId": {
+          "name": "serviceId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "removed": {
+          "name": "removed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        },
+        "serviceId": {
+          "name": "serviceId",
+          "columns": [
+            "serviceId"
+          ],
+          "isUnique": false
+        },
+        "idx_church_service_removed": {
+          "name": "idx_church_service_removed",
+          "columns": [
+            "churchId",
+            "serviceId",
+            "removed"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "serviceTimes_id": {
+          "name": "serviceTimes_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "services": {
+      "name": "services",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "campusId": {
+          "name": "campusId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "removed": {
+          "name": "removed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        },
+        "campusId": {
+          "name": "campusId",
+          "columns": [
+            "campusId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "services_id": {
+          "name": "services_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "sessions": {
+      "name": "sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "groupId": {
+          "name": "groupId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "serviceTimeId": {
+          "name": "serviceTimeId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sessionDate": {
+          "name": "sessionDate",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        },
+        "groupId": {
+          "name": "groupId",
+          "columns": [
+            "groupId"
+          ],
+          "isUnique": false
+        },
+        "serviceTimeId": {
+          "name": "serviceTimeId",
+          "columns": [
+            "serviceTimeId"
+          ],
+          "isUnique": false
+        },
+        "idx_church_session_date": {
+          "name": "idx_church_session_date",
+          "columns": [
+            "churchId",
+            "sessionDate"
+          ],
+          "isUnique": false
+        },
+        "idx_church_group_service": {
+          "name": "idx_church_group_service",
+          "columns": [
+            "churchId",
+            "groupId",
+            "serviceTimeId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "sessions_id": {
+          "name": "sessions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "visitSessions": {
+      "name": "visitSessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "visitId": {
+          "name": "visitId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sessionId": {
+          "name": "sessionId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        },
+        "visitId": {
+          "name": "visitId",
+          "columns": [
+            "visitId"
+          ],
+          "isUnique": false
+        },
+        "sessionId": {
+          "name": "sessionId",
+          "columns": [
+            "sessionId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "visitSessions_id": {
+          "name": "visitSessions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "visits": {
+      "name": "visits",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "churchId": {
+          "name": "churchId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "personId": {
+          "name": "personId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "serviceId": {
+          "name": "serviceId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "groupId": {
+          "name": "groupId",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "visitDate": {
+          "name": "visitDate",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "checkinTime": {
+          "name": "checkinTime",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "addedBy": {
+          "name": "addedBy",
+          "type": "char(11)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "churchId": {
+          "name": "churchId",
+          "columns": [
+            "churchId"
+          ],
+          "isUnique": false
+        },
+        "personId": {
+          "name": "personId",
+          "columns": [
+            "personId"
+          ],
+          "isUnique": false
+        },
+        "serviceId": {
+          "name": "serviceId",
+          "columns": [
+            "serviceId"
+          ],
+          "isUnique": false
+        },
+        "groupId": {
+          "name": "groupId",
+          "columns": [
+            "groupId"
+          ],
+          "isUnique": false
+        },
+        "idx_church_visit_date": {
+          "name": "idx_church_visit_date",
+          "columns": [
+            "churchId",
+            "visitDate"
+          ],
+          "isUnique": false
+        },
+        "idx_church_person": {
+          "name": "idx_church_person",
+          "columns": [
+            "churchId",
+            "personId"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "visits_id": {
+          "name": "visits_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  }
+}
