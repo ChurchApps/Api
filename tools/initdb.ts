@@ -212,8 +212,21 @@ async function loadDemoData(moduleName: string) {
       let clean = statement.trim();
       if (clean && !clean.startsWith('--')) {
         try {
+          const upper = clean.toUpperCase();
+          const isProc = upper.startsWith('CREATE PROCEDURE') || upper.startsWith('CREATE FUNCTION') ||
+            upper.startsWith('DROP PROCEDURE') || upper.startsWith('DROP FUNCTION') ||
+            upper.includes('CREATE DEFINER');
+          const isCall = upper.startsWith('CALL ');
+
+          // Skip stored procs and CALL on PG (MySQL-only; PG equivalents are in app code)
+          if (isPg && (isProc || isCall)) continue;
           if (isPg) clean = mysqlToPgSql(clean);
-          await MultiDatabasePool.query(moduleName, clean);
+
+          if (isProc || isCall) {
+            await MultiDatabasePool.executeDDL(moduleName, clean);
+          } else {
+            await MultiDatabasePool.query(moduleName, clean);
+          }
         } catch (error) {
           console.error(`   ❌ Failed in ${table.file}:`, error);
           console.error(`   Statement: ${clean.substring(0, 100)}...`);

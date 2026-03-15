@@ -272,8 +272,8 @@ describe("VisitRepo", () => {
   });
 
   it("should loadByServiceDatePeopleIds", async () => {
-    // Create a fresh visit with midnight date for exact match
-    const testDate = new Date("2025-07-01T00:00:00");
+    // Create a fresh visit with midnight UTC date for exact match
+    const testDate = new Date("2025-07-01T00:00:00Z");
     const v = await repo.save({ churchId, personId: "sdpid000001", serviceId: "sdpsvc00001", visitDate: testDate } as any);
     const results = await repo.loadByServiceDatePeopleIds(churchId, "sdpsvc00001", testDate, ["sdpid000001"]);
     expect((results as any[]).length).toBeGreaterThanOrEqual(1);

@@ -3,14 +3,19 @@ import { eq, and, sql, inArray, between, max } from "drizzle-orm";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
 import { visits } from "../../../db/schema/attendance.js";
-import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Visit } from "../models/index.js";
 import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 /** Normalize a date-only value to midnight UTC Date for consistent storage. */
 function toDateOnly(val: any): Date | null {
   if (val == null) return null;
-  const str = typeof val === "string" ? val : DateHelper.toMysqlDateOnly(val);
+  if (val instanceof Date) {
+    const y = val.getUTCFullYear();
+    const m = String(val.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(val.getUTCDate()).padStart(2, "0");
+    return new Date(`${y}-${m}-${d}T00:00:00Z`);
+  }
+  const str = typeof val === "string" ? val.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] : null;
   if (!str) return null;
   return new Date(str + "T00:00:00Z");
 }
