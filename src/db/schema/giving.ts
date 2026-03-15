@@ -124,7 +124,7 @@ export const subscriptionFunds = mysqlTable("subscriptionFunds", {
   amount: double("amount")
 }, (t) => [
   index("idx_church_subscription").on(t.churchId, t.subscriptionId),
-  index("idx_church_fund").on(t.churchId, t.fundId)
+  index("idx_sub_church_fund").on(t.churchId, t.fundId)
 ]);
 
 export const subscriptions = mysqlTable("subscriptions", {

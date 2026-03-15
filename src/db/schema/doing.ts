@@ -136,7 +136,7 @@ export const positions = mysqlTable("positions", {
   allowSelfSignup: boolean("allowSelfSignup"),
   description: text("description")
 }, (t) => [
-  index("idx_church_plan").on(t.churchId, t.planId),
+  index("idx_pos_church_plan").on(t.churchId, t.planId),
   index("idx_group").on(t.groupId)
 ]);
 

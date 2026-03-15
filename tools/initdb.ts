@@ -105,8 +105,10 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
       // Run drizzle-kit migrations (creates/updates tables)
       await runMigrations(moduleName);
 
-      // Run stored procedures (MySQL only)
-      await loadStoredProcs(moduleName);
+      if (!options.schemaOnly) {
+        // Run stored procedures (MySQL only)
+        await loadStoredProcs(moduleName);
+      }
     }
 
     console.log(`   ✅ ${moduleName} database initialized successfully`);
