@@ -1,31 +1,18 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { BibleBook } from "../models/index.js";
-import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo.js";
+import { eq, asc } from "drizzle-orm";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { bibleBooks } from "../../../db/schema/content.js";
 
 @injectable()
-export class BibleBookRepo extends GlobalConfiguredRepo<BibleBook> {
-  protected get repoConfig(): GlobalRepoConfig<BibleBook> {
-    return {
-      tableName: "bibleBooks",
-      hasSoftDelete: false,
-      columns: ["translationKey", "keyName", "abbreviation", "name", "sort"],
-      defaultOrderBy: "sort"
-    };
+export class BibleBookRepo extends GlobalDrizzleRepo<typeof bibleBooks> {
+  protected readonly table = bibleBooks;
+  protected readonly moduleName = "content";
+
+  public loadByTranslation(translationKey: string): Promise<any[]> {
+    return this.db.select().from(bibleBooks).where(eq(bibleBooks.translationKey, translationKey)).orderBy(asc(bibleBooks.sort));
   }
 
-  public loadAll(translationKey: string) {
-    return TypedDB.query("SELECT * FROM bibleBooks WHERE translationKey=? order by sort;", [translationKey]);
-  }
-
-  protected rowToModel(row: any): BibleBook {
-    return {
-      id: row.id,
-      translationKey: row.translationKey,
-      keyName: row.keyName,
-      abbreviation: row.abbreviation,
-      name: row.name,
-      sort: row.sort
-    };
+  public saveAll(models: any[]) {
+    return Promise.all(models.map((m) => this.save(m)));
   }
 }

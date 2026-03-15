@@ -1,111 +1,71 @@
-import { DateHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Registration } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, asc, desc, sql, count, inArray } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { registrations } from "../../../db/schema/content.js";
+import { Registration } from "../models/index.js";
 
 @injectable()
-export class RegistrationRepo extends ConfiguredRepo<Registration> {
-  protected get repoConfig(): RepoConfig<Registration> {
-    return {
-      tableName: "registrations",
-      hasSoftDelete: false,
-      columns: [
-        "eventId",
-        "personId",
-        "householdId",
-        "status",
-        "formSubmissionId",
-        "notes",
-        "registeredDate",
-        "cancelledDate"
-      ]
-    };
+export class RegistrationRepo extends DrizzleRepo<typeof registrations> {
+  protected readonly table = registrations;
+  protected readonly moduleName = "content";
+
+  public async loadForEvent(churchId: string, eventId: string) {
+    return this.db.select().from(registrations).where(and(eq(registrations.churchId, churchId), eq(registrations.eventId, eventId))).orderBy(asc(registrations.registeredDate));
   }
 
-  protected async create(model: Registration): Promise<Registration> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    if (m.registeredDate) m.registeredDate = DateHelper.toMysqlDate(m.registeredDate);
-    if (m.cancelledDate) m.cancelledDate = DateHelper.toMysqlDate(m.cancelledDate);
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
+  public async loadForPerson(churchId: string, personId: string) {
+    return this.db.select().from(registrations).where(and(eq(registrations.churchId, churchId), eq(registrations.personId, personId))).orderBy(desc(registrations.registeredDate));
   }
 
-  protected async update(model: Registration): Promise<Registration> {
-    const m: any = model as any;
-    if (m.registeredDate) m.registeredDate = DateHelper.toMysqlDate(m.registeredDate);
-    if (m.cancelledDate) m.cancelledDate = DateHelper.toMysqlDate(m.cancelledDate);
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  public async loadForEvent(churchId: string, eventId: string): Promise<Registration[]> {
-    return TypedDB.query(
-      "SELECT * FROM registrations WHERE churchId=? AND eventId=? ORDER BY registeredDate;",
-      [churchId, eventId]
-    );
-  }
-
-  public async loadForPerson(churchId: string, personId: string): Promise<Registration[]> {
-    return TypedDB.query(
-      "SELECT * FROM registrations WHERE churchId=? AND personId=? ORDER BY registeredDate DESC;",
-      [churchId, personId]
-    );
-  }
-
-  public async loadForHousehold(churchId: string, householdId: string): Promise<Registration[]> {
-    return TypedDB.query(
-      "SELECT * FROM registrations WHERE churchId=? AND householdId=? ORDER BY registeredDate DESC;",
-      [churchId, householdId]
-    );
+  public async loadForHousehold(churchId: string, householdId: string) {
+    return this.db.select().from(registrations).where(and(eq(registrations.churchId, churchId), eq(registrations.householdId, householdId))).orderBy(desc(registrations.registeredDate));
   }
 
   public async countActiveForEvent(churchId: string, eventId: string): Promise<number> {
-    const result: any = await TypedDB.queryOne(
-      "SELECT COUNT(*) as cnt FROM registrations WHERE churchId=? AND eventId=? AND status IN ('pending','confirmed');",
-      [churchId, eventId]
-    );
-    return result?.cnt || 0;
+    const rows = await this.db.select({ cnt: count() })
+      .from(registrations)
+      .where(and(
+        eq(registrations.churchId, churchId),
+        eq(registrations.eventId, eventId),
+        inArray(registrations.status, ["pending", "confirmed"])
+      ));
+    return rows[0]?.cnt || 0;
   }
 
   public async atomicInsertWithCapacityCheck(registration: Registration, capacity: number | null): Promise<boolean> {
     const m: any = { ...registration };
-    if (!m.id) m.id = this.createId();
-    if (m.registeredDate) m.registeredDate = DateHelper.toMysqlDate(m.registeredDate);
+    if (!m.id) m.id = UniqueIdHelper.shortId();
 
     if (capacity === null || capacity === undefined) {
-      // No capacity limit — just insert
-      const { sql, params } = this.buildInsert(m as Registration);
-      await TypedDB.query(sql, params);
+      await this.db.insert(registrations).values(m);
       registration.id = m.id;
       return true;
     }
 
-    // Atomic capacity check via INSERT...SELECT
-    const sql = `INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-      FROM dual
-      WHERE (SELECT COUNT(*) FROM registrations WHERE eventId=? AND churchId=? AND status IN ('pending','confirmed')) < ?`;
-    const params = [
-      m.id,
-      m.churchId,
-      m.eventId,
-      m.personId || null,
-      m.householdId || null,
-      m.status || "confirmed",
-      m.formSubmissionId || null,
-      m.notes || null,
-      m.registeredDate || null,
-      m.cancelledDate || null,
-      m.eventId,
-      m.churchId,
-      capacity
-    ];
-    const result: any = await TypedDB.query(sql, params);
-    if (result?.affectedRows > 0) {
+    // atomicInsertWithCapacityCheck uses INSERT...SELECT which returns affectedRows, not result rows.
+    // We need the raw result here, not executeRows().
+    const dialect = (await import("../../../shared/helpers/Dialect.js")).getDialect();
+    let affectedRows = 0;
+    if (dialect === "postgres") {
+      const result: any = await (this.db as any).execute(sql`
+        INSERT INTO registrations (id, "churchId", "eventId", "personId", "householdId", status, "formSubmissionId", notes, "registeredDate", "cancelledDate")
+        SELECT ${m.id}, ${m.churchId}, ${m.eventId}, ${m.personId || null}, ${m.householdId || null}, ${m.status || "confirmed"}, ${m.formSubmissionId || null}, ${m.notes || null}, ${m.registeredDate || null}, ${m.cancelledDate || null}
+        WHERE (SELECT COUNT(*) FROM registrations WHERE "eventId" = ${m.eventId} AND "churchId" = ${m.churchId} AND status IN ('pending','confirmed')) < ${capacity}
+      `);
+      // postgres.js returns an array with a .count property for non-RETURNING queries
+      affectedRows = result?.count ?? (Array.isArray(result) ? result.length : 0);
+    } else {
+      const result: any = await (this.db as any).execute(sql`
+        INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate)
+        SELECT ${m.id}, ${m.churchId}, ${m.eventId}, ${m.personId || null}, ${m.householdId || null}, ${m.status || "confirmed"}, ${m.formSubmissionId || null}, ${m.notes || null}, ${m.registeredDate || null}, ${m.cancelledDate || null}
+        FROM dual
+        WHERE (SELECT COUNT(*) FROM registrations WHERE eventId = ${m.eventId} AND churchId = ${m.churchId} AND status IN ('pending','confirmed')) < ${capacity}
+      `);
+      const rows: any = Array.isArray(result) ? result[0] : result;
+      affectedRows = rows?.affectedRows ?? 0;
+    }
+    if (affectedRows > 0) {
       registration.id = m.id;
       return true;
     }

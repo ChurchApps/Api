@@ -1,73 +1,102 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { ArrayHelper } from "@churchapps/apihelper";
+import { eq, and, sql, inArray, desc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { sessions } from "../../../db/schema/attendance.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Session } from "../models/index.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
+
+/**
+ * Normalize a date-only value to midnight UTC Date.
+ * Drizzle datetime columns require Date objects. For date-only fields (sessionDate),
+ * we normalize to midnight UTC so raw SQL comparisons with date strings match.
+ */
+function toDateOnly(val: any): Date | null {
+  if (val == null) return null;
+  const str = typeof val === "string" ? val : DateHelper.toMysqlDateOnly(val);
+  if (!str) return null;
+  return new Date(str + "T00:00:00Z");
+}
 
 @injectable()
-export class SessionRepo extends ConfiguredRepo<Session> {
-  protected get repoConfig(): RepoConfig<Session> {
-    return {
-      tableName: "sessions",
-      hasSoftDelete: false,
-      defaultOrderBy: "sessionDate DESC",
-      columns: ["groupId", "serviceTimeId", "sessionDate"]
-    };
-  }
+export class SessionRepo extends DrizzleRepo<typeof sessions> {
+  protected readonly table = sessions;
+  protected readonly moduleName = "attendance";
 
-  protected async create(session: Session): Promise<Session> {
-    const m: any = session;
-    if (!m.id) m.id = this.createId();
-    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);  // date-only field
-    const sql = "INSERT INTO sessions (id, churchId, groupId, serviceTimeId, sessionDate) VALUES (?, ?, ?, ?, ?);";
-    const params = [session.id, session.churchId, session.groupId, session.serviceTimeId, sessionDate];
-    await TypedDB.query(sql, params);
+  public override async save(session: Session) {
+    if (session.id) {
+      await this.db.update(sessions).set({
+        groupId: session.groupId,
+        serviceTimeId: session.serviceTimeId,
+        sessionDate: toDateOnly(session.sessionDate) as any
+      }).where(and(eq(sessions.id, session.id!), eq(sessions.churchId, session.churchId!)));
+    } else {
+      session.id = UniqueIdHelper.shortId();
+      const data = { ...session } as any;
+      data.sessionDate = toDateOnly(session.sessionDate);
+      await this.db.insert(sessions).values(data);
+    }
     return session;
   }
 
-  protected async update(session: Session): Promise<Session> {
-    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);  // date-only field
-    const sql = "UPDATE sessions SET groupId=?, serviceTimeId=?, sessionDate=? WHERE id=? and churchId=?";
-    const params = [session.groupId, session.serviceTimeId, sessionDate, session.id, session.churchId];
-    await TypedDB.query(sql, params);
-    return session;
+  public override loadAll(churchId: string) {
+    return this.db.select().from(sessions).where(eq(sessions.churchId, churchId)).orderBy(desc(sessions.sessionDate));
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
-    const result = await TypedDB.query("SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");", [churchId].concat(ids));
+    if (ids.length === 0) return [];
+    const result = await this.db.select().from(sessions)
+      .where(and(eq(sessions.churchId, churchId), inArray(sessions.id, ids)));
     return this.convertAllToModel(churchId, result);
   }
 
   public async loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
-    const sessDate = DateHelper.toMysqlDateOnly(sessionDate);  // date-only field
-    const result = await TypedDB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
-    return result ? this.convertToModel(churchId, result) : null;
+    const normalizedDate = toDateOnly(sessionDate);
+    const rows = await this.db.select().from(sessions)
+      .where(and(
+        eq(sessions.churchId, churchId),
+        eq(sessions.groupId, groupId),
+        eq(sessions.serviceTimeId, serviceTimeId),
+        eq(sessions.sessionDate, normalizedDate!)
+      ));
+    return rows.length > 0 ? this.convertToModel(churchId, rows[0]) : null;
   }
 
   public async loadByGroupIdWithNames(churchId: string, groupId: string) {
-    const sql =
-      "select s.id, " +
-      " CASE" +
-      "     WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y')" +
-      "     ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name)" +
-      " END AS displayName" +
-      " FROM sessions s" +
-      " LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId" +
-      " WHERE s.churchId=? AND s.groupId=?" +
-      " ORDER by s.sessionDate desc";
-    const result = await TypedDB.query(sql, [churchId, groupId]);
-    return this.convertAllToModel(churchId, result);
+    if (getDialect() === "postgres") {
+      const rows = await this.executeRows(sql`
+        SELECT s.id,
+          CASE
+            WHEN st.name IS NULL THEN to_char(s."sessionDate", 'MM/DD/YYYY')
+            ELSE concat(to_char(s."sessionDate", 'MM/DD/YYYY'), ' - ', st.name)
+          END AS "displayName"
+        FROM sessions s
+        LEFT OUTER JOIN "serviceTimes" st ON st.id = s."serviceTimeId"
+        WHERE s."churchId" = ${churchId} AND s."groupId" = ${groupId}
+        ORDER BY s."sessionDate" DESC
+      `);
+      return this.convertAllToModel(churchId, rows);
+    }
+    const rows = await this.executeRows(sql`
+      SELECT s.id,
+        CASE
+          WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y')
+          ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name)
+        END AS displayName
+      FROM sessions s
+      LEFT OUTER JOIN serviceTimes st ON st.id = s.serviceTimeId
+      WHERE s.churchId = ${churchId} AND s.groupId = ${groupId}
+      ORDER BY s.sessionDate DESC
+    `);
+    return this.convertAllToModel(churchId, rows);
   }
 
-  protected rowToModel(data: any): Session {
-    const result: Session = {
-      id: data.id,
-      groupId: data.groupId,
-      serviceTimeId: data.serviceTimeId,
-      sessionDate: data.sessionDate,
-      displayName: data.displayName
-    };
-    return result;
+  public convertToModel(_churchId: string, data: any): Session {
+    return { id: data.id, groupId: data.groupId, serviceTimeId: data.serviceTimeId, sessionDate: data.sessionDate, displayName: data.displayName };
+  }
+
+  public convertAllToModel(churchId: string, data: any[]) {
+    return (data || []).map((d: any) => this.convertToModel(churchId, d));
   }
 }

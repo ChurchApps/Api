@@ -1,59 +1,70 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { OAuthToken } from "../models/index.js";
-import { DateHelper } from "../helpers/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 import { injectable } from "inversify";
+import { eq, and, lt } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { oAuthTokens } from "../../../db/schema/membership.js";
+import { OAuthToken } from "../models/index.js";
 
 @injectable()
-export class OAuthTokenRepo extends BaseRepo<OAuthToken> {
-  protected tableName = "oAuthTokens";
-  protected hasSoftDelete = false;
+export class OAuthTokenRepo extends GlobalDrizzleRepo<typeof oAuthTokens> {
+  protected readonly table = oAuthTokens;
+  protected readonly moduleName = "membership";
+
+  public async save(token: OAuthToken) {
+    if (token.id) {
+      return this.update(token);
+    } else {
+      return this.create(token);
+    }
+  }
+
   protected async create(token: OAuthToken): Promise<OAuthToken> {
-    token.id = this.createId();
-    const expiresAt = DateHelper.toMysqlDate(token.expiresAt);
-    const sql = "INSERT INTO oAuthTokens (id, accessToken, refreshToken, clientId, userChurchId, scopes, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW());";
-    const params = [token.id, token.accessToken, token.refreshToken, token.clientId, token.userChurchId, token.scopes, expiresAt];
-    await TypedDB.query(sql, params);
+    token.id = UniqueIdHelper.shortId();
+    const data: any = { ...token, createdAt: new Date() };
+    await this.db.insert(oAuthTokens).values(data);
     return token;
   }
 
   protected async update(token: OAuthToken): Promise<OAuthToken> {
-    const expiresAt = DateHelper.toMysqlDate(token.expiresAt);
-    const sql = "UPDATE oAuthTokens SET accessToken=?, refreshToken=?, clientId=?, userChurchId=?, scopes=?, expiresAt=? WHERE id=?;";
-    const params = [token.accessToken, token.refreshToken, token.clientId, token.userChurchId, token.scopes, expiresAt, token.id];
-    await TypedDB.query(sql, params);
+    const data: any = {
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      clientId: token.clientId,
+      userChurchId: token.userChurchId,
+      scopes: token.scopes,
+      expiresAt: token.expiresAt
+    };
+    await this.db.update(oAuthTokens).set(data).where(eq(oAuthTokens.id, token.id!));
     return token;
   }
 
   public load(id: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE id=?", [id]);
+    return this.db.select().from(oAuthTokens).where(eq(oAuthTokens.id, id)).then(r => (r[0] as OAuthToken) ?? null);
   }
 
   public loadByAccessToken(accessToken: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE accessToken=?", [accessToken]);
+    return this.db.select().from(oAuthTokens).where(eq(oAuthTokens.accessToken, accessToken)).then(r => (r[0] as OAuthToken) ?? null);
   }
 
   public loadByRefreshToken(refreshToken: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE refreshToken=?", [refreshToken]);
+    return this.db.select().from(oAuthTokens).where(eq(oAuthTokens.refreshToken, refreshToken)).then(r => (r[0] as OAuthToken) ?? null);
   }
 
   public loadByClientAndUser(clientId: string, userChurchId: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE clientId=? AND userChurchId=?", [clientId, userChurchId]);
-  }
-
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE id=?", [id]);
+    return this.db.select().from(oAuthTokens)
+      .where(and(eq(oAuthTokens.clientId, clientId), eq(oAuthTokens.userChurchId, userChurchId)))
+      .then(r => (r[0] as OAuthToken) ?? null);
   }
 
   public deleteByAccessToken(accessToken: string) {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE accessToken=?", [accessToken]);
+    return this.db.delete(oAuthTokens).where(eq(oAuthTokens.accessToken, accessToken));
   }
 
   public deleteByRefreshToken(refreshToken: string) {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE refreshToken=?", [refreshToken]);
+    return this.db.delete(oAuthTokens).where(eq(oAuthTokens.refreshToken, refreshToken));
   }
 
   public deleteExpired() {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE expiresAt < NOW()", []);
+    return this.db.delete(oAuthTokens).where(lt(oAuthTokens.expiresAt, new Date()));
   }
 }

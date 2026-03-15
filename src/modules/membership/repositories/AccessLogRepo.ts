@@ -1,21 +1,30 @@
 import { injectable } from "inversify";
+import { eq, and } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { accessLogs } from "../../../db/schema/membership.js";
 import { AccessLog } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class AccessLogRepo extends ConfiguredRepo<AccessLog> {
-  protected get repoConfig(): RepoConfig<AccessLog> {
-    return {
-      tableName: "accessLogs",
-      hasSoftDelete: false,
-      columns: ["userId", "appName"],
-      insertLiterals: { loginTime: "NOW()" }
-    };
+export class AccessLogRepo extends DrizzleRepo<typeof accessLogs> {
+  protected readonly table = accessLogs;
+  protected readonly moduleName = "membership";
+
+  public async save(model: AccessLog) {
+    if (model.id) {
+      const { id: _id, churchId: _churchId, ...setData } = model as any;
+      await this.db.update(accessLogs).set(setData)
+        .where(and(eq(accessLogs.id, model.id), eq(accessLogs.churchId, model.churchId!)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      await this.db.insert(accessLogs).values({ ...model, loginTime: new Date() } as any);
+    }
+    return model;
   }
 
-  // For compatibility with existing controllers
   public async create(log: AccessLog) {
-    log.id = this.createId();
-    return super.create(log);
+    log.id = UniqueIdHelper.shortId();
+    await this.db.insert(accessLogs).values({ ...log, loginTime: new Date() } as any);
+    return log;
   }
 }

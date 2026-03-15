@@ -1,33 +1,21 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DeviceContent } from "../models/index.js";
 import { injectable } from "inversify";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { deviceContents } from "../../../db/schema/messaging.js";
 
 @injectable()
-export class DeviceContentRepo extends ConfiguredRepo<DeviceContent> {
-  protected get repoConfig(): RepoConfig<DeviceContent> {
-    return {
-      tableName: "deviceContent",
-      hasSoftDelete: false,
-      columns: ["deviceId", "contentType", "contentId"]
-    };
-  }
-  public loadByDeviceId(churchId: string, deviceId: string) {
-    return TypedDB.query("SELECT * FROM deviceContent WHERE churchId=? AND deviceId=?", [churchId, deviceId]);
+export class DeviceContentRepo extends DrizzleRepo<typeof deviceContents> {
+  protected readonly table = deviceContents;
+  protected readonly moduleName = "messaging";
+
+  public async loadByDeviceId(churchId: string, deviceId: string) {
+    const result = await this.db.select().from(deviceContents)
+      .where(and(eq(deviceContents.churchId, churchId), eq(deviceContents.deviceId, deviceId)));
+    return result || [];
   }
 
-  public deleteByDeviceId(churchId: string, deviceId: string) {
-    return TypedDB.query("DELETE FROM deviceContent WHERE deviceId=? AND churchId=?;", [deviceId, churchId]);
-  }
-
-  protected rowToModel(row: any): DeviceContent {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      deviceId: row.deviceId,
-      contentType: row.contentType,
-      contentId: row.contentId
-    };
+  public async deleteByDeviceId(churchId: string, deviceId: string) {
+    await this.db.delete(deviceContents)
+      .where(and(eq(deviceContents.deviceId, deviceId), eq(deviceContents.churchId, churchId)));
   }
 }

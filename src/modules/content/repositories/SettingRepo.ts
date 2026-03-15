@@ -1,45 +1,49 @@
 import { injectable } from "inversify";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Setting } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { contentSettings } from "../../../db/schema/content.js";
 
 @injectable()
-export class SettingRepo extends ConfiguredRepo<Setting> {
-  protected get repoConfig(): RepoConfig<Setting> {
-    return {
-      tableName: "settings",
-      hasSoftDelete: false,
-      columns: ["userId", "keyName", "value", "public"]
-    };
-  }
+export class SettingRepo extends DrizzleRepo<typeof contentSettings> {
+  protected readonly table = contentSettings;
+  protected readonly moduleName = "content";
 
   public deleteForUser(churchId: string, userId: string, id: string) {
-    return TypedDB.query("DELETE FROM settings WHERE id=? and churchId=? and userId=?;", [id, churchId, userId]);
+    return this.db.delete(contentSettings).where(and(eq(contentSettings.id, id), eq(contentSettings.churchId, churchId), eq(contentSettings.userId, userId)));
   }
 
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM settings WHERE churchId=? and userId is null;", [churchId]);
+  public override loadAll(churchId: string) {
+    return this.db.select().from(contentSettings).where(and(eq(contentSettings.churchId, churchId), isNull(contentSettings.userId)));
   }
 
   public loadUser(churchId: string, userId: string) {
-    return TypedDB.query("SELECT * FROM settings WHERE churchId=? and userId=?;", [churchId, userId]);
+    return this.db.select().from(contentSettings).where(and(eq(contentSettings.churchId, churchId), eq(contentSettings.userId, userId)));
   }
 
   public loadPublicSettings(churchId: string) {
-    return TypedDB.query("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
+    return this.db.select().from(contentSettings).where(and(eq(contentSettings.churchId, churchId), eq(contentSettings.public, true)));
   }
 
   public loadAllPublicSettings() {
-    return TypedDB.query("SELECT * FROM settings WHERE public=1 and userId is null;", []);
+    return this.db.select().from(contentSettings).where(and(eq(contentSettings.public, true), isNull(contentSettings.userId)));
   }
 
   public loadMulipleChurches(keyNames: string[], churchIds: string[]) {
-    return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId IN (?) AND public=1 and userId is null", [keyNames, churchIds]);
+    return this.db.select().from(contentSettings).where(and(
+      inArray(contentSettings.keyName, keyNames),
+      inArray(contentSettings.churchId, churchIds),
+      eq(contentSettings.public, true),
+      isNull(contentSettings.userId)
+    ));
   }
 
   public loadByKeyNames(churchId: string, keyNames: string[]) {
-    return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId=? and userId is null;", [keyNames, churchId]);
+    return this.db.select().from(contentSettings).where(and(
+      inArray(contentSettings.keyName, keyNames),
+      eq(contentSettings.churchId, churchId),
+      isNull(contentSettings.userId)
+    ));
   }
 
   public getImports(data: any[], type?: string, playlistId?: string, channelId?: string) {
@@ -89,6 +93,12 @@ export class SettingRepo extends ConfiguredRepo<Setting> {
     return result;
   }
 
+  public saveAll(models: any[]) {
+    return Promise.all(models.map((m) => this.save(m)));
+  }
+
+
+
   public convertAllImports(data: any[]) {
     const result: any[] = [];
     data.forEach((d) => {
@@ -101,16 +111,5 @@ export class SettingRepo extends ConfiguredRepo<Setting> {
       });
     });
     return result;
-  }
-
-  protected rowToModel(row: any): Setting {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      userId: row.userId,
-      keyName: row.keyName,
-      value: row.value,
-      public: row.public
-    };
   }
 }

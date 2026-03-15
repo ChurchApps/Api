@@ -1,15 +1,19 @@
 import mysql from "mysql2/promise";
+import postgres from "postgres";
 import { Environment } from "../helpers/Environment.js";
+import { getDialect } from "../helpers/Dialect.js";
 
 /**
- * Multi-database pool manager for API
- * Maintains separate connection pools for each module's database
+ * Multi-database pool manager for API.
+ * Supports both MySQL (mysql2) and PostgreSQL (postgres.js) based on DB_DIALECT env var.
+ * Maintains separate connection pools for each module's database.
  */
 export class MultiDatabasePool {
-  private static pools: Map<string, mysql.Pool> = new Map();
+  private static mysqlPools: Map<string, mysql.Pool> = new Map();
+  private static pgClients: Map<string, postgres.Sql> = new Map();
 
   static getPool(moduleName: string): mysql.Pool {
-    let pool = this.pools.get(moduleName);
+    let pool = this.mysqlPools.get(moduleName);
 
     if (!pool) {
       const dbConfig = Environment.getDatabaseConfig(moduleName);
@@ -34,10 +38,48 @@ export class MultiDatabasePool {
         }
       });
 
-      this.pools.set(moduleName, pool);
+      this.mysqlPools.set(moduleName, pool);
     }
 
     return pool;
+  }
+
+  static getPgClient(moduleName: string): postgres.Sql {
+    let client = this.pgClients.get(moduleName);
+
+    if (!client) {
+      const dbConfig = Environment.getDatabaseConfig(moduleName);
+      if (!dbConfig) {
+        throw new Error(`No database config for module: ${moduleName}`);
+      }
+
+      // Each module uses its own PG schema via search_path.
+      // Tables created by Drizzle land in the module's schema.
+      const searchPath = `${moduleName}, public`;
+      const rawClient = postgres({
+        host: dbConfig.host,
+        port: dbConfig.port || 5432,
+        user: dbConfig.user,
+        password: dbConfig.password,
+        database: dbConfig.database,
+        max: dbConfig.connectionLimit || 10,
+        connection: { search_path: searchPath }
+      });
+
+      // Wrap the client's unsafe() method to auto-serialize Date objects.
+      // Drizzle-ORM uses client.unsafe(query, params) which bypasses
+      // postgres.js's built-in type system, causing Date serialization failures.
+      const origUnsafe = rawClient.unsafe.bind(rawClient);
+      rawClient.unsafe = (query: string, params?: any[], ...rest: any[]) => {
+        const serialized = params?.map(p => p instanceof Date ? p.toISOString() : p);
+        return origUnsafe(query, serialized, ...rest);
+      };
+      client = rawClient;
+
+      this.pgClients.set(moduleName, client);
+    }
+
+    return client;
   }
 
   /**
@@ -56,7 +98,7 @@ export class MultiDatabasePool {
   }
 
   /**
-   * Expands arrays in SQL IN clauses
+   * Expands arrays in SQL IN clauses (MySQL only — postgres.js handles arrays natively)
    * Converts: SELECT * FROM table WHERE id IN (?) with params [churchId, [1,2,3]]
    * To: SELECT * FROM table WHERE id IN (?,?,?) with params [churchId, 1, 2, 3]
    */
@@ -108,12 +150,24 @@ export class MultiDatabasePool {
     return { sql: expandedSql, params: expandedParams };
   }
 
-  static async query(moduleName: string, sql: string, params?: any[]): Promise<any> {
+  static async query(moduleName: string, sqlStr: string, params?: any[]): Promise<any> {
+    if (getDialect() === "postgres") {
+      return this.pgQuery(moduleName, sqlStr, params);
+    }
     const pool = this.getPool(moduleName);
     const sanitizedParams = this.sanitizeParams(params);
-    const { sql: expandedSql, params: expandedParams } = this.expandArrayParams(sql, sanitizedParams);
+    const { sql: expandedSql, params: expandedParams } = this.expandArrayParams(sqlStr, sanitizedParams);
     const [rows] = await pool.execute(expandedSql, expandedParams);
     return rows;
+  }
+
+  private static async pgQuery(moduleName: string, sqlStr: string, params?: any[]): Promise<any> {
+    const client = this.getPgClient(moduleName);
+    const sanitizedParams = this.sanitizeParams(params);
+    if (sanitizedParams.length === 0) {
+      return client.unsafe(sqlStr);
+    }
+    return client.unsafe(sqlStr, sanitizedParams);
   }
 
   static async queryOne(moduleName: string, sql: string, params?: any[]): Promise<any> {
@@ -121,16 +175,25 @@ export class MultiDatabasePool {
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   }
 
-  static async executeDDL(moduleName: string, sql: string): Promise<any> {
+  static async executeDDL(moduleName: string, sqlStr: string): Promise<any> {
+    if (getDialect() === "postgres") {
+      const client = this.getPgClient(moduleName);
+      return client.unsafe(sqlStr);
+    }
     const pool = this.getPool(moduleName);
-    const [result] = await pool.query(sql);
+    const [result] = await pool.query(sqlStr);
     return result;
   }
 
   static async closeAll(): Promise<void> {
-    for (const pool of this.pools.values()) {
+    for (const pool of this.mysqlPools.values()) {
       await pool.end();
     }
-    this.pools.clear();
+    this.mysqlPools.clear();
+
+    for (const client of this.pgClients.values()) {
+      await client.end();
+    }
+    this.pgClients.clear();
   }
 }

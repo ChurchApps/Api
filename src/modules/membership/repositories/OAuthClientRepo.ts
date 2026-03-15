@@ -1,44 +1,57 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { OAuthClient } from "../models/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 import { injectable } from "inversify";
+import { eq, and, asc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { oAuthClients } from "../../../db/schema/membership.js";
+import { OAuthClient } from "../models/index.js";
 
 @injectable()
-export class OAuthClientRepo extends BaseRepo<OAuthClient> {
-  protected tableName = "oAuthClients";
-  protected hasSoftDelete = false;
+export class OAuthClientRepo extends GlobalDrizzleRepo<typeof oAuthClients> {
+  protected readonly table = oAuthClients;
+  protected readonly moduleName = "membership";
+
+  public async save(client: OAuthClient) {
+    if (client.id) {
+      return this.update(client);
+    } else {
+      return this.create(client);
+    }
+  }
+
   protected async create(client: OAuthClient): Promise<OAuthClient> {
-    client.id = this.createId();
-    const sql = "INSERT INTO oAuthClients (id, name, clientId, clientSecret, redirectUris, scopes, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW());";
-    const params = [client.id, client.name, client.clientId, client.clientSecret, client.redirectUris, client.scopes];
-    await TypedDB.query(sql, params);
+    client.id = UniqueIdHelper.shortId();
+    const data: any = { ...client, createdAt: new Date() };
+    await this.db.insert(oAuthClients).values(data);
     return client;
   }
 
   protected async update(client: OAuthClient): Promise<OAuthClient> {
-    const sql = "UPDATE oAuthClients SET name=?, clientId=?, clientSecret=?, redirectUris=?, scopes=? WHERE id=?;";
-    const params = [client.name, client.clientId, client.clientSecret, client.redirectUris, client.scopes, client.id];
-    await TypedDB.query(sql, params);
+    const data: any = {
+      name: client.name,
+      clientId: client.clientId,
+      clientSecret: client.clientSecret,
+      redirectUris: client.redirectUris,
+      scopes: client.scopes
+    };
+    await this.db.update(oAuthClients).set(data).where(eq(oAuthClients.id, client.id!));
     return client;
   }
 
   public load(id: string): Promise<OAuthClient> {
-    return TypedDB.queryOne("SELECT * FROM oAuthClients WHERE id=?", [id]);
+    return this.db.select().from(oAuthClients).where(eq(oAuthClients.id, id)).then(r => (r[0] as OAuthClient) ?? null);
   }
 
   public loadByClientId(clientId: string): Promise<OAuthClient> {
-    return TypedDB.queryOne("SELECT * FROM oAuthClients WHERE clientId=?", [clientId]);
+    return this.db.select().from(oAuthClients).where(eq(oAuthClients.clientId, clientId)).then(r => (r[0] as OAuthClient) ?? null);
   }
 
   public loadByClientIdAndSecret(clientId: string, clientSecret: string): Promise<OAuthClient> {
-    return TypedDB.queryOne("SELECT * FROM oAuthClients WHERE clientId=? AND clientSecret=?", [clientId, clientSecret]);
-  }
-
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM oAuthClients WHERE id=?", [id]);
+    return this.db.select().from(oAuthClients)
+      .where(and(eq(oAuthClients.clientId, clientId), eq(oAuthClients.clientSecret, clientSecret)))
+      .then(r => (r[0] as OAuthClient) ?? null);
   }
 
   public async loadAll() {
-    return TypedDB.query("SELECT * FROM oAuthClients ORDER BY name", []);
+    return this.db.select().from(oAuthClients).orderBy(asc(oAuthClients.name));
   }
 }

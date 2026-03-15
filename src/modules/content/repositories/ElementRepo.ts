@@ -1,30 +1,23 @@
-import { ArrayHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Element } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { injectable } from "inversify";
+import { eq, and, asc, inArray, sql } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { elements } from "../../../db/schema/content.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
-export class ElementRepo extends ConfiguredRepo<Element> {
-  protected get repoConfig(): RepoConfig<Element> {
-    return {
-      tableName: "elements",
-      hasSoftDelete: false,
-      defaultOrderBy: "sort",
-      columns: [
-        "sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"
-      ]
-    };
-  }
+export class ElementRepo extends DrizzleRepo<typeof elements> {
+  protected readonly table = elements;
+  protected readonly moduleName = "content";
 
   public async updateSortForBlock(churchId: string, blockId: string, parentId: string) {
-    const elements = await this.loadForBlock(churchId, blockId);
-    const promises: Promise<Element>[] = [];
-    for (let i = 0; i < elements.length; i++) {
-      if (elements[i].parentId === parentId) {
-        if (elements[i].sort !== i + 1) {
-          elements[i].sort = i + 1;
-          promises.push(this.save(elements[i]));
+    const elems = await this.loadForBlock(churchId, blockId);
+    const promises: Promise<any>[] = [];
+    for (let i = 0; i < elems.length; i++) {
+      if (elems[i].parentId === parentId) {
+        if (elems[i].sort !== i + 1) {
+          elems[i].sort = i + 1;
+          promises.push(this.save(elems[i]));
         }
       }
     }
@@ -32,17 +25,16 @@ export class ElementRepo extends ConfiguredRepo<Element> {
   }
 
   public async updateSort(churchId: string, sectionId: string, parentId: string) {
-    const elements = await this.loadForSection(churchId, sectionId);
-    const skipParentId = ArrayHelper.getAll(elements, "parentId", null);
-    const withParentId = ArrayHelper.getAll(elements, "parentId", parentId);
-    const promises: Promise<Element>[] = [];
+    const elems = await this.loadForSection(churchId, sectionId);
+    const skipParentId = ArrayHelper.getAll(elems, "parentId", null);
+    const withParentId = ArrayHelper.getAll(elems, "parentId", parentId);
+    const promises: Promise<any>[] = [];
     for (let i = 0; i < skipParentId.length; i++) {
       if (skipParentId[i].sort !== i + 1) {
         skipParentId[i].sort = i + 1;
         promises.push(this.save(skipParentId[i]));
       }
     }
-    // for elements inside a column/slide/box
     for (let i = 0; i < withParentId.length; i++) {
       if (withParentId[i].sort !== i + 1) {
         withParentId[i].sort = i + 1;
@@ -52,55 +44,39 @@ export class ElementRepo extends ConfiguredRepo<Element> {
     if (promises.length > 0) await Promise.all(promises);
   }
 
-  public loadForSection(churchId: string, sectionId: string) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND sectionId=? order by sort;", [churchId, sectionId]);
+  public loadForSection(churchId: string, sectionId: string): Promise<any[]> {
+    return this.db.select().from(elements).where(and(eq(elements.churchId, churchId), eq(elements.sectionId, sectionId))).orderBy(asc(elements.sort));
   }
 
-  public loadForBlock(churchId: string, blockId: string) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND blockId=? order by sort;", [churchId, blockId]);
+  public loadForBlock(churchId: string, blockId: string): Promise<any[]> {
+    return this.db.select().from(elements).where(and(eq(elements.churchId, churchId), eq(elements.blockId, blockId))).orderBy(asc(elements.sort));
   }
 
-  public loadForBlocks(churchId: string, blockIds: string[]) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND blockId IN (?) order by sort;", [churchId, blockIds]);
+  public loadForBlocks(churchId: string, blockIds: string[]): Promise<any[]> {
+    return this.db.select().from(elements).where(and(eq(elements.churchId, churchId), inArray(elements.blockId, blockIds))).orderBy(asc(elements.sort));
   }
 
-  /*
-  public loadForBlocks(churchId: string, blockIds: string[]) {
-    const sql = "SELECT e.* "
-      + " FROM elements e"
-      + " LEFT JOIN sections s on s.id=e.sectionId"
-      + " WHERE e.churchId=? AND (e.blockId IN (?) OR s.blockId IN (?))"
-      + " ORDER BY sort;";
-    return TypedDB.query(sql, [churchId, blockIds, blockIds]);
+  public async loadForPage(churchId: string, pageId: string): Promise<any[]> {
+    return this.executeRows(
+      getDialect() === "postgres"
+        ? sql`
+          SELECT e.*
+          FROM elements e
+          INNER JOIN sections s ON s.id = e."sectionId"
+          WHERE (s."pageId" = ${pageId} OR (s."pageId" IS NULL AND s."blockId" IS NULL)) AND e."churchId" = ${churchId}
+          ORDER BY e.sort`
+        : sql`
+          SELECT e.*
+          FROM elements e
+          INNER JOIN sections s ON s.id = e.sectionId
+          WHERE (s.pageId = ${pageId} OR (s.pageId IS NULL AND s.blockId IS NULL)) AND e.churchId = ${churchId}
+          ORDER BY e.sort`
+    );
   }
 
-  public loadForBlock(churchId: string, blockId: string) {
-    const sql = "SELECT e.* "
-      + " FROM elements e"
-      + " LEFT JOIN sections s on s.id=e.sectionId"
-      + " WHERE e.churchId=? AND (e.blockId=? OR s.blockId=?)"
-      + " ORDER BY sort;";
-    return TypedDB.query(sql, [churchId, blockId, blockId]);
-  }
-*/
-  public loadForPage(churchId: string, pageId: string) {
-    const sql =
-      "SELECT e.* " + " FROM elements e" + " INNER JOIN sections s on s.id=e.sectionId" + " WHERE (s.pageId=? OR (s.pageId IS NULL and s.blockId IS NULL)) AND e.churchId=?" + " ORDER BY sort;";
-    return TypedDB.query(sql, [pageId, churchId]);
-  }
-
-  protected rowToModel(row: any): Element {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      sectionId: row.sectionId,
-      blockId: row.blockId,
-      elementType: row.elementType,
-      sort: row.sort,
-      parentId: row.parentId,
-      answersJSON: row.answersJSON,
-      stylesJSON: row.stylesJSON,
-      animationsJSON: row.animationsJSON
-    };
+  public async insert(model: any) {
+    if (!model.id) model.id = UniqueIdHelper.shortId();
+    await this.db.insert(elements).values(model);
+    return model;
   }
 }

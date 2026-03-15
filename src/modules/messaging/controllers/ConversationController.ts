@@ -98,7 +98,7 @@ export class ConversationController extends MessagingBaseController {
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
-      return this.repos.conversation.convertAllToModel(data as any[]);
+      return data;
     }) as any;
   }
 
@@ -106,7 +106,7 @@ export class ConversationController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.conversation.loadById(churchId, id);
-      return this.repos.conversation.convertToModel(data);
+      return data;
     }) as any;
   }
 
@@ -119,7 +119,7 @@ export class ConversationController extends MessagingBaseController {
         promises.push(this.repos.conversation.save(conversation));
       }) as any;
       const result = await Promise.all(promises);
-      return this.repos.conversation.convertAllToModel(result);
+      return result;
     }) as any;
   }
 

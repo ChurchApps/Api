@@ -1,53 +1,14 @@
-import { DateHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { EventException } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, inArray } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { eventExceptions } from "../../../db/schema/content.js";
 
 @injectable()
-export class EventExceptionRepo extends ConfiguredRepo<EventException> {
-  protected get repoConfig(): RepoConfig<EventException> {
-    return {
-      tableName: "eventExceptions",
-      hasSoftDelete: false,
-      columns: ["eventId", "exceptionDate"]
-    };
-  }
-
-  // Override to handle date conversion
-  protected async create(model: EventException): Promise<EventException> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    // Convert exceptionDate before insert
-    if (m.exceptionDate) {
-      m.exceptionDate = DateHelper.toMysqlDate(m.exceptionDate);
-    }
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  protected async update(model: EventException): Promise<EventException> {
-    const m: any = model as any;
-    // Convert exceptionDate before update
-    if (m.exceptionDate) {
-      m.exceptionDate = DateHelper.toMysqlDate(m.exceptionDate);
-    }
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
-    return model;
-  }
+export class EventExceptionRepo extends DrizzleRepo<typeof eventExceptions> {
+  protected readonly table = eventExceptions;
+  protected readonly moduleName = "content";
 
   public loadForEvents(churchId: string, eventIds: string[]) {
-    return TypedDB.query("SELECT * FROM eventExceptions WHERE churchId=? and eventId in (?);", [churchId, eventIds]);
-  }
-
-  protected rowToModel(row: any): EventException {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      eventId: row.eventId,
-      exceptionDate: row.exceptionDate
-    };
+    return this.db.select().from(eventExceptions).where(and(eq(eventExceptions.churchId, churchId), inArray(eventExceptions.eventId, eventIds)));
   }
 }

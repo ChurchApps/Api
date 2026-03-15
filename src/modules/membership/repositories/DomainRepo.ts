@@ -1,46 +1,37 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Domain } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and, sql, inArray, or, isNull, lt } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { domains, churches } from "../../../db/schema/membership.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { notLike } from "drizzle-orm";
 
 @injectable()
-export class DomainRepo extends ConfiguredRepo<Domain> {
-  protected get repoConfig(): RepoConfig<Domain> {
-    return {
-      tableName: "domains",
-      hasSoftDelete: false,
-      columns: ["domainName", "lastChecked", "isStale"]
-    };
-  }
+export class DomainRepo extends DrizzleRepo<typeof domains> {
+  protected readonly table = domains;
+  protected readonly moduleName = "membership";
 
   public loadByName(domainName: string) {
-    return TypedDB.queryOne("SELECT * FROM `domains` WHERE domainName=?;", [domainName]);
+    return this.db.select().from(domains).where(eq(domains.domainName, domainName)).then(r => r[0] ?? null);
   }
 
   public loadPairs() {
-    return TypedDB.query(
-      "select d.domainName as host, concat(c.subDomain, '.b1.church:443') as dial from domains d inner join churches c on c.id=d.churchId WHERE d.domainName NOT like '%www.%';",
-      []
-    );
+    return this.db.select({
+      host: domains.domainName,
+      dial: sql`concat(${churches.subDomain}, '.b1.church:443')`.as("dial")
+    })
+      .from(domains)
+      .innerJoin(churches, eq(churches.id, domains.churchId))
+      .where(notLike(domains.domainName, "%www.%"));
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    const sql = "SELECT * FROM `domains` WHERE churchId=? AND id IN (" + ids.join(",") + ") ORDER by name";
-    return TypedDB.query(sql, [churchId]);
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.db.select().from(domains)
+      .where(and(eq(domains.churchId, churchId), inArray(domains.id, ids)));
   }
 
   public loadUnchecked() {
-    return TypedDB.query("SELECT * FROM `domains` WHERE lastChecked IS NULL OR lastChecked < DATE_SUB(NOW(), INTERVAL 24 HOUR);", []);
-  }
-
-  protected rowToModel(row: any): Domain {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      domainName: row.domainName,
-      lastChecked: row.lastChecked,
-      isStale: row.isStale
-    };
+    return this.db.select().from(domains)
+      .where(or(isNull(domains.lastChecked), lt(domains.lastChecked, DateHelper.hoursFromNow(-24))));
   }
 }

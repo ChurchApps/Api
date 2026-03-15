@@ -1,5 +1,5 @@
 /**
- * Utility for parsing MySQL connection strings into configuration objects
+ * Utility for parsing MySQL and PostgreSQL connection strings into configuration objects
  */
 export interface DatabaseConfig {
   host: string;
@@ -12,10 +12,13 @@ export interface DatabaseConfig {
 
 export class DatabaseUrlParser {
   /**
-   * Parses a MySQL connection string into a database configuration object
-   * Format: mysql://user:password@host:port/database
+   * Parses a database connection string into a configuration object.
+   * Supports both MySQL and PostgreSQL URL formats:
+   *   mysql://user:password@host:port/database
+   *   postgresql://user:password@host:port/database
+   *   postgres://user:password@host:port/database
    *
-   * @param url MySQL connection string
+   * @param url Database connection string
    * @returns DatabaseConfig object
    */
   static parseConnectionString(url: string): DatabaseConfig {
@@ -23,8 +26,20 @@ export class DatabaseUrlParser {
       throw new Error("Database URL is required");
     }
 
-    // Remove mysql:// prefix if present
-    const cleanUrl = url.replace(/^mysql:\/\//, "");
+    // Detect protocol and determine default port
+    let defaultPort = 3306;
+    let cleanUrl = url;
+
+    if (url.startsWith("postgresql://") || url.startsWith("postgres://")) {
+      cleanUrl = url.replace(/^postgres(?:ql)?:\/\//, "");
+      defaultPort = 5432;
+    } else if (url.startsWith("mysql://")) {
+      cleanUrl = url.replace(/^mysql:\/\//, "");
+      defaultPort = 3306;
+    } else {
+      // No protocol — try parsing anyway with mysql defaults
+      cleanUrl = url;
+    }
 
     // Parse the URL components
     // Pattern: [user[:password]@]host[:port]/database[?params]
@@ -32,7 +47,7 @@ export class DatabaseUrlParser {
     const match = cleanUrl.match(urlPattern);
 
     if (!match) {
-      throw new Error(`Invalid MySQL connection string format: ${url}. Expected format: mysql://user:password@host:port/database`);
+      throw new Error(`Invalid connection string format: ${url}. Expected format: mysql://user:password@host:port/database or postgresql://user:password@host:port/database`);
     }
 
     const [, user, password, host, portStr, database] = match;
@@ -41,7 +56,7 @@ export class DatabaseUrlParser {
       throw new Error(`Missing required components in connection string: ${url}. Host and database are required.`);
     }
 
-    const port = portStr ? parseInt(portStr, 10) : 3306;
+    const port = portStr ? parseInt(portStr, 10) : defaultPort;
 
     if (isNaN(port) || port <= 0 || port > 65535) {
       throw new Error(`Invalid port number in connection string: ${portStr}. Port must be between 1 and 65535.`);
@@ -84,14 +99,22 @@ export class DatabaseUrlParser {
   }
 
   /**
-   * Converts a database configuration object back to a connection string
+   * Converts a database configuration object back to a connection string.
+   * Uses the protocol appropriate for the current DB_DIALECT.
    *
    * @param config DatabaseConfig object
-   * @returns MySQL connection string
+   * @param protocol Protocol prefix (default: auto-detect from DB_DIALECT)
+   * @returns Connection string
    */
-  static configToConnectionString(config: DatabaseConfig): string {
+  static configToConnectionString(config: DatabaseConfig, protocol?: string): string {
     const userPass = config.password ? `${config.user}:${config.password}` : config.user;
 
-    return `mysql://${userPass}@${config.host}:${config.port}/${config.database}`;
+    if (!protocol) {
+      // Auto-detect from dialect
+      const dialect = (process.env.DB_DIALECT || "mysql").toLowerCase();
+      protocol = (dialect === "postgres" || dialect === "postgresql" || dialect === "pg") ? "postgresql" : "mysql";
+    }
+
+    return `${protocol}://${userPass}@${config.host}:${config.port}/${config.database}`;
   }
 }

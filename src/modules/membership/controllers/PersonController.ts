@@ -525,7 +525,8 @@ export class PersonController extends MembershipBaseController {
   }
 
   private async getPreferences(churchId: string, personId: string, repos: Repos) {
-    const personPreferences: VisibilityPreference = await repos.visibilityPreference.loadForPerson(churchId, personId);
+    const prefRows = await repos.visibilityPreference.loadForPerson(churchId, personId);
+    const personPreferences: VisibilityPreference = (prefRows[0] as VisibilityPreference) ?? null;
     const pref = { address: personPreferences?.address, phone: personPreferences?.phoneNumber, email: personPreferences?.email };
 
     if (!personPreferences?.address || !personPreferences?.phoneNumber || !personPreferences?.email) {

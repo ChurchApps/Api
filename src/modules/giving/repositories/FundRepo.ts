@@ -1,24 +1,21 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { eq, and } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { funds } from "../../../db/schema/giving.js";
 import { Fund } from "../models/index.js";
 
 @injectable()
-export class FundRepo extends ConfiguredRepo<Fund> {
-  protected get repoConfig(): RepoConfig<Fund> {
-    return {
-      tableName: "funds",
-      hasSoftDelete: true,
-      defaultOrderBy: "name",
-      columns: ["name", "taxDeductible", "productId"],
-      insertLiterals: { removed: "0" }
-    };
-  }
+export class FundRepo extends DrizzleRepo<typeof funds> {
+  protected readonly table = funds;
+  protected readonly moduleName = "giving";
+  protected readonly softDelete = true;
 
   public async getOrCreateGeneral(churchId: string) {
-    const data = await TypedDB.queryOne("SELECT * FROM funds WHERE churchId=? AND name='(General Fund)' AND removed=0;", [churchId]);
+    const row = await this.db.select().from(funds)
+      .where(and(eq(funds.churchId, churchId), eq(funds.name, "(General Fund)"), eq(funds.removed, false)))
+      .then(r => r[0] ?? null);
 
-    if (data !== null) return this.convertToModel(churchId, data);
+    if (row !== null) return this.convertToModel(churchId, row);
     else {
       const fund: Fund = { churchId, name: "(General Fund)" };
       const result = await this.save(fund);
@@ -26,7 +23,7 @@ export class FundRepo extends ConfiguredRepo<Fund> {
     }
   }
 
-  protected rowToModel(data: any): Fund {
+  public convertToModel(_churchId: string, data: any): Fund {
     const result: Fund = {
       id: data.id,
       name: data.name,
@@ -35,5 +32,9 @@ export class FundRepo extends ConfiguredRepo<Fund> {
       taxDeductible: data.taxDeductible
     };
     return result;
+  }
+
+  public convertAllToModel(churchId: string, data: any[]) {
+    return (data || []).map((d: any) => this.convertToModel(churchId, d));
   }
 }

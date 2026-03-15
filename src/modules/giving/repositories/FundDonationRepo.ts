@@ -1,66 +1,120 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DateHelper } from "@churchapps/apihelper";
+import { eq, and, between, like, desc, asc } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { fundDonations, donations, funds } from "../../../db/schema/giving.js";
 import { FundDonation } from "../models/index.js";
 
 @injectable()
-export class FundDonationRepo extends ConfiguredRepo<FundDonation> {
-  protected get repoConfig(): RepoConfig<FundDonation> {
-    return {
-      tableName: "fundDonations",
-      hasSoftDelete: false,
-      columns: ["donationId", "fundId", "amount"]
-    };
-  }
+export class FundDonationRepo extends DrizzleRepo<typeof fundDonations> {
+  protected readonly table = fundDonations;
+  protected readonly moduleName = "giving";
 
   public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId WHERE fd.churchId=? AND d.donationDate BETWEEN ? AND ? ORDER by d.donationDate desc;",
-      [churchId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]
-    );
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .where(and(eq(fundDonations.churchId, churchId), between(donations.donationDate, startDate, endDate)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByDonationId(churchId: string, donationId: string) {
-    return TypedDB.query("SELECT * FROM fundDonations WHERE churchId=? AND donationId=?;", [churchId, donationId]);
+    return this.db.select().from(fundDonations).where(and(eq(fundDonations.churchId, churchId), eq(fundDonations.donationId, donationId)));
   }
 
   public loadByPersonId(churchId: string, personId: string) {
-    return TypedDB.query("SELECT fd.* FROM donations d inner join fundDonations fd on fd.churchId=d.churchId and fd.donationId=d.id WHERE d.churchId=? AND d.personId=? ORDER by d.donationDate;", [
-      churchId,
-      personId
-    ]);
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount
+    })
+      .from(donations)
+      .innerJoin(fundDonations, and(eq(fundDonations.churchId, donations.churchId), eq(fundDonations.donationId, donations.id)))
+      .where(and(eq(donations.churchId, churchId), eq(donations.personId, personId)))
+      .orderBy(asc(donations.donationDate));
   }
 
   public loadByFundId(churchId: string, fundId: string) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId WHERE fd.churchId=? AND fd.fundId=? ORDER by d.donationDate desc;",
-      [churchId, fundId]
-    );
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .where(and(eq(fundDonations.churchId, churchId), eq(fundDonations.fundId, fundId)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByFundIdDate(churchId: string, fundId: string, startDate: Date, endDate: Date) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId WHERE fd.churchId=? AND fd.fundId=? AND d.donationDate BETWEEN ? AND ? ORDER by d.donationDate desc;",
-      [churchId, fundId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]
-    );
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .where(and(eq(fundDonations.churchId, churchId), eq(fundDonations.fundId, fundId), between(donations.donationDate, startDate, endDate)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByFundName(churchId: string, fundName: string) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId INNER JOIN funds f ON f.id=fd.fundId WHERE fd.churchId=? AND f.name LIKE ? ORDER by d.donationDate desc;",
-      [churchId, `%${fundName}%`]
-    );
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .innerJoin(funds, eq(funds.id, fundDonations.fundId))
+      .where(and(eq(fundDonations.churchId, churchId), like(funds.name, `%${fundName}%`)))
+      .orderBy(desc(donations.donationDate));
   }
 
   public loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId INNER JOIN funds f ON f.id=fd.fundId WHERE fd.churchId=? AND f.name LIKE ? AND d.donationDate BETWEEN ? AND ? ORDER by d.donationDate desc;",
-      [churchId, `%${fundName}%`, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]
-    );
+    return this.db.select({
+      id: fundDonations.id,
+      churchId: fundDonations.churchId,
+      donationId: fundDonations.donationId,
+      fundId: fundDonations.fundId,
+      amount: fundDonations.amount,
+      donationDate: donations.donationDate,
+      batchId: donations.batchId,
+      personId: donations.personId
+    })
+      .from(fundDonations)
+      .innerJoin(donations, eq(donations.id, fundDonations.donationId))
+      .innerJoin(funds, eq(funds.id, fundDonations.fundId))
+      .where(and(eq(fundDonations.churchId, churchId), like(funds.name, `%${fundName}%`), between(donations.donationDate, startDate, endDate)))
+      .orderBy(desc(donations.donationDate));
   }
 
-  protected rowToModel(data: any): FundDonation {
+  public convertToModel(_churchId: string, data: any): FundDonation {
     const result: FundDonation = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount };
     if (data.batchId !== undefined) {
       result.donation = {
@@ -73,5 +127,7 @@ export class FundDonationRepo extends ConfiguredRepo<FundDonation> {
     return result;
   }
 
-  // Inherit default convertToModel/convertAllToModel from BaseRepo
+  public convertAllToModel(churchId: string, data: any[]) {
+    return (data || []).map((d: any) => this.convertToModel(churchId, d));
+  }
 }

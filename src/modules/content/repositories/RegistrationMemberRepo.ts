@@ -1,36 +1,26 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { RegistrationMember } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, sql } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { registrationMembers } from "../../../db/schema/content.js";
 
 @injectable()
-export class RegistrationMemberRepo extends ConfiguredRepo<RegistrationMember> {
-  protected get repoConfig(): RepoConfig<RegistrationMember> {
-    return {
-      tableName: "registrationMembers",
-      hasSoftDelete: false,
-      columns: ["registrationId", "personId", "firstName", "lastName"]
-    };
+export class RegistrationMemberRepo extends DrizzleRepo<typeof registrationMembers> {
+  protected readonly table = registrationMembers;
+  protected readonly moduleName = "content";
+
+  public async loadForRegistration(churchId: string, registrationId: string) {
+    return this.db.select().from(registrationMembers).where(and(eq(registrationMembers.churchId, churchId), eq(registrationMembers.registrationId, registrationId)));
   }
 
-  public async loadForRegistration(churchId: string, registrationId: string): Promise<RegistrationMember[]> {
-    return TypedDB.query(
-      "SELECT * FROM registrationMembers WHERE churchId=? AND registrationId=?;",
-      [churchId, registrationId]
-    );
+  public async loadForEvent(churchId: string, eventId: string): Promise<any[]> {
+    return this.executeRows(sql`
+      SELECT rm.* FROM registrationMembers rm
+      INNER JOIN registrations r ON rm.registrationId = r.id
+      WHERE r.churchId = ${churchId} AND r.eventId = ${eventId}
+    `);
   }
 
-  public async loadForEvent(churchId: string, eventId: string): Promise<RegistrationMember[]> {
-    return TypedDB.query(
-      "SELECT rm.* FROM registrationMembers rm INNER JOIN registrations r ON rm.registrationId=r.id WHERE r.churchId=? AND r.eventId=?;",
-      [churchId, eventId]
-    );
-  }
-
-  public async deleteForRegistration(churchId: string, registrationId: string): Promise<void> {
-    await TypedDB.query(
-      "DELETE FROM registrationMembers WHERE churchId=? AND registrationId=?;",
-      [churchId, registrationId]
-    );
+  public async deleteForRegistration(churchId: string, registrationId: string) {
+    await this.db.delete(registrationMembers).where(and(eq(registrationMembers.churchId, churchId), eq(registrationMembers.registrationId, registrationId)));
   }
 }

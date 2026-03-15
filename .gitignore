@@ -76,6 +76,8 @@ layers/
 *.sqlite3
 *.db
 
+# Drizzle ORM migrations are committed to version control (drizzle/ directory)
+
 # Certificates
 *.pem
 *.key

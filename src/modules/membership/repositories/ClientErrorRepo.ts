@@ -1,42 +1,15 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { ClientError } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { lt } from "drizzle-orm";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { clientErrors } from "../../../db/schema/membership.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 @injectable()
-export class ClientErrorRepo extends ConfiguredRepo<ClientError> {
-  protected get repoConfig(): RepoConfig<ClientError> {
-    return {
-      tableName: "clientErrors",
-      hasSoftDelete: false,
-      columns: ["application", "errorTime", "userId", "originUrl", "errorType", "message", "details"]
-    };
-  }
+export class ClientErrorRepo extends GlobalDrizzleRepo<typeof clientErrors> {
+  protected readonly table = clientErrors;
+  protected readonly moduleName = "membership";
 
   public deleteOld() {
-    return TypedDB.query("DELETE FROM clientErrors WHERE errorTime<date_add(NOW(), INTERVAL -7 DAY)", []);
-  }
-
-  public load(id: string) {
-    return TypedDB.queryOne("SELECT * FROM clientErrors WHERE id=?;", [id]);
-  }
-
-  public loadAll() {
-    return TypedDB.query("SELECT * FROM clientErrors;", []);
-  }
-
-  protected rowToModel(row: any): ClientError {
-    return {
-      id: row.id,
-      application: row.application,
-      errorTime: row.errorTime,
-      userId: row.userId,
-      churchId: row.churchId,
-      originUrl: row.originUrl,
-      errorType: row.errorType,
-      message: row.message,
-      details: row.details
-    };
+    return this.db.delete(clientErrors).where(lt(clientErrors.errorTime, DateHelper.daysFromNow(-7)));
   }
 }

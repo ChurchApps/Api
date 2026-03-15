@@ -1,26 +1,53 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { eq, and, asc, between, sql } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { bibleVerseTexts } from "../../../db/schema/content.js";
 import { BibleVerseText } from "../models/index.js";
-import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
-export class BibleVerseTextRepo extends GlobalConfiguredRepo<BibleVerseText> {
-  protected get repoConfig(): GlobalRepoConfig<BibleVerseText> {
-    return {
-      tableName: "bibleVerseTexts",
-      hasSoftDelete: false,
-      columns: ["translationKey", "verseKey", "bookKey", "chapterNumber", "verseNumber", "content", "newParagraph"],
-      defaultOrderBy: "chapterNumber, verseNumber"
+export class BibleVerseTextRepo extends GlobalDrizzleRepo<typeof bibleVerseTexts> {
+  protected readonly table = bibleVerseTexts;
+  protected readonly moduleName = "content";
+
+  public async save(model: any) {
+    if (!model.id) model.id = UniqueIdHelper.shortId();
+    const values = {
+      id: model.id,
+      translationKey: model.translationKey,
+      verseKey: model.verseKey,
+      bookKey: model.bookKey,
+      chapterNumber: model.chapterNumber,
+      verseNumber: model.verseNumber,
+      content: model.content,
+      newParagraph: model.newParagraph
     };
+    if (getDialect() === "postgres") {
+      // PG: INSERT ... ON CONFLICT DO UPDATE (uses unique index on translationKey+verseKey)
+      await (this.db as any).insert(bibleVerseTexts).values(values)
+        .onConflictDoUpdate({
+          target: [bibleVerseTexts.translationKey, bibleVerseTexts.verseKey],
+          set: { content: sql`EXCLUDED.content`, newParagraph: sql`EXCLUDED."newParagraph"` }
+        });
+    } else {
+      // MySQL: INSERT ... ON DUPLICATE KEY UPDATE
+      await (this.db as any).insert(bibleVerseTexts).values(values)
+        .onDuplicateKeyUpdate({ set: { content: sql`VALUES(content)`, newParagraph: sql`VALUES(newParagraph)` } });
+    }
+    return model;
+  }
+
+  public async saveAll(models: any[]) {
+    return Promise.all(models.map((m) => this.save(m)));
   }
 
   private loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number) {
-    return TypedDB.query("SELECT * FROM bibleVerseTexts WHERE translationKey=? and bookKey=? AND chapterNumber BETWEEN ? AND ? order by chapterNumber, verseNumber;", [
-      translationKey,
-      bookKey,
-      startChapter,
-      endChapter
-    ]);
+    return this.db.select().from(bibleVerseTexts).where(and(
+      eq(bibleVerseTexts.translationKey, translationKey),
+      eq(bibleVerseTexts.bookKey, bookKey),
+      between(bibleVerseTexts.chapterNumber, startChapter, endChapter)
+    )).orderBy(asc(bibleVerseTexts.chapterNumber), asc(bibleVerseTexts.verseNumber));
   }
 
   private filterResults(data: BibleVerseText[], startChapter: number, startVerse: number, endChapter: number, endVerse: number) {
@@ -46,46 +73,7 @@ export class BibleVerseTextRepo extends GlobalConfiguredRepo<BibleVerseText> {
     const startVerse = parseInt(startParts[2], 0);
     const endVerse = parseInt(endParts[2], 0);
 
-    const data = await this.loadChapters(translationKey, startParts[0], startChapter, endChapter);
+    const data: any = await this.loadChapters(translationKey, startParts[0], startChapter, endChapter);
     return this.filterResults(data, startChapter, startVerse, endChapter, endVerse);
-  }
-
-  protected rowToModel(row: any): BibleVerseText {
-    return {
-      id: row.id,
-      translationKey: row.translationKey,
-      verseKey: row.verseKey,
-      bookKey: row.bookKey,
-      chapterNumber: row.chapterNumber,
-      verseNumber: row.verseNumber,
-      content: row.content,
-      newParagraph: row.newParagraph
-    };
-  }
-
-  public async saveAll(models: BibleVerseText[]) {
-    const promises: Promise<BibleVerseText>[] = [];
-    for (const model of models) {
-      promises.push(this.save(model));
-    }
-    return Promise.all(promises);
-  }
-
-  public async save(model: BibleVerseText) {
-    if (!model.id) model.id = this.createId();
-    const sql = `INSERT INTO bibleVerseTexts (id, translationKey, verseKey, bookKey, chapterNumber, verseNumber, content, newParagraph)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE content=VALUES(content), newParagraph=VALUES(newParagraph);`;
-    await TypedDB.query(sql, [
-      model.id,
-      model.translationKey,
-      model.verseKey,
-      model.bookKey,
-      model.chapterNumber,
-      model.verseNumber,
-      model.content,
-      model.newParagraph
-    ]);
-    return model;
   }
 }

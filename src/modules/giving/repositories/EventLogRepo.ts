@@ -1,61 +1,83 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { eq, and, desc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { eventLogs, customers } from "../../../db/schema/giving.js";
 import { EventLog } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
 @injectable()
-export class EventLogRepo extends ConfiguredRepo<EventLog> {
-  protected get repoConfig(): RepoConfig<EventLog> {
-    return {
-      tableName: "eventLogs",
-      hasSoftDelete: false,
-      idColumn: "id", // Now char(11) generated ID
-      insertColumns: ["customerId", "provider", "providerId", "eventType", "message", "status", "created"],
-      updateColumns: ["resolved"],
-      insertLiterals: { resolved: "FALSE" }
-    };
-  }
+export class EventLogRepo extends DrizzleRepo<typeof eventLogs> {
+  protected readonly table = eventLogs;
+  protected readonly moduleName = "giving";
 
-  // Override create to handle generated ID and providerId field
-  protected async create(model: EventLog): Promise<EventLog> {
-    if (!model.id) model.id = this.createId();
-    const sql = "INSERT INTO eventLogs (id, churchId, customerId, provider, providerId, eventType, message, status, created, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      model.id, model.churchId, model.customerId, model.provider, model.providerId, model.eventType, model.message, model.status, model.created, false
-    ];
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  // Override save to check if event already exists by providerId (idempotency)
-  public async save(eventLog: EventLog) {
+  public async save(eventLog: EventLog): Promise<EventLog> {
     if (eventLog.providerId) {
-      const existingEvent = await this.loadByProviderId(eventLog.churchId as string, eventLog.providerId);
-      if (existingEvent) {
-        return this.update({ ...eventLog, id: existingEvent.id });
+      const existing = await this.loadByProviderId(eventLog.churchId as string, eventLog.providerId);
+      if (existing) {
+        const resolvedVal = eventLog.resolved ? 1 : 0;
+        await this.db.update(eventLogs).set({ resolved: resolvedVal })
+          .where(and(eq(eventLogs.id, existing.id!), eq(eventLogs.churchId, existing.churchId!)));
+        eventLog.id = existing.id;
+        return eventLog;
       }
     }
     return this.create(eventLog);
   }
 
-  // Load event by provider ID (for idempotency checks)
-  public async loadByProviderId(churchId: string, providerId: string): Promise<EventLog | null> {
-    const rows = await TypedDB.query(
-      "SELECT * FROM eventLogs WHERE churchId=? AND providerId=? LIMIT 1;",
-      [churchId, providerId]
-    );
-    return rows.length > 0 ? this.rowToModel(rows[0]) : null;
+  private async create(model: EventLog): Promise<EventLog> {
+    if (!model.id) model.id = UniqueIdHelper.shortId();
+    const values = {
+      id: model.id,
+      churchId: model.churchId,
+      customerId: model.customerId,
+      provider: model.provider,
+      providerId: model.providerId,
+      eventType: model.eventType,
+      message: model.message,
+      status: model.status,
+      created: model.created,
+      resolved: 0
+    };
+    await this.db.insert(eventLogs).values(values as any);
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await this.db.delete(eventLogs).where(and(eq(eventLogs.id, id), eq(eventLogs.churchId, churchId)));
+  }
+
+  public load(churchId: string, id: string) {
+    return this.db.select().from(eventLogs).where(and(eq(eventLogs.id, id), eq(eventLogs.churchId, churchId))).then(r => r[0] ?? null);
+  }
+
+  public loadAll(churchId: string) {
+    return this.db.select().from(eventLogs).where(eq(eventLogs.churchId, churchId));
+  }
+
+  public async loadByProviderId(churchId: string, providerId: string): Promise<any> {
+    return this.db.select().from(eventLogs)
+      .where(and(eq(eventLogs.churchId, churchId), eq(eventLogs.providerId, providerId)))
+      .limit(1)
+      .then(r => r[0] ?? null);
   }
 
   public async loadByType(churchId: string, status: string) {
-    return TypedDB.query(
-      "SELECT eventLogs.*, personId FROM customers LEFT JOIN eventLogs ON customers.id = eventLogs.customerId WHERE eventLogs.status=? AND eventLogs.churchId=? ORDER BY eventLogs.created DESC;",
-      [status, churchId]
-    );
-  }
-
-  protected rowToModel(row: any): EventLog {
-    return { ...row };
+    return this.db.select({
+      id: eventLogs.id,
+      churchId: eventLogs.churchId,
+      customerId: eventLogs.customerId,
+      provider: eventLogs.provider,
+      providerId: eventLogs.providerId,
+      status: eventLogs.status,
+      eventType: eventLogs.eventType,
+      message: eventLogs.message,
+      created: eventLogs.created,
+      resolved: eventLogs.resolved,
+      personId: customers.personId
+    })
+      .from(customers)
+      .leftJoin(eventLogs, eq(customers.id, eventLogs.customerId))
+      .where(and(eq(eventLogs.status, status), eq(eventLogs.churchId, churchId)))
+      .orderBy(desc(eventLogs.created));
   }
 }

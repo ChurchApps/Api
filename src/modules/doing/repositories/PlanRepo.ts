@@ -1,106 +1,62 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { injectable } from "inversify";
+import { eq, and, inArray, desc, asc, gte, between, sql } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { plans, positions } from "../../../db/schema/doing.js";
 import { Plan } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class PlanRepo extends ConfiguredRepo<Plan> {
-  protected get repoConfig(): RepoConfig<Plan> {
-    return {
-      tableName: "plans",
-      hasSoftDelete: false,
-      columns: [
-        "ministryId",
-        "planTypeId",
-        "name",
-        "serviceDate",
-        "notes",
-        "serviceOrder",
-        "contentType",
-        "contentId",
-        "providerId",
-        "providerPlanId",
-        "providerPlanName",
-        "signupDeadlineHours",
-        "showVolunteerNames"
-      ]
-    };
-  }
+export class PlanRepo extends DrizzleRepo<typeof plans> {
+  protected readonly table = plans;
+  protected readonly moduleName = "doing";
 
-  protected async create(plan: Plan): Promise<Plan> {
-    if (!plan.id) plan.id = this.createId();
+  public override async save(model: Plan) {
+    const data = { ...model } as any;
+    data.serviceDate = DateHelper.toMysqlDateOnly(data.serviceDate) || new Date().toISOString().split("T")[0];
 
-    const sql = "INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId, providerId, providerPlanId, providerPlanName, signupDeadlineHours, showVolunteerNames) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      plan.id,
-      plan.churchId,
-      plan.ministryId,
-      plan.planTypeId,
-      plan.name,
-      plan.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
-      plan.notes,
-      plan.serviceOrder,
-      plan.contentType,
-      plan.contentId,
-      plan.providerId,
-      plan.providerPlanId,
-      plan.providerPlanName,
-      plan.signupDeadlineHours,
-      plan.showVolunteerNames
-    ];
-    await TypedDB.query(sql, params);
-    return plan;
-  }
-
-  protected async update(plan: Plan): Promise<Plan> {
-    const sql = "UPDATE plans SET ministryId=?, planTypeId=?, name=?, serviceDate=?, notes=?, serviceOrder=?, contentType=?, contentId=?, providerId=?, providerPlanId=?, providerPlanName=?, signupDeadlineHours=?, showVolunteerNames=? WHERE id=? and churchId=?";
-    const params = [
-      plan.ministryId,
-      plan.planTypeId,
-      plan.name,
-      plan.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
-      plan.notes,
-      plan.serviceOrder,
-      plan.contentType,
-      plan.contentId,
-      plan.providerId,
-      plan.providerPlanId,
-      plan.providerPlanName,
-      plan.signupDeadlineHours,
-      plan.showVolunteerNames,
-      plan.id,
-      plan.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return plan;
+    if (data.id) {
+      await this.db.update(plans).set(data).where(and(eq(plans.id, data.id), eq(plans.churchId, data.churchId)));
+    } else {
+      data.id = UniqueIdHelper.shortId();
+      await this.db.insert(plans).values(data);
+    }
+    return data as Plan;
   }
 
   public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM plans WHERE churchId=? and id in (?);", [churchId, ids]);
+    return this.db.select().from(plans).where(and(eq(plans.churchId, churchId), inArray(plans.id, ids)));
   }
 
   public load7Days(churchId: string) {
-    return TypedDB.query("SELECT * FROM plans WHERE churchId=? AND serviceDate BETWEEN CURDATE() AND (CURDATE() + INTERVAL 7 DAY) order by serviceDate desc;", [churchId]);
+    const today = DateHelper.toMysqlDateOnly(new Date()) as string;
+    const weekOut = DateHelper.toMysqlDateOnly(DateHelper.daysFromNow(7)) as string;
+    return this.db.select().from(plans)
+      .where(and(eq(plans.churchId, churchId), between(plans.serviceDate, sql`${today}`, sql`${weekOut}`)))
+      .orderBy(desc(plans.serviceDate));
   }
 
   public loadByPlanTypeId(churchId: string, planTypeId: string) {
-    return TypedDB.query("SELECT * FROM plans WHERE churchId=? AND planTypeId=? order by serviceDate desc;", [churchId, planTypeId]);
+    return this.db.select().from(plans)
+      .where(and(eq(plans.churchId, churchId), eq(plans.planTypeId, planTypeId)))
+      .orderBy(desc(plans.serviceDate));
   }
 
   public loadCurrentByPlanTypeId(planTypeId: string) {
-    return TypedDB.queryOne(
-      "SELECT * FROM plans WHERE planTypeId=? AND serviceDate>=CURDATE() ORDER by serviceDate LIMIT 1",
-      [planTypeId]
-    );
+    const today = DateHelper.toMysqlDateOnly(new Date()) as string;
+    return this.db.select().from(plans)
+      .where(and(eq(plans.planTypeId, planTypeId), gte(plans.serviceDate, sql`${today}`)))
+      .orderBy(asc(plans.serviceDate))
+      .limit(1)
+      .then(r => r[0] ?? null);
   }
 
-  public loadSignupPlans(churchId: string) {
-    return TypedDB.query(
-      "SELECT DISTINCT p.* FROM plans p"
-      + " INNER JOIN positions pos ON pos.planId = p.id AND pos.churchId = p.churchId"
-      + " WHERE p.churchId = ? AND pos.allowSelfSignup = 1 AND p.serviceDate >= CURDATE()"
-      + " ORDER BY p.serviceDate ASC",
-      [churchId]
-    );
+  public async loadSignupPlans(churchId: string) {
+    const result = await this.db.selectDistinct({ plans })
+      .from(plans)
+      .innerJoin(positions, and(eq(positions.planId, plans.id), eq(positions.churchId, plans.churchId)))
+      .where(and(eq(plans.churchId, churchId), eq(positions.allowSelfSignup, true), gte(plans.serviceDate, sql`${DateHelper.toMysqlDateOnly(new Date())}`)))
+      .orderBy(asc(plans.serviceDate));
+    return result.map(r => r.plans);
   }
 }

@@ -1,21 +1,18 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Automation } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, asc } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { automations } from "../../../db/schema/doing.js";
 
 @injectable()
-export class AutomationRepo extends ConfiguredRepo<Automation> {
-  protected get repoConfig(): RepoConfig<Automation> {
-    return {
-      tableName: "automations",
-      hasSoftDelete: false,
-      defaultOrderBy: "title",
-      columns: ["title", "recurs", "active"]
-    };
+export class AutomationRepo extends DrizzleRepo<typeof automations> {
+  protected readonly table = automations;
+  protected readonly moduleName = "doing";
+
+  public loadAll(churchId: string) {
+    return this.db.select().from(automations).where(eq(automations.churchId, churchId)).orderBy(asc(automations.title));
   }
 
   public loadAllChurches() {
-    return TypedDB.query("SELECT * FROM automations;", []);
+    return this.db.select().from(automations);
   }
 }

@@ -1,97 +1,146 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Conversation } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, sql, inArray, gte, desc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { conversations } from "../../../db/schema/messaging.js";
+import { getDialect } from "../../../shared/helpers/Dialect.js";
 
 @injectable()
-export class ConversationRepo extends ConfiguredRepo<Conversation> {
-  protected get repoConfig(): RepoConfig<Conversation> {
-    return {
-      tableName: "conversations",
-      hasSoftDelete: false,
-      insertColumns: ["contentType", "contentId", "title", "groupId", "visibility", "allowAnonymousPosts"],
-      updateColumns: ["title", "groupId", "visibility", "allowAnonymousPosts"],
-      insertLiterals: { dateCreated: "NOW()", postCount: "0" }
-    };
-  }
+export class ConversationRepo extends DrizzleRepo<typeof conversations> {
+  protected readonly table = conversations;
+  protected readonly moduleName = "messaging";
 
-  // Override save to include cleanup
-  public async save(conversation: Conversation) {
+  public async save(model: any) {
     await this.cleanup();
-    return super.save(conversation);
+    if (model.id) {
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(conversations).set(setData)
+        .where(and(eq(conversations.id, model.id), eq(conversations.churchId, model.churchId)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      model.dateCreated = new Date();
+      model.postCount = 0;
+      await this.db.insert(conversations).values(model);
+    }
+    return model;
   }
 
-  private cleanup() {
-    return TypedDB.query("CALL cleanup()", []);
+  private async cleanup() {
+    if (getDialect() === "postgres") {
+      await (this.db as any).execute(sql`DELETE FROM conversations WHERE "allowAnonymousPosts" = true AND "dateCreated" < NOW() - INTERVAL '7 days'`);
+      await (this.db as any).execute(sql`DELETE FROM connections WHERE "timeJoined" < NOW() - INTERVAL '1 day'`);
+      await (this.db as any).execute(sql`DELETE FROM messages WHERE "conversationId" NOT IN (SELECT id FROM conversations)`);
+    } else {
+      await (this.db as any).execute(sql`CALL cleanup()`);
+    }
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
-    const sql = "select id, firstPostId, lastPostId, postCount" + " FROM conversations" + " WHERE churchId=? and id IN (?)";
-    const params = [churchId, ids];
-    const result: any = await TypedDB.query(sql, params);
+    if (!ids || ids.length === 0) return [];
+    const result = await this.db.select({
+      id: conversations.id,
+      firstPostId: conversations.firstPostId,
+      lastPostId: conversations.lastPostId,
+      postCount: conversations.postCount
+    })
+      .from(conversations)
+      .where(and(eq(conversations.churchId, churchId), inArray(conversations.id, ids)));
     return result || [];
   }
 
   public async loadPosts(churchId: string, groupIds: string[]) {
-    const sql =
-      "select c.contentType, c.contentId, c.groupId, c.id, c.firstPostId, c.lastPostId, c.postCount" +
-      " FROM conversations c" +
-      " INNER JOIN messages fp on fp.id=c.firstPostId" +
-      " INNER JOIN messages lp on lp.id=c.lastPostId" +
-      " WHERE c.churchId=? and c.groupId IN (?)" +
-      " AND lp.timeSent>DATE_SUB(NOW(), INTERVAL 365 DAY)";
-    const params = [churchId, groupIds];
-    const result: any = await TypedDB.query(sql, params);
+    if (!groupIds || groupIds.length === 0) return [];
+    if (getDialect() === "postgres") {
+      return this.executeRows(sql`
+        SELECT c."contentType", c."contentId", c."groupId", c.id, c."firstPostId", c."lastPostId", c."postCount"
+        FROM conversations c
+        INNER JOIN messages fp ON fp.id = c."firstPostId"
+        INNER JOIN messages lp ON lp.id = c."lastPostId"
+        WHERE c."churchId" = ${churchId} AND c."groupId" IN (${sql.join(groupIds.map(id => sql`${id}`), sql`, `)})
+        AND lp."timeSent" > ${DateHelper.daysFromNow(-365)}
+      `);
+    }
+    return this.executeRows(sql`
+      SELECT c.contentType, c.contentId, c.groupId, c.id, c.firstPostId, c.lastPostId, c.postCount
+      FROM conversations c
+      INNER JOIN messages fp ON fp.id = c.firstPostId
+      INNER JOIN messages lp ON lp.id = c.lastPostId
+      WHERE c.churchId = ${churchId} AND c.groupId IN (${sql.join(groupIds.map(id => sql`${id}`), sql`, `)})
+      AND lp.timeSent > ${DateHelper.daysFromNow(-365)}
+    `);
+  }
+
+  public async loadById(churchId: string, id: string) {
+    return this.db.select().from(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.churchId, churchId)))
+      .then(r => r[0] ?? null);
+  }
+
+  public async loadForContent(churchId: string, contentType: string, contentId: string) {
+    const result = await this.db.select().from(conversations)
+      .where(and(
+        eq(conversations.churchId, churchId),
+        eq(conversations.contentType, contentType),
+        eq(conversations.contentId, contentId)
+      ))
+      .orderBy(desc(conversations.dateCreated));
     return result || [];
   }
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM conversations WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public loadForContent(churchId: string, contentType: string, contentId: string) {
-    return TypedDB.query("SELECT * FROM conversations WHERE churchId=? AND contentType=? AND contentId=? ORDER BY dateCreated DESC", [churchId, contentType, contentId]);
-  }
-
-  public loadCurrent(churchId: string, contentType: string, contentId: string) {
+  public async loadCurrent(churchId: string, contentType: string, contentId: string) {
     const cutOff = new Date();
     cutOff.setDate(cutOff.getDate() - 1);
-    const sql = "select *" + " FROM conversations" + " WHERE churchId=? and contentType=? AND contentId=? AND dateCreated>=? ORDER BY dateCreated desc LIMIT 1;";
-    return TypedDB.queryOne(sql, [churchId, contentType, contentId, cutOff]);
+    const result = await this.db.select().from(conversations)
+      .where(and(
+        eq(conversations.churchId, churchId),
+        eq(conversations.contentType, contentType),
+        eq(conversations.contentId, contentId),
+        gte(conversations.dateCreated, cutOff)
+      ))
+      .orderBy(desc(conversations.dateCreated))
+      .limit(1);
+    return result[0] ?? null;
   }
 
-  public loadHostConversation(churchId: string, mainConversationId: string) {
-    const sql =
-      "select c2.*" +
-      " FROM conversations c" +
-      " INNER JOIN conversations c2 on c2.churchId=c.churchId and c2.contentType='streamingLiveHost' and c2.contentId=c.contentId" +
-      " WHERE c.id=? AND c.churchId=? LIMIT 1;";
-    return TypedDB.queryOne(sql, [mainConversationId, churchId]);
+  public async loadHostConversation(churchId: string, mainConversationId: string) {
+    let rows: any[];
+    if (getDialect() === "postgres") {
+      rows = await this.executeRows(sql`
+        SELECT c2.*
+        FROM conversations c
+        INNER JOIN conversations c2 ON c2."churchId" = c."churchId" AND c2."contentType" = 'streamingLiveHost' AND c2."contentId" = c."contentId"
+        WHERE c.id = ${mainConversationId} AND c."churchId" = ${churchId}
+        LIMIT 1
+      `);
+    } else {
+      rows = await this.executeRows(sql`
+        SELECT c2.*
+        FROM conversations c
+        INNER JOIN conversations c2 ON c2.churchId = c.churchId AND c2.contentType = 'streamingLiveHost' AND c2.contentId = c.contentId
+        WHERE c.id = ${mainConversationId} AND c.churchId = ${churchId}
+        LIMIT 1
+      `);
+    }
+    return rows[0] ?? null;
   }
 
   public async updateStats(conversationId: string) {
-    const sql = "CALL updateConversationStats(?)";
-    const params = [conversationId];
-    await TypedDB.query(sql, params);
+    if (getDialect() === "postgres") {
+      await (this.db as any).execute(sql`
+        UPDATE conversations
+        SET "postCount" = (SELECT COUNT(*) FROM messages WHERE "churchId" = conversations."churchId" AND "conversationId" = conversations.id),
+            "firstPostId" = (SELECT id FROM messages WHERE "churchId" = conversations."churchId" AND "conversationId" = conversations.id ORDER BY "timeSent" LIMIT 1),
+            "lastPostId" = (SELECT id FROM messages WHERE "churchId" = conversations."churchId" AND "conversationId" = conversations.id ORDER BY "timeSent" DESC LIMIT 1)
+        WHERE id = ${conversationId}
+      `);
+    } else {
+      await (this.db as any).execute(sql`CALL updateConversationStats(${conversationId})`);
+    }
   }
 
-  protected rowToModel(data: any): Conversation {
-    return {
-      id: data.id,
-      churchId: data.churchId,
-      contentType: data.contentType,
-      contentId: data.contentId,
-      title: data.title,
-      dateCreated: data.dateCreated
-    };
-  }
-
-  public convertToModel(data: any) {
-    return this.rowToModel(data);
-  }
-
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public async delete(churchId: string, id: string) {
+    await this.db.delete(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.churchId, churchId)));
   }
 }

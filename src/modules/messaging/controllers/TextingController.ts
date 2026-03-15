@@ -27,7 +27,7 @@ export class TextingController extends MessagingBaseController {
   public async getProviders(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const providers = await this.repos.textingProvider.loadByChurchId(au.churchId);
-      const result = this.repos.textingProvider.convertAllToModel(providers as any[]);
+      const result = providers as any[];
       // Never return raw credentials to the frontend
       return result.map((p: TextingProvider) => ({ ...p, apiKey: p.apiKey ? "********" : "", apiSecret: p.apiSecret ? "********" : "" }));
     });
@@ -44,7 +44,7 @@ export class TextingController extends MessagingBaseController {
           let existing: TextingProvider | null = null;
           if (provider.apiKey === "********" || provider.apiSecret === "********") {
             const rows = await this.repos.textingProvider.loadByChurchId(au.churchId);
-            const arr = this.repos.textingProvider.convertAllToModel(rows as any[]);
+            const arr = rows as any[];
             if (arr.length > 0) existing = arr[0];
           }
 
@@ -63,7 +63,7 @@ export class TextingController extends MessagingBaseController {
           return this.repos.textingProvider.save(provider);
         })
       );
-      const result = this.repos.textingProvider.convertAllToModel(saved as any[]);
+      const result = saved as any[];
       return result.map((p: TextingProvider) => ({ ...p, apiSecret: "********", apiKey: "********" }));
     });
   }
@@ -214,7 +214,7 @@ export class TextingController extends MessagingBaseController {
   public async getSentTexts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.sentText.loadByChurchId(au.churchId);
-      return this.repos.sentText.convertAllToModel(data as any[]);
+      return data;
     });
   }
 
@@ -223,16 +223,16 @@ export class TextingController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const row = await this.repos.sentText.loadById(au.churchId, id);
       if (!row) return this.json({ error: "Not found" }, 404);
-      const sentText = this.repos.sentText.convertToModel(row);
+      const sentText = row;
       const logRows = await this.repos.deliveryLog.loadByContent("sentText", id);
-      const deliveryLogs = this.repos.deliveryLog.convertAllToModel(logRows as any[]);
+      const deliveryLogs = logRows;
       return { sentText, deliveryLogs };
     });
   }
 
   private async getProviderConfig(churchId: string): Promise<(TextingProviderConfig & { providerName: string }) | null> {
     const providers = await this.repos.textingProvider.loadByChurchId(churchId);
-    const providerList = this.repos.textingProvider.convertAllToModel(providers as any[]);
+    const providerList = providers as any[];
     if (providerList.length === 0) return null;
 
     const p = providerList[0];

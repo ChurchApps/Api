@@ -1,45 +1,18 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { SongDetailLink } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and, asc } from "drizzle-orm";
+import { GlobalDrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { songDetailLinks } from "../../../db/schema/content.js";
 
 @injectable()
-export class SongDetailLinkRepo extends ConfiguredRepo<SongDetailLink> {
-  // This table doesn't have a churchId column - it's a global table
-  protected churchIdColumn = "";
-
-  protected get repoConfig(): RepoConfig<SongDetailLink> {
-    return {
-      tableName: "songDetailLinks",
-      hasSoftDelete: false,
-      churchIdColumn: "", // No churchId column in this table
-      columns: ["songDetailId", "service", "serviceKey", "url"]
-    };
-  }
-
-  public async delete(id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM songDetailLinks WHERE id=?;", [id]);
-  }
-
-  public async load(id: string): Promise<SongDetailLink> {
-    return TypedDB.queryOne("SELECT * FROM songDetailLinks WHERE id=?;", [id]);
-  }
+export class SongDetailLinkRepo extends GlobalDrizzleRepo<typeof songDetailLinks> {
+  protected readonly table = songDetailLinks;
+  protected readonly moduleName = "content";
 
   public loadForSongDetail(songDetailId: string) {
-    return TypedDB.query("SELECT * FROM songDetailLinks WHERE songDetailId=? ORDER BY service;", [songDetailId]);
+    return this.db.select().from(songDetailLinks).where(eq(songDetailLinks.songDetailId, songDetailId)).orderBy(asc(songDetailLinks.service));
   }
 
   public loadByServiceAndKey(service: string, serviceKey: string) {
-    return TypedDB.queryOne("SELECT * FROM songDetailLinks WHERE service=? AND serviceKey=?;", [service, serviceKey]);
-  }
-
-  protected rowToModel(row: any): SongDetailLink {
-    return {
-      id: row.id,
-      songDetailId: row.songDetailId,
-      service: row.service,
-      serviceKey: row.serviceKey,
-      url: row.url
-    };
+    return this.db.select().from(songDetailLinks).where(and(eq(songDetailLinks.service, service), eq(songDetailLinks.serviceKey, serviceKey))).then(r => r[0] ?? null);
   }
 }

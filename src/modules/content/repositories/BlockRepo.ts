@@ -1,29 +1,14 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Block } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and, asc } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { blocks } from "../../../db/schema/content.js";
 
 @injectable()
-export class BlockRepo extends ConfiguredRepo<Block> {
-  protected get repoConfig(): RepoConfig<Block> {
-    return {
-      tableName: "blocks",
-      hasSoftDelete: false,
-      defaultOrderBy: "name",
-      columns: ["blockType", "name"]
-    };
-  }
+export class BlockRepo extends DrizzleRepo<typeof blocks> {
+  protected readonly table = blocks;
+  protected readonly moduleName = "content";
 
   public loadByBlockType(churchId: string, blockType: string) {
-    return TypedDB.query("SELECT * FROM blocks WHERE churchId=? and blockType=? ORDER BY name;", [churchId, blockType]);
-  }
-
-  protected rowToModel(row: any): Block {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      blockType: row.blockType,
-      name: row.name
-    };
+    return this.db.select().from(blocks).where(and(eq(blocks.churchId, churchId), eq(blocks.blockType, blockType))).orderBy(asc(blocks.name));
   }
 }

@@ -1,231 +1,114 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { eq, and, inArray, gt, or, asc, sql } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { tasks } from "../../../db/schema/doing.js";
 import { Task } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class TaskRepo extends ConfiguredRepo<Task> {
-  protected get repoConfig(): RepoConfig<Task> {
-    return {
-      tableName: "tasks",
-      hasSoftDelete: false,
-      insertColumns: [
-        "taskNumber",
-        "taskType",
-        "dateCreated",
-        "dateClosed",
-        "associatedWithType",
-        "associatedWithId",
-        "associatedWithLabel",
-        "createdByType",
-        "createdById",
-        "createdByLabel",
-        "assignedToType",
-        "assignedToId",
-        "assignedToLabel",
-        "title",
-        "status",
-        "automationId",
-        "conversationId",
-        "data"
-      ],
-      updateColumns: [
-        "taskType",
-        "dateCreated",
-        "dateClosed",
-        "associatedWithType",
-        "associatedWithId",
-        "associatedWithLabel",
-        "createdByType",
-        "createdById",
-        "createdByLabel",
-        "assignedToType",
-        "assignedToId",
-        "assignedToLabel",
-        "title",
-        "status",
-        "automationId",
-        "conversationId",
-        "data"
-      ]
-    };
+export class TaskRepo extends DrizzleRepo<typeof tasks> {
+  protected readonly table = tasks;
+  protected readonly moduleName = "doing";
+
+  public override async save(model: Task) {
+    if (model.id) {
+      const { id: _id, churchId: _cid, taskNumber: _tn, ...setData } = model as any;
+      await this.db.update(tasks).set(setData).where(and(eq(tasks.id, model.id), eq(tasks.churchId, model.churchId)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      const taskNumber = await this.loadNextTaskNumber(model.churchId || "");
+      const data = { ...model, taskNumber, dateCreated: new Date() } as any;
+      await this.db.insert(tasks).values(data);
+      return data as Task;
+    }
+    return model;
   }
 
-  protected async create(task: Task): Promise<Task> {
-    if (!task.id) task.id = this.createId();
-    const taskNumber = await this.loadNextTaskNumber(task.churchId || ""); // NOTE - This is problematic if saving multiple records asyncronously.  Be sure to await each call
-
-    const sql =
-      "INSERT INTO tasks (id, churchId, taskNumber, taskType, dateCreated, dateClosed, associatedWithType, associatedWithId, associatedWithLabel, createdByType, createdById, createdByLabel, assignedToType, assignedToId, assignedToLabel, title, status, automationId, conversationId, data) VALUES (?, ?, ?, ?, now(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      task.id,
-      task.churchId,
-      taskNumber,
-      task.taskType,
-      task.dateClosed,
-      task.associatedWithType,
-      task.associatedWithId,
-      task.associatedWithLabel,
-      task.createdByType,
-      task.createdById,
-      task.createdByLabel,
-      task.assignedToType,
-      task.assignedToId,
-      task.assignedToLabel,
-      task.title,
-      task.status,
-      task.automationId,
-      task.conversationId,
-      task.data
-    ];
-    await TypedDB.query(sql, params);
-    return task;
-  }
-
-  protected async update(task: Task): Promise<Task> {
-    const sql =
-      "UPDATE tasks SET taskType=?, dateCreated=?, dateClosed=?, associatedWithType=?, associatedWithId=?, associatedWithLabel=?, createdByType=?, createdById=?, createdByLabel=?, assignedToType=?, assignedToId=?, assignedToLabel=?, title=?, status=?, automationId=?, conversationId=?, data=? WHERE id=? and churchId=?";
-    const params = [
-      task.taskType,
-      task.dateCreated,
-      task.dateClosed,
-      task.associatedWithType,
-      task.associatedWithId,
-      task.associatedWithLabel,
-      task.createdByType,
-      task.createdById,
-      task.createdByLabel,
-      task.assignedToType,
-      task.assignedToId,
-      task.assignedToLabel,
-      task.title,
-      task.status,
-      task.automationId,
-      task.conversationId,
-      task.data,
-      task.id,
-      task.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return task;
+  public override load(churchId: string, id: string) {
+    return this.db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.churchId, churchId))).orderBy(asc(tasks.taskNumber)).then(r => r[0] ?? null);
   }
 
   public async loadTimeline(churchId: string, personId: string, taskIds: string[]) {
-    let sql =
-      "select *, 'task' as postType, id as postId from tasks" +
-      " where churchId=? AND (" +
-      "   status='Open' and (" +
-      "	    (associatedWithType='person' and associatedWithId=?)" +
-      "        OR" +
-      "        (createdByType='person' and createdById=?)" +
-      "        OR" +
-      "        (assignedToType='person' and assignedToId=?)" +
-      "   )" +
-      ")";
-    const params: unknown[] = [churchId, personId, personId, personId];
+    const personCondition = and(
+      eq(tasks.churchId, churchId),
+      eq(tasks.status, "Open"),
+      or(
+        and(eq(tasks.associatedWithType, "person"), eq(tasks.associatedWithId, personId)),
+        and(eq(tasks.createdByType, "person"), eq(tasks.createdById, personId)),
+        and(eq(tasks.assignedToType, "person"), eq(tasks.assignedToId, personId))
+      )
+    );
+
     if (taskIds.length > 0) {
-      sql += " OR id IN (?)";
-      params.push(taskIds);
+      return this.db.select().from(tasks).where(or(personCondition, inArray(tasks.id, taskIds)));
     }
-    const result = await TypedDB.query(sql, params);
-    return result;
+    return this.db.select().from(tasks).where(personCondition);
   }
 
   public async loadByAutomationIdContent(churchId: string, automationId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
-    let result: any[] = [];
+    let threshold: Date | null = null;
     switch (recurs) {
       case "yearly":
-        result = (await this.loadByAutomationIdContentYearly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
+        threshold = new Date();
+        threshold.setFullYear(threshold.getFullYear() - 1);
         break;
       case "monthly":
-        result = (await this.loadByAutomationIdContentMonthly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
+        threshold = new Date();
+        threshold.setMonth(threshold.getMonth() - 1);
         break;
       case "weekly":
-        result = (await this.loadByAutomationIdContentWeekly(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
-        break;
-      default:
-        result = (await this.loadByAutomationIdContentNoRepeat(churchId, automationId, associatedWithType, associatedWithIds)) as any[];
+        threshold = new Date();
+        threshold.setDate(threshold.getDate() - 7);
         break;
     }
-    return result;
-  }
 
-  private async loadByAutomationIdContentNoRepeat(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) order by taskNumber;", [
-      churchId,
-      automationId,
-      associatedWithType,
-      associatedWithIds
-    ]);
-    return result;
-  }
+    const baseCondition = and(
+      eq(tasks.churchId, churchId),
+      eq(tasks.automationId, automationId),
+      eq(tasks.associatedWithType, associatedWithType),
+      inArray(tasks.associatedWithId, associatedWithIds)
+    );
 
-  private async loadByAutomationIdContentYearly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const threshold = new Date();
-    threshold.setFullYear(threshold.getFullYear() - 1);
-    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
-      churchId,
-      automationId,
-      associatedWithType,
-      associatedWithIds,
-      threshold
-    ]);
-    return result;
-  }
-
-  private async loadByAutomationIdContentMonthly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const threshold = new Date();
-    threshold.setMonth(threshold.getMonth() - 1);
-    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [
-      churchId,
-      automationId,
-      associatedWithType,
-      associatedWithIds,
-      threshold
-    ]);
-    return result;
-  }
-
-  private async loadByAutomationIdContentWeekly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const threshold = new Date();
-    threshold.setDate(threshold.getDate() - 7);
-    const result = await TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND automationId=? AND associatedWithType=? AND associatedWithId IN (?) and dateCreated>? order by taskNumber;", [churchId, automationId, associatedWithType, associatedWithIds, threshold]);
-    return result;
+    if (threshold) {
+      return this.db.select().from(tasks).where(and(baseCondition, gt(tasks.dateCreated, threshold))).orderBy(asc(tasks.taskNumber));
+    }
+    return this.db.select().from(tasks).where(baseCondition).orderBy(asc(tasks.taskNumber));
   }
 
   private async loadNextTaskNumber(churchId: string) {
-    const result = await TypedDB.queryOne("select max(ifnull(taskNumber, 0)) + 1 as taskNumber from tasks where churchId=?", [churchId]);
-    return (result as any).taskNumber;
+    const result = await this.db.select({ taskNumber: sql<number>`max(COALESCE(${tasks.taskNumber}, 0)) + 1` }).from(tasks).where(eq(tasks.churchId, churchId));
+    return result[0]?.taskNumber ?? 1;
   }
 
   public loadForPerson(churchId: string, personId: string, status: string) {
-    return TypedDB.query("SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='person' AND assignedToId=?) OR (createdByType='person' AND createdById=?)) and status=? order by taskNumber;", [
-      churchId,
-      personId,
-      personId,
-      status
-    ]);
+    return this.db.select().from(tasks)
+      .where(and(
+        eq(tasks.churchId, churchId),
+        eq(tasks.status, status),
+        or(
+          and(eq(tasks.assignedToType, "person"), eq(tasks.assignedToId, personId)),
+          and(eq(tasks.createdByType, "person"), eq(tasks.createdById, personId))
+        )
+      ))
+      .orderBy(asc(tasks.taskNumber));
   }
 
   public async loadForGroups(churchId: string, groupIds: string[], status: string) {
     if (groupIds.length === 0) return [];
-    else {
-      return TypedDB.query(
-        "SELECT * FROM tasks WHERE churchId=? AND ((assignedToType='group' AND assignedToId IN (?)) OR (createdByType='group' AND createdById IN (?))) AND status=? order by taskNumber;",
-        [churchId, groupIds, groupIds, status]
-      );
-    }
+    return this.db.select().from(tasks)
+      .where(and(
+        eq(tasks.churchId, churchId),
+        eq(tasks.status, status),
+        or(
+          and(eq(tasks.assignedToType, "group"), inArray(tasks.assignedToId, groupIds)),
+          and(eq(tasks.createdByType, "group"), inArray(tasks.createdById, groupIds))
+        )
+      ))
+      .orderBy(asc(tasks.taskNumber));
   }
 
-  public async loadForDirectoryUpdate(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM tasks WHERE taskType='directoryUpdate' AND status='Open' AND churchId=? AND associatedWithId=?;", [churchId, personId]);
-  }
-
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM tasks WHERE id=? AND churchId=? order by taskNumber;", [id, churchId]);
-  }
-
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM tasks WHERE churchId=?;", [churchId]);
+  public loadForDirectoryUpdate(churchId: string, personId: string) {
+    return this.db.select().from(tasks)
+      .where(and(eq(tasks.taskType, "directoryUpdate"), eq(tasks.status, "Open"), eq(tasks.churchId, churchId), eq(tasks.associatedWithId, personId)));
   }
 }

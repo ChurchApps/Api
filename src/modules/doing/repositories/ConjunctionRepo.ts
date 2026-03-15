@@ -1,19 +1,14 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Conjunction } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { conjunctions } from "../../../db/schema/doing.js";
 
 @injectable()
-export class ConjunctionRepo extends ConfiguredRepo<Conjunction> {
-  protected get repoConfig(): RepoConfig<Conjunction> {
-    return {
-      tableName: "conjunctions",
-      hasSoftDelete: false,
-      columns: ["automationId", "parentId", "groupType"]
-    };
-  }
+export class ConjunctionRepo extends DrizzleRepo<typeof conjunctions> {
+  protected readonly table = conjunctions;
+  protected readonly moduleName = "doing";
 
   public loadForAutomation(churchId: string, automationId: string) {
-    return TypedDB.query("SELECT * FROM conjunctions WHERE automationId=? AND churchId=?;", [automationId, churchId]);
+    return this.db.select().from(conjunctions).where(and(eq(conjunctions.automationId, automationId), eq(conjunctions.churchId, churchId)));
   }
 }

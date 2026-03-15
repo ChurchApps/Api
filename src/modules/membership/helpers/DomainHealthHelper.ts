@@ -23,7 +23,7 @@ export class DomainHealthHelper {
 
   static async checkUncheckedDomains(): Promise<Domain[]> {
     const repos = await RepoManager.getRepos<Repos>("membership");
-    const domains: Domain[] = await repos.domain.loadUnchecked();
+    const domains: Domain[] = await repos.domain.loadUnchecked() as unknown as Domain[];
 
     for (const domain of domains) {
       if (!domain.domainName || !domain.id) continue;

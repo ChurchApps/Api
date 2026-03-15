@@ -1,80 +1,99 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Assignment } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and, inArray, sql, gte, lt, between, count } from "drizzle-orm";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { assignments, positions, plans } from "../../../db/schema/doing.js";
 
 @injectable()
-export class AssignmentRepo extends ConfiguredRepo<Assignment> {
-  protected get repoConfig(): RepoConfig<Assignment> {
-    return {
-      tableName: "assignments",
-      hasSoftDelete: false,
-      columns: ["positionId", "personId", "status", "notified"]
-    };
-  }
+export class AssignmentRepo extends DrizzleRepo<typeof assignments> {
+  protected readonly table = assignments;
+  protected readonly moduleName = "doing";
 
   public deleteByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("DELETE FROM assignments WHERE churchId=? and positionId IN (SELECT id from positions WHERE planId=?);", [churchId, planId]);
+    const positionIds = this.db.select({ id: positions.id }).from(positions).where(eq(positions.planId, planId));
+    return this.db.delete(assignments).where(and(eq(assignments.churchId, churchId), inArray(assignments.positionId, positionIds)));
   }
 
-  public loadByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId=?;", [churchId, planId]);
+  public async loadByPlanId(churchId: string, planId: string): Promise<any[]> {
+    const result = await this.db.select({ assignments })
+      .from(assignments)
+      .innerJoin(positions, eq(positions.id, assignments.positionId))
+      .where(and(eq(assignments.churchId, churchId), eq(positions.planId, planId)));
+    return result.map(r => r.assignments);
   }
 
-  public loadByPlanIds(churchId: string, planIds: string[]) {
-    return TypedDB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId IN (?);", [churchId, planIds]);
+  public async loadByPlanIds(churchId: string, planIds: string[]) {
+    const result = await this.db.select({ assignments })
+      .from(assignments)
+      .innerJoin(positions, eq(positions.id, assignments.positionId))
+      .where(and(eq(assignments.churchId, churchId), inArray(positions.planId, planIds)));
+    return result.map(r => r.assignments);
   }
 
-  public loadLastServed(churchId: string) {
-    const sql =
-      "select a.personId, max(pl.serviceDate) as serviceDate" +
-      " from assignments a" +
-      " inner join positions p on p.id = a.positionId" +
-      " inner join plans pl on pl.id = p.planId" +
-      " where a.churchId=?" +
-      " group by a.personId" +
-      " order by max(pl.serviceDate)";
-    return TypedDB.query(sql, [churchId]);
+  public async loadLastServed(churchId: string) {
+    return this.db.select({
+      personId: assignments.personId,
+      serviceDate: sql<Date>`max(${plans.serviceDate})`.as("serviceDate")
+    })
+      .from(assignments)
+      .innerJoin(positions, eq(positions.id, assignments.positionId))
+      .innerJoin(plans, eq(plans.id, positions.planId))
+      .where(eq(assignments.churchId, churchId))
+      .groupBy(assignments.personId)
+      .orderBy(sql`max(${plans.serviceDate})`);
   }
 
   public loadByByPersonId(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM assignments WHERE churchId=? AND personId=?;", [churchId, personId]);
+    return this.db.select().from(assignments).where(and(eq(assignments.churchId, churchId), eq(assignments.personId, personId)));
   }
 
-  public loadUnconfirmedByServiceDateRange(churchId?: string) {
-    let sql =
-      "SELECT a.*, pl.serviceDate, pl.name as planName" +
-      " FROM assignments a" +
-      " INNER JOIN positions p ON p.id = a.positionId" +
-      " INNER JOIN plans pl ON pl.id = p.planId" +
-      " WHERE a.status = 'Unconfirmed'" +
-      " AND pl.serviceDate >= DATE_ADD(CURDATE(), INTERVAL 2 DAY)" +
-      " AND pl.serviceDate < DATE_ADD(CURDATE(), INTERVAL 3 DAY)";
+  public async loadUnconfirmedByServiceDateRange(churchId?: string) {
+    const twoDaysFromNow = DateHelper.daysFromNow(2);
+    const threeDaysFromNow = DateHelper.daysFromNow(3);
 
-    const params: any[] = [];
-    if (churchId) {
-      sql += " AND a.churchId = ?";
-      params.push(churchId);
-    }
+    const conditions = [
+      eq(assignments.status, "Unconfirmed"),
+      gte(plans.serviceDate, twoDaysFromNow),
+      lt(plans.serviceDate, threeDaysFromNow)
+    ];
+    if (churchId) conditions.push(eq(assignments.churchId, churchId));
 
-    return TypedDB.query(sql, params);
+    const result = await this.db.select({
+      assignments,
+      serviceDate: plans.serviceDate,
+      planName: plans.name
+    })
+      .from(assignments)
+      .innerJoin(positions, eq(positions.id, assignments.positionId))
+      .innerJoin(plans, eq(plans.id, positions.planId))
+      .where(and(...conditions));
+    return result.map(r => ({ ...r.assignments, serviceDate: r.serviceDate, planName: r.planName }));
   }
 
-  public countByPositionId(churchId: string, positionId: string) {
-    return TypedDB.queryOne(
-      "SELECT COUNT(*) as cnt FROM assignments WHERE churchId=? AND positionId=? AND status IN ('Accepted','Unconfirmed')",
-      [churchId, positionId]
-    );
+  public async countByPositionId(churchId: string, positionId: string) {
+    const result = await this.db.select({ cnt: count() })
+      .from(assignments)
+      .where(and(eq(assignments.churchId, churchId), eq(assignments.positionId, positionId), inArray(assignments.status, ["Accepted", "Unconfirmed"])));
+    return result[0];
   }
 
-  public loadByServiceDate(churchId: string, serviceDate: Date, excludePlanId?: string) {
-    let sql = "SELECT a.* FROM assignments a" + " INNER JOIN positions p ON p.id = a.positionId" + " INNER JOIN plans pl ON pl.id = p.planId" + " WHERE a.churchId = ? AND DATE(pl.serviceDate) = DATE(?)";
-    const params: any[] = [churchId, serviceDate];
-    if (excludePlanId) {
-      sql += " AND pl.id != ?";
-      params.push(excludePlanId);
-    }
-    return TypedDB.query(sql, params);
+  public async loadByServiceDate(churchId: string, serviceDate: Date, excludePlanId?: string) {
+    const startOfDay = new Date(serviceDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(serviceDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const conditions = [
+      eq(assignments.churchId, churchId),
+      between(plans.serviceDate, startOfDay, endOfDay)
+    ];
+    if (excludePlanId) conditions.push(sql`${plans.id} != ${excludePlanId}`);
+
+    const result = await this.db.select({ assignments })
+      .from(assignments)
+      .innerJoin(positions, eq(positions.id, assignments.positionId))
+      .innerJoin(plans, eq(plans.id, positions.planId))
+      .where(and(...conditions));
+    return result.map(r => r.assignments);
   }
 }

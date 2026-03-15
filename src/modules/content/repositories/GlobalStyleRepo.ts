@@ -1,45 +1,14 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { GlobalStyle } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { globalStyles } from "../../../db/schema/content.js";
 
 @injectable()
-export class GlobalStyleRepo extends ConfiguredRepo<GlobalStyle> {
-  protected get repoConfig(): RepoConfig<GlobalStyle> {
-    return {
-      tableName: "globalStyles",
-      hasSoftDelete: false,
-      columns: ["fonts", "palette", "typography", "spacing", "borderRadius", "customCss", "customJS"]
-    };
-  }
+export class GlobalStyleRepo extends DrizzleRepo<typeof globalStyles> {
+  protected readonly table = globalStyles;
+  protected readonly moduleName = "content";
 
-  public async load(churchId: string, id: string): Promise<GlobalStyle> {
-    return TypedDB.queryOne("SELECT * FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
-  }
-
-  public async loadAll(churchId: string): Promise<GlobalStyle[]> {
-    return TypedDB.query("SELECT * FROM globalStyles WHERE churchId=?", [churchId]);
-  }
-
-  public async delete(churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
-  }
-
-  public loadForChurch(churchId: string): Promise<GlobalStyle[]> {
-    return TypedDB.queryOne("SELECT * FROM globalStyles WHERE churchId=? limit 1;", [churchId]);
-  }
-
-  protected rowToModel(row: any): GlobalStyle {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      fonts: row.fonts,
-      palette: row.palette,
-      typography: row.typography,
-      spacing: row.spacing,
-      borderRadius: row.borderRadius,
-      customCss: row.customCss,
-      customJS: row.customJS
-    };
+  public loadForChurch(churchId: string) {
+    return this.db.select().from(globalStyles).where(eq(globalStyles.churchId, churchId)).limit(1).then(r => r[0] ?? null);
   }
 }

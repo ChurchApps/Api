@@ -1,0 +1,161 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint:check
+      - run: npm run tsc
+
+  integration-tests-mysql:
+    name: Integration Tests (MySQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-typecheck
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpass
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -ptestpass"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=30s
+
+    env:
+      TEST_MYSQL_HOST: 127.0.0.1
+      TEST_MYSQL_PORT: 3306
+      TEST_MYSQL_USER: root
+      TEST_MYSQL_PASSWORD: testpass
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Create test databases
+        run: |
+          mysql -h 127.0.0.1 -u root -ptestpass -e "
+            CREATE DATABASE IF NOT EXISTS membership;
+            CREATE DATABASE IF NOT EXISTS attendance;
+            CREATE DATABASE IF NOT EXISTS content;
+            CREATE DATABASE IF NOT EXISTS giving;
+            CREATE DATABASE IF NOT EXISTS messaging;
+            CREATE DATABASE IF NOT EXISTS doing;
+            CREATE DATABASE IF NOT EXISTS reporting;
+          "
+
+      - name: Initialize database tables
+        env:
+          MEMBERSHIP_CONNECTION_STRING: mysql://root:testpass@127.0.0.1:3306/membership
+          ATTENDANCE_CONNECTION_STRING: mysql://root:testpass@127.0.0.1:3306/attendance
+          CONTENT_CONNECTION_STRING: mysql://root:testpass@127.0.0.1:3306/content
+          GIVING_CONNECTION_STRING: mysql://root:testpass@127.0.0.1:3306/giving
+          MESSAGING_CONNECTION_STRING: mysql://root:testpass@127.0.0.1:3306/messaging
+          DOING_CONNECTION_STRING: mysql://root:testpass@127.0.0.1:3306/doing
+          REPORTING_CONNECTION_STRING: mysql://root:testpass@127.0.0.1:3306/reporting
+          ENCRYPTION_KEY: test-encryption-key
+          JWT_SECRET: test-jwt-secret
+        run: npx tsx tools/initdb.ts
+
+      - name: Run integration tests
+        run: npx jest --config jest.integration.config.cjs --verbose
+        env:
+          NODE_OPTIONS: --experimental-vm-modules
+
+  integration-tests-postgres:
+    name: Integration Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-typecheck
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U testuser -d postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=30s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Create test databases
+        env:
+          PGPASSWORD: testpass
+        run: |
+          for db in membership attendance content giving messaging doing reporting; do
+            psql -h 127.0.0.1 -U testuser -d postgres -c "CREATE DATABASE $db;" || true
+          done
+
+      - name: Initialize database tables
+        env:
+          DB_DIALECT: postgres
+          MEMBERSHIP_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/membership
+          ATTENDANCE_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/attendance
+          CONTENT_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/content
+          GIVING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/giving
+          MESSAGING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/messaging
+          DOING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/doing
+          REPORTING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/reporting
+          ENCRYPTION_KEY: test-encryption-key
+          JWT_SECRET: test-jwt-secret
+        run: npx tsx tools/initdb.ts
+
+      - name: Run integration tests
+        run: npx jest --config jest.integration.config.cjs --verbose
+        env:
+          DB_DIALECT: postgres
+          MEMBERSHIP_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/membership
+          ATTENDANCE_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/attendance
+          CONTENT_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/content
+          GIVING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/giving
+          MESSAGING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/messaging
+          DOING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/doing
+          REPORTING_CONNECTION_STRING: postgres://testuser:testpass@127.0.0.1:5432/reporting
+          ENCRYPTION_KEY: test-encryption-key
+          JWT_SECRET: test-jwt-secret
+          NODE_OPTIONS: --experimental-vm-modules

@@ -1,41 +1,28 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Setting } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { eq, and, inArray } from "drizzle-orm";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { membershipSettings } from "../../../db/schema/membership.js";
 
 @injectable()
-export class SettingRepo extends ConfiguredRepo<Setting> {
-  protected get repoConfig(): RepoConfig<Setting> {
-    return {
-      tableName: "settings",
-      hasSoftDelete: false,
-      columns: ["keyName", "value", "public"]
-    };
-  }
+export class SettingRepo extends DrizzleRepo<typeof membershipSettings> {
+  protected readonly table = membershipSettings;
+  protected readonly moduleName = "membership";
+
+  public convertToModel(_churchId: string, data: any) { return data; }
+  public convertAllToModel(_churchId: string, data: any) { return Array.isArray(data) ? data : []; }
 
   public loadPublicSettings(churchId: string) {
-    return TypedDB.query("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
+    return this.db.select().from(membershipSettings)
+      .where(and(eq(membershipSettings.churchId, churchId), eq(membershipSettings.public, true)));
   }
 
   public loadMulipleChurches(keyNames: string[], churchIds: string[]) {
     if (!keyNames.length || !churchIds.length) return Promise.resolve([]);
-
-    const keyNamePlaceholders = keyNames.map(() => "?").join(",");
-    const churchIdPlaceholders = churchIds.map(() => "?").join(",");
-
-    const sql = `SELECT * FROM settings WHERE keyName IN (${keyNamePlaceholders}) AND churchId IN (${churchIdPlaceholders}) AND public=1`;
-    const params = [...keyNames, ...churchIds];
-
-    return TypedDB.query(sql, params);
-  }
-
-  protected rowToModel(row: any): Setting {
-    return {
-      id: row.id,
-      churchId: row.churchId,
-      keyName: row.keyName,
-      value: row.value,
-      public: row.public
-    };
+    return this.db.select().from(membershipSettings)
+      .where(and(
+        inArray(membershipSettings.keyName, keyNames),
+        inArray(membershipSettings.churchId, churchIds),
+        eq(membershipSettings.public, true)
+      ));
   }
 }

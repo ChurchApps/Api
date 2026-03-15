@@ -1,50 +1,54 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { EmailTemplate } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
+import { eq, and, asc } from "drizzle-orm";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DrizzleRepo } from "../../../shared/infrastructure/DrizzleRepo.js";
+import { emailTemplates } from "../../../db/schema/messaging.js";
 
 @injectable()
-export class EmailTemplateRepo extends ConfiguredRepo<EmailTemplate> {
-  protected get repoConfig(): RepoConfig<EmailTemplate> {
-    return {
-      tableName: "emailTemplates",
-      hasSoftDelete: false,
-      columns: ["name", "subject", "htmlContent", "category"],
-      insertLiterals: { dateCreated: "NOW()", dateModified: "NOW()" },
-      updateLiterals: { dateModified: "NOW()" }
-    };
+export class EmailTemplateRepo extends DrizzleRepo<typeof emailTemplates> {
+  protected readonly table = emailTemplates;
+  protected readonly moduleName = "messaging";
+
+  public async save(model: any) {
+    const now = new Date();
+    if (model.id) {
+      model.dateModified = now;
+      const { id: _id, churchId: _cid, ...setData } = model;
+      await this.db.update(emailTemplates).set(setData)
+        .where(and(eq(emailTemplates.id, model.id), eq(emailTemplates.churchId, model.churchId)));
+    } else {
+      model.id = UniqueIdHelper.shortId();
+      model.dateCreated = now;
+      model.dateModified = now;
+      await this.db.insert(emailTemplates).values(model);
+    }
+    return model;
   }
 
-  public loadByChurchId(churchId: string) {
-    return TypedDB.query("SELECT id, churchId, name, subject, category, dateCreated, dateModified FROM emailTemplates WHERE churchId=? ORDER BY name", [churchId]);
+  public async loadByChurchId(churchId: string) {
+    const result = await this.db.select({
+      id: emailTemplates.id,
+      churchId: emailTemplates.churchId,
+      name: emailTemplates.name,
+      subject: emailTemplates.subject,
+      category: emailTemplates.category,
+      dateCreated: emailTemplates.dateCreated,
+      dateModified: emailTemplates.dateModified
+    })
+      .from(emailTemplates)
+      .where(eq(emailTemplates.churchId, churchId))
+      .orderBy(asc(emailTemplates.name));
+    return result || [];
   }
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM emailTemplates WHERE id=? AND churchId=?;", [id, churchId]);
+  public async loadById(churchId: string, id: string) {
+    return this.db.select().from(emailTemplates)
+      .where(and(eq(emailTemplates.id, id), eq(emailTemplates.churchId, churchId)))
+      .then(r => r[0] ?? null);
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM emailTemplates WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  protected rowToModel(data: any): EmailTemplate {
-    return {
-      id: data.id,
-      churchId: data.churchId,
-      name: data.name,
-      subject: data.subject,
-      htmlContent: data.htmlContent,
-      category: data.category,
-      dateCreated: data.dateCreated,
-      dateModified: data.dateModified
-    };
-  }
-
-  public convertToModel(data: any) {
-    return this.rowToModel(data);
-  }
-
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public async delete(churchId: string, id: string) {
+    await this.db.delete(emailTemplates)
+      .where(and(eq(emailTemplates.id, id), eq(emailTemplates.churchId, churchId)));
   }
 }

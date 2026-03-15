@@ -413,9 +413,31 @@ INSERT INTO users (id, email, password, displayName, firstName, lastName, regist
 INSERT INTO roles (id, churchId, name) VALUES
 ('ROL00000001', 'CHU00000001', 'Domain Admins');
 
--- Add Role Permissions
+-- Add Role Permissions (Domain Admin gets full access to all APIs)
 INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, action) VALUES
-('RPM00000001', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Domain', 'Admin');
+('RPM00000001', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Domain', 'Admin'),
+('RPM00000002', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Roles', 'View'),
+('RPM00000003', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Roles', 'Edit'),
+('RPM00000004', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Settings', 'Edit'),
+('RPM00000005', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'People', 'View'),
+('RPM00000006', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'People', 'Edit'),
+('RPM00000007', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Groups', 'Edit'),
+('RPM00000008', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Group Members', 'Edit'),
+('RPM00000009', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Plans', 'Edit'),
+('RPM00000010', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Forms', 'Admin'),
+('RPM00000011', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Forms', 'Edit'),
+('RPM00000012', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Server', 'Admin'),
+('RPM00000013', 'CHU00000001', 'ROL00000001', 'AttendanceApi', 'Attendance', 'View'),
+('RPM00000014', 'CHU00000001', 'ROL00000001', 'AttendanceApi', 'Attendance', 'View Summary'),
+('RPM00000015', 'CHU00000001', 'ROL00000001', 'AttendanceApi', 'Attendance', 'Edit'),
+('RPM00000016', 'CHU00000001', 'ROL00000001', 'AttendanceApi', 'Services', 'Edit'),
+('RPM00000017', 'CHU00000001', 'ROL00000001', 'GivingApi', 'Donations', 'View Summary'),
+('RPM00000018', 'CHU00000001', 'ROL00000001', 'GivingApi', 'Donations', 'View'),
+('RPM00000019', 'CHU00000001', 'ROL00000001', 'GivingApi', 'Donations', 'Edit'),
+('RPM00000020', 'CHU00000001', 'ROL00000001', 'GivingApi', 'Settings', 'Edit'),
+('RPM00000021', 'CHU00000001', 'ROL00000001', 'ContentApi', 'Content', 'Edit'),
+('RPM00000022', 'CHU00000001', 'ROL00000001', 'ContentApi', 'StreamingServices', 'Edit'),
+('RPM00000023', 'CHU00000001', 'ROL00000001', 'ContentApi', 'Chat', 'Host');
 
 -- Add User to Role
 INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
@@ -520,15 +542,15 @@ INSERT INTO questions (id, churchId, formId, parentId, title, description, field
 ('QST00000002', 'CHU00000001', 'FRM00000001', NULL, 'Last Name', NULL, 'textField', 'Enter last name', 2, NULL, b'0', b'1'),
 ('QST00000003', 'CHU00000001', 'FRM00000001', NULL, 'Email Address', NULL, 'textField', 'Enter email', 3, NULL, b'0', b'1'),
 ('QST00000004', 'CHU00000001', 'FRM00000001', NULL, 'Phone Number', NULL, 'textField', 'Enter phone', 4, NULL, b'0', b'0'),
-('QST00000005', 'CHU00000001', 'FRM00000001', NULL, 'How did you hear about us?', NULL, 'dropdown', NULL, 5, 'Friend or Family,Online Search,Social Media,Drive By,Community Event,Other', b'0', b'0'),
+('QST00000005', 'CHU00000001', 'FRM00000001', NULL, 'How did you hear about us?', NULL, 'dropdown', NULL, 5, '["Friend or Family","Online Search","Social Media","Drive By","Community Event","Other"]', b'0', b'0'),
 -- VBS Registration
 ('QST00000006', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Full Name', NULL, 'textField', 'Enter child name', 1, NULL, b'0', b'1'),
 ('QST00000007', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Age', NULL, 'textField', 'Enter age', 2, NULL, b'0', b'1'),
 ('QST00000008', 'CHU00000001', 'FRM00000002', NULL, 'Allergies or Special Needs', 'Please list any allergies or special needs we should know about.', 'textArea', NULL, 3, NULL, b'0', b'0'),
 ('QST00000009', 'CHU00000001', 'FRM00000002', NULL, 'Emergency Contact Phone', NULL, 'textField', 'Enter phone', 4, NULL, b'0', b'1'),
 -- Small Group Interest Survey
-('QST00000010', 'CHU00000001', 'FRM00000003', NULL, 'What day of the week works best?', NULL, 'dropdown', NULL, 1, 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday', b'0', b'1'),
-('QST00000011', 'CHU00000001', 'FRM00000003', NULL, 'What topics interest you most?', 'Select all that apply.', 'checkboxes', NULL, 2, 'Bible Study,Prayer,Fellowship,Community Service,Parenting,Marriage', b'0', b'0'),
+('QST00000010', 'CHU00000001', 'FRM00000003', NULL, 'What day of the week works best?', NULL, 'dropdown', NULL, 1, '["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]', b'0', b'1'),
+('QST00000011', 'CHU00000001', 'FRM00000003', NULL, 'What topics interest you most?', 'Select all that apply.', 'checkboxes', NULL, 2, '["Bible Study","Prayer","Fellowship","Community Service","Parenting","Marriage"]', b'0', b'0'),
 ('QST00000012', 'CHU00000001', 'FRM00000003', NULL, 'Any additional comments?', NULL, 'textArea', 'Share your thoughts...', 3, NULL, b'0', b'0');
 
 -- ========================================
