@@ -182,7 +182,7 @@ CREATE INDEX `idx_ministry_provider` ON `contentProviderAuths` (`churchId`,`mini
 CREATE INDEX `churchId` ON `notes` (`churchId`);--> statement-breakpoint
 CREATE INDEX `idx_church_plan` ON `planItems` (`churchId`,`planId`);--> statement-breakpoint
 CREATE INDEX `idx_parent` ON `planItems` (`parentId`);--> statement-breakpoint
-CREATE INDEX `idx_church_plan` ON `positions` (`churchId`,`planId`);--> statement-breakpoint
+CREATE INDEX `idx_pos_church_plan` ON `positions` (`churchId`,`planId`);--> statement-breakpoint
 CREATE INDEX `idx_group` ON `positions` (`groupId`);--> statement-breakpoint
 CREATE INDEX `idx_church_status` ON `tasks` (`churchId`,`status`);--> statement-breakpoint
 CREATE INDEX `idx_automation` ON `tasks` (`churchId`,`automationId`);--> statement-breakpoint

@@ -140,4 +140,4 @@ CREATE INDEX `idx_gateway_payment_methods_church` ON `gatewayPaymentMethods` (`c
 CREATE INDEX `idx_gateway_payment_methods_customer` ON `gatewayPaymentMethods` (`customerId`);--> statement-breakpoint
 CREATE INDEX `churchId` ON `settings` (`churchId`);--> statement-breakpoint
 CREATE INDEX `idx_church_subscription` ON `subscriptionFunds` (`churchId`,`subscriptionId`);--> statement-breakpoint
-CREATE INDEX `idx_church_fund` ON `subscriptionFunds` (`churchId`,`fundId`);
+CREATE INDEX `idx_sub_church_fund` ON `subscriptionFunds` (`churchId`,`fundId`);

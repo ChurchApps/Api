@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "13a9e7e4-8400-46a2-959f-ef1efa9b3750",
+  "id": "d9750883-00b1-46e2-9ace-e4a3847c47a6",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "customers": {
@@ -841,8 +841,8 @@
           ],
           "isUnique": false
         },
-        "idx_church_fund": {
-          "name": "idx_church_fund",
+        "idx_sub_church_fund": {
+          "name": "idx_sub_church_fund",
           "columns": [
             "churchId",
             "fundId"

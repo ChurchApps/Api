@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "9f6bd5ed-2193-45c2-9d25-9898438b9926",
+  "id": "b3a880cb-0a2b-4266-8929-6bd03caa2df0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "actions": {
@@ -911,8 +911,8 @@
         }
       },
       "indexes": {
-        "idx_church_plan": {
-          "name": "idx_church_plan",
+        "idx_pos_church_plan": {
+          "name": "idx_pos_church_plan",
           "columns": [
             "churchId",
             "planId"
