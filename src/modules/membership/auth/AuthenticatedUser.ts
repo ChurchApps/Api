@@ -81,7 +81,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     );
   }
 
-  public static getCombinedApiJwt(user: User, userChurch: LoginUserChurch) {
+  public static getCombinedApiJwt(user: User, userChurch: LoginUserChurch, expiresIn?: string) {
     const permList: string[] = [];
 
     userChurch.apis?.forEach((api) => {
@@ -97,7 +97,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     const leaderGroupIds: string[] = [];
     userChurch.groups?.forEach((g) => { if (g.leader) leaderGroupIds.push(g.id); });
 
-    const options: SignOptions = { expiresIn: Environment.jwtExpiration as any };
+    const options: SignOptions = { expiresIn: (expiresIn || Environment.jwtExpiration) as any };
     return jwt.sign(
       {
         id: user.id,
