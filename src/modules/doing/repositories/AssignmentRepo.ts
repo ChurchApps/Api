@@ -68,6 +68,23 @@ export class AssignmentRepo extends ConfiguredRepo<Assignment> {
     );
   }
 
+  public loadOverviewByDateRange(churchId: string, startDate: string, endDate: string, ministryId?: string) {
+    let sql =
+      "SELECT pl.serviceDate, pl.ministryId, p.categoryName, p.name as positionName, p.count as needed," +
+      " a.personId, a.status" +
+      " FROM positions p" +
+      " INNER JOIN plans pl ON pl.id = p.planId" +
+      " LEFT JOIN assignments a ON a.positionId = p.id AND a.status IN ('Accepted','Unconfirmed')" +
+      " WHERE pl.churchId = ? AND pl.serviceDate >= ? AND pl.serviceDate <= ?";
+    const params: any[] = [churchId, startDate, endDate];
+    if (ministryId) {
+      sql += " AND pl.ministryId = ?";
+      params.push(ministryId);
+    }
+    sql += " ORDER BY p.categoryName, p.name, pl.serviceDate";
+    return TypedDB.query(sql, params);
+  }
+
   public loadByServiceDate(churchId: string, serviceDate: Date, excludePlanId?: string) {
     let sql = "SELECT a.* FROM assignments a" + " INNER JOIN positions p ON p.id = a.positionId" + " INNER JOIN plans pl ON pl.id = p.planId" + " WHERE a.churchId = ? AND DATE(pl.serviceDate) = DATE(?)";
     const params: any[] = [churchId, serviceDate];

@@ -6,6 +6,17 @@ import { DoingBaseController } from "./DoingBaseController.js";
 
 @controller("/doing/plans")
 export class PlanController extends DoingBaseController {
+  @httpGet("/overview")
+  public async getOverview(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const ministryId = req.query.ministryId as string | undefined;
+      if (!startDate || !endDate) return this.json({ error: "Missing required parameters: startDate, endDate" });
+      return await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId);
+    });
+  }
+
   @httpGet("/presenter")
   public async getForPresenter(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
