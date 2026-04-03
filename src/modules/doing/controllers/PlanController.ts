@@ -12,8 +12,9 @@ export class PlanController extends DoingBaseController {
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
       const ministryId = req.query.ministryId as string | undefined;
+      const planTypeId = req.query.planTypeId as string | undefined;
       if (!startDate || !endDate) return this.json({ error: "Missing required parameters: startDate, endDate" });
-      return await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId);
+      return await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId);
     });
   }
 

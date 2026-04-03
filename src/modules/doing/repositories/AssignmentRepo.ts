@@ -68,7 +68,7 @@ export class AssignmentRepo extends ConfiguredRepo<Assignment> {
     );
   }
 
-  public loadOverviewByDateRange(churchId: string, startDate: string, endDate: string, ministryId?: string) {
+  public loadOverviewByDateRange(churchId: string, startDate: string, endDate: string, ministryId?: string, planTypeId?: string) {
     let sql =
       "SELECT pl.serviceDate, pl.ministryId, p.categoryName, p.name as positionName, p.count as needed," +
       " a.personId, a.status" +
@@ -80,6 +80,10 @@ export class AssignmentRepo extends ConfiguredRepo<Assignment> {
     if (ministryId) {
       sql += " AND pl.ministryId = ?";
       params.push(ministryId);
+    }
+    if (planTypeId) {
+      sql += " AND pl.planTypeId = ?";
+      params.push(planTypeId);
     }
     sql += " ORDER BY p.categoryName, p.name, pl.serviceDate";
     return TypedDB.query(sql, params);
