@@ -92,9 +92,10 @@ export class UserController extends MembershipBaseController {
             user.lastLogin = new Date();
             this.repos.user.save(user);
             const ip = AuditLogHelper.getClientIp(req);
-            userChurches.forEach((uc) => {
-              AuditLogHelper.logLogin(this.repos, uc.church.id, user.id, true, ip, { email: user.email });
-            });
+            const selectedChurch = userChurches[0];
+            if (selectedChurch) {
+              AuditLogHelper.logLogin(this.repos, selectedChurch.church.id, user.id, true, ip, { email: user.email });
+            }
             return this.json(result, 200);
           }
         }
