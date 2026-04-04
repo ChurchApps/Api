@@ -29,6 +29,7 @@
     "inversify-binding-decorators": "^4.0.0",
     "inversify-express-utils": "^6.5.0",
     "jsonwebtoken": "^9.0.2",
+    "kysely": "^0.28.15",
     "mysql2": "^3.14.3",
     "node-geocoder": "^4.4.1",
     "oauth-1.0a": "^2.2.6",

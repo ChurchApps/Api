@@ -1,6 +1,6 @@
 import { Environment } from "../src/shared/helpers/Environment.js";
-import { ConnectionManager } from "../src/shared/infrastructure/ConnectionManager.js";
-import { MultiDatabasePool } from "../src/shared/infrastructure/MultiDatabasePool.js";
+import { KyselyPool } from "../src/shared/infrastructure/KyselyPool.js";
+import { sql } from "kysely";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -298,8 +298,7 @@ async function initializeDatabases(options: InitOptions = {}) {
     console.error('❌ Database initialization failed:', error);
     process.exit(1);
   } finally {
-    await ConnectionManager.closeAll();
-    await MultiDatabasePool.closeAll();
+    await KyselyPool.destroyAll();
   }
 }
 
@@ -320,8 +319,8 @@ async function initializeModuleDatabase(moduleName: string, options: InitOptions
     // Ensure the database exists
     await ensureDatabaseExists(moduleName, dbConfig);
 
-    // Get the database pool for this module (creates it if it doesn't exist)
-    MultiDatabasePool.getPool(moduleName);
+    // Ensure the Kysely instance exists for this module
+    KyselyPool.getDb(moduleName);
 
     const scriptsPath = path.join(__dirname, 'dbScripts', moduleName);
 
@@ -385,17 +384,8 @@ async function initializeSection(moduleName: string, sectionName: string, tables
       const cleanStatement = statement.trim();
       if (cleanStatement && !cleanStatement.startsWith('--')) {
         try {
-          // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
-          const upperStatement = cleanStatement.toUpperCase();
-          if (upperStatement.startsWith('CREATE PROCEDURE') ||
-            upperStatement.startsWith('CREATE FUNCTION') ||
-            upperStatement.startsWith('DROP PROCEDURE') ||
-            upperStatement.startsWith('DROP FUNCTION') ||
-            upperStatement.includes('CREATE DEFINER')) {
-            await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
-          } else {
-            await MultiDatabasePool.query(moduleName, cleanStatement);
-          }
+          const db = KyselyPool.getDb(moduleName);
+          await sql.raw(cleanStatement).execute(db);
         } catch (error) {
           console.error(`   ❌ Failed to execute statement in ${table.file}:`, error);
           console.error(`   Statement: ${cleanStatement.substring(0, 100)}...`);
@@ -431,17 +421,8 @@ async function initializeDemoData(moduleName: string, demoTables: { title: strin
       const cleanStatement = statement.trim();
       if (cleanStatement && !cleanStatement.startsWith('--')) {
         try {
-          // Check if this is a DDL statement (CREATE/DROP PROCEDURE/FUNCTION)
-          const upperStatement = cleanStatement.toUpperCase();
-          if (upperStatement.startsWith('CREATE PROCEDURE') ||
-            upperStatement.startsWith('CREATE FUNCTION') ||
-            upperStatement.startsWith('DROP PROCEDURE') ||
-            upperStatement.startsWith('DROP FUNCTION') ||
-            upperStatement.includes('CREATE DEFINER')) {
-            await MultiDatabasePool.executeDDL(moduleName, cleanStatement);
-          } else {
-            await MultiDatabasePool.query(moduleName, cleanStatement);
-          }
+          const db = KyselyPool.getDb(moduleName);
+          await sql.raw(cleanStatement).execute(db);
         } catch (error) {
           console.error(`   ❌ Failed to execute statement in ${table.file}:`, error);
           console.error(`   Statement: ${cleanStatement.substring(0, 100)}...`);

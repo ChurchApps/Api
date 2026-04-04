@@ -1,5 +1,6 @@
 import { Environment } from "../../../../src/shared/helpers/Environment";
-import { MultiDatabasePool } from "../../../../src/shared/infrastructure/MultiDatabasePool";
+import { KyselyPool } from "../../../../src/shared/infrastructure/KyselyPool";
+import { sql } from "kysely";
 
 interface MigrationOptions {
   dryRun: boolean;
@@ -15,9 +16,9 @@ async function getDatabaseName(): Promise<string> {
 }
 
 async function columnExists(database: string, table: string, column: string): Promise<boolean> {
-  const sql =
-    "SELECT COUNT(*) as count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME=?";
-  const rows: any[] = await MultiDatabasePool.query("giving", sql, [database, table, column]);
+  const db = KyselyPool.getDb("giving");
+  const result = await sql`SELECT COUNT(*) as count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=${database} AND TABLE_NAME=${table} AND COLUMN_NAME=${column}`.execute(db);
+  const rows = result.rows as any[];
   return rows.length > 0 && rows[0].count > 0;
 }
 
@@ -29,18 +30,20 @@ async function addColumnIfMissing(options: MigrationOptions, table: string, colu
     return;
   }
 
-  const sql = `ALTER TABLE ${table} ADD COLUMN ${definition}`;
+  const stmt = `ALTER TABLE ${table} ADD COLUMN ${definition}`;
   if (options.dryRun) {
-    console.log(`📝 [dry-run] Would execute: ${sql}`);
+    console.log(`📝 [dry-run] Would execute: ${stmt}`);
     return;
   }
-  console.log(`⚙️  Executing: ${sql}`);
-  await MultiDatabasePool.query("giving", sql);
+  console.log(`⚙️  Executing: ${stmt}`);
+  const db = KyselyPool.getDb("giving");
+  await sql.raw(stmt).execute(db);
 }
 
 async function tableExists(database: string, table: string): Promise<boolean> {
-  const sql = "SELECT COUNT(*) as count FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?";
-  const rows: any[] = await MultiDatabasePool.query("giving", sql, [database, table]);
+  const db = KyselyPool.getDb("giving");
+  const result = await sql`SELECT COUNT(*) as count FROM information_schema.TABLES WHERE TABLE_SCHEMA=${database} AND TABLE_NAME=${table}`.execute(db);
+  const rows = result.rows as any[];
   return rows.length > 0 && rows[0].count > 0;
 }
 
@@ -52,7 +55,7 @@ async function createGatewayPaymentMethodsTable(options: MigrationOptions) {
     return;
   }
 
-  const sql = `
+  const stmt = `
     CREATE TABLE gatewayPaymentMethods (
       id char(11) NOT NULL,
       churchId char(11) NOT NULL,
@@ -76,11 +79,12 @@ async function createGatewayPaymentMethodsTable(options: MigrationOptions) {
     return;
   }
   console.log("⚙️  Creating gatewayPaymentMethods table...");
-  await MultiDatabasePool.executeDDL("giving", sql);
+  const db = KyselyPool.getDb("giving");
+  await sql.raw(stmt).execute(db);
 }
 
 async function backfillCustomerProviders(options: MigrationOptions) {
-  const sql = `
+  const stmt = `
     UPDATE customers c
     LEFT JOIN gateways g ON g.churchId = c.churchId
     SET c.provider = COALESCE(g.provider, 'stripe')
@@ -93,13 +97,15 @@ async function backfillCustomerProviders(options: MigrationOptions) {
   }
 
   console.log("⚙️  Backfilling customer providers using current gateway provider...");
-  const result: any = await MultiDatabasePool.query("giving", sql);
-  console.log(`   ✅ Updated rows: ${result.affectedRows ?? 0}`);
+  const db = KyselyPool.getDb("giving");
+  const result: any = await sql.raw(stmt).execute(db);
+  console.log(`   ✅ Updated rows: ${result.numAffectedRows ?? 0}`);
 }
 
 async function validateGatewayUniqueness() {
-  const sql = "SELECT churchId, COUNT(*) as gatewayCount FROM gateways GROUP BY churchId HAVING COUNT(*) > 1";
-  const rows: any[] = await MultiDatabasePool.query("giving", sql);
+  const db = KyselyPool.getDb("giving");
+  const result = await sql.raw("SELECT churchId, COUNT(*) as gatewayCount FROM gateways GROUP BY churchId HAVING COUNT(*) > 1").execute(db);
+  const rows = result.rows as any[];
   if (rows.length === 0) {
     console.log("✅ Validation passed: all churches have at most one gateway row.");
     return;
@@ -153,6 +159,6 @@ function parseOptions(): MigrationOptions {
     console.error("❌ Migration failed:", error instanceof Error ? error.message : error);
     process.exitCode = 1;
   } finally {
-    await MultiDatabasePool.closeAll();
+    await KyselyPool.destroyAll();
   }
 })();
