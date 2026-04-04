@@ -1,96 +1,127 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Group } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class GroupRepo extends ConfiguredRepo<Group> {
-  protected get repoConfig(): RepoConfig<Group> {
-    return {
-      tableName: "groups",
-      hasSoftDelete: true,
-      removedColumn: "removed",
-      columns: [
-        "categoryName", "name", "trackAttendance", "parentPickup", "printNametag", "about", "photoUrl", "tags", "meetingTime", "meetingLocation", "labels", "slug"
-      ],
-      insertLiterals: { removed: "0" }
-    };
-  }
-  public save(group: Group) {
+export class GroupRepo {
+  public async save(group: Group) {
     this.convertFromModel(group);
-    return super.save(group);
+    return group.id ? this.update(group) : this.create(group);
   }
 
-  protected async create(group: Group): Promise<Group> {
+  private async create(group: Group): Promise<Group> {
+    group.id = UniqueIdHelper.shortId();
     this.convertFromModel(group);
-    return super.create(group);
+    await getDb().insertInto("groups").values({
+      id: group.id,
+      churchId: group.churchId,
+      categoryName: group.categoryName,
+      name: group.name,
+      trackAttendance: group.trackAttendance,
+      parentPickup: group.parentPickup,
+      printNametag: group.printNametag,
+      about: group.about,
+      photoUrl: group.photoUrl,
+      tags: group.tags,
+      meetingTime: group.meetingTime,
+      meetingLocation: group.meetingLocation,
+      labels: group.labels as any,
+      slug: group.slug,
+      removed: false as any
+    }).execute();
+    return group;
   }
 
-  protected async update(group: Group): Promise<Group> {
+  private async update(group: Group): Promise<Group> {
     this.convertFromModel(group);
-    return super.update(group);
+    await getDb().updateTable("groups").set({
+      categoryName: group.categoryName,
+      name: group.name,
+      trackAttendance: group.trackAttendance,
+      parentPickup: group.parentPickup,
+      printNametag: group.printNametag,
+      about: group.about,
+      photoUrl: group.photoUrl,
+      tags: group.tags,
+      meetingTime: group.meetingTime,
+      meetingLocation: group.meetingLocation,
+      labels: group.labels as any,
+      slug: group.slug
+    }).where("id", "=", group.id).where("churchId", "=", group.churchId).execute();
+    return group;
   }
 
-  public deleteByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("UPDATE `groups` SET removed=1 WHERE id IN (?) AND churchId=?;", [ids, churchId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().updateTable("groups").set({ removed: true as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public load(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM `groups` WHERE id=? AND churchId=? AND removed=0;", [id, churchId]);
+  public async deleteByIds(churchId: string, ids: string[]) {
+    if (!ids.length) return;
+    await getDb().updateTable("groups").set({ removed: true as any }).where("id", "in", ids).where("churchId", "=", churchId).execute();
   }
 
-  public loadPublicSlug(churchId: string, slug: string) {
-    const sql = "SELECT * FROM `groups`" + " WHERE churchId = ? AND slug = ? AND removed=0";
-    return TypedDB.queryOne(sql, [churchId, slug]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("groups").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false as any).executeTakeFirst()) ?? null;
   }
 
-  public loadByTag(churchId: string, tag: string) {
-    return TypedDB.query(
-      "SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM `groups` g WHERE churchId=? AND removed=0 AND tags like ? ORDER by categoryName, name;",
-      [churchId, "%" + tag + "%"]
-    );
+  public async loadPublicSlug(churchId: string, slug: string) {
+    return (await getDb().selectFrom("groups").selectAll().where("churchId", "=", churchId).where("slug", "=", slug).where("removed", "=", false as any).executeTakeFirst()) ?? null;
   }
 
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM `groups` g WHERE churchId=? AND removed=0 ORDER by categoryName, name;", [churchId]);
+  public async loadByTag(churchId: string, tag: string) {
+    const result = await sql`SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM \`groups\` g WHERE churchId=${churchId} AND removed=0 AND tags LIKE ${"%" + tag + "%"} ORDER BY categoryName, name`.execute(getDb());
+    return result.rows;
   }
 
-  public loadAllForPerson(personId: string) {
-    const sql = "SELECT distinct g.*" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.id=gm.groupId" + " WHERE personId=? and g.removed=0" + " ORDER BY name";
-    return TypedDB.query(sql, [personId]);
+  public async loadAll(churchId: string) {
+    const result = await sql`SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM \`groups\` g WHERE churchId=${churchId} AND removed=0 ORDER BY categoryName, name`.execute(getDb());
+    return result.rows;
   }
 
-  public loadForPerson(personId: string) {
-    const sql = "SELECT distinct g.*" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.id=gm.groupId" + " WHERE personId=? and g.removed=0 and g.tags like '%standard%'" + " ORDER BY name";
-    return TypedDB.query(sql, [personId]);
+  public async loadAllForPerson(personId: string) {
+    const result = await sql`SELECT DISTINCT g.* FROM groupMembers gm INNER JOIN \`groups\` g ON g.id=gm.groupId WHERE personId=${personId} AND g.removed=0 ORDER BY name`.execute(getDb());
+    return result.rows;
+  }
+
+  public async loadForPerson(personId: string) {
+    const result = await sql`SELECT DISTINCT g.* FROM groupMembers gm INNER JOIN \`groups\` g ON g.id=gm.groupId WHERE personId=${personId} AND g.removed=0 AND g.tags LIKE '%standard%' ORDER BY name`.execute(getDb());
+    return result.rows;
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
-    const sql = "SELECT * FROM `groups` WHERE churchId=? AND id IN (?) ORDER by name";
-    const result = await TypedDB.query(sql, [churchId, ids]);
-    return result;
+    if (!ids.length) return [];
+    return getDb().selectFrom("groups").selectAll().where("churchId", "=", churchId).where("id", "in", ids).orderBy("name").execute();
   }
 
-  public publicLabel(churchId: string, label: string) {
-    const sql = "SELECT * FROM `groups`" + " WHERE churchId = ? AND labels LIKE ? AND removed=0" + " ORDER BY name";
-    return TypedDB.query(sql, [churchId, "%" + label + "%"]);
+  public async publicLabel(churchId: string, label: string) {
+    return getDb().selectFrom("groups").selectAll()
+      .where("churchId", "=", churchId)
+      .where("labels", "like", "%" + label + "%")
+      .where("removed", "=", false as any)
+      .orderBy("name")
+      .execute();
   }
 
-  public search(churchId: string, campusId: string, serviceId: string, serviceTimeId: string) {
-    const sql =
-      "SELECT g.id, g.categoryName, g.name" +
-      " FROM `groups` g" +
-      " LEFT OUTER JOIN groupServiceTimes gst on gst.groupId=g.id" +
-      " LEFT OUTER JOIN serviceTimes st on st.id=gst.serviceTimeId" +
-      " LEFT OUTER JOIN services s on s.id=st.serviceId" +
-      " WHERE g.churchId = ? AND (?=0 OR gst.serviceTimeId=?) AND (?=0 OR st.serviceId=?) AND (? = 0 OR s.campusId = ?) and g.removed=0" +
-      " GROUP BY g.id, g.categoryName, g.name ORDER BY g.name";
-    return TypedDB.query(sql, [churchId, serviceTimeId, serviceTimeId, serviceId, serviceId, campusId, campusId]);
+  public async search(churchId: string, campusId: string, serviceId: string, serviceTimeId: string) {
+    const result = await sql`SELECT g.id, g.categoryName, g.name FROM \`groups\` g LEFT OUTER JOIN groupServiceTimes gst ON gst.groupId=g.id LEFT OUTER JOIN serviceTimes st ON st.id=gst.serviceTimeId LEFT OUTER JOIN services s ON s.id=st.serviceId WHERE g.churchId = ${churchId} AND (${serviceTimeId}=0 OR gst.serviceTimeId=${serviceTimeId}) AND (${serviceId}=0 OR st.serviceId=${serviceId}) AND (${campusId} = 0 OR s.campusId = ${campusId}) AND g.removed=0 GROUP BY g.id, g.categoryName, g.name ORDER BY g.name`.execute(getDb());
+    return result.rows;
   }
 
   public convertFromModel(group: Group) {
     group.labels = null;
     if (group.labelArray?.length > 0) group.labels = group.labelArray.join(",");
+  }
+
+  public saveAll(models: Group[]) {
+    const promises: Promise<Group>[] = [];
+    models.forEach((model) => { promises.push(this.save(model)); });
+    return Promise.all(promises);
+  }
+
+  public insert(model: Group): Promise<Group> {
+    return this.create(model);
   }
 
   protected rowToModel(row: any): Group {
@@ -113,5 +144,15 @@ export class GroupRepo extends ConfiguredRepo<Group> {
     };
     row.labels?.split(",").forEach((label: string) => result.labelArray.push(label.trim()));
     return result;
+  }
+
+  public convertToModel(_churchId: string, data: any) {
+    if (!data) return null;
+    return this.rowToModel(data);
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    if (!Array.isArray(data)) return [];
+    return data.map((d) => this.rowToModel(d));
   }
 }

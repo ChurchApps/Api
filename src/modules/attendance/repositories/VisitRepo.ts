@@ -1,77 +1,99 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { ArrayHelper } from "@churchapps/apihelper";
+import { sql } from "kysely";
+import { UniqueIdHelper, ArrayHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { getDb } from "../db/index.js";
 import { Visit } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
-export class VisitRepo extends ConfiguredRepo<Visit> {
-  protected get repoConfig(): RepoConfig<Visit> {
-    return {
-      tableName: "visits",
-      hasSoftDelete: false,
-      columns: ["personId", "serviceId", "groupId", "visitDate", "checkinTime", "addedBy"]
-    };
+export class VisitRepo {
+  public async save(model: Visit) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public save(visit: Visit) {
-    // Handle date conversion before saving
-    const processedVisit = { ...visit };
-    if (processedVisit.visitDate) {
-      (processedVisit as any).visitDate = DateHelper.toMysqlDateOnly(processedVisit.visitDate);  // date-only field
-    }
-    if (processedVisit.checkinTime) {
-      (processedVisit as any).checkinTime = DateHelper.toMysqlDate(processedVisit.checkinTime);  // datetime field
-    }
-    return super.save(processedVisit);
+  private async create(model: Visit): Promise<Visit> {
+    model.id = UniqueIdHelper.shortId();
+    const visitDate = model.visitDate ? DateHelper.toMysqlDateOnly(model.visitDate) : null;
+    const checkinTime = model.checkinTime ? DateHelper.toMysqlDate(model.checkinTime) : null;
+    await getDb().insertInto("visits").values({
+      id: model.id,
+      churchId: model.churchId,
+      personId: model.personId,
+      serviceId: model.serviceId,
+      groupId: model.groupId,
+      visitDate: visitDate as any,
+      checkinTime: checkinTime as any,
+      addedBy: model.addedBy
+    }).execute();
+    return model;
   }
 
-  public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    return TypedDB.query("SELECT * FROM visits WHERE churchId=? AND visitDate BETWEEN ? AND ?;", [churchId, DateHelper.toMysqlDateOnly(startDate), DateHelper.toMysqlDateOnly(endDate)]);
+  private async update(model: Visit): Promise<Visit> {
+    const visitDate = model.visitDate ? DateHelper.toMysqlDateOnly(model.visitDate) : null;
+    const checkinTime = model.checkinTime ? DateHelper.toMysqlDate(model.checkinTime) : null;
+    await getDb().updateTable("visits").set({
+      personId: model.personId,
+      serviceId: model.serviceId,
+      groupId: model.groupId,
+      visitDate: visitDate as any,
+      checkinTime: checkinTime as any,
+      addedBy: model.addedBy
+    }).where("id", "=", model.id)
+      .where("churchId", "=", model.churchId)
+      .execute();
+    return model;
   }
 
-  public loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
-    const sql =
-      "SELECT v.*" +
-      " FROM sessions s" +
-      " LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId" +
-      " INNER JOIN visits v on(v.serviceId = st.serviceId or v.groupId = s.groupId) and v.visitDate = s.sessionDate" +
-      " WHERE v.churchId=? AND s.id = ? AND v.personId=? LIMIT 1";
-    return TypedDB.queryOne(sql, [churchId, sessionId, personId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("visits").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadByServiceDatePeopleIds(churchId: string, serviceId: string, visitDate: Date, peopleIds: string[]) {
-    const vsDate = DateHelper.toMysqlDateOnly(visitDate);  // date-only field
-    const sql = "SELECT * FROM visits WHERE churchId=? AND serviceId = ? AND visitDate = ? AND personId IN (" + ArrayHelper.fillArray("?", peopleIds.length).join(", ") + ")";
-    const params = [churchId, serviceId, vsDate].concat(peopleIds);
-    return TypedDB.query(sql, params);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("visits").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("visits").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
+    const start = DateHelper.toMysqlDateOnly(startDate);
+    const end = DateHelper.toMysqlDateOnly(endDate);
+    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate BETWEEN ${start} AND ${end}`.execute(getDb());
+    return rows.rows;
+  }
+
+  public async loadForSessionPerson(churchId: string, sessionId: string, personId: string) {
+    const rows = await sql<any>`SELECT v.* FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId INNER JOIN visits v on(v.serviceId = st.serviceId or v.groupId = s.groupId) and v.visitDate = s.sessionDate WHERE v.churchId=${churchId} AND s.id = ${sessionId} AND v.personId=${personId} LIMIT 1`.execute(getDb());
+    return rows.rows.length > 0 ? rows.rows[0] : null;
+  }
+
+  public async loadByServiceDatePeopleIds(churchId: string, serviceId: string, visitDate: Date, peopleIds: string[]) {
+    const vsDate = DateHelper.toMysqlDateOnly(visitDate);
+    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND serviceId = ${serviceId} AND visitDate = ${vsDate} AND personId IN (${sql.join(peopleIds)})`.execute(getDb());
+    return rows.rows;
   }
 
   public async loadLastLoggedDate(churchId: string, serviceId: string, peopleIds: string[]) {
     let result = new Date();
     result.setHours(0, 0, 0, 0);
 
-    const sql = "SELECT max(visitDate) as visitDate FROM visits WHERE churchId=? AND serviceId = ? AND personId IN (" + ArrayHelper.fillArray("?", peopleIds.length).join(", ") + ")";
-    const params = [churchId, serviceId].concat(peopleIds);
-    const data: any = await TypedDB.queryOne(sql, params);
+    const rows = await sql<any>`SELECT max(visitDate) as visitDate FROM visits WHERE churchId=${churchId} AND serviceId = ${serviceId} AND personId IN (${sql.join(peopleIds)})`.execute(getDb());
+    const data: any = rows.rows.length > 0 ? rows.rows[0] : null;
 
     if (data?.visitDate) result = new Date(data.visitDate);
     return result;
   }
 
-  public loadForPerson(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM visits WHERE churchId=? AND personId=?", [churchId, personId]);
+  public async loadForPerson(churchId: string, personId: string) {
+    return getDb().selectFrom("visits").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).execute();
   }
 
   public async loadConsecutiveWeekStreaks(churchId: string, personIds: string[]): Promise<Record<string, number>> {
     if (personIds.length === 0) return {};
-    const sql = "SELECT personId, YEARWEEK(visitDate, 3) AS yw FROM visits WHERE churchId = ? AND personId IN ("
-      + ArrayHelper.fillArray("?", personIds.length).join(", ")
-      + ") GROUP BY personId, yw ORDER BY personId, yw DESC";
-    const rows: any[] = await TypedDB.query(sql, [churchId, ...personIds]) as any[];
+    const rows = await sql<any>`SELECT personId, YEARWEEK(visitDate, 3) AS yw FROM visits WHERE churchId = ${churchId} AND personId IN (${sql.join(personIds)}) GROUP BY personId, yw ORDER BY personId, yw DESC`.execute(getDb());
+    const data: any[] = rows.rows as any[];
 
     const byPerson: Record<string, number[]> = {};
-    for (const row of rows) {
+    for (const row of data) {
       if (!byPerson[row.personId]) byPerson[row.personId] = [];
       byPerson[row.personId].push(row.yw);
     }
@@ -114,6 +136,14 @@ export class VisitRepo extends ConfiguredRepo<Visit> {
     const lastYearStart = new Date(Date.UTC(dec28.getUTCFullYear(), 0, 1));
     const lastWeek = Math.ceil((((dec28.getTime() - lastYearStart.getTime()) / 86400000) + 1) / 7);
     return (year - 1) * 100 + lastWeek;
+  }
+
+  public convertToModel(_churchId: string, data: any): Visit {
+    return this.rowToModel(data);
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]): Visit[] {
+    return data.map((row) => this.rowToModel(row));
   }
 
   protected rowToModel(row: any): Visit {

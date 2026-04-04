@@ -1,59 +1,118 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { Device } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
-export class DeviceRepo extends ConfiguredRepo<Device> {
-  // Override churchIdColumn to undefined since devices can exist without a church (anonymous pairing)
-  protected churchIdColumn: string = undefined;
-
-  protected get repoConfig(): RepoConfig<Device> {
-    return {
-      tableName: "devices",
-      hasSoftDelete: false,
-      insertColumns: [
-        "appName", "deviceId", "churchId", "personId", "fcmToken", "label", "registrationDate", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"
-      ],
-      updateColumns: [
-        "appName", "deviceId", "churchId", "personId", "fcmToken", "label", "lastActiveDate", "deviceInfo", "admId", "pairingCode", "ipAddress", "contentType", "contentId"
-      ]
-    };
+export class DeviceRepo {
+  public async save(model: Device) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? AND id IN (?)", [churchId, ids]);
+  private async create(model: Device): Promise<Device> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("devices").values({
+      id: model.id,
+      churchId: model.churchId,
+      appName: model.appName,
+      deviceId: model.deviceId,
+      personId: model.personId,
+      fcmToken: model.fcmToken,
+      label: model.label,
+      registrationDate: model.registrationDate,
+      lastActiveDate: model.lastActiveDate,
+      deviceInfo: model.deviceInfo,
+      admId: model.admId,
+      pairingCode: model.pairingCode,
+      ipAddress: model.ipAddress,
+      contentType: model.contentType,
+      contentId: model.contentId
+    } as any).execute();
+    return model;
   }
 
-  public loadByPersonId(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? AND personId=?", [churchId, personId]);
+  private async update(model: Device): Promise<Device> {
+    await getDb().updateTable("devices").set({
+      appName: model.appName,
+      deviceId: model.deviceId,
+      churchId: model.churchId,
+      personId: model.personId,
+      fcmToken: model.fcmToken,
+      label: model.label,
+      lastActiveDate: model.lastActiveDate,
+      deviceInfo: model.deviceInfo,
+      admId: model.admId,
+      pairingCode: model.pairingCode,
+      ipAddress: model.ipAddress,
+      contentType: model.contentType,
+      contentId: model.contentId
+    }).where("id", "=", model.id).execute();
+    return model;
   }
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE id=? and churchId=?;", [id, churchId]);
+  public async loadByIds(churchId: string, ids: string[]) {
+    if (!ids || ids.length === 0) return [];
+    return getDb().selectFrom("devices").selectAll()
+      .where("churchId", "=", churchId)
+      .where("id", "in", ids)
+      .execute();
   }
 
-  public async loadByPairingCode(pairingCode: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE pairingCode=?;", [pairingCode]);
+  public async loadByPersonId(churchId: string, personId: string) {
+    return getDb().selectFrom("devices").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .execute();
   }
 
-  public loadByDeviceId(deviceId: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE deviceId=?;", [deviceId]);
+  public async loadById(churchId: string, id: string): Promise<Device | undefined> {
+    return (await getDb().selectFrom("devices").selectAll()
+      .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadByFcmToken(churchId: string, fcmToken: string) {
-    return TypedDB.queryOne("SELECT * FROM devices WHERE fcmToken=? and churchId=?;", [fcmToken, churchId]);
+  public async loadByPairingCode(pairingCode: string): Promise<Device | undefined> {
+    return (await getDb().selectFrom("devices").selectAll()
+      .where("pairingCode", "=", pairingCode).executeTakeFirst()) ?? null;
   }
 
-  public loadByChurchId(churchId: string) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? ORDER BY lastActiveDate desc", [churchId]);
+  public async loadByDeviceId(deviceId: string): Promise<Device | undefined> {
+    return (await getDb().selectFrom("devices").selectAll()
+      .where("deviceId", "=", deviceId).executeTakeFirst()) ?? null;
   }
 
-  public loadForPerson(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM devices WHERE churchId=? AND personId=?", [churchId, personId]);
+  public async loadByFcmToken(churchId: string, fcmToken: string): Promise<Device | undefined> {
+    return (await getDb().selectFrom("devices").selectAll()
+      .where("fcmToken", "=", fcmToken).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public deleteByFcmToken(fcmToken: string) {
-    return TypedDB.query("DELETE FROM devices WHERE fcmToken=?", [fcmToken]);
+  public async loadByChurchId(churchId: string) {
+    return getDb().selectFrom("devices").selectAll()
+      .where("churchId", "=", churchId)
+      .orderBy("lastActiveDate", "desc")
+      .execute();
+  }
+
+  public async loadForPerson(churchId: string, personId: string) {
+    return getDb().selectFrom("devices").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .execute();
+  }
+
+  public async deleteByFcmToken(fcmToken: string) {
+    await getDb().deleteFrom("devices").where("fcmToken", "=", fcmToken).execute();
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("devices").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public convertToModel(_churchId: string, data: any): Device {
+    if (!data) return null;
+    return this.rowToModel(data);
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]): Device[] {
+    if (!data) return [];
+    return (Array.isArray(data) ? data : []).map((d: any) => this.rowToModel(d));
   }
 
   protected rowToModel(row: any): Device {

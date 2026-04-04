@@ -1,20 +1,56 @@
-import { ArrayHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
 import { Element } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
 
 @injectable()
-export class ElementRepo extends ConfiguredRepo<Element> {
-  protected get repoConfig(): RepoConfig<Element> {
-    return {
-      tableName: "elements",
-      hasSoftDelete: false,
-      defaultOrderBy: "sort",
-      columns: [
-        "sectionId", "blockId", "elementType", "sort", "parentId", "answersJSON", "stylesJSON", "animationsJSON"
-      ]
-    };
+export class ElementRepo {
+  public async save(model: Element) {
+    return model.id ? this.update(model) : this.create(model);
+  }
+
+  protected async create(model: Element): Promise<Element> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("elements").values({
+      id: model.id,
+      churchId: model.churchId,
+      sectionId: model.sectionId,
+      blockId: model.blockId,
+      elementType: model.elementType,
+      sort: model.sort,
+      parentId: model.parentId,
+      answersJSON: model.answersJSON,
+      stylesJSON: model.stylesJSON,
+      animationsJSON: model.animationsJSON
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: Element): Promise<Element> {
+    await getDb().updateTable("elements").set({
+      sectionId: model.sectionId,
+      blockId: model.blockId,
+      elementType: model.elementType,
+      sort: model.sort,
+      parentId: model.parentId,
+      answersJSON: model.answersJSON,
+      stylesJSON: model.stylesJSON,
+      animationsJSON: model.animationsJSON
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("elements").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<Element | undefined> {
+    return (await getDb().selectFrom("elements").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string): Promise<Element[]> {
+    return getDb().selectFrom("elements").selectAll().where("churchId", "=", churchId).orderBy("sort").execute() as any;
   }
 
   public async updateSortForBlock(churchId: string, blockId: string, parentId: string) {
@@ -52,42 +88,43 @@ export class ElementRepo extends ConfiguredRepo<Element> {
     if (promises.length > 0) await Promise.all(promises);
   }
 
-  public loadForSection(churchId: string, sectionId: string) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND sectionId=? order by sort;", [churchId, sectionId]);
+  public async loadForSection(churchId: string, sectionId: string) {
+    return getDb().selectFrom("elements").selectAll()
+      .where("churchId", "=", churchId)
+      .where("sectionId", "=", sectionId)
+      .orderBy("sort").execute() as any;
   }
 
-  public loadForBlock(churchId: string, blockId: string) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND blockId=? order by sort;", [churchId, blockId]);
+  public async loadForBlock(churchId: string, blockId: string) {
+    return getDb().selectFrom("elements").selectAll()
+      .where("churchId", "=", churchId)
+      .where("blockId", "=", blockId)
+      .orderBy("sort").execute() as any;
   }
 
-  public loadForBlocks(churchId: string, blockIds: string[]) {
-    return TypedDB.query("SELECT * FROM elements WHERE churchId=? AND blockId IN (?) order by sort;", [churchId, blockIds]);
+  public async loadForBlocks(churchId: string, blockIds: string[]) {
+    if (!blockIds || blockIds.length === 0) return [];
+    return getDb().selectFrom("elements").selectAll()
+      .where("churchId", "=", churchId)
+      .where("blockId", "in", blockIds)
+      .orderBy("sort").execute() as any;
   }
 
-  /*
-  public loadForBlocks(churchId: string, blockIds: string[]) {
-    const sql = "SELECT e.* "
-      + " FROM elements e"
-      + " LEFT JOIN sections s on s.id=e.sectionId"
-      + " WHERE e.churchId=? AND (e.blockId IN (?) OR s.blockId IN (?))"
-      + " ORDER BY sort;";
-    return TypedDB.query(sql, [churchId, blockIds, blockIds]);
+  public async loadForPage(churchId: string, pageId: string) {
+    const result = await sql`SELECT e.*
+      FROM elements e
+      INNER JOIN sections s on s.id=e.sectionId
+      WHERE (s.pageId=${pageId} OR (s.pageId IS NULL and s.blockId IS NULL)) AND e.churchId=${churchId}
+      ORDER BY sort`.execute(getDb());
+    return result.rows as any;
   }
 
-  public loadForBlock(churchId: string, blockId: string) {
-    const sql = "SELECT e.* "
-      + " FROM elements e"
-      + " LEFT JOIN sections s on s.id=e.sectionId"
-      + " WHERE e.churchId=? AND (e.blockId=? OR s.blockId=?)"
-      + " ORDER BY sort;";
-    return TypedDB.query(sql, [churchId, blockId, blockId]);
+  public async insert(model: Element): Promise<Element> {
+    return this.create(model);
   }
-*/
-  public loadForPage(churchId: string, pageId: string) {
-    const sql =
-      "SELECT e.* " + " FROM elements e" + " INNER JOIN sections s on s.id=e.sectionId" + " WHERE (s.pageId=? OR (s.pageId IS NULL and s.blockId IS NULL)) AND e.churchId=?" + " ORDER BY sort;";
-    return TypedDB.query(sql, [pageId, churchId]);
-  }
+
+  public convertToModel(_churchId: string, data: any) { return data as Element; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Element[]; }
 
   protected rowToModel(row: any): Element {
     return {

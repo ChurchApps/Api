@@ -1,59 +1,80 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { injectable } from "inversify";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { OAuthToken } from "../models/index.js";
 import { DateHelper } from "../helpers/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
-import { injectable } from "inversify";
 
 @injectable()
-export class OAuthTokenRepo extends BaseRepo<OAuthToken> {
-  protected tableName = "oAuthTokens";
-  protected hasSoftDelete = false;
-  protected async create(token: OAuthToken): Promise<OAuthToken> {
-    token.id = this.createId();
+export class OAuthTokenRepo {
+  public async save(model: OAuthToken) {
+    return model.id ? this.update(model) : this.create(model);
+  }
+
+  private async create(token: OAuthToken): Promise<OAuthToken> {
+    token.id = UniqueIdHelper.shortId();
     const expiresAt = DateHelper.toMysqlDate(token.expiresAt);
-    const sql = "INSERT INTO oAuthTokens (id, accessToken, refreshToken, clientId, userChurchId, scopes, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW());";
-    const params = [token.id, token.accessToken, token.refreshToken, token.clientId, token.userChurchId, token.scopes, expiresAt];
-    await TypedDB.query(sql, params);
+    await getDb().insertInto("oAuthTokens").values({
+      id: token.id,
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      clientId: token.clientId,
+      userChurchId: token.userChurchId,
+      scopes: token.scopes,
+      expiresAt: expiresAt as any,
+      createdAt: sql`NOW()` as any
+    }).execute();
     return token;
   }
 
-  protected async update(token: OAuthToken): Promise<OAuthToken> {
+  private async update(token: OAuthToken): Promise<OAuthToken> {
     const expiresAt = DateHelper.toMysqlDate(token.expiresAt);
-    const sql = "UPDATE oAuthTokens SET accessToken=?, refreshToken=?, clientId=?, userChurchId=?, scopes=?, expiresAt=? WHERE id=?;";
-    const params = [token.accessToken, token.refreshToken, token.clientId, token.userChurchId, token.scopes, expiresAt, token.id];
-    await TypedDB.query(sql, params);
+    await getDb().updateTable("oAuthTokens").set({
+      accessToken: token.accessToken,
+      refreshToken: token.refreshToken,
+      clientId: token.clientId,
+      userChurchId: token.userChurchId,
+      scopes: token.scopes,
+      expiresAt: expiresAt as any
+    }).where("id", "=", token.id).execute();
     return token;
   }
 
-  public load(id: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE id=?", [id]);
+  public async load(id: string): Promise<OAuthToken> {
+    return (await getDb().selectFrom("oAuthTokens").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public loadByAccessToken(accessToken: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE accessToken=?", [accessToken]);
+  public async loadByAccessToken(accessToken: string): Promise<OAuthToken> {
+    return (await getDb().selectFrom("oAuthTokens").selectAll().where("accessToken", "=", accessToken).executeTakeFirst()) ?? null;
   }
 
-  public loadByRefreshToken(refreshToken: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE refreshToken=?", [refreshToken]);
+  public async loadByRefreshToken(refreshToken: string): Promise<OAuthToken> {
+    return (await getDb().selectFrom("oAuthTokens").selectAll().where("refreshToken", "=", refreshToken).executeTakeFirst()) ?? null;
   }
 
-  public loadByClientAndUser(clientId: string, userChurchId: string): Promise<OAuthToken> {
-    return TypedDB.queryOne("SELECT * FROM oAuthTokens WHERE clientId=? AND userChurchId=?", [clientId, userChurchId]);
+  public async loadByClientAndUser(clientId: string, userChurchId: string): Promise<OAuthToken> {
+    return (await getDb().selectFrom("oAuthTokens").selectAll()
+      .where("clientId", "=", clientId)
+      .where("userChurchId", "=", userChurchId)
+      .executeTakeFirst()) ?? null;
   }
 
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE id=?", [id]);
+  public async delete(id: string) {
+    await getDb().deleteFrom("oAuthTokens").where("id", "=", id).execute();
   }
 
-  public deleteByAccessToken(accessToken: string) {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE accessToken=?", [accessToken]);
+  public async deleteByAccessToken(accessToken: string) {
+    await getDb().deleteFrom("oAuthTokens").where("accessToken", "=", accessToken).execute();
   }
 
-  public deleteByRefreshToken(refreshToken: string) {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE refreshToken=?", [refreshToken]);
+  public async deleteByRefreshToken(refreshToken: string) {
+    await getDb().deleteFrom("oAuthTokens").where("refreshToken", "=", refreshToken).execute();
   }
 
-  public deleteExpired() {
-    return TypedDB.query("DELETE FROM oAuthTokens WHERE expiresAt < NOW()", []);
+  public async deleteExpired() {
+    await sql`DELETE FROM oAuthTokens WHERE expiresAt < NOW()`.execute(getDb());
   }
+
+  public convertToModel(_churchId: string, data: any) { return data; }
+  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
 }

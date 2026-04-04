@@ -1,25 +1,47 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { PlanType } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 @injectable()
-export class PlanTypeRepo extends ConfiguredRepo<PlanType> {
-  protected get repoConfig(): RepoConfig<PlanType> {
-    return {
-      tableName: "planTypes",
-      hasSoftDelete: false,
-      columns: ["ministryId", "name"]
-    };
+export class PlanTypeRepo {
+  public async save(model: PlanType) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM planTypes WHERE churchId=? and id in (?);", [churchId, ids]);
+  private async create(model: PlanType): Promise<PlanType> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("planTypes").values({
+      id: model.id, churchId: model.churchId, ministryId: model.ministryId, name: model.name
+    }).execute();
+    return model;
   }
 
-  public loadByMinistryId(churchId: string, ministryId: string) {
-    return TypedDB.query("SELECT * FROM planTypes WHERE churchId=? AND ministryId=?;", [churchId, ministryId]);
+  private async update(model: PlanType): Promise<PlanType> {
+    await getDb().updateTable("planTypes").set({
+      ministryId: model.ministryId, name: model.name
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("planTypes").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("planTypes").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("planTypes").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadByIds(churchId: string, ids: string[]) {
+    return getDb().selectFrom("planTypes").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
+  }
+
+  public async loadByMinistryId(churchId: string, ministryId: string) {
+    return getDb().selectFrom("planTypes").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).execute();
   }
 
   protected rowToModel(row: any): PlanType {

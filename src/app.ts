@@ -8,7 +8,7 @@ import { RepoManager } from "./shared/infrastructure/RepoManager.js";
 import cors from "cors";
 import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
-import { ConnectionManager } from "./shared/infrastructure/ConnectionManager.js";
+import { KyselyPool } from "./shared/infrastructure/KyselyPool.js";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
 
 export const createApp = async () => {
@@ -274,6 +274,6 @@ process.on("SIGINT", async () => {
   }
 
   // Close database connections
-  await ConnectionManager.closeAll();
+  await KyselyPool.destroyAll();
   process.exit(0);
 });

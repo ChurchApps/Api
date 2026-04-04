@@ -1,101 +1,150 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Assignment } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 @injectable()
-export class AssignmentRepo extends ConfiguredRepo<Assignment> {
-  protected get repoConfig(): RepoConfig<Assignment> {
-    return {
-      tableName: "assignments",
-      hasSoftDelete: false,
-      columns: ["positionId", "personId", "status", "notified"]
-    };
+export class AssignmentRepo {
+  public async save(model: Assignment) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public deleteByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("DELETE FROM assignments WHERE churchId=? and positionId IN (SELECT id from positions WHERE planId=?);", [churchId, planId]);
+  private async create(model: Assignment): Promise<Assignment> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("assignments").values({
+      id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified
+    }).execute();
+    return model;
   }
 
-  public loadByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId=?;", [churchId, planId]);
+  private async update(model: Assignment): Promise<Assignment> {
+    await getDb().updateTable("assignments").set({
+      positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByPlanIds(churchId: string, planIds: string[]) {
-    return TypedDB.query("SELECT a.* FROM assignments a INNER JOIN positions p on p.id=a.positionId WHERE a.churchId=? AND p.planId IN (?);", [churchId, planIds]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("assignments").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadLastServed(churchId: string) {
-    const sql =
-      "select a.personId, max(pl.serviceDate) as serviceDate" +
-      " from assignments a" +
-      " inner join positions p on p.id = a.positionId" +
-      " inner join plans pl on pl.id = p.planId" +
-      " where a.churchId=?" +
-      " group by a.personId" +
-      " order by max(pl.serviceDate)";
-    return TypedDB.query(sql, [churchId]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("assignments").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadByByPersonId(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM assignments WHERE churchId=? AND personId=?;", [churchId, personId]);
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("assignments").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  public loadUnconfirmedByServiceDateRange(churchId?: string) {
-    let sql =
-      "SELECT a.*, pl.serviceDate, pl.name as planName" +
-      " FROM assignments a" +
-      " INNER JOIN positions p ON p.id = a.positionId" +
-      " INNER JOIN plans pl ON pl.id = p.planId" +
-      " WHERE a.status = 'Unconfirmed'" +
-      " AND pl.serviceDate >= DATE_ADD(CURDATE(), INTERVAL 2 DAY)" +
-      " AND pl.serviceDate < DATE_ADD(CURDATE(), INTERVAL 3 DAY)";
+  public async deleteByPlanId(churchId: string, planId: string) {
+    await getDb().deleteFrom("assignments")
+      .where("churchId", "=", churchId)
+      .where("positionId", "in",
+        getDb().selectFrom("positions").select("id").where("planId", "=", planId)
+      )
+      .execute();
+  }
 
-    const params: any[] = [];
+  public async loadByPlanId(churchId: string, planId: string): Promise<any[]> {
+    return getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .selectAll("a")
+      .select("p.planId")
+      .where("a.churchId", "=", churchId)
+      .where("p.planId", "=", planId)
+      .execute();
+  }
+
+  public async loadByPlanIds(churchId: string, planIds: string[]) {
+    return getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .selectAll("a")
+      .where("a.churchId", "=", churchId)
+      .where("p.planId", "in", planIds)
+      .execute();
+  }
+
+  public async loadLastServed(churchId: string) {
+    return getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .select(["a.personId", sql`max(pl.serviceDate)`.as("serviceDate")])
+      .where("a.churchId", "=", churchId)
+      .groupBy("a.personId")
+      .orderBy(sql`max(pl.serviceDate)`)
+      .execute();
+  }
+
+  public async loadByByPersonId(churchId: string, personId: string) {
+    return getDb().selectFrom("assignments").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).execute();
+  }
+
+  public async loadUnconfirmedByServiceDateRange(churchId?: string) {
+    let query = getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .select([
+        "a.id", "a.churchId", "a.positionId", "a.personId", "a.status", "a.notified",
+        "pl.serviceDate", sql`pl.name`.as("planName")
+      ])
+      .where("a.status", "=", "Unconfirmed")
+      .where("pl.serviceDate", ">=", sql`DATE_ADD(CURDATE(), INTERVAL 2 DAY)` as any)
+      .where("pl.serviceDate", "<", sql`DATE_ADD(CURDATE(), INTERVAL 3 DAY)` as any);
+
     if (churchId) {
-      sql += " AND a.churchId = ?";
-      params.push(churchId);
+      query = query.where("a.churchId", "=", churchId);
     }
 
-    return TypedDB.query(sql, params);
+    return query.execute();
   }
 
-  public countByPositionId(churchId: string, positionId: string) {
-    return TypedDB.queryOne(
-      "SELECT COUNT(*) as cnt FROM assignments WHERE churchId=? AND positionId=? AND status IN ('Accepted','Unconfirmed')",
-      [churchId, positionId]
-    );
+  public async countByPositionId(churchId: string, positionId: string) {
+    return (await getDb().selectFrom("assignments")
+      .select(sql<number>`COUNT(*)`.as("cnt"))
+      .where("churchId", "=", churchId)
+      .where("positionId", "=", positionId)
+      .where("status", "in", ["Accepted", "Unconfirmed"])
+      .executeTakeFirst()) ?? null;
   }
 
-  public loadOverviewByDateRange(churchId: string, startDate: string, endDate: string, ministryId?: string, planTypeId?: string) {
-    let sql =
-      "SELECT pl.serviceDate, pl.ministryId, p.categoryName, p.name as positionName, p.count as needed," +
-      " a.personId, a.status" +
-      " FROM positions p" +
-      " INNER JOIN plans pl ON pl.id = p.planId" +
-      " LEFT JOIN assignments a ON a.positionId = p.id AND a.status IN ('Accepted','Unconfirmed')" +
-      " WHERE pl.churchId = ? AND pl.serviceDate >= ? AND pl.serviceDate <= ?";
-    const params: any[] = [churchId, startDate, endDate];
+  public async loadOverviewByDateRange(churchId: string, startDate: string, endDate: string, ministryId?: string, planTypeId?: string) {
+    let query = getDb().selectFrom("positions as p")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .leftJoin("assignments as a", (join) =>
+        join.onRef("a.positionId", "=", "p.id").on("a.status", "in", ["Accepted", "Unconfirmed"])
+      )
+      .select([
+        "pl.serviceDate", "pl.ministryId", "p.categoryName",
+        sql`p.name`.as("positionName"), sql`p.count`.as("needed"),
+        "a.personId", "a.status"
+      ])
+      .where("pl.churchId", "=", churchId)
+      .where("pl.serviceDate", ">=", startDate as any)
+      .where("pl.serviceDate", "<=", endDate as any);
+
     if (ministryId) {
-      sql += " AND pl.ministryId = ?";
-      params.push(ministryId);
+      query = query.where("pl.ministryId", "=", ministryId);
     }
     if (planTypeId) {
-      sql += " AND pl.planTypeId = ?";
-      params.push(planTypeId);
+      query = query.where("pl.planTypeId", "=", planTypeId);
     }
-    sql += " ORDER BY p.categoryName, p.name, pl.serviceDate";
-    return TypedDB.query(sql, params);
+
+    return query.orderBy("p.categoryName").orderBy("p.name").orderBy("pl.serviceDate").execute();
   }
 
-  public loadByServiceDate(churchId: string, serviceDate: Date, excludePlanId?: string) {
-    let sql = "SELECT a.* FROM assignments a" + " INNER JOIN positions p ON p.id = a.positionId" + " INNER JOIN plans pl ON pl.id = p.planId" + " WHERE a.churchId = ? AND DATE(pl.serviceDate) = DATE(?)";
-    const params: any[] = [churchId, serviceDate];
+  public async loadByServiceDate(churchId: string, serviceDate: Date, excludePlanId?: string) {
+    let query = getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .selectAll("a")
+      .where("a.churchId", "=", churchId)
+      .where(sql`DATE(pl.serviceDate)`, "=", sql`DATE(${serviceDate})`);
+
     if (excludePlanId) {
-      sql += " AND pl.id != ?";
-      params.push(excludePlanId);
+      query = query.where("pl.id", "!=", excludePlanId);
     }
-    return TypedDB.query(sql, params);
+
+    return query.execute();
   }
 }

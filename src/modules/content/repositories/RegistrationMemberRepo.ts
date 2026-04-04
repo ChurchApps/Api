@@ -1,36 +1,67 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { RegistrationMember } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
 
 @injectable()
-export class RegistrationMemberRepo extends ConfiguredRepo<RegistrationMember> {
-  protected get repoConfig(): RepoConfig<RegistrationMember> {
-    return {
-      tableName: "registrationMembers",
-      hasSoftDelete: false,
-      columns: ["registrationId", "personId", "firstName", "lastName"]
-    };
+export class RegistrationMemberRepo {
+  public async save(model: RegistrationMember) {
+    return model.id ? this.update(model) : this.create(model);
+  }
+
+  private async create(model: RegistrationMember): Promise<RegistrationMember> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("registrationMembers").values({
+      id: model.id,
+      churchId: model.churchId,
+      registrationId: model.registrationId,
+      personId: model.personId,
+      firstName: model.firstName,
+      lastName: model.lastName
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: RegistrationMember): Promise<RegistrationMember> {
+    await getDb().updateTable("registrationMembers").set({
+      registrationId: model.registrationId,
+      personId: model.personId,
+      firstName: model.firstName,
+      lastName: model.lastName
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("registrationMembers").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<RegistrationMember | undefined> {
+    return (await getDb().selectFrom("registrationMembers").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string): Promise<RegistrationMember[]> {
+    return getDb().selectFrom("registrationMembers").selectAll().where("churchId", "=", churchId).execute() as any;
   }
 
   public async loadForRegistration(churchId: string, registrationId: string): Promise<RegistrationMember[]> {
-    return TypedDB.query(
-      "SELECT * FROM registrationMembers WHERE churchId=? AND registrationId=?;",
-      [churchId, registrationId]
-    );
+    return getDb().selectFrom("registrationMembers").selectAll()
+      .where("churchId", "=", churchId)
+      .where("registrationId", "=", registrationId).execute() as any;
   }
 
   public async loadForEvent(churchId: string, eventId: string): Promise<RegistrationMember[]> {
-    return TypedDB.query(
-      "SELECT rm.* FROM registrationMembers rm INNER JOIN registrations r ON rm.registrationId=r.id WHERE r.churchId=? AND r.eventId=?;",
-      [churchId, eventId]
-    );
+    const result = await sql`SELECT rm.* FROM registrationMembers rm INNER JOIN registrations r ON rm.registrationId=r.id WHERE r.churchId=${churchId} AND r.eventId=${eventId}`.execute(getDb());
+    return result.rows as any;
   }
 
   public async deleteForRegistration(churchId: string, registrationId: string): Promise<void> {
-    await TypedDB.query(
-      "DELETE FROM registrationMembers WHERE churchId=? AND registrationId=?;",
-      [churchId, registrationId]
-    );
+    await getDb().deleteFrom("registrationMembers")
+      .where("churchId", "=", churchId)
+      .where("registrationId", "=", registrationId).execute();
   }
+
+  public convertToModel(_churchId: string, data: any) { return data as RegistrationMember; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationMember[]; }
 }

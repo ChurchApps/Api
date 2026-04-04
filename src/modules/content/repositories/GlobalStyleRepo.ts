@@ -1,33 +1,61 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { GlobalStyle } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class GlobalStyleRepo extends ConfiguredRepo<GlobalStyle> {
-  protected get repoConfig(): RepoConfig<GlobalStyle> {
-    return {
-      tableName: "globalStyles",
-      hasSoftDelete: false,
-      columns: ["fonts", "palette", "typography", "spacing", "borderRadius", "customCss", "customJS"]
-    };
+export class GlobalStyleRepo {
+  public async save(model: GlobalStyle) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public async load(churchId: string, id: string): Promise<GlobalStyle> {
-    return TypedDB.queryOne("SELECT * FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
+  private async create(model: GlobalStyle): Promise<GlobalStyle> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("globalStyles").values({
+      id: model.id,
+      churchId: model.churchId,
+      fonts: model.fonts,
+      palette: model.palette,
+      typography: model.typography,
+      spacing: model.spacing,
+      borderRadius: model.borderRadius,
+      customCss: model.customCss,
+      customJS: model.customJS
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: GlobalStyle): Promise<GlobalStyle> {
+    await getDb().updateTable("globalStyles").set({
+      fonts: model.fonts,
+      palette: model.palette,
+      typography: model.typography,
+      spacing: model.spacing,
+      borderRadius: model.borderRadius,
+      customCss: model.customCss,
+      customJS: model.customJS
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("globalStyles").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<GlobalStyle | undefined> {
+    return (await getDb().selectFrom("globalStyles").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(churchId: string): Promise<GlobalStyle[]> {
-    return TypedDB.query("SELECT * FROM globalStyles WHERE churchId=?", [churchId]);
+    return getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).execute() as any;
   }
 
-  public async delete(churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM globalStyles WHERE id=? AND churchId=?", [id, churchId]);
+  public async loadForChurch(churchId: string): Promise<GlobalStyle | undefined> {
+    return (await getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).limit(1).executeTakeFirst()) ?? null;
   }
 
-  public loadForChurch(churchId: string): Promise<GlobalStyle[]> {
-    return TypedDB.queryOne("SELECT * FROM globalStyles WHERE churchId=? limit 1;", [churchId]);
-  }
+  public convertToModel(_churchId: string, data: any) { return data as GlobalStyle; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as GlobalStyle[]; }
 
   protected rowToModel(row: any): GlobalStyle {
     return {

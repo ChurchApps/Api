@@ -1,26 +1,37 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { BibleLookup } from "../models/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 
 @injectable()
-export class BibleLookupRepo extends BaseRepo<BibleLookup> {
-  protected tableName = "bibleLookups";
-  protected hasSoftDelete = false;
-
-  protected async create(lookup: BibleLookup): Promise<BibleLookup> {
-    if (!lookup.id) lookup.id = this.createId();
-    const sql = "INSERT INTO bibleLookups (id, translationKey, lookupTime, ipAddress, startVerseKey, endVerseKey) VALUES (?, ?, now(), ?, ?, ?);";
-    const params = [lookup.id, lookup.translationKey, lookup.ipAddress, lookup.startVerseKey, lookup.endVerseKey];
-    await TypedDB.query(sql, params);
-    return lookup;
+export class BibleLookupRepo {
+  public async save(model: BibleLookup) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  protected async update(lookup: BibleLookup): Promise<BibleLookup> {
-    const sql = "UPDATE bibleLookups SET translationKey=?, lookupTime=?, ipAddress=?, startVerseKey=?, endVerseKey=? WHERE id=?";
-    const params = [lookup.translationKey, lookup.lookupTime, lookup.ipAddress, lookup.startVerseKey, lookup.endVerseKey, lookup.id];
-    await TypedDB.query(sql, params);
-    return lookup;
+  private async create(model: BibleLookup): Promise<BibleLookup> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("bibleLookups").values({
+      id: model.id,
+      translationKey: model.translationKey,
+      lookupTime: sql`NOW()` as any,
+      ipAddress: model.ipAddress,
+      startVerseKey: model.startVerseKey,
+      endVerseKey: model.endVerseKey
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: BibleLookup): Promise<BibleLookup> {
+    await getDb().updateTable("bibleLookups").set({
+      translationKey: model.translationKey,
+      lookupTime: model.lookupTime,
+      ipAddress: model.ipAddress,
+      startVerseKey: model.startVerseKey,
+      endVerseKey: model.endVerseKey
+    } as any).where("id", "=", model.id).execute();
+    return model;
   }
 
   public saveAll(lookups: BibleLookup[]) {
@@ -32,24 +43,25 @@ export class BibleLookupRepo extends BaseRepo<BibleLookup> {
   }
 
   public async getStats(startDate: Date, endDate: Date) {
-    const sql =
-      "SELECT bt.abbreviation, count(distinct(bl.ipAddress)) as lookups" +
-      " FROM bibleTranslations bt" +
-      " INNER JOIN bibleLookups bl ON bl.translationKey = bt.abbreviation" +
-      " WHERE bl.lookupTime BETWEEN ? AND ?" +
-      " GROUP BY bt.abbreviation" +
-      " ORDER BY bt.abbreviation;";
-    const params = [startDate, endDate];
-    return TypedDB.query(sql, params);
+    const result = await sql`SELECT bt.abbreviation, count(distinct(bl.ipAddress)) as lookups
+      FROM bibleTranslations bt
+      INNER JOIN bibleLookups bl ON bl.translationKey = bt.abbreviation
+      WHERE bl.lookupTime BETWEEN ${startDate} AND ${endDate}
+      GROUP BY bt.abbreviation
+      ORDER BY bt.abbreviation`.execute(getDb());
+    return result.rows;
   }
 
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM bibleLookups WHERE id=?;", [id]);
+  public async delete(id: string) {
+    await getDb().deleteFrom("bibleLookups").where("id", "=", id).execute();
   }
 
-  public load(id: string) {
-    return TypedDB.queryOne("SELECT * FROM bibleLookups WHERE id=?;", [id]);
+  public async load(id: string): Promise<BibleLookup | undefined> {
+    return (await getDb().selectFrom("bibleLookups").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
+
+  public convertToModel(data: any) { return data as BibleLookup; }
+  public convertAllToModel(data: any[]) { return (data || []) as BibleLookup[]; }
 
   protected rowToModel(row: any): BibleLookup {
     return {

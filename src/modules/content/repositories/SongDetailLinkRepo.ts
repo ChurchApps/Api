@@ -1,37 +1,59 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { SongDetailLink } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class SongDetailLinkRepo extends ConfiguredRepo<SongDetailLink> {
-  // This table doesn't have a churchId column - it's a global table
-  protected churchIdColumn = "";
-
-  protected get repoConfig(): RepoConfig<SongDetailLink> {
-    return {
-      tableName: "songDetailLinks",
-      hasSoftDelete: false,
-      churchIdColumn: "", // No churchId column in this table
-      columns: ["songDetailId", "service", "serviceKey", "url"]
-    };
+export class SongDetailLinkRepo {
+  public async save(model: SongDetailLink) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public async delete(id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM songDetailLinks WHERE id=?;", [id]);
+  private async create(model: SongDetailLink): Promise<SongDetailLink> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("songDetailLinks").values({
+      id: model.id,
+      songDetailId: model.songDetailId,
+      service: model.service,
+      serviceKey: model.serviceKey,
+      url: model.url
+    } as any).execute();
+    return model;
   }
 
-  public async load(id: string): Promise<SongDetailLink> {
-    return TypedDB.queryOne("SELECT * FROM songDetailLinks WHERE id=?;", [id]);
+  private async update(model: SongDetailLink): Promise<SongDetailLink> {
+    await getDb().updateTable("songDetailLinks").set({
+      songDetailId: model.songDetailId,
+      service: model.service,
+      serviceKey: model.serviceKey,
+      url: model.url
+    }).where("id", "=", model.id).execute();
+    return model;
   }
 
-  public loadForSongDetail(songDetailId: string) {
-    return TypedDB.query("SELECT * FROM songDetailLinks WHERE songDetailId=? ORDER BY service;", [songDetailId]);
+  public async delete(id: string) {
+    await getDb().deleteFrom("songDetailLinks").where("id", "=", id).execute();
   }
 
-  public loadByServiceAndKey(service: string, serviceKey: string) {
-    return TypedDB.queryOne("SELECT * FROM songDetailLinks WHERE service=? AND serviceKey=?;", [service, serviceKey]);
+  public async load(id: string): Promise<SongDetailLink | undefined> {
+    return (await getDb().selectFrom("songDetailLinks").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
+
+  public async loadForSongDetail(songDetailId: string) {
+    return getDb().selectFrom("songDetailLinks").selectAll()
+      .where("songDetailId", "=", songDetailId)
+      .orderBy("service").execute() as any;
+  }
+
+  public async loadByServiceAndKey(service: string, serviceKey: string) {
+    return (await getDb().selectFrom("songDetailLinks").selectAll()
+      .where("service", "=", service)
+      .where("serviceKey", "=", serviceKey)
+      .executeTakeFirst()) ?? null;
+  }
+
+  public convertToModel(data: any) { return data as SongDetailLink; }
+  public convertAllToModel(data: any[]) { return (data || []) as SongDetailLink[]; }
 
   protected rowToModel(row: any): SongDetailLink {
     return {

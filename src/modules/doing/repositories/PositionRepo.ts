@@ -1,37 +1,59 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Position } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 @injectable()
-export class PositionRepo extends ConfiguredRepo<Position> {
-  protected get repoConfig(): RepoConfig<Position> {
-    return {
-      tableName: "positions",
-      hasSoftDelete: false,
-      columns: ["planId", "categoryName", "name", "count", "groupId", "allowSelfSignup", "description"]
-    };
+export class PositionRepo {
+  public async save(model: Position) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public deleteByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("DELETE FROM positions WHERE churchId=? and planId=?;", [churchId, planId]);
+  private async create(model: Position): Promise<Position> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("positions").values({
+      id: model.id, churchId: model.churchId, planId: model.planId, categoryName: model.categoryName, name: model.name, count: model.count, groupId: model.groupId, allowSelfSignup: model.allowSelfSignup, description: model.description
+    }).execute();
+    return model;
   }
 
-  public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? and id in (?);", [churchId, ids]);
+  private async update(model: Position): Promise<Position> {
+    await getDb().updateTable("positions").set({
+      planId: model.planId, categoryName: model.categoryName, name: model.name, count: model.count, groupId: model.groupId, allowSelfSignup: model.allowSelfSignup, description: model.description
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId=? ORDER BY categoryName, name;", [churchId, planId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("positions").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadByPlanIds(churchId: string, planIds: string[]) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId in (?);", [churchId, planIds]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("positions").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadSignupByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("SELECT * FROM positions WHERE churchId=? AND planId=? AND allowSelfSignup=1 ORDER BY categoryName, name;", [churchId, planId]);
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async deleteByPlanId(churchId: string, planId: string) {
+    await getDb().deleteFrom("positions").where("churchId", "=", churchId).where("planId", "=", planId).execute();
+  }
+
+  public async loadByIds(churchId: string, ids: string[]) {
+    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
+  }
+
+  public async loadByPlanId(churchId: string, planId: string) {
+    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "=", planId).orderBy("categoryName").orderBy("name").execute();
+  }
+
+  public async loadByPlanIds(churchId: string, planIds: string[]) {
+    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "in", planIds).execute();
+  }
+
+  public async loadSignupByPlanId(churchId: string, planId: string) {
+    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "=", planId).where("allowSelfSignup", "=", true as any).orderBy("categoryName").orderBy("name").execute();
   }
 
   protected rowToModel(row: any): Position {

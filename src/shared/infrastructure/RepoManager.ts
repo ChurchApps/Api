@@ -1,5 +1,3 @@
-import { ConnectionManager } from "./ConnectionManager.js";
-
 export class RepoManager {
   private static instances: Map<string, any> = new Map();
 
@@ -12,8 +10,6 @@ export class RepoManager {
   }
 
   private static async createRepos(moduleName: string): Promise<any> {
-    // Get the pool for this module (DB helper will be managed by individual repositories)
-    const _pool = await ConnectionManager.getPool(moduleName);
 
     switch (moduleName) {
       case "attendance":

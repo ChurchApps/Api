@@ -1,38 +1,57 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { ArrangementKey } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
 @injectable()
-export class ArrangementKeyRepo extends ConfiguredRepo<ArrangementKey> {
-  protected get repoConfig(): RepoConfig<ArrangementKey> {
-    return {
-      tableName: "arrangementKeys",
-      hasSoftDelete: false,
-      columns: ["arrangementId", "keySignature", "shortDescription"]
-    };
+export class ArrangementKeyRepo {
+  public async save(model: ArrangementKey) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public async delete(churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM arrangementKeys WHERE id=? AND churchId=?", [id, churchId]);
+  private async create(model: ArrangementKey): Promise<ArrangementKey> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("arrangementKeys").values({
+      id: model.id,
+      churchId: model.churchId,
+      arrangementId: model.arrangementId,
+      keySignature: model.keySignature,
+      shortDescription: model.shortDescription
+    } as any).execute();
+    return model;
   }
 
-  public async load(churchId: string, id: string): Promise<ArrangementKey> {
-    return TypedDB.queryOne("SELECT * FROM arrangementKeys WHERE id=? AND churchId=?", [id, churchId]);
+  private async update(model: ArrangementKey): Promise<ArrangementKey> {
+    await getDb().updateTable("arrangementKeys").set({
+      arrangementId: model.arrangementId,
+      keySignature: model.keySignature,
+      shortDescription: model.shortDescription
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("arrangementKeys").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<ArrangementKey | undefined> {
+    return (await getDb().selectFrom("arrangementKeys").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(churchId: string): Promise<ArrangementKey[]> {
-    return TypedDB.query("SELECT * FROM arrangementKeys WHERE churchId=?", [churchId]);
+    return getDb().selectFrom("arrangementKeys").selectAll().where("churchId", "=", churchId).execute() as any;
   }
 
-  public deleteForArrangement(churchId: string, arrangementId: string) {
-    return TypedDB.query("DELETE FROM arrangementKeys WHERE churchId=? and arrangementId=?;", [churchId, arrangementId]);
+  public async deleteForArrangement(churchId: string, arrangementId: string) {
+    await getDb().deleteFrom("arrangementKeys").where("churchId", "=", churchId).where("arrangementId", "=", arrangementId).execute();
   }
 
-  public loadByArrangementId(churchId: string, arrangementId: string) {
-    return TypedDB.query("SELECT * FROM arrangementKeys where churchId=? and arrangementId=?;", [churchId, arrangementId]);
+  public async loadByArrangementId(churchId: string, arrangementId: string) {
+    return getDb().selectFrom("arrangementKeys").selectAll().where("churchId", "=", churchId).where("arrangementId", "=", arrangementId).execute() as any;
   }
+
+  public convertToModel(_churchId: string, data: any) { return data as ArrangementKey; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as ArrangementKey[]; }
 
   protected rowToModel(row: any): ArrangementKey {
     return {

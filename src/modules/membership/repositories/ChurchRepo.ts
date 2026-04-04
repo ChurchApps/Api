@@ -1,59 +1,106 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { Church, Api, LoginUserChurch } from "../models/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
 import { injectable } from "inversify";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { Church, Api, LoginUserChurch } from "../models/index.js";
 
 @injectable()
-export class ChurchRepo extends BaseRepo<Church> {
-  protected tableName = "churches";
-  protected hasSoftDelete = false;
+export class ChurchRepo {
+  public async save(model: Church) {
+    return model.id ? this.update(model) : this.create(model);
+  }
+
+  private async create(church: Church): Promise<Church> {
+    church.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("churches").values({
+      id: church.id,
+      name: church.name,
+      subDomain: church.subDomain,
+      registrationDate: sql`NOW()` as any,
+      address1: church.address1,
+      address2: church.address2,
+      city: church.city,
+      state: church.state,
+      zip: church.zip,
+      country: church.country,
+      archivedDate: church.archivedDate,
+      latitude: church.latitude,
+      longitude: church.longitude
+    }).execute();
+    return church;
+  }
+
+  private async update(church: Church): Promise<Church> {
+    await getDb().updateTable("churches").set({
+      name: church.name,
+      subDomain: church.subDomain,
+      address1: church.address1,
+      address2: church.address2,
+      city: church.city,
+      state: church.state,
+      zip: church.zip,
+      country: church.country,
+      archivedDate: church.archivedDate,
+      latitude: church.latitude,
+      longitude: church.longitude
+    }).where("id", "=", church.id).execute();
+    return church;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("churches").where("id", "=", id).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("churches").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
+  }
+
   public async loadCount() {
-    const data = (await TypedDB.queryOne("SELECT COUNT(*) as count FROM churches", [])) as { count: string };
-    return parseInt(data.count, 0);
+    const result = (await getDb().selectFrom("churches").select(sql`COUNT(*)`.as("count")).executeTakeFirst()) ?? null;
+    return parseInt((result as any)?.count || "0", 10);
   }
 
-  public loadAll() {
-    return TypedDB.query("SELECT * FROM churches WHERE archivedDate IS NULL ORDER BY name", []).then((rows: unknown) => {
-      return rows as Church[];
-    });
+  public async loadAll() {
+    return getDb().selectFrom("churches").selectAll().where("archivedDate", "is", null).orderBy("name").execute();
   }
 
-  public search(name: string, includeArchived: boolean) {
-    let query = "SELECT * FROM churches WHERE name like ?";
-    const params = ["%" + name.replace(" ", "%") + "%"];
-    if (!includeArchived) query += " AND archivedDate IS NULL";
-    query += " ORDER BY name";
-    if (name) query += " LIMIT 50";
-    else query += " LIMIT 10";
-    return TypedDB.query(query, params).then((rows: Church[]) => {
-      return rows;
-    });
+  public async search(name: string, includeArchived: boolean) {
+    let query = getDb().selectFrom("churches").selectAll()
+      .where("name", "like", "%" + name.replace(" ", "%") + "%");
+    if (!includeArchived) query = query.where("archivedDate", "is", null);
+    query = query.orderBy("name");
+    if (name) query = query.limit(50);
+    else query = query.limit(10);
+    return query.execute();
   }
 
-  public loadContainingSubDomain(subDomain: string) {
-    return TypedDB.query("SELECT * FROM churches WHERE subDomain like ? and archivedDate IS NULL;", [subDomain + "%"]) as Promise<Church[]>;
+  public async loadContainingSubDomain(subDomain: string) {
+    return getDb().selectFrom("churches").selectAll()
+      .where("subDomain", "like", subDomain + "%")
+      .where("archivedDate", "is", null)
+      .execute();
   }
 
-  public loadBySubDomain(subDomain: string) {
-    return TypedDB.queryOne("SELECT * FROM churches WHERE subDomain=? and archivedDate IS NULL;", [subDomain]) as Promise<Church>;
+  public async loadBySubDomain(subDomain: string) {
+    return (await getDb().selectFrom("churches").selectAll()
+      .where("subDomain", "=", subDomain)
+      .where("archivedDate", "is", null)
+      .executeTakeFirst()) ?? null;
   }
 
-  public loadById(id: string) {
-    return TypedDB.queryOne("SELECT * FROM churches WHERE id=?;", [id]) as Promise<Church>;
+  public async loadById(id: string) {
+    return (await getDb().selectFrom("churches").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public loadByIds(ids: string[]) {
-    return TypedDB.query("SELECT * FROM churches WHERE id IN (?) order by name;", [ids]) as Promise<Church[]>;
+  public async loadByIds(ids: string[]) {
+    if (!ids.length) return [];
+    return getDb().selectFrom("churches").selectAll().where("id", "in", ids).orderBy("name").execute();
   }
 
   public async loadForUser(userId: string) {
-    const sql =
-      "select c.*, p.id as personId, p.membershipStatus from userChurches uc " +
-      " inner join churches c on c.id=uc.churchId and c.archivedDate IS NULL" +
-      " LEFT JOIN people p on p.id=uc.personId AND (p.removed=0 OR p.removed IS NULL)" +
-      " where uc.userId=?";
-    const rows = (await TypedDB.query(sql, [userId])) as any[];
-    const result: LoginUserChurch[] = [];
+    const result = await sql`SELECT c.*, p.id as personId, p.membershipStatus FROM userChurches uc INNER JOIN churches c ON c.id=uc.churchId AND c.archivedDate IS NULL LEFT JOIN people p ON p.id=uc.personId AND (p.removed=0 OR p.removed IS NULL) WHERE uc.userId=${userId}`.execute(getDb());
+    const rows = result.rows as any[];
+    const loginUserChurches: LoginUserChurch[] = [];
     rows.forEach((row: any) => {
       const apis: Api[] = [];
       const addChurch = {
@@ -75,68 +122,18 @@ export class ChurchRepo extends BaseRepo<Church> {
         },
         apis
       };
-      result.push(addChurch);
+      loginUserChurches.push(addChurch);
     });
-    return result;
+    return loginUserChurches;
   }
 
   public async getAbandoned(noMonths = 6) {
-    const sql =
-      "SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL " +
-      noMonths +
-      " MONTH);";
-    const rows = await TypedDB.query(sql, []);
-    return rows;
+    const result = await sql`SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL ${sql.raw(String(noMonths))} MONTH)`.execute(getDb());
+    return result.rows;
   }
 
   public async deleteAbandoned(noMonths = 7) {
-    const sql =
-      "DELETE churches FROM churches LEFT JOIN (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches ON churches.id = groupedChurches.churchId WHERE groupedChurches.lastAccessed <= DATE_SUB(NOW(), INTERVAL " +
-      noMonths +
-      " MONTH);";
-    return await TypedDB.query(sql, []);
-  }
-
-  protected async create(church: Church): Promise<Church> {
-    church.id = this.createId();
-    const sql =
-      "INSERT INTO churches (id, name, subDomain, registrationDate, address1, address2, city, state, zip, country, archivedDate, latitude, longitude) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      church.id,
-      church.name,
-      church.subDomain,
-      church.address1,
-      church.address2,
-      church.city,
-      church.state,
-      church.zip,
-      church.country,
-      church.archivedDate,
-      church.latitude,
-      church.longitude
-    ];
-    await TypedDB.query(sql, params);
-    return church;
-  }
-
-  protected async update(church: Church): Promise<Church> {
-    const sql = "UPDATE churches SET name=?, subDomain=?, address1=?, address2=?, city=?, state=?, zip=?, country=?, archivedDate=?, latitude=?, longitude=? WHERE id=?;";
-    const params = [
-      church.name,
-      church.subDomain,
-      church.address1,
-      church.address2,
-      church.city,
-      church.state,
-      church.zip,
-      church.country,
-      church.archivedDate,
-      church.latitude,
-      church.longitude,
-      church.id
-    ];
-    await TypedDB.query(sql, params);
-    return church;
+    await sql`DELETE churches FROM churches LEFT JOIN (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches ON churches.id = groupedChurches.churchId WHERE groupedChurches.lastAccessed <= DATE_SUB(NOW(), INTERVAL ${sql.raw(String(noMonths))} MONTH)`.execute(getDb());
   }
 
   protected rowToModel(row: any): Church {
@@ -157,12 +154,13 @@ export class ChurchRepo extends BaseRepo<Church> {
     };
   }
 
-  // For compatibility with existing controllers
   public convertToModel(data: any) {
+    if (!data) return null;
     return this.rowToModel(data);
   }
 
   public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+    if (!Array.isArray(data)) return [];
+    return data.map((d: any) => this.rowToModel(d));
   }
 }

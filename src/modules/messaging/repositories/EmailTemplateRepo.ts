@@ -1,30 +1,56 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { EmailTemplate } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { sql } from "kysely";
 import { injectable } from "inversify";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
+import { EmailTemplate } from "../models/index.js";
 
 @injectable()
-export class EmailTemplateRepo extends ConfiguredRepo<EmailTemplate> {
-  protected get repoConfig(): RepoConfig<EmailTemplate> {
-    return {
-      tableName: "emailTemplates",
-      hasSoftDelete: false,
-      columns: ["name", "subject", "htmlContent", "category"],
-      insertLiterals: { dateCreated: "NOW()", dateModified: "NOW()" },
-      updateLiterals: { dateModified: "NOW()" }
-    };
+export class EmailTemplateRepo {
+  public async save(model: EmailTemplate) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadByChurchId(churchId: string) {
-    return TypedDB.query("SELECT id, churchId, name, subject, category, dateCreated, dateModified FROM emailTemplates WHERE churchId=? ORDER BY name", [churchId]);
+  private async create(model: EmailTemplate): Promise<EmailTemplate> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("emailTemplates").values({
+      id: model.id,
+      churchId: model.churchId,
+      name: model.name,
+      subject: model.subject,
+      htmlContent: model.htmlContent,
+      category: model.category,
+      dateCreated: sql`NOW()`,
+      dateModified: sql`NOW()`
+    }).execute();
+    return model;
   }
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM emailTemplates WHERE id=? AND churchId=?;", [id, churchId]);
+  private async update(model: EmailTemplate): Promise<EmailTemplate> {
+    await getDb().updateTable("emailTemplates").set({
+      name: model.name,
+      subject: model.subject,
+      htmlContent: model.htmlContent,
+      category: model.category,
+      dateModified: sql`NOW()`
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM emailTemplates WHERE id=? AND churchId=?;", [id, churchId]);
+  public async loadByChurchId(churchId: string) {
+    return getDb().selectFrom("emailTemplates")
+      .select(["id", "churchId", "name", "subject", "category", "dateCreated", "dateModified"])
+      .where("churchId", "=", churchId)
+      .orderBy("name")
+      .execute();
+  }
+
+  public async loadById(churchId: string, id: string) {
+    return (await getDb().selectFrom("emailTemplates").selectAll()
+      .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("emailTemplates").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   protected rowToModel(data: any): EmailTemplate {
@@ -44,7 +70,7 @@ export class EmailTemplateRepo extends ConfiguredRepo<EmailTemplate> {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public convertAllToModel(data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
   }
 }

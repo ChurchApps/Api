@@ -1,22 +1,57 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { BibleBook } from "../models/index.js";
-import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo.js";
 
 @injectable()
-export class BibleBookRepo extends GlobalConfiguredRepo<BibleBook> {
-  protected get repoConfig(): GlobalRepoConfig<BibleBook> {
-    return {
-      tableName: "bibleBooks",
-      hasSoftDelete: false,
-      columns: ["translationKey", "keyName", "abbreviation", "name", "sort"],
-      defaultOrderBy: "sort"
-    };
+export class BibleBookRepo {
+  public async save(model: BibleBook) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadAll(translationKey: string) {
-    return TypedDB.query("SELECT * FROM bibleBooks WHERE translationKey=? order by sort;", [translationKey]);
+  private async create(model: BibleBook): Promise<BibleBook> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("bibleBooks").values({
+      id: model.id,
+      translationKey: model.translationKey,
+      keyName: model.keyName,
+      abbreviation: model.abbreviation,
+      name: model.name,
+      sort: model.sort
+    } as any).execute();
+    return model;
   }
+
+  private async update(model: BibleBook): Promise<BibleBook> {
+    await getDb().updateTable("bibleBooks").set({
+      translationKey: model.translationKey,
+      keyName: model.keyName,
+      abbreviation: model.abbreviation,
+      name: model.name,
+      sort: model.sort
+    }).where("id", "=", model.id).execute();
+    return model;
+  }
+
+  public async delete(id: string) {
+    await getDb().deleteFrom("bibleBooks").where("id", "=", id).execute();
+  }
+
+  public async load(id: string): Promise<BibleBook | undefined> {
+    return (await getDb().selectFrom("bibleBooks").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(translationKey: string) {
+    return getDb().selectFrom("bibleBooks").selectAll().where("translationKey", "=", translationKey).orderBy("sort").execute() as any;
+  }
+
+  public async saveAll(models: BibleBook[]) {
+    const promises = models.map(m => this.save(m));
+    return Promise.all(promises);
+  }
+
+  public convertToModel(data: any) { return data as BibleBook; }
+  public convertAllToModel(data: any[]) { return (data || []) as BibleBook[]; }
 
   protected rowToModel(row: any): BibleBook {
     return {

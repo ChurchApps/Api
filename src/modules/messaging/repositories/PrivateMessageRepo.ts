@@ -1,32 +1,102 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { PrivateMessage } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { sql } from "kysely";
 import { injectable } from "inversify";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
+import { PrivateMessage } from "../models/index.js";
 
 @injectable()
-export class PrivateMessageRepo extends ConfiguredRepo<PrivateMessage> {
-  protected get repoConfig(): RepoConfig<PrivateMessage> {
-    return {
-      tableName: "privateMessages",
-      hasSoftDelete: false,
-      columns: ["fromPersonId", "toPersonId", "conversationId", "notifyPersonId", "deliveryMethod"]
-    };
+export class PrivateMessageRepo {
+  public async save(model: PrivateMessage) {
+    return model.id ? this.update(model) : this.create(model);
   }
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM privateMessages WHERE id=? and churchId=?;", [id, churchId]);
+
+  private async create(model: PrivateMessage): Promise<PrivateMessage> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("privateMessages").values({
+      id: model.id,
+      churchId: model.churchId,
+      fromPersonId: model.fromPersonId,
+      toPersonId: model.toPersonId,
+      conversationId: model.conversationId,
+      notifyPersonId: model.notifyPersonId,
+      deliveryMethod: model.deliveryMethod
+    }).execute();
+    return model;
+  }
+
+  private async update(model: PrivateMessage): Promise<PrivateMessage> {
+    await getDb().updateTable("privateMessages").set({
+      fromPersonId: model.fromPersonId,
+      toPersonId: model.toPersonId,
+      conversationId: model.conversationId,
+      notifyPersonId: model.notifyPersonId,
+      deliveryMethod: model.deliveryMethod
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async loadById(churchId: string, id: string) {
+    return (await getDb().selectFrom("privateMessages").selectAll()
+      .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
   public async loadByPersonId(churchId: string, personId: string) {
-    const result = await TypedDB.query("SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, pm.deliveryMethod, m.timeSent as lastMessageTime FROM privateMessages pm INNER JOIN conversations c on c.id=pm.conversationId LEFT JOIN messages m on m.id=c.lastPostId WHERE pm.churchId=? AND (pm.fromPersonId=? OR pm.toPersonId=?) ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC", [churchId, personId, personId] );
-    return this.mapToModels(result);
+    const result = await sql<any>`
+      SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, pm.deliveryMethod, m.timeSent as lastMessageTime
+      FROM privateMessages pm
+      INNER JOIN conversations c on c.id=pm.conversationId
+      LEFT JOIN messages m on m.id=c.lastPostId
+      WHERE pm.churchId=${churchId} AND (pm.fromPersonId=${personId} OR pm.toPersonId=${personId})
+      ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC
+    `.execute(getDb());
+    return (result.rows || []).map((d: any) => this.rowToModel(d));
   }
 
-  public loadByChurchId(churchId: string) {
-    return TypedDB.query("SELECT * FROM privateMessages WHERE churchId=?", [churchId]);
+  public async loadByChurchId(churchId: string) {
+    return getDb().selectFrom("privateMessages").selectAll()
+      .where("churchId", "=", churchId)
+      .execute();
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM privateMessages WHERE id=? AND churchId=?;", [id, churchId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("privateMessages").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async loadByConversationId(churchId: string, conversationId: string) {
+    return (await getDb().selectFrom("privateMessages").selectAll()
+      .where("churchId", "=", churchId)
+      .where("conversationId", "=", conversationId)
+      .executeTakeFirst()) ?? null;
+  }
+
+  public async loadUndelivered() {
+    const result = await getDb().selectFrom("privateMessages").selectAll()
+      .where("notifyPersonId", "is not", null)
+      .where((eb) =>
+        eb.or([
+          eb("deliveryMethod", "is", null),
+          eb("deliveryMethod", "=", ""),
+          eb("deliveryMethod", "=", "push"),
+          eb("deliveryMethod", "=", "socket"),
+          eb("deliveryMethod", "=", "email")
+        ])
+      )
+      .execute();
+    return result.map((d: any) => this.rowToModel(d));
+  }
+
+  public async markAllRead(churchId: string, personId: string) {
+    await getDb().updateTable("privateMessages").set({
+      notifyPersonId: null,
+      deliveryMethod: "complete"
+    }).where("churchId", "=", churchId).where("notifyPersonId", "=", personId).execute();
+  }
+
+  public async loadPendingEscalation() {
+    return getDb().selectFrom("privateMessages").selectAll()
+      .where("notifyPersonId", "is not", null)
+      .where("deliveryMethod", "in", ["socket", "push"])
+      .execute();
   }
 
   protected rowToModel(data: any): PrivateMessage {
@@ -62,27 +132,7 @@ export class PrivateMessageRepo extends ConfiguredRepo<PrivateMessage> {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
-  }
-
-  public loadByConversationId(churchId: string, conversationId: string) {
-    return TypedDB.queryOne("SELECT * FROM privateMessages WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
-  }
-
-  public async loadUndelivered() {
-    const sql = "SELECT * FROM privateMessages WHERE notifyPersonId IS NOT NULL AND (deliveryMethod IS NULL OR deliveryMethod='' OR deliveryMethod='push' OR deliveryMethod='socket' OR deliveryMethod='email')";
-    const result = await TypedDB.query(sql, []);
-    return this.mapToModels(result);
-  }
-
-  public async markAllRead(churchId: string, personId: string) {
-    const sql = "UPDATE privateMessages SET notifyPersonId=NULL, deliveryMethod='complete' WHERE churchId=? AND notifyPersonId=?";
-    return TypedDB.query(sql, [churchId, personId]);
-  }
-
-  public loadPendingEscalation() {
-    const sql = "SELECT * FROM privateMessages WHERE notifyPersonId IS NOT NULL AND deliveryMethod IN ('socket', 'push')";
-    return TypedDB.query(sql, []);
+  public convertAllToModel(data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
   }
 }

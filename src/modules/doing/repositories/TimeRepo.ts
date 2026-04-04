@@ -1,28 +1,50 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Time } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 @injectable()
-export class TimeRepo extends ConfiguredRepo<Time> {
-  protected get repoConfig(): RepoConfig<Time> {
-    return {
-      tableName: "times",
-      hasSoftDelete: false,
-      columns: ["planId", "displayName", "startTime", "endTime", "teams"]
-    };
+export class TimeRepo {
+  public async save(model: Time) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public deleteByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("DELETE FROM times WHERE churchId=? and planId=?;", [churchId, planId]);
+  private async create(model: Time): Promise<Time> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("times").values({
+      id: model.id, churchId: model.churchId, planId: model.planId, displayName: model.displayName, startTime: model.startTime, endTime: model.endTime, teams: model.teams
+    }).execute();
+    return model;
   }
 
-  public loadByPlanId(churchId: string, planId: string) {
-    return TypedDB.query("SELECT * FROM times WHERE churchId=? AND planId=?;", [churchId, planId]);
+  private async update(model: Time): Promise<Time> {
+    await getDb().updateTable("times").set({
+      planId: model.planId, displayName: model.displayName, startTime: model.startTime, endTime: model.endTime, teams: model.teams
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByPlanIds(churchId: string, planIds: string[]) {
-    return TypedDB.query("SELECT * FROM times WHERE churchId=? and planId in (?);", [churchId, planIds]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("times").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("times").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("times").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async deleteByPlanId(churchId: string, planId: string) {
+    await getDb().deleteFrom("times").where("churchId", "=", churchId).where("planId", "=", planId).execute();
+  }
+
+  public async loadByPlanId(churchId: string, planId: string) {
+    return getDb().selectFrom("times").selectAll().where("churchId", "=", churchId).where("planId", "=", planId).execute();
+  }
+
+  public async loadByPlanIds(churchId: string, planIds: string[]) {
+    return getDb().selectFrom("times").selectAll().where("churchId", "=", churchId).where("planId", "in", planIds).execute();
   }
 }

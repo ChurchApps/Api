@@ -1,66 +1,128 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DateHelper } from "@churchapps/apihelper";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper, DateHelper } from "@churchapps/apihelper";
 import { FundDonation } from "../models/index.js";
 
 @injectable()
-export class FundDonationRepo extends ConfiguredRepo<FundDonation> {
-  protected get repoConfig(): RepoConfig<FundDonation> {
-    return {
-      tableName: "fundDonations",
-      hasSoftDelete: false,
-      columns: ["donationId", "fundId", "amount"]
-    };
+export class FundDonationRepo {
+
+  public async save(model: FundDonation) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId WHERE fd.churchId=? AND d.donationDate BETWEEN ? AND ? ORDER by d.donationDate desc;",
-      [churchId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]
-    );
+  private async create(model: FundDonation): Promise<FundDonation> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("fundDonations").values({
+      id: model.id,
+      churchId: model.churchId,
+      donationId: model.donationId,
+      fundId: model.fundId,
+      amount: model.amount
+    } as any).execute();
+    return model;
   }
 
-  public loadByDonationId(churchId: string, donationId: string) {
-    return TypedDB.query("SELECT * FROM fundDonations WHERE churchId=? AND donationId=?;", [churchId, donationId]);
+  private async update(model: FundDonation): Promise<FundDonation> {
+    await getDb().updateTable("fundDonations").set({
+      donationId: model.donationId,
+      fundId: model.fundId,
+      amount: model.amount
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByPersonId(churchId: string, personId: string) {
-    return TypedDB.query("SELECT fd.* FROM donations d inner join fundDonations fd on fd.churchId=d.churchId and fd.donationId=d.id WHERE d.churchId=? AND d.personId=? ORDER by d.donationDate;", [
-      churchId,
-      personId
-    ]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("fundDonations").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadByFundId(churchId: string, fundId: string) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId WHERE fd.churchId=? AND fd.fundId=? ORDER by d.donationDate desc;",
-      [churchId, fundId]
-    );
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("fundDonations").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadByFundIdDate(churchId: string, fundId: string, startDate: Date, endDate: Date) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId WHERE fd.churchId=? AND fd.fundId=? AND d.donationDate BETWEEN ? AND ? ORDER by d.donationDate desc;",
-      [churchId, fundId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]
-    );
+  public async loadAll(churchId: string) {
+    const rows = await getDb().selectFrom("fundDonations").selectAll()
+      .where("churchId", "=", churchId)
+      .execute();
+    return rows;
   }
 
-  public loadByFundName(churchId: string, fundName: string) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId INNER JOIN funds f ON f.id=fd.fundId WHERE fd.churchId=? AND f.name LIKE ? ORDER by d.donationDate desc;",
-      [churchId, `%${fundName}%`]
-    );
+  public async loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
+    const result = await sql<any>`
+      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      WHERE fd.churchId = ${churchId}
+        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
+      ORDER BY d.donationDate DESC`.execute(getDb());
+    return result.rows;
   }
 
-  public loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date) {
-    return TypedDB.query(
-      "SELECT fd.*, d.donationDate, d.batchId, d.personId FROM fundDonations fd INNER JOIN donations d ON d.id=fd.donationId INNER JOIN funds f ON f.id=fd.fundId WHERE fd.churchId=? AND f.name LIKE ? AND d.donationDate BETWEEN ? AND ? ORDER by d.donationDate desc;",
-      [churchId, `%${fundName}%`, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]
-    );
+  public async loadByDonationId(churchId: string, donationId: string) {
+    const rows = await getDb().selectFrom("fundDonations").selectAll()
+      .where("churchId", "=", churchId)
+      .where("donationId", "=", donationId)
+      .execute();
+    return rows;
   }
 
-  protected rowToModel(data: any): FundDonation {
+  public async loadByPersonId(churchId: string, personId: string) {
+    const result = await sql<any>`
+      SELECT fd.*
+      FROM donations d
+      INNER JOIN fundDonations fd on fd.churchId = d.churchId and fd.donationId = d.id
+      WHERE d.churchId = ${churchId} AND d.personId = ${personId}
+      ORDER BY d.donationDate`.execute(getDb());
+    return result.rows;
+  }
+
+  public async loadByFundId(churchId: string, fundId: string) {
+    const result = await sql<any>`
+      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
+      ORDER BY d.donationDate DESC`.execute(getDb());
+    return result.rows;
+  }
+
+  public async loadByFundIdDate(churchId: string, fundId: string, startDate: Date, endDate: Date) {
+    const result = await sql<any>`
+      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
+        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
+      ORDER BY d.donationDate DESC`.execute(getDb());
+    return result.rows;
+  }
+
+  public async loadByFundName(churchId: string, fundName: string) {
+    const pattern = `%${fundName}%`;
+    const result = await sql<any>`
+      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN funds f ON f.id = fd.fundId
+      WHERE fd.churchId = ${churchId} AND f.name LIKE ${pattern}
+      ORDER BY d.donationDate DESC`.execute(getDb());
+    return result.rows;
+  }
+
+  public async loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date) {
+    const pattern = `%${fundName}%`;
+    const result = await sql<any>`
+      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN funds f ON f.id = fd.fundId
+      WHERE fd.churchId = ${churchId} AND f.name LIKE ${pattern}
+        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
+      ORDER BY d.donationDate DESC`.execute(getDb());
+    return result.rows;
+  }
+
+  private rowToModel(data: any): FundDonation {
     const result: FundDonation = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount };
     if (data.batchId !== undefined) {
       result.donation = {
@@ -73,5 +135,11 @@ export class FundDonationRepo extends ConfiguredRepo<FundDonation> {
     return result;
   }
 
-  // Inherit default convertToModel/convertAllToModel from BaseRepo
+  public convertToModel(_churchId: string, data: any) {
+    return data ? this.rowToModel(data) : null;
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
+  }
 }

@@ -1,38 +1,72 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { PageHistory } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
 
 @injectable()
-export class PageHistoryRepo extends ConfiguredRepo<PageHistory> {
-  protected get repoConfig(): RepoConfig<PageHistory> {
-    return {
-      tableName: "pageHistory",
-      hasSoftDelete: false,
-      defaultOrderBy: "createdDate DESC",
-      columns: ["pageId", "blockId", "snapshotJSON", "description", "userId", "createdDate"]
-    };
+export class PageHistoryRepo {
+  public async save(model: PageHistory) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadForPage(churchId: string, pageId: string, limit: number = 50) {
-    // Note: LIMIT doesn't work with prepared statement parameters in some MySQL versions
-    return TypedDB.query(
-      `SELECT * FROM pageHistory WHERE churchId=? AND pageId=? ORDER BY createdDate DESC LIMIT ${parseInt(String(limit), 10)};`,
-      [churchId, pageId]
-    );
+  private async create(model: PageHistory): Promise<PageHistory> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("pageHistory").values({
+      id: model.id,
+      churchId: model.churchId,
+      pageId: model.pageId,
+      blockId: model.blockId,
+      snapshotJSON: model.snapshotJSON,
+      description: model.description,
+      userId: model.userId,
+      createdDate: model.createdDate
+    } as any).execute();
+    return model;
   }
 
-  public loadForBlock(churchId: string, blockId: string, limit: number = 50) {
-    // Note: LIMIT doesn't work with prepared statement parameters in some MySQL versions
-    return TypedDB.query(
-      `SELECT * FROM pageHistory WHERE churchId=? AND blockId=? ORDER BY createdDate DESC LIMIT ${parseInt(String(limit), 10)};`,
-      [churchId, blockId]
-    );
+  private async update(model: PageHistory): Promise<PageHistory> {
+    await getDb().updateTable("pageHistory").set({
+      pageId: model.pageId,
+      blockId: model.blockId,
+      snapshotJSON: model.snapshotJSON,
+      description: model.description,
+      userId: model.userId,
+      createdDate: model.createdDate
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("pageHistory").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<PageHistory | undefined> {
+    return (await getDb().selectFrom("pageHistory").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string): Promise<PageHistory[]> {
+    return getDb().selectFrom("pageHistory").selectAll().where("churchId", "=", churchId).orderBy("createdDate", "desc").execute() as any;
+  }
+
+  public async loadForPage(churchId: string, pageId: string, limit: number = 50) {
+    const safeLimit = parseInt(String(limit), 10);
+    const result = await sql`SELECT * FROM pageHistory WHERE churchId=${churchId} AND pageId=${pageId} ORDER BY createdDate DESC LIMIT ${safeLimit}`.execute(getDb());
+    return result.rows as any;
+  }
+
+  public async loadForBlock(churchId: string, blockId: string, limit: number = 50) {
+    const safeLimit = parseInt(String(limit), 10);
+    const result = await sql`SELECT * FROM pageHistory WHERE churchId=${churchId} AND blockId=${blockId} ORDER BY createdDate DESC LIMIT ${safeLimit}`.execute(getDb());
+    return result.rows as any;
   }
 
   public async deleteOldHistory(churchId: string, pageId: string, daysToKeep: number = 30) {
-    await TypedDB.query("DELETE FROM pageHistory WHERE churchId=? AND pageId=? AND createdDate < DATE_SUB(NOW(), INTERVAL ? DAY);", [churchId, pageId, daysToKeep]);
+    await sql`DELETE FROM pageHistory WHERE churchId=${churchId} AND pageId=${pageId} AND createdDate < DATE_SUB(NOW(), INTERVAL ${daysToKeep} DAY)`.execute(getDb());
   }
+
+  public convertToModel(_churchId: string, data: any) { return data as PageHistory; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as PageHistory[]; }
 
   protected rowToModel(row: any): PageHistory {
     return {

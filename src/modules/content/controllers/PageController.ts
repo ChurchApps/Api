@@ -53,7 +53,7 @@ export class PageController2 extends ContentBaseController {
       else {
         const page = await this.repos.page.load(au.churchId, id);
         page.id = undefined;
-        page.name += " (copy)";
+        page.title += " (copy)";
         page.url += "-copy";
         const newPage = await this.repos.page.save(page);
         const sections: Section[] = await this.repos.section.loadForPage(au.churchId, id);

@@ -1,62 +1,63 @@
-import { DateHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { Playlist } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 import { injectable } from "inversify";
 
 @injectable()
-export class PlaylistRepo extends ConfiguredRepo<Playlist> {
-  protected get repoConfig(): RepoConfig<Playlist> {
-    return {
-      tableName: "playlists",
-      hasSoftDelete: false,
-      columns: ["title", "description", "publishDate", "thumbnail"]
-    };
+export class PlaylistRepo {
+  public async save(model: Playlist) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  // Override to use TypedDB instead of DB
-  protected async create(model: Playlist): Promise<Playlist> {
-    const m: any = model as any;
-    if (!m[this.idColumn]) m[this.idColumn] = this.createId();
-    // Convert publishDate before insert
-    if (m.publishDate) {
-      m.publishDate = DateHelper.toMysqlDate(m.publishDate);
-    }
-    const { sql, params } = this.buildInsert(model);
-    await TypedDB.query(sql, params);
+  private async create(model: Playlist): Promise<Playlist> {
+    model.id = UniqueIdHelper.shortId();
+    const m: any = { ...model };
+    if (m.publishDate) m.publishDate = DateHelper.toMysqlDate(m.publishDate);
+    await getDb().insertInto("playlists").values({
+      id: model.id,
+      churchId: model.churchId,
+      title: m.title,
+      description: m.description,
+      publishDate: m.publishDate,
+      thumbnail: m.thumbnail
+    } as any).execute();
     return model;
   }
 
-  protected async update(model: Playlist): Promise<Playlist> {
-    const m: any = model as any;
-    // Convert publishDate before update
-    if (m.publishDate) {
-      m.publishDate = DateHelper.toMysqlDate(m.publishDate);
-    }
-    const { sql, params } = this.buildUpdate(model);
-    await TypedDB.query(sql, params);
+  private async update(model: Playlist): Promise<Playlist> {
+    const m: any = { ...model };
+    if (m.publishDate) m.publishDate = DateHelper.toMysqlDate(m.publishDate);
+    await getDb().updateTable("playlists").set({
+      title: m.title,
+      description: m.description,
+      publishDate: m.publishDate,
+      thumbnail: m.thumbnail
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
-  public async delete(churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM playlists WHERE id=? AND churchId=?;", [id, churchId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("playlists").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public async load(churchId: string, id: string): Promise<Playlist> {
-    return TypedDB.queryOne("SELECT * FROM playlists WHERE id=? AND churchId=?;", [id, churchId]);
+  public async load(churchId: string, id: string): Promise<Playlist | undefined> {
+    return (await getDb().selectFrom("playlists").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadById(id: string, churchId: string): Promise<Playlist> {
+  public loadById(id: string, churchId: string): Promise<Playlist | undefined> {
     return this.load(churchId, id);
   }
 
   public async loadAll(churchId: string): Promise<Playlist[]> {
-    return TypedDB.query("SELECT * FROM playlists WHERE churchId=? ORDER BY publishDate desc;", [churchId]);
+    return getDb().selectFrom("playlists").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
   }
 
-  public loadPublicAll(churchId: string): Promise<Playlist[]> {
-    return TypedDB.query("SELECT * FROM playlists WHERE churchId=? ORDER BY publishDate desc;", [churchId]);
+  public async loadPublicAll(churchId: string): Promise<Playlist[]> {
+    return getDb().selectFrom("playlists").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
   }
+
+  public convertToModel(_churchId: string, data: any) { return data as Playlist; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Playlist[]; }
 
   protected rowToModel(row: any): Playlist {
     return {

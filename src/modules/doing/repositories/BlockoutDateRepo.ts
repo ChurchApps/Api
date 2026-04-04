@@ -1,42 +1,61 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { BlockoutDate } from "../models/index.js";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 @injectable()
-export class BlockoutDateRepo extends ConfiguredRepo<BlockoutDate> {
-  protected get repoConfig(): RepoConfig<BlockoutDate> {
-    return {
-      tableName: "blockoutDates",
-      hasSoftDelete: false,
-      columns: ["personId", "startDate", "endDate"]
-    };
-  }
-
-  public save(blockoutDate: BlockoutDate) {
+export class BlockoutDateRepo {
+  public async save(model: BlockoutDate) {
     // Convert date-only fields before saving
-    const processedData = { ...blockoutDate };
+    const processedData = { ...model };
     if (processedData.startDate) {
       (processedData as any).startDate = DateHelper.toMysqlDateOnly(processedData.startDate);
     }
     if (processedData.endDate) {
       (processedData as any).endDate = DateHelper.toMysqlDateOnly(processedData.endDate);
     }
-    return super.save(processedData);
+    return processedData.id ? this.update(processedData) : this.create(processedData);
   }
 
-  public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM blockoutDates WHERE churchId=? and id in (?);", [churchId, ids]);
+  private async create(model: BlockoutDate): Promise<BlockoutDate> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("blockoutDates").values({
+      id: model.id, churchId: model.churchId, personId: model.personId, startDate: model.startDate as any, endDate: model.endDate as any
+    }).execute();
+    return model;
   }
 
-  public loadForPerson(churchId: string, personId: string) {
-    return TypedDB.query("SELECT * FROM blockoutDates WHERE churchId=? and personId=?;", [churchId, personId]);
+  private async update(model: BlockoutDate): Promise<BlockoutDate> {
+    await getDb().updateTable("blockoutDates").set({
+      personId: model.personId, startDate: model.startDate as any, endDate: model.endDate as any
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadUpcoming(churchId: string) {
-    return TypedDB.query("SELECT * FROM blockoutDates WHERE churchId=? AND endDate>NOW();", [churchId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("blockoutDates").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("blockoutDates").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("blockoutDates").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadByIds(churchId: string, ids: string[]) {
+    return getDb().selectFrom("blockoutDates").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
+  }
+
+  public async loadForPerson(churchId: string, personId: string) {
+    return getDb().selectFrom("blockoutDates").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).execute();
+  }
+
+  public async loadUpcoming(churchId: string) {
+    return getDb().selectFrom("blockoutDates").selectAll().where("churchId", "=", churchId).where("endDate", ">", sql`NOW()` as any).execute();
   }
 
   protected rowToModel(row: any): BlockoutDate {

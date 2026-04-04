@@ -1,69 +1,97 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { injectable } from "inversify";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { Connection } from "../models/index.js";
 import { ViewerInterface } from "../helpers/Interfaces.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-import { injectable } from "inversify";
 
 @injectable()
-export class ConnectionRepo extends ConfiguredRepo<Connection> {
-  protected get repoConfig(): RepoConfig<Connection> {
-    return {
-      tableName: "connections",
-      hasSoftDelete: false,
-      insertColumns: ["conversationId", "personId", "displayName", "socketId", "ipAddress"],
-      updateColumns: ["personId", "displayName"],
-      insertLiterals: { timeJoined: "NOW()" }
-    };
+export class ConnectionRepo {
+  public async save(model: Connection) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  // Override create to handle deleteExisting logic
-  protected async create(connection: Connection): Promise<Connection> {
-    if (!connection.id) connection.id = this.createId();
+  private async create(connection: Connection): Promise<Connection> {
+    connection.id = UniqueIdHelper.shortId();
+    // Delete existing connections for same church/conversation/socket before creating
     await this.deleteExisting(connection.churchId, connection.conversationId, connection.socketId, connection.id);
-    return super.create(connection);
+    await getDb().insertInto("connections").values({
+      id: connection.id,
+      churchId: connection.churchId,
+      conversationId: connection.conversationId,
+      personId: connection.personId,
+      displayName: connection.displayName,
+      socketId: connection.socketId,
+      ipAddress: connection.ipAddress,
+      timeJoined: sql`NOW()`
+    }).execute();
+    return connection;
   }
+
+  private async update(model: Connection): Promise<Connection> {
+    await getDb().updateTable("connections").set({
+      personId: model.personId,
+      displayName: model.displayName
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
   public async loadAttendance(churchId: string, conversationId: string) {
-    const sql = "SELECT id, displayName, ipAddress FROM connections WHERE churchId=? AND conversationId=? ORDER BY displayName;";
-    const result: any = await TypedDB.query(sql, [churchId, conversationId]);
-    const data: ViewerInterface[] = result || [];
-    data.forEach((d: ViewerInterface) => {
+    const data = await getDb().selectFrom("connections")
+      .select(["id", "displayName", "ipAddress"])
+      .where("churchId", "=", churchId)
+      .where("conversationId", "=", conversationId)
+      .orderBy("displayName")
+      .execute();
+    const result: ViewerInterface[] = data as any;
+    result.forEach((d: ViewerInterface) => {
       if (d.displayName === "") d.displayName = "Anonymous";
     });
-    return data;
+    return result;
   }
 
   public async loadById(churchId: string, id: string) {
-    const result: any = await TypedDB.queryOne("SELECT * FROM connections WHERE id=? and churchId=?;", [id, churchId]);
+    const result = (await getDb().selectFrom("connections").selectAll()
+      .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
     return result || {};
   }
 
   public async loadForConversation(churchId: string, conversationId: string) {
-    const result: any = await TypedDB.query("SELECT * FROM connections WHERE churchId=? AND conversationId=?", [churchId, conversationId]);
-    return result || [];
+    return getDb().selectFrom("connections").selectAll()
+      .where("churchId", "=", churchId)
+      .where("conversationId", "=", conversationId)
+      .execute();
   }
 
   public async loadForNotification(churchId: string, personId: string) {
-    const result: any = await TypedDB.query("SELECT * FROM connections WHERE churchId=? AND personId=? and conversationId='alerts'", [churchId, personId]);
-    return result || [];
+    return getDb().selectFrom("connections").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .where("conversationId", "=", "alerts")
+      .execute();
   }
 
   public async loadBySocketId(socketId: string) {
-    const result: any = await TypedDB.query("SELECT * FROM connections WHERE socketId=?", [socketId]);
-    return result || [];
+    return getDb().selectFrom("connections").selectAll()
+      .where("socketId", "=", socketId)
+      .execute();
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM connections WHERE id=? AND churchId=?;", [id, churchId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("connections").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public deleteForSocket(socketId: string) {
-    return TypedDB.query("DELETE FROM connections WHERE socketId=?;", [socketId]);
+  public async deleteForSocket(socketId: string) {
+    await getDb().deleteFrom("connections").where("socketId", "=", socketId).execute();
   }
 
-  public deleteExisting(churchId: string, conversationId: string, socketId: string, id: string) {
-    const sql = "DELETE FROM connections WHERE churchId=? AND conversationId=? AND socketId=? AND id<>?;";
-    const params = [churchId, conversationId, socketId, id];
-    return TypedDB.query(sql, params);
+  public async deleteExisting(churchId: string, conversationId: string, socketId: string, id: string) {
+    await getDb().deleteFrom("connections")
+      .where("churchId", "=", churchId)
+      .where("conversationId", "=", conversationId)
+      .where("socketId", "=", socketId)
+      .where("id", "<>", id)
+      .execute();
   }
 
   protected rowToModel(data: any): Connection {
@@ -83,7 +111,7 @@ export class ConnectionRepo extends ConfiguredRepo<Connection> {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public convertAllToModel(data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
   }
 }

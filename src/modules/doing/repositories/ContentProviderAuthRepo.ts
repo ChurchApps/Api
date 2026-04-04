@@ -1,28 +1,51 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { ContentProviderAuth } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 @injectable()
-export class ContentProviderAuthRepo extends ConfiguredRepo<ContentProviderAuth> {
-  protected get repoConfig(): RepoConfig<ContentProviderAuth> {
-    return {
-      tableName: "contentProviderAuths",
-      hasSoftDelete: false,
-      columns: ["ministryId", "providerId", "accessToken", "refreshToken", "tokenType", "expiresAt", "scope"]
-    };
+export class ContentProviderAuthRepo {
+  public async save(model: ContentProviderAuth) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM contentProviderAuths WHERE churchId=? and id in (?);", [churchId, ids]);
+  private async create(model: ContentProviderAuth): Promise<ContentProviderAuth> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("contentProviderAuths").values({
+      id: model.id, churchId: model.churchId, ministryId: model.ministryId, providerId: model.providerId, accessToken: model.accessToken, refreshToken: model.refreshToken, tokenType: model.tokenType, expiresAt: model.expiresAt, scope: model.scope
+    }).execute();
+    return model;
   }
 
-  public loadByMinistry(churchId: string, ministryId: string) {
-    return TypedDB.query("SELECT * FROM contentProviderAuths WHERE churchId=? AND ministryId=?;", [churchId, ministryId]);
+  private async update(model: ContentProviderAuth): Promise<ContentProviderAuth> {
+    await getDb().updateTable("contentProviderAuths").set({
+      ministryId: model.ministryId, providerId: model.providerId, accessToken: model.accessToken, refreshToken: model.refreshToken, tokenType: model.tokenType, expiresAt: model.expiresAt, scope: model.scope
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByMinistryAndProvider(churchId: string, ministryId: string, providerId: string) {
-    return TypedDB.queryOne("SELECT * FROM contentProviderAuths WHERE churchId=? AND ministryId=? AND providerId=?;", [churchId, ministryId, providerId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("contentProviderAuths").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("contentProviderAuths").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadByIds(churchId: string, ids: string[]) {
+    return getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
+  }
+
+  public async loadByMinistry(churchId: string, ministryId: string) {
+    return getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).execute();
+  }
+
+  public async loadByMinistryAndProvider(churchId: string, ministryId: string, providerId: string) {
+    return (await getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).where("providerId", "=", providerId).executeTakeFirst()) ?? null;
   }
 
   protected rowToModel(row: any): ContentProviderAuth {
