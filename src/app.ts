@@ -8,7 +8,6 @@ import { RepoManager } from "./shared/infrastructure/RepoManager.js";
 import cors from "cors";
 import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
-import { KyselyPool } from "./shared/infrastructure/KyselyPool.js";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
 
 export const createApp = async () => {
@@ -261,19 +260,3 @@ async function loadModuleBindings(container: Container) {
   }
 }
 
-// Handle process termination
-process.on("SIGINT", async () => {
-  console.warn("SIGINT received, shutting down gracefully...");
-
-  // Close WebSocket server
-  try {
-    const { SocketHelper } = await import("./modules/messaging/helpers/SocketHelper.js");
-    SocketHelper.shutdown();
-  } catch (error) {
-    console.warn("Failed to shutdown WebSocket server:", (error as any)?.message || error);
-  }
-
-  // Close database connections
-  await KyselyPool.destroyAll();
-  process.exit(0);
-});

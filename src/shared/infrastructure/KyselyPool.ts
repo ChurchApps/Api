@@ -10,6 +10,13 @@ import { Environment } from "../helpers/Environment.js";
 export class KyselyPool {
   private static instances: Map<string, Kysely<any>> = new Map();
 
+  private static getPoolSize(): number {
+    if (process.env.CONNECTION_POOL_SIZE) return parseInt(process.env.CONNECTION_POOL_SIZE, 10);
+    // Lambda has limited connections — default to 2 per module
+    if (process.env.AWS_LAMBDA_FUNCTION_NAME) return 2;
+    return 5;
+  }
+
   static getDb<T>(moduleName: string): Kysely<T> {
     let instance = this.instances.get(moduleName);
 
@@ -20,7 +27,6 @@ export class KyselyPool {
       }
 
       instance = new Kysely<T>({
-        log: ['query'],
         dialect: new MysqlDialect({
           pool: createPool({
             host: dbConfig.host,
@@ -28,7 +34,7 @@ export class KyselyPool {
             database: dbConfig.database,
             user: dbConfig.user,
             password: dbConfig.password,
-            connectionLimit: 10,
+            connectionLimit: this.getPoolSize(),
             connectTimeout: 60000,
             waitForConnections: true,
             queueLimit: 9999,
