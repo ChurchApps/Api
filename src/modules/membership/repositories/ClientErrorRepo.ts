@@ -40,7 +40,7 @@ export class ClientErrorRepo {
   }
 
   public async deleteOld() {
-    await sql`DELETE FROM clientErrors WHERE errorTime < DATE_ADD(NOW(), INTERVAL -7 DAY)`.execute(getDb());
+    await getDb().deleteFrom("clientErrors").where("errorTime", "<", sql`DATE_ADD(NOW(), INTERVAL -7 DAY)` as any).execute();
   }
 
   public async delete(churchId: string, id: string) {

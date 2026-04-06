@@ -1,5 +1,4 @@
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
-import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { Element } from "../models/index.js";
 import { injectable } from "inversify";
@@ -111,12 +110,17 @@ export class ElementRepo {
   }
 
   public async loadForPage(churchId: string, pageId: string) {
-    const result = await sql`SELECT e.*
-      FROM elements e
-      INNER JOIN sections s on s.id=e.sectionId
-      WHERE (s.pageId=${pageId} OR (s.pageId IS NULL and s.blockId IS NULL)) AND e.churchId=${churchId}
-      ORDER BY sort`.execute(getDb());
-    return result.rows as any;
+    const result = await getDb().selectFrom("elements as e")
+      .innerJoin("sections as s", "s.id", "e.sectionId")
+      .selectAll("e")
+      .where((eb) => eb.or([
+        eb("s.pageId", "=", pageId),
+        eb.and([eb("s.pageId", "is", null), eb("s.blockId", "is", null)])
+      ]))
+      .where("e.churchId", "=", churchId)
+      .orderBy("e.sort")
+      .execute();
+    return result as any;
   }
 
   public async insert(model: Element): Promise<Element> {

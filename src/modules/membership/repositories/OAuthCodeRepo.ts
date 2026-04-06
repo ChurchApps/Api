@@ -57,7 +57,7 @@ export class OAuthCodeRepo {
   }
 
   public async deleteExpired() {
-    await sql`DELETE FROM oAuthCodes WHERE expiresAt < NOW()`.execute(getDb());
+    await getDb().deleteFrom("oAuthCodes").where("expiresAt", "<", sql`NOW()` as any).execute();
   }
 
   public convertToModel(_churchId: string, data: any) { return data; }

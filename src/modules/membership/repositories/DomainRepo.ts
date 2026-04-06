@@ -48,8 +48,11 @@ export class DomainRepo {
   }
 
   public async loadPairs() {
-    const result = await sql`SELECT d.domainName as host, CONCAT(c.subDomain, '.b1.church:443') as dial FROM domains d INNER JOIN churches c ON c.id=d.churchId WHERE d.domainName NOT LIKE '%www.%'`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("domains as d")
+      .innerJoin("churches as c", "c.id", "d.churchId")
+      .select(["d.domainName as host", sql`CONCAT(c.subDomain, '.b1.church:443')`.as("dial")])
+      .where("d.domainName", "not like", "%www.%")
+      .execute();
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
@@ -58,8 +61,12 @@ export class DomainRepo {
   }
 
   public async loadUnchecked() {
-    const result = await sql`SELECT * FROM domains WHERE lastChecked IS NULL OR lastChecked < DATE_SUB(NOW(), INTERVAL 24 HOUR)`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("domains").selectAll()
+      .where((eb) => eb.or([
+        eb("lastChecked", "is", null),
+        eb("lastChecked", "<", sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)` as any)
+      ]))
+      .execute();
   }
 
   public saveAll(models: Domain[]) {

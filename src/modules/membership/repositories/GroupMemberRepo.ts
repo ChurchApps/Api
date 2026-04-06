@@ -46,30 +46,65 @@ export class GroupMemberRepo {
   }
 
   public async loadForGroup(churchId: string, groupId: string) {
-    const result = await sql`SELECT gm.*, p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, p.optedOut, p.address1, p.address2, p.city, p.state, p.zip, p.householdId, p.householdRole FROM groupMembers gm INNER JOIN people p ON p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL) WHERE gm.churchId=${churchId} AND gm.groupId=${groupId} ORDER BY gm.leader DESC, p.lastName, p.firstName`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("gm")
+      .select(["p.photoUpdated", "p.displayName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole"])
+      .where("gm.churchId", "=", churchId)
+      .where("gm.groupId", "=", groupId)
+      .orderBy("gm.leader", "desc")
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
+      .execute();
   }
 
   public async loadLeadersForGroup(churchId: string, groupId: string) {
-    const result = await sql`SELECT gm.*, p.photoUpdated, p.displayName FROM groupMembers gm INNER JOIN people p ON p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL) WHERE gm.churchId=${churchId} AND gm.groupId=${groupId} AND gm.leader=1 ORDER BY p.lastName, p.firstName`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("gm")
+      .select(["p.photoUpdated", "p.displayName"])
+      .where("gm.churchId", "=", churchId)
+      .where("gm.groupId", "=", groupId)
+      .where("gm.leader", "=", 1 as any)
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
+      .execute();
   }
 
   public async loadForGroups(churchId: string, groupIds: string[]) {
     if (!groupIds.length) return [];
-    const result = await sql`SELECT gm.*, p.photoUpdated, p.displayName, p.email FROM groupMembers gm INNER JOIN people p ON p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL) WHERE gm.churchId=${churchId} AND gm.groupId IN (${sql.join(groupIds)}) ORDER BY gm.leader DESC, p.lastName, p.firstName`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("gm")
+      .select(["p.photoUpdated", "p.displayName", "p.email"])
+      .where("gm.churchId", "=", churchId)
+      .where("gm.groupId", "in", groupIds)
+      .orderBy("gm.leader", "desc")
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
+      .execute();
   }
 
   public async loadForPerson(churchId: string, personId: string) {
-    const result = await sql`SELECT gm.*, g.name as groupName FROM groupMembers gm INNER JOIN \`groups\` g ON g.Id=gm.groupId WHERE gm.churchId=${churchId} AND gm.personId=${personId} AND g.removed=0 ORDER BY g.name`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .selectAll("gm")
+      .select("g.name as groupName")
+      .where("gm.churchId", "=", churchId)
+      .where("gm.personId", "=", personId)
+      .where("g.removed", "=", 0 as any)
+      .orderBy("g.name")
+      .execute();
   }
 
   public async loadForPeople(peopleIds: string[]) {
     if (!peopleIds.length) return [];
-    const result = await sql`SELECT gm.*, g.name, g.tags FROM groupMembers gm INNER JOIN \`groups\` g ON g.Id=gm.groupId WHERE gm.personId IN (${sql.join(peopleIds)})`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .selectAll("gm")
+      .select(["g.name", "g.tags"])
+      .where("gm.personId", "in", peopleIds)
+      .execute();
   }
 
   public saveAll(models: GroupMember[]) {

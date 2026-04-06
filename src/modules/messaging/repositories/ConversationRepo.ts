@@ -53,15 +53,14 @@ export class ConversationRepo {
 
   public async loadPosts(churchId: string, groupIds: string[]) {
     if (!groupIds || groupIds.length === 0) return [];
-    const result = await sql<any>`
-      SELECT c.contentType, c.contentId, c.groupId, c.id, c.firstPostId, c.lastPostId, c.postCount
-      FROM conversations c
-      INNER JOIN messages fp on fp.id=c.firstPostId
-      INNER JOIN messages lp on lp.id=c.lastPostId
-      WHERE c.churchId=${churchId} AND c.groupId IN (${sql.join(groupIds)})
-      AND lp.timeSent>DATE_SUB(NOW(), INTERVAL 365 DAY)
-    `.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("conversations as c")
+      .innerJoin("messages as fp", "fp.id", "c.firstPostId")
+      .innerJoin("messages as lp", "lp.id", "c.lastPostId")
+      .select(["c.contentType", "c.contentId", "c.groupId", "c.id", "c.firstPostId", "c.lastPostId", "c.postCount"])
+      .where("c.churchId", "=", churchId)
+      .where("c.groupId", "in", groupIds)
+      .where("lp.timeSent", ">", sql`DATE_SUB(NOW(), INTERVAL 365 DAY)` as any)
+      .execute();
   }
 
   public async loadById(churchId: string, id: string) {
@@ -92,13 +91,18 @@ export class ConversationRepo {
   }
 
   public async loadHostConversation(churchId: string, mainConversationId: string) {
-    const result = await sql<any>`
-      SELECT c2.*
-      FROM conversations c
-      INNER JOIN conversations c2 on c2.churchId=c.churchId and c2.contentType='streamingLiveHost' and c2.contentId=c.contentId
-      WHERE c.id=${mainConversationId} AND c.churchId=${churchId} LIMIT 1
-    `.execute(getDb());
-    return result.rows?.[0];
+    const result = await getDb().selectFrom("conversations as c")
+      .innerJoin("conversations as c2", (join) =>
+        join.onRef("c2.churchId", "=", "c.churchId")
+          .on("c2.contentType", "=", "streamingLiveHost")
+          .onRef("c2.contentId", "=", "c.contentId")
+      )
+      .selectAll("c2")
+      .where("c.id", "=", mainConversationId)
+      .where("c.churchId", "=", churchId)
+      .limit(1)
+      .executeTakeFirst();
+    return result;
   }
 
   public async updateStats(conversationId: string) {

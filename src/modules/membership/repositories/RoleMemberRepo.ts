@@ -42,8 +42,14 @@ export class RoleMemberRepo {
   }
 
   public async loadByRoleId(roleId: string, churchId: string): Promise<RoleMember[]> {
-    const result = await sql`SELECT rm.*, uc.personId FROM roleMembers rm LEFT JOIN userChurches uc ON rm.userId=uc.userId AND rm.churchId=uc.churchId WHERE roleId=${roleId} AND rm.churchId=${churchId} ORDER BY rm.dateAdded`.execute(getDb());
-    return result.rows as RoleMember[];
+    return getDb().selectFrom("roleMembers as rm")
+      .leftJoin("userChurches as uc", (join) => join.onRef("rm.userId", "=", "uc.userId").onRef("rm.churchId", "=", "uc.churchId"))
+      .selectAll("rm")
+      .select("uc.personId")
+      .where("rm.roleId", "=", roleId)
+      .where("rm.churchId", "=", churchId)
+      .orderBy("rm.dateAdded")
+      .execute() as Promise<RoleMember[]>;
   }
 
   public async delete(id: string, churchId: string): Promise<any> {

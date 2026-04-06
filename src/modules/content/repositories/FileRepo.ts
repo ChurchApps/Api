@@ -70,8 +70,13 @@ export class FileRepo {
   }
 
   public async loadTotalBytes(churchId: string, contentType: string, contentId: string): Promise<{ size: number }> {
-    const result = await sql`select IFNULL(sum(size), 0) as size from files where churchId=${churchId} and contentType=${contentType} and contentId=${contentId}`.execute(getDb());
-    return result.rows[0] as any;
+    const result = await getDb().selectFrom("files")
+      .select(sql<number>`IFNULL(sum(size), 0)`.as("size"))
+      .where("churchId", "=", churchId)
+      .where("contentType", "=", contentType)
+      .where("contentId", "=", contentId)
+      .executeTakeFirst();
+    return result as any;
   }
 
   public convertToModel(_churchId: string, data: any) { return data as File; }

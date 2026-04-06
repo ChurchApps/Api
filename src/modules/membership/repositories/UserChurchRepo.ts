@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { UserChurch } from "../models/index.js";
@@ -56,13 +55,23 @@ export class UserChurchRepo {
   }
 
   public async loadByPersonId(personId: string, churchId: string): Promise<any> {
-    const result = await sql`SELECT uc.*, u.email FROM userChurches uc INNER JOIN users u ON u.id = uc.userId WHERE uc.personId=${personId} AND uc.churchId=${churchId}`.execute(getDb());
-    return (result.rows as any[])?.[0] || null;
+    return (await getDb().selectFrom("userChurches as uc")
+      .innerJoin("users as u", "u.id", "uc.userId")
+      .selectAll("uc")
+      .select("u.email")
+      .where("uc.personId", "=", personId)
+      .where("uc.churchId", "=", churchId)
+      .executeTakeFirst()) ?? null;
   }
 
   public async loadForUser(userId: string): Promise<any[]> {
-    const result = await sql`SELECT uc.*, c.id as churchId, c.name as churchName, c.subDomain, p.id as activePersonId, p.firstName, p.lastName, p.displayName FROM userChurches uc INNER JOIN churches c ON c.id = uc.churchId AND c.archivedDate IS NULL LEFT JOIN people p ON p.id = uc.personId AND p.churchId = uc.churchId AND (p.removed = 0 OR p.removed IS NULL) WHERE uc.userId = ${userId}`.execute(getDb());
-    const rows = result.rows as any[];
+    const rows = await getDb().selectFrom("userChurches as uc")
+      .innerJoin("churches as c", (join) => join.onRef("c.id", "=", "uc.churchId").on("c.archivedDate", "is", null))
+      .leftJoin("people as p", (join) => join.onRef("p.id", "=", "uc.personId").onRef("p.churchId", "=", "uc.churchId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("uc")
+      .select(["c.id as churchId", "c.name as churchName", "c.subDomain", "p.id as activePersonId", "p.firstName", "p.lastName", "p.displayName"])
+      .where("uc.userId", "=", userId)
+      .execute() as any[];
     return rows.map((row: any) => ({
       id: row.id,
       userId: row.userId,

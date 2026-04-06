@@ -81,9 +81,13 @@ export class RegistrationRepo {
   }
 
   public async countActiveForEvent(churchId: string, eventId: string): Promise<number> {
-    const result = await sql`SELECT COUNT(*) as cnt FROM registrations WHERE churchId=${churchId} AND eventId=${eventId} AND status IN ('pending','confirmed')`.execute(getDb());
-    const row: any = result.rows[0];
-    return row?.cnt || 0;
+    const result = await getDb().selectFrom("registrations")
+      .select(sql<number>`COUNT(*)`.as("cnt"))
+      .where("churchId", "=", churchId)
+      .where("eventId", "=", eventId)
+      .where("status", "in", ["pending", "confirmed"])
+      .executeTakeFirst();
+    return (result as any)?.cnt || 0;
   }
 
   public async atomicInsertWithCapacityCheck(registration: Registration, capacity: number | null): Promise<boolean> {

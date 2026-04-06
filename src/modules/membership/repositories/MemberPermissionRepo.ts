@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { MemberPermission } from "../models/index.js";
@@ -74,13 +73,27 @@ export class MemberPermissionRepo {
   }
 
   public async loadFormsByPerson(churchId: string, personId: string) {
-    const result = await sql`SELECT mp.*, p.displayName as personName FROM memberPermissions mp INNER JOIN people p ON p.id=mp.memberId AND (p.removed=0 OR p.removed IS NULL) WHERE mp.churchId=${churchId} AND mp.memberId=${personId} ORDER BY mp.action, mp.emailNotification DESC`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("memberPermissions as mp")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("mp")
+      .select("p.displayName as personName")
+      .where("mp.churchId", "=", churchId)
+      .where("mp.memberId", "=", personId)
+      .orderBy("mp.action")
+      .orderBy("mp.emailNotification", "desc")
+      .execute();
   }
 
   public async loadPeopleByForm(churchId: string, formId: string) {
-    const result = await sql`SELECT mp.*, p.displayName as personName FROM memberPermissions mp INNER JOIN people p ON p.id=mp.memberId AND (p.removed=0 OR p.removed IS NULL) WHERE mp.churchId=${churchId} AND mp.contentId=${formId} ORDER BY mp.action, mp.emailNotification DESC`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("memberPermissions as mp")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("mp")
+      .select("p.displayName as personName")
+      .where("mp.churchId", "=", churchId)
+      .where("mp.contentId", "=", formId)
+      .orderBy("mp.action")
+      .orderBy("mp.emailNotification", "desc")
+      .execute();
   }
 
   public saveAll(models: MemberPermission[]) {

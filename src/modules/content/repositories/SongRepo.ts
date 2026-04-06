@@ -43,12 +43,18 @@ export class SongRepo {
 
   public async search(churchId: string, query: string) {
     const q = "%" + query.replace(/ /g, "%") + "%";
-    const result = await sql`SELECT sd.*, ak.id as arrangementKeyId, ak.keySignature as arrangementKeySignature, ak.shortDescription FROM songs s
-      INNER JOIN arrangements a on a.songId=s.id
-      INNER JOIN arrangementKeys ak on ak.arrangementId=a.id
-      INNER JOIN songDetails sd on sd.id=a.songDetailId
-      where s.churchId=${churchId} AND (concat(sd.title, ' ', sd.artist) like ${q} or concat(sd.artist, ' ', sd.title) like ${q})`.execute(getDb());
-    return result.rows as any;
+    return getDb().selectFrom("songs as s")
+      .innerJoin("arrangements as a", "a.songId", "s.id")
+      .innerJoin("arrangementKeys as ak", "ak.arrangementId", "a.id")
+      .innerJoin("songDetails as sd", "sd.id", "a.songDetailId")
+      .selectAll("sd")
+      .select(["ak.id as arrangementKeyId", "ak.keySignature as arrangementKeySignature", "ak.shortDescription"])
+      .where("s.churchId", "=", churchId)
+      .where((eb) => eb.or([
+        eb(sql`concat(sd.title, ' ', sd.artist)`, "like", q),
+        eb(sql`concat(sd.artist, ' ', sd.title)`, "like", q)
+      ]))
+      .execute() as any;
   }
 
   public convertToModel(_churchId: string, data: any) { return data as Song; }

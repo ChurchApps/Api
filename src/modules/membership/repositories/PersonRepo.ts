@@ -206,16 +206,26 @@ export class PersonRepo {
 
   public async search(churchId: string, term: string, filterOptedOut?: boolean) {
     const searchTerm = "%" + term.replace(" ", "%") + "%";
-    let filterSql = "";
-    if (filterOptedOut) filterSql = " AND (optedOut = FALSE OR optedOut IS NULL)";
-    const result = await sql`SELECT * FROM people WHERE churchId=${churchId} AND CONCAT(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,''), ' ', IFNULL(donorNumber,'')) LIKE ${searchTerm} AND removed=0${sql.raw(filterSql)} LIMIT 100`.execute(getDb());
-    return result.rows;
+    let query = getDb().selectFrom("people").selectAll()
+      .where("churchId", "=", churchId)
+      .where(sql`CONCAT(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,''), ' ', IFNULL(donorNumber,''))`, "like", searchTerm)
+      .where("removed", "=", 0 as any);
+    if (filterOptedOut) query = query.where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]));
+    return query.limit(100).execute();
   }
 
   public async searchPhone(churchId: string, phonestring: string) {
     const phoneSearch = "%" + phonestring.replace(/ |-/g, "%") + "%";
-    const result = await sql`SELECT * FROM people WHERE churchId=${churchId} AND (REPLACE(REPLACE(HomePhone,'-',''), ' ', '') LIKE ${phoneSearch} OR REPLACE(REPLACE(WorkPhone,'-',''), ' ', '') LIKE ${phoneSearch} OR REPLACE(REPLACE(MobilePhone,'-',''), ' ', '') LIKE ${phoneSearch}) AND removed=0 LIMIT 100`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("people").selectAll()
+      .where("churchId", "=", churchId)
+      .where((eb) => eb.or([
+        eb(sql`REPLACE(REPLACE(HomePhone,'-',''), ' ', '')`, "like", phoneSearch),
+        eb(sql`REPLACE(REPLACE(WorkPhone,'-',''), ' ', '')`, "like", phoneSearch),
+        eb(sql`REPLACE(REPLACE(MobilePhone,'-',''), ' ', '')`, "like", phoneSearch)
+      ]))
+      .where("removed", "=", 0 as any)
+      .limit(100)
+      .execute();
   }
 
   public async searchEmail(churchId: string, email: string): Promise<any[]> {

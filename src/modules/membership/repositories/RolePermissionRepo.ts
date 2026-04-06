@@ -222,8 +222,12 @@ export class RolePermissionRepo {
 
   // permissions applied to all the members of church
   public async loadForEveryone(churchId: string) {
-    const result = await sql`SELECT rp.id, rp.churchId, rp.roleId, rp.apiName, rp.contentType, rp.contentId, rp.action, c.name AS churchName, c.subDomain FROM rolePermissions rp LEFT JOIN churches c ON c.id=rp.churchId WHERE rp.churchId=${churchId} AND rp.roleId IS NULL`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("rolePermissions as rp")
+      .leftJoin("churches as c", "c.id", "rp.churchId")
+      .select(["rp.id", "rp.churchId", "rp.roleId", "rp.apiName", "rp.contentType", "rp.contentId", "rp.action", "c.name as churchName", "c.subDomain"])
+      .where("rp.churchId", "=", churchId)
+      .where("rp.roleId", "is", null)
+      .execute();
   }
 
   public saveAll(models: RolePermission[]) {

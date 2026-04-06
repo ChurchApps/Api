@@ -56,7 +56,7 @@ export class ChurchRepo {
   }
 
   public async loadCount() {
-    const result = (await getDb().selectFrom("churches").select(sql`COUNT(*)`.as("count")).executeTakeFirst()) ?? null;
+    const result = (await getDb().selectFrom("churches").select((eb) => eb.fn.countAll().as("count")).executeTakeFirst()) ?? null;
     return parseInt((result as any)?.count || "0", 10);
   }
 
@@ -98,8 +98,24 @@ export class ChurchRepo {
   }
 
   public async loadForUser(userId: string) {
-    const result = await sql`SELECT c.*, p.id as personId, p.membershipStatus FROM userChurches uc INNER JOIN churches c ON c.id=uc.churchId AND c.archivedDate IS NULL LEFT JOIN people p ON p.id=uc.personId AND (p.removed=0 OR p.removed IS NULL) WHERE uc.userId=${userId}`.execute(getDb());
-    const rows = result.rows as any[];
+    const rows = await getDb()
+      .selectFrom("userChurches as uc")
+      .innerJoin("churches as c", (join) =>
+        join.onRef("c.id", "=", "uc.churchId").on("c.archivedDate", "is", null)
+      )
+      .leftJoin("people as p", (join) =>
+        join.onRef("p.id", "=", "uc.personId").on((eb) =>
+          eb.or([eb("p.removed", "=", false as any), eb("p.removed", "is", null)])
+        )
+      )
+      .select([
+        "c.id", "c.name", "c.subDomain", "c.archivedDate",
+        "c.address1", "c.address2", "c.city", "c.state", "c.zip", "c.country",
+        "c.registrationDate", "c.latitude", "c.longitude",
+        "p.id as personId", "p.membershipStatus"
+      ])
+      .where("uc.userId", "=", userId)
+      .execute() as any[];
     const loginUserChurches: LoginUserChurch[] = [];
     rows.forEach((row: any) => {
       const apis: Api[] = [];

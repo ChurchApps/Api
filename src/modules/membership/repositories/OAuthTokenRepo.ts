@@ -72,7 +72,7 @@ export class OAuthTokenRepo {
   }
 
   public async deleteExpired() {
-    await sql`DELETE FROM oAuthTokens WHERE expiresAt < NOW()`.execute(getDb());
+    await getDb().deleteFrom("oAuthTokens").where("expiresAt", "<", sql`NOW()` as any).execute();
   }
 
   public convertToModel(_churchId: string, data: any) { return data; }

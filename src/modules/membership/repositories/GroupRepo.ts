@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Group } from "../models/index.js";
@@ -71,23 +70,49 @@ export class GroupRepo {
   }
 
   public async loadByTag(churchId: string, tag: string) {
-    const result = await sql`SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM \`groups\` g WHERE churchId=${churchId} AND removed=0 AND tags LIKE ${"%" + tag + "%"} ORDER BY categoryName, name`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groups as g")
+      .selectAll("g")
+      .select((eb) => eb.selectFrom("groupMembers as gm").whereRef("gm.groupId", "=", "g.id").select(eb.fn.countAll().as("count")).as("memberCount"))
+      .where("g.churchId", "=", churchId)
+      .where("g.removed", "=", 0 as any)
+      .where("g.tags", "like", "%" + tag + "%")
+      .orderBy("g.categoryName")
+      .orderBy("g.name")
+      .execute();
   }
 
   public async loadAll(churchId: string) {
-    const result = await sql`SELECT *, (SELECT COUNT(*) FROM groupMembers gm WHERE gm.groupId=g.id) AS memberCount FROM \`groups\` g WHERE churchId=${churchId} AND removed=0 ORDER BY categoryName, name`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groups as g")
+      .selectAll("g")
+      .select((eb) => eb.selectFrom("groupMembers as gm").whereRef("gm.groupId", "=", "g.id").select(eb.fn.countAll().as("count")).as("memberCount"))
+      .where("g.churchId", "=", churchId)
+      .where("g.removed", "=", 0 as any)
+      .orderBy("g.categoryName")
+      .orderBy("g.name")
+      .execute();
   }
 
   public async loadAllForPerson(personId: string) {
-    const result = await sql`SELECT DISTINCT g.* FROM groupMembers gm INNER JOIN \`groups\` g ON g.id=gm.groupId WHERE personId=${personId} AND g.removed=0 ORDER BY name`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .selectAll("g")
+      .distinct()
+      .where("gm.personId", "=", personId)
+      .where("g.removed", "=", 0 as any)
+      .orderBy("g.name")
+      .execute();
   }
 
   public async loadForPerson(personId: string) {
-    const result = await sql`SELECT DISTINCT g.* FROM groupMembers gm INNER JOIN \`groups\` g ON g.id=gm.groupId WHERE personId=${personId} AND g.removed=0 AND g.tags LIKE '%standard%' ORDER BY name`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .selectAll("g")
+      .distinct()
+      .where("gm.personId", "=", personId)
+      .where("g.removed", "=", 0 as any)
+      .where("g.tags", "like", "%standard%")
+      .orderBy("g.name")
+      .execute();
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
@@ -105,8 +130,17 @@ export class GroupRepo {
   }
 
   public async search(churchId: string, campusId: string, serviceId: string, serviceTimeId: string) {
-    const result = await sql`SELECT g.id, g.categoryName, g.name FROM \`groups\` g LEFT OUTER JOIN groupServiceTimes gst ON gst.groupId=g.id LEFT OUTER JOIN serviceTimes st ON st.id=gst.serviceTimeId LEFT OUTER JOIN services s ON s.id=st.serviceId WHERE g.churchId = ${churchId} AND (${serviceTimeId}=0 OR gst.serviceTimeId=${serviceTimeId}) AND (${serviceId}=0 OR st.serviceId=${serviceId}) AND (${campusId} = 0 OR s.campusId = ${campusId}) AND g.removed=0 GROUP BY g.id, g.categoryName, g.name ORDER BY g.name`.execute(getDb());
-    return result.rows;
+    let query = getDb().selectFrom("groups as g")
+      .leftJoin("groupServiceTimes as gst", "gst.groupId", "g.id")
+      .leftJoin("serviceTimes as st", "st.id", "gst.serviceTimeId")
+      .leftJoin("services as s", "s.id", "st.serviceId")
+      .select(["g.id", "g.categoryName", "g.name"])
+      .where("g.churchId", "=", churchId)
+      .where("g.removed", "=", 0 as any);
+    if (serviceTimeId !== "0") query = query.where("gst.serviceTimeId", "=", serviceTimeId);
+    if (serviceId !== "0") query = query.where("st.serviceId", "=", serviceId);
+    if (campusId !== "0") query = query.where("s.campusId", "=", campusId);
+    return query.groupBy(["g.id", "g.categoryName", "g.name"]).orderBy("g.name").execute();
   }
 
   public convertFromModel(group: Group) {

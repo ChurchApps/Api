@@ -56,17 +56,24 @@ export class MembershipRepo {
     const dbField = this.getDBField(condition);
     const dbValue = this.getDBValue(condition);
 
-    const rows = await sql`select id from people where churchId = ${condition.churchId} AND removed = 0 AND ${sql.raw(dbField)} ${sql.raw(condition.operator)} ${dbValue}`
-      .execute(this.getDb()) as any;
+    const rows = await (this.getDb() as any).selectFrom("people")
+      .select("id")
+      .where("churchId", "=", condition.churchId)
+      .where("removed", "=", 0)
+      .where(sql`${sql.raw(dbField)} ${sql.raw(condition.operator)} ${dbValue}`)
+      .execute() as { id: string }[];
 
     const result: string[] = [];
-    (rows.rows as { id: string }[]).forEach((r) => result.push(r.id));
+    rows.forEach((r) => result.push(r.id));
     return result;
   }
 
   public async loadPeople(churchId: string, personIds: string[]) {
-    return sql`select id, displayName from people where churchId = ${churchId} AND removed = 0 AND id in (${sql.join(personIds)})`
-      .execute(this.getDb())
-      .then((r: any) => r.rows);
+    return (this.getDb() as any).selectFrom("people")
+      .select(["id", "displayName"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("id", "in", personIds)
+      .execute();
   }
 }

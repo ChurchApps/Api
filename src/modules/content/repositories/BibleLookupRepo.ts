@@ -43,13 +43,15 @@ export class BibleLookupRepo {
   }
 
   public async getStats(startDate: Date, endDate: Date) {
-    const result = await sql`SELECT bt.abbreviation, count(distinct(bl.ipAddress)) as lookups
-      FROM bibleTranslations bt
-      INNER JOIN bibleLookups bl ON bl.translationKey = bt.abbreviation
-      WHERE bl.lookupTime BETWEEN ${startDate} AND ${endDate}
-      GROUP BY bt.abbreviation
-      ORDER BY bt.abbreviation`.execute(getDb());
-    return result.rows;
+    const result = await getDb().selectFrom("bibleTranslations as bt")
+      .innerJoin("bibleLookups as bl", "bl.translationKey", "bt.abbreviation")
+      .select(["bt.abbreviation", sql<number>`count(distinct(bl.ipAddress))`.as("lookups")])
+      .where("bl.lookupTime", ">=", startDate as any)
+      .where("bl.lookupTime", "<=", endDate as any)
+      .groupBy("bt.abbreviation")
+      .orderBy("bt.abbreviation")
+      .execute();
+    return result;
   }
 
   public async delete(id: string) {

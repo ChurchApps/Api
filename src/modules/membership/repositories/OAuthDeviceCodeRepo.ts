@@ -52,8 +52,10 @@ export class OAuthDeviceCodeRepo {
   public async loadByUserCode(userCode: string): Promise<OAuthDeviceCode> {
     // Normalize: remove hyphens and uppercase
     const normalizedCode = userCode.replace(/-/g, "").toUpperCase();
-    const result = await sql`SELECT * FROM oAuthDeviceCodes WHERE REPLACE(userCode, '-', '')=${normalizedCode} AND status='pending'`.execute(getDb());
-    return (result.rows as any[])?.[0] || null;
+    return (await getDb().selectFrom("oAuthDeviceCodes").selectAll()
+      .where(sql`REPLACE(userCode, '-', '')`, "=", normalizedCode)
+      .where("status", "=", "pending")
+      .executeTakeFirst()) ?? null;
   }
 
   public async delete(id: string) {
@@ -61,7 +63,10 @@ export class OAuthDeviceCodeRepo {
   }
 
   public async deleteExpired() {
-    await sql`DELETE FROM oAuthDeviceCodes WHERE expiresAt < NOW() AND status IN ('pending', 'expired')`.execute(getDb());
+    await getDb().deleteFrom("oAuthDeviceCodes")
+      .where("expiresAt", "<", sql`NOW()` as any)
+      .where("status", "in", ["pending", "expired"])
+      .execute();
   }
 
   // Generate cryptographically secure device code (32 bytes, hex encoded)

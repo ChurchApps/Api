@@ -94,23 +94,48 @@ export class FormRepo {
   }
 
   public async loadMemberForms(churchId: string, personId: string) {
-    const result = await sql`SELECT f.*, mp.action FROM forms f LEFT JOIN memberPermissions mp ON mp.contentId = f.id WHERE mp.memberId=${personId} AND f.churchId=${churchId} AND f.removed=0 AND f.archived=0`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("forms as f")
+      .leftJoin("memberPermissions as mp", "mp.contentId", "f.id")
+      .selectAll("f")
+      .select("mp.action")
+      .where("mp.memberId", "=", personId)
+      .where("f.churchId", "=", churchId)
+      .where("f.removed", "=", 0 as any)
+      .where("f.archived", "=", 0 as any)
+      .execute();
   }
 
   public async loadMemberArchivedForms(churchId: string, personId: string) {
-    const result = await sql`SELECT f.* FROM forms f LEFT JOIN memberPermissions mp ON mp.contentId = f.id WHERE mp.memberId=${personId} AND f.churchId=${churchId} AND f.removed=0 AND f.archived=1`.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("forms as f")
+      .leftJoin("memberPermissions as mp", "mp.contentId", "f.id")
+      .selectAll("f")
+      .where("mp.memberId", "=", personId)
+      .where("f.churchId", "=", churchId)
+      .where("f.removed", "=", 0 as any)
+      .where("f.archived", "=", 1 as any)
+      .execute();
   }
 
   public async loadWithMemberPermissions(churchId: string, formId: string, personId: string) {
-    const result = await sql`SELECT f.*, mp.action FROM forms f LEFT JOIN memberPermissions mp ON mp.contentId = f.id WHERE f.id=${formId} AND f.churchId=${churchId} AND mp.memberId=${personId} AND f.removed=0 AND archived=0`.execute(getDb());
-    return (result.rows as any[])?.[0] || null;
+    return (await getDb().selectFrom("forms as f")
+      .leftJoin("memberPermissions as mp", "mp.contentId", "f.id")
+      .selectAll("f")
+      .select("mp.action")
+      .where("f.id", "=", formId)
+      .where("f.churchId", "=", churchId)
+      .where("mp.memberId", "=", personId)
+      .where("f.removed", "=", 0 as any)
+      .where("f.archived", "=", 0 as any)
+      .executeTakeFirst()) ?? null;
   }
 
   public async access(id: string) {
-    const result = await sql`SELECT id, name, restricted, churchId FROM forms WHERE id=${id} AND removed=0 AND archived=0`.execute(getDb());
-    return (result.rows as any[])?.[0] || null;
+    return (await getDb().selectFrom("forms")
+      .select(["id", "name", "restricted", "churchId"])
+      .where("id", "=", id)
+      .where("removed", "=", 0 as any)
+      .where("archived", "=", 0 as any)
+      .executeTakeFirst()) ?? null;
   }
 
   public saveAll(models: Form[]) {

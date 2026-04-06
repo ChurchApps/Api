@@ -1,4 +1,3 @@
-import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { RegistrationMember } from "../models/index.js";
@@ -52,8 +51,12 @@ export class RegistrationMemberRepo {
   }
 
   public async loadForEvent(churchId: string, eventId: string): Promise<RegistrationMember[]> {
-    const result = await sql`SELECT rm.* FROM registrationMembers rm INNER JOIN registrations r ON rm.registrationId=r.id WHERE r.churchId=${churchId} AND r.eventId=${eventId}`.execute(getDb());
-    return result.rows as any;
+    return getDb().selectFrom("registrationMembers as rm")
+      .innerJoin("registrations as r", "rm.registrationId", "r.id")
+      .selectAll("rm")
+      .where("r.churchId", "=", churchId)
+      .where("r.eventId", "=", eventId)
+      .execute() as any;
   }
 
   public async deleteForRegistration(churchId: string, registrationId: string): Promise<void> {

@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Household } from "../models/index.js";
@@ -32,7 +31,16 @@ export class HouseholdRepo {
   }
 
   public async deleteUnused(churchId: string) {
-    await sql`DELETE FROM households WHERE churchId=${churchId} AND id NOT IN (SELECT householdId FROM people WHERE churchId=${churchId} AND householdId IS NOT NULL GROUP BY householdId)`.execute(getDb());
+    await getDb().deleteFrom("households")
+      .where("churchId", "=", churchId)
+      .where("id", "not in",
+        getDb().selectFrom("people")
+          .select("householdId")
+          .where("churchId", "=", churchId)
+          .where("householdId", "is not", null)
+          .groupBy("householdId")
+      )
+      .execute();
   }
 
   public async load(churchId: string, id: string) {

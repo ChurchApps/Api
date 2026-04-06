@@ -51,18 +51,30 @@ export class PageHistoryRepo {
 
   public async loadForPage(churchId: string, pageId: string, limit: number = 50) {
     const safeLimit = parseInt(String(limit), 10);
-    const result = await sql`SELECT * FROM pageHistory WHERE churchId=${churchId} AND pageId=${pageId} ORDER BY createdDate DESC LIMIT ${safeLimit}`.execute(getDb());
-    return result.rows as any;
+    return getDb().selectFrom("pageHistory").selectAll()
+      .where("churchId", "=", churchId)
+      .where("pageId", "=", pageId)
+      .orderBy("createdDate", "desc")
+      .limit(safeLimit)
+      .execute() as any;
   }
 
   public async loadForBlock(churchId: string, blockId: string, limit: number = 50) {
     const safeLimit = parseInt(String(limit), 10);
-    const result = await sql`SELECT * FROM pageHistory WHERE churchId=${churchId} AND blockId=${blockId} ORDER BY createdDate DESC LIMIT ${safeLimit}`.execute(getDb());
-    return result.rows as any;
+    return getDb().selectFrom("pageHistory").selectAll()
+      .where("churchId", "=", churchId)
+      .where("blockId", "=", blockId)
+      .orderBy("createdDate", "desc")
+      .limit(safeLimit)
+      .execute() as any;
   }
 
   public async deleteOldHistory(churchId: string, pageId: string, daysToKeep: number = 30) {
-    await sql`DELETE FROM pageHistory WHERE churchId=${churchId} AND pageId=${pageId} AND createdDate < DATE_SUB(NOW(), INTERVAL ${daysToKeep} DAY)`.execute(getDb());
+    await getDb().deleteFrom("pageHistory")
+      .where("churchId", "=", churchId)
+      .where("pageId", "=", pageId)
+      .where("createdDate", "<", sql`DATE_SUB(NOW(), INTERVAL ${daysToKeep} DAY)` as any)
+      .execute();
   }
 
   public convertToModel(_churchId: string, data: any) { return data as PageHistory; }

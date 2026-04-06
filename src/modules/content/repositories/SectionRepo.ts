@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Section } from "../models/index.js";
@@ -101,8 +100,14 @@ export class SectionRepo {
   }
 
   public async loadForPage(churchId: string, pageId: string) {
-    const result = await sql`SELECT * FROM sections WHERE churchId=${churchId} AND (pageId=${pageId} or (pageId IS NULL and blockId IS NULL)) order by sort`.execute(getDb());
-    return result.rows as any;
+    return getDb().selectFrom("sections").selectAll()
+      .where("churchId", "=", churchId)
+      .where((eb) => eb.or([
+        eb("pageId", "=", pageId),
+        eb.and([eb("pageId", "is", null), eb("blockId", "is", null)])
+      ]))
+      .orderBy("sort")
+      .execute() as any;
   }
 
   public async loadForZone(churchId: string, pageId: string, zone: string) {

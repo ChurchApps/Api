@@ -55,26 +55,30 @@ export class NotificationRepo {
   }
 
   public async loadForEmail(frequency: string) {
-    const result = await sql<any>`
-      SELECT DISTINCT n.churchId, n.personId
-      FROM notifications n
-      INNER JOIN notificationPreferences np on np.churchId=n.churchId and np.personId=n.personId
-      WHERE n.deliveryMethod='email' AND np.emailFrequency=${frequency} AND n.timeSent>DATE_SUB(NOW(), INTERVAL 24 HOUR)
-      LIMIT 200
-    `.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("notifications as n")
+      .innerJoin("notificationPreferences as np", (join) =>
+        join.onRef("np.churchId", "=", "n.churchId").onRef("np.personId", "=", "n.personId")
+      )
+      .select(["n.churchId", "n.personId"])
+      .distinct()
+      .where("n.deliveryMethod", "=", "email")
+      .where("np.emailFrequency", "=", frequency)
+      .where("n.timeSent", ">", sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)` as any)
+      .limit(200)
+      .execute();
   }
 
   public async loadByPersonIdForEmail(churchId: string, personId: string, frequency: string) {
     const timeCutoff = frequency === "individual"
       ? sql`DATE_SUB(NOW(), INTERVAL 30 MINUTE)`
       : sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)`;
-    const result = await sql<any>`
-      SELECT * FROM notifications
-      WHERE churchId=${churchId} AND personId=${personId} AND deliveryMethod='email' AND timeSent>=${timeCutoff}
-      ORDER BY timeSent
-    `.execute(getDb());
-    return result.rows;
+    return getDb().selectFrom("notifications").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .where("deliveryMethod", "=", "email")
+      .where("timeSent", ">=", timeCutoff as any)
+      .orderBy("timeSent")
+      .execute();
   }
 
   public async delete(churchId: string, id: string) {
@@ -104,14 +108,20 @@ export class NotificationRepo {
   }
 
   public async loadNewCounts(churchId: string, personId: string) {
-    const result = await sql<any>`
-      SELECT (
-        SELECT COUNT(*) FROM notifications where churchId=${churchId} and personId=${personId} and isNew=1
-      ) AS notificationCount, (
-        SELECT COUNT(*) FROM privateMessages where churchId=${churchId} and notifyPersonId=${personId}
-      ) AS pmCount
-    `.execute(getDb());
-    return result.rows?.[0] || {};
+    const result = await getDb().selectNoFrom((eb) => [
+      eb.selectFrom("notifications")
+        .select(sql<number>`COUNT(*)`.as("notificationCount"))
+        .where("churchId", "=", churchId)
+        .where("personId", "=", personId)
+        .where("isNew", "=", true as any)
+        .as("notificationCount"),
+      eb.selectFrom("privateMessages")
+        .select(sql<number>`COUNT(*)`.as("pmCount"))
+        .where("churchId", "=", churchId)
+        .where("notifyPersonId", "=", personId)
+        .as("pmCount")
+    ]).executeTakeFirst();
+    return result || {};
   }
 
   public async loadUndelivered() {

@@ -48,8 +48,8 @@ export class QuestionRepo {
 
   public async delete(churchId: string, id: string) {
     const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
-    await sql`UPDATE questions SET sort=sort-1 WHERE formId=${question.formId} AND sort>${+question.sort}`.execute(getDb());
-    await sql`UPDATE questions SET sort=CONCAT('d', sort), removed=1 WHERE id=${id} AND churchId=${churchId}`.execute(getDb());
+    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("formId", "=", question.formId).where("sort", ">", +question.sort as any).execute();
+    await getDb().updateTable("questions").set({ sort: sql`CONCAT('d', sort)` as any, removed: 1 as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async load(churchId: string, id: string) {
@@ -79,14 +79,14 @@ export class QuestionRepo {
 
   public async moveQuestionUp(id: string) {
     const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
-    await sql`UPDATE questions SET sort=sort+1 WHERE formId=${question.formId} AND sort=${+question.sort - 1}`.execute(getDb());
-    await sql`UPDATE questions SET sort=sort-1 WHERE id=${id}`.execute(getDb());
+    await getDb().updateTable("questions").set({ sort: sql`sort+1` as any }).where("formId", "=", question.formId).where("sort", "=", +question.sort - 1 as any).execute();
+    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("id", "=", id).execute();
   }
 
   public async moveQuestionDown(id: string) {
     const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
-    await sql`UPDATE questions SET sort=sort-1 WHERE formId=${question.formId} AND sort=${+question.sort + 1}`.execute(getDb());
-    await sql`UPDATE questions SET sort=sort+1 WHERE id=${id}`.execute(getDb());
+    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("formId", "=", question.formId).where("sort", "=", +question.sort + 1 as any).execute();
+    await getDb().updateTable("questions").set({ sort: sql`sort+1` as any }).where("id", "=", id).execute();
   }
 
   public saveAll(models: Question[]) {

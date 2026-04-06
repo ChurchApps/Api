@@ -72,8 +72,12 @@ export class SongDetailRepo {
 
   public async search(query: string) {
     const q = "%" + query.replace(/ /g, "%") + "%";
-    const result = await sql`SELECT * FROM songDetails where title + ' ' + artist like ${q} or artist + ' ' + title like ${q}`.execute(getDb());
-    return result.rows as any;
+    return getDb().selectFrom("songDetails").selectAll()
+      .where((eb) => eb.or([
+        eb(sql`concat(title, ' ', artist)`, "like", q),
+        eb(sql`concat(artist, ' ', title)`, "like", q)
+      ]))
+      .execute() as any;
   }
 
   public async loadByPraiseChartsId(praiseChartsId: string): Promise<SongDetail | null> {
@@ -81,13 +85,15 @@ export class SongDetailRepo {
   }
 
   public async loadForChurch(churchId: string) {
-    const result = await sql`SELECT sd.*, s.Id as songId, s.churchId
-      FROM songs s
-      INNER JOIN arrangements a on a.songId=s.id
-      INNER JOIN songDetails sd on sd.id=a.songDetailId
-      WHERE s.churchId=${churchId}
-      ORDER BY sd.title, sd.artist`.execute(getDb());
-    return result.rows as any;
+    return getDb().selectFrom("songs as s")
+      .innerJoin("arrangements as a", "a.songId", "s.id")
+      .innerJoin("songDetails as sd", "sd.id", "a.songDetailId")
+      .selectAll("sd")
+      .select(["s.id as songId", "s.churchId"])
+      .where("s.churchId", "=", churchId)
+      .orderBy("sd.title")
+      .orderBy("sd.artist")
+      .execute() as any;
   }
 
   public convertToModel(data: any) { return data as SongDetail; }

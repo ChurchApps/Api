@@ -40,8 +40,10 @@ export class OAuthRelaySessionRepo {
   }
 
   public async loadBySessionCode(sessionCode: string): Promise<OAuthRelaySession> {
-    const result = await sql`SELECT * FROM oAuthRelaySessions WHERE sessionCode=${sessionCode} AND expiresAt > NOW()`.execute(getDb());
-    return (result.rows as any[])?.[0] || null;
+    return (await getDb().selectFrom("oAuthRelaySessions").selectAll()
+      .where("sessionCode", "=", sessionCode)
+      .where("expiresAt", ">", sql`NOW()` as any)
+      .executeTakeFirst()) ?? null;
   }
 
   public async delete(id: string) {
@@ -49,7 +51,7 @@ export class OAuthRelaySessionRepo {
   }
 
   public async deleteExpired() {
-    await sql`DELETE FROM oAuthRelaySessions WHERE expiresAt < NOW()`.execute(getDb());
+    await getDb().deleteFrom("oAuthRelaySessions").where("expiresAt", "<", sql`NOW()` as any).execute();
   }
 
   // Generate 8-character session code (TV-friendly, no ambiguous characters)

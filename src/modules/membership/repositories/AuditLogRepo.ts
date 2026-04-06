@@ -81,10 +81,16 @@ export class AuditLogRepo {
   public async loadForPerson(churchId: string, personId: string, limit: number = 100, offset: number = 0): Promise<AuditLog[]> {
     const safeLimit = Math.max(1, Math.min(limit, 1000));
     const safeOffset = Math.max(0, offset);
-    const results = await sql`SELECT al.* FROM auditLogs al
-      WHERE al.churchId=${churchId} AND (al.userId=${personId} OR (al.entityType='person' AND al.entityId=${personId}))
-      ORDER BY al.created DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`.execute(getDb());
-    return results.rows as AuditLog[];
+    return getDb().selectFrom("auditLogs as al").selectAll("al")
+      .where("al.churchId", "=", churchId)
+      .where((eb) => eb.or([
+        eb("al.userId", "=", personId),
+        eb.and([eb("al.entityType", "=", "person"), eb("al.entityId", "=", personId)])
+      ]))
+      .orderBy("al.created", "desc")
+      .limit(safeLimit)
+      .offset(safeOffset)
+      .execute() as Promise<AuditLog[]>;
   }
 
   public async loadCount(churchId: string, filter: AuditLogFilter): Promise<number> {
@@ -102,7 +108,7 @@ export class AuditLogRepo {
   }
 
   public async deleteOld(days: number = 365): Promise<void> {
-    await sql`DELETE FROM auditLogs WHERE created < DATE_SUB(NOW(), INTERVAL ${days} DAY)`.execute(getDb());
+    await getDb().deleteFrom("auditLogs").where("created", "<", sql`DATE_SUB(NOW(), INTERVAL ${days} DAY)` as any).execute();
   }
 
   public convertToModel(_churchId: string, data: any) { return data; }

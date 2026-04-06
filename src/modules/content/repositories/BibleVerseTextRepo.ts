@@ -8,9 +8,19 @@ import { BibleVerseText } from "../models/index.js";
 export class BibleVerseTextRepo {
   public async save(model: BibleVerseText) {
     if (!model.id) model.id = UniqueIdHelper.shortId();
-    await sql`INSERT INTO bibleVerseTexts (id, translationKey, verseKey, bookKey, chapterNumber, verseNumber, content, newParagraph)
-      VALUES (${model.id}, ${model.translationKey}, ${model.verseKey}, ${model.bookKey}, ${model.chapterNumber}, ${model.verseNumber}, ${model.content}, ${model.newParagraph})
-      ON DUPLICATE KEY UPDATE content=VALUES(content), newParagraph=VALUES(newParagraph)`.execute(getDb());
+    await getDb().insertInto("bibleVerseTexts").values({
+      id: model.id,
+      translationKey: model.translationKey,
+      verseKey: model.verseKey,
+      bookKey: model.bookKey,
+      chapterNumber: model.chapterNumber,
+      verseNumber: model.verseNumber,
+      content: model.content,
+      newParagraph: model.newParagraph
+    } as any).onDuplicateKeyUpdate({
+      content: sql`VALUES(content)`,
+      newParagraph: sql`VALUES(newParagraph)`
+    } as any).execute();
     return model;
   }
 
