@@ -153,22 +153,35 @@ export class StripeGatewayProvider implements IGatewayProvider {
     await StripeHelper.deleteSubscription(config.privateKey, subscriptionId);
   }
 
-  async calculateFees(amount: number, churchId: string, currency: string = "USD"): Promise<number> {
+  async calculateFees(amount: number, churchId: string, currency: string = "USD", paymentType?: "card" | "bank"): Promise<number> {
     let customFixedFee: number | null = null;
     let customPercentFee: number | null = null;
+    let customMaxFee: number | null = null;
 
     if (churchId) {
       const response = await Axios.get(Environment.membershipApi + "/settings/public/" + churchId);
       const data = response.data;
-      if (data?.flatRateCC && data.flatRateCC !== null && data.flatRateCC !== undefined && data.flatRateCC !== "") {
-        customFixedFee = +data.flatRateCC;
-      }
-      if (data?.transFeeCC && data.transFeeCC !== null && data.transFeeCC !== undefined && data.transFeeCC !== "") {
-        customPercentFee = +data.transFeeCC / 100;
+      if (paymentType === "bank") {
+        if (data?.flatRateACH != null && data.flatRateACH !== "") customPercentFee = +data.flatRateACH / 100;
+        if (data?.hardLimitACH != null && data.hardLimitACH !== "") customMaxFee = +data.hardLimitACH;
+      } else {
+        if (data?.flatRateCC && data.flatRateCC !== null && data.flatRateCC !== undefined && data.flatRateCC !== "") {
+          customFixedFee = +data.flatRateCC;
+        }
+        if (data?.transFeeCC && data.transFeeCC !== null && data.transFeeCC !== undefined && data.transFeeCC !== "") {
+          customPercentFee = +data.transFeeCC / 100;
+        }
       }
     }
 
-    // Stripe currency-specific fees
+    if (paymentType === "bank") {
+      const fixedPercent = customPercentFee ?? 0.008;
+      const fixedMaxFee = customMaxFee ?? 5.0;
+      const fee = Math.round((amount / (1 - fixedPercent) - amount) * 100) / 100;
+      return Math.min(fee, fixedMaxFee);
+    }
+
+    // Stripe currency-specific fees for card payments
     const STRIPE_FEES: Record<string, { percent: number; fixed: number }> = {
       usd: { percent: 0.029, fixed: 0.30 },
       eur: { percent: 0.029, fixed: 0.25 },

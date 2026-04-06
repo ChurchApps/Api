@@ -526,7 +526,8 @@ export class DonateController extends GivingCrudController {
             return this.json({ error: "Gateway not found" }, 404);
           }
 
-          calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId, currencyToUse);
+          const paymentType = type === "ach" ? "bank" as const : "card" as const;
+          calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId, currencyToUse, paymentType);
           gatewayProvider = gateway.provider;
         } else {
           // Legacy type-based calculation for backward compatibility
@@ -690,7 +691,7 @@ export class DonateController extends GivingCrudController {
     const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
     const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
     if (stripeGateway) {
-      return await GatewayService.calculateFees(stripeGateway, amount, churchId);
+      return await GatewayService.calculateFees(stripeGateway, amount, churchId, undefined, "bank");
     }
 
     // Fallback to hardcoded calculation if no Stripe gateway found

@@ -47,7 +47,7 @@ export interface IGatewayProvider {
   cancelSubscription(config: GatewayConfig, subscriptionId: string, reason?: string): Promise<void>;
 
   // Fee calculation
-  calculateFees(amount: number, churchId: string, currency?: string): Promise<number>;
+  calculateFees(amount: number, churchId: string, currency?: string, paymentType?: "card" | "bank"): Promise<number>;
 
   // Product/service management
   createProduct?(config: GatewayConfig, churchId: string): Promise<string>;
