@@ -11,16 +11,12 @@ export class ConjunctionRepo {
 
   private async create(model: Conjunction): Promise<Conjunction> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("conjunctions").values({
-      id: model.id, churchId: model.churchId, automationId: model.automationId, parentId: model.parentId, groupType: model.groupType
-    }).execute();
+    await getDb().insertInto("conjunctions").values({ id: model.id, churchId: model.churchId, automationId: model.automationId, parentId: model.parentId, groupType: model.groupType }).execute();
     return model;
   }
 
   private async update(model: Conjunction): Promise<Conjunction> {
-    await getDb().updateTable("conjunctions").set({
-      automationId: model.automationId, parentId: model.parentId, groupType: model.groupType
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("conjunctions").set({ automationId: model.automationId, parentId: model.parentId, groupType: model.groupType }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

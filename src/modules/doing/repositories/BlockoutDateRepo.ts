@@ -21,16 +21,12 @@ export class BlockoutDateRepo {
 
   private async create(model: BlockoutDate): Promise<BlockoutDate> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("blockoutDates").values({
-      id: model.id, churchId: model.churchId, personId: model.personId, startDate: model.startDate as any, endDate: model.endDate as any
-    }).execute();
+    await getDb().insertInto("blockoutDates").values({ id: model.id, churchId: model.churchId, personId: model.personId, startDate: model.startDate as any, endDate: model.endDate as any }).execute();
     return model;
   }
 
   private async update(model: BlockoutDate): Promise<BlockoutDate> {
-    await getDb().updateTable("blockoutDates").set({
-      personId: model.personId, startDate: model.startDate as any, endDate: model.endDate as any
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("blockoutDates").set({ personId: model.personId, startDate: model.startDate as any, endDate: model.endDate as any }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

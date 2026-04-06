@@ -11,16 +11,12 @@ export class TimeRepo {
 
   private async create(model: Time): Promise<Time> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("times").values({
-      id: model.id, churchId: model.churchId, planId: model.planId, displayName: model.displayName, startTime: model.startTime, endTime: model.endTime, teams: model.teams
-    }).execute();
+    await getDb().insertInto("times").values({ id: model.id, churchId: model.churchId, planId: model.planId, displayName: model.displayName, startTime: model.startTime, endTime: model.endTime, teams: model.teams }).execute();
     return model;
   }
 
   private async update(model: Time): Promise<Time> {
-    await getDb().updateTable("times").set({
-      planId: model.planId, displayName: model.displayName, startTime: model.startTime, endTime: model.endTime, teams: model.teams
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("times").set({ planId: model.planId, displayName: model.displayName, startTime: model.startTime, endTime: model.endTime, teams: model.teams }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

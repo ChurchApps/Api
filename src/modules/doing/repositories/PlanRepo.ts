@@ -96,8 +96,7 @@ export class PlanRepo {
   public async loadSignupPlans(churchId: string) {
     return getDb().selectFrom("plans as p")
       .innerJoin("positions as pos", (join) =>
-        join.onRef("pos.planId", "=", "p.id").onRef("pos.churchId", "=", "p.churchId")
-      )
+        join.onRef("pos.planId", "=", "p.id").onRef("pos.churchId", "=", "p.churchId"))
       .selectAll("p")
       .distinct()
       .where("p.churchId", "=", churchId)

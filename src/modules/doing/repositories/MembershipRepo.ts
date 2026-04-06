@@ -6,10 +6,23 @@ import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 @injectable()
 export class MembershipRepo {
   private static readonly ALLOWED_FIELDS = new Set([
-    "firstName", "lastName", "middleName", "nickName", "displayName",
-    "email", "homePhone", "workPhone", "mobilePhone",
-    "birthDate", "anniversary", "membershipStatus", "gender",
-    "city", "state", "zip", "maritalStatus"
+    "firstName",
+    "lastName",
+    "middleName",
+    "nickName",
+    "displayName",
+    "email",
+    "homePhone",
+    "workPhone",
+    "mobilePhone",
+    "birthDate",
+    "anniversary",
+    "membershipStatus",
+    "gender",
+    "city",
+    "state",
+    "zip",
+    "maritalStatus"
   ]);
 
   private static readonly ALLOWED_OPERATORS = new Set(["=", "!=", ">", "<", ">=", "<=", "LIKE"]);

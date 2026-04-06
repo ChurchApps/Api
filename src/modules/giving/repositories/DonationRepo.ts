@@ -212,9 +212,7 @@ export class DonationRepo {
   }
 
   public async updateStatus(churchId: string, transactionId: string, status: string): Promise<void> {
-    await getDb().updateTable("donations").set({
-      status
-    } as any).where("churchId", "=", churchId).where("transactionId", "=", transactionId).execute();
+    await getDb().updateTable("donations").set({ status } as any).where("churchId", "=", churchId).where("transactionId", "=", transactionId).execute();
   }
 
   public convertToModel(_churchId: string, data: any) {

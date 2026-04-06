@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Condition } from "../models/index.js";
 import { getDb } from "../db/index.js";
@@ -12,16 +11,12 @@ export class ConditionRepo {
 
   private async create(model: Condition): Promise<Condition> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("conditions").values({
-      id: model.id, churchId: model.churchId, conjunctionId: model.conjunctionId, field: model.field, fieldData: model.fieldData, operator: model.operator, value: model.value, label: model.label
-    }).execute();
+    await getDb().insertInto("conditions").values({ id: model.id, churchId: model.churchId, conjunctionId: model.conjunctionId, field: model.field, fieldData: model.fieldData, operator: model.operator, value: model.value, label: model.label }).execute();
     return model;
   }
 
   private async update(model: Condition): Promise<Condition> {
-    await getDb().updateTable("conditions").set({
-      conjunctionId: model.conjunctionId, field: model.field, fieldData: model.fieldData, operator: model.operator, value: model.value, label: model.label
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("conditions").set({ conjunctionId: model.conjunctionId, field: model.field, fieldData: model.fieldData, operator: model.operator, value: model.value, label: model.label }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -39,9 +34,7 @@ export class ConditionRepo {
 
   public async loadForAutomation(churchId: string, automationId: string) {
     return getDb().selectFrom("conditions").selectAll()
-      .where("conjunctionId", "in",
-        getDb().selectFrom("conjunctions").select("id").where("automationId", "=", automationId)
-      )
+      .where("conjunctionId", "in", getDb().selectFrom("conjunctions").select("id").where("automationId", "=", automationId))
       .where("churchId", "=", churchId)
       .execute();
   }

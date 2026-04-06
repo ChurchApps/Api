@@ -35,9 +35,7 @@ export class EventLogRepo {
   }
 
   private async update(model: EventLog): Promise<EventLog> {
-    await getDb().updateTable("eventLogs").set({
-      resolved: model.resolved
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("eventLogs").set({ resolved: model.resolved } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

@@ -11,16 +11,12 @@ export class PositionRepo {
 
   private async create(model: Position): Promise<Position> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("positions").values({
-      id: model.id, churchId: model.churchId, planId: model.planId, categoryName: model.categoryName, name: model.name, count: model.count, groupId: model.groupId, allowSelfSignup: model.allowSelfSignup, description: model.description
-    }).execute();
+    await getDb().insertInto("positions").values({ id: model.id, churchId: model.churchId, planId: model.planId, categoryName: model.categoryName, name: model.name, count: model.count, groupId: model.groupId, allowSelfSignup: model.allowSelfSignup, description: model.description }).execute();
     return model;
   }
 
   private async update(model: Position): Promise<Position> {
-    await getDb().updateTable("positions").set({
-      planId: model.planId, categoryName: model.categoryName, name: model.name, count: model.count, groupId: model.groupId, allowSelfSignup: model.allowSelfSignup, description: model.description
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("positions").set({ planId: model.planId, categoryName: model.categoryName, name: model.name, count: model.count, groupId: model.groupId, allowSelfSignup: model.allowSelfSignup, description: model.description }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

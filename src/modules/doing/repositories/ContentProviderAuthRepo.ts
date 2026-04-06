@@ -11,16 +11,12 @@ export class ContentProviderAuthRepo {
 
   private async create(model: ContentProviderAuth): Promise<ContentProviderAuth> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("contentProviderAuths").values({
-      id: model.id, churchId: model.churchId, ministryId: model.ministryId, providerId: model.providerId, accessToken: model.accessToken, refreshToken: model.refreshToken, tokenType: model.tokenType, expiresAt: model.expiresAt, scope: model.scope
-    }).execute();
+    await getDb().insertInto("contentProviderAuths").values({ id: model.id, churchId: model.churchId, ministryId: model.ministryId, providerId: model.providerId, accessToken: model.accessToken, refreshToken: model.refreshToken, tokenType: model.tokenType, expiresAt: model.expiresAt, scope: model.scope }).execute();
     return model;
   }
 
   private async update(model: ContentProviderAuth): Promise<ContentProviderAuth> {
-    await getDb().updateTable("contentProviderAuths").set({
-      ministryId: model.ministryId, providerId: model.providerId, accessToken: model.accessToken, refreshToken: model.refreshToken, tokenType: model.tokenType, expiresAt: model.expiresAt, scope: model.scope
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("contentProviderAuths").set({ ministryId: model.ministryId, providerId: model.providerId, accessToken: model.accessToken, refreshToken: model.refreshToken, tokenType: model.tokenType, expiresAt: model.expiresAt, scope: model.scope }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

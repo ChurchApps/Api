@@ -11,16 +11,12 @@ export class AutomationRepo {
 
   private async create(model: Automation): Promise<Automation> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("automations").values({
-      id: model.id, churchId: model.churchId, title: model.title, recurs: model.recurs, active: model.active
-    }).execute();
+    await getDb().insertInto("automations").values({ id: model.id, churchId: model.churchId, title: model.title, recurs: model.recurs, active: model.active }).execute();
     return model;
   }
 
   private async update(model: Automation): Promise<Automation> {
-    await getDb().updateTable("automations").set({
-      title: model.title, recurs: model.recurs, active: model.active
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("automations").set({ title: model.title, recurs: model.recurs, active: model.active }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

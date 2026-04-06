@@ -11,16 +11,12 @@ export class PlanTypeRepo {
 
   private async create(model: PlanType): Promise<PlanType> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("planTypes").values({
-      id: model.id, churchId: model.churchId, ministryId: model.ministryId, name: model.name
-    }).execute();
+    await getDb().insertInto("planTypes").values({ id: model.id, churchId: model.churchId, ministryId: model.ministryId, name: model.name }).execute();
     return model;
   }
 
   private async update(model: PlanType): Promise<PlanType> {
-    await getDb().updateTable("planTypes").set({
-      ministryId: model.ministryId, name: model.name
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("planTypes").set({ ministryId: model.ministryId, name: model.name }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

@@ -75,7 +75,7 @@ export class TaskRepo {
   }
 
   public async loadTimeline(churchId: string, personId: string, taskIds: string[]) {
-    let query = getDb().selectFrom("tasks")
+    const query = getDb().selectFrom("tasks")
       .selectAll()
       .select(sql`'task'`.as("postType"))
       .select("id as postId")
@@ -181,8 +181,7 @@ export class TaskRepo {
         eb.or([
           eb.and([eb("assignedToType", "=", "person"), eb("assignedToId", "=", personId)]),
           eb.and([eb("createdByType", "=", "person"), eb("createdById", "=", personId)])
-        ])
-      )
+        ]))
       .where("status", "=", status)
       .orderBy("taskNumber")
       .execute();
@@ -196,8 +195,7 @@ export class TaskRepo {
         eb.or([
           eb.and([eb("assignedToType", "=", "group"), eb("assignedToId", "in", groupIds)]),
           eb.and([eb("createdByType", "=", "group"), eb("createdById", "in", groupIds)])
-        ])
-      )
+        ]))
       .where("status", "=", status)
       .orderBy("taskNumber")
       .execute();
