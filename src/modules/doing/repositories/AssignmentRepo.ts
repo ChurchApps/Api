@@ -12,16 +12,12 @@ export class AssignmentRepo {
 
   private async create(model: Assignment): Promise<Assignment> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("assignments").values({
-      id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified
-    }).execute();
+    await getDb().insertInto("assignments").values({ id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified }).execute();
     return model;
   }
 
   private async update(model: Assignment): Promise<Assignment> {
-    await getDb().updateTable("assignments").set({
-      positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("assignments").set({ positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -40,9 +36,7 @@ export class AssignmentRepo {
   public async deleteByPlanId(churchId: string, planId: string) {
     await getDb().deleteFrom("assignments")
       .where("churchId", "=", churchId)
-      .where("positionId", "in",
-        getDb().selectFrom("positions").select("id").where("planId", "=", planId)
-      )
+      .where("positionId", "in", getDb().selectFrom("positions").select("id").where("planId", "=", planId))
       .execute();
   }
 
@@ -85,8 +79,14 @@ export class AssignmentRepo {
       .innerJoin("positions as p", "p.id", "a.positionId")
       .innerJoin("plans as pl", "pl.id", "p.planId")
       .select([
-        "a.id", "a.churchId", "a.positionId", "a.personId", "a.status", "a.notified",
-        "pl.serviceDate", sql`pl.name`.as("planName")
+        "a.id",
+        "a.churchId",
+        "a.positionId",
+        "a.personId",
+        "a.status",
+        "a.notified",
+        "pl.serviceDate",
+        sql`pl.name`.as("planName")
       ])
       .where("a.status", "=", "Unconfirmed")
       .where("pl.serviceDate", ">=", sql`DATE_ADD(CURDATE(), INTERVAL 2 DAY)` as any)
@@ -112,12 +112,15 @@ export class AssignmentRepo {
     let query = getDb().selectFrom("positions as p")
       .innerJoin("plans as pl", "pl.id", "p.planId")
       .leftJoin("assignments as a", (join) =>
-        join.onRef("a.positionId", "=", "p.id").on("a.status", "in", ["Accepted", "Unconfirmed"])
-      )
+        join.onRef("a.positionId", "=", "p.id").on("a.status", "in", ["Accepted", "Unconfirmed"]))
       .select([
-        "pl.serviceDate", "pl.ministryId", "p.categoryName",
-        sql`p.name`.as("positionName"), sql`p.count`.as("needed"),
-        "a.personId", "a.status"
+        "pl.serviceDate",
+        "pl.ministryId",
+        "p.categoryName",
+        sql`p.name`.as("positionName"),
+        sql`p.count`.as("needed"),
+        "a.personId",
+        "a.status"
       ])
       .where("pl.churchId", "=", churchId)
       .where("pl.serviceDate", ">=", startDate as any)

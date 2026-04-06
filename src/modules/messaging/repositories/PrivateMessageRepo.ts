@@ -79,8 +79,7 @@ export class PrivateMessageRepo {
           eb("deliveryMethod", "=", "push"),
           eb("deliveryMethod", "=", "socket"),
           eb("deliveryMethod", "=", "email")
-        ])
-      )
+        ]))
       .execute();
     return result.map((d: any) => this.rowToModel(d));
   }

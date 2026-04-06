@@ -20,9 +20,7 @@ export class RoleRepo {
   }
 
   private async update(model: Role): Promise<Role> {
-    await getDb().updateTable("roles").set({
-      name: model.name
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("roles").set({ name: model.name }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

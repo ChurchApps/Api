@@ -20,9 +20,7 @@ export class HouseholdRepo {
   }
 
   private async update(model: Household): Promise<Household> {
-    await getDb().updateTable("households").set({
-      name: model.name
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("households").set({ name: model.name }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -33,13 +31,11 @@ export class HouseholdRepo {
   public async deleteUnused(churchId: string) {
     await getDb().deleteFrom("households")
       .where("churchId", "=", churchId)
-      .where("id", "not in",
-        getDb().selectFrom("people")
-          .select("householdId")
-          .where("churchId", "=", churchId)
-          .where("householdId", "is not", null)
-          .groupBy("householdId")
-      )
+      .where("id", "not in", getDb().selectFrom("people")
+        .select("householdId")
+        .where("churchId", "=", churchId)
+        .where("householdId", "is not", null)
+        .groupBy("householdId"))
       .execute();
   }
 

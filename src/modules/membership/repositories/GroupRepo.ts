@@ -130,7 +130,7 @@ export class GroupRepo {
   }
 
   public async search(churchId: string, campusId: string, serviceId: string, serviceTimeId: string) {
-    let query = getDb().selectFrom("groups as g")
+    let query = (getDb() as any).selectFrom("groups as g")
       .leftJoin("groupServiceTimes as gst", "gst.groupId", "g.id")
       .leftJoin("serviceTimes as st", "st.id", "gst.serviceTimeId")
       .leftJoin("services as s", "s.id", "st.serviceId")

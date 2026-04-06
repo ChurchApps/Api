@@ -95,8 +95,7 @@ export class ConversationRepo {
       .innerJoin("conversations as c2", (join) =>
         join.onRef("c2.churchId", "=", "c.churchId")
           .on("c2.contentType", "=", "streamingLiveHost")
-          .onRef("c2.contentId", "=", "c.contentId")
-      )
+          .onRef("c2.contentId", "=", "c.contentId"))
       .selectAll("c2")
       .where("c.id", "=", mainConversationId)
       .where("c.churchId", "=", churchId)

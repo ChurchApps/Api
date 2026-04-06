@@ -70,15 +70,21 @@ export class CuratedEventRepo {
           eb.or([
             eb.and([eb("ce.eventId", "is", null), eb("e.groupId", "=", eb.ref("ce.groupId"))]),
             eb.and([eb("ce.eventId", "is not", null), eb("e.id", "=", eb.ref("ce.eventId"))])
-          ])
-        )
-      )
+          ])))
       .select([
-        "ce.id", "ce.churchId", "ce.curatedCalendarId",
+        "ce.id",
+        "ce.churchId",
+        "ce.curatedCalendarId",
         sql`ce.groupId`.as("curatedGroupId"),
         "ce.eventId",
-        "e.groupId", "e.title", "e.description", "e.start", "e.end",
-        "e.allDay", "e.recurrenceRule", "e.visibility"
+        "e.groupId",
+        "e.title",
+        "e.description",
+        "e.start",
+        "e.end",
+        "e.allDay",
+        "e.recurrenceRule",
+        "e.visibility"
       ])
       .where("ce.curatedCalendarId", "=", curatedCalendarId)
       .where("ce.churchId", "=", churchId)

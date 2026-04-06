@@ -47,11 +47,11 @@ export class ChurchRepo {
     return church;
   }
 
-  public async delete(churchId: string, id: string) {
+  public async delete(_churchId: string, id: string) {
     await getDb().deleteFrom("churches").where("id", "=", id).execute();
   }
 
-  public async load(churchId: string, id: string) {
+  public async load(_churchId: string, id: string) {
     return (await getDb().selectFrom("churches").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
@@ -101,18 +101,26 @@ export class ChurchRepo {
     const rows = await getDb()
       .selectFrom("userChurches as uc")
       .innerJoin("churches as c", (join) =>
-        join.onRef("c.id", "=", "uc.churchId").on("c.archivedDate", "is", null)
-      )
+        join.onRef("c.id", "=", "uc.churchId").on("c.archivedDate", "is", null))
       .leftJoin("people as p", (join) =>
         join.onRef("p.id", "=", "uc.personId").on((eb) =>
-          eb.or([eb("p.removed", "=", false as any), eb("p.removed", "is", null)])
-        )
-      )
+          eb.or([eb("p.removed", "=", false as any), eb("p.removed", "is", null)])))
       .select([
-        "c.id", "c.name", "c.subDomain", "c.archivedDate",
-        "c.address1", "c.address2", "c.city", "c.state", "c.zip", "c.country",
-        "c.registrationDate", "c.latitude", "c.longitude",
-        "p.id as personId", "p.membershipStatus"
+        "c.id",
+        "c.name",
+        "c.subDomain",
+        "c.archivedDate",
+        "c.address1",
+        "c.address2",
+        "c.city",
+        "c.state",
+        "c.zip",
+        "c.country",
+        "c.registrationDate",
+        "c.latitude",
+        "c.longitude",
+        "p.id as personId",
+        "p.membershipStatus"
       ])
       .where("uc.userId", "=", userId)
       .execute() as any[];

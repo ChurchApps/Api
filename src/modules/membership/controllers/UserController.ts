@@ -63,7 +63,7 @@ export class UserController extends MembershipBaseController {
           }
         } else {
           user = await this.repos.user.loadByEmail(req.body.email.trim());
-          console.log("BODY", req.body)
+          console.log("BODY", req.body);
           console.log("LOADED USER", user);
           if (user !== null) {
             if (!bcrypt.compareSync(req.body.password, user.password?.toString() || "")) user = null;

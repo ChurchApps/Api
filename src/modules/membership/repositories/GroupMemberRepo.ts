@@ -49,7 +49,9 @@ export class GroupMemberRepo {
     return getDb().selectFrom("groupMembers as gm")
       .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
       .selectAll("gm")
-      .select(["p.photoUpdated", "p.displayName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole"])
+      .select([
+        "p.photoUpdated", "p.displayName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole"
+      ])
       .where("gm.churchId", "=", churchId)
       .where("gm.groupId", "=", groupId)
       .orderBy("gm.leader", "desc")

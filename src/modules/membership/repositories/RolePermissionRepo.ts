@@ -224,7 +224,9 @@ export class RolePermissionRepo {
   public async loadForEveryone(churchId: string) {
     return getDb().selectFrom("rolePermissions as rp")
       .leftJoin("churches as c", "c.id", "rp.churchId")
-      .select(["rp.id", "rp.churchId", "rp.roleId", "rp.apiName", "rp.contentType", "rp.contentId", "rp.action", "c.name as churchName", "c.subDomain"])
+      .select([
+        "rp.id", "rp.churchId", "rp.roleId", "rp.apiName", "rp.contentType", "rp.contentId", "rp.action", "c.name as churchName", "c.subDomain"
+      ])
       .where("rp.churchId", "=", churchId)
       .where("rp.roleId", "is", null)
       .execute();

@@ -57,8 +57,7 @@ export class NotificationRepo {
   public async loadForEmail(frequency: string) {
     return getDb().selectFrom("notifications as n")
       .innerJoin("notificationPreferences as np", (join) =>
-        join.onRef("np.churchId", "=", "n.churchId").onRef("np.personId", "=", "n.personId")
-      )
+        join.onRef("np.churchId", "=", "n.churchId").onRef("np.personId", "=", "n.personId"))
       .select(["n.churchId", "n.personId"])
       .distinct()
       .where("n.deliveryMethod", "=", "email")
@@ -134,8 +133,7 @@ export class NotificationRepo {
           eb("deliveryMethod", "=", "push"),
           eb("deliveryMethod", "=", "socket"),
           eb("deliveryMethod", "=", "email")
-        ])
-      )
+        ]))
       .execute();
   }
 

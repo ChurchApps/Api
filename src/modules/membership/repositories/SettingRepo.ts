@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Setting } from "../models/index.js";

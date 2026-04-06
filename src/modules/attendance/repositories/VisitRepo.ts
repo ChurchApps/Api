@@ -1,5 +1,5 @@
 import { sql } from "kysely";
-import { UniqueIdHelper, ArrayHelper } from "@churchapps/apihelper";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { getDb } from "../db/index.js";
 import { Visit } from "../models/index.js";
