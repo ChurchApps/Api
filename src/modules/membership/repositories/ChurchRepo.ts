@@ -128,12 +128,12 @@ export class ChurchRepo {
   }
 
   public async getAbandoned(noMonths = 6) {
-    const result = await sql`SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL ${sql.raw(String(noMonths))} MONTH)`.execute(getDb());
+    const result = await sql`SELECT churchId FROM (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches WHERE lastAccessed <= DATE_SUB(NOW(), INTERVAL ${noMonths} MONTH)`.execute(getDb());
     return result.rows;
   }
 
   public async deleteAbandoned(noMonths = 7) {
-    await sql`DELETE churches FROM churches LEFT JOIN (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches ON churches.id = groupedChurches.churchId WHERE groupedChurches.lastAccessed <= DATE_SUB(NOW(), INTERVAL ${sql.raw(String(noMonths))} MONTH)`.execute(getDb());
+    await sql`DELETE churches FROM churches LEFT JOIN (SELECT churchId, MAX(lastAccessed) lastAccessed FROM userChurches GROUP BY churchId) groupedChurches ON churches.id = groupedChurches.churchId WHERE groupedChurches.lastAccessed <= DATE_SUB(NOW(), INTERVAL ${noMonths} MONTH)`.execute(getDb());
   }
 
   protected rowToModel(row: any): Church {

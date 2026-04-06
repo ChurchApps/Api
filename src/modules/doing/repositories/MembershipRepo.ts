@@ -5,11 +5,23 @@ import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 
 @injectable()
 export class MembershipRepo {
+  private static readonly ALLOWED_FIELDS = new Set([
+    "firstName", "lastName", "middleName", "nickName", "displayName",
+    "email", "homePhone", "workPhone", "mobilePhone",
+    "birthDate", "anniversary", "membershipStatus", "gender",
+    "city", "state", "zip", "maritalStatus"
+  ]);
+
+  private static readonly ALLOWED_OPERATORS = new Set(["=", "!=", ">", "<", ">=", "<=", "LIKE"]);
+
   private getDb() {
     return KyselyPool.getDb("membership-doing");
   }
 
   private getDBField(condition: Condition) {
+    if (!MembershipRepo.ALLOWED_FIELDS.has(condition.field)) {
+      throw new Error(`Invalid condition field: ${condition.field}`);
+    }
     const fieldData = condition.fieldData ? JSON.parse(condition.fieldData) : {};
     let result = condition.field;
     switch (fieldData.datePart) {
@@ -38,6 +50,9 @@ export class MembershipRepo {
   }
 
   public async loadIdsMatchingCondition(condition: Condition) {
+    if (!MembershipRepo.ALLOWED_OPERATORS.has(condition.operator)) {
+      throw new Error(`Invalid condition operator: ${condition.operator}`);
+    }
     const dbField = this.getDBField(condition);
     const dbValue = this.getDBValue(condition);
 
