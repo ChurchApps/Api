@@ -115,10 +115,11 @@ export class VisitSessionController extends AttendanceBaseController {
 
       if (!au.checkAccess(Permissions.attendance.view) && !isGroupLeader) return this.json([], 401);
       else {
-        let data;
-        if (sessionId !== "") data = await this.repos.visitSession.loadForSession(au.churchId, sessionId);
-        else data = await this.repos.visitSession.loadAll(au.churchId);
-        return this.repos.visitSession.convertAllToModel(au.churchId, data as any) || [];
+        if (sessionId !== "") return (await this.repos.visitSession.loadForSession(au.churchId, sessionId)) || [];
+        else {
+          const data = await this.repos.visitSession.loadAll(au.churchId);
+          return this.repos.visitSession.convertAllToModel(au.churchId, data as any) || [];
+        }
       }
     });
   }
