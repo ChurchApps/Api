@@ -1,63 +1,70 @@
 import { injectable } from "inversify";
-import { ConfiguredRepo, type RepoConfig } from "../../../shared/infrastructure/index.js";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { ArrayHelper } from "@churchapps/apihelper";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { getDb } from "../db/index.js";
 import { Session } from "../models/index.js";
 
 @injectable()
-export class SessionRepo extends ConfiguredRepo<Session> {
-  protected get repoConfig(): RepoConfig<Session> {
-    return {
-      tableName: "sessions",
-      hasSoftDelete: false,
-      defaultOrderBy: "sessionDate DESC",
-      columns: ["groupId", "serviceTimeId", "sessionDate"]
-    };
+export class SessionRepo {
+  public async save(model: Session) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  protected async create(session: Session): Promise<Session> {
-    const m: any = session;
-    if (!m.id) m.id = this.createId();
-    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);  // date-only field
-    const sql = "INSERT INTO sessions (id, churchId, groupId, serviceTimeId, sessionDate) VALUES (?, ?, ?, ?, ?);";
-    const params = [session.id, session.churchId, session.groupId, session.serviceTimeId, sessionDate];
-    await TypedDB.query(sql, params);
+  private async create(session: Session): Promise<Session> {
+    session.id = UniqueIdHelper.shortId();
+    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);
+    await getDb().insertInto("sessions").values({
+      id: session.id,
+      churchId: session.churchId,
+      groupId: session.groupId,
+      serviceTimeId: session.serviceTimeId,
+      sessionDate: sessionDate as any
+    }).execute();
     return session;
   }
 
-  protected async update(session: Session): Promise<Session> {
-    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);  // date-only field
-    const sql = "UPDATE sessions SET groupId=?, serviceTimeId=?, sessionDate=? WHERE id=? and churchId=?";
-    const params = [session.groupId, session.serviceTimeId, sessionDate, session.id, session.churchId];
-    await TypedDB.query(sql, params);
+  private async update(session: Session): Promise<Session> {
+    const sessionDate = DateHelper.toMysqlDateOnly(session.sessionDate);
+    await getDb().updateTable("sessions").set({
+      groupId: session.groupId,
+      serviceTimeId: session.serviceTimeId,
+      sessionDate: sessionDate as any
+    }).where("id", "=", session.id)
+      .where("churchId", "=", session.churchId)
+      .execute();
     return session;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("sessions").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("sessions").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("sessions").selectAll().where("churchId", "=", churchId).orderBy("sessionDate", "desc").execute();
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
-    const result = await TypedDB.query("SELECT * FROM sessions WHERE churchId=? AND id IN (" + ArrayHelper.fillArray("?", ids.length).join(", ") + ");", [churchId].concat(ids));
-    return this.convertAllToModel(churchId, result);
+    return getDb().selectFrom("sessions").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 
   public async loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
-    const sessDate = DateHelper.toMysqlDateOnly(sessionDate);  // date-only field
-    const result = await TypedDB.queryOne("SELECT * FROM sessions WHERE churchId=? AND groupId = ? AND serviceTimeId = ? AND sessionDate = ?;", [churchId, groupId, serviceTimeId, sessDate]);
-    return result ? this.convertToModel(churchId, result) : null;
+    const sessDate = DateHelper.toMysqlDateOnly(sessionDate);
+    const row = await sql<any>`SELECT * FROM sessions WHERE churchId=${churchId} AND groupId = ${groupId} AND serviceTimeId = ${serviceTimeId} AND sessionDate = ${sessDate}`.execute(getDb());
+    return row.rows.length > 0 ? this.rowToModel(row.rows[0]) : null;
   }
 
   public async loadByGroupIdWithNames(churchId: string, groupId: string) {
-    const sql =
-      "select s.id, " +
-      " CASE" +
-      "     WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y')" +
-      "     ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name)" +
-      " END AS displayName" +
-      " FROM sessions s" +
-      " LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId" +
-      " WHERE s.churchId=? AND s.groupId=?" +
-      " ORDER by s.sessionDate desc";
-    const result = await TypedDB.query(sql, [churchId, groupId]);
-    return this.convertAllToModel(churchId, result);
+    const rows = await sql<any>`select s.id, CASE WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y') ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name) END AS displayName FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId WHERE s.churchId=${churchId} AND s.groupId=${groupId} ORDER by s.sessionDate desc`.execute(getDb());
+    return rows.rows.map((row: any) => this.rowToModel(row));
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]): Session[] {
+    return data.map((row) => this.rowToModel(row));
   }
 
   protected rowToModel(data: any): Session {

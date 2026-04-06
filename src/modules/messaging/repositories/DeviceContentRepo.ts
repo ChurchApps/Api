@@ -1,24 +1,59 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DeviceContent } from "../models/index.js";
 import { injectable } from "inversify";
-
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
+import { DeviceContent } from "../models/index.js";
 
 @injectable()
-export class DeviceContentRepo extends ConfiguredRepo<DeviceContent> {
-  protected get repoConfig(): RepoConfig<DeviceContent> {
-    return {
-      tableName: "deviceContent",
-      hasSoftDelete: false,
-      columns: ["deviceId", "contentType", "contentId"]
-    };
-  }
-  public loadByDeviceId(churchId: string, deviceId: string) {
-    return TypedDB.query("SELECT * FROM deviceContent WHERE churchId=? AND deviceId=?", [churchId, deviceId]);
+export class DeviceContentRepo {
+  public async save(model: DeviceContent) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public deleteByDeviceId(churchId: string, deviceId: string) {
-    return TypedDB.query("DELETE FROM deviceContent WHERE deviceId=? AND churchId=?;", [deviceId, churchId]);
+  private async create(model: DeviceContent): Promise<DeviceContent> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("deviceContent").values({
+      id: model.id,
+      churchId: model.churchId,
+      deviceId: model.deviceId,
+      contentType: model.contentType,
+      contentId: model.contentId
+    }).execute();
+    return model;
+  }
+
+  private async update(model: DeviceContent): Promise<DeviceContent> {
+    await getDb().updateTable("deviceContent").set({
+      deviceId: model.deviceId,
+      contentType: model.contentType,
+      contentId: model.contentId
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async loadByDeviceId(churchId: string, deviceId: string) {
+    return getDb().selectFrom("deviceContent").selectAll()
+      .where("churchId", "=", churchId)
+      .where("deviceId", "=", deviceId)
+      .execute();
+  }
+
+  public async deleteByDeviceId(churchId: string, deviceId: string) {
+    await getDb().deleteFrom("deviceContent")
+      .where("deviceId", "=", deviceId)
+      .where("churchId", "=", churchId)
+      .execute();
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("deviceContent").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("deviceContent").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("deviceContent").selectAll().where("churchId", "=", churchId).execute();
   }
 
   protected rowToModel(row: any): DeviceContent {

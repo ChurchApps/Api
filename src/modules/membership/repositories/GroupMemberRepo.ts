@@ -1,62 +1,120 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { GroupMember } from "../models/index.js";
 import { PersonHelper } from "../helpers/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
-  protected get repoConfig(): RepoConfig<GroupMember> {
-    return {
-      tableName: "groupMembers",
-      hasSoftDelete: false,
-      columns: ["groupId", "personId", "leader"],
-      insertLiterals: { joinDate: "NOW()" }
-    };
+export class GroupMemberRepo {
+  public async save(model: GroupMember) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadForGroup(churchId: string, groupId: string) {
-    const sql =
-      "SELECT gm.*, " +
-      "p.photoUpdated, p.displayName, p.email, p.homePhone, p.mobilePhone, p.workPhone, p.optedOut, " +
-      "p.address1, p.address2, p.city, p.state, p.zip, " +
-      "p.householdId, p.householdRole " +
-      "FROM groupMembers gm " +
-      "INNER JOIN people p on p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL) " +
-      "WHERE gm.churchId=? AND gm.groupId=? " +
-      "ORDER BY gm.leader DESC, p.lastName, p.firstName;";
-    return TypedDB.query(sql, [churchId, groupId]);
+  private async create(model: GroupMember): Promise<GroupMember> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("groupMembers").values({
+      id: model.id,
+      churchId: model.churchId,
+      groupId: model.groupId,
+      personId: model.personId,
+      leader: model.leader,
+      joinDate: sql`NOW()` as any
+    }).execute();
+    return model;
   }
 
-  public loadLeadersForGroup(churchId: string, groupId: string) {
-    const sql =
-      "SELECT gm.*, p.photoUpdated, p.displayName" +
-      " FROM groupMembers gm" +
-      " INNER JOIN people p on p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL)" +
-      " WHERE gm.churchId=? AND gm.groupId=? and gm.leader=1" +
-      " ORDER BY p.lastName, p.firstName;";
-    return TypedDB.query(sql, [churchId, groupId]);
+  private async update(model: GroupMember): Promise<GroupMember> {
+    await getDb().updateTable("groupMembers").set({
+      groupId: model.groupId,
+      personId: model.personId,
+      leader: model.leader
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadForGroups(churchId: string, groupIds: string[]) {
-    const sql =
-      "SELECT gm.*, p.photoUpdated, p.displayName, p.email" +
-      " FROM groupMembers gm" +
-      " INNER JOIN people p on p.id=gm.personId AND (p.removed=0 OR p.removed IS NULL)" +
-      " WHERE gm.churchId=? AND gm.groupId IN (?)" +
-      " ORDER BY gm.leader desc, p.lastName, p.firstName;";
-    return TypedDB.query(sql, [churchId, groupIds]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("groupMembers").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadForPerson(churchId: string, personId: string) {
-    const sql =
-      "SELECT gm.*, g.name as groupName" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.Id=gm.groupId" + " WHERE gm.churchId=? AND gm.personId=? AND g.removed=0" + " ORDER BY g.name;";
-    return TypedDB.query(sql, [churchId, personId]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("groupMembers").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadForPeople(peopleIds: string[]) {
-    const sql = "SELECT gm.*, g.name, g.tags" + " FROM groupMembers gm" + " INNER JOIN `groups` g on g.Id=gm.groupId" + " WHERE gm.personId IN (?);";
-    return TypedDB.query(sql, [peopleIds]);
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("groupMembers").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadForGroup(churchId: string, groupId: string) {
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("gm")
+      .select(["p.photoUpdated", "p.displayName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole"])
+      .where("gm.churchId", "=", churchId)
+      .where("gm.groupId", "=", groupId)
+      .orderBy("gm.leader", "desc")
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
+      .execute();
+  }
+
+  public async loadLeadersForGroup(churchId: string, groupId: string) {
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("gm")
+      .select(["p.photoUpdated", "p.displayName"])
+      .where("gm.churchId", "=", churchId)
+      .where("gm.groupId", "=", groupId)
+      .where("gm.leader", "=", 1 as any)
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
+      .execute();
+  }
+
+  public async loadForGroups(churchId: string, groupIds: string[]) {
+    if (!groupIds.length) return [];
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("gm")
+      .select(["p.photoUpdated", "p.displayName", "p.email"])
+      .where("gm.churchId", "=", churchId)
+      .where("gm.groupId", "in", groupIds)
+      .orderBy("gm.leader", "desc")
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
+      .execute();
+  }
+
+  public async loadForPerson(churchId: string, personId: string) {
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .selectAll("gm")
+      .select("g.name as groupName")
+      .where("gm.churchId", "=", churchId)
+      .where("gm.personId", "=", personId)
+      .where("g.removed", "=", 0 as any)
+      .orderBy("g.name")
+      .execute();
+  }
+
+  public async loadForPeople(peopleIds: string[]) {
+    if (!peopleIds.length) return [];
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .selectAll("gm")
+      .select(["g.name", "g.tags"])
+      .where("gm.personId", "in", peopleIds)
+      .execute();
+  }
+
+  public saveAll(models: GroupMember[]) {
+    const promises: Promise<GroupMember>[] = [];
+    models.forEach((model) => { promises.push(this.save(model)); });
+    return Promise.all(promises);
+  }
+
+  public insert(model: GroupMember): Promise<GroupMember> {
+    return this.create(model);
   }
 
   protected rowToModel(row: any): GroupMember {
@@ -95,6 +153,15 @@ export class GroupMemberRepo extends ConfiguredRepo<GroupMember> {
     return result;
   }
 
+  public convertToModel(_churchId: string, data: any) {
+    if (!data) return null;
+    return this.rowToModel(data);
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    if (!Array.isArray(data)) return [];
+    return data.map((d) => this.rowToModel(d));
+  }
 
   public convertAllToBasicModel(churchId: string, data: any[]) {
     const result: GroupMember[] = [];

@@ -1,31 +1,63 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { NotificationPreference } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { sql } from "kysely";
 import { injectable } from "inversify";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
+import { NotificationPreference } from "../models/index.js";
 
 @injectable()
-export class NotificationPreferenceRepo extends ConfiguredRepo<NotificationPreference> {
-  protected get repoConfig(): RepoConfig<NotificationPreference> {
-    return {
-      tableName: "notificationPreferences",
-      hasSoftDelete: false,
-      columns: ["personId", "allowPush", "emailFrequency"]
-    };
-  }
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM notificationPreferences WHERE id=? and churchId=?;", [id, churchId]);
+export class NotificationPreferenceRepo {
+  public async save(model: NotificationPreference) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadByPersonId(churchId: string, personId: string) {
-    return TypedDB.queryOne("SELECT * FROM notificationPreferences WHERE churchId=? AND personId=?", [churchId, personId]);
+  private async create(model: NotificationPreference): Promise<NotificationPreference> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("notificationPreferences").values({
+      id: model.id,
+      churchId: model.churchId,
+      personId: model.personId,
+      allowPush: model.allowPush,
+      emailFrequency: model.emailFrequency
+    }).execute();
+    return model;
   }
 
-  public loadByChurchId(churchId: string) {
-    return TypedDB.query("SELECT * FROM notificationPreferences WHERE churchId=?", [churchId]);
+  private async update(model: NotificationPreference): Promise<NotificationPreference> {
+    await getDb().updateTable("notificationPreferences").set({
+      personId: model.personId,
+      allowPush: model.allowPush,
+      emailFrequency: model.emailFrequency
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM notificationPreferences WHERE id=? AND churchId=?;", [id, churchId]);
+  public async loadById(churchId: string, id: string) {
+    return (await getDb().selectFrom("notificationPreferences").selectAll()
+      .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadByPersonId(churchId: string, personId: string): Promise<NotificationPreference | undefined> {
+    return (await getDb().selectFrom("notificationPreferences").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .executeTakeFirst()) ?? null;
+  }
+
+  public async loadByChurchId(churchId: string) {
+    return getDb().selectFrom("notificationPreferences").selectAll()
+      .where("churchId", "=", churchId)
+      .execute();
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("notificationPreferences").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async loadByPersonIds(personIds: string[]) {
+    if (!personIds || personIds.length === 0) return [];
+    return getDb().selectFrom("notificationPreferences").selectAll()
+      .where("personId", "in", personIds)
+      .execute();
   }
 
   protected rowToModel(data: any): NotificationPreference {
@@ -42,12 +74,7 @@ export class NotificationPreferenceRepo extends ConfiguredRepo<NotificationPrefe
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
-  }
-
-  public loadByPersonIds(personIds: string[]) {
-    const sql = "SELECT * FROM notificationPreferences WHERE personId IN (?)";
-    return TypedDB.query(sql, [personIds]);
+  public convertAllToModel(data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
   }
 }

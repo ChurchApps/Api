@@ -1,64 +1,102 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Question } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class QuestionRepo extends ConfiguredRepo<Question> {
-  protected get repoConfig(): RepoConfig<Question> {
-    return {
-      tableName: "questions",
-      hasSoftDelete: true,
-      removedColumn: "removed",
-      columns: [
-        "formId", "parentId", "title", "description", "fieldType", "placeholder", "sort", "required", "choices"
-      ],
-      insertLiterals: { removed: "0" }
-    };
-  }
-  protected async create(question: Question): Promise<Question> {
-    (question as any).choices = JSON.stringify(question.choices);
-    return super.create(question);
+export class QuestionRepo {
+  public async save(model: Question) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  protected async update(question: Question): Promise<Question> {
-    (question as any).choices = JSON.stringify(question.choices);
-    return super.update(question);
+  private async create(question: Question): Promise<Question> {
+    question.id = UniqueIdHelper.shortId();
+    const choices = JSON.stringify(question.choices);
+    await getDb().insertInto("questions").values({
+      id: question.id,
+      churchId: question.churchId,
+      formId: question.formId,
+      parentId: question.parentId,
+      title: question.title,
+      description: question.description,
+      fieldType: question.fieldType,
+      placeholder: question.placeholder,
+      sort: question.sort,
+      required: question.required,
+      choices: choices as any,
+      removed: false as any
+    }).execute();
+    return question;
+  }
+
+  private async update(question: Question): Promise<Question> {
+    const choices = JSON.stringify(question.choices);
+    await getDb().updateTable("questions").set({
+      formId: question.formId,
+      parentId: question.parentId,
+      title: question.title,
+      description: question.description,
+      fieldType: question.fieldType,
+      placeholder: question.placeholder,
+      sort: question.sort,
+      required: question.required,
+      choices: choices as any
+    }).where("id", "=", question.id).where("churchId", "=", question.churchId).execute();
+    return question;
   }
 
   public async delete(churchId: string, id: string) {
-    const question = (await TypedDB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
-      formId: string;
-      sort: number;
-    };
-    await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort>?;", [question.formId, +question.sort]);
-    return TypedDB.query("UPDATE questions SET sort=CONCAT('d', sort), removed=1 WHERE id=? AND churchId=?;", [id, churchId]);
+    const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
+    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("formId", "=", question.formId).where("sort", ">", +question.sort as any).execute();
+    await getDb().updateTable("questions").set({ sort: sql`CONCAT('d', sort)` as any, removed: 1 as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadForForm(churchId: string, formId: string) {
-    return TypedDB.query("SELECT * FROM questions WHERE churchId=? AND formId=? AND removed=0 ORDER BY sort;", [churchId, formId]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("questions").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false as any).executeTakeFirst()) ?? null;
   }
 
-  public loadForUnrestrictedForm(formId: string) {
-    return TypedDB.query("SELECT * FROM questions WHERE formId=? AND removed=0 ORDER BY sort;", [formId]);
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("questions").selectAll().where("churchId", "=", churchId).where("removed", "=", false as any).orderBy("sort").execute();
+  }
+
+  public async loadForForm(churchId: string, formId: string) {
+    return getDb().selectFrom("questions").selectAll()
+      .where("churchId", "=", churchId)
+      .where("formId", "=", formId)
+      .where("removed", "=", false as any)
+      .orderBy("sort")
+      .execute();
+  }
+
+  public async loadForUnrestrictedForm(formId: string) {
+    return getDb().selectFrom("questions").selectAll()
+      .where("formId", "=", formId)
+      .where("removed", "=", false as any)
+      .orderBy("sort")
+      .execute();
   }
 
   public async moveQuestionUp(id: string) {
-    const question = (await TypedDB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
-      formId: string;
-      sort: number;
-    };
-    await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE formId=? AND sort=?;", [question.formId, +question.sort - 1]);
-    await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE id=?;", [id]);
+    const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
+    await getDb().updateTable("questions").set({ sort: sql`sort+1` as any }).where("formId", "=", question.formId).where("sort", "=", +question.sort - 1 as any).execute();
+    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("id", "=", id).execute();
   }
 
   public async moveQuestionDown(id: string) {
-    const question = (await TypedDB.queryOne("SELECT formId, sort FROM questions WHERE id=?", [id])) as {
-      formId: string;
-      sort: number;
-    };
-    await TypedDB.query("UPDATE questions SET sort=sort-1 WHERE formId=? AND sort=?;", [question.formId, +question.sort + 1]);
-    await TypedDB.query("UPDATE questions SET sort=sort+1 WHERE id=?;", [id]);
+    const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
+    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("formId", "=", question.formId).where("sort", "=", +question.sort + 1 as any).execute();
+    await getDb().updateTable("questions").set({ sort: sql`sort+1` as any }).where("id", "=", id).execute();
+  }
+
+  public saveAll(models: Question[]) {
+    const promises: Promise<Question>[] = [];
+    models.forEach((model) => { promises.push(this.save(model)); });
+    return Promise.all(promises);
+  }
+
+  public insert(model: Question): Promise<Question> {
+    return this.create(model);
   }
 
   protected rowToModel(row: any): Question {
@@ -78,5 +116,15 @@ export class QuestionRepo extends ConfiguredRepo<Question> {
     if (typeof row.choices === "string") result.choices = JSON.parse(row.choices);
     else result.choices = row.choices;
     return result;
+  }
+
+  public convertToModel(_churchId: string, data: any) {
+    if (!data) return null;
+    return this.rowToModel(data);
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    if (!Array.isArray(data)) return [];
+    return data.map((d) => this.rowToModel(d));
   }
 }

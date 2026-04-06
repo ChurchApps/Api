@@ -14,7 +14,8 @@
 
 import Stripe from "stripe";
 import { Environment } from "../../../../src/shared/helpers/Environment";
-import { MultiDatabasePool } from "../../../../src/shared/infrastructure/MultiDatabasePool";
+import { KyselyPool } from "../../../../src/shared/infrastructure/KyselyPool";
+import { sql } from "kysely";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
 interface MigrationOptions {
@@ -55,30 +56,33 @@ interface SubscriptionMigrationResult {
 }
 
 async function getStripeGateways(): Promise<Gateway[]> {
-  const sql = `
+  const db = KyselyPool.getDb("giving");
+  const result = await sql`
     SELECT id, churchId, provider, privateKey
     FROM gateways
     WHERE provider = 'stripe' OR provider = 'Stripe'
-  `;
-  return await MultiDatabasePool.query("giving", sql);
+  `.execute(db);
+  return result.rows as Gateway[];
 }
 
 async function getCustomersForChurch(churchId: string): Promise<Customer[]> {
-  const sql = `
+  const db = KyselyPool.getDb("giving");
+  const result = await sql`
     SELECT id, churchId, personId, provider
     FROM customers
-    WHERE churchId = ? AND (provider = 'stripe' OR provider = 'Stripe' OR provider IS NULL)
-  `;
-  return await MultiDatabasePool.query("giving", sql, [churchId]);
+    WHERE churchId = ${churchId} AND (provider = 'stripe' OR provider = 'Stripe' OR provider IS NULL)
+  `.execute(db);
+  return result.rows as Customer[];
 }
 
 async function getSubscriptionsForChurch(churchId: string): Promise<{ id: string; churchId: string; customerId: string }[]> {
-  const sql = `
+  const db = KyselyPool.getDb("giving");
+  const result = await sql`
     SELECT id, churchId, customerId
     FROM subscriptions
-    WHERE churchId = ?
-  `;
-  return await MultiDatabasePool.query("giving", sql, [churchId]);
+    WHERE churchId = ${churchId}
+  `.execute(db);
+  return result.rows as { id: string; churchId: string; customerId: string }[];
 }
 
 async function migrateBankAccountsForGateway(
@@ -390,6 +394,6 @@ function parseOptions(): MigrationOptions {
     console.error("❌ Migration failed:", error instanceof Error ? error.message : error);
     process.exitCode = 1;
   } finally {
-    await MultiDatabasePool.closeAll();
+    await KyselyPool.destroyAll();
   }
 })();

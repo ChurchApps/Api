@@ -1,8 +1,7 @@
 import { injectable } from "inversify";
 import { Link } from "../models/index.js";
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 const DEFAULT_B1TAB_LINKS: Partial<Link>[] = [
   { linkType: "bible", text: "Bible", icon: "menu_book", visibility: "everyone", sort: 1 },
@@ -18,31 +17,65 @@ const DEFAULT_B1TAB_LINKS: Partial<Link>[] = [
 ];
 
 @injectable()
-export class LinkRepo extends ConfiguredRepo<Link> {
-  protected get repoConfig(): RepoConfig<Link> {
-    return {
-      tableName: "links",
-      hasSoftDelete: false,
-      columns: [
-        "category", "url", "linkType", "linkData", "photo", "icon", "text", "sort", "parentId", "visibility", "groupIds"
-      ]
-    };
+export class LinkRepo {
+  public async save(model: Link) {
+    return model.id ? this.update(model) : this.create(model);
+  }
+
+  private async create(model: Link): Promise<Link> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("links").values({
+      id: model.id,
+      churchId: model.churchId,
+      category: model.category,
+      url: model.url,
+      linkType: model.linkType,
+      linkData: model.linkData,
+      photo: model.photo,
+      icon: model.icon,
+      text: model.text,
+      sort: model.sort,
+      parentId: model.parentId,
+      visibility: model.visibility,
+      groupIds: model.groupIds
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: Link): Promise<Link> {
+    await getDb().updateTable("links").set({
+      category: model.category,
+      url: model.url,
+      linkType: model.linkType,
+      linkData: model.linkData,
+      photo: model.photo,
+      icon: model.icon,
+      text: model.text,
+      sort: model.sort,
+      parentId: model.parentId,
+      visibility: model.visibility,
+      groupIds: model.groupIds
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("links").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<Link | undefined> {
+    return (await getDb().selectFrom("links").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(churchId: string): Promise<Link[]> {
-    return TypedDB.query("SELECT * FROM links WHERE churchId=? order by sort", [churchId]);
-  }
-
-  public async load(churchId: string, id: string): Promise<Link> {
-    return TypedDB.queryOne("SELECT * FROM links WHERE id=? AND churchId=?;", [id, churchId]);
-  }
-
-  public async delete(churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM links WHERE id=? AND churchId=?;", [id, churchId]);
+    return getDb().selectFrom("links").selectAll().where("churchId", "=", churchId).orderBy("sort").execute() as any;
   }
 
   public async loadByCategory(churchId: string, category: string): Promise<Link[]> {
-    let links = await TypedDB.query<Link[]>("SELECT * FROM links WHERE churchId=? and category=? order by sort", [churchId, category]);
+    let links = await getDb().selectFrom("links").selectAll()
+      .where("churchId", "=", churchId)
+      .where("category", "=", category)
+      .orderBy("sort").execute() as any as Link[];
 
     // Create default b1Tab links if none exist
     if (category === "b1Tab" && links.length === 0) {
@@ -79,9 +112,12 @@ export class LinkRepo extends ConfiguredRepo<Link> {
     await Promise.all(promises);
   }
 
-  public loadById(id: string, churchId: string): Promise<Link> {
-    return TypedDB.queryOne("SELECT * FROM links WHERE id=? AND churchId=?;", [id, churchId]);
+  public async loadById(id: string, churchId: string): Promise<Link | undefined> {
+    return (await getDb().selectFrom("links").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
+
+  public convertToModel(_churchId: string, data: any) { return data as Link; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Link[]; }
 
   protected rowToModel(row: any): Link {
     const result = { ...row };

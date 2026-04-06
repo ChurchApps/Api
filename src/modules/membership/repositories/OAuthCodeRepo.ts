@@ -1,47 +1,65 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { injectable } from "inversify";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { OAuthCode } from "../models/index.js";
 import { DateHelper } from "../helpers/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
-import { injectable } from "inversify";
 
 @injectable()
-export class OAuthCodeRepo extends BaseRepo<OAuthCode> {
-  protected tableName = "oAuthCodes";
-  protected hasSoftDelete = false;
-  protected async create(authCode: OAuthCode): Promise<OAuthCode> {
-    authCode.id = this.createId();
+export class OAuthCodeRepo {
+  public async save(model: OAuthCode) {
+    return model.id ? this.update(model) : this.create(model);
+  }
+
+  private async create(authCode: OAuthCode): Promise<OAuthCode> {
+    authCode.id = UniqueIdHelper.shortId();
     const expiresAt = DateHelper.toMysqlDate(authCode.expiresAt);
-    const sql = "INSERT INTO oAuthCodes (id, code, clientId, userChurchId, redirectUri, scopes, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW());";
-    const params = [authCode.id, authCode.code, authCode.clientId, authCode.userChurchId, authCode.redirectUri, authCode.scopes, expiresAt];
-    await TypedDB.query(sql, params);
+    await getDb().insertInto("oAuthCodes").values({
+      id: authCode.id,
+      code: authCode.code,
+      clientId: authCode.clientId,
+      userChurchId: authCode.userChurchId,
+      redirectUri: authCode.redirectUri,
+      scopes: authCode.scopes,
+      expiresAt: expiresAt as any,
+      createdAt: sql`NOW()` as any
+    }).execute();
     return authCode;
   }
 
-  protected async update(authCode: OAuthCode): Promise<OAuthCode> {
+  private async update(authCode: OAuthCode): Promise<OAuthCode> {
     const expiresAt = DateHelper.toMysqlDate(authCode.expiresAt);
-    const sql = "UPDATE oAuthCodes SET code=?, clientId=?, userChurchId=?, redirectUri=?, scopes=?, expiresAt=? WHERE id=?;";
-    const params = [authCode.code, authCode.clientId, authCode.userChurchId, authCode.redirectUri, authCode.scopes, expiresAt, authCode.id];
-    await TypedDB.query(sql, params);
+    await getDb().updateTable("oAuthCodes").set({
+      code: authCode.code,
+      clientId: authCode.clientId,
+      userChurchId: authCode.userChurchId,
+      redirectUri: authCode.redirectUri,
+      scopes: authCode.scopes,
+      expiresAt: expiresAt as any
+    }).where("id", "=", authCode.id).execute();
     return authCode;
   }
 
-  public load(id: string): Promise<OAuthCode> {
-    return TypedDB.queryOne("SELECT * FROM oAuthCodes WHERE id=?", [id]);
+  public async load(id: string): Promise<OAuthCode> {
+    return (await getDb().selectFrom("oAuthCodes").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public loadByCode(code: string): Promise<OAuthCode> {
-    return TypedDB.queryOne("SELECT * FROM oAuthCodes WHERE code=?", [code]);
+  public async loadByCode(code: string): Promise<OAuthCode> {
+    return (await getDb().selectFrom("oAuthCodes").selectAll().where("code", "=", code).executeTakeFirst()) ?? null;
   }
 
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM oAuthCodes WHERE id=?", [id]);
+  public async delete(id: string) {
+    await getDb().deleteFrom("oAuthCodes").where("id", "=", id).execute();
   }
 
-  public deleteByCode(code: string) {
-    return TypedDB.query("DELETE FROM oAuthCodes WHERE code=?", [code]);
+  public async deleteByCode(code: string) {
+    await getDb().deleteFrom("oAuthCodes").where("code", "=", code).execute();
   }
 
-  public deleteExpired() {
-    return TypedDB.query("DELETE FROM oAuthCodes WHERE expiresAt < NOW()", []);
+  public async deleteExpired() {
+    await getDb().deleteFrom("oAuthCodes").where("expiresAt", "<", sql`NOW()` as any).execute();
   }
+
+  public convertToModel(_churchId: string, data: any) { return data; }
+  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
 }

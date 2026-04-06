@@ -1,113 +1,103 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { SongDetail } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
+import { SongDetail } from "../models/index.js";
 
 @injectable()
-export class SongDetailRepo extends ConfiguredRepo<SongDetail> {
-  protected churchIdColumn = "";
-
-  protected get repoConfig(): RepoConfig<SongDetail> {
-    return {
-      tableName: "songDetails",
-      hasSoftDelete: false,
-      columns: [
-        "praiseChartsId", "title", "artist", "album", "language", "thumbnail", "releaseDate", "bpm", "keySignature", "seconds", "meter", "tones"
-      ]
-    };
+export class SongDetailRepo {
+  public async save(model: SongDetail) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  // SongDetails is a global table (no churchId), so override standard methods
-  public async delete(_churchId: string, id: string): Promise<any> {
-    return TypedDB.query("DELETE FROM songDetails WHERE id=?;", [id]);
+  private async create(model: SongDetail): Promise<SongDetail> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("songDetails").values({
+      id: model.id,
+      praiseChartsId: model.praiseChartsId,
+      title: model.title,
+      artist: model.artist,
+      album: model.album,
+      language: model.language,
+      thumbnail: model.thumbnail,
+      releaseDate: model.releaseDate,
+      bpm: model.bpm,
+      keySignature: model.keySignature,
+      seconds: model.seconds,
+      meter: model.meter,
+      tones: model.tones
+    } as any).execute();
+    return model;
   }
 
-  public async load(_churchId: string, id: string): Promise<SongDetail> {
-    return TypedDB.queryOne("SELECT * FROM songDetails WHERE id=?;", [id]);
+  private async update(model: SongDetail): Promise<SongDetail> {
+    await getDb().updateTable("songDetails").set({
+      praiseChartsId: model.praiseChartsId,
+      title: model.title,
+      artist: model.artist,
+      album: model.album,
+      language: model.language,
+      thumbnail: model.thumbnail,
+      releaseDate: model.releaseDate,
+      bpm: model.bpm,
+      keySignature: model.keySignature,
+      seconds: model.seconds,
+      meter: model.meter,
+      tones: model.tones
+    } as any).where("id", "=", model.id).execute();
+    return model;
+  }
+
+  // SongDetails is a global table (no churchId)
+  public async delete(_churchId: string, id: string) {
+    await getDb().deleteFrom("songDetails").where("id", "=", id).execute();
+  }
+
+  public async load(_churchId: string, id: string): Promise<SongDetail | undefined> {
+    return (await getDb().selectFrom("songDetails").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(_churchId: string): Promise<SongDetail[]> {
-    return TypedDB.query("SELECT * FROM songDetails ORDER BY title, artist;", []);
+    return getDb().selectFrom("songDetails").selectAll().orderBy("title").orderBy("artist").execute() as any;
   }
 
-  // Global methods without churchId (for global song details)
-  public loadGlobal(id: string) {
-    return TypedDB.queryOne("SELECT * FROM songDetails WHERE id=?;", [id]);
+  // Global methods without churchId
+  public async loadGlobal(id: string) {
+    return (await getDb().selectFrom("songDetails").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public deleteGlobal(id: string) {
-    return TypedDB.query("DELETE FROM songDetails WHERE id=?;", [id]);
+  public async deleteGlobal(id: string) {
+    await getDb().deleteFrom("songDetails").where("id", "=", id).execute();
   }
 
-  public search(query: string) {
+  public async search(query: string) {
     const q = "%" + query.replace(/ /g, "%") + "%";
-    return TypedDB.query("SELECT * FROM songDetails where title + ' ' + artist like ? or artist + ' ' + title like ?;", [q, q]);
+    return getDb().selectFrom("songDetails").selectAll()
+      .where((eb) => eb.or([
+        eb(sql`concat(title, ' ', artist)`, "like", q),
+        eb(sql`concat(artist, ' ', title)`, "like", q)
+      ]))
+      .execute() as any;
   }
 
-  public loadByPraiseChartsId(praiseChartsId: string) {
-    return TypedDB.queryOne("SELECT * FROM songDetails where praiseChartsId=?;", [praiseChartsId]);
+  public async loadByPraiseChartsId(praiseChartsId: string): Promise<SongDetail | null> {
+    return (await getDb().selectFrom("songDetails").selectAll().where("praiseChartsId", "=", praiseChartsId).executeTakeFirst()) ?? null as any;
   }
 
-  public loadForChurch(churchId: string) {
-    const sql =
-      "SELECT sd.*, s.Id as songId, s.churchId" +
-      " FROM songs s" +
-      " INNER JOIN arrangements a on a.songId=s.id" +
-      " INNER JOIN songDetails sd on sd.id=a.songDetailId" +
-      " WHERE s.churchId=?" +
-      " ORDER BY sd.title, sd.artist;";
-    return TypedDB.query(sql, [churchId]);
+  public async loadForChurch(churchId: string) {
+    return getDb().selectFrom("songs as s")
+      .innerJoin("arrangements as a", "a.songId", "s.id")
+      .innerJoin("songDetails as sd", "sd.id", "a.songDetailId")
+      .selectAll("sd")
+      .select(["s.id as songId", "s.churchId"])
+      .where("s.churchId", "=", churchId)
+      .orderBy("sd.title")
+      .orderBy("sd.artist")
+      .execute() as any;
   }
 
-  protected async create(songDetail: SongDetail) {
-    songDetail.id = UniqueIdHelper.shortId();
-    const sql =
-      "INSERT INTO songDetails (id, praiseChartsId, title, artist, album, language, thumbnail, releaseDate, bpm, keySignature, seconds, meter, tones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      songDetail.id,
-      songDetail.praiseChartsId,
-      songDetail.title,
-      songDetail.artist,
-      songDetail.album,
-      songDetail.language,
-      songDetail.thumbnail,
-      songDetail.releaseDate,
-      songDetail.bpm,
-      songDetail.keySignature,
-      songDetail.seconds,
-      songDetail.meter,
-      songDetail.tones
-    ];
-    await TypedDB.query(sql, params);
-    return songDetail;
-  }
-
-  protected async update(songDetail: SongDetail) {
-    const sql =
-      "UPDATE songDetails SET praiseChartsId=?, title=?, artist=?, album=?, language=?, thumbnail=?, releaseDate=?, bpm=?, keySignature=?, seconds=?, meter=?, tones=? WHERE id=?";
-    const params = [
-      songDetail.praiseChartsId,
-      songDetail.title,
-      songDetail.artist,
-      songDetail.album,
-      songDetail.language,
-      songDetail.thumbnail,
-      songDetail.releaseDate,
-      songDetail.bpm,
-      songDetail.keySignature,
-      songDetail.seconds,
-      songDetail.meter,
-      songDetail.tones,
-      songDetail.id
-    ];
-    await TypedDB.query(sql, params);
-    return songDetail;
-  }
-
-  public save(songDetail: SongDetail) {
-    return songDetail.id ? this.update(songDetail) : this.create(songDetail);
-  }
+  public convertToModel(data: any) { return data as SongDetail; }
+  public convertAllToModel(data: any[]) { return (data || []) as SongDetail[]; }
 
   protected rowToModel(row: any): SongDetail {
     return {

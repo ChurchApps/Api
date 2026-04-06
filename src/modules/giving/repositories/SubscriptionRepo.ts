@@ -1,46 +1,54 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { getDb } from "../db/index.js";
 import { Subscription } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
 @injectable()
-export class SubscriptionRepo extends ConfiguredRepo<Subscription> {
-  protected get repoConfig(): RepoConfig<Subscription> {
-    return {
-      tableName: "subscriptions",
-      hasSoftDelete: false,
-      idColumn: "id", // External ID from payment provider
-      columns: ["personId", "customerId"]
-    };
-  }
+export class SubscriptionRepo {
 
-  // Override create to use external ID
-  protected async create(model: Subscription): Promise<Subscription> {
-    const sql = "INSERT INTO subscriptions (id, churchId, personId, customerId) VALUES (?, ?, ?, ?);";
-    const params = [model.id, model.churchId, model.personId, model.customerId];
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  // Override update for completeness (subscriptions rarely update)
-  protected async update(model: Subscription): Promise<Subscription> {
-    const sql = "UPDATE subscriptions SET personId=?, customerId=? WHERE id=? AND churchId=?";
-    const params = [model.personId, model.customerId, model.id, model.churchId];
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  // Override save to only create (subscriptions are typically immutable)
+  // Subscriptions are typically immutable - save always creates
   public async save(subscription: Subscription) {
     return this.create(subscription);
   }
 
-  public async loadByCustomerId(churchId: string, customerId: string) {
-    return TypedDB.queryOne("SELECT * FROM subscriptions WHERE customerId=? AND churchId=?;", [customerId, churchId]);
+  // External ID from payment provider, don't auto-generate
+  private async create(model: Subscription): Promise<Subscription> {
+    await getDb().insertInto("subscriptions").values({
+      id: model.id,
+      churchId: model.churchId,
+      personId: model.personId,
+      customerId: model.customerId
+    }).execute();
+    return model;
   }
 
-  protected rowToModel(row: any): Subscription {
+  private async update(model: Subscription): Promise<Subscription> {
+    await getDb().updateTable("subscriptions").set({
+      personId: model.personId,
+      customerId: model.customerId
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("subscriptions").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("subscriptions").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("subscriptions").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadByCustomerId(churchId: string, customerId: string) {
+    return (await getDb().selectFrom("subscriptions").selectAll()
+      .where("customerId", "=", customerId)
+      .where("churchId", "=", churchId)
+      .executeTakeFirst()) ?? null;
+  }
+
+  private rowToModel(row: any): Subscription {
     return { id: row.id, churchId: row.churchId, personId: row.personId, customerId: row.customerId };
   }
 }

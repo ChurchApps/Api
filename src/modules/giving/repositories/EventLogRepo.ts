@@ -1,34 +1,12 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { EventLog } from "../models/index.js";
 
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
-
 @injectable()
-export class EventLogRepo extends ConfiguredRepo<EventLog> {
-  protected get repoConfig(): RepoConfig<EventLog> {
-    return {
-      tableName: "eventLogs",
-      hasSoftDelete: false,
-      idColumn: "id", // Now char(11) generated ID
-      insertColumns: ["customerId", "provider", "providerId", "eventType", "message", "status", "created"],
-      updateColumns: ["resolved"],
-      insertLiterals: { resolved: "FALSE" }
-    };
-  }
+export class EventLogRepo {
 
-  // Override create to handle generated ID and providerId field
-  protected async create(model: EventLog): Promise<EventLog> {
-    if (!model.id) model.id = this.createId();
-    const sql = "INSERT INTO eventLogs (id, churchId, customerId, provider, providerId, eventType, message, status, created, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      model.id, model.churchId, model.customerId, model.provider, model.providerId, model.eventType, model.message, model.status, model.created, false
-    ];
-    await TypedDB.query(sql, params);
-    return model;
-  }
-
-  // Override save to check if event already exists by providerId (idempotency)
   public async save(eventLog: EventLog) {
     if (eventLog.providerId) {
       const existingEvent = await this.loadByProviderId(eventLog.churchId as string, eventLog.providerId);
@@ -39,23 +17,71 @@ export class EventLogRepo extends ConfiguredRepo<EventLog> {
     return this.create(eventLog);
   }
 
-  // Load event by provider ID (for idempotency checks)
+  private async create(model: EventLog): Promise<EventLog> {
+    if (!model.id) model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("eventLogs").values({
+      id: model.id,
+      churchId: model.churchId,
+      customerId: model.customerId,
+      provider: model.provider,
+      providerId: model.providerId,
+      eventType: model.eventType,
+      message: model.message,
+      status: model.status,
+      created: model.created,
+      resolved: false
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: EventLog): Promise<EventLog> {
+    await getDb().updateTable("eventLogs").set({
+      resolved: model.resolved
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("eventLogs").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("eventLogs").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
   public async loadByProviderId(churchId: string, providerId: string): Promise<EventLog | null> {
-    const rows = await TypedDB.query(
-      "SELECT * FROM eventLogs WHERE churchId=? AND providerId=? LIMIT 1;",
-      [churchId, providerId]
-    );
-    return rows.length > 0 ? this.rowToModel(rows[0]) : null;
+    const row = (await getDb().selectFrom("eventLogs").selectAll()
+      .where("churchId", "=", churchId)
+      .where("providerId", "=", providerId)
+      .limit(1)
+      .executeTakeFirst()) ?? null;
+    return row ? this.rowToModel(row) : null;
   }
 
   public async loadByType(churchId: string, status: string) {
-    return TypedDB.query(
-      "SELECT eventLogs.*, personId FROM customers LEFT JOIN eventLogs ON customers.id = eventLogs.customerId WHERE eventLogs.status=? AND eventLogs.churchId=? ORDER BY eventLogs.created DESC;",
-      [status, churchId]
-    );
+    const result = await sql<any>`
+      SELECT eventLogs.*, personId
+      FROM customers
+      LEFT JOIN eventLogs ON customers.id = eventLogs.customerId
+      WHERE eventLogs.status = ${status}
+        AND eventLogs.churchId = ${churchId}
+      ORDER BY eventLogs.created DESC`.execute(getDb());
+    return result.rows;
   }
 
-  protected rowToModel(row: any): EventLog {
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("eventLogs").selectAll().where("churchId", "=", churchId).orderBy("created", "desc").execute();
+  }
+
+  public convertToModel(_churchId: string, data: any) {
+    return data ? this.rowToModel(data) : null;
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
+  }
+
+  private rowToModel(row: any): EventLog {
     return { ...row };
   }
 }

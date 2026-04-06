@@ -1,9 +1,12 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { CompiledQuery } from "kysely";
+import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 
 @injectable()
 export class ReportRepo {
-  public async run(db: string, sql: string, parameters: any[]): Promise<any[]> {
-    return TypedDB.queryModule(db, sql, parameters);
+  public async run(moduleName: string, rawSql: string, parameters: any[]): Promise<any[]> {
+    const db = KyselyPool.getDb(moduleName);
+    const result = await db.executeQuery(CompiledQuery.raw(rawSql, parameters));
+    return result.rows as any[];
   }
 }

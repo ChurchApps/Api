@@ -28,28 +28,11 @@ export const MODULE_ROUTES = {
  * This ensures the correct database connection is used for each module's requests
  */
 export const createModuleContextMiddleware = (moduleName: string) => {
-  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    try {
-      // Import TypedDB to set up request context
-      const { TypedDB } = await import("./shared/infrastructure/TypedDB.js");
-
-      // Add module information to request for debugging/logging
-      (req as any).module = moduleName;
-
-      // Run the rest of the request handling within the module's database context
-      await TypedDB.runWithContext(moduleName, async () => {
-        next();
-      });
-    } catch (error) {
-      console.error(`Error setting up context for module ${moduleName}:`, error);
-      res.status(500).json({
-        error: {
-          message: "Module context initialization failed",
-          module: moduleName,
-          timestamp: new Date().toISOString()
-        }
-      });
-    }
+  return (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    // Add module information to request for debugging/logging
+    // Database context is no longer needed — repos use Kysely with per-module getDb()
+    (req as any).module = moduleName;
+    next();
   };
 };
 

@@ -1,7 +1,6 @@
 import { ScheduledEvent, Context } from "aws-lambda";
 
 import { Environment } from "../shared/helpers/Environment.js";
-import { TypedDB } from "../shared/infrastructure/TypedDB.js";
 
 import { NotificationHelper } from "../modules/messaging/helpers/NotificationHelper.js";
 import { RepoManager } from "../shared/infrastructure/RepoManager.js";
@@ -19,11 +18,9 @@ const initEnv = async () => {
 
   // Always initialize messaging helpers (repos may be undefined on warm starts)
   console.log("[initEnv] Initializing messaging repos...");
-  await TypedDB.runWithContext("messaging", async () => {
-    const repos = await RepoManager.getRepos<any>("messaging");
-    NotificationHelper.init(repos);
-    console.log("[initEnv] NotificationHelper initialized with repos");
-  });
+  const repos = await RepoManager.getRepos<any>("messaging");
+  NotificationHelper.init(repos);
+  console.log("[initEnv] NotificationHelper initialized with repos");
   console.log("[initEnv] Environment initialization complete");
 };
 
@@ -36,18 +33,15 @@ export const handle15MinTimer = async (_event: ScheduledEvent, _context: Context
     await initEnv();
     console.log("[handle15MinTimer] initEnv completed in", Date.now() - startTime, "ms");
 
-    // Run within messaging module context
-    await TypedDB.runWithContext("messaging", async () => {
-      // Step 1: Escalate notifications that haven't been read
-      console.log("[handle15MinTimer] Escalating unread notifications...");
-      const escalationResult = await NotificationHelper.escalateDelivery();
-      console.log("[handle15MinTimer] escalateDelivery result:", JSON.stringify(escalationResult));
+    // Step 1: Escalate notifications that haven't been read
+    console.log("[handle15MinTimer] Escalating unread notifications...");
+    const escalationResult = await NotificationHelper.escalateDelivery();
+    console.log("[handle15MinTimer] escalateDelivery result:", JSON.stringify(escalationResult));
 
-      // Step 2: Process individual email notifications (for users with "individual" email frequency)
-      console.log("[handle15MinTimer] Processing individual email notifications...");
-      const emailResult = await NotificationHelper.sendEmailNotifications("individual");
-      console.log("[handle15MinTimer] sendEmailNotifications result:", JSON.stringify(emailResult));
-    });
+    // Step 2: Process individual email notifications (for users with "individual" email frequency)
+    console.log("[handle15MinTimer] Processing individual email notifications...");
+    const emailResult = await NotificationHelper.sendEmailNotifications("individual");
+    console.log("[handle15MinTimer] sendEmailNotifications result:", JSON.stringify(emailResult));
     console.log("[handle15MinTimer] ========== TIMER COMPLETE ==========");
     console.log("[handle15MinTimer] Total execution time:", Date.now() - startTime, "ms");
   } catch (error) {
@@ -74,19 +68,13 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
 
     // Advance recurring streaming services
     console.log("[handleMidnightTimer] Advancing recurring streaming services...");
-    await TypedDB.runWithContext("content", async () => {
-      const repos = await RepoManager.getRepos<any>("content");
-      await repos.streamingService.advanceRecurringServices();
-    });
+    const contentRepos = await RepoManager.getRepos<any>("content");
+    await contentRepos.streamingService.advanceRecurringServices();
     console.log("[handleMidnightTimer] advanceRecurringServices completed in", Date.now() - startTime, "ms");
 
-    // Run within messaging module context
     console.log("[handleMidnightTimer] Processing daily email notifications...");
-    await TypedDB.runWithContext("messaging", async () => {
-      console.log("[handleMidnightTimer] Inside messaging context, calling sendEmailNotifications('daily')...");
-      const result = await NotificationHelper.sendEmailNotifications("daily");
-      console.log("[handleMidnightTimer] sendEmailNotifications result:", JSON.stringify(result));
-    });
+    const result = await NotificationHelper.sendEmailNotifications("daily");
+    console.log("[handleMidnightTimer] sendEmailNotifications result:", JSON.stringify(result));
     console.log("[handleMidnightTimer] ========== TIMER COMPLETE ==========");
     console.log("[handleMidnightTimer] Total execution time:", Date.now() - startTime, "ms");
   } catch (error) {

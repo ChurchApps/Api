@@ -1,5 +1,5 @@
 import { Environment } from "./shared/helpers/Environment.js";
-import { ConnectionManager } from "./shared/infrastructure/ConnectionManager.js";
+import { KyselyPool } from "./shared/infrastructure/KyselyPool.js";
 
 // Global test setup
 beforeAll(async () => {
@@ -9,7 +9,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // Clean up database connections
-  await ConnectionManager.closeAll();
+  await KyselyPool.destroyAll();
 });
 
 // Mock external services for testing

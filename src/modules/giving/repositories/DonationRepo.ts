@@ -1,76 +1,108 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { DateHelper as LocalDateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Donation, DonationSummary } from "../models/index.js";
-import { CollectionHelper } from "../../../shared/helpers/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class DonationRepo extends ConfiguredRepo<Donation> {
-  protected get repoConfig(): RepoConfig<Donation> {
-    return {
-      tableName: "donations",
-      hasSoftDelete: false,
-      columns: [
-        "batchId", "personId", "donationDate", "amount", "method", "methodDetails", "notes", "entryTime", "status", "transactionId"
-      ]
-    };
-  }
-  // Override save to handle empty personId conversion
+export class DonationRepo {
+
   public async save(donation: Donation) {
     if (donation.personId === "") donation.personId = null as any;
-    return super.save(donation);
+    return donation.id ? this.update(donation) : this.create(donation);
   }
 
-  // Override create to handle date conversion
-  protected async create(donation: Donation): Promise<Donation> {
+  private async create(donation: Donation): Promise<Donation> {
     donation.id = UniqueIdHelper.shortId();
     donation.entryTime = new Date();
     if (!donation.status) donation.status = "complete";
-    const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);  // date-only field
+    const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);
     const entryTime = DateHelper.toMysqlDate(donation.entryTime);
-    const sql = "INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, currency, method, methodDetails, notes, entryTime, status, transactionId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      donation.id, donation.churchId, donation.batchId, donation.personId, donationDate, donation.amount, donation.currency, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId
-    ];
-    await TypedDB.query(sql, params);
+    await getDb().insertInto("donations").values({
+      id: donation.id,
+      churchId: donation.churchId,
+      batchId: donation.batchId,
+      personId: donation.personId,
+      donationDate,
+      amount: donation.amount,
+      currency: donation.currency,
+      method: donation.method,
+      methodDetails: donation.methodDetails,
+      notes: donation.notes,
+      entryTime,
+      status: donation.status,
+      transactionId: donation.transactionId
+    } as any).execute();
     return donation;
   }
 
-  // Override update to handle date conversion
-  protected async update(donation: Donation): Promise<Donation> {
-    const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);  // date-only field
+  private async update(donation: Donation): Promise<Donation> {
+    const donationDate = LocalDateHelper.toMysqlDateOnly(donation.donationDate);
     const entryTime = DateHelper.toMysqlDate(donation.entryTime as Date);
-    const sql = "UPDATE donations SET batchId=?, personId=?, donationDate=?, amount=?, currency=?, method=?, methodDetails=?, notes=?, entryTime=?, status=?, transactionId=? WHERE id=? and churchId=?";
-    const params = [
-      donation.batchId, donation.personId, donationDate, donation.amount, donation.currency, donation.method, donation.methodDetails, donation.notes, entryTime, donation.status, donation.transactionId, donation.id, donation.churchId
-    ];
-    await TypedDB.query(sql, params);
+    await getDb().updateTable("donations").set({
+      batchId: donation.batchId,
+      personId: donation.personId,
+      donationDate,
+      amount: donation.amount,
+      currency: donation.currency,
+      method: donation.method,
+      methodDetails: donation.methodDetails,
+      notes: donation.notes,
+      entryTime,
+      status: donation.status,
+      transactionId: donation.transactionId
+    } as any).where("id", "=", donation.id).where("churchId", "=", donation.churchId).execute();
     return donation;
   }
 
-  public deleteByBatchId(churchId: string, batchId: string) {
-    return TypedDB.query("DELETE FROM donations WHERE churchId=? AND batchId=?;", [churchId, batchId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("donations").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadByBatchId(churchId: string, batchId: string) {
-    return TypedDB.query("SELECT d.* FROM donations d WHERE d.churchId=? AND d.batchId=? ORDER BY d.entryTime DESC;", [churchId, batchId]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("donations").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadByMethodDetails(churchId: string, method: string, methodDetails: string) {
-    return TypedDB.queryOne("SELECT d.* FROM donations d WHERE d.churchId=? AND d.method=? AND d.methodDetails=? ORDER BY d.donationDate DESC;", [churchId, method, methodDetails]);
+  public async loadAll(churchId: string) {
+    const rows = await getDb().selectFrom("donations").selectAll()
+      .where("churchId", "=", churchId)
+      .orderBy("donationDate", "desc")
+      .execute();
+    return rows;
   }
 
-  public loadByPersonId(churchId: string, personId: string) {
-    const sql =
-      "SELECT d.*, f.id as fundId, IFNULL(f.name, 'Unkown') as fundName, fd.amount as fundAmount" +
-      " FROM donations d" +
-      " INNER JOIN fundDonations fd on fd.donationId = d.id" +
-      " LEFT JOIN funds f on f.id = fd.fundId" +
-      " WHERE d.churchId = ? AND d.personId = ? AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)" +
-      " ORDER BY d.donationDate DESC";
-    return TypedDB.query(sql, [churchId, personId]);
+  public async deleteByBatchId(churchId: string, batchId: string) {
+    await getDb().deleteFrom("donations").where("churchId", "=", churchId).where("batchId", "=", batchId).execute();
+  }
+
+  public async loadByBatchId(churchId: string, batchId: string) {
+    const rows = await getDb().selectFrom("donations").selectAll()
+      .where("churchId", "=", churchId)
+      .where("batchId", "=", batchId)
+      .orderBy("entryTime", "desc")
+      .execute();
+    return rows;
+  }
+
+  public async loadByMethodDetails(churchId: string, method: string, methodDetails: string) {
+    return (await getDb().selectFrom("donations").selectAll()
+      .where("churchId", "=", churchId)
+      .where("method", "=", method)
+      .where("methodDetails", "=", methodDetails)
+      .orderBy("donationDate", "desc")
+      .executeTakeFirst()) ?? null;
+  }
+
+  public async loadByPersonId(churchId: string, personId: string) {
+    const result = await sql<any>`
+      SELECT d.*, f.id as fundId, IFNULL(f.name, 'Unkown') as fundName, fd.amount as fundAmount
+      FROM donations d
+      INNER JOIN fundDonations fd on fd.donationId = d.id
+      LEFT JOIN funds f on f.id = fd.fundId
+      WHERE d.churchId = ${churchId} AND d.personId = ${personId} AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)
+      ORDER BY d.donationDate DESC`.execute(getDb());
+    return result.rows;
   }
 
   public async findMatchingDonation(churchId: string, amount: number, donationDate: Date, personId?: string | null): Promise<Donation | null> {
@@ -82,64 +114,75 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     const startStr = DateHelper.toMysqlDate(startOfDay);
     const endStr = DateHelper.toMysqlDate(endOfDay);
 
-    const sql = personId
-      ? "SELECT * FROM donations WHERE churchId = ? AND amount = ? AND donationDate >= ? AND donationDate <= ? AND personId = ? LIMIT 1"
-      : "SELECT * FROM donations WHERE churchId = ? AND amount = ? AND donationDate >= ? AND donationDate <= ? AND personId IS NULL LIMIT 1";
+    let query = getDb().selectFrom("donations").selectAll()
+      .where("churchId", "=", churchId)
+      .where("amount", "=", amount as any)
+      .where("donationDate", ">=", startStr as any)
+      .where("donationDate", "<=", endStr as any);
 
-    const params = personId
-      ? [churchId, amount, startStr, endStr, personId]
-      : [churchId, amount, startStr, endStr];
-
-    const rows = await TypedDB.query(sql, params);
-    return rows.length > 0 ? this.rowToModel(rows[0]) : null;
-  }
-
-  public loadDashboardKpis(churchId: string, startDate: Date, endDate: Date, fundId?: string) {
-    const sDate = DateHelper.toMysqlDate(startDate);
-    const eDate = DateHelper.toMysqlDate(endDate);
-    let sql =
-      "SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount" +
-      " FROM donations d" +
-      " INNER JOIN fundDonations fd on fd.donationId = d.id" +
-      " INNER JOIN funds f on f.id = fd.fundId" +
-      " WHERE d.churchId=?" +
-      " AND d.donationDate BETWEEN ? AND ?";
-    const params: any[] = [churchId, sDate, eDate];
-    if (fundId) {
-      sql += " AND fd.fundId = ?";
-      params.push(fundId);
+    if (personId) {
+      query = query.where("personId", "=", personId);
+    } else {
+      query = query.where("personId", "is", null);
     }
-    return TypedDB.queryOne(sql, params);
+
+    const row = (await query.limit(1).executeTakeFirst()) ?? null;
+    return row ? this.rowToModel(row) : null;
   }
 
-  public loadSummary(churchId: string, startDate: Date, endDate: Date) {
+  public async loadDashboardKpis(churchId: string, startDate: Date, endDate: Date, fundId?: string) {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
-    // const sql = "SELECT week(d.donationDate, 0) as week, SUM(fd.amount) as totalAmount, f.name as fundName"
-    const sql =
-      "SELECT STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W') AS week, SUM(fd.amount) as totalAmount, f.name as fundName" +
-      " FROM donations d" +
-      " INNER JOIN fundDonations fd on fd.donationId = d.id" +
-      " INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1" +
-      " WHERE d.churchId=?" +
-      " AND d.donationDate BETWEEN ? AND ?" +
-      " GROUP BY year(d.donationDate), week(d.donationDate, 0), f.name" +
-      " ORDER BY year(d.donationDate), week(d.donationDate, 0), f.name";
-    return TypedDB.query(sql, [churchId, sDate, eDate]);
+    if (fundId) {
+      const result = await sql<any>`
+        SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
+        FROM donations d
+        INNER JOIN fundDonations fd on fd.donationId = d.id
+        INNER JOIN funds f on f.id = fd.fundId
+        WHERE d.churchId = ${churchId}
+          AND d.donationDate BETWEEN ${sDate} AND ${eDate}
+          AND fd.fundId = ${fundId}`.execute(getDb());
+      return result.rows[0] ?? null;
+    } else {
+      const result = await sql<any>`
+        SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
+        FROM donations d
+        INNER JOIN fundDonations fd on fd.donationId = d.id
+        INNER JOIN funds f on f.id = fd.fundId
+        WHERE d.churchId = ${churchId}
+          AND d.donationDate BETWEEN ${sDate} AND ${eDate}`.execute(getDb());
+      return result.rows[0] ?? null;
+    }
   }
 
-  public loadPersonBasedSummary(churchId: string, startDate: Date, endDate: Date) {
-    const sql =
-      "SELECT d.personId, d.amount as donationAmount, fd.fundId, fd.amount as fundAmount, f.name as fundName" +
-      " FROM donations d" +
-      " INNER JOIN fundDonations fd on fd.donationId = d.id" +
-      " INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1" +
-      " WHERE d.churchId=?" +
-      " AND d.donationDate BETWEEN ? AND ?";
-    return TypedDB.query(sql, [churchId, DateHelper.toMysqlDate(startDate), DateHelper.toMysqlDate(endDate)]);
+  public async loadSummary(churchId: string, startDate: Date, endDate: Date) {
+    const sDate = DateHelper.toMysqlDate(startDate);
+    const eDate = DateHelper.toMysqlDate(endDate);
+    const result = await sql<any>`
+      SELECT STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W') AS week,
+        SUM(fd.amount) as totalAmount, f.name as fundName
+      FROM donations d
+      INNER JOIN fundDonations fd on fd.donationId = d.id
+      INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1
+      WHERE d.churchId = ${churchId}
+        AND d.donationDate BETWEEN ${sDate} AND ${eDate}
+      GROUP BY year(d.donationDate), week(d.donationDate, 0), f.name
+      ORDER BY year(d.donationDate), week(d.donationDate, 0), f.name`.execute(getDb());
+    return result.rows;
   }
 
-  protected rowToModel(row: any): Donation {
+  public async loadPersonBasedSummary(churchId: string, startDate: Date, endDate: Date) {
+    const result = await sql<any>`
+      SELECT d.personId, d.amount as donationAmount, fd.fundId, fd.amount as fundAmount, f.name as fundName
+      FROM donations d
+      INNER JOIN fundDonations fd on fd.donationId = d.id
+      INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1
+      WHERE d.churchId = ${churchId}
+        AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}`.execute(getDb());
+    return result.rows;
+  }
+
+  private rowToModel(row: any): Donation {
     const result: Donation = {
       id: row.id,
       churchId: row.churchId,
@@ -160,22 +203,26 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
   }
 
   public async loadByTransactionId(churchId: string, transactionId: string): Promise<Donation | null> {
-    const sql = "SELECT * FROM donations WHERE churchId = ? AND transactionId = ? LIMIT 1";
-    const rows = await TypedDB.query(sql, [churchId, transactionId]);
-    return rows.length > 0 ? this.rowToModel(rows[0]) : null;
+    const row = (await getDb().selectFrom("donations").selectAll()
+      .where("churchId", "=", churchId)
+      .where("transactionId", "=", transactionId)
+      .limit(1)
+      .executeTakeFirst()) ?? null;
+    return row ? this.rowToModel(row) : null;
   }
 
   public async updateStatus(churchId: string, transactionId: string, status: string): Promise<void> {
-    const sql = "UPDATE donations SET status = ? WHERE churchId = ? AND transactionId = ?";
-    await TypedDB.query(sql, [status, churchId, transactionId]);
+    await getDb().updateTable("donations").set({
+      status
+    } as any).where("churchId", "=", churchId).where("transactionId", "=", transactionId).execute();
   }
 
   public convertToModel(_churchId: string, data: any) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any) {
-    return CollectionHelper.convertAll<Donation>(data, (d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
   }
 
   public convertAllToSummary(_churchId: string, data: any[]) {
@@ -206,18 +253,18 @@ export class DonationRepo extends ConfiguredRepo<Donation> {
     peopleIds.forEach((id) => {
       let totalAmount: number = 0;
       const funds: any[] = [];
-      const personDonations = ArrayHelper.getAll(data, "personId", id); // combine all the donations for a person
+      const personDonations = ArrayHelper.getAll(data, "personId", id);
       personDonations.forEach((pd) => {
-        totalAmount += pd.fundAmount; // pd.donationAmount; // get total donated amount for a person
+        totalAmount += pd.fundAmount;
       });
       const fundIds = ArrayHelper.getIds(personDonations, "fundId");
       fundIds.forEach((fuId) => {
         let totalFundAmount: number = 0;
-        const fundBasedRecords = ArrayHelper.getAll(personDonations, "fundId", fuId); // combine all the person donations based on fundId
+        const fundBasedRecords = ArrayHelper.getAll(personDonations, "fundId", fuId);
         fundBasedRecords.forEach((r) => {
-          totalFundAmount += r.fundAmount; // get total amount donated to each fund
+          totalFundAmount += r.fundAmount;
         });
-        funds.push({ [fundBasedRecords[0].fundName]: checkDecimals(totalFundAmount) }); // create object for each fund and the amount donated by a person
+        funds.push({ [fundBasedRecords[0].fundName]: checkDecimals(totalFundAmount) });
       });
       result.push({ personId: id, totalAmount: checkDecimals(totalAmount), funds });
     });

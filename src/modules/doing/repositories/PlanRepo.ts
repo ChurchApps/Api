@@ -1,106 +1,109 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
 import { injectable } from "inversify";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Plan } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { getDb } from "../db/index.js";
 
 @injectable()
-export class PlanRepo extends ConfiguredRepo<Plan> {
-  protected get repoConfig(): RepoConfig<Plan> {
-    return {
-      tableName: "plans",
-      hasSoftDelete: false,
-      columns: [
-        "ministryId",
-        "planTypeId",
-        "name",
-        "serviceDate",
-        "notes",
-        "serviceOrder",
-        "contentType",
-        "contentId",
-        "providerId",
-        "providerPlanId",
-        "providerPlanName",
-        "signupDeadlineHours",
-        "showVolunteerNames"
-      ]
-    };
+export class PlanRepo {
+  public async save(model: Plan) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  protected async create(plan: Plan): Promise<Plan> {
-    if (!plan.id) plan.id = this.createId();
-
-    const sql = "INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId, providerId, providerPlanId, providerPlanName, signupDeadlineHours, showVolunteerNames) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-    const params = [
-      plan.id,
-      plan.churchId,
-      plan.ministryId,
-      plan.planTypeId,
-      plan.name,
-      plan.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
-      plan.notes,
-      plan.serviceOrder,
-      plan.contentType,
-      plan.contentId,
-      plan.providerId,
-      plan.providerPlanId,
-      plan.providerPlanName,
-      plan.signupDeadlineHours,
-      plan.showVolunteerNames
-    ];
-    await TypedDB.query(sql, params);
-    return plan;
+  private async create(model: Plan): Promise<Plan> {
+    model.id = model.id || UniqueIdHelper.shortId();
+    await getDb().insertInto("plans").values({
+      id: model.id,
+      churchId: model.churchId,
+      ministryId: model.ministryId,
+      planTypeId: model.planTypeId,
+      name: model.name,
+      serviceDate: (model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]) as any,
+      notes: model.notes,
+      serviceOrder: model.serviceOrder,
+      contentType: model.contentType,
+      contentId: model.contentId,
+      providerId: model.providerId,
+      providerPlanId: model.providerPlanId,
+      providerPlanName: model.providerPlanName,
+      signupDeadlineHours: model.signupDeadlineHours,
+      showVolunteerNames: model.showVolunteerNames
+    }).execute();
+    return model;
   }
 
-  protected async update(plan: Plan): Promise<Plan> {
-    const sql = "UPDATE plans SET ministryId=?, planTypeId=?, name=?, serviceDate=?, notes=?, serviceOrder=?, contentType=?, contentId=?, providerId=?, providerPlanId=?, providerPlanName=?, signupDeadlineHours=?, showVolunteerNames=? WHERE id=? and churchId=?";
-    const params = [
-      plan.ministryId,
-      plan.planTypeId,
-      plan.name,
-      plan.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
-      plan.notes,
-      plan.serviceOrder,
-      plan.contentType,
-      plan.contentId,
-      plan.providerId,
-      plan.providerPlanId,
-      plan.providerPlanName,
-      plan.signupDeadlineHours,
-      plan.showVolunteerNames,
-      plan.id,
-      plan.churchId
-    ];
-    await TypedDB.query(sql, params);
-    return plan;
+  private async update(model: Plan): Promise<Plan> {
+    await getDb().updateTable("plans").set({
+      ministryId: model.ministryId,
+      planTypeId: model.planTypeId,
+      name: model.name,
+      serviceDate: (model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]) as any,
+      notes: model.notes,
+      serviceOrder: model.serviceOrder,
+      contentType: model.contentType,
+      contentId: model.contentId,
+      providerId: model.providerId,
+      providerPlanId: model.providerPlanId,
+      providerPlanName: model.providerPlanName,
+      signupDeadlineHours: model.signupDeadlineHours,
+      showVolunteerNames: model.showVolunteerNames
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByIds(churchId: string, ids: string[]) {
-    return TypedDB.query("SELECT * FROM plans WHERE churchId=? and id in (?);", [churchId, ids]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("plans").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public load7Days(churchId: string) {
-    return TypedDB.query("SELECT * FROM plans WHERE churchId=? AND serviceDate BETWEEN CURDATE() AND (CURDATE() + INTERVAL 7 DAY) order by serviceDate desc;", [churchId]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("plans").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadByPlanTypeId(churchId: string, planTypeId: string) {
-    return TypedDB.query("SELECT * FROM plans WHERE churchId=? AND planTypeId=? order by serviceDate desc;", [churchId, planTypeId]);
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("plans").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  public loadCurrentByPlanTypeId(planTypeId: string) {
-    return TypedDB.queryOne(
-      "SELECT * FROM plans WHERE planTypeId=? AND serviceDate>=CURDATE() ORDER by serviceDate LIMIT 1",
-      [planTypeId]
-    );
+  public async loadByIds(churchId: string, ids: string[]) {
+    return getDb().selectFrom("plans").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 
-  public loadSignupPlans(churchId: string) {
-    return TypedDB.query(
-      "SELECT DISTINCT p.* FROM plans p"
-      + " INNER JOIN positions pos ON pos.planId = p.id AND pos.churchId = p.churchId"
-      + " WHERE p.churchId = ? AND pos.allowSelfSignup = 1 AND p.serviceDate >= CURDATE()"
-      + " ORDER BY p.serviceDate ASC",
-      [churchId]
-    );
+  public async load7Days(churchId: string) {
+    return getDb().selectFrom("plans").selectAll()
+      .where("churchId", "=", churchId)
+      .where("serviceDate", ">=", sql`CURDATE()` as any)
+      .where("serviceDate", "<=", sql`CURDATE() + INTERVAL 7 DAY` as any)
+      .orderBy("serviceDate", "desc")
+      .execute();
+  }
+
+  public async loadByPlanTypeId(churchId: string, planTypeId: string) {
+    return getDb().selectFrom("plans").selectAll()
+      .where("churchId", "=", churchId)
+      .where("planTypeId", "=", planTypeId)
+      .orderBy("serviceDate", "desc")
+      .execute();
+  }
+
+  public async loadCurrentByPlanTypeId(planTypeId: string) {
+    return (await getDb().selectFrom("plans").selectAll()
+      .where("planTypeId", "=", planTypeId)
+      .where("serviceDate", ">=", sql`CURDATE()` as any)
+      .orderBy("serviceDate")
+      .limit(1)
+      .executeTakeFirst()) ?? null;
+  }
+
+  public async loadSignupPlans(churchId: string) {
+    return getDb().selectFrom("plans as p")
+      .innerJoin("positions as pos", (join) =>
+        join.onRef("pos.planId", "=", "p.id").onRef("pos.churchId", "=", "p.churchId")
+      )
+      .selectAll("p")
+      .distinct()
+      .where("p.churchId", "=", churchId)
+      .where("pos.allowSelfSignup", "=", true as any)
+      .where("p.serviceDate", ">=", sql`CURDATE()` as any)
+      .orderBy("p.serviceDate", "asc")
+      .execute();
   }
 }

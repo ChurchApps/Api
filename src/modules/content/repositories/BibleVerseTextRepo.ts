@@ -1,26 +1,54 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { BibleVerseText } from "../models/index.js";
-import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo.js";
 
 @injectable()
-export class BibleVerseTextRepo extends GlobalConfiguredRepo<BibleVerseText> {
-  protected get repoConfig(): GlobalRepoConfig<BibleVerseText> {
-    return {
-      tableName: "bibleVerseTexts",
-      hasSoftDelete: false,
-      columns: ["translationKey", "verseKey", "bookKey", "chapterNumber", "verseNumber", "content", "newParagraph"],
-      defaultOrderBy: "chapterNumber, verseNumber"
-    };
+export class BibleVerseTextRepo {
+  public async save(model: BibleVerseText) {
+    if (!model.id) model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("bibleVerseTexts").values({
+      id: model.id,
+      translationKey: model.translationKey,
+      verseKey: model.verseKey,
+      bookKey: model.bookKey,
+      chapterNumber: model.chapterNumber,
+      verseNumber: model.verseNumber,
+      content: model.content,
+      newParagraph: model.newParagraph
+    } as any).onDuplicateKeyUpdate({
+      content: sql`VALUES(content)`,
+      newParagraph: sql`VALUES(newParagraph)`
+    } as any).execute();
+    return model;
   }
 
-  private loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number) {
-    return TypedDB.query("SELECT * FROM bibleVerseTexts WHERE translationKey=? and bookKey=? AND chapterNumber BETWEEN ? AND ? order by chapterNumber, verseNumber;", [
-      translationKey,
-      bookKey,
-      startChapter,
-      endChapter
-    ]);
+  public async saveAll(models: BibleVerseText[]) {
+    const promises: Promise<BibleVerseText>[] = [];
+    for (const model of models) {
+      promises.push(this.save(model));
+    }
+    return Promise.all(promises);
+  }
+
+  public async delete(id: string) {
+    await getDb().deleteFrom("bibleVerseTexts").where("id", "=", id).execute();
+  }
+
+  public async load(id: string): Promise<BibleVerseText | undefined> {
+    return (await getDb().selectFrom("bibleVerseTexts").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
+  }
+
+  private async loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number) {
+    return getDb().selectFrom("bibleVerseTexts").selectAll()
+      .where("translationKey", "=", translationKey)
+      .where("bookKey", "=", bookKey)
+      .where("chapterNumber", ">=", startChapter)
+      .where("chapterNumber", "<=", endChapter)
+      .orderBy("chapterNumber")
+      .orderBy("verseNumber")
+      .execute() as any as BibleVerseText[];
   }
 
   private filterResults(data: BibleVerseText[], startChapter: number, startVerse: number, endChapter: number, endVerse: number) {
@@ -50,6 +78,9 @@ export class BibleVerseTextRepo extends GlobalConfiguredRepo<BibleVerseText> {
     return this.filterResults(data, startChapter, startVerse, endChapter, endVerse);
   }
 
+  public convertToModel(data: any) { return data as BibleVerseText; }
+  public convertAllToModel(data: any[]) { return (data || []) as BibleVerseText[]; }
+
   protected rowToModel(row: any): BibleVerseText {
     return {
       id: row.id,
@@ -61,31 +92,5 @@ export class BibleVerseTextRepo extends GlobalConfiguredRepo<BibleVerseText> {
       content: row.content,
       newParagraph: row.newParagraph
     };
-  }
-
-  public async saveAll(models: BibleVerseText[]) {
-    const promises: Promise<BibleVerseText>[] = [];
-    for (const model of models) {
-      promises.push(this.save(model));
-    }
-    return Promise.all(promises);
-  }
-
-  public async save(model: BibleVerseText) {
-    if (!model.id) model.id = this.createId();
-    const sql = `INSERT INTO bibleVerseTexts (id, translationKey, verseKey, bookKey, chapterNumber, verseNumber, content, newParagraph)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE content=VALUES(content), newParagraph=VALUES(newParagraph);`;
-    await TypedDB.query(sql, [
-      model.id,
-      model.translationKey,
-      model.verseKey,
-      model.bookKey,
-      model.chapterNumber,
-      model.verseNumber,
-      model.content,
-      model.newParagraph
-    ]);
-    return model;
   }
 }

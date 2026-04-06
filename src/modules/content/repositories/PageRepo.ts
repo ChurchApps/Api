@@ -1,21 +1,53 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { Page } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class PageRepo extends ConfiguredRepo<Page> {
-  protected get repoConfig(): RepoConfig<Page> {
-    return {
-      tableName: "pages",
-      hasSoftDelete: false,
-      columns: ["url", "title", "layout"]
-    };
+export class PageRepo {
+  public async save(model: Page) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadByUrl(churchId: string, url: string) {
-    return TypedDB.queryOne("SELECT * FROM pages WHERE url=? AND churchId=?;", [url, churchId]);
+  private async create(model: Page): Promise<Page> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("pages").values({
+      id: model.id,
+      churchId: model.churchId,
+      url: model.url,
+      title: model.title,
+      layout: model.layout
+    } as any).execute();
+    return model;
   }
+
+  private async update(model: Page): Promise<Page> {
+    await getDb().updateTable("pages").set({
+      url: model.url,
+      title: model.title,
+      layout: model.layout
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("pages").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<Page | undefined> {
+    return (await getDb().selectFrom("pages").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string): Promise<Page[]> {
+    return getDb().selectFrom("pages").selectAll().where("churchId", "=", churchId).execute() as any;
+  }
+
+  public async loadByUrl(churchId: string, url: string) {
+    return (await getDb().selectFrom("pages").selectAll().where("url", "=", url).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public convertToModel(_churchId: string, data: any) { return data as Page; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Page[]; }
 
   protected rowToModel(row: any): Page {
     return {

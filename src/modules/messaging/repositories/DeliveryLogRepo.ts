@@ -1,49 +1,76 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
-import { DeliveryLog } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
+import { sql } from "kysely";
 import { injectable } from "inversify";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
+import { DeliveryLog } from "../models/index.js";
 
 @injectable()
-export class DeliveryLogRepo extends ConfiguredRepo<DeliveryLog> {
-  protected get repoConfig(): RepoConfig<DeliveryLog> {
-    return {
-      tableName: "deliveryLogs",
-      hasSoftDelete: false,
-      insertColumns: ["personId", "contentType", "contentId", "deliveryMethod", "success", "errorMessage", "deliveryAddress"],
-      updateColumns: ["success", "errorMessage"],
-      insertLiterals: { attemptTime: "NOW()" }
-    };
+export class DeliveryLogRepo {
+  public async save(model: DeliveryLog) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadById(churchId: string, id: string) {
-    return TypedDB.queryOne("SELECT * FROM deliveryLogs WHERE id=? AND churchId=?;", [id, churchId]);
+  private async create(model: DeliveryLog): Promise<DeliveryLog> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("deliveryLogs").values({
+      id: model.id,
+      churchId: model.churchId,
+      personId: model.personId,
+      contentType: model.contentType,
+      contentId: model.contentId,
+      deliveryMethod: model.deliveryMethod,
+      success: model.success,
+      errorMessage: model.errorMessage,
+      deliveryAddress: model.deliveryAddress,
+      attemptTime: sql`NOW()`
+    }).execute();
+    return model;
   }
 
-  public loadByContent(contentType: string, contentId: string) {
-    return TypedDB.query("SELECT * FROM deliveryLogs WHERE contentType=? AND contentId=? ORDER BY attemptTime DESC", [contentType, contentId]);
+  private async update(model: DeliveryLog): Promise<DeliveryLog> {
+    await getDb().updateTable("deliveryLogs").set({
+      success: model.success,
+      errorMessage: model.errorMessage
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByPerson(churchId: string, personId: string, startDate?: Date, endDate?: Date) {
-    let sql = "SELECT * FROM deliveryLogs WHERE churchId=? AND personId=?";
-    const params: any[] = [churchId, personId];
+  public async loadById(churchId: string, id: string) {
+    return (await getDb().selectFrom("deliveryLogs").selectAll()
+      .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadByContent(contentType: string, contentId: string) {
+    return getDb().selectFrom("deliveryLogs").selectAll()
+      .where("contentType", "=", contentType)
+      .where("contentId", "=", contentId)
+      .orderBy("attemptTime", "desc")
+      .execute();
+  }
+
+  public async loadByPerson(churchId: string, personId: string, startDate?: Date, endDate?: Date) {
+    let query = getDb().selectFrom("deliveryLogs").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId);
     if (startDate) {
-      sql += " AND attemptTime >= ?";
-      params.push(startDate);
+      query = query.where("attemptTime", ">=", startDate);
     }
     if (endDate) {
-      sql += " AND attemptTime <= ?";
-      params.push(endDate);
+      query = query.where("attemptTime", "<=", endDate);
     }
-    sql += " ORDER BY attemptTime DESC";
-    return TypedDB.query(sql, params);
+    return query.orderBy("attemptTime", "desc").execute();
   }
 
-  public loadRecent(churchId: string, limit: number = 100) {
-    return TypedDB.query("SELECT * FROM deliveryLogs WHERE churchId=? ORDER BY attemptTime DESC LIMIT ?", [churchId, limit]);
+  public async loadRecent(churchId: string, limit: number = 100) {
+    return getDb().selectFrom("deliveryLogs").selectAll()
+      .where("churchId", "=", churchId)
+      .orderBy("attemptTime", "desc")
+      .limit(limit)
+      .execute();
   }
 
-  public delete(churchId: string, id: string) {
-    return TypedDB.query("DELETE FROM deliveryLogs WHERE id=? AND churchId=?;", [id, churchId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("deliveryLogs").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   protected rowToModel(data: any): DeliveryLog {
@@ -65,7 +92,7 @@ export class DeliveryLogRepo extends ConfiguredRepo<DeliveryLog> {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any) {
-    return this.mapToModels(data);
+  public convertAllToModel(data: any[]) {
+    return data.map((d: any) => this.rowToModel(d));
   }
 }

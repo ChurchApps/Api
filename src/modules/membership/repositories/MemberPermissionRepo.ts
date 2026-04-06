@@ -1,48 +1,109 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { MemberPermission } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class MemberPermissionRepo extends ConfiguredRepo<MemberPermission> {
-  protected get repoConfig(): RepoConfig<MemberPermission> {
-    return {
-      tableName: "memberPermissions",
-      hasSoftDelete: false,
-      columns: ["memberId", "contentType", "contentId", "action", "emailNotification"]
-    };
+export class MemberPermissionRepo {
+  public async save(model: MemberPermission) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public deleteByMemberId(churchId: string, memberId: string, contentId: string) {
-    return TypedDB.query("DELETE FROM memberPermissions WHERE memberId=? AND contentId=? AND churchId=?;", [memberId, churchId, contentId]);
+  private async create(model: MemberPermission): Promise<MemberPermission> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("memberPermissions").values({
+      id: model.id,
+      churchId: model.churchId,
+      memberId: model.memberId,
+      contentType: model.contentType,
+      contentId: model.contentId,
+      action: model.action,
+      emailNotification: model.emailNotification
+    }).execute();
+    return model;
   }
 
-  public loadMyByForm(churchId: string, formId: string, personId: string) {
-    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE churchId=? and contentType='form' and contentId=? and memberId=?;", [churchId, formId, personId]);
+  private async update(model: MemberPermission): Promise<MemberPermission> {
+    await getDb().updateTable("memberPermissions").set({
+      memberId: model.memberId,
+      contentType: model.contentType,
+      contentId: model.contentId,
+      action: model.action,
+      emailNotification: model.emailNotification
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadByEmailNotification(churchId: string, contentType: string, contentId: string, emailNotification: boolean) {
-    return TypedDB.query("SELECT * FROM memberPermissions WHERE churchId=? AND contentType=? AND contentId=? AND emailNotification=?;", [churchId, contentType, contentId, emailNotification]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("memberPermissions").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadFormsByPerson(churchId: string, personId: string) {
-    const sql =
-      "SELECT mp.*, p.displayName as personName" +
-      " FROM memberPermissions mp" +
-      " INNER JOIN `people` p on p.id=mp.memberId AND (p.removed=0 OR p.removed IS NULL)" +
-      " WHERE mp.churchId=? AND mp.memberId=?" +
-      " ORDER BY mp.action, mp.emailNotification desc;";
-    return TypedDB.query(sql, [churchId, personId]);
+  public async deleteByMemberId(churchId: string, memberId: string, contentId: string) {
+    await getDb().deleteFrom("memberPermissions")
+      .where("memberId", "=", memberId)
+      .where("contentId", "=", contentId)
+      .where("churchId", "=", churchId)
+      .execute();
   }
 
-  public loadPeopleByForm(churchId: string, formId: string) {
-    const sql =
-      "SELECT mp.*, p.displayName as personName" +
-      " FROM memberPermissions mp" +
-      " INNER JOIN `people` p on p.id=mp.memberId AND (p.removed=0 OR p.removed IS NULL)" +
-      " WHERE mp.churchId=? AND mp.contentId=?" +
-      " ORDER BY mp.action, mp.emailNotification desc;";
-    return TypedDB.query(sql, [churchId, formId]);
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("memberPermissions").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("memberPermissions").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadMyByForm(churchId: string, formId: string, personId: string) {
+    return (await getDb().selectFrom("memberPermissions").selectAll()
+      .where("churchId", "=", churchId)
+      .where("contentType", "=", "form")
+      .where("contentId", "=", formId)
+      .where("memberId", "=", personId)
+      .executeTakeFirst()) ?? null;
+  }
+
+  public async loadByEmailNotification(churchId: string, contentType: string, contentId: string, emailNotification: boolean) {
+    return getDb().selectFrom("memberPermissions").selectAll()
+      .where("churchId", "=", churchId)
+      .where("contentType", "=", contentType)
+      .where("contentId", "=", contentId)
+      .where("emailNotification", "=", emailNotification as any)
+      .execute();
+  }
+
+  public async loadFormsByPerson(churchId: string, personId: string) {
+    return getDb().selectFrom("memberPermissions as mp")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("mp")
+      .select("p.displayName as personName")
+      .where("mp.churchId", "=", churchId)
+      .where("mp.memberId", "=", personId)
+      .orderBy("mp.action")
+      .orderBy("mp.emailNotification", "desc")
+      .execute();
+  }
+
+  public async loadPeopleByForm(churchId: string, formId: string) {
+    return getDb().selectFrom("memberPermissions as mp")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "mp.memberId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .selectAll("mp")
+      .select("p.displayName as personName")
+      .where("mp.churchId", "=", churchId)
+      .where("mp.contentId", "=", formId)
+      .orderBy("mp.action")
+      .orderBy("mp.emailNotification", "desc")
+      .execute();
+  }
+
+  public saveAll(models: MemberPermission[]) {
+    const promises: Promise<MemberPermission>[] = [];
+    models.forEach((model) => { promises.push(this.save(model)); });
+    return Promise.all(promises);
+  }
+
+  public insert(model: MemberPermission): Promise<MemberPermission> {
+    return this.create(model);
   }
 
   protected rowToModel(row: any): MemberPermission {
@@ -58,7 +119,13 @@ export class MemberPermissionRepo extends ConfiguredRepo<MemberPermission> {
     };
   }
 
-  private existingPermissionRecord(churchId: string, contentId: string) {
-    return TypedDB.queryOne("SELECT * FROM memberPermissions WHERE contentId=? AND churchId=?;", [contentId, churchId]);
+  public convertToModel(_churchId: string, data: any) {
+    if (!data) return null;
+    return this.rowToModel(data);
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    if (!Array.isArray(data)) return [];
+    return data.map((d) => this.rowToModel(d));
   }
 }

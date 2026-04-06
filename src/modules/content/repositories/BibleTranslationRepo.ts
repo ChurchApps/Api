@@ -1,35 +1,85 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { BibleTranslation } from "../models/index.js";
-import { GlobalConfiguredRepo, GlobalRepoConfig } from "../../../shared/infrastructure/GlobalConfiguredRepo.js";
 
 @injectable()
-export class BibleTranslationRepo extends GlobalConfiguredRepo<BibleTranslation> {
-  protected get repoConfig(): GlobalRepoConfig<BibleTranslation> {
-    return {
-      tableName: "bibleTranslations",
-      hasSoftDelete: false,
-      columns: [
-        "abbreviation", "name", "nameLocal", "description", "source", "sourceKey", "language", "countries", "copyright", "attributionRequired", "attributionString"
-      ],
-      defaultOrderBy: "name"
-    };
+export class BibleTranslationRepo {
+  public async save(model: BibleTranslation) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadBySourceKey(source: string | null, sourceKey: string) {
+  private async create(model: BibleTranslation): Promise<BibleTranslation> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("bibleTranslations").values({
+      id: model.id,
+      abbreviation: model.abbreviation,
+      name: model.name,
+      nameLocal: model.nameLocal,
+      description: model.description,
+      source: model.source,
+      sourceKey: model.sourceKey,
+      language: model.language,
+      countries: model.countries,
+      copyright: model.copyright,
+      attributionRequired: model.attributionRequired,
+      attributionString: model.attributionString
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: BibleTranslation): Promise<BibleTranslation> {
+    await getDb().updateTable("bibleTranslations").set({
+      abbreviation: model.abbreviation,
+      name: model.name,
+      nameLocal: model.nameLocal,
+      description: model.description,
+      source: model.source,
+      sourceKey: model.sourceKey,
+      language: model.language,
+      countries: model.countries,
+      copyright: model.copyright,
+      attributionRequired: model.attributionRequired,
+      attributionString: model.attributionString
+    }).where("id", "=", model.id).execute();
+    return model;
+  }
+
+  public async delete(id: string) {
+    await getDb().deleteFrom("bibleTranslations").where("id", "=", id).execute();
+  }
+
+  public async load(id: string): Promise<BibleTranslation | undefined> {
+    return (await getDb().selectFrom("bibleTranslations").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
+  }
+
+  public async loadBySourceKey(source: string | null, sourceKey: string) {
     if (source) {
-      return TypedDB.queryOne("SELECT * FROM bibleTranslations WHERE source=? and sourceKey=?;", [source, sourceKey]);
+      return (await getDb().selectFrom("bibleTranslations").selectAll()
+        .where("source", "=", source)
+        .where("sourceKey", "=", sourceKey)
+        .executeTakeFirst()) ?? null;
     }
-    return TypedDB.queryOne("SELECT * FROM bibleTranslations WHERE sourceKey=?;", [sourceKey]);
+    return (await getDb().selectFrom("bibleTranslations").selectAll()
+      .where("sourceKey", "=", sourceKey)
+      .executeTakeFirst()) ?? null;
   }
 
-  public loadAll() {
-    return TypedDB.query("SELECT * FROM bibleTranslations order by name;", []);
+  public async loadAll() {
+    return getDb().selectFrom("bibleTranslations").selectAll().orderBy("name").execute() as any;
   }
 
-  public loadNeedingCopyrights() {
-    return TypedDB.query("SELECT * FROM bibleTranslations where copyright is null;", []);
+  public async loadNeedingCopyrights() {
+    return getDb().selectFrom("bibleTranslations").selectAll().where("copyright", "is", null).execute() as any;
   }
+
+  public async saveAll(models: BibleTranslation[]) {
+    const promises = models.map(m => this.save(m));
+    return Promise.all(promises);
+  }
+
+  public convertToModel(data: any) { return data as BibleTranslation; }
+  public convertAllToModel(data: any[]) { return (data || []) as BibleTranslation[]; }
 
   protected rowToModel(row: any): BibleTranslation {
     return {

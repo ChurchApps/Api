@@ -1,19 +1,63 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { Section } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class SectionRepo extends ConfiguredRepo<Section> {
-  protected get repoConfig(): RepoConfig<Section> {
-    return {
-      tableName: "sections",
-      hasSoftDelete: false,
-      defaultOrderBy: "sort",
-      columns: [
-        "pageId", "blockId", "zone", "background", "textColor", "headingColor", "linkColor", "sort", "targetBlockId", "answersJSON", "stylesJSON", "animationsJSON"
-      ]
-    };
+export class SectionRepo {
+  public async save(model: Section) {
+    return model.id ? this.update(model) : this.create(model);
+  }
+
+  protected async create(model: Section): Promise<Section> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("sections").values({
+      id: model.id,
+      churchId: model.churchId,
+      pageId: model.pageId,
+      blockId: model.blockId,
+      zone: model.zone,
+      background: model.background,
+      textColor: model.textColor,
+      headingColor: model.headingColor,
+      linkColor: model.linkColor,
+      sort: model.sort,
+      targetBlockId: model.targetBlockId,
+      answersJSON: model.answersJSON,
+      stylesJSON: model.stylesJSON,
+      animationsJSON: model.animationsJSON
+    } as any).execute();
+    return model;
+  }
+
+  private async update(model: Section): Promise<Section> {
+    await getDb().updateTable("sections").set({
+      pageId: model.pageId,
+      blockId: model.blockId,
+      zone: model.zone,
+      background: model.background,
+      textColor: model.textColor,
+      headingColor: model.headingColor,
+      linkColor: model.linkColor,
+      sort: model.sort,
+      targetBlockId: model.targetBlockId,
+      answersJSON: model.answersJSON,
+      stylesJSON: model.stylesJSON,
+      animationsJSON: model.animationsJSON
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("sections").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string): Promise<Section | undefined> {
+    return (await getDb().selectFrom("sections").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string): Promise<Section[]> {
+    return getDb().selectFrom("sections").selectAll().where("churchId", "=", churchId).orderBy("sort").execute() as any;
   }
 
   public async updateSortForBlock(churchId: string, blockId: string) {
@@ -40,21 +84,46 @@ export class SectionRepo extends ConfiguredRepo<Section> {
     if (promises.length > 0) await Promise.all(promises);
   }
 
-  public loadForBlock(churchId: string, blockId: string) {
-    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND blockId=? order by sort;", [churchId, blockId]);
+  public async loadForBlock(churchId: string, blockId: string) {
+    return getDb().selectFrom("sections").selectAll()
+      .where("churchId", "=", churchId)
+      .where("blockId", "=", blockId)
+      .orderBy("sort").execute() as any;
   }
 
-  public loadForBlocks(churchId: string, blockIds: string[]) {
-    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND blockId IN (?) order by sort;", [churchId, blockIds]);
+  public async loadForBlocks(churchId: string, blockIds: string[]) {
+    if (!blockIds || blockIds.length === 0) return [];
+    return getDb().selectFrom("sections").selectAll()
+      .where("churchId", "=", churchId)
+      .where("blockId", "in", blockIds)
+      .orderBy("sort").execute() as any;
   }
 
-  public loadForPage(churchId: string, pageId: string) {
-    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND (pageId=? or (pageId IS NULL and blockId IS NULL)) order by sort;", [churchId, pageId]);
+  public async loadForPage(churchId: string, pageId: string) {
+    return getDb().selectFrom("sections").selectAll()
+      .where("churchId", "=", churchId)
+      .where((eb) => eb.or([
+        eb("pageId", "=", pageId),
+        eb.and([eb("pageId", "is", null), eb("blockId", "is", null)])
+      ]))
+      .orderBy("sort")
+      .execute() as any;
   }
 
-  public loadForZone(churchId: string, pageId: string, zone: string) {
-    return TypedDB.query("SELECT * FROM sections WHERE churchId=? AND pageId=? AND zone=? order by sort;", [churchId, pageId, zone]);
+  public async loadForZone(churchId: string, pageId: string, zone: string) {
+    return getDb().selectFrom("sections").selectAll()
+      .where("churchId", "=", churchId)
+      .where("pageId", "=", pageId)
+      .where("zone", "=", zone)
+      .orderBy("sort").execute() as any;
   }
+
+  public async insert(model: Section): Promise<Section> {
+    return this.create(model);
+  }
+
+  public convertToModel(_churchId: string, data: any) { return data as Section; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Section[]; }
 
   protected rowToModel(row: any): Section {
     return {

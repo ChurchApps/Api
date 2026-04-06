@@ -1,45 +1,91 @@
 import { injectable } from "inversify";
-import { ArrayHelper } from "@churchapps/apihelper";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
+import { getDb } from "../db/index.js";
 import { Setting } from "../models/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class SettingRepo extends ConfiguredRepo<Setting> {
-  protected get repoConfig(): RepoConfig<Setting> {
-    return {
-      tableName: "settings",
-      hasSoftDelete: false,
-      columns: ["userId", "keyName", "value", "public"]
-    };
+export class SettingRepo {
+  public async save(model: Setting) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public deleteForUser(churchId: string, userId: string, id: string) {
-    return TypedDB.query("DELETE FROM settings WHERE id=? and churchId=? and userId=?;", [id, churchId, userId]);
+  private async create(model: Setting): Promise<Setting> {
+    model.id = UniqueIdHelper.shortId();
+    await getDb().insertInto("settings").values({
+      id: model.id,
+      churchId: model.churchId,
+      userId: model.userId,
+      keyName: model.keyName,
+      value: model.value,
+      public: model.public
+    } as any).execute();
+    return model;
   }
 
-  public loadAll(churchId: string) {
-    return TypedDB.query("SELECT * FROM settings WHERE churchId=? and userId is null;", [churchId]);
+  private async update(model: Setting): Promise<Setting> {
+    await getDb().updateTable("settings").set({
+      userId: model.userId,
+      keyName: model.keyName,
+      value: model.value,
+      public: model.public
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    return model;
   }
 
-  public loadUser(churchId: string, userId: string) {
-    return TypedDB.query("SELECT * FROM settings WHERE churchId=? and userId=?;", [churchId, userId]);
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("settings").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public loadPublicSettings(churchId: string) {
-    return TypedDB.query("SELECT * FROM settings WHERE churchId=? AND public=?", [churchId, 1]);
+  public async load(churchId: string, id: string): Promise<Setting | undefined> {
+    return (await getDb().selectFrom("settings").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public loadAllPublicSettings() {
-    return TypedDB.query("SELECT * FROM settings WHERE public=1 and userId is null;", []);
+  public async deleteForUser(churchId: string, userId: string, id: string) {
+    await getDb().deleteFrom("settings")
+      .where("id", "=", id)
+      .where("churchId", "=", churchId)
+      .where("userId", "=", userId).execute();
   }
 
-  public loadMulipleChurches(keyNames: string[], churchIds: string[]) {
-    return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId IN (?) AND public=1 and userId is null", [keyNames, churchIds]);
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("settings").selectAll()
+      .where("churchId", "=", churchId)
+      .where("userId", "is", null).execute() as any;
   }
 
-  public loadByKeyNames(churchId: string, keyNames: string[]) {
-    return TypedDB.query("SELECT * FROM settings WHERE keyName in (?) AND churchId=? and userId is null;", [keyNames, churchId]);
+  public async loadUser(churchId: string, userId: string) {
+    return getDb().selectFrom("settings").selectAll()
+      .where("churchId", "=", churchId)
+      .where("userId", "=", userId).execute() as any;
+  }
+
+  public async loadPublicSettings(churchId: string) {
+    return getDb().selectFrom("settings").selectAll()
+      .where("churchId", "=", churchId)
+      .where("public", "=", 1 as any).execute() as any;
+  }
+
+  public async loadAllPublicSettings() {
+    return getDb().selectFrom("settings").selectAll()
+      .where("public", "=", 1 as any)
+      .where("userId", "is", null).execute() as any;
+  }
+
+  public async loadMulipleChurches(keyNames: string[], churchIds: string[]) {
+    if (!keyNames || keyNames.length === 0 || !churchIds || churchIds.length === 0) return [];
+    return getDb().selectFrom("settings").selectAll()
+      .where("keyName", "in", keyNames)
+      .where("churchId", "in", churchIds)
+      .where("public", "=", 1 as any)
+      .where("userId", "is", null).execute() as any;
+  }
+
+  public async loadByKeyNames(churchId: string, keyNames: string[]) {
+    if (!keyNames || keyNames.length === 0) return [];
+    return getDb().selectFrom("settings").selectAll()
+      .where("keyName", "in", keyNames)
+      .where("churchId", "=", churchId)
+      .where("userId", "is", null).execute() as any;
   }
 
   public getImports(data: any[], type?: string, playlistId?: string, channelId?: string) {
@@ -102,6 +148,14 @@ export class SettingRepo extends ConfiguredRepo<Setting> {
     });
     return result;
   }
+
+  public async saveAll(models: Setting[]) {
+    const promises = models.map(m => this.save(m));
+    return Promise.all(promises);
+  }
+
+  public convertToModel(_churchId: string, data: any) { return data as Setting; }
+  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Setting[]; }
 
   protected rowToModel(row: any): Setting {
     return {

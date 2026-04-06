@@ -2,7 +2,6 @@ import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda";
 
 import { Environment } from "../shared/helpers/Environment.js";
-import { TypedDB } from "../shared/infrastructure/TypedDB.js";
 
 import { Logger } from "../modules/messaging/helpers/Logger.js";
 import { SocketHelper } from "../modules/messaging/helpers/SocketHelper.js";
@@ -20,11 +19,9 @@ const initEnv = async () => {
       endpoint: Environment.socketUrl || "ws://localhost:8087"
     });
 
-    // Initialize messaging module repositories and helpers in messaging context
-    await TypedDB.runWithContext("messaging", async () => {
-      const repos = await RepoManager.getRepos<any>("messaging");
-      initializeMessagingModule(repos);
-    });
+    // Initialize messaging module repositories and helpers
+    const repos = await RepoManager.getRepos<any>("messaging");
+    initializeMessagingModule(repos);
   }
 };
 
@@ -42,17 +39,14 @@ export const handleSocket = async (event: APIGatewayProxyEvent, context: Context
 
     console.log(`WebSocket ${eventType} for connection ${connectionId}`);
 
-    // Run within messaging module context
-    return await TypedDB.runWithContext("messaging", async () => {
-      switch (eventType) {
-        case "CONNECT": return await handleConnect(event, context);
-        case "DISCONNECT": return await handleDisconnect(event, context);
-        case "MESSAGE": return await handleMessage(event, context);
-        default:
-          console.log("Unknown eventType:", eventType);
-          return { statusCode: 400, body: "Unknown event type" };
-      }
-    });
+    switch (eventType) {
+      case "CONNECT": return await handleConnect(event, context);
+      case "DISCONNECT": return await handleDisconnect(event, context);
+      case "MESSAGE": return await handleMessage(event, context);
+      default:
+        console.log("Unknown eventType:", eventType);
+        return { statusCode: 400, body: "Unknown event type" };
+    }
   } catch (error) {
     console.error("Socket handler error:", error);
     return { statusCode: 500, body: "Internal server error" };

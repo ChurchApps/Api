@@ -10,4 +10,3 @@ export { DateHelper } from "./DateHelper.js";
 export { ValidationHelper } from "./ValidationHelper.js";
 export { StripeHelper } from "./StripeHelper.js";
 export { CollectionHelper } from "./CollectionHelper.js";
-export { rowsToArray } from "./DbArrayHelper.js";

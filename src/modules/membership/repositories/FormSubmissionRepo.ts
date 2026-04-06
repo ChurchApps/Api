@@ -1,32 +1,78 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { FormSubmission } from "../models/index.js";
 import { DateHelper } from "../helpers/index.js";
-import { ConfiguredRepo, RepoConfig } from "../../../shared/infrastructure/ConfiguredRepo.js";
 
 @injectable()
-export class FormSubmissionRepo extends ConfiguredRepo<FormSubmission> {
-  protected get repoConfig(): RepoConfig<FormSubmission> {
-    return {
-      tableName: "formSubmissions",
-      hasSoftDelete: false,
-      insertColumns: ["formId", "contentType", "contentId", "submissionDate", "submittedBy", "revisionDate", "revisedBy"],
-      updateColumns: ["contentId", "revisedBy"],
-      updateLiterals: { revisionDate: "NOW()" }
-    };
-  }
-  protected async create(formSubmission: FormSubmission): Promise<FormSubmission> {
-    (formSubmission as any).submissionDate = DateHelper.toMysqlDate(formSubmission.submissionDate);
-    (formSubmission as any).revisionDate = DateHelper.toMysqlDate(formSubmission.revisionDate);
-    return super.create(formSubmission);
+export class FormSubmissionRepo {
+  public async save(model: FormSubmission) {
+    return model.id ? this.update(model) : this.create(model);
   }
 
-  public loadForContent(churchId: string, contentType: string, contentId: string) {
-    return TypedDB.query("SELECT * FROM formSubmissions WHERE churchId=? AND contentType=? AND contentId=?;", [churchId, contentType, contentId]);
+  private async create(formSubmission: FormSubmission): Promise<FormSubmission> {
+    formSubmission.id = UniqueIdHelper.shortId();
+    const submissionDate = DateHelper.toMysqlDate(formSubmission.submissionDate);
+    const revisionDate = DateHelper.toMysqlDate(formSubmission.revisionDate);
+    await getDb().insertInto("formSubmissions").values({
+      id: formSubmission.id,
+      churchId: formSubmission.churchId,
+      formId: formSubmission.formId,
+      contentType: formSubmission.contentType,
+      contentId: formSubmission.contentId,
+      submissionDate: submissionDate as any,
+      submittedBy: formSubmission.submittedBy,
+      revisionDate: revisionDate as any,
+      revisedBy: formSubmission.revisedBy
+    }).execute();
+    return formSubmission;
   }
 
-  public loadByFormId(churchId: string, formId: string) {
-    return TypedDB.query("SELECT * FROM formSubmissions WHERE churchId=? AND formId=?;", [churchId, formId]);
+  private async update(formSubmission: FormSubmission): Promise<FormSubmission> {
+    await getDb().updateTable("formSubmissions").set({
+      contentId: formSubmission.contentId,
+      revisedBy: formSubmission.revisedBy,
+      revisionDate: sql`NOW()` as any
+    }).where("id", "=", formSubmission.id).where("churchId", "=", formSubmission.churchId).execute();
+    return formSubmission;
+  }
+
+  public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("formSubmissions").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async load(churchId: string, id: string) {
+    return (await getDb().selectFrom("formSubmissions").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadAll(churchId: string) {
+    return getDb().selectFrom("formSubmissions").selectAll().where("churchId", "=", churchId).execute();
+  }
+
+  public async loadForContent(churchId: string, contentType: string, contentId: string) {
+    return getDb().selectFrom("formSubmissions").selectAll()
+      .where("churchId", "=", churchId)
+      .where("contentType", "=", contentType)
+      .where("contentId", "=", contentId)
+      .execute();
+  }
+
+  public async loadByFormId(churchId: string, formId: string) {
+    return getDb().selectFrom("formSubmissions").selectAll()
+      .where("churchId", "=", churchId)
+      .where("formId", "=", formId)
+      .execute();
+  }
+
+  public saveAll(models: FormSubmission[]) {
+    const promises: Promise<FormSubmission>[] = [];
+    models.forEach((model) => { promises.push(this.save(model)); });
+    return Promise.all(promises);
+  }
+
+  public insert(model: FormSubmission): Promise<FormSubmission> {
+    return this.create(model);
   }
 
   protected rowToModel(row: any): FormSubmission {
@@ -41,5 +87,15 @@ export class FormSubmissionRepo extends ConfiguredRepo<FormSubmission> {
       revisionDate: row.revisionDate,
       revisedBy: row.revisedBy
     };
+  }
+
+  public convertToModel(_churchId: string, data: any) {
+    if (!data) return null;
+    return this.rowToModel(data);
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    if (!Array.isArray(data)) return [];
+    return data.map((d) => this.rowToModel(d));
   }
 }

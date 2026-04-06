@@ -1,23 +1,27 @@
 import { injectable } from "inversify";
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { sql } from "kysely";
 import { Condition } from "../models/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
+import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 
 @injectable()
-export class MembershipRepo extends BaseRepo<any> {
-  protected tableName = "people";
-  protected hasSoftDelete = false;
+export class MembershipRepo {
+  private static readonly ALLOWED_FIELDS = new Set([
+    "firstName", "lastName", "middleName", "nickName", "displayName",
+    "email", "homePhone", "workPhone", "mobilePhone",
+    "birthDate", "anniversary", "membershipStatus", "gender",
+    "city", "state", "zip", "maritalStatus"
+  ]);
 
-  protected async create(_model: any): Promise<any> {
-    // This repository doesn't handle create operations
-    throw new Error("Create operation not supported");
+  private static readonly ALLOWED_OPERATORS = new Set(["=", "!=", ">", "<", ">=", "<=", "LIKE"]);
+
+  private getDb() {
+    return KyselyPool.getDb("membership-doing");
   }
 
-  protected async update(_model: any): Promise<any> {
-    // This repository doesn't handle update operations
-    throw new Error("Update operation not supported");
-  }
   private getDBField(condition: Condition) {
+    if (!MembershipRepo.ALLOWED_FIELDS.has(condition.field)) {
+      throw new Error(`Invalid condition field: ${condition.field}`);
+    }
     const fieldData = condition.fieldData ? JSON.parse(condition.fieldData) : {};
     let result = condition.field;
     switch (fieldData.datePart) {
@@ -26,7 +30,6 @@ export class MembershipRepo extends BaseRepo<any> {
       case "month": result = "month(" + condition.field + ")"; break;
       case "years": result = "TIMESTAMPDIFF(YEAR, " + condition.field + ", CURDATE())"; break;
     }
-
     return result;
   }
 
@@ -47,20 +50,30 @@ export class MembershipRepo extends BaseRepo<any> {
   }
 
   public async loadIdsMatchingCondition(condition: Condition) {
-    let sql = "select id from people where churchId = ? AND removed = 0 AND ";
-    const params = [condition.churchId];
-    sql += this.getDBField(condition) + " " + condition.operator + " ?";
-    params.push(this.getDBValue(condition));
+    if (!MembershipRepo.ALLOWED_OPERATORS.has(condition.operator)) {
+      throw new Error(`Invalid condition operator: ${condition.operator}`);
+    }
+    const dbField = this.getDBField(condition);
+    const dbValue = this.getDBValue(condition);
+
+    const rows = await (this.getDb() as any).selectFrom("people")
+      .select("id")
+      .where("churchId", "=", condition.churchId)
+      .where("removed", "=", 0)
+      .where(sql`${sql.raw(dbField)} ${sql.raw(condition.operator)} ${dbValue}`)
+      .execute() as { id: string }[];
 
     const result: string[] = [];
-    const rows = (await TypedDB.query(sql, params)) as { id: string }[];
-    rows.forEach((r: { id: string }) => result.push(r.id));
+    rows.forEach((r) => result.push(r.id));
     return result;
   }
 
   public async loadPeople(churchId: string, personIds: string[]) {
-    const sql = "select id, displayName from people where churchId = ? AND removed = 0 AND id in (?)";
-    const params = [churchId, personIds];
-    return TypedDB.query(sql, params);
+    return (this.getDb() as any).selectFrom("people")
+      .select(["id", "displayName"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("id", "in", personIds)
+      .execute();
   }
 }

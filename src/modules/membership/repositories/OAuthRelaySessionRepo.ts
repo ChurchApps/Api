@@ -1,56 +1,57 @@
-import { TypedDB } from "../../../shared/infrastructure/TypedDB.js";
+import { injectable } from "inversify";
+import { sql } from "kysely";
+import { getDb } from "../db/index.js";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { OAuthRelaySession } from "../models/index.js";
 import { DateHelper } from "../helpers/index.js";
-import { BaseRepo } from "../../../shared/infrastructure/BaseRepo.js";
-import { injectable } from "inversify";
 import crypto from "crypto";
 
 @injectable()
-export class OAuthRelaySessionRepo extends BaseRepo<OAuthRelaySession> {
-  protected tableName = "oAuthRelaySessions";
-  protected hasSoftDelete = false;
+export class OAuthRelaySessionRepo {
+  public async save(model: OAuthRelaySession) {
+    return model.id ? this.update(model) : this.create(model);
+  }
 
-  protected async create(session: OAuthRelaySession): Promise<OAuthRelaySession> {
-    session.id = this.createId();
+  private async create(session: OAuthRelaySession): Promise<OAuthRelaySession> {
+    session.id = UniqueIdHelper.shortId();
     const expiresAt = DateHelper.toMysqlDate(session.expiresAt);
-    const sql = `INSERT INTO oAuthRelaySessions (id, sessionCode, provider, redirectUri, status, expiresAt, createdAt)
-                 VALUES (?, ?, ?, ?, ?, ?, NOW());`;
-    const params = [
-      session.id,
-      session.sessionCode,
-      session.provider,
-      session.redirectUri,
-      session.status || "pending",
-      expiresAt
-    ];
-    await TypedDB.query(sql, params);
+    await getDb().insertInto("oAuthRelaySessions").values({
+      id: session.id,
+      sessionCode: session.sessionCode,
+      provider: session.provider,
+      redirectUri: session.redirectUri,
+      status: session.status || "pending",
+      expiresAt: expiresAt as any,
+      createdAt: sql`NOW()` as any
+    }).execute();
     return session;
   }
 
-  protected async update(session: OAuthRelaySession): Promise<OAuthRelaySession> {
-    const sql = "UPDATE oAuthRelaySessions SET authCode=?, status=? WHERE id=?;";
-    const params = [session.authCode, session.status, session.id];
-    await TypedDB.query(sql, params);
+  private async update(session: OAuthRelaySession): Promise<OAuthRelaySession> {
+    await getDb().updateTable("oAuthRelaySessions").set({
+      authCode: session.authCode,
+      status: session.status
+    }).where("id", "=", session.id).execute();
     return session;
   }
 
-  public load(id: string): Promise<OAuthRelaySession> {
-    return TypedDB.queryOne("SELECT * FROM oAuthRelaySessions WHERE id=?", [id]);
+  public async load(id: string): Promise<OAuthRelaySession> {
+    return (await getDb().selectFrom("oAuthRelaySessions").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public loadBySessionCode(sessionCode: string): Promise<OAuthRelaySession> {
-    return TypedDB.queryOne(
-      "SELECT * FROM oAuthRelaySessions WHERE sessionCode=? AND expiresAt > NOW()",
-      [sessionCode]
-    );
+  public async loadBySessionCode(sessionCode: string): Promise<OAuthRelaySession> {
+    return (await getDb().selectFrom("oAuthRelaySessions").selectAll()
+      .where("sessionCode", "=", sessionCode)
+      .where("expiresAt", ">", sql`NOW()` as any)
+      .executeTakeFirst()) ?? null;
   }
 
-  public delete(id: string) {
-    return TypedDB.query("DELETE FROM oAuthRelaySessions WHERE id=?", [id]);
+  public async delete(id: string) {
+    await getDb().deleteFrom("oAuthRelaySessions").where("id", "=", id).execute();
   }
 
-  public deleteExpired() {
-    return TypedDB.query("DELETE FROM oAuthRelaySessions WHERE expiresAt < NOW()", []);
+  public async deleteExpired() {
+    await getDb().deleteFrom("oAuthRelaySessions").where("expiresAt", "<", sql`NOW()` as any).execute();
   }
 
   // Generate 8-character session code (TV-friendly, no ambiguous characters)
@@ -62,4 +63,7 @@ export class OAuthRelaySessionRepo extends BaseRepo<OAuthRelaySession> {
     }
     return code;
   }
+
+  public convertToModel(_churchId: string, data: any) { return data; }
+  public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
 }
