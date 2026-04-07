@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { BibleLookup } from "../models/index.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 @injectable()
 export class BibleLookupRepo {
@@ -43,11 +44,13 @@ export class BibleLookupRepo {
   }
 
   public async getStats(startDate: Date, endDate: Date) {
+    const start = DateHelper.toMysqlDate(startDate);
+    const end = DateHelper.toMysqlDate(endDate);
     const result = await getDb().selectFrom("bibleTranslations as bt")
-      .innerJoin("bibleLookups as bl", "bl.translationKey", "bt.sourceKey")
+      .innerJoin("bibleLookups as bl", "bl.translationKey", "bt.abbreviation")
       .select(["bt.abbreviation", sql<number>`count(distinct(bl.ipAddress))`.as("lookups")])
-      .where("bl.lookupTime", ">=", startDate as any)
-      .where("bl.lookupTime", "<=", endDate as any)
+      .where("bl.lookupTime", ">=", start as any)
+      .where("bl.lookupTime", "<=", end as any)
       .groupBy("bt.abbreviation")
       .orderBy("bt.abbreviation")
       .execute();
