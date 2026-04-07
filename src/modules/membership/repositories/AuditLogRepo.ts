@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { AuditLog } from "../models/index.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 export interface AuditLogFilter {
   category?: string;
@@ -68,8 +69,8 @@ export class AuditLogRepo {
     if (filter.userId) query = query.where("userId", "=", filter.userId);
     if (filter.entityType) query = query.where("entityType", "=", filter.entityType);
     if (filter.entityId) query = query.where("entityId", "=", filter.entityId);
-    if (filter.startDate) query = query.where("created", ">=", filter.startDate as any);
-    if (filter.endDate) query = query.where("created", "<=", filter.endDate as any);
+    if (filter.startDate) query = query.where("created", ">=", DateHelper.toMysqlDate(filter.startDate) as any);
+    if (filter.endDate) query = query.where("created", "<=", DateHelper.toMysqlDate(filter.endDate) as any);
 
     const limit = Math.max(1, Math.min(filter.limit || 100, 1000));
     const offset = Math.max(0, filter.offset || 0);
@@ -100,8 +101,8 @@ export class AuditLogRepo {
     if (filter.userId) query = query.where("userId", "=", filter.userId);
     if (filter.entityType) query = query.where("entityType", "=", filter.entityType);
     if (filter.entityId) query = query.where("entityId", "=", filter.entityId);
-    if (filter.startDate) query = query.where("created", ">=", filter.startDate as any);
-    if (filter.endDate) query = query.where("created", "<=", filter.endDate as any);
+    if (filter.startDate) query = query.where("created", ">=", DateHelper.toMysqlDate(filter.startDate) as any);
+    if (filter.endDate) query = query.where("created", "<=", DateHelper.toMysqlDate(filter.endDate) as any);
 
     const row = await query.executeTakeFirst();
     return (row as any)?.count || 0;

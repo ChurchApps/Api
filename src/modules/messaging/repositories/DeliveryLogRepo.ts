@@ -3,6 +3,7 @@ import { injectable } from "inversify";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { DeliveryLog } from "../models/index.js";
+import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 @injectable()
 export class DeliveryLogRepo {
@@ -53,10 +54,10 @@ export class DeliveryLogRepo {
       .where("churchId", "=", churchId)
       .where("personId", "=", personId);
     if (startDate) {
-      query = query.where("attemptTime", ">=", startDate);
+      query = query.where("attemptTime", ">=", DateHelper.toMysqlDate(startDate) as any);
     }
     if (endDate) {
-      query = query.where("attemptTime", "<=", endDate);
+      query = query.where("attemptTime", "<=", DateHelper.toMysqlDate(endDate) as any);
     }
     return query.orderBy("attemptTime", "desc").execute();
   }
