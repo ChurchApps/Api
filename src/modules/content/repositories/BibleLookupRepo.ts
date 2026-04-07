@@ -44,7 +44,7 @@ export class BibleLookupRepo {
 
   public async getStats(startDate: Date, endDate: Date) {
     const result = await getDb().selectFrom("bibleTranslations as bt")
-      .innerJoin("bibleLookups as bl", "bl.translationKey", "bt.abbreviation")
+      .innerJoin("bibleLookups as bl", "bl.translationKey", "bt.sourceKey")
       .select(["bt.abbreviation", sql<number>`count(distinct(bl.ipAddress))`.as("lookups")])
       .where("bl.lookupTime", ">=", startDate as any)
       .where("bl.lookupTime", "<=", endDate as any)
