@@ -1,17 +1,11 @@
-import { controller, httpGet, httpDelete, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { Permissions } from "../helpers/index.js";
-import { ContentCrudController } from "./ContentCrudController.js";
+import { ContentBaseController } from "./ContentBaseController.js";
 import { Link } from "../models/index.js";
-import { CrudHelper } from "../../../shared/controllers/index.js";
 
 @controller("/content/links")
-export class LinkController extends ContentCrudController {
-  protected crudSettings = {
-    repoKey: "link",
-    permissions: { view: undefined, edit: Permissions.content.edit },
-    routes: ["getById", "getAll", "post"] as const
-  };
+export class LinkController extends ContentBaseController {
 
   // Authenticated access - filters links by visibility based on user context
   // Note: "team" visibility is handled client-side since group tags aren't in the JWT
@@ -64,13 +58,40 @@ export class LinkController extends ContentCrudController {
     });
   }
 
-  // Override GET / to support optional category filter and custom sort after save
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.link.load(au.churchId, id);
+      return this.repos.link.convertToModel(au.churchId, data);
+    });
+  }
+
+  // Override GET / to support optional category filter
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query?.category?.toString();
       const data = category ? await this.repos.link.loadByCategory(au.churchId, category) : await this.repos.link.loadAll(au.churchId);
       return this.repos.link.convertAllToModel(au.churchId, data);
+    });
+  }
+
+  @httpPost("/")
+  public async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const promises: Promise<Link>[] = [];
+      req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.link.save(item)); });
+      const result = await Promise.all(promises);
+      // Post-save sort behavior
+      if (result.length > 0) {
+        try {
+          await this.repos.link.sort(au.churchId, result[0].category, result[0].parentId);
+        } catch {
+          // ignore sort errors
+        }
+      }
+      return this.repos.link.convertAllToModel(au.churchId, result);
     });
   }
 
@@ -84,29 +105,4 @@ export class LinkController extends ContentCrudController {
       }
     });
   }
-
-  // Use base POST / but add post-save sort behavior
-  public override async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<any> {
-    const result = (await CrudHelper.saveManyWrapped<Link>(this, req as any, res, Permissions.content.edit, "link", (item, churchId) => (item.churchId = churchId))) as Link[];
-    if (Array.isArray(result) && result.length > 0) {
-      const au: any = (req as any).user || {};
-      try {
-        await this.repos.link.sort(au.churchId, result[0].category, result[0].parentId);
-      } catch {
-        // ignore sort errors
-      }
-    }
-    return result as any;
-  }
-
-  /*
-  private async savePhoto(churchId: string, link: Link) {
-    const base64 = link.photo.split(',')[1];
-    const key = "/" + churchId + "/tabs/" + link.id + ".png";
-    return FileStorageHelper.store(key, "image/png", Buffer.from(base64, 'base64')).then(async () => {
-      link.photo = EnvironmentBase.contentRoot + key + "?dt=" + new Date().getTime().toString();
-      await this.repos.link.save(link);
-    });
-  }
-  */
 }

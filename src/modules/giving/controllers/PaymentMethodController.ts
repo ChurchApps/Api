@@ -1,17 +1,12 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { GivingCrudController } from "./GivingCrudController.js";
+import { GivingBaseController } from "./GivingBaseController.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayPaymentMethod } from "../models/index.js";
 
 @controller("/giving/paymentmethods")
-export class PaymentMethodController extends GivingCrudController {
-  protected crudSettings = {
-    repoKey: "customer", // not used by base here
-    permissions: { view: Permissions.donations.view, edit: Permissions.donations.edit },
-    routes: [] as const
-  };
+export class PaymentMethodController extends GivingBaseController {
 
   @httpGet("/test/personid/:id")
   public async testGetPersonPaymentMethods(@requestParam("id") id: string, _req: express.Request<{}, {}, null>, _res: express.Response): Promise<any> {

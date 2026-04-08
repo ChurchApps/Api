@@ -1,16 +1,11 @@
-import { controller, httpGet } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { AttendanceCrudController } from "./AttendanceCrudController.js";
+import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { ServiceTime, GroupServiceTime } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/attendance/servicetimes")
-export class ServiceTimeController extends AttendanceCrudController {
-  protected crudSettings = {
-    repoKey: "serviceTime",
-    permissions: { view: null, edit: Permissions.services.edit },
-    routes: ["getById", "post", "delete"] as const
-  };
+export class ServiceTimeController extends AttendanceBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
@@ -18,6 +13,14 @@ export class ServiceTimeController extends AttendanceCrudController {
       const serviceId = req.query.serviceId.toString();
       const data = await this.repos.serviceTime.loadByChurchCampusService(au.churchId, campusId, serviceId);
       return this.repos.serviceTime.convertAllToModel(au.churchId, data as any);
+    });
+  }
+
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.serviceTime.load(au.churchId, id);
+      return this.repos.serviceTime.convertToModel(au.churchId, data);
     });
   }
 
@@ -31,6 +34,26 @@ export class ServiceTimeController extends AttendanceCrudController {
       const result: ServiceTime[] = this.repos.serviceTime.convertAllToModel(au.churchId, data as any);
       if (result.length > 0 && this.include(req, "groups")) await this.appendGroups(au.churchId, result);
       return result;
+    });
+  }
+
+  @httpPost("/")
+  public async save(req: express.Request<{}, {}, ServiceTime[]>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
+      const promises: Promise<ServiceTime>[] = [];
+      req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.serviceTime.save(item)); });
+      const result = await Promise.all(promises);
+      return this.repos.serviceTime.convertAllToModel(au.churchId, result);
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.services.edit)) return this.json({}, 401);
+      await this.repos.serviceTime.delete(au.churchId, id);
+      return {};
     });
   }
 

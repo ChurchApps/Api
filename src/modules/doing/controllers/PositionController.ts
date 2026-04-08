@@ -1,10 +1,10 @@
-import { controller, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { DoingCrudController } from "./DoingCrudController.js";
+import { DoingBaseController } from "./DoingBaseController.js";
+import { Position } from "../models/index.js";
 
 @controller("/doing/positions")
-export class PositionController extends DoingCrudController {
-  protected crudSettings = { repoKey: "position", permissions: {}, routes: ["getById", "post", "delete"] as const };
+export class PositionController extends DoingBaseController {
   @httpGet("/ids")
   public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -30,5 +30,29 @@ export class PositionController extends DoingCrudController {
     });
   }
 
-  // Inherit GET /:id, POST /, and DELETE /:id
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.position.load(au.churchId, id);
+      return this.repos.position.convertToModel(au.churchId, data);
+    });
+  }
+
+  @httpPost("/")
+  public async save(req: express.Request<{}, {}, Position[]>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const promises: Promise<Position>[] = [];
+      req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.position.save(item)); });
+      const result = await Promise.all(promises);
+      return this.repos.position.convertAllToModel(au.churchId, result);
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      await this.repos.position.delete(au.churchId, id);
+      return {};
+    });
+  }
 }

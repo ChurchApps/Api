@@ -1,6 +1,6 @@
 import { controller, httpPost, httpGet } from "inversify-express-utils";
 import express from "express";
-import { GivingCrudController } from "./GivingCrudController.js";
+import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { StripeHelper } from "../../../shared/helpers/StripeHelper.js";
@@ -11,12 +11,7 @@ import Axios from "axios";
 import dayjs from "dayjs";
 
 @controller("/giving/donate")
-export class DonateController extends GivingCrudController {
-  protected crudSettings = {
-    repoKey: "donation", // not used by base here
-    permissions: { view: Permissions.donations.view, edit: Permissions.donations.edit },
-    routes: [] as const // all CRUD endpoints disabled; custom routes only
-  };
+export class DonateController extends GivingBaseController {
 
   /**
    * Get available payment gateways for a church

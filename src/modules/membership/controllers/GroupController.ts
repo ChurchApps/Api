@@ -1,17 +1,12 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import { MembershipCrudController } from "./MembershipCrudController.js";
+import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Group } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { ArrayHelper, SlugHelper } from "@churchapps/apihelper";
 
 @controller("/membership/groups")
-export class GroupController extends MembershipCrudController {
-  protected crudSettings = {
-    repoKey: "group",
-    permissions: { view: null, edit: Permissions.groups.edit },
-    routes: ["getById", "getAll"] as const // Custom POST and DELETE implementations below
-  };
+export class GroupController extends MembershipBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -70,6 +65,22 @@ export class GroupController extends MembershipCrudController {
   public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadByTag(churchId, tag)) as any[]);
+    });
+  }
+
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.group.load(au.churchId, id);
+      return this.repos.group.convertToModel(au.churchId, data);
+    });
+  }
+
+  @httpGet("/")
+  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.group.loadAll(au.churchId);
+      return this.repos.group.convertAllToModel(au.churchId, data);
     });
   }
 

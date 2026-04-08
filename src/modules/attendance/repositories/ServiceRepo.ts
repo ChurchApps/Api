@@ -54,6 +54,10 @@ export class ServiceRepo {
     return rows.rows.map((row: any) => this.rowToModel(row));
   }
 
+  public convertToModel(_churchId: string, data: any) {
+    return data ? this.rowToModel(data) : data;
+  }
+
   public convertAllToModel(_churchId: string, data: any[]): Service[] {
     return data.map((row) => this.rowToModel(row));
   }

@@ -1,17 +1,20 @@
-import { controller, httpGet, httpPost } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { AttendanceCrudController } from "./AttendanceCrudController.js";
+import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { Session } from "../models/index.js";
 
 @controller("/attendance/sessions")
-export class SessionController extends AttendanceCrudController {
-  protected crudSettings = {
-    repoKey: "session",
-    permissions: { view: Permissions.attendance.view, edit: Permissions.attendance.edit },
-    routes: ["getById", "delete"] as const,
-    groupIdField: "groupId"
-  };
+export class SessionController extends AttendanceBaseController {
+
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
+      const data = await this.repos.session.load(au.churchId, id);
+      return this.repos.session.convertToModel(au.churchId, data);
+    });
+  }
 
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
@@ -48,6 +51,15 @@ export class SessionController extends AttendanceCrudController {
         const result = await Promise.all(promises);
         return this.repos.session.convertAllToModel(au.churchId, result);
       }
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
+      await this.repos.session.delete(au.churchId, id);
+      return {};
     });
   }
 }

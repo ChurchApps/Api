@@ -59,6 +59,10 @@ export class ServiceTimeRepo {
     return rows.rows.map((row: any) => this.rowToModel(row));
   }
 
+  public convertToModel(_churchId: string, data: any) {
+    return data ? this.rowToModel(data) : data;
+  }
+
   public convertAllToModel(_churchId: string, data: any[]): ServiceTime[] {
     return data.map((row) => this.rowToModel(row));
   }

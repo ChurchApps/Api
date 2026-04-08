@@ -1,15 +1,10 @@
-import { controller, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { DoingCrudController } from "./DoingCrudController.js";
+import { DoingBaseController } from "./DoingBaseController.js";
+import { ContentProviderAuth } from "../models/index.js";
 
 @controller("/doing/contentProviderAuths")
-export class ContentProviderAuthController extends DoingCrudController {
-  protected crudSettings = {
-    repoKey: "contentProviderAuth",
-    permissions: { view: null, edit: null },
-    routes: ["getById", "getAll", "post", "delete"] as const
-  };
-
+export class ContentProviderAuthController extends DoingBaseController {
   @httpGet("/ids")
   public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -36,6 +31,40 @@ export class ContentProviderAuthController extends DoingCrudController {
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId);
+    });
+  }
+
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.contentProviderAuth.load(au.churchId, id);
+      return this.repos.contentProviderAuth.convertToModel(au.churchId, data);
+    });
+  }
+
+  @httpGet("/")
+  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.contentProviderAuth.loadAll(au.churchId);
+      return this.repos.contentProviderAuth.convertAllToModel(au.churchId, data);
+    });
+  }
+
+  @httpPost("/")
+  public async save(req: express.Request<{}, {}, ContentProviderAuth[]>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const promises: Promise<ContentProviderAuth>[] = [];
+      req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.contentProviderAuth.save(item)); });
+      const result = await Promise.all(promises);
+      return this.repos.contentProviderAuth.convertAllToModel(au.churchId, result);
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      await this.repos.contentProviderAuth.delete(au.churchId, id);
+      return {};
     });
   }
 }

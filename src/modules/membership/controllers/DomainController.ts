@@ -1,17 +1,12 @@
-import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MembershipCrudController } from "./MembershipCrudController.js";
+import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Domain } from "../models/index.js";
 import { CaddyHelper, Permissions } from "../helpers/index.js";
 import { DomainHealthHelper } from "../helpers/DomainHealthHelper.js";
 
 @controller("/membership/domains")
-export class DomainController extends MembershipCrudController {
-  protected crudSettings = {
-    repoKey: "domain",
-    permissions: { view: null, edit: Permissions.settings.edit },
-    routes: ["getById", "getAll", "delete"] as const
-  };
+export class DomainController extends MembershipBaseController {
   @httpGet("/caddy")
   public async caddy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -50,6 +45,22 @@ export class DomainController extends MembershipCrudController {
     });
   }
 
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.domain.load(au.churchId, id);
+      return this.repos.domain.convertToModel(au.churchId, data);
+    });
+  }
+
+  @httpGet("/")
+  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.domain.loadAll(au.churchId);
+      return this.repos.domain.convertAllToModel(au.churchId, data);
+    });
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Domain[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -64,6 +75,15 @@ export class DomainController extends MembershipCrudController {
         await CaddyHelper.updateCaddy();
         return result;
       }
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      await this.repos.domain.delete(au.churchId, id);
+      return {};
     });
   }
 

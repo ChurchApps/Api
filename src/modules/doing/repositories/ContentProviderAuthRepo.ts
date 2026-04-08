@@ -44,6 +44,14 @@ export class ContentProviderAuthRepo {
     return (await getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).where("providerId", "=", providerId).executeTakeFirst()) ?? null;
   }
 
+  public convertToModel(_churchId: string, data: any) {
+    return data ? this.rowToModel(data) : data;
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    return (data || []).map(row => this.rowToModel(row));
+  }
+
   protected rowToModel(row: any): ContentProviderAuth {
     return {
       id: row.id,

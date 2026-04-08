@@ -51,6 +51,14 @@ export class CampusRepo {
     return getDb().selectFrom("campuses").selectAll().where("churchId", "=", churchId).where("removed", "=", false).orderBy("name").execute();
   }
 
+  public convertToModel(_churchId: string, data: any) {
+    return data ? this.rowToModel(data) : data;
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    return (data || []).map(row => this.rowToModel(row));
+  }
+
   protected rowToModel(data: any): Campus {
     const result: Campus = {
       id: data.id,

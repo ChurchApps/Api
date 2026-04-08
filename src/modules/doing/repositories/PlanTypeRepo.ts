@@ -40,6 +40,14 @@ export class PlanTypeRepo {
     return getDb().selectFrom("planTypes").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).execute();
   }
 
+  public convertToModel(_churchId: string, data: any) {
+    return data ? this.rowToModel(data) : data;
+  }
+
+  public convertAllToModel(_churchId: string, data: any[]) {
+    return (data || []).map(row => this.rowToModel(row));
+  }
+
   protected rowToModel(row: any): PlanType {
     return {
       id: row.id,

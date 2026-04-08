@@ -1,16 +1,11 @@
-import { controller, httpGet, httpPost, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { MembershipCrudController } from "./MembershipCrudController.js";
+import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions, UserChurchHelper } from "../helpers/index.js";
 import { GroupMember } from "../models/index.js";
 
 @controller("/membership/groupmembers")
-export class GroupMemberController extends MembershipCrudController {
-  protected crudSettings = {
-    repoKey: "groupMember",
-    permissions: { view: Permissions.groupMembers.view, edit: Permissions.groupMembers.edit },
-    routes: ["getById", "delete"] as const
-  };
+export class GroupMemberController extends MembershipBaseController {
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -31,6 +26,15 @@ export class GroupMemberController extends MembershipCrudController {
     return this.actionWrapper(req, res, async (au) => {
       const result = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
       return this.repos.groupMember.convertAllToBasicModel(au.churchId, result);
+    });
+  }
+
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.view)) return this.json({}, 401);
+      const data = await this.repos.groupMember.load(au.churchId, id);
+      return this.repos.groupMember.convertToModel(au.churchId, data);
     });
   }
 
@@ -76,5 +80,12 @@ export class GroupMemberController extends MembershipCrudController {
     });
   }
 
-  // Inherit GET /:id and DELETE /:id via crudSettings
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
+      await this.repos.groupMember.delete(au.churchId, id);
+      return {};
+    });
+  }
 }

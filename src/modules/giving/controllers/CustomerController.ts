@@ -1,24 +1,11 @@
-import { controller, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { GivingCrudController } from "./GivingCrudController.js";
+import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 
 @controller("/giving/customers")
-export class CustomerController extends GivingCrudController {
-  protected crudSettings = {
-    repoKey: "customer",
-    permissions: { view: Permissions.donations.viewSummary, edit: Permissions.donations.edit },
-    routes: ["getAll", "delete"] as const // no POST; custom GET /:id below
-  };
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const customer = await this.repos.customer.convertToModel(au.churchId, (await this.repos.customer.load(au.churchId, id)) as any);
-      if (!au.checkAccess(Permissions.donations.viewSummary) && au.personId !== customer.personId) return this.json({}, 401);
-      else return customer;
-    });
-  }
+export class CustomerController extends GivingBaseController {
 
   @httpGet("/:id/subscriptions")
   public async getSubscriptions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
@@ -49,7 +36,30 @@ export class CustomerController extends GivingCrudController {
     });
   }
 
-  // GET / inherited via enableGetAll=true
-  // DELETE /:id inherited via enableDelete=true
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const customer = await this.repos.customer.convertToModel(au.churchId, (await this.repos.customer.load(au.churchId, id)) as any);
+      if (!au.checkAccess(Permissions.donations.viewSummary) && au.personId !== customer.personId) return this.json({}, 401);
+      else return customer;
+    });
+  }
 
+  @httpGet("/")
+  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json([], 401);
+      const data = await this.repos.customer.loadAll(au.churchId);
+      return this.repos.customer.convertAllToModel(au.churchId, data);
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
+      await this.repos.customer.delete(au.churchId, id);
+      return {};
+    });
+  }
 }

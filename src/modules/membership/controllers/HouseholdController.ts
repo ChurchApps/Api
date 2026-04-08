@@ -1,12 +1,44 @@
-import { controller } from "inversify-express-utils";
-import { MembershipCrudController } from "./MembershipCrudController.js";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
+import express from "express";
+import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions } from "../helpers/index.js";
+import { Household } from "../models/index.js";
 
 @controller("/membership/households")
-export class HouseholdController extends MembershipCrudController {
-  protected crudSettings = {
-    repoKey: "household",
-    permissions: { view: null, edit: Permissions.people.edit },
-    routes: ["getById", "getAll", "post", "delete"] as const
-  };
+export class HouseholdController extends MembershipBaseController {
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.household.load(au.churchId, id);
+      return this.repos.household.convertToModel(au.churchId, data);
+    });
+  }
+
+  @httpGet("/")
+  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.household.loadAll(au.churchId);
+      return this.repos.household.convertAllToModel(au.churchId, data);
+    });
+  }
+
+  @httpPost("/")
+  public async save(req: express.Request<{}, {}, Household[]>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+      const promises: Promise<Household>[] = [];
+      req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.household.save(item)); });
+      const result = await Promise.all(promises);
+      return this.repos.household.convertAllToModel(au.churchId, result);
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+      await this.repos.household.delete(au.churchId, id);
+      return {};
+    });
+  }
 }

@@ -1,18 +1,14 @@
-import { controller, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import { ContentCrudController } from "./ContentCrudController.js";
+import { ContentBaseController } from "./ContentBaseController.js";
 import { Block, Element, Section } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { TreeHelper } from "../helpers/TreeHelper.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 
 @controller("/content/blocks")
-export class BlockController extends ContentCrudController {
-  protected crudSettings = {
-    repoKey: "block",
-    permissions: { view: null, edit: Permissions.content.edit },
-    routes: ["getById", "getAll", "post", "delete"] as const
-  };
+export class BlockController extends ContentBaseController {
+
   @httpGet("/:churchId/tree/:id")
   public async getTree(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -22,10 +18,6 @@ export class BlockController extends ContentCrudController {
         const sections: Section[] =
           block.blockType === "elementBlock" ? [{ id: "", background: "#FFFFFF", textColor: "dark", blockId: block.id }] : await this.repos.section.loadForBlock(churchId, block.id);
         const allElements: Element[] = await this.repos.element.loadForBlock(churchId, block.id);
-        /*
-        const allElements: Element[] = (block.blockType === "elements")
-        ? await this.repos.element.loadByBlockId(churchId, block.id)
-        : await this.repos.element.loadForBlock(churchId, block.id);*/
         TreeHelper.populateAnswers(allElements);
         TreeHelper.populateAnswers(sections);
         result = block;
@@ -63,6 +55,42 @@ export class BlockController extends ContentCrudController {
         });
       }
       return result;
+    });
+  }
+
+  @httpGet("/:id")
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.block.load(au.churchId, id);
+      return this.repos.block.convertToModel(au.churchId, data);
+    });
+  }
+
+  @httpGet("/")
+  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const data = await this.repos.block.loadAll(au.churchId);
+      return this.repos.block.convertAllToModel(au.churchId, data);
+    });
+  }
+
+  @httpPost("/")
+  public async save(req: express.Request<{}, {}, Block[]>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const promises: Promise<Block>[] = [];
+      req.body.forEach((item) => { (item as any).churchId = au.churchId; promises.push(this.repos.block.save(item)); });
+      const result = await Promise.all(promises);
+      return this.repos.block.convertAllToModel(au.churchId, result);
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      await this.repos.block.delete(au.churchId, id);
+      return {};
     });
   }
 }
