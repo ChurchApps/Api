@@ -46,17 +46,17 @@ export class ServiceTimeRepo {
 
   public async loadNamesWithCampusService(churchId: string) {
     const rows = await sql<any>`SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName FROM serviceTimes st INNER JOIN services s on s.Id=st.serviceId INNER JOIN campuses c on c.Id=s.campusId WHERE s.churchId=${churchId} AND st.removed=0 AND s.removed=0 AND c.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public async loadNamesByServiceId(churchId: string, serviceId: string) {
     const rows = await sql<any>`SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName FROM serviceTimes st INNER JOIN services s on s.id=st.serviceId INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=${churchId} AND s.id=${serviceId} AND st.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public async loadByChurchCampusService(churchId: string, campusId: string, serviceId: string) {
     const rows = await sql<any>`SELECT st.* FROM serviceTimes st LEFT OUTER JOIN services s on s.id=st.serviceId WHERE st.churchId = ${churchId} AND (${serviceId}='0' OR st.serviceId=${serviceId}) AND (${campusId} = '0' OR s.campusId = ${campusId}) AND st.removed=0`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public convertToModel(_churchId: string, data: any) {

@@ -45,7 +45,7 @@ export class GroupServiceTimeRepo {
 
   public async loadWithServiceNames(churchId: string, groupId: string) {
     const rows = await sql<any>`SELECT gst.*, concat(c.name, ' - ', s.name, ' - ', st.name) as serviceTimeName FROM groupServiceTimes gst INNER JOIN serviceTimes st on st.id = gst.serviceTimeId INNER JOIN services s on s.id = st.serviceId INNER JOIN campuses c on c.id = s.campusId WHERE gst.churchId=${churchId} AND gst.groupId=${groupId}`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public async loadByServiceTimeIds(churchId: string, serviceTimeIds: string[]) {

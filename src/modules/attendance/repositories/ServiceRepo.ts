@@ -46,12 +46,12 @@ export class ServiceRepo {
 
   public async loadWithCampus(churchId: string) {
     const rows = await sql<any>`SELECT s.*, c.name as campusName FROM services s INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=${churchId} AND s.removed=0 and c.removed=0 ORDER BY c.name, s.name`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public async searchByCampus(churchId: string, campusId: string) {
     const rows = await sql<any>`SELECT * FROM services WHERE churchId=${churchId} AND (${campusId}='0' OR campusId=${campusId}) AND removed=0 ORDER BY name`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public convertToModel(_churchId: string, data: any) {

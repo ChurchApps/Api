@@ -9,7 +9,7 @@ export class AttendanceRepo {
 
   public async loadTree(churchId: string) {
     const rows = await sql<any>`SELECT c.id as campusId, IFNULL(c.name, 'Unassigned') as campusName, s.id as serviceId, s.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName FROM campuses c LEFT JOIN services s on s.campusId = c.id AND IFNULL(s.removed, 0) = 0 LEFT JOIN serviceTimes st on st.serviceId = s.id AND IFNULL(st.removed, 0) = 0 WHERE(c.id is NULL or c.churchId = ${churchId}) AND IFNULL(c.removed, 0) = 0 ORDER by campusName, serviceName, serviceTimeName`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public async loadTrend(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, groupId: string) {
@@ -24,7 +24,7 @@ export class AttendanceRepo {
 
   public async loadForPerson(churchId: string, personId: string) {
     const rows = await sql<any>`SELECT v.visitDate, c.id as campusId, c.name as campusName, ser.id as serviceId, ser.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName, s.groupId FROM visits v INNER JOIN visitSessions vs on vs.visitId = v.id INNER JOIN sessions s on s.id = vs.sessionId LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId LEFT OUTER JOIN services ser on ser.Id = st.serviceId LEFT OUTER JOIN campuses c on c.id = ser.campusId WHERE v.churchId=${churchId} AND v.PersonId = ${personId} ORDER BY v.visitDate desc, c.name, ser.name, st.name`.execute(getDb());
-    return rows.rows.map((row: any) => this.rowToModel(row));
+    return rows.rows;
   }
 
   public async loadByCampusId(churchId: string, campusId: string, startDate: Date, endDate: Date) {
