@@ -37,6 +37,7 @@ export class PositionRepo {
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
+    if (ids.length === 0) return [];
     return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 
@@ -45,6 +46,7 @@ export class PositionRepo {
   }
 
   public async loadByPlanIds(churchId: string, planIds: string[]) {
+    if (planIds.length === 0) return [];
     return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "in", planIds).execute();
   }
 

@@ -99,6 +99,7 @@ export class TaskRepo {
   }
 
   public async loadByAutomationIdContent(churchId: string, automationId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
+    if (associatedWithIds.length === 0) return [];
     let result: any[] = [];
     switch (recurs) {
       case "yearly":

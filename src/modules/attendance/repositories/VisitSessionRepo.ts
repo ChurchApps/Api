@@ -53,6 +53,7 @@ export class VisitSessionRepo {
   }
 
   public async loadByVisitIds(churchId: string, visitIds: string[]) {
+    if (visitIds.length === 0) return [];
     return getDb().selectFrom("visitSessions").selectAll()
       .where("churchId", "=", churchId)
       .where("visitId", "in", visitIds)

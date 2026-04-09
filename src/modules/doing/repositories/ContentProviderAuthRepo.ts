@@ -33,6 +33,7 @@ export class ContentProviderAuthRepo {
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
+    if (ids.length === 0) return [];
     return getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 

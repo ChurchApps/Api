@@ -33,6 +33,7 @@ export class PlanTypeRepo {
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
+    if (ids.length === 0) return [];
     return getDb().selectFrom("planTypes").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 

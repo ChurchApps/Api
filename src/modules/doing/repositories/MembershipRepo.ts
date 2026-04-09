@@ -82,6 +82,7 @@ export class MembershipRepo {
   }
 
   public async loadPeople(churchId: string, personIds: string[]) {
+    if (personIds.length === 0) return [];
     return (this.getDb() as any).selectFrom("people")
       .select(["id", "displayName"])
       .where("churchId", "=", churchId)

@@ -49,6 +49,7 @@ export class SessionRepo {
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
+    if (ids.length === 0) return [];
     return getDb().selectFrom("sessions").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 

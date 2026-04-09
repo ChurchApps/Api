@@ -51,6 +51,7 @@ export class AssignmentRepo {
   }
 
   public async loadByPlanIds(churchId: string, planIds: string[]) {
+    if (planIds.length === 0) return [];
     return getDb().selectFrom("assignments as a")
       .innerJoin("positions as p", "p.id", "a.positionId")
       .selectAll("a")

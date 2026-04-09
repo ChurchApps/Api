@@ -41,6 +41,7 @@ export class TimeRepo {
   }
 
   public async loadByPlanIds(churchId: string, planIds: string[]) {
+    if (planIds.length === 0) return [];
     return getDb().selectFrom("times").selectAll().where("churchId", "=", churchId).where("planId", "in", planIds).execute();
   }
 }
