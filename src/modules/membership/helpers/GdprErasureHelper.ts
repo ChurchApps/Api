@@ -1,10 +1,5 @@
 import { FileStorageHelper } from "@churchapps/apihelper";
-import { getDb as getMembershipDb } from "../db/index.js";
-import { getDb as getGivingDb } from "../../giving/db/index.js";
-import { getDb as getAttendanceDb } from "../../attendance/db/index.js";
-import { getDb as getMessagingDb } from "../../messaging/db/index.js";
-import { getDb as getDoingDb } from "../../doing/db/index.js";
-import { getDb as getContentDb } from "../../content/db/index.js";
+import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 import { Repos } from "../repositories/index.js";
 
 export class GdprErasureHelper {
@@ -33,8 +28,8 @@ export class GdprErasureHelper {
     }
   }
 
-  private static async anonymizeMembership(churchId: string, personId: string, repos: Repos) {
-    const db = getMembershipDb();
+  private static async anonymizeMembership(churchId: string, personId: string, _repos: Repos) {
+    const db = KyselyPool.getDb<any>("membership");
 
     // Anonymize the person record — clear PII, keep the row
     await db.updateTable("people").set({
@@ -75,7 +70,7 @@ export class GdprErasureHelper {
   }
 
   private static async anonymizeGiving(churchId: string, personId: string) {
-    const db = getGivingDb();
+    const db = KyselyPool.getDb<any>("giving");
 
     // NULL out personId on donations — keeps amounts/dates for financial records
     await db.updateTable("donations").set({ personId: null } as any)
@@ -113,14 +108,14 @@ export class GdprErasureHelper {
   }
 
   private static async anonymizeAttendance(churchId: string, personId: string) {
-    const db = getAttendanceDb();
+    const db = KyselyPool.getDb<any>("attendance");
     // NULL out personId on visits — keeps dates for aggregate stats
     await db.updateTable("visits").set({ personId: null } as any)
       .where("personId", "=", personId).where("churchId", "=", churchId).execute();
   }
 
   private static async anonymizeMessaging(churchId: string, personId: string) {
-    const db = getMessagingDb();
+    const db = KyselyPool.getDb<any>("messaging");
     await Promise.all([
       db.deleteFrom("devices").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
       db.deleteFrom("connections").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
@@ -136,7 +131,7 @@ export class GdprErasureHelper {
   }
 
   private static async anonymizeDoing(churchId: string, personId: string) {
-    const db = getDoingDb();
+    const db = KyselyPool.getDb<any>("doing");
     await Promise.all([
       db.deleteFrom("assignments").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
       db.deleteFrom("blockoutDates").where("personId", "=", personId).where("churchId", "=", churchId).execute()
@@ -144,7 +139,7 @@ export class GdprErasureHelper {
   }
 
   private static async anonymizeContent(churchId: string, personId: string) {
-    const db = getContentDb();
+    const db = KyselyPool.getDb<any>("content");
     // Delete registration members first, then registrations
     const registrations = await db.selectFrom("registrations").select("id")
       .where("personId", "=", personId).where("churchId", "=", churchId).execute();

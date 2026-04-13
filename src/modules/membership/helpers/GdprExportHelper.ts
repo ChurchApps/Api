@@ -1,20 +1,15 @@
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { Repos as MembershipRepos } from "../repositories/index.js";
-import { Repos as GivingRepos } from "../../giving/repositories/Repos.js";
-import { Repos as AttendanceRepos } from "../../attendance/repositories/Repos.js";
-import { Repos as MessagingRepos } from "../../messaging/repositories/Repos.js";
-import { Repos as DoingRepos } from "../../doing/repositories/Repos.js";
-import { Repos as ContentRepos } from "../../content/repositories/Repos.js";
 
 export class GdprExportHelper {
 
   public static async exportPersonData(churchId: string, personId: string, membershipRepos: MembershipRepos) {
     const [givingRepos, attendanceRepos, messagingRepos, doingRepos, contentRepos] = await Promise.all([
-      RepoManager.getRepos<GivingRepos>("giving"),
-      RepoManager.getRepos<AttendanceRepos>("attendance"),
-      RepoManager.getRepos<MessagingRepos>("messaging"),
-      RepoManager.getRepos<DoingRepos>("doing"),
-      RepoManager.getRepos<ContentRepos>("content")
+      RepoManager.getRepos<any>("giving"),
+      RepoManager.getRepos<any>("attendance"),
+      RepoManager.getRepos<any>("messaging"),
+      RepoManager.getRepos<any>("doing"),
+      RepoManager.getRepos<any>("content")
     ]);
 
     const [
