@@ -34,23 +34,4 @@ export class GdprController extends MembershipBaseController {
     });
   }
 
-  /** Self-service: export own data */
-  @httpGet("/my/export")
-  public async exportMyData(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.personId) return this.denyAccess(["No person record linked to this account"]);
-      return GdprExportHelper.exportPersonData(au.churchId, au.personId, this.repos);
-    });
-  }
-
-  /** Self-service: delete own account and anonymize data */
-  @httpDelete("/my/account")
-  public async deleteMyAccount(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.personId) return this.denyAccess(["No person record linked to this account"]);
-      await GdprErasureHelper.anonymize(au.churchId, au.personId, au.id, this.repos);
-      return {};
-    });
-  }
-
 }
