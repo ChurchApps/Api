@@ -25,3 +25,4 @@ export { QueryController } from "./QueryController.js";
 
 export { OAuthController } from "./OAuthController.js";
 export { AuditLogController } from "./AuditLogController.js";
+export { GdprController } from "./GdprController.js";

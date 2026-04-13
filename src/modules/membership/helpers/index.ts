@@ -19,3 +19,5 @@ export { UserHelper } from "./UserHelper.js";
 export { UserChurchHelper } from "./UserChurchHelper.js";
 export { Utils } from "./Utils.js";
 export { AuditLogHelper } from "./AuditLogHelper.js";
+export { GdprExportHelper } from "./GdprExportHelper.js";
+export { GdprErasureHelper } from "./GdprErasureHelper.js";
