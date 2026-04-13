@@ -23,7 +23,9 @@ export class LinkRepo {
   }
 
   private async create(model: Link): Promise<Link> {
-    model.id = UniqueIdHelper.shortId();
+    if (!model.id){
+      model.id = UniqueIdHelper.shortId();
+    }
     await getDb().insertInto("links").values({
       id: model.id,
       churchId: model.churchId,
@@ -88,8 +90,9 @@ export class LinkRepo {
         url: ""
       } as Link));
 
+      // Use create (insert) so seeded tabs keep their provided ids for consistency and future edits.
       for (const link of defaults) {
-        await this.save(link);
+        await this.create(link);
       }
       links = defaults;
     }
