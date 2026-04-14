@@ -45,7 +45,9 @@
     "migrate:down": "tsx tools/migrate.ts --action=down",
     "migrate:status": "tsx tools/migrate.ts --action=status",
     "migrate:create": "tsx tools/migrate-create.ts",
-    "scheduled-tasks": "tsx tools/run-scheduled-tasks.ts"
+    "scheduled-tasks": "tsx tools/run-scheduled-tasks.ts",
+    "timer:30min": "tsx tools/run-timer-30min.ts",
+    "timer:midnight": "tsx tools/run-timer-midnight.ts"
   },
   "keywords": [
     "church",
