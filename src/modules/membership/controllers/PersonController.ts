@@ -452,6 +452,7 @@ export class PersonController extends MembershipBaseController {
       const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
       const result: Person[] = [];
       people.forEach((p) => {
+        if (p.optedOut) return;
         if (this.shouldShowInDirectory(p.membershipStatus, directoryVisibility)) result.push(p);
       });
       return result;

@@ -178,6 +178,7 @@ export class PersonRepo {
       .where("churchId", "=", churchId)
       .where("removed", "=", false as any)
       .where("membershipStatus", "in", statuses)
+      .where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]))
       .execute();
   }
 
