@@ -101,6 +101,10 @@ export class DeviceRepo {
     await getDb().deleteFrom("devices").where("fcmToken", "=", fcmToken).execute();
   }
 
+  public async deleteByFcmTokenContains(substring: string) {
+    await getDb().deleteFrom("devices").where("fcmToken", "like", `%${substring}%`).execute();
+  }
+
   public async delete(churchId: string, id: string) {
     await getDb().deleteFrom("devices").where("id", "=", id).where("churchId", "=", churchId).execute();
   }

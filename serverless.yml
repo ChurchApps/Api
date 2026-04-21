@@ -67,6 +67,11 @@ provider:
     OPENROUTER_API_KEY: ${ssm:/${self:custom.envLower}/openRouterApiKey, ''}
     OPENAI_API_KEY: ${ssm:/${self:custom.envLower}/openAiApiKey, ''}
 
+    # Web Push (VAPID)
+    WEB_PUSH_PUBLIC_KEY: ${ssm:/${self:custom.envLower}/webPushPublicKey, ''}
+    WEB_PUSH_PRIVATE_KEY: ${ssm:/${self:custom.envLower}/webPushPrivateKey, ''}
+    WEB_PUSH_SUBJECT: ${ssm:/${self:custom.envLower}/webPushSubject, 'mailto:support@churchapps.org'}
+
     # Sentry error tracking
     NODE_OPTIONS: "--import @sentry/aws-serverless/awslambda-auto"
     SENTRY_DSN: "https://15d37b1878f2bb1f6a94e8e47495625f@o4510432524107776.ingest.us.sentry.io/4510433937915904"

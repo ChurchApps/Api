@@ -66,6 +66,11 @@ export class Environment extends EnvironmentBase {
   // Delivery provider
   static deliveryProvider: string;
 
+  // Web Push (VAPID) configuration
+  static webPushPublicKey: string;
+  static webPushPrivateKey: string;
+  static webPushSubject: string;
+
   // CORS configuration
   static corsOrigin: string;
 
@@ -219,6 +224,9 @@ export class Environment extends EnvironmentBase {
     this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || "";
     this.openRouterApiKey = process.env.OPENROUTER_API_KEY || "";
     this.openAiApiKey = process.env.OPENAI_API_KEY || "";
+    this.webPushPublicKey = process.env.WEB_PUSH_PUBLIC_KEY || config.webPushPublicKey || "";
+    this.webPushPrivateKey = process.env.WEB_PUSH_PRIVATE_KEY || "";
+    this.webPushSubject = process.env.WEB_PUSH_SUBJECT || config.webPushSubject || "mailto:support@churchapps.org";
 
     console.log("✅ Configuration parameters loaded from environment variables");
   }

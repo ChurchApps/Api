@@ -3,6 +3,7 @@ import { Conversation, DeliveryLog, Device, Message, PrivateMessage, Notificatio
 import { Repos } from "../repositories/index.js";
 import { DeliveryHelper } from "./DeliveryHelper.js";
 import { ExpoPushHelper } from "./ExpoPushHelper.js";
+import { WebPushHelper } from "./WebPushHelper.js";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
@@ -94,7 +95,11 @@ export class NotificationHelper {
     if (startLevel <= 1) {
       if (pref.allowPush) {
         const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
-        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
+        const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
+        const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
+        const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
+
+        let anyPushSent = false;
 
         if (expoPushTokens.length > 0) {
           try {
@@ -106,13 +111,33 @@ export class NotificationHelper {
               await this.logDelivery(churchId, personId, contentType, contentId, "push", success, expoPushTokens[i], errorMsg);
               if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
             }
-            return "push"; // Stop here, let 15-min timer escalate if unread
+            anyPushSent = true;
           } catch (error) {
             console.error("Push notification failed:", error);
             for (const token of expoPushTokens) {
               await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
             }
           }
+        }
+
+        if (webPushTokens.length > 0) {
+          try {
+            const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId);
+            for (const r of results) {
+              await this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, r.errorMessage);
+              if (r.gone) await this.deleteInvalidToken(r.token);
+            }
+            anyPushSent = anyPushSent || results.some((r) => r.success);
+          } catch (error) {
+            console.error("Web push notification failed:", error);
+            for (const token of webPushTokens) {
+              await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
+            }
+          }
+        }
+
+        if (anyPushSent) {
+          return "push"; // Stop here, let 15-min timer escalate if unread
         }
       }
     }
@@ -320,14 +345,21 @@ export class NotificationHelper {
 
     if (devices.length > 0) {
       try {
-        // Filter out any invalid tokens and get unique tokens
-        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
+        const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
+        const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
+        const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
 
         if (expoPushTokens.length > 0) {
-          // Send notifications in bulk for efficiency
           await ExpoPushHelper.sendBulkMessages(expoPushTokens, title, title);
           method = "push";
-          // Only log significant events or errors, not routine operations
+        }
+
+        if (webPushTokens.length > 0) {
+          const results = await WebPushHelper.sendBulkMessages(webPushTokens, title, title);
+          for (const r of results) {
+            if (r.gone) await this.deleteInvalidToken(r.token);
+          }
+          if (results.some((r) => r.success)) method = "push";
         }
       } catch (error) {
         // Log the error but don't throw - we still want to return the method if socket delivery worked
@@ -363,11 +395,13 @@ export class NotificationHelper {
     const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
-      try {
-        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
+      const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
+      const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
+      const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
+      const title = `New Message from ${senderName}`;
 
-        if (expoPushTokens.length > 0) {
-          const title = `New Message from ${senderName}`;
+      if (expoPushTokens.length > 0) {
+        try {
           const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, messageContent, "privateMessage", conversationId);
           method = "push";
           for (let i = 0; i < expoPushTokens.length; i++) {
@@ -377,11 +411,27 @@ export class NotificationHelper {
             await this.logDelivery(churchId, personId, contentType, contentId, "push", success, expoPushTokens[i], errorMsg);
             if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
           }
+        } catch (error) {
+          console.error("Push notification failed for private message:", error);
+          for (const token of expoPushTokens) {
+            await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
+          }
         }
-      } catch (error) {
-        console.error("Push notification failed for private message:", error);
-        for (const token of [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))]) {
-          await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
+      }
+
+      if (webPushTokens.length > 0) {
+        try {
+          const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, messageContent, "privateMessage", conversationId);
+          for (const r of results) {
+            await this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, r.errorMessage);
+            if (r.gone) await this.deleteInvalidToken(r.token);
+          }
+          if (results.some((r) => r.success)) method = "push";
+        } catch (error) {
+          console.error("Web push notification failed for private message:", error);
+          for (const token of webPushTokens) {
+            await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
+          }
         }
       }
     }
@@ -413,19 +463,21 @@ export class NotificationHelper {
     const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
     if (devices.length > 0) {
-      try {
-        const expoPushTokens = [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))];
+      const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
+      const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
+      const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
 
-        if (expoPushTokens.length > 0) {
-          let title = "New Notification";
-          if (notificationMessage.includes("Volunteer Requests:")) {
-            title = "New Plan Assignment";
-          } else if (notificationMessage.startsWith("New message:")) {
-            title = notificationMessage;
-          } else {
-            title = notificationMessage;
-          }
+      let title = "New Notification";
+      if (notificationMessage.includes("Volunteer Requests:")) {
+        title = "New Plan Assignment";
+      } else if (notificationMessage.startsWith("New message:")) {
+        title = notificationMessage;
+      } else {
+        title = notificationMessage;
+      }
 
+      if (expoPushTokens.length > 0) {
+        try {
           const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, notificationMessage, "notification", notificationId);
           method = "push";
           for (let i = 0; i < expoPushTokens.length; i++) {
@@ -435,11 +487,27 @@ export class NotificationHelper {
             await this.logDelivery(churchId, personId, contentType, notificationId, "push", success, expoPushTokens[i], errorMsg);
             if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
           }
+        } catch (error) {
+          console.error("Push notification failed for general notification:", error);
+          for (const token of expoPushTokens) {
+            await this.logDelivery(churchId, personId, contentType, notificationId, "push", false, token, String(error));
+          }
         }
-      } catch (error) {
-        console.error("Push notification failed for general notification:", error);
-        for (const token of [...new Set(devices.map((device) => device.fcmToken).filter((token) => token && token.startsWith("ExponentPushToken[")))]) {
-          await this.logDelivery(churchId, personId, contentType, notificationId, "push", false, token, String(error));
+      }
+
+      if (webPushTokens.length > 0) {
+        try {
+          const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, notificationMessage, "notification", notificationId);
+          for (const r of results) {
+            await this.logDelivery(churchId, personId, contentType, notificationId, "push", r.success, r.token, r.errorMessage);
+            if (r.gone) await this.deleteInvalidToken(r.token);
+          }
+          if (results.some((r) => r.success)) method = "push";
+        } catch (error) {
+          console.error("Web push notification failed for general notification:", error);
+          for (const token of webPushTokens) {
+            await this.logDelivery(churchId, personId, contentType, notificationId, "push", false, token, String(error));
+          }
         }
       }
     }
