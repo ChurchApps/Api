@@ -39,6 +39,28 @@ export class UserRepo {
     return user;
   }
 
+  public async updateVerification(userId: string, codeHash: string | null, expires: Date | null): Promise<void> {
+    await getDb().updateTable("users").set({
+      verificationCode: codeHash,
+      verificationExpires: DateHelper.toMysqlDate(expires) as any,
+      verificationAttempts: 0
+    } as any).where("id", "=", userId).execute();
+  }
+
+  public async incrementVerificationAttempts(userId: string): Promise<number> {
+    await getDb().updateTable("users").set({ verificationAttempts: sql`verificationAttempts + 1` } as any).where("id", "=", userId).execute();
+    const row = await getDb().selectFrom("users").select("verificationAttempts" as any).where("id", "=", userId).executeTakeFirst();
+    return parseInt((row as any)?.verificationAttempts ?? "0", 10);
+  }
+
+  public async clearVerification(userId: string): Promise<void> {
+    await getDb().updateTable("users").set({
+      verificationCode: null,
+      verificationExpires: null,
+      verificationAttempts: 0
+    } as any).where("id", "=", userId).execute();
+  }
+
   public async load(id: string): Promise<User> {
     return (await getDb().selectFrom("users").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }

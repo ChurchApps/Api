@@ -1,6 +1,7 @@
 import { controller, httpDelete, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
@@ -43,6 +44,13 @@ const setDisplayNameValidation = [
 ];
 
 const updateEmailValidation = [body("userId").optional().isString(), body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address")];
+
+const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
+const VERIFICATION_MAX_ATTEMPTS = 5;
+
+function generateVerificationCode(): string {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
 
 @controller("/membership/users")
 export class UserController extends MembershipBaseController {
@@ -203,7 +211,6 @@ export class UserController extends MembershipBaseController {
 
       if (!user) {
         isNewUser = true;
-        const timestamp = Date.now();
         user = { email: userEmail, firstName, lastName };
         user.registrationDate = new Date();
         user.lastLogin = user.registrationDate;
@@ -211,7 +218,11 @@ export class UserController extends MembershipBaseController {
         user.password = bcrypt.hashSync(tempPassword, 10);
         user.authGuid = v4();
         user = await this.repos.user.save(user);
-        await UserHelper.sendWelcomeEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, null, null);
+
+        const code = generateVerificationCode();
+        const codeHash = bcrypt.hashSync(code, 10);
+        await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
+        await UserHelper.sendWelcomeEmail(user.email, code, null, null);
         // Create userChurch records for matching people in groups
         await UserChurchHelper.createForNewUser(user.id, user.email);
       }
@@ -240,11 +251,13 @@ export class UserController extends MembershipBaseController {
         user.password = bcrypt.hashSync(tempPassword, 10);
         console.log("Register: bcrypt", Date.now() - regStart, "ms");
 
+        const code = generateVerificationCode();
+        const codeHash = bcrypt.hashSync(code, 10);
+
         try {
           const emailStart = Date.now();
-          const timestamp = Date.now();
           const emailPromises: Promise<any>[] = [];
-          emailPromises.push(UserHelper.sendWelcomeEmail(register.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, register.appName, register.appUrl));
+          emailPromises.push(UserHelper.sendWelcomeEmail(register.email, code, register.appName, register.appUrl));
 
           if (Environment.emailOnRegistration) {
             const emailBody = "Name: " + register.firstName + " " + register.lastName + "<br/>Email: " + register.email + "<br/>App: " + register.appName;
@@ -260,6 +273,7 @@ export class UserController extends MembershipBaseController {
         let stepStart = Date.now();
         const userCount = await this.repos.user.loadCount();
         user = await this.repos.user.save(user);
+        await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
         console.log("Register: save user", Date.now() - stepStart, "ms");
 
         // Create userChurch records for matching people in groups
@@ -330,16 +344,56 @@ export class UserController extends MembershipBaseController {
         const user = await this.repos.user.loadByEmail(req.body.userEmail);
         if (user === null) return this.json({ emailed: false }, 200);
         else {
-          user.authGuid = v4();
+          const code = generateVerificationCode();
+          const codeHash = bcrypt.hashSync(code, 10);
           const promises = [] as Promise<any>[];
-          const timestamp = Date.now();
-          promises.push(this.repos.user.save(user));
-          promises.push(UserHelper.sendForgotEmail(user.email, `/login?auth=${user.authGuid}&timestamp=${timestamp}`, req.body.appName, req.body.appUrl));
+          promises.push(this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS)));
+          promises.push(UserHelper.sendForgotEmail(user.email, code, req.body.appName, req.body.appUrl));
           await Promise.all(promises);
           const ip = AuditLogHelper.getClientIp(req);
           AuditLogHelper.log(this.repos, "", user.id, "security", "password_reset", "user", user.id, { email: user.email }, ip);
           return this.json({ emailed: true }, 200);
         }
+      } catch (e) {
+        if (Environment.currentEnvironment === "dev") {
+          throw e;
+        }
+        this.logger.error(e);
+        return this.error([e.toString()]);
+      }
+    });
+  }
+
+  @httpPost("/verifyCode", body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("code").isString().isLength({ min: 6, max: 6 }).withMessage("enter a 6-digit code"))
+  public async verifyCode(req: express.Request<{}, {}, { email: string; code: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ errors: errors.array() });
+        }
+
+        const user = await this.repos.user.loadByEmail(req.body.email);
+        if (user === null) return this.json({ errors: ["invalid code"] }, 400);
+        if (!user.verificationCode || !user.verificationExpires) return this.json({ errors: ["invalid code"] }, 400);
+        if (new Date(user.verificationExpires).getTime() < Date.now()) return this.json({ errors: ["code expired"] }, 400);
+
+        const attempts = await this.repos.user.incrementVerificationAttempts(user.id);
+        const ip = AuditLogHelper.getClientIp(req);
+        if (attempts > VERIFICATION_MAX_ATTEMPTS) {
+          await this.repos.user.clearVerification(user.id);
+          AuditLogHelper.log(this.repos, "", user.id, "security", "verification_locked", "user", user.id, { email: user.email }, ip);
+          return this.json({ errors: ["too many attempts"] }, 429);
+        }
+
+        const match = await bcrypt.compare(req.body.code, user.verificationCode);
+        if (!match) return this.json({ errors: ["invalid code"] }, 400);
+
+        user.authGuid = user.authGuid || v4();
+        await this.repos.user.save(user);
+        await this.repos.user.clearVerification(user.id);
+        AuditLogHelper.log(this.repos, "", user.id, "security", "code_verified", "user", user.id, { email: user.email }, ip);
+        return this.json({ authGuid: user.authGuid }, 200);
       } catch (e) {
         if (Environment.currentEnvironment === "dev") {
           throw e;

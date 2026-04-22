@@ -8,4 +8,7 @@ export class User {
   public lastLogin?: Date;
   public password?: string;
   public jwt?: string;
+  public verificationCode?: string;
+  public verificationExpires?: Date;
+  public verificationAttempts?: number;
 }
