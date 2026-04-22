@@ -71,10 +71,10 @@ export class VisitSessionController extends AttendanceBaseController {
           const config = { headers: { Authorization: "Bearer " + au.jwt } };
           const groupMembers: any = (await axios.get(url, config)).data;
 
-          const visitSessionPersonIds = new Set(visitSessions.map((session: any) => session.personId));
+          const visitSessionPersonIds = new Set(visitSessions.map((session: any) => session.visit?.personId));
           groupMembers?.forEach((member: any) => {
             const status = visitSessionPersonIds.has(member.personId) ? "present" : "absent";
-            const visitSession = visitSessions.find((session: any) => session.personId === member.personId);
+            const visitSession = visitSessions.find((session: any) => session.visit?.personId === member.personId);
             result.push({
               id: visitSession ? visitSession.id : "",
               personId: member.personId,
