@@ -38,6 +38,7 @@
     "reflect-metadata": "^0.2.2",
     "stripe": "^17.4.0",
     "uuid": "^11.0.3",
+    "web-push": "^3.6.7",
     "ws": "^8.18.0",
     "youtube-captions-scraper": "^2.0.3"
   }
