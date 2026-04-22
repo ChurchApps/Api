@@ -50,7 +50,6 @@ export class UserController extends MembershipBaseController {
   public async login(req: express.Request<{}, {}, LoginRequest>, res: express.Response): Promise<any> {
     // Ensure repositories are hydrated for anonymous access routes
     return this.actionWrapperAnon(req, res, async () => {
-      console.log("LOGIN REQUEST BODY", req.body);
       try {
         let user: User = null;
         if (req.body.jwt !== undefined && req.body.jwt !== "") {
@@ -63,8 +62,6 @@ export class UserController extends MembershipBaseController {
           }
         } else {
           user = await this.repos.user.loadByEmail(req.body.email.trim());
-          console.log("BODY", req.body);
-          console.log("LOADED USER", user);
           if (user !== null) {
             if (!bcrypt.compareSync(req.body.password, user.password?.toString() || "")) user = null;
           }
