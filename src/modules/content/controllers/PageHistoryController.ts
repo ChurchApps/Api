@@ -3,7 +3,6 @@ import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { PageHistory, Section, Element } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 
 @controller("/content/pageHistory")
 export class PageHistoryController extends ContentBaseController {
@@ -107,30 +106,27 @@ export class PageHistoryController extends ContentBaseController {
 
     // Now restore sections and elements from snapshot with NEW IDs
     for (const sectionData of snapshot.sections || []) {
-      const newSectionId = UniqueIdHelper.shortId();
       const section: Section = {
         ...sectionData,
-        id: newSectionId,
+        id: undefined,
         churchId
       };
       delete (section as any).elements;
-      await this.repos.section.insert(section);
+      const savedSection = await this.repos.section.insert(section);
 
       // Restore elements for this section with new IDs
       for (const elementData of sectionData.elements || []) {
-        await this.restoreElement(churchId, newSectionId, elementData, {});
+        await this.restoreElement(churchId, savedSection.id, elementData, {});
       }
     }
   }
 
   private async restoreElement(churchId: string, sectionId: string, elementData: any, idMap: Record<string, string>) {
     const oldId = elementData.id;
-    const newId = UniqueIdHelper.shortId();
-    idMap[oldId] = newId;
 
     const element: Element = {
       ...elementData,
-      id: newId,
+      id: undefined,
       sectionId,
       churchId,
       // Update parentId if it was remapped
@@ -138,7 +134,8 @@ export class PageHistoryController extends ContentBaseController {
     };
     const childElements = element.elements;
     delete element.elements;
-    await this.repos.element.insert(element);
+    const savedElement = await this.repos.element.insert(element);
+    idMap[oldId] = savedElement.id;
 
     // Restore child elements recursively
     if (childElements && childElements.length > 0) {
