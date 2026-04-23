@@ -68,27 +68,35 @@ export class NotificationHelper {
   ): Promise<string> => {
     this.ensureInitialized();
 
-    // Load user preferences
-    let pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
-    if (!pref) {
-      pref = await this.createNotificationPref(churchId, personId);
-    }
-
-    // Level 0: Try Socket
+    // Level 0: Try Socket. Load connections and unread counts in parallel so the
+    // socket payload can carry the fresh counts and the client avoids a round-trip.
     if (startLevel <= 0) {
-      const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
+      const [connections, countsRaw] = await Promise.all([
+        NotificationHelper.repos.connection.loadForNotification(churchId, personId),
+        NotificationHelper.repos.notification.loadNewCounts(churchId, personId)
+      ]);
       if (connections.length > 0) {
+        const counts = {
+          notificationCount: Number((countsRaw as any)?.notificationCount) || 0,
+          pmCount: Number((countsRaw as any)?.pmCount) || 0
+        };
         await DeliveryHelper.sendMessages(connections, {
           churchId,
           conversationId: "alert",
           action: contentType === "privateMessage" ? "privateMessage" : "notification",
-          data: {}
+          data: { counts }
         });
-        for (const conn of connections) {
-          await this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId);
-        }
+        await Promise.all(connections.map((conn) =>
+          this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId)
+        ));
         return "socket"; // Stop here, let 15-min timer escalate if unread
       }
+    }
+
+    // Only load prefs when we may need them (push/email fallback).
+    let pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
+    if (!pref) {
+      pref = await this.createNotificationPref(churchId, personId);
     }
 
     // Level 1: Try Push
@@ -104,35 +112,38 @@ export class NotificationHelper {
         if (expoPushTokens.length > 0) {
           try {
             const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, body, contentType, contentId);
-            for (let i = 0; i < expoPushTokens.length; i++) {
+            await Promise.all(expoPushTokens.map((token, i) => {
               const ticket = tickets?.[i];
               const success = ticket?.status === "ok";
               const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
-              await this.logDelivery(churchId, personId, contentType, contentId, "push", success, expoPushTokens[i], errorMsg);
-              if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
-            }
+              const logPromise = this.logDelivery(churchId, personId, contentType, contentId, "push", success, token, errorMsg);
+              if (!success && ticket?.status === "error") {
+                return Promise.all([logPromise, this.deleteInvalidToken(token)]);
+              }
+              return logPromise;
+            }));
             anyPushSent = true;
           } catch (error) {
             console.error("Push notification failed:", error);
-            for (const token of expoPushTokens) {
-              await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
-            }
+            await Promise.all(expoPushTokens.map((token) =>
+              this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))
+            ));
           }
         }
 
         if (webPushTokens.length > 0) {
           try {
             const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId);
-            for (const r of results) {
-              await this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, r.errorMessage);
-              if (r.gone) await this.deleteInvalidToken(r.token);
-            }
+            await Promise.all(results.map((r) => {
+              const logPromise = this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, r.errorMessage);
+              return r.gone ? Promise.all([logPromise, this.deleteInvalidToken(r.token)]) : logPromise;
+            }));
             anyPushSent = anyPushSent || results.some((r) => r.success);
           } catch (error) {
             console.error("Web push notification failed:", error);
-            for (const token of webPushTokens) {
-              await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
-            }
+            await Promise.all(webPushTokens.map((token) =>
+              this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))
+            ));
           }
         }
 
@@ -229,6 +240,10 @@ export class NotificationHelper {
       case "privateMessage": {
         const pm: PrivateMessage = await NotificationHelper.repos.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
+
+        // Persist notifyPersonId first so the unread count query inside
+        // attemptDeliveryWithEscalation includes this new message.
+        await NotificationHelper.repos.privateMessage.save(pm);
 
         // Use escalation logic - start at level 0 (socket)
         const deliveryMethod = await this.attemptDeliveryWithEscalation(

@@ -31,20 +31,25 @@ export class MessageController extends MessagingBaseController {
       req.body.forEach((message) => {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
-            const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
+            // Load conversation and update stats in parallel - updateStats doesn't
+            // depend on the result of loadById.
+            const [conversation] = await Promise.all([
+              this.repos.conversation.loadById(message.churchId, message.conversationId),
+              this.repos.conversation.updateStats(message.conversationId)
+            ]);
             const conv = this.repos.conversation.convertToModel(conversation);
-            await this.repos.conversation.updateStats(message.conversationId);
 
-            // Send real-time updates
-            (await DeliveryHelper.sendConversationMessages({
-              churchId: message.churchId,
-              conversationId: message.conversationId,
-              action: "message",
-              data: savedMessage
-            })) as any;
-
-            // Handle notifications
-            await NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous");
+            // Fan out real-time delivery and notification escalation concurrently -
+            // both are independent side-effects that each make their own AWS/DB calls.
+            await Promise.all([
+              DeliveryHelper.sendConversationMessages({
+                churchId: message.churchId,
+                conversationId: message.conversationId,
+                action: "message",
+                data: savedMessage
+              }),
+              NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous")
+            ]);
 
             return savedMessage;
           })
@@ -91,20 +96,25 @@ export class MessageController extends MessagingBaseController {
         if (!message.displayName && au?.firstName) message.displayName = au.firstName + " " + au.lastName;
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
-            const conversation = await this.repos.conversation.loadById(message.churchId, message.conversationId);
+            // Load conversation and update stats in parallel - updateStats doesn't
+            // depend on the result of loadById.
+            const [conversation] = await Promise.all([
+              this.repos.conversation.loadById(message.churchId, message.conversationId),
+              this.repos.conversation.updateStats(message.conversationId)
+            ]);
             const conv = this.repos.conversation.convertToModel(conversation);
-            await this.repos.conversation.updateStats(message.conversationId);
 
-            // Send real-time updates
-            (await DeliveryHelper.sendConversationMessages({
-              churchId: message.churchId,
-              conversationId: message.conversationId,
-              action: "message",
-              data: savedMessage
-            })) as any;
-
-            // Handle notifications
-            await NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous");
+            // Fan out real-time delivery and notification escalation concurrently -
+            // both are independent side-effects that each make their own AWS/DB calls.
+            await Promise.all([
+              DeliveryHelper.sendConversationMessages({
+                churchId: message.churchId,
+                conversationId: message.conversationId,
+                action: "message",
+                data: savedMessage
+              }),
+              NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous")
+            ]);
 
             return savedMessage;
           })
