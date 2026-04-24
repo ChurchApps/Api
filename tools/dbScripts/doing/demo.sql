@@ -13,7 +13,7 @@ BEGIN
     TRUNCATE TABLE conjunctions;
     TRUNCATE TABLE assignments;
     TRUNCATE TABLE blockoutDates;
-    TRUNCATE TABLE notes;
+    -- notes lives in the membership database (polymorphic), not doing
     TRUNCATE TABLE planItems;
     TRUNCATE TABLE plans;
     TRUNCATE TABLE planTypes;
@@ -130,12 +130,9 @@ BEGIN
     ('BLK00000006', 'CHU00000001', 'PER00000082', DATE_ADD(CURDATE(), INTERVAL 10 DAY), DATE_ADD(CURDATE(), INTERVAL 13 DAY)), -- Demo user - vacation
     ('BLK00000007', 'CHU00000001', 'PER00000082', DATE_ADD(CURDATE(), INTERVAL 28 DAY), DATE_ADD(CURDATE(), INTERVAL 29 DAY)); -- Demo user - conference
 
-    -- Create Notes
-    INSERT INTO notes (id, churchId, contentType, contentId, noteType, addedBy, createdAt, updatedAt, contents) VALUES
-    ('NOT00000001', 'CHU00000001', 'assignment', 'ASS00000001', 'General', 'PER00000027', DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 'Please prepare 4 songs for upcoming service'),
-    ('NOT00000002', 'CHU00000001', 'assignment', 'ASS00000062', 'General', 'PER00000027', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), 'Special seasonal service - need 6 songs including traditional hymns'),
-    ('NOT00000003', 'CHU00000001', 'assignment', 'ASS00000015', 'Technical', 'PER00000075', DATE_SUB(NOW(), INTERVAL 3 HOUR), DATE_SUB(NOW(), INTERVAL 3 HOUR), 'New microphone setup for upcoming service'),
-    ('NOT00000004', 'CHU00000001', 'assignment', 'ASS00000071', 'Hospitality', 'PER00000068', DATE_SUB(NOW(), INTERVAL 12 HOUR), DATE_SUB(NOW(), INTERVAL 12 HOUR), 'Extra greeters needed for special service');
+    -- Assignment notes would go into the membership.notes table (polymorphic
+    -- via contentType='assignment', contentId=<ASS id>). Seeding them here
+    -- would fail because `notes` does not exist in the doing schema.
 
     -- Create sample tasks (after automations are created)
     INSERT INTO tasks (id, churchId, taskNumber, taskType, dateCreated, dateClosed, associatedWithType, associatedWithId, associatedWithLabel, createdByType, createdById, createdByLabel, assignedToType, assignedToId, assignedToLabel, title, status, automationId, conversationId, data) VALUES

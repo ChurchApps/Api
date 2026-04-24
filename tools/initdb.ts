@@ -1,10 +1,10 @@
 import { Environment } from "../src/shared/helpers/Environment.js";
 import { KyselyPool } from "../src/shared/infrastructure/KyselyPool.js";
 import { sql } from "kysely";
-import { Migrator, FileMigrationProvider } from "kysely";
+import { Migrator, type MigrationProvider } from "kysely";
 import * as fs from "fs";
 import * as path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import mysql from "mysql2/promise";
 import { ensureEnvironment, createKysely, ensureDatabaseExists } from "./kysely-config.js";
 
@@ -23,7 +23,7 @@ const moduleDemoFiles: Record<string, string[]> = {
   doing: ["demo.sql"],
 };
 
-interface InitOptions {
+export interface InitOptions {
   module?: string;
   reset?: boolean;
   environment?: string;
@@ -31,7 +31,7 @@ interface InitOptions {
   schemaOnly?: boolean;
 }
 
-async function initializeDatabases(options: InitOptions = {}) {
+export async function initializeDatabases(options: InitOptions = {}) {
   try {
     await ensureEnvironment();
 
@@ -82,10 +82,34 @@ async function runMigrations(moduleName: string) {
   }
 
   const db = createKysely(moduleName);
-  const migrator = new Migrator({
-    db,
-    provider: new FileMigrationProvider({ fs: fs.promises, path, migrationFolder: migrationsPath }),
-  });
+  // Custom provider instead of Kysely's FileMigrationProvider: the built-in
+  // version calls `import()` with a raw OS path, which fails on Windows ESM
+  // (`ERR_UNSUPPORTED_ESM_URL_SCHEME` for `d:\...`). We convert to a file:// URL.
+  const provider: MigrationProvider = {
+    async getMigrations() {
+      const migrations: Record<string, any> = {};
+      const files = (await fs.promises.readdir(migrationsPath)).sort();
+      for (const fileName of files) {
+        const isMigrationFile =
+          fileName.endsWith(".js") ||
+          fileName.endsWith(".mjs") ||
+          (fileName.endsWith(".ts") && !fileName.endsWith(".d.ts")) ||
+          (fileName.endsWith(".mts") && !fileName.endsWith(".d.mts"));
+        if (!isMigrationFile) continue;
+
+        const absolutePath = path.join(migrationsPath, fileName);
+        const fileUrl = pathToFileURL(absolutePath).href;
+        const mod = await import(fileUrl);
+        const migration = mod?.default && typeof mod.default.up === "function" ? mod.default : mod;
+        if (migration && typeof migration.up === "function") {
+          const key = fileName.substring(0, fileName.lastIndexOf("."));
+          migrations[key] = migration;
+        }
+      }
+      return migrations;
+    },
+  };
+  const migrator = new Migrator({ db, provider });
 
   try {
     const { error, results } = await migrator.migrateToLatest();

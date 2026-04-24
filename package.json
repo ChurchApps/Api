@@ -20,6 +20,7 @@
     "populateDemo:messaging": "tsx tools/initdb.ts --module=messaging --demo-only",
     "populateDemo:doing": "tsx tools/initdb.ts --module=doing --demo-only",
     "reset-db": "tsx tools/initdb.ts --reset",
+    "reset-demo": "tsx tools/reset-demo.ts",
     "dev": "tsx watch src/index.ts",
     "clean": "rimraf dist",
     "lint": "eslint --fix src/",

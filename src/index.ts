@@ -1,7 +1,12 @@
+import dotenv from "dotenv";
 import { createApp } from "./app.js";
 import { Environment } from "./shared/helpers/Environment.js";
 import { KyselyPool } from "./shared/infrastructure/KyselyPool.js";
 import { fileURLToPath } from "url";
+
+// Load .env for local dev. In Lambda there is no .env file; dotenv returns silently.
+// Does not overwrite existing env vars — shell overrides still win.
+dotenv.config();
 
 const startServer = async () => {
   try {
