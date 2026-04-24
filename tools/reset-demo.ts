@@ -3,8 +3,8 @@ import { DatabaseUrlParser } from "../src/shared/helpers/DatabaseUrlParser.js";
 import { initializeDatabases } from "./initdb.js";
 
 const REQUIRED_MODULES = ["membership", "attendance", "content", "giving", "messaging", "doing"] as const;
-const REQUIRED_ENVIRONMENT = "demo";
-const REQUIRED_HOST_SUBSTRING = "lcs-demo";
+const ALLOWED_ENVIRONMENTS = ["demo", "dev"] as const;
+const ALLOWED_HOST_SUBSTRINGS = ["demo", "localhost"] as const;
 
 function refuse(message: string): never {
   console.error("\n========================================");
@@ -18,10 +18,10 @@ async function main() {
   dotenv.config();
 
   const env = process.env.ENVIRONMENT;
-  if (env !== REQUIRED_ENVIRONMENT) {
+  if (!env || !ALLOWED_ENVIRONMENTS.includes(env as (typeof ALLOWED_ENVIRONMENTS)[number])) {
     refuse(
-      `ENVIRONMENT is "${env ?? "<unset>"}" but must be "${REQUIRED_ENVIRONMENT}".\n` +
-        `Set ENVIRONMENT=demo in Api/.env before running tests.`
+      `ENVIRONMENT is "${env ?? "<unset>"}" but must be one of: ${ALLOWED_ENVIRONMENTS.join(", ")}.\n` +
+        `Set ENVIRONMENT=demo or ENVIRONMENT=dev in Api/.env before running tests.`
     );
   }
 
@@ -43,13 +43,16 @@ async function main() {
     }
   }
 
-  // Every connection string that IS set must point at a demo host.
+  // Every connection string that IS set must point at a demo or localhost host.
   for (const envVar of allConnStrings) {
     const connString = process.env[envVar]!;
     try {
       const config = DatabaseUrlParser.parseConnectionString(connString);
-      if (!config.host.includes(REQUIRED_HOST_SUBSTRING)) {
-        offenders.push(`${envVar}: host "${config.host}" does not contain "${REQUIRED_HOST_SUBSTRING}"`);
+      const hostMatches = ALLOWED_HOST_SUBSTRINGS.some((sub) => config.host.includes(sub));
+      if (!hostMatches) {
+        offenders.push(
+          `${envVar}: host "${config.host}" does not contain any of: ${ALLOWED_HOST_SUBSTRINGS.join(", ")}`
+        );
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -59,15 +62,15 @@ async function main() {
 
   if (offenders.length > 0) {
     refuse(
-      `Connection strings must point at a host containing "${REQUIRED_HOST_SUBSTRING}".\n` +
+      `Connection strings must point at a host containing one of: ${ALLOWED_HOST_SUBSTRINGS.join(", ")}.\n` +
         `Offenders:\n  - ${offenders.join("\n  - ")}\n\n` +
-        `Uncomment the lcs-demo CONNECTION_STRING lines in Api/.env.`
+        `Uncomment the demo or localhost CONNECTION_STRING lines in Api/.env.`
     );
   }
 
   console.log(
     `reset-demo: environment=${env}, validated ${allConnStrings.length} connection string(s) ` +
-      `against host "${REQUIRED_HOST_SUBSTRING}":\n  - ${allConnStrings.join("\n  - ")}\nProceeding.\n`
+      `against host substrings [${ALLOWED_HOST_SUBSTRINGS.join(", ")}]:\n  - ${allConnStrings.join("\n  - ")}\nProceeding.\n`
   );
   await initializeDatabases({ reset: true });
 }
