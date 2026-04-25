@@ -30,7 +30,8 @@ BEGIN
     ('CVS00000002', 'CHU00000001', 'group', 'GRP00000013', 'Youth Group Chat', DATE_SUB(NOW(), INTERVAL 10 DAY), 'GRP00000013', 'public', 'MSG00000005', 'MSG00000007', 3, b'0'),
     ('CVS00000003', 'CHU00000001', 'church', 'CHU00000001', 'General Announcements', DATE_SUB(NOW(), INTERVAL 30 DAY), NULL, 'public', 'MSG00000008', 'MSG00000010', 3, b'0'),
     ('CVS00000004', 'CHU00000001', 'group', 'GRP00000019', 'Praise Team Planning', DATE_SUB(NOW(), INTERVAL 7 DAY), 'GRP00000019', 'members', 'MSG00000011', 'MSG00000012', 2, b'0'),
-    ('CVS00000005', 'CHU00000001', 'church', 'CHU00000001', 'Prayer Requests', DATE_SUB(NOW(), INTERVAL 21 DAY), NULL, 'public', 'MSG00000013', 'MSG00000015', 3, b'0');
+    ('CVS00000005', 'CHU00000001', 'church', 'CHU00000001', 'Prayer Requests', DATE_SUB(NOW(), INTERVAL 21 DAY), NULL, 'public', 'MSG00000013', 'MSG00000015', 3, b'0'),
+    ('CVS00000006', 'CHU00000001', 'group', 'GRP00000004', 'Adult Bible Class Discussion', DATE_SUB(NOW(), INTERVAL 5 DAY), 'GRP00000004', 'public', 'MSG00000016', 'MSG00000017', 2, b'0');
 
     -- ========================================
     -- Messages
@@ -59,7 +60,12 @@ BEGIN
     -- Prayer Requests (CVS00000005)
     ('MSG00000013', 'CHU00000001', 'CVS00000005', 'Miguel Hernandez', DATE_SUB(NOW(), INTERVAL 18 DAY), 'message', 'Please pray for my father Antonio''s recovery from hip surgery.', 'PER00000036', DATE_SUB(NOW(), INTERVAL 18 DAY)),
     ('MSG00000014', 'CHU00000001', 'CVS00000005', 'Michelle Lee', DATE_SUB(NOW(), INTERVAL 10 DAY), 'message', 'Prayers requested for my children as they transition to new school.', 'PER00000070', DATE_SUB(NOW(), INTERVAL 10 DAY)),
-    ('MSG00000015', 'CHU00000001', 'CVS00000005', 'George Thompson', DATE_SUB(NOW(), INTERVAL 2 DAY), 'message', 'Praise report: Margaret''s test results came back clear! Thank you for your prayers.', 'PER00000073', DATE_SUB(NOW(), INTERVAL 2 DAY));
+    ('MSG00000015', 'CHU00000001', 'CVS00000005', 'George Thompson', DATE_SUB(NOW(), INTERVAL 2 DAY), 'message', 'Praise report: Margaret''s test results came back clear! Thank you for your prayers.', 'PER00000073', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+
+    -- Adult Bible Class Discussion (CVS00000006) — group conversation visible
+    -- to demo user, who is a member of GRP00000004.
+    ('MSG00000016', 'CHU00000001', 'CVS00000006', 'John Smith', DATE_SUB(NOW(), INTERVAL 5 DAY), 'message', 'This week we''re studying Romans chapter 8 — bring your Bible and a friend!', 'PER00000001', DATE_SUB(NOW(), INTERVAL 5 DAY)),
+    ('MSG00000017', 'CHU00000001', 'CVS00000006', 'Demo User', DATE_SUB(NOW(), INTERVAL 4 DAY), 'message', 'Looking forward to it. I''ll bring coffee.', 'PER00000082', DATE_SUB(NOW(), INTERVAL 4 DAY));
 
     -- ========================================
     -- Notifications

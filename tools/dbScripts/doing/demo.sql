@@ -46,20 +46,22 @@ BEGIN
     ('PLT00000004', 'CHU00000001', 'GRP0000000a', 'Youth Service'),
     ('PLT00000005', 'CHU00000001', 'GRP0000000a', 'Prayer Meeting');
 
-    -- Create Worship Ministry Positions
-    INSERT INTO positions (id, churchId, planId, categoryName, name, count, groupId) VALUES
+    -- Create Worship Ministry Positions. Greeter + Usher have allowSelfSignup=1
+    -- so the public /mobile/volunteer screen has open positions to display and
+    -- (if you sign up) a way to test the click-to-signup flow.
+    INSERT INTO positions (id, churchId, planId, categoryName, name, count, groupId, allowSelfSignup) VALUES
     -- Sunday Morning Service Positions
-    ('POS00000001', 'CHU00000001', 'PLA00000001', 'Worship', 'Worship Leader', 1, 'GRP0000000b'),
-    ('POS00000002', 'CHU00000001', 'PLA00000001', 'Worship', 'Acoustic Guitar', 1, 'GRP0000000b'),
-    ('POS00000003', 'CHU00000001', 'PLA00000001', 'Worship', 'Electric Guitar', 1, 'GRP0000000b'),
-    ('POS00000004', 'CHU00000001', 'PLA00000001', 'Worship', 'Bass Guitar', 1, 'GRP0000000b'),
-    ('POS00000005', 'CHU00000001', 'PLA00000001', 'Worship', 'Drums', 1, 'GRP0000000b'),
-    ('POS00000006', 'CHU00000001', 'PLA00000001', 'Worship', 'Keyboard', 1, 'GRP0000000b'),
-    ('POS00000007', 'CHU00000001', 'PLA00000001', 'Worship', 'Vocals', 1, 'GRP0000000b'),
-    ('POS00000008', 'CHU00000001', 'PLA00000001', 'Technical', 'Sound Tech', 1, 'GRP0000000b'),
-    ('POS00000009', 'CHU00000001', 'PLA00000001', 'Technical', 'Projection Tech', 1, 'GRP0000000b'),
-    ('POS00000010', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Greeter', 1, 'GRP0000000b'),
-    ('POS00000011', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Usher', 1, 'GRP0000000b');
+    ('POS00000001', 'CHU00000001', 'PLA00000001', 'Worship', 'Worship Leader', 1, 'GRP0000000b', b'0'),
+    ('POS00000002', 'CHU00000001', 'PLA00000001', 'Worship', 'Acoustic Guitar', 1, 'GRP0000000b', b'0'),
+    ('POS00000003', 'CHU00000001', 'PLA00000001', 'Worship', 'Electric Guitar', 1, 'GRP0000000b', b'0'),
+    ('POS00000004', 'CHU00000001', 'PLA00000001', 'Worship', 'Bass Guitar', 1, 'GRP0000000b', b'0'),
+    ('POS00000005', 'CHU00000001', 'PLA00000001', 'Worship', 'Drums', 1, 'GRP0000000b', b'0'),
+    ('POS00000006', 'CHU00000001', 'PLA00000001', 'Worship', 'Keyboard', 1, 'GRP0000000b', b'0'),
+    ('POS00000007', 'CHU00000001', 'PLA00000001', 'Worship', 'Vocals', 1, 'GRP0000000b', b'0'),
+    ('POS00000008', 'CHU00000001', 'PLA00000001', 'Technical', 'Sound Tech', 1, 'GRP0000000b', b'0'),
+    ('POS00000009', 'CHU00000001', 'PLA00000001', 'Technical', 'Projection Tech', 1, 'GRP0000000b', b'0'),
+    ('POS00000010', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Greeter', 1, 'GRP0000000b', b'1'),
+    ('POS00000011', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Usher', 1, 'GRP0000000b', b'1');
 
     -- Create Service Times
     INSERT INTO times (id, churchId, planId, displayName, startTime, endTime, teams) VALUES
