@@ -1,6 +1,6 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
-import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { Task } from "../models/index.js";
 import { getDb } from "../db/index.js";
 
@@ -20,7 +20,7 @@ export class TaskRepo {
       taskNumber: taskNumber,
       taskType: task.taskType,
       dateCreated: sql`now()` as any,
-      dateClosed: task.dateClosed,
+      dateClosed: task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed,
       associatedWithType: task.associatedWithType,
       associatedWithId: task.associatedWithId,
       associatedWithLabel: task.associatedWithLabel,
@@ -40,10 +40,12 @@ export class TaskRepo {
   }
 
   private async update(task: Task): Promise<Task> {
+    // dateCreated is an immutable creation timestamp; don't overwrite it on
+    // update. The client can send it back as an ISO string, which MySQL
+    // rejects ("Incorrect datetime value") when assigned to a DATETIME column.
     await getDb().updateTable("tasks").set({
       taskType: task.taskType,
-      dateCreated: task.dateCreated,
-      dateClosed: task.dateClosed,
+      dateClosed: task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed,
       associatedWithType: task.associatedWithType,
       associatedWithId: task.associatedWithId,
       associatedWithLabel: task.associatedWithLabel,
