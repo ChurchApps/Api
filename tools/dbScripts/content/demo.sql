@@ -333,19 +333,19 @@ BEGIN
     INSERT INTO elements (id, churchId, sectionId, blockId, elementType, sort, parentId, answersJSON, stylesJSON, animationsJSON) VALUES
     -- Hero Section
     ('ELE00000001', 'CHU00000001', 'SEC00000001', NULL, 'text', 1, NULL,
-      '{"text": "# Welcome to Grace Community Church\\n\\n### *A place to belong, grow, and serve together*\\n\\nJoin us this Sunday as we worship, learn, and connect with God and each other.", "textAlignment": "center"}',
+      '{"text": "<h1>Welcome to Grace Community Church</h1><h3><em>A place to belong, grow, and serve together</em></h3><p>Join us this Sunday as we worship, learn, and connect with God and each other.</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
     -- Service Times Section
     ('ELE00000002', 'CHU00000001', 'SEC00000002', NULL, 'text', 1, NULL,
-      '{"text": "## Sunday Service Times\\n\\n### Morning Worship: 9:00 AM & 11:00 AM\\n### Sunday School: 10:00 AM\\n### Evening Service: 6:00 PM\\n\\n**What to Expect:** Casual dress, friendly people, inspiring music, and biblical teaching that applies to your daily life.", "textAlignment": "center"}',
+      '{"text": "<h2>Sunday Service Times</h2><h3>Morning Worship: 9:00 AM &amp; 11:00 AM</h3><h3>Sunday School: 10:00 AM</h3><h3>Evening Service: 6:00 PM</h3><p><strong>What to Expect:</strong> Casual dress, friendly people, inspiring music, and biblical teaching that applies to your daily life.</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
     -- About Pastor Section with Photo
     ('ELE00000003', 'CHU00000001', 'SEC00000003', NULL, 'textWithPhoto', 1, NULL,
-      '{"photoPosition": "right", "photo": "/tempLibrary/pastor.jpg", "text": "# Meet Pastor John Smith\\n\\n**Welcome to our church family!**\\n\\nPastor John has been serving Grace Community Church since 2010. He is passionate about helping people discover God''s love and purpose for their lives.\\n\\n**Education:** M.Div. from Seminary, B.A. in Theology\\n**Family:** Married to Sarah, father of three children\\n**Hobbies:** Reading, hiking, and coffee\\n\\n*\\"My heart''s desire is to see every person experience the transforming love of Jesus Christ.\\"*"}',
+      '{"photoPosition": "right", "photo": "/tempLibrary/pastor.jpg", "text": "<h1>Meet Pastor John Smith</h1><p><strong>Welcome to our church family!</strong></p><p>Pastor John has been serving Grace Community Church since 2010. He is passionate about helping people discover God''s love and purpose for their lives.</p><p><strong>Education:</strong> M.Div. from Seminary, B.A. in Theology<br><strong>Family:</strong> Married to Sarah, father of three children<br><strong>Hobbies:</strong> Reading, hiking, and coffee</p><p><em>&quot;My heart''s desire is to see every person experience the transforming love of Jesus Christ.&quot;</em></p>"}',
       NULL,
       NULL),
 
@@ -376,28 +376,28 @@ BEGIN
       NULL),
 
     ('ELE00000009', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000005',
-      '{"text": "## Children''s Ministry\\n\\nNursery through 5th grade programs with engaging lessons, games, and activities that teach kids about God''s love.\\n\\n**Ages:** 0-11 years\\n**When:** Every Sunday", "textAlignment": "center"}',
+      '{"text": "<h2>Children''s Ministry</h2><p>Nursery through 5th grade programs with engaging lessons, games, and activities that teach kids about God''s love.</p><p><strong>Ages:</strong> 0-11 years<br><strong>When:</strong> Every Sunday</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
     ('ELE00000010', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000006',
-      '{"text": "## Youth Ministry\\n\\nMiddle and high school students connect through fun activities, deep discussions, and mission trips.\\n\\n**Ages:** 12-18 years\\n**When:** Sundays & Wednesdays", "textAlignment": "center"}',
+      '{"text": "<h2>Youth Ministry</h2><p>Middle and high school students connect through fun activities, deep discussions, and mission trips.</p><p><strong>Ages:</strong> 12-18 years<br><strong>When:</strong> Sundays &amp; Wednesdays</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
     ('ELE00000011', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000007',
-      '{"text": "## Small Groups\\n\\nAdult small groups meet throughout the week for Bible study, prayer, and fellowship in homes.\\n\\n**When:** Various times\\n**Where:** Member homes", "textAlignment": "center"}',
+      '{"text": "<h2>Small Groups</h2><p>Adult small groups meet throughout the week for Bible study, prayer, and fellowship in homes.</p><p><strong>When:</strong> Various times<br><strong>Where:</strong> Member homes</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
     ('ELE00000012', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000008',
-      '{"text": "## Music Ministry\\n\\nWorship team, choir, and special music opportunities for all ages and skill levels.\\n\\n**Rehearsals:** Thursdays\\n**Performances:** Sundays", "textAlignment": "center"}',
+      '{"text": "<h2>Music Ministry</h2><p>Worship team, choir, and special music opportunities for all ages and skill levels.</p><p><strong>Rehearsals:</strong> Thursdays<br><strong>Performances:</strong> Sundays</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
     -- Latest Sermons Section
     ('ELE00000013', 'CHU00000001', 'SEC00000005', NULL, 'text', 1, NULL,
-      '{"text": "## Latest Sermons", "textAlignment": "center"}',
+      '{"text": "<h2>Latest Sermons</h2>", "textAlignment": "center"}',
       NULL,
       NULL),
 
@@ -417,18 +417,18 @@ BEGIN
       NULL),
 
     ('ELE00000017', 'CHU00000001', 'SEC00000005', NULL, 'text', 1, 'ELE00000015',
-      '{"text": "### \\"The Power of Faith\\"\\n**January 4, 2026**\\n\\nExploring how faith transforms our lives and strengthens our relationship with God. Join us as we dive into practical ways to grow in faith.\\n\\n*[Watch Online] [Download Audio]*"}',
+      '{"text": "<h3>&quot;The Power of Faith&quot;</h3><p><strong>January 4, 2026</strong></p><p>Exploring how faith transforms our lives and strengthens our relationship with God. Join us as we dive into practical ways to grow in faith.</p><p><em>[Watch Online] [Download Audio]</em></p>"}',
       NULL,
       NULL),
 
     ('ELE00000018', 'CHU00000001', 'SEC00000005', NULL, 'text', 1, 'ELE00000016',
-      '{"text": "### \\"Walking in Love\\"\\n**December 28, 2025**\\n\\nUnderstanding God''s love and how to share it with others in our daily lives. A message of hope for the new year.\\n\\n*[Watch Online] [Download Audio]*"}',
+      '{"text": "<h3>&quot;Walking in Love&quot;</h3><p><strong>December 28, 2025</strong></p><p>Understanding God''s love and how to share it with others in our daily lives. A message of hope for the new year.</p><p><em>[Watch Online] [Download Audio]</em></p>"}',
       NULL,
       NULL),
 
     -- FAQ Section
     ('ELE00000019', 'CHU00000001', 'SEC00000006', NULL, 'text', 1, NULL,
-      '{"text": "## Frequently Asked Questions", "textAlignment": "center"}',
+      '{"text": "<h2>Frequently Asked Questions</h2>", "textAlignment": "center"}',
       NULL,
       NULL),
 
@@ -448,18 +448,18 @@ BEGIN
       NULL),
 
     ('ELE00000023', 'CHU00000001', 'SEC00000006', NULL, 'text', 1, 'ELE00000021',
-      '{"text": "**What should I wear?**\\nCome as you are! We have people in everything from jeans to suits.\\n\\n**What about my kids?**\\nWe have age-appropriate programs for all children during services.\\n\\n**Where do I park?**\\nPlenty of free parking is available in our lot and on surrounding streets."}',
+      '{"text": "<p><strong>What should I wear?</strong><br>Come as you are! We have people in everything from jeans to suits.</p><p><strong>What about my kids?</strong><br>We have age-appropriate programs for all children during services.</p><p><strong>Where do I park?</strong><br>Plenty of free parking is available in our lot and on surrounding streets.</p>"}',
       NULL,
       NULL),
 
     ('ELE00000024', 'CHU00000001', 'SEC00000006', NULL, 'text', 1, 'ELE00000022',
-      '{"text": "**How long is the service?**\\nServices typically last about 75 minutes including worship and message.\\n\\n**Do I need to bring anything?**\\nJust yourself! Bibles and bulletins are provided.\\n\\n**Can I get involved?**\\nAbsolutely! We have ministries for every interest and skill level."}',
+      '{"text": "<p><strong>How long is the service?</strong><br>Services typically last about 75 minutes including worship and message.</p><p><strong>Do I need to bring anything?</strong><br>Just yourself! Bibles and bulletins are provided.</p><p><strong>Can I get involved?</strong><br>Absolutely! We have ministries for every interest and skill level.</p>"}',
       NULL,
       NULL),
 
     -- Contact & Location Section
     ('ELE00000025', 'CHU00000001', 'SEC00000007', NULL, 'text', 1, NULL,
-      '{"text": "## Visit Us This Sunday\\n\\n**We would love to meet you!**\\n\\nCome as you are and experience God''s love in our community.", "textAlignment": "center"}',
+      '{"text": "<h2>Visit Us This Sunday</h2><p><strong>We would love to meet you!</strong></p><p>Come as you are and experience God''s love in our community.</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
@@ -479,7 +479,7 @@ BEGIN
       NULL),
 
     ('ELE00000029', 'CHU00000001', 'SEC00000007', NULL, 'text', 1, 'ELE00000027',
-      '{"text": "### Contact Information\\n\\n**Address:**\\n123 Church Street\\nAnytown, USA 12345\\n\\n**Phone:** (555) 123-4567\\n**Email:** info@gracechurch.org\\n\\n**Office Hours:**\\nMonday-Friday: 9 AM - 5 PM", "textAlignment": "center"}',
+      '{"text": "<h3>Contact Information</h3><p><strong>Address:</strong><br>123 Church Street<br>Anytown, USA 12345</p><p><strong>Phone:</strong> (555) 123-4567<br><strong>Email:</strong> info@gracechurch.org</p><p><strong>Office Hours:</strong><br>Monday-Friday: 9 AM - 5 PM</p>", "textAlignment": "center"}',
       NULL,
       NULL),
 
@@ -490,7 +490,7 @@ BEGIN
 
     -- Main Church Calendar Section
     ('ELE00000031', 'CHU00000001', 'SEC00000008', NULL, 'text', 1, NULL,
-      '{"text": "## Upcoming Events", "textAlignment": "center"}',
+      '{"text": "<h2>Upcoming Events</h2>", "textAlignment": "center"}',
       NULL,
       NULL),
 
@@ -587,21 +587,19 @@ BEGIN
     -- Navigation Links
     -- ========================================
     INSERT INTO links (id, churchId, category, url, linkType, linkData, icon, text, sort, photo, parentId, visibility, groupIds) VALUES
-    ('LNK00000001', 'CHU00000001', 'main', '/', 'url', NULL, 'home', 'Home', 1, NULL, NULL, 'everyone', NULL),
-    ('LNK00000002', 'CHU00000001', 'main', '/about', 'url', NULL, 'info', 'About', 2, NULL, NULL, 'everyone', NULL),
-    ('LNK00000003', 'CHU00000001', 'main', '/ministries', 'url', NULL, 'groups', 'Ministries', 3, NULL, NULL, 'everyone', NULL),
-    ('LNK00000004', 'CHU00000001', 'main', '/sermons', 'url', NULL, 'play_circle', 'Sermons', 4, NULL, NULL, 'everyone', NULL),
-    ('LNK00000005', 'CHU00000001', 'main', '/events', 'url', NULL, 'event', 'Events', 5, NULL, NULL, 'everyone', NULL),
-    ('LNK00000006', 'CHU00000001', 'main', '/give', 'url', NULL, 'favorite', 'Give', 6, NULL, NULL, 'everyone', NULL),
-    ('LNK00000007', 'CHU00000001', 'main', '/members', 'url', NULL, 'lock', 'Members Area', 7, NULL, NULL, 'members', NULL),
-    ('LNK00000008', 'CHU00000001', 'main', '/youth', 'url', NULL, 'people', 'Youth', 8, NULL, NULL, 'groups', 'GRP00000013');
+    ('LNK00000001', 'CHU00000001', 'website', '/', 'url', NULL, 'home', 'Home', 1, NULL, NULL, 'everyone', NULL),
+    ('LNK00000002', 'CHU00000001', 'website', '/about', 'url', NULL, 'info', 'About', 2, NULL, NULL, 'everyone', NULL),
+    ('LNK00000003', 'CHU00000001', 'website', '/ministries', 'url', NULL, 'groups', 'Ministries', 3, NULL, NULL, 'everyone', NULL),
+    ('LNK00000004', 'CHU00000001', 'website', '/sermons', 'url', NULL, 'play_circle', 'Sermons', 4, NULL, NULL, 'everyone', NULL),
+    ('LNK00000005', 'CHU00000001', 'website', '/events', 'url', NULL, 'event', 'Events', 5, NULL, NULL, 'everyone', NULL),
+    ('LNK00000006', 'CHU00000001', 'website', '/give', 'url', NULL, 'favorite', 'Give', 6, NULL, NULL, 'everyone', NULL);
 
     -- ========================================
     -- Global Styles
     -- ========================================
     INSERT INTO globalStyles (id, churchId, fonts, palette, typography, spacing, borderRadius, customCss, customJS) VALUES
     ('GST00000001', 'CHU00000001',
-      '{"headingFont": "Open Sans", "bodyFont": "Roboto"}',
+      '{"heading": "Open Sans", "body": "Roboto"}',
       '{"light": "#FFFFFF", "lightAccent": "#E8F0FE", "accent": "#1976D2", "darkAccent": "#1565C0", "dark": "#212121"}',
       '{"headingSize": "2rem", "bodySize": "1rem"}',
       '{"sectionPadding": "60px", "elementSpacing": "20px"}',
