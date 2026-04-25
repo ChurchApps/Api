@@ -223,7 +223,7 @@ export class UserController extends MembershipBaseController {
         const codeHash = bcrypt.hashSync(code, 10);
         await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
         await UserHelper.sendWelcomeEmail(user.email, code, null, null);
-        // Create userChurch records for matching people in groups
+        // Create userChurch records for matching people in non-archived churches
         await UserChurchHelper.createForNewUser(user.id, user.email);
       }
       user.password = null;
@@ -276,7 +276,7 @@ export class UserController extends MembershipBaseController {
         await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
         console.log("Register: save user", Date.now() - stepStart, "ms");
 
-        // Create userChurch records for matching people in groups
+        // Create userChurch records for matching people in non-archived churches
         stepStart = Date.now();
         await UserChurchHelper.createForNewUser(user.id, user.email);
         console.log("Register: createForNewUser", Date.now() - stepStart, "ms");

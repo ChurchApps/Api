@@ -26,19 +26,17 @@ export class UserChurchHelper {
     await repos.userChurch.save(userChurch);
   }
 
-  // Scenario 2: When user is created, find all matching people in groups across churches
+  // Scenario 2: When user is created, find all matching people across non-archived churches
   public static async createForNewUser(userId: string, email: string): Promise<void> {
     if (!email) return;
     const repos = await this.repos();
 
-    // Find people with exact email match who are in at least one group,
-    // in non-archived churches, excluding churches where a userChurch already exists.
+    // Find people with exact email match in non-archived churches,
+    // excluding churches where a userChurch already exists.
     const result = await sql<{ personId: string; churchId: string }>`
       SELECT p.id as personId, p.churchId
       FROM people p
       INNER JOIN churches c ON c.id = p.churchId AND c.archivedDate IS NULL
-      INNER JOIN groupMembers gm ON gm.personId = p.id AND gm.churchId = p.churchId
-      INNER JOIN \`groups\` g ON g.id = gm.groupId AND g.removed = 0
       LEFT JOIN userChurches uc ON uc.userId = ${userId} AND uc.churchId = p.churchId
       WHERE LOWER(p.email) = LOWER(${email}) AND p.removed = 0 AND uc.id IS NULL
       GROUP BY p.churchId, p.id
