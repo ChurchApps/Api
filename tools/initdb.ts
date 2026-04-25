@@ -53,6 +53,12 @@ export async function initializeDatabases(options: InitOptions = {}) {
 
       console.log(`\n--- ${moduleName} ---`);
 
+      const envVar = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
+      if (!process.env[envVar]) {
+        console.log(`  No connection string for ${moduleName}, skipping.`);
+        continue;
+      }
+
       if (!options.demoOnly) {
         // Run Kysely migrations for schema
         await runMigrations(moduleName);
