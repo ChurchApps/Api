@@ -86,9 +86,7 @@ export class NotificationHelper {
           action: contentType === "privateMessage" ? "privateMessage" : "notification",
           data: { counts }
         });
-        await Promise.all(connections.map((conn) =>
-          this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId)
-        ));
+        await Promise.all(connections.map((conn) => this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId)));
         return "socket"; // Stop here, let 15-min timer escalate if unread
       }
     }
@@ -125,9 +123,7 @@ export class NotificationHelper {
             anyPushSent = true;
           } catch (error) {
             console.error("Push notification failed:", error);
-            await Promise.all(expoPushTokens.map((token) =>
-              this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))
-            ));
+            await Promise.all(expoPushTokens.map((token) => this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))));
           }
         }
 
@@ -141,9 +137,7 @@ export class NotificationHelper {
             anyPushSent = anyPushSent || results.some((r) => r.success);
           } catch (error) {
             console.error("Web push notification failed:", error);
-            await Promise.all(webPushTokens.map((token) =>
-              this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))
-            ));
+            await Promise.all(webPushTokens.map((token) => this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))));
           }
         }
 
