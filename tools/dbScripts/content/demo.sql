@@ -213,6 +213,23 @@ BEGIN
         DATE_ADD(DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY), INTERVAL '12:00:00' HOUR_SECOND) + INTERVAL ((5 + 7 - DAYOFWEEK(DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY))) % 7 + 14) DAY, 
         0, 'FREQ=MONTHLY;BYDAY=3SA', 'public');
 
+    -- Enable registration on the seeded special events so /mobile/register/<id>
+    -- and the public guest registration form have something live to render.
+    -- VBS opens registration immediately; Missions Conference opens 7 days from
+    -- now. Both close 1 day before the event start.
+    UPDATE events
+        SET registrationEnabled = b'1',
+            capacity = 50,
+            registrationOpenDate = DATE_SUB(NOW(), INTERVAL 7 DAY),
+            registrationCloseDate = DATE_SUB(DATE_ADD(CURDATE(), INTERVAL 4 MONTH), INTERVAL 1 DAY)
+        WHERE id = 'EVT00000015';
+    UPDATE events
+        SET registrationEnabled = b'1',
+            capacity = 100,
+            registrationOpenDate = DATE_ADD(CURDATE(), INTERVAL 7 DAY),
+            registrationCloseDate = DATE_SUB(DATE_ADD(CURDATE(), INTERVAL 1 MONTH), INTERVAL 1 DAY)
+        WHERE id = 'EVT00000016';
+
     -- Event Exceptions
     -- Note: Using dynamic dates relative to current date
     INSERT INTO eventExceptions (id, churchId, eventId, exceptionDate, recurrenceDate) VALUES

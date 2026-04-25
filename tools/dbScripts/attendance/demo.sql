@@ -105,7 +105,13 @@ INSERT INTO sessions (id, churchId, groupId, serviceTimeId, sessionDate) VALUES
 ('SES00000025', 'CHU00000001', 'GRP00000001', 'SST00000001', '2026-01-18 09:00:00'),
 ('SES00000026', 'CHU00000001', 'GRP00000001', 'SST00000002', '2026-01-18 10:30:00'),
 ('SES00000027', 'CHU00000001', 'GRP00000001', 'SST00000001', '2026-01-25 09:00:00'),
-('SES00000028', 'CHU00000001', 'GRP00000001', 'SST00000002', '2026-01-25 10:30:00');
+('SES00000028', 'CHU00000001', 'GRP00000001', 'SST00000002', '2026-01-25 10:30:00'),
+
+-- Active checkin session for the current week — sessionDate = upcoming Sunday
+-- 9:00 AM, attached to GRP00000001 (Sunday Morning Service) so /mobile/checkin
+-- has data anchoring "this week" when run any day of the year.
+('SES00000029', 'CHU00000001', 'GRP00000001', 'SST00000001',
+   DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (7 - DAYOFWEEK(CURDATE())) DAY), INTERVAL '09:00:00' HOUR_SECOND));
 
 -- Sample Visits (March 2024)
 INSERT INTO visits (id, churchId, personId, serviceId, groupId, visitDate, checkinTime, addedBy) VALUES 
