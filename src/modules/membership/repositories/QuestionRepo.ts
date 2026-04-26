@@ -49,7 +49,10 @@ export class QuestionRepo {
   public async delete(churchId: string, id: string) {
     const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
     await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("formId", "=", question.formId).where("sort", ">", +question.sort as any).execute();
-    await getDb().updateTable("questions").set({ sort: sql`CONCAT('d', sort)` as any, removed: 1 as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
+    // Soft-delete: marking removed=1 is enough — every read filters on
+    // removed=false. The previous CONCAT('d', sort) trick failed because
+    // `sort` is an INT column and would throw "Incorrect integer value".
+    await getDb().updateTable("questions").set({ removed: 1 as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async load(churchId: string, id: string) {
@@ -113,8 +116,17 @@ export class QuestionRepo {
       sort: row.sort,
       choices: row.choices || []
     };
-    if (typeof row.choices === "string") result.choices = JSON.parse(row.choices);
-    else result.choices = row.choices;
+    if (typeof row.choices === "string") {
+      try {
+        result.choices = JSON.parse(row.choices);
+      } catch {
+        // Seed data (and some legacy rows) store raw text in `choices` rather
+        // than JSON — don't 500 the whole request in that case.
+        result.choices = [];
+      }
+    } else {
+      result.choices = row.choices;
+    }
     return result;
   }
 

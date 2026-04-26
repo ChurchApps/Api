@@ -1,6 +1,6 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
-import { UniqueIdHelper } from "@churchapps/apihelper";
+import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Song } from "../models/index.js";
 
@@ -16,7 +16,7 @@ export class SongRepo {
       id: model.id,
       churchId: model.churchId,
       name: model.name,
-      dateAdded: model.dateAdded
+      dateAdded: model.dateAdded ? DateHelper.toMysqlDate(model.dateAdded) : model.dateAdded
     } as any).execute();
     return model;
   }
@@ -24,7 +24,7 @@ export class SongRepo {
   private async update(model: Song): Promise<Song> {
     await getDb().updateTable("songs").set({
       name: model.name,
-      dateAdded: model.dateAdded
+      dateAdded: model.dateAdded ? DateHelper.toMysqlDate(model.dateAdded) : model.dateAdded
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }

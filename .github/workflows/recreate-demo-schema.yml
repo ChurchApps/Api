@@ -31,45 +31,41 @@ jobs:
         run: |
           # Define all modules in correct initialization order
           MODULES=("membership" "attendance" "content" "giving" "messaging" "doing")
-          
+
           echo "🚀 Recreating demo database schemas (structure only)..."
           echo "📋 Module order: ${MODULES[*]}"
-          
+
           # Create base .env file
           echo "APP_ENV=Demo" > .env
-          
-          # Process each module
+
+          # Drop/recreate each module's database and collect connection strings
           for MODULE in "${MODULES[@]}"; do
             echo ""
-            echo "🔧 Processing $MODULE module..."
-            
-            # Get module-specific connection string from Parameter Store
+            echo "🔧 Preparing $MODULE module..."
+
             PARAM_NAME="/demo/${MODULE}Api/connectionString"
             echo "   📡 Fetching connection string from $PARAM_NAME"
-            
+
             if CONNECTION_STRING=$(aws ssm get-parameter --name "$PARAM_NAME" --with-decryption --query "Parameter.Value" --output text 2>/dev/null); then
               echo "   ✅ Connection string retrieved for $MODULE"
-              
-              # Extract database details from connection string
+
               DB_NAME=$(echo $CONNECTION_STRING | sed -n 's/.*\/\/[^:]*:[^@]*@[^:]*:[0-9]*\/\([^?]*\).*/\1/p')
               DB_HOST=$(echo $CONNECTION_STRING | sed -n 's/.*@\([^:]*\):[0-9]*\/.*/\1/p')
               DB_USER=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/\([^:]*\):.*/\1/p')
               DB_PASS=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
-              
+
               echo "   🗑️ Dropping and recreating database: $DB_NAME"
               mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`; CREATE DATABASE \`${DB_NAME}\`;"
-              
-              # Add connection string to .env for this module
+
               echo "${MODULE^^}_CONNECTION_STRING=$CONNECTION_STRING" >> .env
-              
-              echo "   🔧 Initializing $MODULE database schema only (no demo data)..."
-              npm run initdb:$MODULE -- --schema-only
-              
-              echo "   ✅ $MODULE module completed successfully"
             else
               echo "   ⚠️ No connection string found for $MODULE, skipping..."
             fi
           done
-          
+
+          echo ""
+          echo "🔧 Initializing schemas for all configured modules..."
+          npm run initdb -- --schema-only
+
           echo ""
           echo "🎉 All module database schemas have been recreated successfully!"

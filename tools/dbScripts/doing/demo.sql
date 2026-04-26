@@ -13,7 +13,7 @@ BEGIN
     TRUNCATE TABLE conjunctions;
     TRUNCATE TABLE assignments;
     TRUNCATE TABLE blockoutDates;
-    TRUNCATE TABLE notes;
+    -- notes lives in the membership database (polymorphic), not doing
     TRUNCATE TABLE planItems;
     TRUNCATE TABLE plans;
     TRUNCATE TABLE planTypes;
@@ -46,20 +46,30 @@ BEGIN
     ('PLT00000004', 'CHU00000001', 'GRP0000000a', 'Youth Service'),
     ('PLT00000005', 'CHU00000001', 'GRP0000000a', 'Prayer Meeting');
 
-    -- Create Worship Ministry Positions
-    INSERT INTO positions (id, churchId, planId, categoryName, name, count, groupId) VALUES
+    -- Create Worship Ministry Positions. Greeter + Usher have allowSelfSignup=1
+    -- so the public /mobile/volunteer screen has open positions to display and
+    -- (if you sign up) a way to test the click-to-signup flow.
+    INSERT INTO positions (id, churchId, planId, categoryName, name, count, groupId, allowSelfSignup) VALUES
     -- Sunday Morning Service Positions
-    ('POS00000001', 'CHU00000001', 'PLA00000001', 'Worship', 'Worship Leader', 1, 'GRP0000000b'),
-    ('POS00000002', 'CHU00000001', 'PLA00000001', 'Worship', 'Acoustic Guitar', 1, 'GRP0000000b'),
-    ('POS00000003', 'CHU00000001', 'PLA00000001', 'Worship', 'Electric Guitar', 1, 'GRP0000000b'),
-    ('POS00000004', 'CHU00000001', 'PLA00000001', 'Worship', 'Bass Guitar', 1, 'GRP0000000b'),
-    ('POS00000005', 'CHU00000001', 'PLA00000001', 'Worship', 'Drums', 1, 'GRP0000000b'),
-    ('POS00000006', 'CHU00000001', 'PLA00000001', 'Worship', 'Keyboard', 1, 'GRP0000000b'),
-    ('POS00000007', 'CHU00000001', 'PLA00000001', 'Worship', 'Vocals', 1, 'GRP0000000b'),
-    ('POS00000008', 'CHU00000001', 'PLA00000001', 'Technical', 'Sound Tech', 1, 'GRP0000000b'),
-    ('POS00000009', 'CHU00000001', 'PLA00000001', 'Technical', 'Projection Tech', 1, 'GRP0000000b'),
-    ('POS00000010', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Greeter', 1, 'GRP0000000b'),
-    ('POS00000011', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Usher', 1, 'GRP0000000b');
+    ('POS00000001', 'CHU00000001', 'PLA00000001', 'Worship', 'Worship Leader', 1, 'GRP0000000b', b'0'),
+    ('POS00000002', 'CHU00000001', 'PLA00000001', 'Worship', 'Acoustic Guitar', 1, 'GRP0000000b', b'0'),
+    ('POS00000003', 'CHU00000001', 'PLA00000001', 'Worship', 'Electric Guitar', 1, 'GRP0000000b', b'0'),
+    ('POS00000004', 'CHU00000001', 'PLA00000001', 'Worship', 'Bass Guitar', 1, 'GRP0000000b', b'0'),
+    ('POS00000005', 'CHU00000001', 'PLA00000001', 'Worship', 'Drums', 1, 'GRP0000000b', b'0'),
+    ('POS00000006', 'CHU00000001', 'PLA00000001', 'Worship', 'Keyboard', 1, 'GRP0000000b', b'0'),
+    ('POS00000007', 'CHU00000001', 'PLA00000001', 'Worship', 'Vocals', 1, 'GRP0000000b', b'0'),
+    ('POS00000008', 'CHU00000001', 'PLA00000001', 'Technical', 'Sound Tech', 1, 'GRP0000000b', b'0'),
+    ('POS00000009', 'CHU00000001', 'PLA00000001', 'Technical', 'Projection Tech', 1, 'GRP0000000b', b'0'),
+    ('POS00000010', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Greeter', 2, 'GRP0000000b', b'1'),
+    ('POS00000011', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Usher', 1, 'GRP0000000b', b'1'),
+    -- POS00000012 is intentionally count=1 with a filled assignment (ASS00000010
+    -- below) so /mobile/volunteer renders the "Full" / disabled state.
+    ('POS00000012', 'CHU00000001', 'PLA00000001', 'Hospitality', 'Coffee Host', 1, 'GRP0000000b', b'1'),
+    -- POS00000013 / POS00000014 belong to the past-deadline plan PLA00000002;
+    -- allowSelfSignup is on but the plan's serviceDate is already in the past,
+    -- so the UI shows the deadline-passed banner.
+    ('POS00000013', 'CHU00000001', 'PLA00000002', 'Hospitality', 'Greeter (last week)', 1, 'GRP0000000b', b'1'),
+    ('POS00000014', 'CHU00000001', 'PLA00000002', 'Hospitality', 'Usher (last week)', 1, 'GRP0000000b', b'1');
 
     -- Create Service Times
     INSERT INTO times (id, churchId, planId, displayName, startTime, endTime, teams) VALUES
@@ -71,10 +81,16 @@ BEGIN
      DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (5 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 21 HOUR), 'Worship,Technical');
 
     -- Create Worship Plans
+    -- PLA00000001 — upcoming Sunday (covers status-stats / hero card scenarios)
+    -- PLA00000002 — past Sunday with allowSelfSignup positions (covers the
+    -- "Registration deadline passed" / past-plan state on /mobile/volunteer)
     INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId) VALUES
-    ('PLA00000001', 'CHU00000001', 'GRP0000000a', 'PLT00000001', 'Upcoming Worship Schedule', 
-     DATE_ADD(CURDATE(), INTERVAL (7 - DAYOFWEEK(CURDATE())) DAY), 
-     'Upcoming worship services including special seasonal service', 1, 'lesson', 'LES12345678');
+    ('PLA00000001', 'CHU00000001', 'GRP0000000a', 'PLT00000001', 'Upcoming Worship Schedule',
+     DATE_ADD(CURDATE(), INTERVAL (7 - DAYOFWEEK(CURDATE())) DAY),
+     'Upcoming worship services including special seasonal service', 1, 'lesson', 'LES12345678'),
+    ('PLA00000002', 'CHU00000001', 'GRP0000000a', 'PLT00000001', 'Last Week Worship Schedule',
+     DATE_SUB(CURDATE(), INTERVAL 7 DAY),
+     'Past worship service used to test deadline-passed scenarios', 1, 'lesson', 'LES12345678');
 
     -- Create Plan Items
     INSERT INTO planItems (id, churchId, planId, parentId, sort, itemType, relatedId, label, description, seconds, link) VALUES
@@ -110,6 +126,9 @@ BEGIN
 
 
     -- Create Assignments
+    -- Demo user (PER00000082) gets THREE assignments in different statuses so
+    -- /mobile/plans status-stats / "needs response" hero / Past tab can be tested.
+    -- ASS00000010 fills POS00000012 (count=1) so the Coffee Host shows as Full.
     INSERT INTO assignments (id, churchId, positionId, personId, status, notified) VALUES
     ('ASS00000001', 'CHU00000001', 'POS00000001', 'PER00000027', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)), -- Michael Davis (Worship Leader)
     ('ASS00000002', 'CHU00000001', 'POS00000002', 'PER00000042', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)), -- David Lopez (Acoustic Guitar)
@@ -118,7 +137,9 @@ BEGIN
     ('ASS00000005', 'CHU00000001', 'POS00000005', 'PER00000036', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)), -- Miguel Hernandez (Drums)
     ('ASS00000006', 'CHU00000001', 'POS00000006', 'PER00000028', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)), -- Emily Davis (Keyboard)
     ('ASS00000007', 'CHU00000001', 'POS00000007', 'PER00000022', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)), -- Maria Garcia (Vocals)
-    ('ASS00000008', 'CHU00000001', 'POS00000008', 'PER00000082', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)); -- Demo user (Sound Tech)
+    ('ASS00000008', 'CHU00000001', 'POS00000008', 'PER00000082', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)), -- Demo user (Sound Tech) — Accepted
+    ('ASS00000009', 'CHU00000001', 'POS00000009', 'PER00000082', 'Unconfirmed', DATE_SUB(NOW(), INTERVAL 1 DAY)), -- Demo user (Projection Tech) — Unconfirmed (needs response)
+    ('ASS00000010', 'CHU00000001', 'POS00000012', 'PER00000028', 'Accepted', DATE_SUB(NOW(), INTERVAL 7 DAY)); -- Emily Davis fills Coffee Host (renders position as Full)
 
     -- Create Blockout Dates
     INSERT INTO blockoutDates (id, churchId, personId, startDate, endDate) VALUES
@@ -130,12 +151,9 @@ BEGIN
     ('BLK00000006', 'CHU00000001', 'PER00000082', DATE_ADD(CURDATE(), INTERVAL 10 DAY), DATE_ADD(CURDATE(), INTERVAL 13 DAY)), -- Demo user - vacation
     ('BLK00000007', 'CHU00000001', 'PER00000082', DATE_ADD(CURDATE(), INTERVAL 28 DAY), DATE_ADD(CURDATE(), INTERVAL 29 DAY)); -- Demo user - conference
 
-    -- Create Notes
-    INSERT INTO notes (id, churchId, contentType, contentId, noteType, addedBy, createdAt, updatedAt, contents) VALUES
-    ('NOT00000001', 'CHU00000001', 'assignment', 'ASS00000001', 'General', 'PER00000027', DATE_SUB(NOW(), INTERVAL 6 DAY), DATE_SUB(NOW(), INTERVAL 6 DAY), 'Please prepare 4 songs for upcoming service'),
-    ('NOT00000002', 'CHU00000001', 'assignment', 'ASS00000062', 'General', 'PER00000027', DATE_SUB(NOW(), INTERVAL 1 DAY), DATE_SUB(NOW(), INTERVAL 1 DAY), 'Special seasonal service - need 6 songs including traditional hymns'),
-    ('NOT00000003', 'CHU00000001', 'assignment', 'ASS00000015', 'Technical', 'PER00000075', DATE_SUB(NOW(), INTERVAL 3 HOUR), DATE_SUB(NOW(), INTERVAL 3 HOUR), 'New microphone setup for upcoming service'),
-    ('NOT00000004', 'CHU00000001', 'assignment', 'ASS00000071', 'Hospitality', 'PER00000068', DATE_SUB(NOW(), INTERVAL 12 HOUR), DATE_SUB(NOW(), INTERVAL 12 HOUR), 'Extra greeters needed for special service');
+    -- Assignment notes would go into the membership.notes table (polymorphic
+    -- via contentType='assignment', contentId=<ASS id>). Seeding them here
+    -- would fail because `notes` does not exist in the doing schema.
 
     -- Create sample tasks (after automations are created)
     INSERT INTO tasks (id, churchId, taskNumber, taskType, dateCreated, dateClosed, associatedWithType, associatedWithId, associatedWithLabel, createdByType, createdById, createdByLabel, assignedToType, assignedToId, assignedToLabel, title, status, automationId, conversationId, data) VALUES

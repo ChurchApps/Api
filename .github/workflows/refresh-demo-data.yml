@@ -33,50 +33,45 @@ jobs:
         run: |
           # Define all modules in correct initialization order
           MODULES=("membership" "attendance" "content" "giving" "messaging" "doing")
-          
+
           echo "🚀 Truncating and repopulating demo data for all modules..."
           echo "📋 Module order: ${MODULES[*]}"
-          
+
           # Create base .env file
           echo "APP_ENV=Demo" > .env
-          
-          # Process each module
+
+          # Truncate each module's tables and collect connection strings
           for MODULE in "${MODULES[@]}"; do
             echo ""
-            echo "🔧 Processing $MODULE module..."
-            
-            # Get module-specific connection string from Parameter Store
+            echo "🔧 Preparing $MODULE module..."
+
             PARAM_NAME="/demo/${MODULE}Api/connectionString"
             echo "   📡 Fetching connection string from $PARAM_NAME"
-            
+
             if CONNECTION_STRING=$(aws ssm get-parameter --name "$PARAM_NAME" --with-decryption --query "Parameter.Value" --output text 2>/dev/null); then
               echo "   ✅ Connection string retrieved for $MODULE"
-              
-              # Extract database details from connection string
+
               DB_NAME=$(echo $CONNECTION_STRING | sed -n 's/.*\/\/[^:]*:[^@]*@[^:]*:[0-9]*\/\([^?]*\).*/\1/p')
               DB_HOST=$(echo $CONNECTION_STRING | sed -n 's/.*@\([^:]*\):[0-9]*\/.*/\1/p')
               DB_USER=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/\([^:]*\):.*/\1/p')
               DB_PASS=$(echo $CONNECTION_STRING | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
-              
+
               echo "   🧹 Truncating data tables in database: $DB_NAME"
-              # Truncate all tables instead of dropping the database
               mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "
                 USE \`${DB_NAME}\`;
                 SET FOREIGN_KEY_CHECKS=0;
                 SHOW TABLES;" | tail -n +2 | xargs -I {} mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "USE \`${DB_NAME}\`; TRUNCATE TABLE \`{}\`;"
               mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" -e "USE \`${DB_NAME}\`; SET FOREIGN_KEY_CHECKS=1;"
-              
-              # Add connection string to .env for this module
+
               echo "${MODULE^^}_CONNECTION_STRING=$CONNECTION_STRING" >> .env
-              
-              echo "   📄 Populating $MODULE demo data only..."
-              npm run populateDemo:$MODULE
-              
-              echo "   ✅ $MODULE module completed successfully"
             else
               echo "   ⚠️ No connection string found for $MODULE, skipping..."
             fi
           done
-          
+
+          echo ""
+          echo "📄 Populating demo data for all configured modules..."
+          npm run populateDemo
+
           echo ""
           echo "🎉 All demo data has been repopulated successfully!"

@@ -15,8 +15,8 @@
         " WHERE d.churchId=:churchId",
         " AND d.donationDate BETWEEN :startDate AND :endDate",
         " AND (:fundId='' OR fd.fundId = :fundId)",
-        " GROUP BY year(d.donationDate), week(d.donationDate, 0), f.name",
-        " ORDER BY year(d.donationDate), week(d.donationDate, 0), f.name"
+        " GROUP BY STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W'), f.name",
+        " ORDER BY STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W'), f.name"
       ]
     }
   ],

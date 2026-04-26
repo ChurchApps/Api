@@ -188,6 +188,16 @@ INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, me
 ('DON00000091', 'CHU00000001', 'BAT00000013', 'PER00000044', '2025-05-25 10:40:00', 175.00, 'Check', 'CHECK', 'Weekly tithe'),
 ('DON00000092', 'CHU00000001', 'BAT00000013', 'PER00000049', '2025-05-25 10:45:00', 125.00, 'Credit Card', 'STRIPE', 'Weekly giving');
 
+-- Demo user (PER00000082) donation history — three recent gifts so the
+-- /mobile/donate Overview tab and Year-to-Date totals have data to render.
+INSERT INTO donationBatches (id, churchId, name, batchDate) VALUES
+('BAT00000014', 'CHU00000001', 'Demo User Recent Batch', DATE_SUB(CURDATE(), INTERVAL 7 DAY));
+
+INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes) VALUES
+('DON00000093', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 90 DAY),  100.00, 'Credit Card', 'STRIPE', 'Demo donation'),
+('DON00000094', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 30 DAY),  150.00, 'Credit Card', 'STRIPE', 'Demo donation'),
+('DON00000095', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 7 DAY),   200.00, 'Credit Card', 'STRIPE', 'Demo donation');
+
 -- Fund Donations for all 92 donations across 13 weeks
 INSERT INTO fundDonations (id, churchId, donationId, fundId, amount) VALUES
 -- March 2, 2025 donations (Week 1)
@@ -393,7 +403,11 @@ INSERT INTO fundDonations (id, churchId, donationId, fundId, amount) VALUES
 ('FDO00000176', 'CHU00000001', 'DON00000091', 'FUN00000001', 140.00), -- Roberto Gonzalez: General Fund
 ('FDO00000177', 'CHU00000001', 'DON00000091', 'FUN00000003', 35.00),  -- Roberto Gonzalez: Missions Fund
 ('FDO00000178', 'CHU00000001', 'DON00000092', 'FUN00000001', 100.00), -- James Wilson: General Fund
-('FDO00000179', 'CHU00000001', 'DON00000092', 'FUN00000005', 25.00);  -- James Wilson: Food Pantry
+('FDO00000179', 'CHU00000001', 'DON00000092', 'FUN00000005', 25.00),  -- James Wilson: Food Pantry
+-- Demo user fund donations (all to General Fund)
+('FDO00000180', 'CHU00000001', 'DON00000093', 'FUN00000001', 100.00), -- Demo User: General Fund
+('FDO00000181', 'CHU00000001', 'DON00000094', 'FUN00000001', 150.00), -- Demo User: General Fund
+('FDO00000182', 'CHU00000001', 'DON00000095', 'FUN00000001', 200.00); -- Demo User: General Fund
 
 -- Subscriptions (monthly recurring donations)
 INSERT INTO subscriptions (id, churchId, personId, customerId) VALUES
