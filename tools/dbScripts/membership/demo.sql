@@ -415,7 +415,11 @@ INSERT INTO roles (id, churchId, name) VALUES
 
 -- Add Role Permissions
 INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, action) VALUES
-('RPM00000001', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Domain', 'Admin');
+('RPM00000001', 'CHU00000001', 'ROL00000001', 'MembershipApi', 'Domain', 'Admin'),
+-- Explicit LessonsApi permissions so the demo Domain Admin can manage Grace's classrooms / schedules
+-- and customizations through LessonsApp /portal flows.
+('RPM00000002', 'CHU00000001', 'ROL00000001', 'LessonsApi', 'Lessons', 'Edit'),
+('RPM00000003', 'CHU00000001', 'ROL00000001', 'LessonsApi', 'Schedules', 'Edit');
 
 -- Add User to Role
 INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
@@ -578,6 +582,37 @@ INSERT INTO visibilityPreferences (id, churchId, personId, address, phoneNumber,
 ('VIS00000001', 'CHU00000001', 'PER00000031', 'hidden', 'hidden', 'visible'),
 ('VIS00000002', 'CHU00000001', 'PER00000060', 'hidden', 'visible', 'visible'),
 ('VIS00000003', 'CHU00000001', 'PER00000079', 'visible', 'visible', 'hidden');
+
+-- ========================================
+-- Lessons.church Publisher (used by LessonsApi demo + Playwright tests)
+-- ========================================
+INSERT INTO churches (id, name, subDomain, address1, city, state, zip, country, latitude, longitude) VALUES
+('CHU00000099', 'Lessons.church Free Curriculum', 'lessonschurch', '500 Curriculum Way', 'Springfield', 'IL', '62701', 'US', 39.7817, -89.6501);
+
+INSERT INTO households (id, churchId, name) VALUES
+('HOU00000099', 'CHU00000099', 'Lessons Admin Family');
+
+INSERT INTO people (id, churchId, displayName, firstName, middleName, lastName, prefix, suffix, gender, maritalStatus, birthDate, email, householdId, householdRole, membershipStatus, homePhone, mobilePhone, workPhone, address1, city, state, zip, removed) VALUES
+('PER00000099', 'CHU00000099', 'Lessons Admin', 'Lessons', NULL, 'Admin', 'Mr.', NULL, 'Male', 'Single', '1980-01-01', 'lessons-admin@demo.churchapps.org', 'HOU00000099', 'Head', 'Member', NULL, NULL, NULL, '500 Curriculum Way', 'Springfield', 'IL', '62701', 0);
+
+-- bcrypt hash for 'password' (same as demo@b1.church)
+INSERT INTO users (id, email, password, displayName, firstName, lastName, registrationDate) VALUES
+('USR00000002', 'lessons-admin@demo.churchapps.org', '$2a$10$qBWddIw2QMUlRrX9/6Cdz.nW.L5FqE45R1NTLF.V71LyhjY6I0lFu', 'Lessons Admin', 'Lessons', 'Admin', '2024-01-01 00:00:00');
+
+INSERT INTO userChurches (id, userId, churchId, personId) VALUES
+('UCH00000002', 'USR00000002', 'CHU00000099', 'PER00000099');
+
+INSERT INTO roles (id, churchId, name) VALUES
+('ROL00000099', 'CHU00000099', 'Domain Admins');
+
+INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, action) VALUES
+('RPM00000099', 'CHU00000099', 'ROL00000099', 'MembershipApi', 'Domain', 'Admin'),
+-- Explicit LessonsApi permissions for the curriculum publisher admin role.
+('RPM00000098', 'CHU00000099', 'ROL00000099', 'LessonsApi', 'Lessons', 'Edit'),
+('RPM00000097', 'CHU00000099', 'ROL00000099', 'LessonsApi', 'Schedules', 'Edit');
+
+INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
+('RME00000099', 'CHU00000099', 'ROL00000099', 'USR00000002', '2024-01-01 00:00:00');
 
 END $$
 DELIMITER ;

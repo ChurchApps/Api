@@ -1,4 +1,5 @@
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import type { Server as HttpServer } from "http";
 import { WebSocketServer } from "ws";
 import { PayloadInterface, SocketConnectionInterface } from "./Interfaces.js";
 import { Repos } from "../repositories/index.js";
@@ -16,27 +17,19 @@ export class SocketHelper {
     const port = Environment.websocketPort;
     console.log(`SocketHelper: Initializing with port ${port}, deliveryProvider: ${Environment.deliveryProvider}`);
 
+    // When running on Railway (or any host that exposes a single port), the WebSocket server
+    // is attached to the HTTP server in index.ts via attachToServer(). Skip the port-based path.
+    if (process.env.RAILWAY_ENVIRONMENT) {
+      console.log("WebSocket server will attach to HTTP server (Railway mode)");
+      return;
+    }
+
     // Only start WebSocket server in local development mode
     if (port > 0 && Environment.deliveryProvider === "local") {
       try {
         console.log(`Starting WebSocket server on port ${port}...`);
         SocketHelper.wss = new WebSocketServer({ port });
-
-        SocketHelper.wss.on("connection", (socket) => {
-          const sc: SocketConnectionInterface = { id: UniqueIdHelper.shortId(), socket };
-          SocketHelper.connections.push(sc);
-
-          // Handle incoming messages - send socketId for ANY message
-          sc.socket.on("message", (message) => {
-            console.log(`Received message: ${message.toString()}`);
-            const payload: PayloadInterface = { churchId: "", conversationId: "", action: "socketId", data: sc.id };
-            sc.socket.send(JSON.stringify(payload));
-          });
-
-          sc.socket.on("close", async () => {
-            await SocketHelper.handleDisconnect(sc.id);
-          });
-        });
+        SocketHelper.bindConnectionHandlers();
         console.log(`✓ WebSocket server started on port ${port}`);
       } catch (error) {
         console.warn(`⚠️ Failed to start WebSocket server on port ${port}:`, error.message);
@@ -45,6 +38,39 @@ export class SocketHelper {
     } else {
       console.log("WebSocket server not started (AWS mode or port disabled)");
     }
+  };
+
+  static attachToServer = (server: HttpServer) => {
+    if (SocketHelper.wss) {
+      console.log("WebSocket server already running; skipping attachToServer");
+      return;
+    }
+    try {
+      console.log("Attaching WebSocket server to HTTP listener...");
+      SocketHelper.wss = new WebSocketServer({ server });
+      SocketHelper.bindConnectionHandlers();
+      console.log("✓ WebSocket server attached to HTTP listener");
+    } catch (error) {
+      console.warn("⚠️ Failed to attach WebSocket server:", (error as Error).message);
+    }
+  };
+
+  private static bindConnectionHandlers = () => {
+    SocketHelper.wss.on("connection", (socket) => {
+      const sc: SocketConnectionInterface = { id: UniqueIdHelper.shortId(), socket };
+      SocketHelper.connections.push(sc);
+
+      // Handle incoming messages - send socketId for ANY message
+      sc.socket.on("message", (message) => {
+        console.log(`Received message: ${message.toString()}`);
+        const payload: PayloadInterface = { churchId: "", conversationId: "", action: "socketId", data: sc.id };
+        sc.socket.send(JSON.stringify(payload));
+      });
+
+      sc.socket.on("close", async () => {
+        await SocketHelper.handleDisconnect(sc.id);
+      });
+    });
   };
 
   static handleDisconnect = async (socketId: string) => {
