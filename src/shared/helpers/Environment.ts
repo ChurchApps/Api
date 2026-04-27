@@ -110,7 +110,7 @@ export class Environment extends EnvironmentBase {
 
     // Set current environment and server config
     this.currentEnvironment = environment;
-    this.port = process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : 8084;
+    this.port = process.env.PORT ? parseInt(process.env.PORT) : (process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT) : 8084);
     this.socketUrl = process.env.SOCKET_URL;
 
     // Legacy environment variable support

@@ -122,7 +122,7 @@ export class QuestionRepo {
       } catch {
         // Seed data (and some legacy rows) store raw text in `choices` rather
         // than JSON — don't 500 the whole request in that case.
-        result.choices = [];
+        result.choices = [] as any;
       }
     } else {
       result.choices = row.choices;

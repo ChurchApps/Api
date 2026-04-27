@@ -20,7 +20,7 @@ export class TaskRepo {
       taskNumber: taskNumber,
       taskType: task.taskType,
       dateCreated: sql`now()` as any,
-      dateClosed: task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed,
+      dateClosed: (task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed) as any,
       associatedWithType: task.associatedWithType,
       associatedWithId: task.associatedWithId,
       associatedWithLabel: task.associatedWithLabel,
@@ -45,7 +45,7 @@ export class TaskRepo {
     // rejects ("Incorrect datetime value") when assigned to a DATETIME column.
     await getDb().updateTable("tasks").set({
       taskType: task.taskType,
-      dateClosed: task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed,
+      dateClosed: (task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed) as any,
       associatedWithType: task.associatedWithType,
       associatedWithId: task.associatedWithId,
       associatedWithLabel: task.associatedWithLabel,
