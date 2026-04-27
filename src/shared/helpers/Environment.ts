@@ -200,12 +200,18 @@ export class Environment extends EnvironmentBase {
     this.contentRoot = process.env.CONTENT_ROOT || config.contentRoot;
     this.deliveryProvider = process.env.DELIVERY_PROVIDER || config.deliveryProvider;
 
+    // Sync overrides to EnvironmentBase fields that apihelper reads directly
+    EnvironmentBase.fileStore = this.fileStore;
+    EnvironmentBase.s3Bucket = this.s3Bucket;
+    EnvironmentBase.contentRoot = this.contentRoot;
+
     // Membership API specific
     this.jwtExpiration = "2 days";
     this.emailOnRegistration = process.env.EMAIL_ON_REGISTRATION === "true" || config.emailOnRegistration === true;
     this.supportEmail = process.env.SUPPORT_EMAIL || config.supportEmail || "support@churchapps.org";
     this.b1AdminRoot = process.env.B1ADMIN_ROOT || config.b1AdminRoot || "https://admin.staging.b1.church";
     this.mailSystem = process.env.MAIL_SYSTEM || config.mailSystem || "";
+    EnvironmentBase.mailSystem = this.mailSystem;
 
     // AI provider configuration (shared)
     this.aiProvider = process.env.AI_PROVIDER || config.aiProvider || "openrouter";
