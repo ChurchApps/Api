@@ -6,7 +6,7 @@
   "contentRoot": "",
   "emailOnRegistration": true,
   "fileStore": "disk",
-  "mailSystem": "SMTP",
+  "mailSystem": "",
   "s3Bucket": "",
   "supportEmail": "support@churchapps.org",
   "b1AdminRoot": "",
