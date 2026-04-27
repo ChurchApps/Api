@@ -1,0 +1,16 @@
+{
+  "environment": "railway",
+  "apiUrl": "",
+  "deliveryProvider": "local",
+  "appName": "API",
+  "contentRoot": "",
+  "emailOnRegistration": true,
+  "fileStore": "disk",
+  "mailSystem": "SMTP",
+  "s3Bucket": "",
+  "supportEmail": "support@churchapps.org",
+  "b1AdminRoot": "",
+  "messagingApi": "",
+  "aiProvider": "openrouter",
+  "storeApi": ""
+}

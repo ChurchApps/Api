@@ -87,6 +87,7 @@ export class Environment extends EnvironmentBase {
     if (environment === "demo") file = "demo.json";
     if (environment === "staging") file = "staging.json";
     if (environment === "prod") file = "prod.json";
+    if (environment === "railway") file = "railway.json";
 
     // In Lambda, __dirname is /var/task/dist/src/shared/helpers
     // Config files are at /var/task/config
