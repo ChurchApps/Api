@@ -238,6 +238,10 @@ export class Environment extends EnvironmentBase {
     console.log("✅ Configuration parameters loaded from environment variables");
   }
 
+  static get isMailConfigured(): boolean {
+    return !!Environment.mailSystem && Environment.mailSystem !== "";
+  }
+
   static getDatabaseConfig(moduleName: string): any {
     const config = this.dbConnections.get(moduleName);
     if (!config) {

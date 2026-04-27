@@ -251,29 +251,32 @@ export class UserController extends MembershipBaseController {
         user.password = bcrypt.hashSync(tempPassword, 10);
         console.log("Register: bcrypt", Date.now() - regStart, "ms");
 
-        const code = generateVerificationCode();
-        const codeHash = bcrypt.hashSync(code, 10);
+        const mailConfigured = Environment.isMailConfigured;
+        const code = mailConfigured ? generateVerificationCode() : null;
+        const codeHash = code ? bcrypt.hashSync(code, 10) : null;
 
-        try {
-          const emailStart = Date.now();
-          const emailPromises: Promise<any>[] = [];
-          emailPromises.push(UserHelper.sendWelcomeEmail(register.email, code, register.appName, register.appUrl));
+        if (mailConfigured) {
+          try {
+            const emailStart = Date.now();
+            const emailPromises: Promise<any>[] = [];
+            emailPromises.push(UserHelper.sendWelcomeEmail(register.email, code, register.appName, register.appUrl));
 
-          if (Environment.emailOnRegistration) {
-            const emailBody = "Name: " + register.firstName + " " + register.lastName + "<br/>Email: " + register.email + "<br/>App: " + register.appName;
-            emailPromises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody));
+            if (Environment.emailOnRegistration) {
+              const emailBody = "Name: " + register.firstName + " " + register.lastName + "<br/>Email: " + register.email + "<br/>App: " + register.appName;
+              emailPromises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody));
+            }
+            await Promise.all(emailPromises);
+            console.log("Register: emails", Date.now() - emailStart, "ms");
+          } catch (err) {
+            return this.json({ errors: [err.toString()] });
           }
-          await Promise.all(emailPromises);
-          console.log("Register: emails", Date.now() - emailStart, "ms");
-        } catch (err) {
-          return this.json({ errors: [err.toString()] });
-          // return this.json({ errors: ["Email address does not exist."] })
         }
 
         let stepStart = Date.now();
         const userCount = await this.repos.user.loadCount();
+        const savedAuthGuid = user.authGuid;
         user = await this.repos.user.save(user);
-        await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
+        if (codeHash) await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
         console.log("Register: save user", Date.now() - stepStart, "ms");
 
         // Create userChurch records for matching people in non-archived churches
@@ -304,7 +307,10 @@ export class UserController extends MembershipBaseController {
         console.log("Register: total", Date.now() - regStart, "ms");
       }
       user.password = null;
-      return this.json(user, 200);
+      const mailConfigured = Environment.isMailConfigured;
+      const response: any = { ...user, mailConfigured };
+      if (!mailConfigured) response.authGuid = user.authGuid;
+      return this.json(response, 200);
     });
   }
 
@@ -339,6 +345,10 @@ export class UserController extends MembershipBaseController {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
           return res.status(400).json({ errors: errors.array() });
+        }
+
+        if (!Environment.isMailConfigured) {
+          return res.status(400).json({ errors: ["Email is not configured on this server. Please contact your administrator to reset your password."], mailConfigured: false });
         }
 
         const user = await this.repos.user.loadByEmail(req.body.userEmail);
