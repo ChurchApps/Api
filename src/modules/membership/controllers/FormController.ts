@@ -9,13 +9,17 @@ export class FormController extends MembershipBaseController {
   @httpGet("/archived")
   public async getArchived(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (au.checkAccess(Permissions.forms.admin)) return this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadAllArchived(au.churchId)) as any[]);
-      else {
+      const contentType = (req.query?.contentType as string) || null;
+      if (au.checkAccess(Permissions.forms.admin)) {
+        const all = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadAllArchived(au.churchId)) as any[]);
+        return contentType ? all.filter((f) => f.contentType !== "form") : all;
+      } else {
         const memberForms = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadMemberArchivedForms(au.churchId, au.personId)) as any[]);
+        const filteredMember = contentType ? memberForms.filter((f) => f.contentType !== "form") : memberForms;
         const nonMemberForms = au.checkAccess(Permissions.forms.edit)
           ? await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadNonMemberArchivedForms(au.churchId)) as any[])
           : [];
-        return [...memberForms, ...nonMemberForms];
+        return [...filteredMember, ...nonMemberForms];
       }
     });
   }
@@ -41,11 +45,15 @@ export class FormController extends MembershipBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (au.checkAccess(Permissions.forms.admin)) return await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadAll(au.churchId)) as any[]);
-      else {
+      const contentType = (req.query?.contentType as string) || null;
+      if (au.checkAccess(Permissions.forms.admin)) {
+        const all = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadAll(au.churchId)) as any[]);
+        return contentType ? all.filter((f) => f.contentType !== "form") : all;
+      } else {
         const memberForms = await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadMemberForms(au.churchId, au.personId)) as any[]);
+        const filteredMember = contentType ? memberForms.filter((f) => f.contentType !== "form") : memberForms;
         const nonMemberForms = au.checkAccess(Permissions.forms.edit) ? await this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadNonMemberForms(au.churchId)) as any[]) : [];
-        return [...memberForms, ...nonMemberForms];
+        return [...filteredMember, ...nonMemberForms];
       }
     });
   }
