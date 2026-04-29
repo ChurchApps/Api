@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm ci && npm run build:prod"
+    "buildCommand": "npm run build:prod"
   },
   "deploy": {
     "preDeployCommand": ["npm run migrate:up"],
