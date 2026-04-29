@@ -5,8 +5,9 @@ import { Church } from "../models/index.js";
 
 export class ChurchHelper {
   static async selectSubDomain(name: string) {
-    const subDomain = this.suggestSubDomain(name) || "church";
     const repos = await RepoManager.getRepos<Repos>("membership");
+    if ((await repos.church.loadCount()) === 0) return "church";
+    const subDomain = this.suggestSubDomain(name) || "church";
     const churches: Church[] = await repos.church.loadContainingSubDomain(subDomain);
     let result = subDomain;
     let i = 1;
