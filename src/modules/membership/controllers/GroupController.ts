@@ -1,9 +1,11 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
+import { sql } from "kysely";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Group } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { ArrayHelper, SlugHelper } from "@churchapps/apihelper";
+import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 
 @controller("/membership/groups")
 export class GroupController extends MembershipBaseController {
@@ -65,6 +67,31 @@ export class GroupController extends MembershipBaseController {
   public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       return this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadByTag(churchId, tag)) as any[]);
+    });
+  }
+
+  @httpGet("/:id/plans")
+  public async getPlans(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const isAdmin = au.checkAccess(Permissions.groups.edit) || au.checkAccess(Permissions.plans.edit);
+      if (!isAdmin) {
+        const member = await (this.repos.groupMember as any).loadForPerson(au.churchId, au.personId);
+        const isMember = Array.isArray(member) && member.some((m: any) => m.groupId === id);
+        if (!isMember) return this.json({ error: "Not a member of this group" }, 403);
+      }
+      const associations = (await this.repos.associatedGroup.loadByGroup(au.churchId, id, "planType")) as { contentId: string; settings: string | null }[];
+      if (associations.length === 0) return [];
+      const doingDb = KyselyPool.getDb<any>("doing");
+      return doingDb.selectFrom("plans").selectAll()
+        .where("churchId", "=", au.churchId)
+        .where((eb: any) => eb.or(associations.map((a) => {
+          const base = eb("planTypeId", "=", a.contentId);
+          if (a.settings === "past") return eb.and([base, eb("serviceDate", "<", sql`CURDATE()`)]);
+          if (a.settings === "future") return eb.and([base, eb("serviceDate", ">=", sql`CURDATE()`)]);
+          return base;
+        })))
+        .orderBy("serviceDate", "desc")
+        .execute();
     });
   }
 

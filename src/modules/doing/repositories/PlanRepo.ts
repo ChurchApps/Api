@@ -85,21 +85,6 @@ export class PlanRepo {
       .execute();
   }
 
-  public async loadByPlanTypeAssociations(churchId: string, associations: { contentId: string; settings: string | null }[]) {
-    if (associations.length === 0) return [];
-
-    return getDb().selectFrom("plans").selectAll()
-      .where("churchId", "=", churchId)
-      .where((eb) => eb.or(associations.map((a) => {
-        const base = eb("planTypeId", "=", a.contentId);
-        if (a.settings === "past") return eb.and([base, eb("serviceDate", "<", sql`CURDATE()` as any)]);
-        if (a.settings === "future") return eb.and([base, eb("serviceDate", ">=", sql`CURDATE()` as any)]);
-        return base;
-      })))
-      .orderBy("serviceDate", "desc")
-      .execute();
-  }
-
   public async loadCurrentByPlanTypeId(planTypeId: string) {
     return (await getDb().selectFrom("plans").selectAll()
       .where("planTypeId", "=", planTypeId)
