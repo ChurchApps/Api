@@ -1,4 +1,5 @@
 export { CustomBaseController, ErrorController } from "@churchapps/apihelper";
+export { AssociatedGroupController } from "./AssociatedGroupController.js";
 export { GroupController } from "./GroupController.js";
 export { GroupMemberController } from "./GroupMemberController.js";
 export { HouseholdController } from "./HouseholdController.js";

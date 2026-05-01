@@ -1,4 +1,5 @@
 import {
+  AssociatedGroupRepo,
   GroupMemberRepo,
   GroupRepo,
   HouseholdRepo,
@@ -21,6 +22,7 @@ import {
 import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo, AuditLogRepo } from "./index.js";
 
 export class Repos {
+  public associatedGroup: AssociatedGroupRepo;
   public groupMember: GroupMemberRepo;
   public group: GroupRepo;
   public household: HouseholdRepo;
@@ -54,6 +56,7 @@ export class Repos {
   public static getCurrent = () => new Repos();
 
   constructor() {
+    this.associatedGroup = new AssociatedGroupRepo();
     this.groupMember = new GroupMemberRepo();
     this.group = new GroupRepo();
     this.household = new HouseholdRepo();

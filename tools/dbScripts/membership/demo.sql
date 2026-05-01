@@ -18,6 +18,7 @@ BEGIN
     TRUNCATE TABLE users;
     TRUNCATE TABLE userChurches;
     TRUNCATE TABLE groupMembers;
+    TRUNCATE TABLE associatedGroups;
     TRUNCATE TABLE notes;
     TRUNCATE TABLE `groups`;
     TRUNCATE TABLE people;
@@ -506,6 +507,16 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 ('GME00000118', 'CHU00000001', 'GRP0000000b', 'PER00000050', '2024-01-01', 0), -- Sarah Wilson
 ('GME00000119', 'CHU00000001', 'GRP0000000b', 'PER00000057', '2024-01-01', 0), -- Amanda Thomas
 ('GME00000120', 'CHU00000001', 'GRP0000000b', 'PER00000082', '2024-01-01', 0); -- Demo User
+
+-- ========================================
+-- Associated Groups (generic group <-> content links; settings is content-specific)
+-- For contentType='planType' the settings column stores the time filter:
+-- 'past' | 'future' | 'both'.
+-- ========================================
+INSERT INTO associatedGroups (id, churchId, contentType, contentId, groupId, settings) VALUES
+('AGR00000001', 'CHU00000001', 'planType', 'PLT00000001', 'GRP00000001', 'both'),   -- Sunday Service -> Sunday Morning Service group
+('AGR00000002', 'CHU00000001', 'planType', 'PLT00000001', 'GRP00000004', 'past'),   -- Sunday Service -> Adult Bible Class (past lessons)
+('AGR00000003', 'CHU00000001', 'planType', 'PLT00000004', 'GRP00000011', 'future'); -- Youth Service -> Middle School Youth (upcoming)
 
 -- ========================================
 -- Forms

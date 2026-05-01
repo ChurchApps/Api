@@ -3,6 +3,7 @@ import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversi
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { Assignment, Plan, PlanItem, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 @controller("/doing/plans")
 export class PlanController extends DoingBaseController {
@@ -53,6 +54,19 @@ export class PlanController extends DoingBaseController {
   public async getByPlanTypeId(@requestParam("planTypeId") planTypeId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.plan.loadByPlanTypeId(au.churchId, planTypeId);
+    });
+  }
+
+  @httpGet("/group/:groupId")
+  public async getByGroupId(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const isAdmin = au.checkAccess(Permissions.groups.edit) || au.checkAccess(Permissions.plans.edit);
+      if (!isAdmin) {
+        const isMember = await this.repos.membership.isGroupMember(au.churchId, groupId, au.personId);
+        if (!isMember) return this.json({ error: "Not a member of this group" }, 403);
+      }
+      const associations = await this.repos.membership.loadAssociatedGroups(au.churchId, groupId, "planType");
+      return await this.repos.plan.loadByPlanTypeAssociations(au.churchId, associations);
     });
   }
 

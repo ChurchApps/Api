@@ -90,4 +90,24 @@ export class MembershipRepo {
       .where("id", "in", personIds)
       .execute();
   }
+
+  public async isGroupMember(churchId: string, groupId: string, personId: string): Promise<boolean> {
+    const row = await (this.getDb() as any).selectFrom("groupMembers")
+      .select("id")
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .where("personId", "=", personId)
+      .limit(1)
+      .executeTakeFirst();
+    return !!row;
+  }
+
+  public async loadAssociatedGroups(churchId: string, groupId: string, contentType: string) {
+    return (this.getDb() as any).selectFrom("associatedGroups")
+      .select(["id", "contentId", "settings"])
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .where("contentType", "=", contentType)
+      .execute() as Promise<{ id: string; contentId: string; settings: string | null }[]>;
+  }
 }

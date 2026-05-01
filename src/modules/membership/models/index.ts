@@ -1,3 +1,4 @@
+export { AssociatedGroup } from "./AssociatedGroup.js";
 export { Group } from "./Group.js";
 export { GroupMember } from "./GroupMember.js";
 export { Household } from "./Household.js";
