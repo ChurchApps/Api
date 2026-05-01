@@ -123,6 +123,11 @@ export class PersonRepo {
     await getDb().updateTable("people").set({ removed: true as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
+  public async deleteByIds(churchId: string, ids: string[]) {
+    if (!ids.length) return;
+    await getDb().updateTable("people").set({ removed: true as any }).where("id", "in", ids).where("churchId", "=", churchId).execute();
+  }
+
   public async updateOptedOut(personId: string, optedOut: boolean) {
     await getDb().updateTable("people").set({ optedOut: optedOut as any }).where("id", "=", personId).execute();
   }
