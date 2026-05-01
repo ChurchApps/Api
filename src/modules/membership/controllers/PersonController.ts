@@ -4,6 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Person, Household, SearchCondition, Group, VisibilityPreference } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
+import { BulkPersonDeleteRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
 import { Environment, Permissions, PersonHelper, UserChurchHelper } from "../helpers/index.js";
 import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
@@ -411,10 +412,39 @@ export class PersonController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       else {
-        await this.repos.person.delete(au.churchId, id);
-        return this.json({});
+        return this.deletePeople(au.churchId, [id]);
       }
     });
+  }
+
+  @httpPost("/bulk-delete")
+  public async bulkDelete(req: express.Request<{}, {}, BulkPersonDeleteRequest>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+
+      const personIds = Array.isArray(req.body?.personIds) ? ArrayHelper.getUnique(req.body.personIds.filter((id) => typeof id === "string").map((id) => id.trim()).filter(Boolean)) : [];
+      if (personIds.length === 0) return this.json({ error: "personIds is required" }, 400);
+
+      const existingPeople = (await this.repos.person.loadByIds(au.churchId, personIds)) as any[];
+      const existingIds = ArrayHelper.getIds(existingPeople, "id");
+      if (existingIds.length === 0) return this.json({ error: "No matching people found" }, 404);
+
+      const missingIds = personIds.filter((id) => existingIds.indexOf(id) === -1);
+      if (missingIds.length > 0) return this.json({ error: "Some people were not found", missingIds }, 404);
+
+      return this.deletePeople(au.churchId, existingIds);
+    });
+  }
+
+  private async deletePeople(churchId: string, personIds: string[]) {
+    if (personIds.length === 1) {
+      await this.repos.person.delete(churchId, personIds[0]);
+    } else {
+      await this.repos.person.deleteByIds(churchId, personIds);
+    }
+
+    await this.repos.household.deleteUnused(churchId);
+    return this.json({ success: true, deletedIds: personIds, count: personIds.length });
   }
 
   private async savePhoto(churchId: string, person: Person) {
