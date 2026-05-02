@@ -541,6 +541,18 @@ export class UserController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/:id/impersonate")
+  public async impersonate(req: express.Request<{ id: string }, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+
+      const targetUser = await this.repos.user.load(req.params.id);
+      if (!targetUser) return this.json({}, 404);
+
+      return this.json({ jwt: AuthenticatedUser.getUserJwt(targetUser) }, 200);
+    });
+  }
+
   @httpPost("/sendInviteEmail")
   public async sendInviteEmail(req: express.Request<{}, {}, { email: string; personName: string; contextName: string; churchName: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
