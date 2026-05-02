@@ -2,6 +2,7 @@ import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanType } from "../models/index.js";
+import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/doing/planTypes")
 export class PlanTypeController extends DoingBaseController {
@@ -41,6 +42,14 @@ export class PlanTypeController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, PlanType[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const item of req.body) {
+        let ministryId = item.ministryId;
+        if (!ministryId && item.id) {
+          const existing: any = await this.repos.planType.load(au.churchId, item.id);
+          ministryId = existing?.ministryId;
+        }
+        if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
+      }
       const promises: Promise<PlanType>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.planType.save(item)); });
       const result = await Promise.all(promises);
@@ -51,6 +60,7 @@ export class PlanTypeController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPlanType(au, id)) return this.json({}, 401);
       await this.repos.planType.delete(au.churchId, id);
       return {};
     });

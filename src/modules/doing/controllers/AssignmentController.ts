@@ -2,6 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Assignment, Plan, Position } from "../models/index.js";
+import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
@@ -119,6 +120,9 @@ export class AssignmentController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Assignment[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const assignment of req.body) {
+        if (!await PlanAuth.canEditPosition(au, assignment.positionId)) return this.json({}, 401);
+      }
       const promises: Promise<Assignment>[] = [];
       req.body.forEach((assignment) => {
         assignment.churchId = au.churchId;
@@ -133,6 +137,8 @@ export class AssignmentController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const assignment: any = await this.repos.assignment.load(au.churchId, id);
+      if (!await PlanAuth.canEditPosition(au, assignment?.positionId)) return this.json({}, 401);
       await this.repos.assignment.delete(au.churchId, id);
       return {};
     });

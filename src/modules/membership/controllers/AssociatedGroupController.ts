@@ -2,6 +2,7 @@ import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { AssociatedGroup } from "../models/index.js";
+import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/membership/associatedGroups")
 export class AssociatedGroupController extends MembershipBaseController {
@@ -34,6 +35,11 @@ export class AssociatedGroupController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, AssociatedGroup[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const item of req.body) {
+        if (item.contentType === "planType") {
+          if (!await PlanAuth.canEditPlanType(au, item.contentId)) return this.json({}, 401);
+        }
+      }
       const promises: Promise<AssociatedGroup>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.associatedGroup.save(item)); });
       const result = await Promise.all(promises);
@@ -44,6 +50,10 @@ export class AssociatedGroupController extends MembershipBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const assoc: any = await this.repos.associatedGroup.load(au.churchId, id);
+      if (assoc?.contentType === "planType") {
+        if (!await PlanAuth.canEditPlanType(au, assoc.contentId)) return this.json({}, 401);
+      }
       await this.repos.associatedGroup.delete(au.churchId, id);
       return {};
     });

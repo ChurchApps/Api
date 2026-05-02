@@ -2,6 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Time } from "../models/index.js";
+import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/doing/times")
 export class TimeController extends DoingBaseController {
@@ -38,6 +39,9 @@ export class TimeController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Time[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const time of req.body) {
+        if (!await PlanAuth.canEditPlan(au, time.planId)) return this.json({}, 401);
+      }
       const promises: Promise<Time>[] = [];
       req.body.forEach((time) => {
         time.churchId = au.churchId;
@@ -51,6 +55,8 @@ export class TimeController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const time: any = await this.repos.time.load(au.churchId, id);
+      if (!await PlanAuth.canEditPlan(au, time?.planId)) return this.json({}, 401);
       await this.repos.time.delete(au.churchId, id);
       return {};
     });

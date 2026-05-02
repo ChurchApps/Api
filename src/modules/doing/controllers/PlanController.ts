@@ -3,6 +3,7 @@ import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversi
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { Assignment, Plan, PlanItem, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
+import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/doing/plans")
 export class PlanController extends DoingBaseController {
@@ -164,6 +165,7 @@ export class PlanController extends DoingBaseController {
   @httpPost("/autofill/:id")
   public async autofill(@requestParam("id") id: string, req: express.Request<{}, {}, { teams: { positionId: string; personIds: string[] }[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
       const plan = await this.repos.plan.load(au.churchId, id);
       const positions: Position[] = (await this.repos.position.loadByPlanId(au.churchId, id)) as Position[];
       const assignments = (await this.repos.assignment.loadByPlanId(au.churchId, id)) as any[];
@@ -180,6 +182,7 @@ export class PlanController extends DoingBaseController {
   @httpPost("/copy/:id")
   public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan & { copyMode?: string; copyServiceOrder?: boolean }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditMinistry(au, req.body.ministryId)) return this.json({}, 401);
       const copyMode = req.body.copyMode || "all"; // "none" | "positions" | "all"
       const copyServiceOrder = req.body.copyServiceOrder || false;
       const oldPlan = (await this.repos.plan.load(au.churchId, id)) as Plan;
@@ -209,6 +212,15 @@ export class PlanController extends DoingBaseController {
       // Handle both single plan object and array of plans
       const plans = Array.isArray(req.body) ? req.body : [req.body];
 
+      for (const plan of plans) {
+        let ministryId = plan.ministryId;
+        if (!ministryId && plan.id) {
+          const existing: any = await this.repos.plan.load(au.churchId, plan.id);
+          ministryId = existing?.ministryId;
+        }
+        if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
+      }
+
       const promises: Promise<Plan>[] = [];
       plans.forEach((plan) => {
         plan.churchId = au.churchId;
@@ -227,6 +239,7 @@ export class PlanController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
       await this.repos.time.deleteByPlanId(au.churchId, id);
       await this.repos.assignment.deleteByPlanId(au.churchId, id);
       await this.repos.position.deleteByPlanId(au.churchId, id);

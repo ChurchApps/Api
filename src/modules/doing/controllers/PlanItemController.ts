@@ -2,6 +2,7 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanItem } from "../models/index.js";
+import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/doing/planItems")
 export class PlanItemController extends DoingBaseController {
@@ -41,6 +42,7 @@ export class PlanItemController extends DoingBaseController {
   @httpPost("/sort")
   public async sort(req: express.Request<{}, {}, PlanItem>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPlan(au, req.body.planId)) return this.json({}, 401);
       await this.repos.planItem.save(req.body);
 
       const items = (await this.repos.planItem.loadForPlan(au.churchId, req.body.planId || "")) as PlanItem[];
@@ -57,6 +59,9 @@ export class PlanItemController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, PlanItem[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const planItem of req.body) {
+        if (!await PlanAuth.canEditPlan(au, planItem.planId)) return this.json({}, 401);
+      }
       const promises: Promise<PlanItem>[] = [];
       req.body.forEach((planItem) => {
         planItem.churchId = au.churchId;
@@ -70,6 +75,8 @@ export class PlanItemController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const planItem: any = await this.repos.planItem.load(au.churchId, id);
+      if (!await PlanAuth.canEditPlan(au, planItem?.planId)) return this.json({}, 401);
       await this.repos.planItem.delete(au.churchId, id);
       return {};
     });

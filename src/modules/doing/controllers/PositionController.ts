@@ -2,6 +2,7 @@ import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Position } from "../models/index.js";
+import { PlanAuth } from "../../../shared/helpers/index.js";
 
 @controller("/doing/positions")
 export class PositionController extends DoingBaseController {
@@ -41,6 +42,9 @@ export class PositionController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Position[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const item of req.body) {
+        if (!await PlanAuth.canEditPlan(au, item.planId)) return this.json({}, 401);
+      }
       const promises: Promise<Position>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.position.save(item)); });
       const result = await Promise.all(promises);
@@ -51,6 +55,7 @@ export class PositionController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPosition(au, id)) return this.json({}, 401);
       await this.repos.position.delete(au.churchId, id);
       return {};
     });

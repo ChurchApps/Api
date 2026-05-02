@@ -5,6 +5,7 @@
 
 export { Environment } from "./Environment.js";
 export { Permissions, permissionsList, type IPermission, type ApiName, type DisplaySection, type ContentType, type Actions } from "./Permissions.js";
+export { PlanAuth } from "./PlanAuth.js";
 export { UniqueIdHelper } from "./UniqueIdHelper.js";
 export { DateHelper } from "./DateHelper.js";
 export { ValidationHelper } from "./ValidationHelper.js";
