@@ -18,6 +18,7 @@ export class DeliveryHelper {
 
   static sendConversationMessages = async (payload: PayloadInterface) => {
     const connections = DeliveryHelper.repos.connection.convertAllToModel(await DeliveryHelper.repos.connection.loadForConversation(payload.churchId, payload.conversationId));
+    console.log(`[DeliveryHelper] action=${payload.action} room=${payload.conversationId} -> ${connections.length} connection(s)`);
     const deliveryCount = await this.sendMessages(connections, payload);
     if (deliveryCount !== connections.length) DeliveryHelper.sendAttendance(payload.churchId, payload.conversationId);
   };
@@ -62,6 +63,14 @@ export class DeliveryHelper {
         sc.socket.send(JSON.stringify(payload));
         return true;
       } else {
+        // The DB row points at a socketId we don't have in our in-memory map.
+        // Most common cause: the client's WebSocket is connected to a *different*
+        // Api instance (e.g. wss://socket.staging.churchapps.org instead of
+        // ws://localhost:8087). The /connections POST hit this Api but the WS
+        // session lives elsewhere, so we can't deliver. Log loudly so this isn't
+        // mistaken for a "stale connection".
+        const reason = !sc ? "not in local in-memory connections (likely client connected to a different WS endpoint)" : `readyState=${sc.socket.readyState}`;
+        console.warn(`[DeliveryHelper.sendLocal] dropping ${payload.action} for socketId=${connection.socketId} room=${connection.conversationId} — ${reason}`);
         SocketHelper.deleteConnection(connection.socketId);
         return false;
       }

@@ -13,13 +13,14 @@ export async function up(db: Kysely<any>): Promise<void> {
     .modifyEnd(sql`ENGINE=InnoDB`)
     .execute();
 
-  // connections
+  // connections — conversationId widened beyond the 11-char id format because
+  // content-scoped rooms (e.g. "content-person-PER00000081") also live in this column.
   await db.schema
     .createTable("connections")
     .ifNotExists()
     .addColumn("id", sql`char(11)`, (col) => col.notNull().primaryKey())
     .addColumn("churchId", sql`char(11)`)
-    .addColumn("conversationId", sql`char(11)`)
+    .addColumn("conversationId", sql`varchar(64)`)
     .addColumn("personId", sql`char(11)`)
     .addColumn("displayName", sql`varchar(45)`)
     .addColumn("timeJoined", sql`datetime`)
