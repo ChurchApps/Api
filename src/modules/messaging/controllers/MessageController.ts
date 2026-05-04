@@ -45,7 +45,6 @@ export class MessageController extends MessagingBaseController {
             // Fan out real-time delivery and notification escalation concurrently -
             // both are independent side-effects that each make their own AWS/DB calls.
             const room = contentRoom(conv?.contentType, conv?.contentId);
-            console.log(`[MessageController.send] broadcasting message convId=${message.conversationId} contentRoom=${room || "(none)"} contentType=${conv?.contentType} contentId=${conv?.contentId}`);
             await Promise.all([
               DeliveryHelper.sendConversationMessages({
                 churchId: message.churchId,
@@ -118,7 +117,6 @@ export class MessageController extends MessagingBaseController {
             // Fan out real-time delivery and notification escalation concurrently -
             // both are independent side-effects that each make their own AWS/DB calls.
             const room = contentRoom(conv?.contentType, conv?.contentId);
-            console.log(`[MessageController.save] broadcasting message convId=${message.conversationId} contentRoom=${room || "(none)"} contentType=${conv?.contentType} contentId=${conv?.contentId}`);
             await Promise.all([
               DeliveryHelper.sendConversationMessages({
                 churchId: message.churchId,

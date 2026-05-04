@@ -256,12 +256,31 @@ export class NotificationHelper {
       }
       default: {
         const allMessages: Message[] = await NotificationHelper.repos.message.loadForConversation(conversation.churchId, conversation.id);
-        const peopleIds = ArrayHelper.getIds(allMessages, "personId");
-        if (peopleIds.length > 1) {
-          for (let i = peopleIds.length - 1; i >= 0; i--) {
-            if (peopleIds[i] === senderPersonId) peopleIds.splice(i, 1);
+        // Subscription model — latest action per person wins:
+        //   - a "real" comment auto-subscribes the poster
+        //   - a messageType="subscription" marker explicitly toggles their state
+        //     ("off" content → unsubscribed; anything else → subscribed)
+        // Iterate chronologically so the last action determines final state.
+        const sorted = [...allMessages].sort((a, b) => {
+          const ta = a.timeSent ? new Date(a.timeSent).getTime() : 0;
+          const tb = b.timeSent ? new Date(b.timeSent).getTime() : 0;
+          return ta - tb;
+        });
+        const stateByPerson = new Map<string, boolean>();
+        sorted.forEach((m) => {
+          if (!m.personId) return;
+          if (m.messageType === "subscription") {
+            stateByPerson.set(m.personId, m.content !== "off");
+          } else {
+            stateByPerson.set(m.personId, true);
           }
-          await this.createNotifications(peopleIds, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + conversation.title, undefined, senderPersonId);
+        });
+        const subscribers = Array.from(stateByPerson.entries())
+          .filter(([, subscribed]) => subscribed)
+          .map(([personId]) => personId)
+          .filter((pid) => pid !== senderPersonId);
+        if (subscribers.length > 0) {
+          await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + conversation.title, undefined, senderPersonId);
         }
         break;
       }

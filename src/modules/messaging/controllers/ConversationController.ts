@@ -130,7 +130,6 @@ export class ConversationController extends MessagingBaseController {
       result.forEach((c) => {
         const room = contentRoom(c.contentType, c.contentId);
         if (!room) return;
-        console.log(`[ConversationController.save] broadcasting created convId=${c.id} contentRoom=${room}`);
         activityPromises.push(DeliveryHelper.sendConversationMessages({
           churchId: c.churchId,
           conversationId: room,

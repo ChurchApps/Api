@@ -18,7 +18,6 @@ export class DeliveryHelper {
 
   static sendConversationMessages = async (payload: PayloadInterface) => {
     const connections = DeliveryHelper.repos.connection.convertAllToModel(await DeliveryHelper.repos.connection.loadForConversation(payload.churchId, payload.conversationId));
-    console.log(`[DeliveryHelper] action=${payload.action} room=${payload.conversationId} -> ${connections.length} connection(s)`);
     const deliveryCount = await this.sendMessages(connections, payload);
     if (deliveryCount !== connections.length) DeliveryHelper.sendAttendance(payload.churchId, payload.conversationId);
   };
