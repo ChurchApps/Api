@@ -3,6 +3,10 @@ import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Conversation, Message } from "../models/index.js";
 import { ArrayHelper, EncryptionHelper } from "@churchapps/apihelper";
+import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
+
+const contentRoom = (contentType?: string, contentId?: string) =>
+  contentType && contentId ? `content-${contentType}-${contentId}` : null;
 
 @controller("/messaging/conversations")
 export class ConversationController extends MessagingBaseController {
@@ -119,6 +123,21 @@ export class ConversationController extends MessagingBaseController {
         promises.push(this.repos.conversation.save(conversation));
       }) as any;
       const result = await Promise.all(promises);
+      // Notify any client subscribed to this content's room (e.g. a second tab on the
+      // same person profile) that a conversation now exists for it. Without this, the
+      // second tab would still show conversationId=null until a manual reload.
+      const activityPromises: Promise<unknown>[] = [];
+      result.forEach((c) => {
+        const room = contentRoom(c.contentType, c.contentId);
+        if (!room) return;
+        activityPromises.push(DeliveryHelper.sendConversationMessages({
+          churchId: c.churchId,
+          conversationId: room,
+          action: "conversationActivity",
+          data: { contentType: c.contentType, contentId: c.contentId, conversationId: c.id, kind: "created" }
+        }));
+      });
+      await Promise.all(activityPromises);
       return this.repos.conversation.convertAllToModel(result);
     }) as any;
   }

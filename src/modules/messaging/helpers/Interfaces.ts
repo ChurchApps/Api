@@ -11,7 +11,8 @@ export type PayloadAction =
   | "privateRoomAdded"
   | "videoChatInvite"
   | "notification"
-  | "blockedIp";
+  | "blockedIp"
+  | "conversationActivity";
 
 export interface PayloadInterface {
   churchId: string;

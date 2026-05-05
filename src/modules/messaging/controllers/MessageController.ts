@@ -6,6 +6,9 @@ import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
 import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 
+const contentRoom = (contentType?: string, contentId?: string) =>
+  contentType && contentId ? `content-${contentType}-${contentId}` : null;
+
 @controller("/messaging/messages")
 export class MessageController extends MessagingBaseController {
   @httpGet("/conversation/:conversationId")
@@ -41,6 +44,7 @@ export class MessageController extends MessagingBaseController {
 
             // Fan out real-time delivery and notification escalation concurrently -
             // both are independent side-effects that each make their own AWS/DB calls.
+            const room = contentRoom(conv?.contentType, conv?.contentId);
             await Promise.all([
               DeliveryHelper.sendConversationMessages({
                 churchId: message.churchId,
@@ -48,6 +52,12 @@ export class MessageController extends MessagingBaseController {
                 action: "message",
                 data: savedMessage
               }),
+              room ? DeliveryHelper.sendConversationMessages({
+                churchId: message.churchId,
+                conversationId: room,
+                action: "conversationActivity",
+                data: { contentType: conv.contentType, contentId: conv.contentId, conversationId: conv.id, kind: "message" }
+              }) : Promise.resolve(),
               NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous")
             ]);
 
@@ -106,6 +116,7 @@ export class MessageController extends MessagingBaseController {
 
             // Fan out real-time delivery and notification escalation concurrently -
             // both are independent side-effects that each make their own AWS/DB calls.
+            const room = contentRoom(conv?.contentType, conv?.contentId);
             await Promise.all([
               DeliveryHelper.sendConversationMessages({
                 churchId: message.churchId,
@@ -113,6 +124,12 @@ export class MessageController extends MessagingBaseController {
                 action: "message",
                 data: savedMessage
               }),
+              room ? DeliveryHelper.sendConversationMessages({
+                churchId: message.churchId,
+                conversationId: room,
+                action: "conversationActivity",
+                data: { contentType: conv.contentType, contentId: conv.contentId, conversationId: conv.id, kind: "message" }
+              }) : Promise.resolve(),
               NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous")
             ]);
 

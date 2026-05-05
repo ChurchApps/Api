@@ -85,6 +85,14 @@ export class ConnectionRepo {
     await getDb().deleteFrom("connections").where("socketId", "=", socketId).execute();
   }
 
+  public async deleteForRoom(churchId: string, conversationId: string, socketId: string) {
+    await getDb().deleteFrom("connections")
+      .where("churchId", "=", churchId)
+      .where("conversationId", "=", conversationId)
+      .where("socketId", "=", socketId)
+      .execute();
+  }
+
   public async deleteExisting(churchId: string, conversationId: string, socketId: string, id: string) {
     await getDb().deleteFrom("connections")
       .where("churchId", "=", churchId)

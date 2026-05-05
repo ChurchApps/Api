@@ -555,9 +555,14 @@ BEGIN
     -- Streaming Services
     INSERT INTO streamingServices (id, churchId, serviceTime, earlyStart, chatBefore, chatAfter, provider, providerKey, videoUrl, timezoneOffset, recurring, label, sermonId) VALUES
     -- Sunday Morning Service (Recurring) - Next Sunday
-    ('STR00000001', 'CHU00000001', 
-        DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (6 - WEEKDAY(CURDATE())) DAY), INTERVAL '10:00:00' HOUR_SECOND), 
-        900, 1800, 900, 'youtube', 'CHANNEL_ID_123', 'https://www.youtube.com/channel/CHANNEL_ID_123/live', -300, 1, 'Sunday Morning Service', 'SER00000001');
+    ('STR00000001', 'CHU00000001',
+        DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (6 - WEEKDAY(CURDATE())) DAY), INTERVAL '10:00:00' HOUR_SECOND),
+        900, 1800, 900, 'youtube', 'CHANNEL_ID_123', 'https://www.youtube.com/channel/CHANNEL_ID_123/live', -300, 1, 'Sunday Morning Service', 'SER00000001'),
+    -- Always-on test service so /stream renders chat after every reset-demo;
+    -- chat window is +/- 7 days around NOW().
+    ('STR00000002', 'CHU00000001',
+        NOW(),
+        0, 604800, 604800, 'vimeo', 'CHANNEL_ID_TEST', 'https://vimeo.com/000000000', 0, 0, 'Always-Live Test Service', 'SER00000001');
 
     -- Settings
     INSERT INTO settings (id, churchId, keyName, `value`, public) VALUES
@@ -609,7 +614,9 @@ BEGIN
     ('LNK00000003', 'CHU00000001', 'website', '/ministries', 'url', NULL, 'groups', 'Ministries', 3, NULL, NULL, 'everyone', NULL),
     ('LNK00000004', 'CHU00000001', 'website', '/sermons', 'url', NULL, 'play_circle', 'Sermons', 4, NULL, NULL, 'everyone', NULL),
     ('LNK00000005', 'CHU00000001', 'website', '/events', 'url', NULL, 'event', 'Events', 5, NULL, NULL, 'everyone', NULL),
-    ('LNK00000006', 'CHU00000001', 'website', '/give', 'url', NULL, 'favorite', 'Give', 6, NULL, NULL, 'everyone', NULL);
+    ('LNK00000006', 'CHU00000001', 'website', '/give', 'url', NULL, 'favorite', 'Give', 6, NULL, NULL, 'everyone', NULL),
+    -- Streaming-page tab so /stream renders the live chat container.
+    ('LNK00000007', 'CHU00000001', 'streamingTab', '', 'chat', NULL, 'chat', 'Chat', 1, NULL, NULL, 'everyone', NULL);
 
     -- ========================================
     -- Global Styles

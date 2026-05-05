@@ -441,6 +441,20 @@ INSERT INTO households (id, churchId, name) VALUES
 INSERT INTO userChurches (id, userId, churchId, personId) VALUES
 ('UCH00000001', 'USR00000001', 'CHU00000001', 'PER00000082');
 
+-- Create Tester User (regular Grace member, NOT a domain admin) — used by cross-user
+-- Playwright tests so realtime messaging can be exercised end-to-end with two real
+-- accounts in the same church. Linked to PER00000083 (Jane User, demo user's spouse).
+INSERT INTO users (id, email, password, displayName, firstName, lastName, registrationDate) VALUES
+('USR00000003', 'tester@b1.church', '$2a$10$qBWddIw2QMUlRrX9/6Cdz.nW.L5FqE45R1NTLF.V71LyhjY6I0lFu', 'Jane User', 'Jane', 'User', '2024-01-01 00:00:00');
+
+INSERT INTO userChurches (id, userId, churchId, personId) VALUES
+('UCH00000003', 'USR00000003', 'CHU00000001', 'PER00000083');
+
+-- Tester is also a Domain Admin so they can view person profiles in B1Admin and
+-- exercise cross-user realtime tests (e.g. two staff on the same person's notes tab).
+INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
+('RME00000003', 'CHU00000001', 'ROL00000001', 'USR00000003', '2024-01-01 00:00:00');
+
 -- Add Demo User Family to Groups
 INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VALUES
 -- Main worship service (whole family)
