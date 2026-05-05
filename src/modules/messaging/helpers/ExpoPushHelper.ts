@@ -51,7 +51,7 @@ export class ExpoPushHelper {
     }
   }
 
-  static async sendBulkTypedMessages(tokens: string[], title: string, body: string, type: string, contentId: string) {
+  static async sendBulkTypedMessages(tokens: string[], title: string, body: string, type: string, contentId: string, extra?: Record<string, unknown>) {
     ExpoPushHelper.init();
 
     const messages: ExpoPushMessage[] = [];
@@ -72,7 +72,8 @@ export class ExpoPushHelper {
           body,
           type,
           contentId,
-          url: `${Environment.membershipApi}/${type}/${contentId}`
+          url: `${Environment.membershipApi}/${type}/${contentId}`,
+          ...(extra || {})
         }
       });
     }

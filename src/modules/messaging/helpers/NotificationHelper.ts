@@ -64,7 +64,8 @@ export class NotificationHelper {
     title: string,
     body: string,
     contentType: string,
-    contentId: string
+    contentId: string,
+    navData?: Record<string, unknown>
   ): Promise<string> => {
     this.ensureInitialized();
 
@@ -109,7 +110,7 @@ export class NotificationHelper {
 
         if (expoPushTokens.length > 0) {
           try {
-            const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, body, contentType, contentId);
+            const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, body, contentType, contentId, navData);
             await Promise.all(expoPushTokens.map((token, i) => {
               const ticket = tickets?.[i];
               const success = ticket?.status === "ok";
@@ -129,7 +130,7 @@ export class NotificationHelper {
 
         if (webPushTokens.length > 0) {
           try {
-            const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId);
+            const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId, navData);
             await Promise.all(results.map((r) => {
               const logPromise = this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, r.errorMessage);
               return r.gone ? Promise.all([logPromise, this.deleteInvalidToken(r.token)]) : logPromise;
@@ -193,7 +194,8 @@ export class NotificationHelper {
         title,
         notification.message,
         "notification",
-        notification.id
+        notification.id,
+        { innerType: notification.contentType, innerId: notification.contentId }
       );
 
       notification.deliveryMethod = newMethod;
@@ -206,6 +208,9 @@ export class NotificationHelper {
       const currentLevel = pm.deliveryMethod === "socket" ? 0 : 1;
       const nextLevel = currentLevel + 1;
 
+      // Other party = whichever of fromPersonId/toPersonId is NOT the notify recipient.
+      const otherPersonId = pm.fromPersonId === pm.notifyPersonId ? pm.toPersonId : pm.fromPersonId;
+
       const newMethod = await this.attemptDeliveryWithEscalation(
         pm.churchId,
         pm.notifyPersonId,
@@ -213,7 +218,8 @@ export class NotificationHelper {
         "New Private Message",
         "You have a new private message",
         "privateMessage",
-        pm.id
+        pm.id,
+        { personId: otherPersonId, conversationId: pm.conversationId }
       );
 
       pm.deliveryMethod = newMethod;
@@ -240,6 +246,9 @@ export class NotificationHelper {
         await NotificationHelper.repos.privateMessage.save(pm);
 
         // Use escalation logic - start at level 0 (socket)
+        // navData.personId = the OTHER party in the chat (the sender), so the
+        // service worker can deep-link to /mobile/messages/{senderPersonId}
+        // (the route's [id] is the other person's id, not the conversation id).
         const deliveryMethod = await this.attemptDeliveryWithEscalation(
           message.churchId,
           pm.notifyPersonId,
@@ -247,7 +256,8 @@ export class NotificationHelper {
           `New Message from ${message.displayName}`,
           message.content,
           "privateMessage",
-          pm.id || conversation.id
+          pm.id || conversation.id,
+          { personId: senderPersonId, conversationId: conversation.id }
         );
 
         pm.deliveryMethod = deliveryMethod;
@@ -327,6 +337,8 @@ export class NotificationHelper {
             title = n.message;
           }
 
+          // Forward the wrapped content's type/id so the SW can deep-link to
+          // the actual conversation/group/etc. instead of the notifications list.
           const deliveryMethod = await NotificationHelper.attemptDeliveryWithEscalation(
             n.churchId,
             n.personId,
@@ -334,7 +346,8 @@ export class NotificationHelper {
             title,
             n.message,
             "notification",
-            notification.id
+            notification.id,
+            { innerType: n.contentType, innerId: n.contentId }
           );
 
           // Save the delivery method

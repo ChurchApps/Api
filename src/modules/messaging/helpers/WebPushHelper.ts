@@ -67,9 +67,10 @@ export class WebPushHelper {
     title: string,
     body: string,
     type: string,
-    contentId: string
+    contentId: string,
+    extra?: Record<string, unknown>
   ): Promise<WebPushDispatchResult[]> {
-    return WebPushHelper.sendBulk(tokens, { title, body, type, contentId });
+    return WebPushHelper.sendBulk(tokens, { title, body, type, contentId, ...(extra || {}) });
   }
 
   private static async sendBulk(tokens: string[], payload: Record<string, unknown>): Promise<WebPushDispatchResult[]> {
