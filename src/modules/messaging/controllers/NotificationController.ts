@@ -118,6 +118,13 @@ export class NotificationController extends MessagingBaseController {
     }) as any;
   }*/
 
+  @httpDelete("/my")
+  public async deleteMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+    return this.actionWrapper(req, res, async (au) => {
+      await this.repos.notification.deleteAllForPerson(au.churchId, au.personId);
+    }) as any;
+  }
+
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {

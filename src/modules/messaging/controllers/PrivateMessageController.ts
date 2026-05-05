@@ -1,4 +1,4 @@
-import { controller, httpGet, httpPost, requestParam } from "inversify-express-utils";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { PrivateMessage } from "../models/index.js";
@@ -82,6 +82,22 @@ export class PrivateMessageController extends MessagingBaseController {
         await this.repos.privateMessage.save(result);
       }
       return result;
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      const pm = (await this.repos.privateMessage.loadById(au.churchId, id)) as any;
+      if (!pm) {
+        return this.json({ error: "Conversation not found" }, 404);
+      }
+      const isParticipant = pm.fromPersonId === au.personId || pm.toPersonId === au.personId;
+      if (!isParticipant) {
+        return this.json({ error: "Unauthorized" }, 401);
+      }
+      await this.repos.privateMessage.delete(au.churchId, id);
+      return { success: true };
     });
   }
 }

@@ -84,6 +84,13 @@ export class NotificationRepo {
     await getDb().deleteFrom("notifications").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
+  public async deleteAllForPerson(churchId: string, personId: string) {
+    await getDb().deleteFrom("notifications")
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .execute();
+  }
+
   public async markRead(churchId: string, personId: string) {
     await getDb().updateTable("notifications").set({
       isNew: false as any,
