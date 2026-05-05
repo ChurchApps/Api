@@ -10,8 +10,8 @@ export class AssociatedGroupController extends MembershipBaseController {
   public async getByContent(
     @requestParam("contentType") contentType: string,
     @requestParam("contentId") contentId: string,
-    req: express.Request,
-    res: express.Response
+      req: express.Request,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.associatedGroup.loadByContent(au.churchId, contentType, contentId);
@@ -22,8 +22,8 @@ export class AssociatedGroupController extends MembershipBaseController {
   @httpGet("/group/:groupId")
   public async getByGroup(
     @requestParam("groupId") groupId: string,
-    req: express.Request,
-    res: express.Response
+      req: express.Request,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const contentType = typeof req.query.contentType === "string" ? req.query.contentType : undefined;

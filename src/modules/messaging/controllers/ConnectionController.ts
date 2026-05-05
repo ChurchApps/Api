@@ -82,8 +82,8 @@ export class ConnectionController extends MessagingBaseController {
     @requestParam("churchId") churchId: string,
     @requestParam("conversationId") conversationId: string,
     @requestParam("socketId") socketId: string,
-    req: express.Request<{}, {}, null>,
-    res: express.Response
+      req: express.Request<{}, {}, null>,
+      res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       await this.repos.connection.deleteForRoom(churchId, conversationId, socketId);

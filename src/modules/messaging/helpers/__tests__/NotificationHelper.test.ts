@@ -20,35 +20,29 @@ sendBulkTypedMessagesMock.mockResolvedValue([{ token: "webpush:fake", success: t
 jest.mock("../WebPushHelper.js", () => ({
   WebPushHelper: {
     sendBulkTypedMessages: sendBulkTypedMessagesMock,
-    isWebPushToken: (t?: string) => !!t && t.startsWith("webpush:"),
-  },
+    isWebPushToken: (t?: string) => !!t && t.startsWith("webpush:")
+  }
 }));
 
 // ExpoPushHelper might be invoked too; provide a no-op so the test doesn't
 // accidentally exercise expo-server-sdk.
-jest.mock("../ExpoPushHelper.js", () => ({
-  ExpoPushHelper: { sendBulkTypedMessages: jest.fn().mockResolvedValue([]) },
-}));
+jest.mock("../ExpoPushHelper.js", () => ({ ExpoPushHelper: { sendBulkTypedMessages: jest.fn().mockResolvedValue([]) } }));
 
 // DeliveryHelper.sendMessages is only called on the socket path; we assert it
 // is NOT called in this test (recipient is offline).
 const sendMessagesMock = jest.fn() as jest.MockedFunction<any>;
 sendMessagesMock.mockResolvedValue(0);
-jest.mock("../DeliveryHelper.js", () => ({
-  DeliveryHelper: { sendMessages: sendMessagesMock },
-}));
+jest.mock("../DeliveryHelper.js", () => ({ DeliveryHelper: { sendMessages: sendMessagesMock } }));
 
 // @churchapps/apihelper is ESM-only and breaks Jest's CommonJS loader. Mock it
 // since our paths under test don't use ArrayHelper or EmailHelper.
 jest.mock("@churchapps/apihelper", () => ({
   ArrayHelper: { getIds: jest.fn(() => []), getAll: jest.fn(() => []), getOne: jest.fn(() => null) },
-  EmailHelper: { sendEmail: jest.fn().mockResolvedValue(undefined) },
+  EmailHelper: { sendEmail: jest.fn().mockResolvedValue(undefined) }
 }));
 
 // Environment uses import.meta.url which CommonJS-transformed Jest can't parse.
-jest.mock("../../../../shared/helpers/Environment.js", () => ({
-  Environment: { getEnvironmentName: () => "test" },
-}));
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { getEnvironmentName: () => "test" } }));
 
 // axios is used elsewhere in NotificationHelper but not on the path under test.
 jest.mock("axios", () => ({ default: { post: jest.fn() }, post: jest.fn() }));
@@ -63,29 +57,21 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
 
   function buildRepos(opts: { connections?: any[]; devices?: any[]; pref?: any }) {
     return {
-      connection: {
-        loadForNotification: jest.fn(async () => opts.connections ?? []),
-      },
-      notification: {
-        loadNewCounts: jest.fn(async () => ({ notificationCount: 1, pmCount: 0 })),
-      },
-      notificationPreference: {
-        loadByPersonId: jest.fn(async () => opts.pref ?? { allowPush: true, emailFrequency: "individual" }),
-      },
+      connection: { loadForNotification: jest.fn(async () => opts.connections ?? []) },
+      notification: { loadNewCounts: jest.fn(async () => ({ notificationCount: 1, pmCount: 0 })) },
+      notificationPreference: { loadByPersonId: jest.fn(async () => opts.pref ?? { allowPush: true, emailFrequency: "individual" }) },
       device: {
         loadForPerson: jest.fn(async () => opts.devices ?? []),
-        deleteByFcmToken: jest.fn(async () => {}),
+        deleteByFcmToken: jest.fn(async () => {})
       },
-      deliveryLog: {
-        save: jest.fn(async () => ({})),
-      },
+      deliveryLog: { save: jest.fn(async () => ({})) }
     } as any;
   }
 
   it("escalates to web push when the recipient has no live socket", async () => {
     const repos = buildRepos({
       connections: [], // offline
-      devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }],
+      devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
     });
     NotificationHelper.init(repos);
 
@@ -117,7 +103,7 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
   it("delivers via socket when the recipient is online (push not invoked)", async () => {
     const repos = buildRepos({
       connections: [{ socketId: "abc", churchId: "CHU00000001" }],
-      devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }],
+      devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
     });
     NotificationHelper.init(repos);
 
@@ -140,7 +126,7 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
     const repos = buildRepos({
       connections: [],
       devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }],
-      pref: { allowPush: false, emailFrequency: "individual" },
+      pref: { allowPush: false, emailFrequency: "individual" }
     });
     NotificationHelper.init(repos);
 
