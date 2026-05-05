@@ -473,7 +473,7 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 ('GME00000099', 'CHU00000001', 'GRP00000019', 'PER00000082', '2024-01-01', 0), -- Demo User
 ('GME00000126', 'CHU00000001', 'GRP00000019', 'PER00000083', '2024-01-01', 0), -- Jane User
 -- Community Service Team
-('GME00000100', 'CHU00000001', 'GRP00000023', 'PER00000082', '2024-01-01', 0), -- Demo User
+('GME00000100', 'CHU00000001', 'GRP00000023', 'PER00000082', '2024-01-01', 1), -- Demo User (leader; lets E2E tests exercise leader-only UI)
 ('GME00000127', 'CHU00000001', 'GRP00000023', 'PER00000083', '2024-01-01', 0), -- Jane User
 -- Young Families Group
 ('GME00000128', 'CHU00000001', 'GRP00000014', 'PER00000082', '2024-01-01', 0), -- Demo User
