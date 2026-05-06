@@ -1,8 +1,6 @@
 // Stub repo/db imports so the static import chain doesn't pull in Environment.ts,
 // which uses ESM-only `import.meta.url` and crashes ts-jest's commonjs transform.
-jest.mock("../../../modules/giving/repositories/GatewayRepo", () => ({
-  GatewayRepo: jest.fn()
-}));
+jest.mock("../../../modules/giving/repositories/GatewayRepo", () => ({ GatewayRepo: jest.fn() }));
 
 import { GatewayService } from "../GatewayService";
 import { GatewayFactory } from "../gateways";

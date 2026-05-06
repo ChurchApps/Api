@@ -16,7 +16,8 @@ export class SubscriptionRepo {
       id: model.id,
       churchId: model.churchId,
       personId: model.personId,
-      customerId: model.customerId
+      customerId: model.customerId,
+      currency: model.currency
     }).execute();
     return model;
   }
@@ -24,7 +25,8 @@ export class SubscriptionRepo {
   private async update(model: Subscription): Promise<Subscription> {
     await getDb().updateTable("subscriptions").set({
       personId: model.personId,
-      customerId: model.customerId
+      customerId: model.customerId,
+      currency: model.currency
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -49,6 +51,6 @@ export class SubscriptionRepo {
   }
 
   private rowToModel(row: any): Subscription {
-    return { id: row.id, churchId: row.churchId, personId: row.personId, customerId: row.customerId };
+    return { id: row.id, churchId: row.churchId, personId: row.personId, customerId: row.customerId, currency: row.currency };
   }
 }

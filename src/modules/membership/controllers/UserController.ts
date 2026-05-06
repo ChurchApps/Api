@@ -274,7 +274,6 @@ export class UserController extends MembershipBaseController {
 
         let stepStart = Date.now();
         const userCount = await this.repos.user.loadCount();
-        const savedAuthGuid = user.authGuid;
         user = await this.repos.user.save(user);
         if (codeHash) await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
         console.log("Register: save user", Date.now() - stepStart, "ms");

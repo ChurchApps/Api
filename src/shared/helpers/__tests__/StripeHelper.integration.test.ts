@@ -25,7 +25,6 @@ const describeIntegration = RUN_INTEGRATION && SECRET_KEY ? describe : describe.
 
 describeIntegration("Stripe integration: USD + GBP", () => {
   // Lazily import StripeHelper so the real Stripe module is loaded only here.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { StripeHelper } = require("../StripeHelper");
 
   let customerId: string;

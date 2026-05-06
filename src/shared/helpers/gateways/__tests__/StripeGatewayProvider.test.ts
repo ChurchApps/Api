@@ -1,8 +1,6 @@
 // Stub the Environment helper because it uses ESM-only `import.meta.url`,
 // which can't be loaded under ts-jest's commonjs transform.
-jest.mock("../../Environment", () => ({
-  Environment: { membershipApi: "http://test" }
-}));
+jest.mock("../../Environment", () => ({ Environment: { membershipApi: "http://test" } }));
 
 import { StripeGatewayProvider } from "../StripeGatewayProvider";
 

@@ -154,6 +154,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("churchId", sql`char(11)`)
     .addColumn("personId", sql`char(11)`)
     .addColumn("customerId", sql`varchar(255)`)
+    .addColumn("currency", sql`varchar(10)`)
     .modifyEnd(sql`ENGINE=InnoDB`)
     .execute();
 

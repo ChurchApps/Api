@@ -4,4 +4,5 @@ export class Subscription {
   public personId?: string;
   public customerId?: string;
   public gatewayId?: string;
+  public currency?: string;
 }

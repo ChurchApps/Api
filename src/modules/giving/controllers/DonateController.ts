@@ -269,6 +269,7 @@ export class DonateController extends GivingBaseController {
           eventId: string;
           type: string;
           amount: number;
+          currency: string;
           created: Date;
           customer: string;
           status: "new" | "already_imported" | "imported" | "skipped" | "error";
@@ -277,6 +278,7 @@ export class DonateController extends GivingBaseController {
 
         for (const event of events) {
           const eventData = event.data.object as any;
+          const eventCurrency = (eventData.currency || stripeGateway.currency || "usd").toString().toLowerCase();
 
           // Skip subscription events (they're handled separately)
           const isSubscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
@@ -285,6 +287,7 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+              currency: eventCurrency,
               created: new Date(event.created * 1000),
               customer: eventData.customer || "",
               status: "skipped",
@@ -301,6 +304,7 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+              currency: eventCurrency,
               created: new Date(event.created * 1000),
               customer: eventData.customer || "",
               status: "already_imported"
@@ -321,6 +325,7 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount,
+              currency: eventCurrency,
               created: donationDate,
               customer: eventData.customer || "",
               status: "already_imported",
@@ -334,6 +339,7 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount,
+              currency: eventCurrency,
               created: donationDate,
               customer: eventData.customer || "",
               status: "new"
@@ -348,6 +354,7 @@ export class DonateController extends GivingBaseController {
                 eventId: event.id,
                 type: event.type,
                 amount,
+                currency: eventCurrency,
                 created: donationDate,
                 customer: eventData.customer || "",
                 status: "imported"
@@ -357,6 +364,7 @@ export class DonateController extends GivingBaseController {
                 eventId: event.id,
                 type: event.type,
                 amount,
+                currency: eventCurrency,
                 created: donationDate,
                 customer: eventData.customer || "",
                 status: "error",
@@ -414,7 +422,7 @@ export class DonateController extends GivingBaseController {
           await GatewayService.logDonation(gateway, churchId, chargeResult.data, this.repos);
         }
 
-        await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
+        await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
 
         return { ...chargeResult.data, provider: gateway.provider };
       } catch (error) {
@@ -471,7 +479,8 @@ export class DonateController extends GivingBaseController {
           churchId,
           personId: person.id,
           customerId,
-          gatewayId: gateway.id
+          gatewayId: gateway.id,
+          currency: normalizedCurrency
         };
 
         await this.repos.subscription.save(subscription);
@@ -488,7 +497,7 @@ export class DonateController extends GivingBaseController {
         });
 
         await Promise.all(promises);
-        await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
+        await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring", normalizedCurrency);
 
         return { ...subscriptionResult.data, provider: gateway.provider };
       } catch (error) {
@@ -548,27 +557,32 @@ export class DonateController extends GivingBaseController {
     amount?: number,
     interval?: { interval_count: number; interval: string },
     billingCycleAnchor?: number,
-    donationType: "recurring" | "one-time" = "recurring"
+    donationType: "recurring" | "one-time" = "recurring",
+    currency: string = "USD"
   ) => {
     // Skip email if no recipient address
     if (!to) return;
 
     const contentRows: any[] = [];
     let totalFundAmount = 0;
+    const currencyCode = (currency || "USD").toUpperCase();
 
     funds.forEach((fund, index) => {
       totalFundAmount += fund.amount;
+      const formattedFund = CurrencyHelper.formatCurrencyWithLocale(fund.amount, currencyCode);
       if (donationType === "recurring") {
         const startDate = dayjs(billingCycleAnchor).format("MMM D, YYYY");
         contentRows.push(
-          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`
+          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">${formattedFund}</td></tr>`
         );
       } else {
-        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`);
+        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">${formattedFund}</td></tr>`);
       }
     });
 
     const transactionFee = amount! - totalFundAmount;
+    const formattedFee = CurrencyHelper.formatCurrencyWithLocale(transactionFee, currencyCode);
+    const formattedTotal = CurrencyHelper.formatCurrencyWithLocale(amount || 0, currencyCode);
 
     const domain = Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
 
@@ -592,12 +606,12 @@ export class DonateController extends GivingBaseController {
             <tr style="border-top: solid #dee2e6 1px">
               <td></td>
               <th style="font-size: 15px">Transaction Fee</th>
-              <td>$${CurrencyHelper.formatCurrency(transactionFee)}</td>
+              <td>${formattedFee}</td>
             </tr>
             <tr style="border-top: solid #dee2e6 1px">
               <td></td>
               <th style="font-size: 15px">Total</th>
-              <td>$${amount}</td>
+              <td>${formattedTotal}</td>
             </tr>
           `
       }
@@ -624,11 +638,11 @@ export class DonateController extends GivingBaseController {
           : `
             <tr style="border-top: solid #dee2e6 1px">
               <th style="font-size: 15px">Transaction Fee</th>
-              <td>$${CurrencyHelper.formatCurrency(transactionFee)}</td>
+              <td>${formattedFee}</td>
             </tr>
             <tr style="border-top: solid #dee2e6 1px">
               <th style="font-size: 15px">Total</th>
-              <td>$${amount}</td>
+              <td>${formattedTotal}</td>
             </tr>
           `
       }
