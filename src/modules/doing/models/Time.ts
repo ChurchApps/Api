@@ -6,4 +6,5 @@ export class Time {
   public startTime?: Date;
   public endTime?: Date;
   public teams?: string;
+  public serviceTimeType?: string;
 }

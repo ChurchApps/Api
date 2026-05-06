@@ -7,6 +7,7 @@ export { ConjunctionRepo } from "./ConjunctionRepo.js";
 export { ContentProviderAuthRepo } from "./ContentProviderAuthRepo.js";
 export { PlanRepo } from "./PlanRepo.js";
 export { PlanItemRepo } from "./PlanItemRepo.js";
+export { PlanItemTimeRepo } from "./PlanItemTimeRepo.js";
 export { PlanTypeRepo } from "./PlanTypeRepo.js";
 export { PositionRepo } from "./PositionRepo.js";
 export { TaskRepo } from "./TaskRepo.js";

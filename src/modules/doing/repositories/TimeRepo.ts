@@ -13,14 +13,14 @@ export class TimeRepo {
     model.id = UniqueIdHelper.shortId();
     const startTime = model.startTime ? DateHelper.toMysqlDate(model.startTime) : model.startTime;
     const endTime = model.endTime ? DateHelper.toMysqlDate(model.endTime) : model.endTime;
-    await getDb().insertInto("times").values({ id: model.id, churchId: model.churchId, planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams } as any).execute();
+    await getDb().insertInto("times").values({ id: model.id, churchId: model.churchId, planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams, serviceTimeType: model.serviceTimeType ?? "service" } as any).execute();
     return model;
   }
 
   private async update(model: Time): Promise<Time> {
     const startTime = model.startTime ? DateHelper.toMysqlDate(model.startTime) : model.startTime;
     const endTime = model.endTime ? DateHelper.toMysqlDate(model.endTime) : model.endTime;
-    await getDb().updateTable("times").set({ planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("times").set({ planId: model.planId, displayName: model.displayName, startTime, endTime, teams: model.teams, serviceTimeType: model.serviceTimeType ?? "service" } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

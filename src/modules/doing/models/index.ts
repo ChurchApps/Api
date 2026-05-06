@@ -7,6 +7,7 @@ export { Conjunction } from "./Conjunction.js";
 export { ContentProviderAuth } from "./ContentProviderAuth.js";
 export { Plan } from "./Plan.js";
 export { PlanItem } from "./PlanItem.js";
+export { PlanItemTime } from "./PlanItemTime.js";
 export { PlanType } from "./PlanType.js";
 export { Position } from "./Position.js";
 export { Task } from "./Task.js";

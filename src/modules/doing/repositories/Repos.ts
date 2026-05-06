@@ -8,6 +8,7 @@ import {
   ContentProviderAuthRepo,
   PlanRepo,
   PlanItemRepo,
+  PlanItemTimeRepo,
   PlanTypeRepo,
   PositionRepo,
   TaskRepo,
@@ -25,6 +26,7 @@ export class Repos {
   public contentProviderAuth: ContentProviderAuthRepo;
   public plan: PlanRepo;
   public planItem: PlanItemRepo;
+  public planItemTime: PlanItemTimeRepo;
   public planType: PlanTypeRepo;
   public position: PositionRepo;
   public task: TaskRepo;
@@ -47,6 +49,7 @@ export class Repos {
     this.contentProviderAuth = new ContentProviderAuthRepo();
     this.plan = new PlanRepo();
     this.planItem = new PlanItemRepo();
+    this.planItemTime = new PlanItemTimeRepo();
     this.planType = new PlanTypeRepo();
     this.position = new PositionRepo();
     this.task = new TaskRepo();

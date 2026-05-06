@@ -1,7 +1,7 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import { PlanHelper } from "../helpers/PlanHelper.js";
-import { Assignment, Plan, PlanItem, Position, Time } from "../models/index.js";
+import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
 
@@ -95,19 +95,22 @@ export class PlanController extends DoingBaseController {
     return result;
   }
 
-  private async copyTimesAndPositions(churchId: string, sourcePlanId: string, targetPlan: Plan, oldPlan: Plan, copyAssignments: boolean): Promise<void> {
+  private async copyTimesAndPositions(churchId: string, sourcePlanId: string, targetPlan: Plan, oldPlan: Plan, copyAssignments: boolean): Promise<Map<string, string>> {
     const times: Time[] = await this.repos.time.loadByPlanId(churchId, sourcePlanId) as Time[];
     const positions: Position[] = await this.repos.position.loadByPlanId(churchId, sourcePlanId) as Position[];
     const positionIdMap = new Map<string, string>();
+    const timeIdMap = new Map<string, string>();
     const promises: Promise<any>[] = [];
 
-    // Copy times
+    // Copy times and track old->new id mapping
     for (const time of times) {
+      const oldTimeId = time.id;
       time.id = null as any;
       time.planId = targetPlan.id;
       time.startTime = this.adjustTime(time.startTime || new Date(), targetPlan.serviceDate || new Date(), oldPlan.serviceDate || new Date());
       time.endTime = this.adjustTime(time.endTime || new Date(), targetPlan.serviceDate || new Date(), oldPlan.serviceDate || new Date());
-      promises.push(this.repos.time.save(time));
+      const savedTime = await this.repos.time.save(time);
+      if (oldTimeId) timeIdMap.set(oldTimeId, savedTime.id || "");
     }
 
     // Copy positions and track old->new id mapping
@@ -135,11 +138,12 @@ export class PlanController extends DoingBaseController {
     }
 
     await Promise.all(promises);
+    return timeIdMap;
   }
 
-  private async copyServiceOrderItems(churchId: string, sourcePlanId: string, targetPlanId: string): Promise<void> {
+  private async copyServiceOrderItems(churchId: string, sourcePlanId: string, targetPlanId: string): Promise<Map<string, string>> {
     const planItems: PlanItem[] = await this.repos.planItem.loadForPlan(churchId, sourcePlanId) as PlanItem[];
-    const parentIdMap = new Map<string, string>();
+    const planItemIdMap = new Map<string, string>();
 
     // First pass: save items without parentId (top-level headers)
     for (const item of planItems.filter(pi => !pi.parentId)) {
@@ -147,19 +151,42 @@ export class PlanController extends DoingBaseController {
       item.id = undefined;
       item.planId = targetPlanId;
       const savedItem = await this.repos.planItem.save(item);
-      if (oldId) parentIdMap.set(oldId, savedItem.id || "");
+      if (oldId) planItemIdMap.set(oldId, savedItem.id || "");
     }
 
     // Second pass: save child items with updated parentId
     for (const item of planItems.filter(pi => pi.parentId)) {
-      const newParentId = parentIdMap.get(item.parentId || "");
+      const oldId = item.id;
+      const newParentId = planItemIdMap.get(item.parentId || "");
       if (newParentId) {
         item.id = undefined;
         item.planId = targetPlanId;
         item.parentId = newParentId;
-        await this.repos.planItem.save(item);
+        const savedItem = await this.repos.planItem.save(item);
+        if (oldId) planItemIdMap.set(oldId, savedItem.id || "");
       }
     }
+
+    return planItemIdMap;
+  }
+
+  private async copyPlanItemTimes(churchId: string, sourcePlanId: string, planItemIdMap: Map<string, string>, timeIdMap: Map<string, string>): Promise<void> {
+    if (planItemIdMap.size === 0 || timeIdMap.size === 0) return;
+    const exclusions: PlanItemTime[] = await this.repos.planItemTime.loadByPlanId(churchId, sourcePlanId) as PlanItemTime[];
+    const promises: Promise<any>[] = [];
+    for (const ex of exclusions) {
+      const newPlanItemId = planItemIdMap.get(ex.planItemId || "");
+      const newTimeId = timeIdMap.get(ex.timeId || "");
+      if (newPlanItemId && newTimeId) {
+        promises.push(this.repos.planItemTime.save({
+          churchId,
+          planItemId: newPlanItemId,
+          timeId: newTimeId,
+          excluded: ex.excluded
+        }));
+      }
+    }
+    await Promise.all(promises);
   }
 
   @httpPost("/autofill/:id")
@@ -194,12 +221,19 @@ export class PlanController extends DoingBaseController {
       p.serviceDate = new Date(req.body.serviceDate || new Date());
       const plan = await this.repos.plan.save(p);
 
+      let timeIdMap = new Map<string, string>();
+      let planItemIdMap = new Map<string, string>();
+
       if (copyMode !== "none") {
-        await this.copyTimesAndPositions(au.churchId, id, plan, oldPlan, copyMode === "all");
+        timeIdMap = await this.copyTimesAndPositions(au.churchId, id, plan, oldPlan, copyMode === "all");
       }
 
       if (copyServiceOrder) {
-        await this.copyServiceOrderItems(au.churchId, id, plan.id!);
+        planItemIdMap = await this.copyServiceOrderItems(au.churchId, id, plan.id!);
+      }
+
+      if (timeIdMap.size > 0 && planItemIdMap.size > 0) {
+        await this.copyPlanItemTimes(au.churchId, id, planItemIdMap, timeIdMap);
       }
 
       return plan;
@@ -240,6 +274,7 @@ export class PlanController extends DoingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
+      await this.repos.planItemTime.deleteByPlanId(au.churchId, id);
       await this.repos.time.deleteByPlanId(au.churchId, id);
       await this.repos.assignment.deleteByPlanId(au.churchId, id);
       await this.repos.position.deleteByPlanId(au.churchId, id);

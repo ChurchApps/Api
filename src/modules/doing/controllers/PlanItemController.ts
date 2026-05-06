@@ -77,6 +77,7 @@ export class PlanItemController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const planItem: any = await this.repos.planItem.load(au.churchId, id);
       if (!await PlanAuth.canEditPlan(au, planItem?.planId)) return this.json({}, 401);
+      await this.repos.planItemTime.deleteByPlanItemId(au.churchId, id);
       await this.repos.planItem.delete(au.churchId, id);
       return {};
     });

@@ -57,6 +57,7 @@ export class TimeController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const time: any = await this.repos.time.load(au.churchId, id);
       if (!await PlanAuth.canEditPlan(au, time?.planId)) return this.json({}, 401);
+      await this.repos.planItemTime.deleteByTimeId(au.churchId, id);
       await this.repos.time.delete(au.churchId, id);
       return {};
     });
