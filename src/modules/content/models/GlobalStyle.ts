@@ -6,6 +6,7 @@ export class GlobalStyle {
   typography?: string;       // NEW: font sizes, weights, line heights
   spacing?: string;          // NEW: spacing scale
   borderRadius?: string;     // NEW: radius tokens
+  navStyles?: string;
   customCss?: string;
   customJS?: string;
 }

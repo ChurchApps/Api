@@ -19,6 +19,7 @@ export class GlobalStyleRepo {
       typography: model.typography,
       spacing: model.spacing,
       borderRadius: model.borderRadius,
+      navStyles: model.navStyles,
       customCss: model.customCss,
       customJS: model.customJS
     } as any).execute();
@@ -32,6 +33,7 @@ export class GlobalStyleRepo {
       typography: model.typography,
       spacing: model.spacing,
       borderRadius: model.borderRadius,
+      navStyles: model.navStyles,
       customCss: model.customCss,
       customJS: model.customJS
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
@@ -66,6 +68,7 @@ export class GlobalStyleRepo {
       typography: row.typography,
       spacing: row.spacing,
       borderRadius: row.borderRadius,
+      navStyles: row.navStyles,
       customCss: row.customCss,
       customJS: row.customJS
     };
