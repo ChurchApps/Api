@@ -422,7 +422,7 @@ export class GatewayService {
         supportsOrders: false,
         supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
         supportedCurrencies: [
-          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
+          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd", "inr"
         ],
         requiresPlansForSubscriptions: false,
         requiresCustomerForSubscription: true,

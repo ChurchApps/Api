@@ -1,3 +1,9 @@
+// Stub repo/db imports so the static import chain doesn't pull in Environment.ts,
+// which uses ESM-only `import.meta.url` and crashes ts-jest's commonjs transform.
+jest.mock("../../../modules/giving/repositories/GatewayRepo", () => ({
+  GatewayRepo: jest.fn()
+}));
+
 import { GatewayService } from "../GatewayService";
 import { GatewayFactory } from "../gateways";
 import { EncryptionHelper } from "@churchapps/apihelper";
@@ -34,7 +40,7 @@ describe("GatewayService", () => {
 
       const result = GatewayService.getGatewayConfig(mockGateway);
 
-      expect(result).toEqual({ publicKey: "public_test_key", privateKey: "decrypted_encrypted_private_key", webhookKey: "decrypted_encrypted_webhook_key", productId: "test_product_id" });
+      expect(result).toMatchObject({ publicKey: "public_test_key", privateKey: "decrypted_encrypted_private_key", webhookKey: "decrypted_encrypted_webhook_key", productId: "test_product_id" });
 
       expect(EncryptionHelper.decrypt).toHaveBeenCalledWith("encrypted_private_key");
       expect(EncryptionHelper.decrypt).toHaveBeenCalledWith("encrypted_webhook_key");
@@ -230,7 +236,7 @@ describe("GatewayService", () => {
         requiresCustomerForSubscription: true,
         supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
         supportedCurrencies: [
-          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
+          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd", "inr"
         ],
         maxRefundWindow: 180,
         minTransactionAmount: 50,

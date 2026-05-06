@@ -3,19 +3,6 @@ import { Link } from "../models/index.js";
 import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 
-const DEFAULT_B1TAB_LINKS: Partial<Link>[] = [
-  { linkType: "bible", text: "Bible", icon: "menu_book", visibility: "everyone", sort: 1 },
-  { linkType: "votd", text: "Verse of the Day", icon: "format_quote", visibility: "everyone", sort: 2 },
-  { linkType: "sermons", text: "Sermons", icon: "play_circle", visibility: "everyone", sort: 3 },
-  { linkType: "stream", text: "Live", icon: "live_tv", visibility: "everyone", sort: 4 },
-  { linkType: "donation", text: "Give", icon: "volunteer_activism", visibility: "everyone", sort: 5 },
-  { linkType: "groups", text: "My Groups", icon: "groups", visibility: "visitors", sort: 6 },
-  { linkType: "directory", text: "Directory", icon: "people", visibility: "members", sort: 7 },
-  { linkType: "lessons", text: "Lessons", icon: "school", visibility: "visitors", sort: 8 },
-  { linkType: "plans", text: "Serving", icon: "assignment", visibility: "team", sort: 9 },
-  { linkType: "checkin", text: "Check-in", icon: "how_to_reg", visibility: "visitors", sort: 10 }
-];
-
 @injectable()
 export class LinkRepo {
   public async save(model: Link) {
@@ -74,30 +61,10 @@ export class LinkRepo {
   }
 
   public async loadByCategory(churchId: string, category: string): Promise<Link[]> {
-    let links = await getDb().selectFrom("links").selectAll()
+    return getDb().selectFrom("links").selectAll()
       .where("churchId", "=", churchId)
       .where("category", "=", category)
-      .orderBy("sort").execute() as any as Link[];
-
-    // Create default b1Tab links if none exist
-    if (category === "b1Tab" && links.length === 0) {
-      const defaults: Link[] = DEFAULT_B1TAB_LINKS.map(item => ({
-        ...item,
-        id: UniqueIdHelper.shortId(),
-        churchId,
-        category: "b1Tab",
-        linkData: "",
-        url: ""
-      } as Link));
-
-      // Use create (insert) so seeded tabs keep their provided ids for consistency and future edits.
-      for (const link of defaults) {
-        await this.create(link);
-      }
-      links = defaults;
-    }
-
-    return links;
+      .orderBy("sort").execute() as any;
   }
 
   public async sort(churchId: string, category: string, parentId: string) {

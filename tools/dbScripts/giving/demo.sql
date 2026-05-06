@@ -31,8 +31,13 @@ INSERT INTO funds (id, churchId, name, taxDeductible, removed, productId) VALUES
 ('FUN00000006', 'CHU00000001', 'Benevolence Fund', 1, 0, NULL);
 
 -- Gateways
-INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees) VALUES
-('GAT00000001', 'CHU00000001', 'Stripe', 'pk_test_IsC6UPM4P5EZ6KAEorHwEMvU00M6ioef1d', 'FHY0qWkxbhUdqJlffjXuzg==|0EX5qs5+vvw9gMHAKQD8XhyxOabDkz5q/WMLaDne/iFXugUgW4sVwfIr', 'ZMjSV5CAubfN/Y9gf3iOmQ==|qe/e5/ltr5hUKCUsRAMW4jYc90sc7MmJPPxByyd/wSHDo1/9Jpw=', 'prod_LrPszPDWKmksbK', 0);
+-- Two Stripe test-mode gateways are seeded so the donation UI can exercise
+-- multi-currency code paths. Both rows reuse the same Stripe test account
+-- (test-mode supports any currency on a single account) and differ only
+-- in the `currency` column.
+INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees, currency) VALUES
+('GAT00000001', 'CHU00000001', 'Stripe', 'pk_test_IsC6UPM4P5EZ6KAEorHwEMvU00M6ioef1d', 'FHY0qWkxbhUdqJlffjXuzg==|0EX5qs5+vvw9gMHAKQD8XhyxOabDkz5q/WMLaDne/iFXugUgW4sVwfIr', 'ZMjSV5CAubfN/Y9gf3iOmQ==|qe/e5/ltr5hUKCUsRAMW4jYc90sc7MmJPPxByyd/wSHDo1/9Jpw=', 'prod_LrPszPDWKmksbK', 0, 'USD'),
+('GAT00000002', 'CHU00000001', 'Stripe', 'pk_test_IsC6UPM4P5EZ6KAEorHwEMvU00M6ioef1d', 'FHY0qWkxbhUdqJlffjXuzg==|0EX5qs5+vvw9gMHAKQD8XhyxOabDkz5q/WMLaDne/iFXugUgW4sVwfIr', 'ZMjSV5CAubfN/Y9gf3iOmQ==|qe/e5/ltr5hUKCUsRAMW4jYc90sc7MmJPPxByyd/wSHDo1/9Jpw=', 'prod_LrPszPDWKmksbK', 0, 'GBP');
 
 -- Customers (mapped to people from membership demo)
 INSERT INTO customers (id, churchId, personId) VALUES
