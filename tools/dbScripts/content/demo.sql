@@ -616,7 +616,14 @@ BEGIN
     ('LNK00000005', 'CHU00000001', 'website', '/events', 'url', NULL, 'event', 'Events', 5, NULL, NULL, 'everyone', NULL),
     ('LNK00000006', 'CHU00000001', 'website', '/give', 'url', NULL, 'favorite', 'Give', 6, NULL, NULL, 'everyone', NULL),
     -- Streaming-page tab so /stream renders the live chat container.
-    ('LNK00000007', 'CHU00000001', 'streamingTab', '', 'chat', NULL, 'chat', 'Chat', 1, NULL, NULL, 'everyone', NULL);
+    ('LNK00000007', 'CHU00000001', 'streamingTab', '', 'chat', NULL, 'chat', 'Chat', 1, NULL, NULL, 'everyone', NULL),
+    -- B1 mobile dashboard tabs (b1Tab category) — these populate the mobile
+    -- dashboard's hero/featured/quick actions sections and the side drawer.
+    ('LNK00000010', 'CHU00000001', 'b1Tab', '', 'sermons', NULL, 'play_circle', 'Sermons', 1, NULL, NULL, 'everyone', NULL),
+    ('LNK00000011', 'CHU00000001', 'b1Tab', '', 'bible', NULL, 'menu_book', 'Bible', 2, NULL, NULL, 'everyone', NULL),
+    ('LNK00000012', 'CHU00000001', 'b1Tab', '', 'stream', NULL, 'live_tv', 'Live', 3, NULL, NULL, 'everyone', NULL),
+    ('LNK00000013', 'CHU00000001', 'b1Tab', '', 'donation', NULL, 'volunteer_activism', 'Give', 4, NULL, NULL, 'everyone', NULL),
+    ('LNK00000014', 'CHU00000001', 'b1Tab', '', 'votd', NULL, 'auto_stories', 'Verse of the Day', 5, NULL, NULL, 'everyone', NULL);
 
     -- ========================================
     -- Global Styles
