@@ -15,6 +15,8 @@ export class Group {
   public labelArray?: string[];
   public slug?: string;
 
+  public joinPolicy?: "open" | "request" | "closed";
+
   public memberCount?: number;
   public importKey?: string;
 }

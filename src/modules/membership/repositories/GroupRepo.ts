@@ -28,6 +28,7 @@ export class GroupRepo {
       meetingLocation: group.meetingLocation,
       labels: group.labels as any,
       slug: group.slug,
+      joinPolicy: group.joinPolicy ?? "open",
       removed: false as any
     }).execute();
     return group;
@@ -47,7 +48,8 @@ export class GroupRepo {
       meetingTime: group.meetingTime,
       meetingLocation: group.meetingLocation,
       labels: group.labels as any,
-      slug: group.slug
+      slug: group.slug,
+      joinPolicy: group.joinPolicy ?? "open"
     }).where("id", "=", group.id).where("churchId", "=", group.churchId).execute();
     return group;
   }
@@ -174,7 +176,8 @@ export class GroupRepo {
       meetingTime: row.meetingTime,
       meetingLocation: row.meetingLocation,
       labelArray: [],
-      slug: row.slug
+      slug: row.slug,
+      joinPolicy: (row.joinPolicy as Group["joinPolicy"]) ?? "open"
     };
     row.labels?.split(",").forEach((label: string) => result.labelArray.push(label.trim()));
     return result;

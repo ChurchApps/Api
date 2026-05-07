@@ -1,6 +1,7 @@
 import {
   AssociatedGroupRepo,
   GroupMemberRepo,
+  GroupJoinRequestRepo,
   GroupRepo,
   HouseholdRepo,
   PersonRepo,
@@ -24,6 +25,7 @@ import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, Use
 export class Repos {
   public associatedGroup: AssociatedGroupRepo;
   public groupMember: GroupMemberRepo;
+  public groupJoinRequest: GroupJoinRequestRepo;
   public group: GroupRepo;
   public household: HouseholdRepo;
   public person: PersonRepo;
@@ -58,6 +60,7 @@ export class Repos {
   constructor() {
     this.associatedGroup = new AssociatedGroupRepo();
     this.groupMember = new GroupMemberRepo();
+    this.groupJoinRequest = new GroupJoinRequestRepo();
     this.group = new GroupRepo();
     this.household = new HouseholdRepo();
     this.person = new PersonRepo();

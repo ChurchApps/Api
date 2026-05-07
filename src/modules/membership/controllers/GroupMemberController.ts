@@ -80,6 +80,30 @@ export class GroupMemberController extends MembershipBaseController {
     });
   }
 
+  @httpPost("/self")
+  public async joinSelf(req: express.Request<{}, {}, { groupId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const groupId = req.body?.groupId;
+      if (!groupId) return this.json({ error: "groupId required" }, 400);
+
+      const group: any = await this.repos.group.load(au.churchId, groupId);
+      if (!group) return this.json({ error: "Group not found" }, 404);
+
+      const policy = group.joinPolicy ?? "open";
+      if (policy === "closed") return this.json({ error: "Group is closed to new members" }, 403);
+      if (policy === "request") return this.json({ redirect: "request", error: "This group requires approval" }, 409);
+
+      const existing = (await this.repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[];
+      const already = existing.find((m: any) => m.groupId === groupId);
+      if (already) return this.repos.groupMember.convertToModel(au.churchId, already);
+
+      const member: GroupMember = { churchId: au.churchId, groupId, personId: au.personId, leader: false };
+      const saved = await this.repos.groupMember.save(member);
+      await UserChurchHelper.createForGroupMember(au.churchId, saved.personId);
+      return this.repos.groupMember.convertToModel(au.churchId, saved);
+    });
+  }
+
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
