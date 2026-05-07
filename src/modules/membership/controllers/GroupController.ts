@@ -49,6 +49,13 @@ export class GroupController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/public/:churchId/list")
+  public async getPublicList(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      return this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadAll(churchId)) as any[]);
+    });
+  }
+
   @httpGet("/public/:churchId/:id")
   public async getPublic(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

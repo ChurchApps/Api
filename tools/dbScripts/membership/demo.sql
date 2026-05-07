@@ -239,54 +239,54 @@ INSERT INTO `groups` (id, churchId, categoryName, name, trackAttendance, parentP
 -- Church Groups
 
 -- Worship Services
-('GRP00000001', 'CHU00000001', 'Worship', 'Sunday Morning Service', 1, 0, 1, 'Our main Sunday worship service featuring contemporary worship and biblical teaching.', 'Sunday 10:00 AM', 'Main Sanctuary', 'standard', 'worship,service,main', 'sunday-morning', 0),
-('GRP00000002', 'CHU00000001', 'Worship', 'Sunday Evening Service', 1, 0, 1, 'A more intimate evening service with traditional hymns and deeper Bible study.', 'Sunday 6:00 PM', 'Main Sanctuary', 'standard', 'worship,service,evening', 'sunday-evening', 0),
-('GRP00000003', 'CHU00000001', 'Worship', 'Wednesday Prayer Service', 1, 0, 1, 'Midweek prayer and worship service focusing on intercessory prayer.', 'Wednesday 7:00 PM', 'Main Sanctuary', 'standard', 'worship,prayer,midweek', 'wednesday-prayer', 0),
+('GRP00000001', 'CHU00000001', 'Worship', 'Sunday Morning Service', 1, 0, 1, 'Our main Sunday worship service featuring contemporary worship and biblical teaching.', 'Sunday 10:00 AM', 'Main Sanctuary', 'standard', 'worship', 'sunday-morning', 0),
+('GRP00000002', 'CHU00000001', 'Worship', 'Sunday Evening Service', 1, 0, 1, 'A more intimate evening service with traditional hymns and deeper Bible study.', 'Sunday 6:00 PM', 'Main Sanctuary', 'standard', 'worship', 'sunday-evening', 0),
+('GRP00000003', 'CHU00000001', 'Worship', 'Wednesday Prayer Service', 1, 0, 1, 'Midweek prayer and worship service focusing on intercessory prayer.', 'Wednesday 7:00 PM', 'Main Sanctuary', 'standard', 'worship', 'wednesday-prayer', 0),
 
 -- Sunday School Classes
-('GRP00000004', 'CHU00000001', 'Sunday School', 'Adult Bible Class', 1, 0, 1, 'In-depth Bible study for adults of all ages.', 'Sunday 9:00 AM', 'Room 101', 'standard', 'sunday-school,adult,bible-study', 'adult-bible-class', 0),
-('GRP00000005', 'CHU00000001', 'Sunday School', 'Young Adults Class', 1, 0, 1, 'Bible study and fellowship for young adults (18-30).', 'Sunday 9:00 AM', 'Room 102', 'standard', 'sunday-school,young-adult,bible-study', 'young-adults-class', 0),
-('GRP00000006', 'CHU00000001', 'Sunday School', 'Senior Adults Class', 1, 0, 1, 'Bible study and fellowship for senior adults.', 'Sunday 9:00 AM', 'Room 103', 'standard', 'sunday-school,senior,bible-study', 'senior-adults-class', 0),
+('GRP00000004', 'CHU00000001', 'Sunday School', 'Adult Bible Class', 1, 0, 1, 'In-depth Bible study for adults of all ages.', 'Sunday 9:00 AM', 'Room 101', 'standard', 'sunday-school', 'adult-bible-class', 0),
+('GRP00000005', 'CHU00000001', 'Sunday School', 'Young Adults Class', 1, 0, 1, 'Bible study and fellowship for young adults (18-30).', 'Sunday 9:00 AM', 'Room 102', 'standard', 'sunday-school', 'young-adults-class', 0),
+('GRP00000006', 'CHU00000001', 'Sunday School', 'Senior Adults Class', 1, 0, 1, 'Bible study and fellowship for senior adults.', 'Sunday 9:00 AM', 'Room 103', 'standard', 'sunday-school', 'senior-adults-class', 0),
 
 -- Children's Ministry
-('GRP00000007', 'CHU00000001', 'Children', 'Nursery (0-2)', 1, 1, 1, 'Loving care for our youngest members during services.', 'Sunday 9:00 AM', 'Nursery', 'standard', 'children,nursery,infant', 'nursery', 0),
-('GRP00000008', 'CHU00000001', 'Children', 'Preschool (3-5)', 1, 1, 1, 'Age-appropriate Bible stories and activities for preschoolers.', 'Sunday 9:00 AM', 'Room 201', 'standard', 'children,preschool,bible', 'preschool', 0),
-('GRP00000009', 'CHU00000001', 'Children', 'Elementary (K-2)', 1, 1, 1, 'Interactive Bible lessons and activities for early elementary.', 'Sunday 9:00 AM', 'Room 202', 'standard', 'children,elementary,bible', 'elementary-k2', 0),
-('GRP00000010', 'CHU00000001', 'Children', 'Elementary (3-5)', 1, 1, 1, 'Bible lessons and activities for upper elementary.', 'Sunday 9:00 AM', 'Room 203', 'standard', 'children,elementary,bible', 'elementary-35', 0),
+('GRP00000007', 'CHU00000001', 'Children', 'Nursery (0-2)', 1, 1, 1, 'Loving care for our youngest members during services.', 'Sunday 9:00 AM', 'Nursery', 'standard', 'children', 'nursery', 0),
+('GRP00000008', 'CHU00000001', 'Children', 'Preschool (3-5)', 1, 1, 1, 'Age-appropriate Bible stories and activities for preschoolers.', 'Sunday 9:00 AM', 'Room 201', 'standard', 'children', 'preschool', 0),
+('GRP00000009', 'CHU00000001', 'Children', 'Elementary (K-2)', 1, 1, 1, 'Interactive Bible lessons and activities for early elementary.', 'Sunday 9:00 AM', 'Room 202', 'standard', 'children', 'elementary-k2', 0),
+('GRP00000010', 'CHU00000001', 'Children', 'Elementary (3-5)', 1, 1, 1, 'Bible lessons and activities for upper elementary.', 'Sunday 9:00 AM', 'Room 203', 'standard', 'children', 'elementary-35', 0),
 
 -- Youth Ministry
-('GRP00000011', 'CHU00000001', 'Youth', 'Middle School Youth', 1, 0, 1, 'Bible study and activities for middle school students.', 'Sunday 9:00 AM', 'Youth Room', 'standard', 'youth,middle-school,bible-study', 'middle-school-youth', 0),
-('GRP00000012', 'CHU00000001', 'Youth', 'High School Youth', 1, 0, 1, 'Bible study and activities for high school students.', 'Sunday 9:00 AM', 'Youth Room', 'standard', 'youth,high-school,bible-study', 'high-school-youth', 0),
-('GRP00000013', 'CHU00000001', 'Youth', 'Youth Group', 1, 0, 1, 'Weekly youth group meeting with games, worship, and Bible study.', 'Wednesday 6:30 PM', 'Youth Room', 'standard', 'youth,group,weekly', 'youth-group', 0),
+('GRP00000011', 'CHU00000001', 'Youth', 'Middle School Youth', 1, 0, 1, 'Bible study and activities for middle school students.', 'Sunday 9:00 AM', 'Youth Room', 'standard', 'youth', 'middle-school-youth', 0),
+('GRP00000012', 'CHU00000001', 'Youth', 'High School Youth', 1, 0, 1, 'Bible study and activities for high school students.', 'Sunday 9:00 AM', 'Youth Room', 'standard', 'youth', 'high-school-youth', 0),
+('GRP00000013', 'CHU00000001', 'Youth', 'Youth Group', 1, 0, 1, 'Weekly youth group meeting with games, worship, and Bible study.', 'Wednesday 6:30 PM', 'Youth Room', 'standard', 'youth', 'youth-group', 0),
 
 -- Small Groups
-('GRP00000014', 'CHU00000001', 'Small Groups', 'Young Families Group', 1, 0, 1, 'Small group for families with young children.', 'Tuesday 7:00 PM', 'Various Homes', 'standard', 'small-group,family,young', 'young-families-group', 0),
-('GRP00000015', 'CHU00000001', 'Small Groups', 'Empty Nesters Group', 1, 0, 1, 'Small group for couples whose children have left home.', 'Thursday 7:00 PM', 'Various Homes', 'standard', 'small-group,empty-nester', 'empty-nesters-group', 0),
-('GRP00000016', 'CHU00000001', 'Small Groups', 'Men''s Bible Study', 1, 0, 1, 'Weekly Bible study and fellowship for men.', 'Saturday 7:00 AM', 'Fellowship Hall', 'standard', 'small-group,men,bible-study', 'mens-bible-study', 0),
-('GRP00000017', 'CHU00000001', 'Small Groups', 'Women''s Bible Study', 1, 0, 1, 'Weekly Bible study and fellowship for women.', 'Tuesday 10:00 AM', 'Fellowship Hall', 'standard', 'small-group,women,bible-study', 'womens-bible-study', 0),
+('GRP00000014', 'CHU00000001', 'Small Groups', 'Young Families Group', 1, 0, 1, 'Small group for families with young children.', 'Tuesday 7:00 PM', 'Various Homes', 'standard', 'small-group', 'young-families-group', 0),
+('GRP00000015', 'CHU00000001', 'Small Groups', 'Empty Nesters Group', 1, 0, 1, 'Small group for couples whose children have left home.', 'Thursday 7:00 PM', 'Various Homes', 'standard', 'small-group', 'empty-nesters-group', 0),
+('GRP00000016', 'CHU00000001', 'Small Groups', 'Men''s Bible Study', 1, 0, 1, 'Weekly Bible study and fellowship for men.', 'Saturday 7:00 AM', 'Fellowship Hall', 'standard', 'small-group', 'mens-bible-study', 0),
+('GRP00000017', 'CHU00000001', 'Small Groups', 'Women''s Bible Study', 1, 0, 1, 'Weekly Bible study and fellowship for women.', 'Tuesday 10:00 AM', 'Fellowship Hall', 'standard', 'small-group', 'womens-bible-study', 0),
 
 -- Music Ministry
-('GRP00000018', 'CHU00000001', 'Music', 'Adult Choir', 1, 0, 1, 'Main worship choir for Sunday services.', 'Thursday 7:00 PM', 'Choir Room', 'standard', 'music,choir,adult', 'adult-choir', 0),
-('GRP00000019', 'CHU00000001', 'Music', 'Praise Team', 1, 0, 1, 'Contemporary worship team for Sunday services.', 'Saturday 10:00 AM', 'Sanctuary', 'standard', 'music,praise,contemporary', 'praise-team', 0),
-('GRP00000020', 'CHU00000001', 'Music', 'Children''s Choir', 1, 1, 1, 'Choir for children in grades 1-5.', 'Wednesday 4:00 PM', 'Choir Room', 'standard', 'music,children,choir', 'childrens-choir', 0),
+('GRP00000018', 'CHU00000001', 'Music', 'Adult Choir', 1, 0, 1, 'Main worship choir for Sunday services.', 'Thursday 7:00 PM', 'Choir Room', 'standard', 'music', 'adult-choir', 0),
+('GRP00000019', 'CHU00000001', 'Music', 'Praise Team', 1, 0, 1, 'Contemporary worship team for Sunday services.', 'Saturday 10:00 AM', 'Sanctuary', 'standard', 'music', 'praise-team', 0),
+('GRP00000020', 'CHU00000001', 'Music', 'Children''s Choir', 1, 1, 1, 'Choir for children in grades 1-5.', 'Wednesday 4:00 PM', 'Choir Room', 'standard', 'music', 'childrens-choir', 0),
 
 -- Outreach Ministry
-('GRP00000021', 'CHU00000001', 'Outreach', 'Food Pantry Team', 1, 0, 1, 'Volunteers who staff our community food pantry.', 'Saturday 9:00 AM', 'Food Pantry', 'standard', 'outreach,food-pantry,volunteer', 'food-pantry-team', 0),
-('GRP00000022', 'CHU00000001', 'Outreach', 'Missions Committee', 1, 0, 1, 'Committee that oversees our local and global missions.', 'Monthly', 'Conference Room', 'standard', 'outreach,missions,committee', 'missions-committee', 0),
-('GRP00000023', 'CHU00000001', 'Outreach', 'Community Service Team', 1, 0, 1, 'Volunteers who serve in various community projects.', 'Various', 'Various', 'standard', 'outreach,community,volunteer', 'community-service-team', 0),
+('GRP00000021', 'CHU00000001', 'Outreach', 'Food Pantry Team', 1, 0, 1, 'Volunteers who staff our community food pantry.', 'Saturday 9:00 AM', 'Food Pantry', 'standard', 'outreach', 'food-pantry-team', 0),
+('GRP00000022', 'CHU00000001', 'Outreach', 'Missions Committee', 1, 0, 1, 'Committee that oversees our local and global missions.', 'Monthly', 'Conference Room', 'standard', 'outreach', 'missions-committee', 0),
+('GRP00000023', 'CHU00000001', 'Outreach', 'Community Service Team', 1, 0, 1, 'Volunteers who serve in various community projects.', 'Various', 'Various', 'standard', 'outreach', 'community-service-team', 0),
 
--- Special Ministries
-('GRP00000024', 'CHU00000001', 'Special', 'Prayer Team', 1, 0, 1, 'Team that prays for church and community needs.', 'Various', 'Prayer Room', 'standard', 'special,prayer,team', 'prayer-team', 0),
-('GRP00000025', 'CHU00000001', 'Special', 'Greeters Ministry', 1, 0, 1, 'Team that welcomes visitors and members.', 'Sunday 9:30 AM', 'Main Entrance', 'standard', 'special,greeters,welcome', 'greeters-ministry', 0),
-('GRP00000026', 'CHU00000001', 'Special', 'Ushers Ministry', 1, 0, 1, 'Team that assists with Sunday services.', 'Sunday 9:30 AM', 'Sanctuary', 'standard', 'special,ushers,service', 'ushers-ministry', 0),
+-- Serving Ministries
+('GRP00000024', 'CHU00000001', 'Serving', 'Prayer Team', 1, 0, 1, 'Team that prays for church and community needs.', 'Various', 'Prayer Room', 'standard', 'serving', 'prayer-team', 0),
+('GRP00000025', 'CHU00000001', 'Serving', 'Greeters Ministry', 1, 0, 1, 'Team that welcomes visitors and members.', 'Sunday 9:30 AM', 'Main Entrance', 'standard', 'serving', 'greeters-ministry', 0),
+('GRP00000026', 'CHU00000001', 'Serving', 'Ushers Ministry', 1, 0, 1, 'Team that assists with Sunday services.', 'Sunday 9:30 AM', 'Sanctuary', 'standard', 'serving', 'ushers-ministry', 0),
 
 -- Support Groups
-('GRP00000027', 'CHU00000001', 'Support', 'Divorce Care', 1, 0, 1, 'Support group for those going through divorce.', 'Monday 7:00 PM', 'Room 104', 'standard', 'support,divorce,care', 'divorce-care', 0),
-('GRP00000028', 'CHU00000001', 'Support', 'Grief Support', 1, 0, 1, 'Support group for those dealing with loss.', 'Tuesday 7:00 PM', 'Room 104', 'standard', 'support,grief,care', 'grief-support', 0),
-('GRP00000029', 'CHU00000001', 'Support', 'Financial Peace', 1, 0, 1, 'Financial management course using Dave Ramsey''s principles.', 'Thursday 7:00 PM', 'Fellowship Hall', 'standard', 'support,financial,peace', 'financial-peace', 0),
+('GRP00000027', 'CHU00000001', 'Support', 'Divorce Care', 1, 0, 1, 'Support group for those going through divorce.', 'Monday 7:00 PM', 'Room 104', 'standard', 'support', 'divorce-care', 0),
+('GRP00000028', 'CHU00000001', 'Support', 'Grief Support', 1, 0, 1, 'Support group for those dealing with loss.', 'Tuesday 7:00 PM', 'Room 104', 'standard', 'support', 'grief-support', 0),
+('GRP00000029', 'CHU00000001', 'Support', 'Financial Peace', 1, 0, 1, 'Financial management course using Dave Ramsey''s principles.', 'Thursday 7:00 PM', 'Fellowship Hall', 'standard', 'support', 'financial-peace', 0),
 
 -- Special Events
-('GRP00000030', 'CHU00000001', 'Events', 'Vacation Bible School', 1, 1, 1, 'Annual summer program for children.', 'Summer', 'Various', 'standard', 'events,vbs,summer', 'vacation-bible-school', 0);
+('GRP00000030', 'CHU00000001', 'Events', 'Vacation Bible School', 1, 1, 1, 'Annual summer program for children.', 'Summer', 'Various', 'standard', 'events', 'vacation-bible-school', 0);
 
 -- Group Memberships
 INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VALUES
