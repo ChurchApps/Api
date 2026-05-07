@@ -3,7 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions, UserChurchHelper } from "../helpers/index.js";
 import { GroupJoinRequest, GroupMember } from "../models/index.js";
-import { NotificationHelper } from "../../messaging/helpers/NotificationHelper.js";
+import { NotificationService } from "../../../shared/helpers/index.js";
 
 @controller("/membership/groupjoinrequests")
 export class GroupJoinRequestController extends MembershipBaseController {
@@ -64,7 +64,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
         const leaderIds = leaders.map((l: any) => l.personId).filter(Boolean);
         if (leaderIds.length) {
           const requesterDisplay = (await this.repos.person.load(au.churchId, au.personId) as any)?.displayName || "Someone";
-          await NotificationHelper.createNotifications(
+          await NotificationService.createNotifications(
             leaderIds,
             au.churchId,
             "groupJoinRequest",
@@ -108,7 +108,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
 
       try {
         const group: any = await this.repos.group.load(au.churchId, request.groupId);
-        await NotificationHelper.createNotifications(
+        await NotificationService.createNotifications(
           [request.personId],
           au.churchId,
           "groupJoinRequest",
@@ -145,7 +145,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
         const group: any = await this.repos.group.load(au.churchId, request.groupId);
         const baseMessage = `Your request to join ${group?.name ?? "the group"} was declined`;
         const fullMessage = request.declineReason ? `${baseMessage}: ${request.declineReason}` : baseMessage;
-        await NotificationHelper.createNotifications(
+        await NotificationService.createNotifications(
           [request.personId],
           au.churchId,
           "groupJoinRequest",

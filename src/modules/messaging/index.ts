@@ -17,6 +17,7 @@ import { NotificationHelper } from "./helpers/NotificationHelper.js";
 import { DeliveryHelper } from "./helpers/DeliveryHelper.js";
 import { SocketHelper } from "./helpers/SocketHelper.js";
 import { WebPushHelper } from "./helpers/WebPushHelper.js";
+import { NotificationService } from "../../shared/helpers/NotificationService.js";
 
 export function initializeMessagingModule(repos: Repos) {
   // Initialize helpers with repositories
@@ -24,4 +25,5 @@ export function initializeMessagingModule(repos: Repos) {
   DeliveryHelper.init(repos);
   SocketHelper.init(repos);
   WebPushHelper.init();
+  NotificationService.register(NotificationHelper.createNotifications);
 }
