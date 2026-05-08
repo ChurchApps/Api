@@ -318,7 +318,8 @@ BEGIN
 
     -- Pages
     INSERT INTO pages (id, churchId, url, title, layout) VALUES
-    ('PAG00000001', 'CHU00000001', '/', 'Home', 'default');
+    ('PAG00000001', 'CHU00000001', '/', 'Home', 'default'),
+    ('PAG00000002', 'CHU00000001', '/ministries', 'Ministries', 'default');
 
     -- Sections (Home Page)
     INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES
@@ -344,7 +345,10 @@ BEGIN
     ('SEC00000006', 'CHU00000001', 'PAG00000001', NULL, 'main', '#f8f9fa', 'dark', NULL, NULL, 7, NULL, NULL, NULL, NULL),
 
     -- Contact & Location Section
-    ('SEC00000007', 'CHU00000001', 'PAG00000001', NULL, 'main', '/tempLibrary/backgrounds/crowd.jpg', 'light', NULL, NULL, 8, NULL, NULL, NULL, NULL);
+    ('SEC00000007', 'CHU00000001', 'PAG00000001', NULL, 'main', '/tempLibrary/backgrounds/crowd.jpg', 'light', NULL, NULL, 8, NULL, NULL, NULL, NULL),
+
+    -- Ministries Page Section (groups browser)
+    ('SEC00000009', 'CHU00000001', 'PAG00000002', NULL, 'main', '#FFFFFF', 'dark', NULL, NULL, 1, NULL, NULL, NULL, NULL);
 
     -- Elements (Home Page)
     INSERT INTO elements (id, churchId, sectionId, blockId, elementType, sort, parentId, answersJSON, stylesJSON, animationsJSON) VALUES
@@ -518,6 +522,12 @@ BEGIN
 
     ('ELE00000033', 'CHU00000001', 'SEC00000008', NULL, 'calendar', 3, NULL,
       '{"calendarType": "curated", "calendarId": "CAL00000004"}',
+      NULL,
+      NULL),
+
+    -- Ministries Page: Groups browser element
+    ('ELE00000034', 'CHU00000001', 'SEC00000009', NULL, 'groups', 1, NULL,
+      '{"title": "Find a Group"}',
       NULL,
       NULL);
 

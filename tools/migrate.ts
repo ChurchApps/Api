@@ -1,11 +1,34 @@
 import * as path from "path";
 import * as fs from "fs";
-import { fileURLToPath } from "url";
-import { Migrator, FileMigrationProvider } from "kysely";
+import { fileURLToPath, pathToFileURL } from "url";
+import { Migrator, type Migration, type MigrationProvider } from "kysely";
 import { ensureEnvironment, createKysely, ensureDatabaseExists, getModules } from "./kysely-config.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Drop-in replacement for kysely's FileMigrationProvider that imports each
+// migration via a file:// URL. Plain Windows absolute paths (e.g. `D:\foo`)
+// fail Node's ESM loader with ERR_UNSUPPORTED_ESM_URL_SCHEME because they
+// aren't valid URL schemes. The standard provider hits this on Windows; this
+// wrapper sidesteps it by converting paths before `await import()`.
+class FileURLMigrationProvider implements MigrationProvider {
+  constructor(private readonly migrationFolder: string) {}
+
+  async getMigrations(): Promise<Record<string, Migration>> {
+    const result: Record<string, Migration> = {};
+    const files = await fs.promises.readdir(this.migrationFolder);
+    for (const fileName of files) {
+      if (!/\.(js|ts|mjs|cjs)$/.test(fileName)) continue;
+      const filePath = path.resolve(this.migrationFolder, fileName);
+      const url = pathToFileURL(filePath).href;
+      const mod = await import(url);
+      const name = fileName.replace(/\.(js|ts|mjs|cjs)$/, "");
+      result[name] = mod as Migration;
+    }
+    return result;
+  }
+}
 
 type Action = "up" | "down" | "status";
 
@@ -46,7 +69,7 @@ async function getMigrator(moduleName: string) {
   const db = createKysely(moduleName);
   const migrator = new Migrator({
     db,
-    provider: new FileMigrationProvider({ fs: fs.promises, path, migrationFolder: migrationsPath }),
+    provider: new FileURLMigrationProvider(migrationsPath),
   });
 
   return { db, migrator };
