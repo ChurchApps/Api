@@ -87,10 +87,18 @@ BEGIN
     INSERT INTO plans (id, churchId, ministryId, planTypeId, name, serviceDate, notes, serviceOrder, contentType, contentId) VALUES
     ('PLA00000001', 'CHU00000001', 'GRP0000000a', 'PLT00000001', 'Upcoming Worship Schedule',
      DATE_ADD(CURDATE(), INTERVAL (7 - DAYOFWEEK(CURDATE())) DAY),
-     'Upcoming worship services including special seasonal service', 1, 'lesson', 'LES12345678'),
+     'Upcoming worship services including special seasonal service', 1, 'lesson', 'keYYf8Z8ZD1'),
     ('PLA00000002', 'CHU00000001', 'GRP0000000a', 'PLT00000001', 'Last Week Worship Schedule',
      DATE_SUB(CURDATE(), INTERVAL 7 DAY),
-     'Past worship service used to test deadline-passed scenarios', 1, 'lesson', 'LES12345678');
+     'Past worship service used to test deadline-passed scenarios', 1, 'lesson', 'keYYf8Z8ZD1'),
+    -- Plan used by FreePlay's B1ChurchProvider Maestro test. Has the right
+    -- plan-item structure (lessonSection child referencing venue Xc5mhXN_RED)
+    -- so b1church.getPlaylist can resolve files from the venue feed. Sorted
+    -- ahead of PLA00000001 (yesterday +1 day) so it's the upcoming plan when
+    -- the FreePlay flow drills into the plan-type folder.
+    ('PLA00000003', 'CHU00000001', 'GRP0000000a', 'PLT00000001', 'Lessons.church Test Plan',
+     DATE_ADD(CURDATE(), INTERVAL 1 DAY),
+     'Demo plan that exercises the lessons.church venue playback path via B1Church.', 1, 'lesson', 'keYYf8Z8ZD1');
 
     -- Create Plan Items
     INSERT INTO planItems (id, churchId, planId, parentId, sort, itemType, relatedId, label, description, seconds, link) VALUES
@@ -122,7 +130,15 @@ BEGIN
     ('PLI00000017', 'CHU00000001', 'PLA00000001', 'PLI00000016', 1, 'arrangementKey', 'ARK00000009', 'Graves Into Gardens', 'Key of F# - closing song', 365, 'https://www.youtube.com/watch?v=37qjuS4zMpY'),
     ('PLI00000018', 'CHU00000001', 'PLA00000001', 'PLI00000016', 2, 'item', NULL, 'Announcements', 'Weekly announcements', 180, 'https://example.com/weekly-announcements'),
     ('PLI00000019', 'CHU00000001', 'PLA00000001', 'PLI00000016', 3, 'item', NULL, 'Benediction', 'Pastor John gives blessing', 60, NULL),
-    ('PLI00000020', 'CHU00000001', 'PLA00000001', 'PLI00000016', 4, 'item', NULL, 'Postlude', 'Instrumental music as people leave', 300, NULL);
+    ('PLI00000020', 'CHU00000001', 'PLA00000001', 'PLI00000016', 4, 'item', NULL, 'Postlude', 'Instrumental music as people leave', 300, NULL),
+
+    -- PLA00000003 plan items: a single root header containing one lessonSection
+    -- whose relatedId points at section "Xc5mhXN_RED" of venue keYYf8Z8ZD1.
+    -- B1ChurchProvider.getPlaylist iterates each root item's children, finds the
+    -- lessonSection, then pulls every "play"-type action's files out of the
+    -- venue feed at https://api.lessons.church/venues/public/feed/keYYf8Z8ZD1.
+    ('PLI00000101', 'CHU00000001', 'PLA00000003', NULL, 1, 'header', NULL, 'Lesson Playback', '', 0, NULL),
+    ('PLI00000102', 'CHU00000001', 'PLA00000003', 'PLI00000101', 1, 'lessonSection', 'Xc5mhXN_RED', 'Section 1', '', 0, NULL);
 
 
     -- Create Assignments

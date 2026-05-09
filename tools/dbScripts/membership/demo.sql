@@ -410,6 +410,16 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 INSERT INTO users (id, email, password, displayName, firstName, lastName, registrationDate) VALUES
 ('USR00000001', 'demo@b1.church', '$2a$10$qBWddIw2QMUlRrX9/6Cdz.nW.L5FqE45R1NTLF.V71LyhjY6I0lFu', 'Demo User', 'Demo', 'User', '2024-01-01 00:00:00');
 
+-- Register the B1Church OAuth client used by the FreePlay TV app's
+-- B1ChurchProvider (clientId is hardcoded in @churchapps/content-providers).
+-- Without this row, /membership/oauth/device/authorize returns invalid_client
+-- and the FreePlay E2E test cannot complete the device-flow handshake.
+-- oAuthClients is not in the truncate list above, so use ON DUPLICATE KEY UPDATE
+-- to keep this idempotent across reset-demo runs.
+INSERT INTO oAuthClients (id, name, clientId, clientSecret, redirectUris, scopes, createdAt) VALUES
+('OAC00000001', 'FreePlay (B1Church)', 'nsowldn58dk', '', 'app://freeplay/callback|http://localhost/callback', 'plans offline_access', NOW())
+ON DUPLICATE KEY UPDATE name = VALUES(name), redirectUris = VALUES(redirectUris), scopes = VALUES(scopes);
+
 -- Create Domain Admin Role
 INSERT INTO roles (id, churchId, name) VALUES
 ('ROL00000001', 'CHU00000001', 'Domain Admins');
