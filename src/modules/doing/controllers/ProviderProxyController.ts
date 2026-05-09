@@ -28,6 +28,12 @@ function providerRequiresAuth(provider: Provider): boolean {
 @controller("/doing/providerProxy")
 export class ProviderProxyController extends DoingBaseController {
 
+  // Single-flight de-dup for token refreshes. If two requests race past the expiry check,
+  // the second one piggy-backs on the first's refresh promise instead of consuming the same
+  // refresh_token a second time (which would invalidate it on rotating-token providers).
+  // Static so it spans request-scoped controller instances within the same Lambda warm pool.
+  private static refreshInflight = new Map<string, Promise<ContentProviderAuthData | null>>();
+
   private convertAuthToProviderFormat(authRecord: ContentProviderAuth): ContentProviderAuthData | null {
     if (!authRecord.accessToken) return null;
 
@@ -55,21 +61,38 @@ export class ProviderProxyController extends DoingBaseController {
     let auth = this.convertAuthToProviderFormat(authRecord);
     if (!auth) return null;
 
-    // Check if token is expired and refresh if needed
     const tokenHelper = new TokenHelper();
     if (tokenHelper.isTokenExpired(auth) && auth.refresh_token) {
-      const config = getProviderConfig(providerId) as ContentProviderConfig | null;
-      if (config) {
-        const refreshedAuth = await tokenHelper.refreshToken(config, auth);
-        if (refreshedAuth) {
-          // Update database with new tokens
+      const key = `${churchId}:${ministryId}:${providerId}`;
+      let inflight = ProviderProxyController.refreshInflight.get(key);
+      if (!inflight) {
+        const expiredAuth = auth;
+        inflight = (async (): Promise<ContentProviderAuthData | null> => {
+          // Re-read inside the critical section: another Lambda invocation in the same warm
+          // pool may have already refreshed, in which case we can skip the network call.
+          const fresh = await this.repos.contentProviderAuth.loadByMinistryAndProvider(churchId, ministryId, providerId);
+          if (fresh) {
+            const freshAuth = this.convertAuthToProviderFormat(fresh);
+            if (freshAuth && !tokenHelper.isTokenExpired(freshAuth)) return freshAuth;
+          }
+
+          const config = getProviderConfig(providerId) as ContentProviderConfig | null;
+          if (!config) return null;
+          const refreshedAuth = await tokenHelper.refreshToken(config, expiredAuth);
+          if (!refreshedAuth) return null;
+
           authRecord.accessToken = refreshedAuth.access_token;
           authRecord.refreshToken = refreshedAuth.refresh_token;
           authRecord.expiresAt = new Date((refreshedAuth.created_at + refreshedAuth.expires_in) * 1000);
           await this.repos.contentProviderAuth.save(authRecord);
-          auth = refreshedAuth;
-        }
+          return refreshedAuth;
+        })().finally(() => {
+          ProviderProxyController.refreshInflight.delete(key);
+        });
+        ProviderProxyController.refreshInflight.set(key, inflight);
       }
+      const refreshed = await inflight;
+      if (refreshed) auth = refreshed;
     }
 
     return auth;
