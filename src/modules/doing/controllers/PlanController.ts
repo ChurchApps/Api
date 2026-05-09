@@ -89,7 +89,9 @@ export class PlanController extends DoingBaseController {
   }
 
   private adjustTime(time: Date, serviceDate: Date, oldServiceDate: Date) {
-    const dayDiff = serviceDate.getDate() - oldServiceDate.getDate();
+    // Use absolute day diff — getDate() alone is day-of-month, which silently flips negative
+    // across month boundaries (e.g. Mar 30 → Apr 6 would yield 6 - 30 = -24).
+    const dayDiff = Math.round((serviceDate.getTime() - oldServiceDate.getTime()) / 86400000);
     const result = new Date(time);
     result.setDate(result.getDate() + dayDiff);
     return result;

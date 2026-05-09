@@ -76,9 +76,24 @@ export class PlanItemController extends DoingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const planItem: any = await this.repos.planItem.load(au.churchId, id);
+      if (!planItem) return {};
       if (!await PlanAuth.canEditPlan(au, planItem?.planId)) return this.json({}, 401);
-      await this.repos.planItemTime.deleteByPlanItemId(au.churchId, id);
-      await this.repos.planItem.delete(au.churchId, id);
+
+      // Cascade to descendants so deleting a section doesn't orphan its children.
+      const allItems = (await this.repos.planItem.loadForPlan(au.churchId, planItem.planId || "")) as PlanItem[];
+      const idsToDelete: string[] = [];
+      const collect = (parentId: string) => {
+        idsToDelete.push(parentId);
+        for (const child of allItems) {
+          if (child.parentId === parentId && child.id) collect(child.id);
+        }
+      };
+      collect(id);
+
+      for (const itemId of idsToDelete) {
+        await this.repos.planItemTime.deleteByPlanItemId(au.churchId, itemId);
+        await this.repos.planItem.delete(au.churchId, itemId);
+      }
       return {};
     });
   }

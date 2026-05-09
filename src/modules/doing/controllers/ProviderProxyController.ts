@@ -31,15 +31,18 @@ export class ProviderProxyController extends DoingBaseController {
   private convertAuthToProviderFormat(authRecord: ContentProviderAuth): ContentProviderAuthData | null {
     if (!authRecord.accessToken) return null;
 
+    // TokenHelper.isTokenExpired uses (created_at + expires_in) as the absolute expiry.
+    // Anchor created_at to now so the sum matches the stored expiresAt — otherwise tokens
+    // with under ~1h remaining are treated as expired and refreshed every request, which
+    // breaks rotating-refresh-token providers (Dropbox, Planning Center).
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = authRecord.expiresAt ? Math.floor(authRecord.expiresAt.getTime() / 1000) : now + 3600;
-    const createdAt = expiresAt - 3600; // Assume 1 hour tokens
 
     return {
       access_token: authRecord.accessToken,
       refresh_token: authRecord.refreshToken || "",
       token_type: authRecord.tokenType || "Bearer",
-      created_at: createdAt,
+      created_at: now,
       expires_in: Math.max(0, expiresAt - now),
       scope: authRecord.scope || ""
     };
