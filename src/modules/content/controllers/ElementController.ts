@@ -21,6 +21,7 @@ export class ElementController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const element = await this.repos.element.load(au.churchId, id);
+        if (!element) return this.json({}, 404);
         const allElements: Element[] = await this.repos.element.loadForSection(element.churchId, element.sectionId);
         TreeHelper.getChildElements(element, allElements);
         const result = await TreeHelper.duplicateElement(element, element.sectionId, element.parentId);

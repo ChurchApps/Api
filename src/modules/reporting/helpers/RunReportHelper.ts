@@ -51,7 +51,10 @@ export class RunReportHelper {
     storedSql.match(/:[A-Za-z0-9]{1,99}/g)?.forEach((m) => {
       const keyName = m.replace(":", "");
       const p: Parameter = ArrayHelper.getOne(report.parameters, "keyName", keyName);
-      parameters.push(p.value);
+      // Empty arrays expand to `IN ()` and crash MySQL with a syntax error; substitute
+      // `[null]` so the clause becomes `IN (NULL)` (matches no rows but parses cleanly).
+      const value = Array.isArray(p.value) && p.value.length === 0 ? [null] : p.value;
+      parameters.push(value);
     });
 
     let sql = storedSql;
