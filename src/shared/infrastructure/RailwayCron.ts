@@ -1,5 +1,6 @@
 import { RepoManager } from "./RepoManager.js";
 
+const ONE_MINUTE_MS = 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -44,12 +45,19 @@ const runScheduledTasks = async (): Promise<void> => {
   await processServiceRequestReminders();
 };
 
+const runWebhookDeliveries = async (): Promise<void> => {
+  const { WebhookDeliveryWorker } = await import("../webhooks/index.js");
+  const repos = await RepoManager.getRepos<any>("membership");
+  await WebhookDeliveryWorker.process(repos);
+};
+
 export const startRailwayCron = (): void => {
   if (!process.env.RAILWAY_ENVIRONMENT) return;
 
   console.warn("[cron] Railway in-process scheduler starting");
 
   setInterval(() => void safe("30-min timer", runThirtyMinute), THIRTY_MINUTES_MS);
+  setInterval(() => void safe("webhook deliveries", runWebhookDeliveries), ONE_MINUTE_MS);
 
   const scheduleDaily = (label: string, fn: () => Promise<void>): void => {
     setTimeout(() => {

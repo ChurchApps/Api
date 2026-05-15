@@ -209,6 +209,22 @@ functions:
           rate: cron(0 5 * * ? *)
           enabled: true
 
+  timerWebhooks:
+    handler: lambda.timerWebhooks
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
+    memorySize: 256
+    timeout: 120
+    vpc: ${self:custom.vpcSettings.current, ''}
+    environment:
+      # Database connection for the webhook delivery outbox worker
+      MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/membershipApi/connectionString, ''}
+    events:
+      - schedule:
+          rate: rate(1 minute)
+          enabled: true
+
 plugins:
   - serverless-offline
 

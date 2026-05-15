@@ -18,7 +18,9 @@ import {
   OAuthCodeRepo,
   OAuthClientRepo,
   OAuthDeviceCodeRepo,
-  OAuthRelaySessionRepo
+  OAuthRelaySessionRepo,
+  WebhookRepo,
+  WebhookDeliveryRepo
 } from "./index.js";
 import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo, AuditLogRepo } from "./index.js";
 
@@ -55,6 +57,9 @@ export class Repos {
   public auditLog: AuditLogRepo;
   public clientError: ClientErrorRepo;
 
+  public webhook: WebhookRepo;
+  public webhookDelivery: WebhookDeliveryRepo;
+
   public static getCurrent = () => new Repos();
 
   constructor() {
@@ -89,5 +94,8 @@ export class Repos {
 
     this.auditLog = new AuditLogRepo();
     this.clientError = new ClientErrorRepo();
+
+    this.webhook = new WebhookRepo();
+    this.webhookDelivery = new WebhookDeliveryRepo();
   }
 }

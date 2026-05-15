@@ -8,7 +8,7 @@ import { createApp } from "./dist/app.js";
 
 // Import socket and timer handlers
 import { handleSocket } from "./dist/lambda/socket-handler.js";
-import { handle15MinTimer, handleMidnightTimer, handleScheduledTasks } from "./dist/lambda/timer-handler.js";
+import { handle15MinTimer, handleMidnightTimer, handleScheduledTasks, handleWebhookTimer } from "./dist/lambda/timer-handler.js";
 
 // Initialize environment and database pools
 const initializeEnvironment = async () => {
@@ -175,6 +175,17 @@ export const timerScheduledTasks = async function (event, context) {
     return { statusCode: 200, body: "Scheduled tasks executed successfully" };
   } catch (error) {
     console.error("Error in scheduled tasks timer:", error);
+    throw error;
+  }
+};
+
+export const timerWebhooks = async function (event, context) {
+  try {
+    await initializeEnvironment();
+    await handleWebhookTimer(event, context);
+    return { statusCode: 200, body: "Webhook deliveries processed successfully" };
+  } catch (error) {
+    console.error("Error in webhook timer:", error);
     throw error;
   }
 };

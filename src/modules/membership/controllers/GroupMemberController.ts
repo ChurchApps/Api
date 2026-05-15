@@ -3,6 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions, UserChurchHelper } from "../helpers/index.js";
 import { GroupMember } from "../models/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @controller("/membership/groupmembers")
 export class GroupMemberController extends MembershipBaseController {
@@ -67,7 +68,13 @@ export class GroupMemberController extends MembershipBaseController {
       const promises: Promise<GroupMember>[] = [];
       req.body.forEach((gm) => {
         gm.churchId = au.churchId;
-        promises.push(this.repos.groupMember.save(gm));
+        const isNew = !gm.id;
+        promises.push(
+          this.repos.groupMember.save(gm).then(async (saved) => {
+            if (isNew) await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.added", saved);
+            return saved;
+          })
+        );
       });
       const result = await Promise.all(promises);
 
@@ -100,6 +107,7 @@ export class GroupMemberController extends MembershipBaseController {
       const member: GroupMember = { churchId: au.churchId, groupId, personId: au.personId, leader: false };
       const saved = await this.repos.groupMember.save(member);
       await UserChurchHelper.createForGroupMember(au.churchId, saved.personId);
+      await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.added", saved);
       return this.repos.groupMember.convertToModel(au.churchId, saved);
     });
   }
@@ -108,7 +116,9 @@ export class GroupMemberController extends MembershipBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
+      const existing = await this.repos.groupMember.load(au.churchId, id);
       await this.repos.groupMember.delete(au.churchId, id);
+      await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.removed", existing ?? { id, churchId: au.churchId });
       return {};
     });
   }
