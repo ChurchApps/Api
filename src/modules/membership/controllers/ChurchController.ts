@@ -4,7 +4,7 @@ import express from "express";
 import { body, validationResult } from "express-validator";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { Utils, Permissions, ChurchHelper, RoleHelper, Environment, HubspotHelper, GeoHelper, PersonHelper, UserHelper } from "../helpers/index.js";
+import { Utils, Permissions, ChurchHelper, RoleHelper, Environment, HubspotHelper, MauticHelper, GeoHelper, PersonHelper, UserHelper } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
 
@@ -343,6 +343,9 @@ export class ChurchController extends MembershipBaseController {
         }
         if (Environment.hubspotKey) {
           postInitPromises.push(HubspotHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName).catch(() => {}));
+        }
+        if (Environment.mauticUrl) {
+          postInitPromises.push(MauticHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName).catch(() => {}));
         }
         await Promise.all(postInitPromises);
         return church;

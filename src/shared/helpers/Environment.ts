@@ -31,6 +31,9 @@ export class Environment extends EnvironmentBase {
   static supportEmail: string;
   static b1AdminRoot: string;
   static hubspotKey: string;
+  static mauticUrl: string;
+  static mauticUser: string;
+  static mauticPassword: string;
   static caddyHost: string;
   static caddyPort: string;
   static mailSystem: string;
@@ -219,6 +222,9 @@ export class Environment extends EnvironmentBase {
 
     // Config strictly from environment variables (with config file fallback for non-secrets)
     this.hubspotKey = process.env.HUBSPOT_KEY || "";
+    this.mauticUrl = process.env.MAUTIC_URL || "";
+    this.mauticUser = process.env.MAUTIC_USER || "";
+    this.mauticPassword = process.env.MAUTIC_PASSWORD || "";
     this.caddyHost = process.env.CADDY_HOST || config.caddyHost || "";
     this.caddyPort = process.env.CADDY_PORT || config.caddyPort || "";
     this.youTubeApiKey = process.env.YOUTUBE_API_KEY || "";

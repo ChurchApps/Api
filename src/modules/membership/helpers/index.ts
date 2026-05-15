@@ -12,6 +12,7 @@ export { CaddyHelper } from "./CaddyHelper.js";
 export { ChurchHelper } from "./ChurchHelper.js";
 export { GeoHelper } from "./GeoHelper.js";
 export { HubspotHelper } from "./HubspotHelper.js";
+export { MauticHelper } from "./MauticHelper.js";
 export { OpenAiHelper } from "./OpenAiHelper.js";
 export { PersonHelper } from "./PersonHelper.js";
 export { RoleHelper } from "./RoleHelper.js";

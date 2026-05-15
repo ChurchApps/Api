@@ -54,6 +54,9 @@ provider:
 
     # Third-party API keys (non-DB secrets)
     HUBSPOT_KEY: ${ssm:/${self:custom.envLower}/hubspotKey, ''}
+    MAUTIC_URL: ${ssm:/${self:custom.envLower}/mauticUrl, ''}
+    MAUTIC_USER: ${ssm:/${self:custom.envLower}/mauticUser, ''}
+    MAUTIC_PASSWORD: ${ssm:/${self:custom.envLower}/mauticPassword, ''}
     CADDY_HOST: ${ssm:/${self:custom.envLower}/caddyHost, ''}
     CADDY_PORT: ${ssm:/${self:custom.envLower}/caddyPort, ''}
     YOUTUBE_API_KEY: ${ssm:/${self:custom.envLower}/youTubeApiKey, ''}
