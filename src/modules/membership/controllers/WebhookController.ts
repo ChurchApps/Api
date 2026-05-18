@@ -132,7 +132,7 @@ export class WebhookController extends MembershipBaseController {
   }
 
   private maskSecret(webhook: Webhook): Webhook {
-    const { secret, ...rest } = webhook;
+    const { secret: _secret, ...rest } = webhook;
     return { ...rest, secret: undefined };
   }
 }
