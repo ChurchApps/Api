@@ -6,7 +6,7 @@ import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { EmailHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper } from "../helpers/index.js";
+import { EmailHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, MauticHelper } from "../helpers/index.js";
 import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
@@ -96,6 +96,7 @@ export class UserController extends MembershipBaseController {
           else {
             user.lastLogin = new Date();
             this.repos.user.save(user);
+            MauticHelper.trackLogin(user.email).catch(() => {});
             const ip = AuditLogHelper.getClientIp(req);
             const selectedChurch = userChurches[0];
             if (selectedChurch) {
