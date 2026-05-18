@@ -6,6 +6,7 @@ import { Group } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { ArrayHelper, SlugHelper } from "@churchapps/apihelper";
 import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @controller("/membership/groups")
 export class GroupController extends MembershipBaseController {
@@ -128,7 +129,13 @@ export class GroupController extends MembershipBaseController {
         req.body.forEach((group) => {
           group.churchId = au.churchId;
           if (!group.slug) group.slug = SlugHelper.slugifyString(group.name);
-          promises.push(this.repos.group.save(group));
+          const isNew = !group.id;
+          promises.push(
+            this.repos.group.save(group).then(async (g) => {
+              await WebhookDispatcher.emit(this.repos, au.churchId, isNew ? "group.created" : "group.updated", g);
+              return g;
+            })
+          );
         });
         const result = await Promise.all(promises);
         return this.repos.group.convertAllToModel(au.churchId, result);
@@ -149,9 +156,11 @@ export class GroupController extends MembershipBaseController {
           const ids = ArrayHelper.getIds(ministryTeams, "id");
           await this.repos.group.delete(au.churchId, id);
           await this.repos.group.deleteByIds(au.churchId, ids);
+          for (const deletedId of [id, ...ids]) await WebhookDispatcher.emit(this.repos, au.churchId, "group.destroyed", { id: deletedId, churchId: au.churchId });
           return this.json({});
         } else {
           await this.repos.group.delete(au.churchId, id);
+          await WebhookDispatcher.emit(this.repos, au.churchId, "group.destroyed", { id, churchId: au.churchId });
           return this.json({});
         }
       }

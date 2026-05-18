@@ -38,4 +38,7 @@ export { OAuthCode } from "./OAuthCode.js";
 export { OAuthDeviceCode } from "./OAuthDeviceCode.js";
 export { OAuthRelaySession } from "./OAuthRelaySession.js";
 
+export { Webhook } from "./Webhook.js";
+export { WebhookDelivery } from "./WebhookDelivery.js";
+
 export * from "./LoginModels.js";

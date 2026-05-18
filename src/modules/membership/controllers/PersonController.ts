@@ -7,6 +7,7 @@ import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
 import { Environment, Permissions, PersonHelper, UserChurchHelper } from "../helpers/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
 
 @controller("/membership/people")
@@ -391,6 +392,7 @@ export class PersonController extends MembershipBaseController {
         req.body.forEach((person) => {
           person.churchId = au.churchId;
           if (person.contactInfo === undefined) person.contactInfo = {};
+          const isNew = !person.id;
           promises.push(
             this.repos.person.save(person).then(async (p) => {
               // const r = this.repos.person.convertToModel(au.churchId, p);
@@ -398,6 +400,7 @@ export class PersonController extends MembershipBaseController {
               if (p.photo !== undefined && p.photo.startsWith("data:image/png;base64,")) await this.savePhoto(au.churchId, p);
               // Create userChurch record if email matches a user and person is in groups
               if (p.email) await UserChurchHelper.createForPersonEmailUpdate(au.churchId, p.id, p.email);
+              await WebhookDispatcher.emit(this.repos, au.churchId, isNew ? "person.created" : "person.updated", p);
               return p;
             })
           );
@@ -442,6 +445,8 @@ export class PersonController extends MembershipBaseController {
     } else {
       await this.repos.person.deleteByIds(churchId, personIds);
     }
+
+    for (const id of personIds) await WebhookDispatcher.emit(this.repos, churchId, "person.destroyed", { id, churchId });
 
     await this.repos.household.deleteUnused(churchId);
     return this.json({ success: true, deletedIds: personIds, count: personIds.length });

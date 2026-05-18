@@ -86,6 +86,19 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
   }
 };
 
+export const handleWebhookTimer = async (_event: ScheduledEvent, _context: Context): Promise<void> => {
+  try {
+    await initEnv();
+    const { WebhookDeliveryWorker } = await import("../shared/webhooks/index.js");
+    const repos = await RepoManager.getRepos<any>("membership");
+    const result = await WebhookDeliveryWorker.process(repos);
+    console.log("[handleWebhookTimer] result:", JSON.stringify(result));
+  } catch (error) {
+    console.error("Error in webhook timer:", error);
+    throw error;
+  }
+};
+
 export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Context): Promise<void> => {
   try {
     await initEnv();

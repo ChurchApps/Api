@@ -3,7 +3,7 @@ import type {
   FormSubmission, Group, GroupJoinRequest, GroupMember, Household, MemberPermission,
   OAuthClient, OAuthCode, OAuthDeviceCode, OAuthRelaySession, OAuthToken,
   Question, Role, RoleMember, RolePermission, Setting, User, UserChurch,
-  VisibilityPreference
+  VisibilityPreference, Webhook, WebhookDelivery
 } from "../models/index.js";
 
 /**
@@ -76,4 +76,6 @@ export interface MembershipDatabase {
   users: Omit<User, "jwt"> & { password?: string };
   userChurches: UserChurch;
   visibilityPreferences: VisibilityPreference;
+  webhooks: Omit<Webhook, "events" | "active"> & { events: string; active: number };
+  webhookDeliveries: WebhookDelivery;
 }
