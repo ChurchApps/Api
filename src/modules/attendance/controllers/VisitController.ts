@@ -3,6 +3,7 @@ import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Visit, VisitSession, Session } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 interface IdCache {
   [name: string]: string;
@@ -22,6 +23,7 @@ export class VisitController extends AttendanceBaseController {
       if (session === null) {
         session = { churchId, groupId, serviceTimeId, sessionDate: currentDate };
         session = await this.repos.session.save(session);
+        await WebhookDispatcher.emit(churchId, "session.created", session);
       }
       VisitController.cachedSessionIds[key] = session.id;
       result = session.id;
@@ -179,7 +181,12 @@ export class VisitController extends AttendanceBaseController {
         const promises: Promise<Visit>[] = [];
         req.body.forEach((visit) => {
           visit.churchId = au.churchId;
-          promises.push(this.repos.visit.save(visit));
+          promises.push(
+            this.repos.visit.save(visit).then(async (saved) => {
+              await WebhookDispatcher.emit(au.churchId, "attendance.recorded", saved);
+              return saved;
+            })
+          );
         });
         const result = await Promise.all(promises);
         return this.repos.visit.convertAllToModel(au.churchId, result);
@@ -220,6 +227,7 @@ export class VisitController extends AttendanceBaseController {
             sessionPromises.push(this.repos.visitSession.save(vs));
           });
           await Promise.all(sessionPromises);
+          await WebhookDispatcher.emit(sv.churchId, "attendance.recorded", sv);
         })
       );
     });

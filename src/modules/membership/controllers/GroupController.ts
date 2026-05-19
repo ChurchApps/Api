@@ -132,7 +132,7 @@ export class GroupController extends MembershipBaseController {
           const isNew = !group.id;
           promises.push(
             this.repos.group.save(group).then(async (g) => {
-              await WebhookDispatcher.emit(this.repos, au.churchId, isNew ? "group.created" : "group.updated", g);
+              await WebhookDispatcher.emit(au.churchId, isNew ? "group.created" : "group.updated", g);
               return g;
             })
           );
@@ -156,11 +156,11 @@ export class GroupController extends MembershipBaseController {
           const ids = ArrayHelper.getIds(ministryTeams, "id");
           await this.repos.group.delete(au.churchId, id);
           await this.repos.group.deleteByIds(au.churchId, ids);
-          for (const deletedId of [id, ...ids]) await WebhookDispatcher.emit(this.repos, au.churchId, "group.destroyed", { id: deletedId, churchId: au.churchId });
+          for (const deletedId of [id, ...ids]) await WebhookDispatcher.emit(au.churchId, "group.destroyed", { id: deletedId, churchId: au.churchId });
           return this.json({});
         } else {
           await this.repos.group.delete(au.churchId, id);
-          await WebhookDispatcher.emit(this.repos, au.churchId, "group.destroyed", { id, churchId: au.churchId });
+          await WebhookDispatcher.emit(au.churchId, "group.destroyed", { id, churchId: au.churchId });
           return this.json({});
         }
       }

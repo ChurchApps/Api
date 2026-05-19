@@ -1,4 +1,5 @@
 export { WEBHOOK_EVENTS, ALL_WEBHOOK_EVENTS, isValidWebhookEvent } from "./WebhookEvents.js";
+export { samplePayloadFor, hasSamplePayload, SAMPLE_PAYLOAD_EVENTS } from "./WebhookSamplePayloads.js";
 export { WebhookSigner } from "./WebhookSigner.js";
 export { WebhookRetryPolicy } from "./WebhookRetryPolicy.js";
 export { UrlValidator } from "./UrlValidator.js";

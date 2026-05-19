@@ -4,7 +4,12 @@ export const WEBHOOK_EVENTS: Record<string, string[]> = {
   person: ["person.created", "person.updated", "person.destroyed"],
   group: ["group.created", "group.updated", "group.destroyed"],
   groupMember: ["group.member.added", "group.member.removed"],
-  household: ["household.created", "household.updated", "household.destroyed"]
+  household: ["household.created", "household.updated", "household.destroyed"],
+  donation: ["donation.created", "donation.updated"],
+  attendance: ["attendance.recorded"],
+  session: ["session.created"],
+  formSubmission: ["form.submission.created"],
+  event: ["event.created", "event.updated", "event.destroyed"]
 };
 
 export const ALL_WEBHOOK_EVENTS: string[] = Object.values(WEBHOOK_EVENTS).flat();

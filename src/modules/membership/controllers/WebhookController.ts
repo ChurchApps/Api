@@ -3,7 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions } from "../helpers/index.js";
 import { Webhook } from "../models/index.js";
-import { WEBHOOK_EVENTS, ALL_WEBHOOK_EVENTS, WebhookSigner, UrlValidator, WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { WEBHOOK_EVENTS, ALL_WEBHOOK_EVENTS, WebhookSigner, UrlValidator, WebhookDispatcher, WebhookDeliveryWorker, samplePayloadFor } from "../../../shared/webhooks/index.js";
 
 @controller("/membership/webhooks")
 export class WebhookController extends MembershipBaseController {
@@ -40,6 +40,26 @@ export class WebhookController extends MembershipBaseController {
         status: "pending",
         attemptCount: 0
       });
+    });
+  }
+
+  // Fires a synthetic sample payload at the webhook so an integrator can verify
+  // connectivity and signature handling before real data flows. The delivery is
+  // attempted synchronously and the result is returned for immediate feedback.
+  @httpPost("/:id/test")
+  public async test(@requestParam("id") id: string, req: express.Request<{}, {}, { event?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      const webhook = await this.repos.webhook.load(au.churchId, id);
+      if (!webhook) return this.json({ error: "Not found" }, 404);
+      const requested = req.body?.event;
+      const event = requested && webhook.events?.includes(requested) ? requested : webhook.events?.[0];
+      if (!event) return this.json({ error: "Webhook has no subscribed events" }, 400);
+
+      const payload = JSON.stringify({ event, churchId: au.churchId, occurredAt: new Date().toISOString(), data: samplePayloadFor(event, au.churchId) });
+      const delivery = await this.repos.webhookDelivery.create({ churchId: au.churchId, webhookId: webhook.id, event, payload, status: "pending", attemptCount: 0 });
+      await WebhookDeliveryWorker.attempt(this.repos, webhook, delivery);
+      return delivery;
     });
   }
 

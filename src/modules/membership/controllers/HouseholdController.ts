@@ -33,7 +33,7 @@ export class HouseholdController extends MembershipBaseController {
         const isNew = !item.id;
         promises.push(
           this.repos.household.save(item).then(async (saved) => {
-            await WebhookDispatcher.emit(this.repos, au.churchId, isNew ? "household.created" : "household.updated", saved);
+            await WebhookDispatcher.emit(au.churchId, isNew ? "household.created" : "household.updated", saved);
             return saved;
           })
         );
@@ -48,7 +48,7 @@ export class HouseholdController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       await this.repos.household.delete(au.churchId, id);
-      await WebhookDispatcher.emit(this.repos, au.churchId, "household.destroyed", { id, churchId: au.churchId });
+      await WebhookDispatcher.emit(au.churchId, "household.destroyed", { id, churchId: au.churchId });
       return {};
     });
   }

@@ -1,11 +1,14 @@
 import { Webhook } from "../../modules/membership/models/index.js";
+import { RepoManager } from "../infrastructure/RepoManager.js";
 
-// In-process webhook event emitter. Called from controllers right after a
-// mutation. emit() does a cached subscription lookup (so churches with no
-// webhooks — the vast majority — cost zero queries on the write path) and,
+// In-process webhook event emitter. Called from controllers (or repos) right
+// after a mutation. emit() does a cached subscription lookup (so churches with
+// no webhooks — the vast majority — cost zero queries on the write path) and,
 // when there is a match, durably enqueues a delivery row. The actual HTTP
 // delivery is handled separately by WebhookDeliveryWorker. emit() never
 // throws — a webhook failure must never break the originating operation.
+// Webhook storage lives in the membership module, so emit() resolves those
+// repos itself — callers in any module just pass churchId/event/payload.
 export class WebhookDispatcher {
   private static cache = new Map<string, { hooks: Webhook[]; expires: number }>();
   private static TTL_MS = 60000;
@@ -14,9 +17,10 @@ export class WebhookDispatcher {
     WebhookDispatcher.cache.delete(churchId);
   }
 
-  public static async emit(repos: any, churchId: string, event: string, payload: any): Promise<void> {
+  public static async emit(churchId: string, event: string, payload: any): Promise<void> {
     try {
       if (!churchId) return;
+      const repos = await RepoManager.getRepos<any>("membership");
       const hooks = await WebhookDispatcher.getHooks(repos, churchId);
       if (hooks.length === 0) return;
       const matching = hooks.filter((h) => Array.isArray(h.events) && h.events.includes(event));

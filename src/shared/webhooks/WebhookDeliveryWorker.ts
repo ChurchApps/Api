@@ -32,7 +32,9 @@ export class WebhookDeliveryWorker {
     return { attempted: due.length, succeeded, failed };
   }
 
-  private static async attempt(repos: any, webhook: Webhook, delivery: WebhookDelivery): Promise<boolean> {
+  // Public so the "Send test event" route can run a single delivery synchronously
+  // through the real signed-delivery path and return the result immediately.
+  public static async attempt(repos: any, webhook: Webhook, delivery: WebhookDelivery): Promise<boolean> {
     delivery.attemptCount = (delivery.attemptCount ?? 0) + 1;
     let status = 0;
     let responseBody = "";

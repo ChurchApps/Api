@@ -400,7 +400,7 @@ export class PersonController extends MembershipBaseController {
               if (p.photo !== undefined && p.photo.startsWith("data:image/png;base64,")) await this.savePhoto(au.churchId, p);
               // Create userChurch record if email matches a user and person is in groups
               if (p.email) await UserChurchHelper.createForPersonEmailUpdate(au.churchId, p.id, p.email);
-              await WebhookDispatcher.emit(this.repos, au.churchId, isNew ? "person.created" : "person.updated", p);
+              await WebhookDispatcher.emit(au.churchId, isNew ? "person.created" : "person.updated", p);
               return p;
             })
           );
@@ -465,7 +465,7 @@ export class PersonController extends MembershipBaseController {
       await this.repos.person.updateFieldsByIds(au.churchId, existingIds, updates);
 
       for (const person of existingPeople) {
-        await WebhookDispatcher.emit(this.repos, au.churchId, "person.updated", { ...person, ...updates, churchId: au.churchId });
+        await WebhookDispatcher.emit(au.churchId, "person.updated", { ...person, ...updates, churchId: au.churchId });
       }
 
       return this.json({ success: true, updatedIds: existingIds, count: existingIds.length });
@@ -479,7 +479,7 @@ export class PersonController extends MembershipBaseController {
       await this.repos.person.deleteByIds(churchId, personIds);
     }
 
-    for (const id of personIds) await WebhookDispatcher.emit(this.repos, churchId, "person.destroyed", { id, churchId });
+    for (const id of personIds) await WebhookDispatcher.emit(churchId, "person.destroyed", { id, churchId });
 
     await this.repos.household.deleteUnused(churchId);
     return this.json({ success: true, deletedIds: personIds, count: personIds.length });

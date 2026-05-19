@@ -4,6 +4,7 @@ import * as ics from "ics";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Event } from "../models/index.js";
 import { CalendarHelper, Permissions } from "../helpers/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @controller("/content/events")
 export class EventController extends ContentBaseController {
@@ -113,7 +114,13 @@ export class EventController extends ContentBaseController {
       const promises: Promise<Event>[] = [];
       req.body.forEach((event) => {
         event.churchId = au.churchId;
-        promises.push(this.repos.event.save(event));
+        const isNew = !event.id;
+        promises.push(
+          this.repos.event.save(event).then(async (saved) => {
+            await WebhookDispatcher.emit(au.churchId, isNew ? "event.created" : "event.updated", saved);
+            return saved;
+          })
+        );
       });
       const result = await Promise.all(promises);
       return result;
@@ -127,6 +134,7 @@ export class EventController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         await this.repos.event.delete(au.churchId, id);
+        await WebhookDispatcher.emit(au.churchId, "event.destroyed", { id, churchId: au.churchId });
         return this.json({});
       }
     });

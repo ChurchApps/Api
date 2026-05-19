@@ -72,7 +72,7 @@ export class GroupMemberController extends MembershipBaseController {
         const isNew = !gm.id;
         promises.push(
           this.repos.groupMember.save(gm).then(async (saved) => {
-            if (isNew) await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.added", saved);
+            if (isNew) await WebhookDispatcher.emit(au.churchId, "group.member.added", saved);
             return saved;
           })
         );
@@ -106,7 +106,7 @@ export class GroupMemberController extends MembershipBaseController {
       for (const personId of newPersonIds) {
         const saved = await this.repos.groupMember.save({ churchId: au.churchId, groupId, personId, leader: false });
         await UserChurchHelper.createForGroupMember(au.churchId, personId);
-        await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.added", saved);
+        await WebhookDispatcher.emit(au.churchId, "group.member.added", saved);
         added.push(saved);
       }
 
@@ -128,7 +128,7 @@ export class GroupMemberController extends MembershipBaseController {
       const toRemove = existing.filter((gm) => personIds.indexOf(gm.personId) !== -1);
 
       await this.repos.groupMember.deleteForGroupAndPeople(au.churchId, groupId, toRemove.map((gm) => gm.personId));
-      for (const gm of toRemove) await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.removed", gm);
+      for (const gm of toRemove) await WebhookDispatcher.emit(au.churchId, "group.member.removed", gm);
 
       return this.json({ success: true, removedIds: toRemove.map((gm) => gm.personId), count: toRemove.length });
     });
@@ -154,7 +154,7 @@ export class GroupMemberController extends MembershipBaseController {
       const member: GroupMember = { churchId: au.churchId, groupId, personId: au.personId, leader: false };
       const saved = await this.repos.groupMember.save(member);
       await UserChurchHelper.createForGroupMember(au.churchId, saved.personId);
-      await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.added", saved);
+      await WebhookDispatcher.emit(au.churchId, "group.member.added", saved);
       return this.repos.groupMember.convertToModel(au.churchId, saved);
     });
   }
@@ -165,7 +165,7 @@ export class GroupMemberController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const existing = await this.repos.groupMember.load(au.churchId, id);
       await this.repos.groupMember.delete(au.churchId, id);
-      await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.removed", existing ?? { id, churchId: au.churchId });
+      await WebhookDispatcher.emit(au.churchId, "group.member.removed", existing ?? { id, churchId: au.churchId });
       return {};
     });
   }

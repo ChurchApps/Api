@@ -2,6 +2,7 @@ import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversi
 import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { Session } from "../models/index.js";
 
 @controller("/attendance/sessions")
@@ -46,7 +47,13 @@ export class SessionController extends AttendanceBaseController {
         const promises: Promise<Session>[] = [];
         sessions.forEach((session) => {
           session.churchId = au.churchId;
-          promises.push(this.repos.session.save(session));
+          const isNew = !session.id;
+          promises.push(
+            this.repos.session.save(session).then(async (saved) => {
+              if (isNew) await WebhookDispatcher.emit(au.churchId, "session.created", saved);
+              return saved;
+            })
+          );
         });
         const result = await Promise.all(promises);
         return this.repos.session.convertAllToModel(au.churchId, result);
