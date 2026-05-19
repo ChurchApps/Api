@@ -3,6 +3,8 @@ import { Api, LoginResponse, LoginUserChurch, User } from "../models/index.js";
 import jwt, { SignOptions, JwtPayload } from "jsonwebtoken";
 import { Repos } from "../repositories/index.js";
 import { Environment } from "../helpers/index.js";
+import { buildPermStrings } from "../../../shared/auth/buildPermStrings.js";
+import { filterPermissionsByScopes } from "../../../shared/auth/Scopes.js";
 
 export class AuthenticatedUser extends BaseAuthenticatedUser {
   public static async login(allUserChurches: LoginUserChurch[], user: User) {
@@ -27,12 +29,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
   }
 
   public static getApiJwt(api: Api, user: User, userChurch: LoginUserChurch) {
-    const permList: string[] = [];
-    api.permissions?.forEach((p) => {
-      let permString = p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
-      if (p.apiName) permString = p.apiName + "_" + p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
-      permList.push(permString);
-    });
+    const permList = buildPermStrings([api]);
 
     const groupIds: string[] = [];
     userChurch.groups?.forEach((g) => groupIds.push(g.id));
@@ -59,14 +56,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
   }
 
   public static getChurchJwt(user: User, userChurch: LoginUserChurch) {
-    const permList: string[] = [];
-    userChurch.apis?.forEach((api) => {
-      api.permissions?.forEach((p) => {
-        let permString = p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
-        if (p.apiName) permString = p.apiName + "_" + p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
-        permList.push(permString);
-      });
-    });
+    const permList = buildPermStrings(userChurch.apis);
 
     const groupIds: string[] = [];
     userChurch.groups?.forEach((g) => groupIds.push(g.id));
@@ -91,16 +81,15 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     );
   }
 
-  public static getCombinedApiJwt(user: User, userChurch: LoginUserChurch, expiresIn?: string) {
-    const permList: string[] = [];
-
-    userChurch.apis?.forEach((api) => {
-      api.permissions?.forEach((p) => {
-        let permString = p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
-        if (p.apiName) permString = p.apiName + "_" + p.contentType + "_" + String(p.contentId).replace("null", "") + "_" + p.action;
-        permList.push(permString);
-      });
-    });
+  /**
+   * Mints the JWT used as an OAuth access token. When `scopes` is supplied
+   * (a non-empty list), the permission array is filtered down to what those
+   * scopes allow *before signing* — the token then carries an already-reduced
+   * permission set, so no request-time scope check is ever needed. Absent or
+   * empty scopes leave the full permission set (backward compatible).
+   */
+  public static getCombinedApiJwt(user: User, userChurch: LoginUserChurch, expiresIn?: string, scopes?: string[]) {
+    const permList = filterPermissionsByScopes(buildPermStrings(userChurch.apis), scopes ?? []);
 
     const groupIds: string[] = [];
     userChurch.groups?.forEach((g) => groupIds.push(g.id));

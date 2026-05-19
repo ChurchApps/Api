@@ -1,5 +1,6 @@
-import { LoginUserChurch, RolePermission } from "../models/index.js";
+import { Api, LoginUserChurch, RolePermission } from "../models/index.js";
 import { Environment, permissionsList } from "./index.js";
+import { Repos } from "../repositories/index.js";
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
 
 export class UserHelper {
@@ -54,6 +55,15 @@ export class UserHelper {
         }
       });
     });
+  }
+
+  // Resolves a user's permissions in one church with domain-admin and reporting
+  // permissions expanded — the shape both JWT minting and API-key auth consume.
+  static async loadExpandedPermissions(userId: string, churchId: string, repos: Repos): Promise<Api[]> {
+    const luc = (await repos.rolePermission.loadUserPermissionInChurch(userId, churchId)) ?? ({ apis: [] } as unknown as LoginUserChurch);
+    await UserHelper.replaceDomainAdminPermissions([luc]);
+    UserHelper.addAllReportingPermissions([luc]);
+    return luc.apis;
   }
 
   static sendWelcomeEmail(email: string, code: string, appName: string, appUrl: string): Promise<any> {

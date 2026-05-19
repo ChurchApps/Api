@@ -1,5 +1,5 @@
 import type {
-  AccessLog, Answer, AssociatedGroup, AuditLog, Campus, Church, ClientError, Domain, Form,
+  AccessLog, Answer, ApiKey, AssociatedGroup, AuditLog, Campus, Church, ClientError, Domain, Form,
   FormSubmission, Group, GroupJoinRequest, GroupMember, Household, MemberPermission,
   OAuthClient, OAuthCode, OAuthDeviceCode, OAuthRelaySession, OAuthToken,
   Question, Role, RoleMember, RolePermission, Setting, User, UserChurch,
@@ -49,6 +49,7 @@ export interface PeopleTable {
 export interface MembershipDatabase {
   accessLogs: AccessLog;
   answers: Answer;
+  apiKeys: ApiKey;
   associatedGroups: AssociatedGroup;
   auditLogs: AuditLog;
   campuses: Campus;

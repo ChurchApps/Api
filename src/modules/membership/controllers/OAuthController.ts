@@ -6,6 +6,7 @@ import { Permissions, UniqueIdHelper, UserHelper } from "../helpers/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { OAuthDeviceCodeRepo, OAuthRelaySessionRepo } from "../repositories/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { parseScopes } from "../../../shared/auth/Scopes.js";
 
 @controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {
@@ -118,19 +119,13 @@ export class OAuthController extends MembershipBaseController {
           apis: []
         };
 
-        // Load permissions for all APIs
-        const permissionData = await this.repos.rolePermission.loadUserPermissionInChurch(user.id, church.id);
-        if (permissionData) {
-          loginUserChurch.apis = permissionData.apis;
-        }
-        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
-        UserHelper.addAllReportingPermissions([loginUserChurch]);
+        loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
         // Create access token (refresh token expires in 90 days)
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: authCode.userChurchId,
-          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days"),
+          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(authCode.scopes)),
           refreshToken: UniqueIdHelper.shortId(),
           scopes: authCode.scopes,
           expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
@@ -170,19 +165,13 @@ export class OAuthController extends MembershipBaseController {
           apis: []
         };
 
-        // Load permissions for all APIs
-        const permissionData = await this.repos.rolePermission.loadUserPermissionInChurch(user.id, church.id);
-        if (permissionData) {
-          loginUserChurch.apis = permissionData.apis;
-        }
-        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
-        UserHelper.addAllReportingPermissions([loginUserChurch]);
+        loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
         // Create new access token (refresh token expires in 90 days)
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: oldToken.userChurchId,
-          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days"),
+          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(oldToken.scopes)),
           refreshToken: UniqueIdHelper.shortId(),
           scopes: oldToken.scopes,
           expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
@@ -307,16 +296,10 @@ export class OAuthController extends MembershipBaseController {
           apis: []
         };
 
-        // Load permissions for all APIs
-        const permissionData = await this.repos.rolePermission.loadUserPermissionInChurch(user.id, church.id);
-        if (permissionData) {
-          loginUserChurch.apis = permissionData.apis;
-        }
-        await UserHelper.replaceDomainAdminPermissions([loginUserChurch]);
-        UserHelper.addAllReportingPermissions([loginUserChurch]);
+        loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
         // Create access token
-        const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days");
+        const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(dc.scopes));
         const refreshToken = UniqueIdHelper.shortId();
 
         // Store the refresh token (expires in 90 days)

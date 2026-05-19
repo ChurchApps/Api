@@ -41,4 +41,6 @@ export { OAuthRelaySession } from "./OAuthRelaySession.js";
 export { Webhook } from "./Webhook.js";
 export { WebhookDelivery } from "./WebhookDelivery.js";
 
+export { ApiKey } from "./ApiKey.js";
+
 export * from "./LoginModels.js";

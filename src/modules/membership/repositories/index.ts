@@ -31,5 +31,7 @@ export { OAuthClientRepo } from "./OAuthClientRepo.js";
 export { OAuthDeviceCodeRepo } from "./OAuthDeviceCodeRepo.js";
 export { OAuthRelaySessionRepo } from "./OAuthRelaySessionRepo.js";
 
+export { ApiKeyRepo } from "./ApiKeyRepo.js";
+
 export { WebhookRepo } from "./WebhookRepo.js";
 export { WebhookDeliveryRepo } from "./WebhookDeliveryRepo.js";
