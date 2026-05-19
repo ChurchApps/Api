@@ -7,6 +7,7 @@ import { AuthenticatedUser } from "../auth/index.js";
 import { OAuthDeviceCodeRepo, OAuthRelaySessionRepo } from "../repositories/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { parseScopes } from "../../../shared/auth/Scopes.js";
+import { toConnections } from "../helpers/OAuthConnectionHelper.js";
 
 @controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {
@@ -515,6 +516,33 @@ export class OAuthController extends MembershipBaseController {
 .card{text-align:center;padding:40px;border-radius:12px;background:rgba(255,255,255,0.05);max-width:400px}
 h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1.5}</style>
 </head><body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`;
+  }
+
+  // Lists the OAuth apps the current user has authorized, for the
+  // Connected Apps screen in B1Admin Settings.
+  @httpGet("/connections")
+  public async getConnections(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
+      if (!userChurch) return [];
+      return toConnections(await this.repos.oAuthToken.loadForUser(userChurch.id));
+    });
+  }
+
+  // Revokes one of the current user's OAuth connections. A token can only be
+  // revoked by the user it belongs to.
+  @httpDelete("/connections/:id")
+  public async deleteConnection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      const token = (await this.repos.oAuthToken.load(id)) as any;
+      if (!token) return this.json({}, 404);
+      const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
+      if (!userChurch || token.userChurchId !== userChurch.id) return this.json({}, 403);
+      await this.repos.oAuthToken.delete(id);
+      return this.json({}, 200);
+    });
   }
 
   @httpGet("/clients")

@@ -59,6 +59,22 @@ export class OAuthTokenRepo {
       .executeTakeFirst()) ?? null;
   }
 
+  public async loadForUser(userChurchId: string): Promise<any[]> {
+    return await getDb().selectFrom("oAuthTokens")
+      .leftJoin("oAuthClients", "oAuthClients.clientId", "oAuthTokens.clientId")
+      .where("oAuthTokens.userChurchId", "=", userChurchId)
+      .select([
+        "oAuthTokens.id as id",
+        "oAuthTokens.clientId as clientId",
+        "oAuthClients.name as clientName",
+        "oAuthTokens.scopes as scopes",
+        "oAuthTokens.createdAt as createdAt",
+        "oAuthTokens.expiresAt as expiresAt"
+      ])
+      .orderBy("oAuthTokens.createdAt", "desc")
+      .execute();
+  }
+
   public async delete(id: string) {
     await getDb().deleteFrom("oAuthTokens").where("id", "=", id).execute();
   }
