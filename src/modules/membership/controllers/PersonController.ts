@@ -4,7 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Person, Household, SearchCondition, Group, VisibilityPreference } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
-import { BulkPersonDeleteRequest } from "../models/requests.js";
+import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
 import { Environment, Permissions, PersonHelper, UserChurchHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
@@ -436,6 +436,39 @@ export class PersonController extends MembershipBaseController {
       if (missingIds.length > 0) return this.json({ error: "Some people were not found", missingIds }, 404);
 
       return this.deletePeople(au.churchId, existingIds);
+    });
+  }
+
+  @httpPost("/bulk-update")
+  public async bulkUpdate(req: express.Request<{}, {}, BulkPersonUpdateRequest>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+
+      const personIds = Array.isArray(req.body?.personIds) ? ArrayHelper.getUnique(req.body.personIds.filter((id) => typeof id === "string").map((id) => id.trim()).filter(Boolean)) : [];
+      if (personIds.length === 0) return this.json({ error: "personIds is required" }, 400);
+
+      const allowedFields = ["membershipStatus", "maritalStatus", "gender", "optedOut"];
+      const updates: Record<string, any> = {};
+      const rawUpdates = req.body?.updates || {};
+      allowedFields.forEach((field) => {
+        if (rawUpdates[field] !== undefined) updates[field] = rawUpdates[field];
+      });
+      if (Object.keys(updates).length === 0) return this.json({ error: "updates is required" }, 400);
+
+      const existingPeople = (await this.repos.person.loadByIds(au.churchId, personIds)) as any[];
+      const existingIds = ArrayHelper.getIds(existingPeople, "id");
+      if (existingIds.length === 0) return this.json({ error: "No matching people found" }, 404);
+
+      const missingIds = personIds.filter((id) => existingIds.indexOf(id) === -1);
+      if (missingIds.length > 0) return this.json({ error: "Some people were not found", missingIds }, 404);
+
+      await this.repos.person.updateFieldsByIds(au.churchId, existingIds, updates);
+
+      for (const person of existingPeople) {
+        await WebhookDispatcher.emit(this.repos, au.churchId, "person.updated", { ...person, ...updates, churchId: au.churchId });
+      }
+
+      return this.json({ success: true, updatedIds: existingIds, count: existingIds.length });
     });
   }
 

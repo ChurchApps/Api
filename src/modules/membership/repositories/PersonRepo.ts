@@ -128,6 +128,11 @@ export class PersonRepo {
     await getDb().updateTable("people").set({ removed: true as any }).where("id", "in", ids).where("churchId", "=", churchId).execute();
   }
 
+  public async updateFieldsByIds(churchId: string, ids: string[], fields: Record<string, any>) {
+    if (!ids.length || !Object.keys(fields).length) return;
+    await getDb().updateTable("people").set(fields).where("id", "in", ids).where("churchId", "=", churchId).execute();
+  }
+
   public async updateOptedOut(personId: string, optedOut: boolean) {
     await getDb().updateTable("people").set({ optedOut: optedOut as any }).where("id", "=", personId).execute();
   }

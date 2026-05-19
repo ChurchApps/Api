@@ -37,6 +37,11 @@ export class GroupMemberRepo {
     await getDb().deleteFrom("groupMembers").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
+  public async deleteForGroupAndPeople(churchId: string, groupId: string, personIds: string[]) {
+    if (!personIds.length) return;
+    await getDb().deleteFrom("groupMembers").where("churchId", "=", churchId).where("groupId", "=", groupId).where("personId", "in", personIds).execute();
+  }
+
   public async load(churchId: string, id: string) {
     return (await getDb().selectFrom("groupMembers").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }

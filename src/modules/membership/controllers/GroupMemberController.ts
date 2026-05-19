@@ -3,6 +3,7 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions, UserChurchHelper } from "../helpers/index.js";
 import { GroupMember } from "../models/index.js";
+import { BulkGroupMemberRequest } from "../models/requests.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @controller("/membership/groupmembers")
@@ -84,6 +85,52 @@ export class GroupMemberController extends MembershipBaseController {
       }
 
       return this.repos.groupMember.convertAllToModel(au.churchId, result);
+    });
+  }
+
+  @httpPost("/bulk-add")
+  public async bulkAdd(req: express.Request<{}, {}, BulkGroupMemberRequest>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const groupId = req.body?.groupId;
+      if (!groupId) return this.json({ error: "groupId is required" }, 400);
+      const personIds = Array.isArray(req.body?.personIds) ? Array.from(new Set(req.body.personIds.filter((id) => typeof id === "string").map((id) => id.trim()).filter(Boolean))) : [];
+      if (personIds.length === 0) return this.json({ error: "personIds is required" }, 400);
+
+      const existing = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
+      const existingPersonIds = new Set(existing.map((gm) => gm.personId));
+      const newPersonIds = personIds.filter((id) => !existingPersonIds.has(id));
+
+      const added: GroupMember[] = [];
+      for (const personId of newPersonIds) {
+        const saved = await this.repos.groupMember.save({ churchId: au.churchId, groupId, personId, leader: false });
+        await UserChurchHelper.createForGroupMember(au.churchId, personId);
+        await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.added", saved);
+        added.push(saved);
+      }
+
+      return this.json({ success: true, addedIds: added.map((gm) => gm.personId), count: added.length });
+    });
+  }
+
+  @httpPost("/bulk-remove")
+  public async bulkRemove(req: express.Request<{}, {}, BulkGroupMemberRequest>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const groupId = req.body?.groupId;
+      if (!groupId) return this.json({ error: "groupId is required" }, 400);
+      const personIds = Array.isArray(req.body?.personIds) ? Array.from(new Set(req.body.personIds.filter((id) => typeof id === "string").map((id) => id.trim()).filter(Boolean))) : [];
+      if (personIds.length === 0) return this.json({ error: "personIds is required" }, 400);
+
+      const existing = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
+      const toRemove = existing.filter((gm) => personIds.indexOf(gm.personId) !== -1);
+
+      await this.repos.groupMember.deleteForGroupAndPeople(au.churchId, groupId, toRemove.map((gm) => gm.personId));
+      for (const gm of toRemove) await WebhookDispatcher.emit(this.repos, au.churchId, "group.member.removed", gm);
+
+      return this.json({ success: true, removedIds: toRemove.map((gm) => gm.personId), count: toRemove.length });
     });
   }
 
