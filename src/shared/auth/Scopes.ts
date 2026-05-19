@@ -15,9 +15,7 @@ const peopleRead: PermPair[] = [
   { contentType: "Group Members", action: "View" }
 ];
 
-const groupsRead: PermPair[] = [
-  { contentType: "Group Members", action: "View" }
-];
+const groupsRead: PermPair[] = [{ contentType: "Group Members", action: "View" }];
 
 const donationsRead: PermPair[] = [
   { contentType: "Donations", action: "View" },
@@ -29,21 +27,13 @@ const attendanceRead: PermPair[] = [
   { contentType: "Attendance", action: "View Summary" }
 ];
 
-const contentRead: PermPair[] = [
-  { contentType: "Registrations", action: "View" }
-];
+const contentRead: PermPair[] = [{ contentType: "Registrations", action: "View" }];
 
-const messagingRead: PermPair[] = [
-  { contentType: "Messaging", action: "View" }
-];
+const messagingRead: PermPair[] = [{ contentType: "Messaging", action: "View" }];
 
-const rolesRead: PermPair[] = [
-  { contentType: "Roles", action: "View" }
-];
+const rolesRead: PermPair[] = [{ contentType: "Roles", action: "View" }];
 
-const settingsRead: PermPair[] = [
-  { contentType: "Settings", action: "View" }
-];
+const settingsRead: PermPair[] = [{ contentType: "Settings", action: "View" }];
 
 // --- the catalog ----------------------------------------------------------
 // `write` scopes include their matching `read` pairs — a connector that

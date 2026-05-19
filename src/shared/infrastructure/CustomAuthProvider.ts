@@ -98,7 +98,7 @@ export class CustomAuthProvider extends BaseAuthProvider {
         return await this.getUserFromApiKey(token);
       }
       return await super.getUser(req, res, next);
-    } catch (error) {
+    } catch {
       // jwt.verify throws on an invalid/expired token — treat as unauthenticated.
       return null;
     }
