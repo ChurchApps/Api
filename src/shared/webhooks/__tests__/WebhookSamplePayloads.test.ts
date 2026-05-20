@@ -3,10 +3,14 @@ import { samplePayloadFor, hasSamplePayload } from "../WebhookSamplePayloads.js"
 
 describe("WebhookEvents catalog", () => {
   const phase2Events = [
-    "donation.created", "donation.updated",
-    "attendance.recorded", "session.created",
+    "donation.created",
+    "donation.updated",
+    "attendance.recorded",
+    "session.created",
     "form.submission.created",
-    "event.created", "event.updated", "event.destroyed"
+    "event.created",
+    "event.updated",
+    "event.destroyed"
   ];
 
   it("includes every Phase 2 event", () => {
