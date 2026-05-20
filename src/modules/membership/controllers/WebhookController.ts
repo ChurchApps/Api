@@ -3,7 +3,9 @@ import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions } from "../helpers/index.js";
 import { Webhook } from "../models/index.js";
-import { WEBHOOK_EVENTS, ALL_WEBHOOK_EVENTS, WebhookSigner, UrlValidator, WebhookDispatcher, WebhookDeliveryWorker, samplePayloadFor } from "../../../shared/webhooks/index.js";
+import { WEBHOOK_EVENTS, ALL_WEBHOOK_EVENTS, WebhookSigner, UrlValidator, WebhookDispatcher, WebhookDeliveryWorker, samplePayloadFor, formatForConnector } from "../../../shared/webhooks/index.js";
+
+const CONNECTOR_TYPES = ["standard", "slack", "discord"];
 
 @controller("/membership/webhooks")
 export class WebhookController extends MembershipBaseController {
@@ -56,7 +58,8 @@ export class WebhookController extends MembershipBaseController {
       const event = requested && webhook.events?.includes(requested) ? requested : webhook.events?.[0];
       if (!event) return this.json({ error: "Webhook has no subscribed events" }, 400);
 
-      const payload = JSON.stringify({ event, churchId: au.churchId, occurredAt: new Date().toISOString(), data: samplePayloadFor(event, au.churchId) });
+      const envelope = { event, churchId: au.churchId, occurredAt: new Date().toISOString(), data: samplePayloadFor(event, au.churchId) };
+      const payload = formatForConnector(webhook.connectorType, envelope);
       const delivery = await this.repos.webhookDelivery.create({ churchId: au.churchId, webhookId: webhook.id, event, payload, status: "pending", attemptCount: 0 });
       await WebhookDeliveryWorker.attempt(this.repos, webhook, delivery);
       return delivery;
@@ -105,6 +108,9 @@ export class WebhookController extends MembershipBaseController {
       const urlError = await UrlValidator.validate(input.url ?? "");
       if (urlError) return this.json({ error: urlError }, 400);
 
+      const connectorType = input.connectorType ?? "standard";
+      if (!CONNECTOR_TYPES.includes(connectorType)) return this.json({ error: "Unknown connector type: " + connectorType }, 400);
+
       let isNew = false;
       let webhook: Webhook;
       if (input.id) {
@@ -119,6 +125,7 @@ export class WebhookController extends MembershipBaseController {
       webhook.url = input.url;
       webhook.events = events;
       webhook.active = input.active !== false;
+      webhook.connectorType = connectorType;
 
       const saved = await this.repos.webhook.save(webhook);
       WebhookDispatcher.invalidate(au.churchId);

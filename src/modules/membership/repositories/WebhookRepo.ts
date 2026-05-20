@@ -20,6 +20,7 @@ export class WebhookRepo {
       secret: model.secret,
       events: JSON.stringify(model.events ?? []),
       active: model.active === false ? 0 : 1,
+      connectorType: model.connectorType ?? "standard",
       consecutiveFailures: 0,
       createdBy: model.createdBy,
       dateCreated: sql`NOW()` as any
@@ -34,6 +35,7 @@ export class WebhookRepo {
       secret: model.secret,
       events: JSON.stringify(model.events ?? []),
       active: model.active === false ? 0 : 1,
+      connectorType: model.connectorType ?? "standard",
       dateModified: sql`NOW()` as any
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
@@ -82,6 +84,7 @@ export class WebhookRepo {
       secret: row.secret,
       events,
       active: row.active === 1 || row.active === true,
+      connectorType: row.connectorType ?? "standard",
       consecutiveFailures: row.consecutiveFailures,
       createdBy: row.createdBy,
       dateCreated: row.dateCreated,

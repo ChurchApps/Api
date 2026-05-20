@@ -1,5 +1,6 @@
 import { Webhook } from "../../modules/membership/models/index.js";
 import { RepoManager } from "../infrastructure/RepoManager.js";
+import { formatForConnector } from "./WebhookFormatters.js";
 
 // In-process webhook event emitter. Called from controllers (or repos) right
 // after a mutation. emit() does a cached subscription lookup (so churches with
@@ -26,13 +27,15 @@ export class WebhookDispatcher {
       const matching = hooks.filter((h) => Array.isArray(h.events) && h.events.includes(event));
       if (matching.length === 0) return;
 
-      const body = JSON.stringify({ event, churchId, occurredAt: new Date().toISOString(), data: payload });
+      // The delivery body is formatted per hook — a Slack/Discord connector
+      // stores its chat-ready message, a standard hook stores the raw envelope.
+      const envelope = { event, churchId, occurredAt: new Date().toISOString(), data: payload };
       for (const hook of matching) {
         await repos.webhookDelivery.create({
           churchId,
           webhookId: hook.id,
           event,
-          payload: body,
+          payload: formatForConnector(hook.connectorType, envelope),
           status: "pending",
           attemptCount: 0
         });

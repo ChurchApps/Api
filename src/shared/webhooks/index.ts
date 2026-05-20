@@ -5,3 +5,4 @@ export { WebhookRetryPolicy } from "./WebhookRetryPolicy.js";
 export { UrlValidator } from "./UrlValidator.js";
 export { WebhookDispatcher } from "./WebhookDispatcher.js";
 export { WebhookDeliveryWorker } from "./WebhookDeliveryWorker.js";
+export { formatForConnector, describeEvent } from "./WebhookFormatters.js";

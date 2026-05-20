@@ -7,6 +7,8 @@ export class Webhook {
   public secret?: string;
   public events?: string[];
   public active?: boolean;
+  // How the outbound delivery body is formatted: "standard" | "slack" | "discord".
+  public connectorType?: string;
   public consecutiveFailures?: number;
   public createdBy?: string;
   public dateCreated?: Date;
