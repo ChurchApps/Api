@@ -145,3 +145,72 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
     expect(result).toBe("email");
   });
 });
+
+describe("NotificationHelper.checkShouldNotify privateMessage", () => {
+  beforeEach(() => {
+    sendBulkTypedMessagesMock.mockClear();
+    sendMessagesMock.mockClear();
+  });
+
+  function buildPrivateMessageRepos(privateMessage: any) {
+    return {
+      privateMessage: {
+        loadByConversationId: jest.fn(async () => ({ ...privateMessage })),
+        save: jest.fn(async (pm) => pm)
+      },
+      message: { loadForConversation: jest.fn(async () => []) },
+      connection: { loadForNotification: jest.fn(async () => []) },
+      notification: { loadNewCounts: jest.fn(async () => ({ notificationCount: 0, pmCount: 1 })) },
+      notificationPreference: { loadByPersonId: jest.fn(async () => ({ allowPush: true, emailFrequency: "individual" })) },
+      device: {
+        loadForPerson: jest.fn(async () => [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]),
+        deleteByFcmToken: jest.fn(async () => {})
+      },
+      deliveryLog: { save: jest.fn(async () => ({})) }
+    } as any;
+  }
+
+  it("notifies only the other participant when the sender is resolved", async () => {
+    const repos = buildPrivateMessageRepos({
+      id: "PM1",
+      churchId: "CHU1",
+      conversationId: "CONV1",
+      fromPersonId: "PER_A",
+      toPersonId: "PER_B"
+    });
+    NotificationHelper.init(repos);
+
+    await NotificationHelper.checkShouldNotify(
+      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any,
+      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "User A", content: "Hello" } as any,
+      "PER_A"
+    );
+
+    expect(repos.privateMessage.save).toHaveBeenCalled();
+    const saved = repos.privateMessage.save.mock.calls.at(-1)?.[0];
+    expect(saved.notifyPersonId).toBe("PER_B");
+    expect(sendBulkTypedMessagesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("suppresses notification when the sender is not one of the conversation participants", async () => {
+    const repos = buildPrivateMessageRepos({
+      id: "PM1",
+      churchId: "CHU1",
+      conversationId: "CONV1",
+      fromPersonId: "PER_A",
+      toPersonId: "PER_B"
+    });
+    NotificationHelper.init(repos);
+
+    await NotificationHelper.checkShouldNotify(
+      { churchId: "CHU1", id: "CONV1", contentType: "privateMessage" } as any,
+      { id: "MSG1", churchId: "CHU1", conversationId: "CONV1", displayName: "Unknown", content: "Hello" } as any,
+      "anonymous"
+    );
+
+    expect(sendBulkTypedMessagesMock).not.toHaveBeenCalled();
+    const saved = repos.privateMessage.save.mock.calls.at(-1)?.[0];
+    expect(saved.notifyPersonId).toBeNull();
+    expect(saved.deliveryMethod).toBe("complete");
+  });
+});
