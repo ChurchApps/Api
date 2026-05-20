@@ -68,9 +68,16 @@ export class NotificationHelper {
     navData?: Record<string, unknown>
   ): Promise<string> => {
     this.ensureInitialized();
+    const isPrivateMessage = contentType === "privateMessage";
+    const senderPersonId = isPrivateMessage ? String(navData?.personId || "") : "";
+    const conversationId = isPrivateMessage ? String(navData?.conversationId || "") : "";
 
     // Level 0: Try Socket. Load connections and unread counts in parallel so the
     // socket payload can carry the fresh counts and the client avoids a round-trip.
+    // For private messages, do not stop at socket delivery. Installed PWAs can
+    // keep an alerts socket alive in the background, which would otherwise
+    // suppress the OS-level push notification entirely.
+    let socketDelivered = false;
     if (startLevel <= 0) {
       const [connections, countsRaw] = await Promise.all([
         NotificationHelper.repos.connection.loadForNotification(churchId, personId),
@@ -88,7 +95,10 @@ export class NotificationHelper {
           data: { counts }
         });
         await Promise.all(connections.map((conn) => this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId)));
-        return "socket"; // Stop here, let 15-min timer escalate if unread
+        socketDelivered = true;
+        if (contentType !== "privateMessage") {
+          return "socket"; // Stop here, let 15-min timer escalate if unread
+        }
       }
     }
 
@@ -146,6 +156,10 @@ export class NotificationHelper {
           return "push"; // Stop here, let 15-min timer escalate if unread
         }
       }
+    }
+
+    if (socketDelivered) {
+      return "socket";
     }
 
     // Level 2: Email
@@ -239,7 +253,45 @@ export class NotificationHelper {
         break;
       case "privateMessage": {
         const pm: PrivateMessage = await NotificationHelper.repos.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
+        if (!pm) {
+          console.warn("[chat-push] private message notification skipped: conversation mapping not found", {
+            churchId: conversation.churchId,
+            conversationId: conversation.id,
+            senderPersonId
+          });
+          break;
+        }
+
+        const participants = [pm.fromPersonId, pm.toPersonId].filter((value): value is string => !!value);
+        if (!senderPersonId || !participants.includes(senderPersonId)) {
+          console.warn("[chat-push] private message notification skipped: sender is not a conversation participant", {
+            churchId: conversation.churchId,
+            conversationId: conversation.id,
+            senderPersonId,
+            fromPersonId: pm.fromPersonId,
+            toPersonId: pm.toPersonId,
+            messageId: message.id
+          });
+          pm.notifyPersonId = null;
+          pm.deliveryMethod = "complete";
+          await NotificationHelper.repos.privateMessage.save(pm);
+          break;
+        }
+
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
+        if (!pm.notifyPersonId) {
+          console.warn("[chat-push] private message notification skipped: recipient could not be resolved", {
+            churchId: conversation.churchId,
+            conversationId: conversation.id,
+            senderPersonId,
+            fromPersonId: pm.fromPersonId,
+            toPersonId: pm.toPersonId,
+            messageId: message.id
+          });
+          pm.deliveryMethod = "complete";
+          await NotificationHelper.repos.privateMessage.save(pm);
+          break;
+        }
 
         // Persist notifyPersonId first so the unread count query inside
         // attemptDeliveryWithEscalation includes this new message.
