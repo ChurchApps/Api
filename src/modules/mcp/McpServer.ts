@@ -7,6 +7,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { listEndpointsSchema, listEndpointsHandler } from "./tools/listEndpoints.js";
 import { describeEndpointSchema, describeEndpointHandler } from "./tools/describeEndpoint.js";
 import { apiCallSchema, makeApiCallHandler } from "./tools/apiCall.js";
+import { describePageBuilderSchema, describePageBuilderHandler } from "./tools/describePageBuilder.js";
 
 export function buildMcpServer(authorization: string | undefined): McpServer {
   const server = new McpServer({ name: "churchapps-api", version: "1.0.0" });
@@ -16,7 +17,7 @@ export function buildMcpServer(authorization: string | undefined): McpServer {
     {
       title: "List API endpoints",
       description:
-        "Lists every HTTP endpoint exposed by the ChurchApps Api, optionally filtered by path substring or HTTP method. Each entry includes the controller name and the API key scopes that likely gate access. Call this first to discover what api_call can invoke.",
+        "Lists every HTTP endpoint exposed by the ChurchApps Api, optionally filtered by path substring or HTTP method. Each entry includes the controller name and the API key scopes that likely gate access. Call this first to discover what api_call can invoke. When working on /content/* routes (building B1App pages/sections/elements/HTML blocks) call describe_page_builder first — it has the data model, the full elementType catalog, and the answersJSON shapes.",
       inputSchema: listEndpointsSchema
     },
     listEndpointsHandler
@@ -27,7 +28,7 @@ export function buildMcpServer(authorization: string | undefined): McpServer {
     {
       title: "Describe API endpoint",
       description:
-        "Returns a brief summary and (where available) a curated request/response example for one endpoint. Use this after list_endpoints to learn the request body shape before calling POST/PUT.",
+        "Returns a brief summary and (where available) a curated request/response example for one endpoint. Use this after list_endpoints to learn the request body shape before calling POST/PUT. For /content/* routes (page building) describe_page_builder is more useful — it covers the whole Page→Section→Element model and all element types in one call.",
       inputSchema: describeEndpointSchema
     },
     describeEndpointHandler
@@ -48,6 +49,23 @@ export function buildMcpServer(authorization: string | undefined): McpServer {
       }
     },
     makeApiCallHandler(() => authorization)
+  );
+
+  server.registerTool(
+    "describe_page_builder",
+    {
+      title: "B1App page builder guide",
+      description:
+        "Returns a single self-contained guide for building B1App pages via the /content/* endpoints: the Page→Section→Element data model, the standard create workflow, every elementType (text, image, video, row, rawHTML/HTML block, iframe, block, etc.) with its answersJSON shape, the auto-creation behavior for row columns and carousel slides, the stylesJSON breakpoint format, and a worked end-to-end example. Call this once whenever the task involves creating or editing page content.",
+      inputSchema: describePageBuilderSchema,
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    describePageBuilderHandler
   );
 
   return server;

@@ -67,6 +67,31 @@ export const EXAMPLES: Record<string, EndpointExample> = {
   "GET /giving/funds": {
     summary: "List funds (donation designations).",
     responseSample: [{ id: "f1", name: "General Fund" }]
+  },
+
+  "GET /content/pages/:churchId/tree": {
+    summary: "Load a fully populated page tree (sections + nested elements) for display. Pass ?url=/about or ?id=<pageId>. Returns parsed answers/styles/animations objects (not JSON strings).",
+    notes: "Use this to verify a page after creating it, or to read the current structure before editing."
+  },
+  "POST /content/pages": {
+    summary: "Create or update pages. Submit an array; omit id to create, include id to update.",
+    requestBody: [{ url: "/about", title: "About Us" }],
+    notes: "churchId is auto-set from auth. For building page content (sections, elements, HTML blocks, etc.) call describe_page_builder for the full data model and elementType catalog."
+  },
+  "POST /content/sections": {
+    summary: "Create or update sections (children of a page or block).",
+    requestBody: [{ pageId: "P1", zone: "main", background: "#ffffff", textColor: "dark", sort: 1 }],
+    notes: "Provide pageId OR blockId, not both. zone is typically 'main' (page body) or 'siteFooter'."
+  },
+  "POST /content/elements": {
+    summary: "Create or update elements inside a section (or a block, or as a child of another element).",
+    requestBody: [{ sectionId: "S1", elementType: "rawHTML", sort: 1, answersJSON: "{\"rawHTML\":\"<h1>Hello</h1>\",\"javascript\":\"\"}" }],
+    notes: "Call describe_page_builder for the full elementType catalog (text, image, video, rawHTML, row, etc.) and the answers shape for each. answersJSON must be a JSON STRING on write. For nested children (inside a row column or carousel slide) set parentId to the auto-created child's id. Never POST elementType:'column' yourself — rows create columns automatically."
+  },
+  "POST /content/blocks": {
+    summary: "Create or update reusable blocks (sectionBlock, footerBlock, elementBlock).",
+    requestBody: [{ blockType: "sectionBlock", name: "Reusable Hero" }],
+    notes: "After saving the block, add Sections with blockId=<this block's id>, then Elements inside those Sections. Reference the block from a Section via targetBlockId, or from an Element via elementType:'block' with answersJSON:'{\"blockId\":\"...\"}'."
   }
 };
 
