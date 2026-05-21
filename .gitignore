@@ -15,6 +15,8 @@ dist/
 .tsbuildinfo
 
 # Environment files
+.env
+.env.*
 !.env.sample
 
 # IDE files
@@ -78,4 +80,3 @@ layers/
 *.pem
 *.key
 *.crt
-config.bat
