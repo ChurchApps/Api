@@ -88,24 +88,15 @@ export class NotificationHelper {
           notificationCount: Number((countsRaw as any)?.notificationCount) || 0,
           pmCount: Number((countsRaw as any)?.pmCount) || 0
         };
-        const deliveryCount = await DeliveryHelper.sendMessages(connections, {
+        await DeliveryHelper.sendMessages(connections, {
           churchId,
           conversationId: "alert",
           action: contentType === "privateMessage" ? "privateMessage" : "notification",
           data: { counts }
         });
-        await Promise.all(connections.map((conn, index) => this.logDelivery(
-          churchId,
-          personId,
-          contentType,
-          contentId,
-          "socket",
-          index < deliveryCount,
-          conn.socketId,
-          index < deliveryCount ? undefined : "Socket delivery failed"
-        )));
-        socketDelivered = deliveryCount > 0;
-        if (contentType !== "privateMessage" && deliveryCount > 0) {
+        await Promise.all(connections.map((conn) => this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId)));
+        socketDelivered = true;
+        if (contentType !== "privateMessage") {
           return "socket"; // Stop here, let 15-min timer escalate if unread
         }
       }
@@ -433,13 +424,13 @@ export class NotificationHelper {
     // Handle web socket notifications
     const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
-      const deliveryCount = await DeliveryHelper.sendMessages(connections, {
+      method = "socket";
+      await DeliveryHelper.sendMessages(connections, {
         churchId,
         conversationId: "alert",
         action: "notification",
         data: {}
       });
-      if (deliveryCount > 0) method = "socket";
     }
 
     // Handle push notifications
@@ -481,16 +472,16 @@ export class NotificationHelper {
     // Handle web socket notifications
     const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
-      const deliveryCount = await DeliveryHelper.sendMessages(connections, {
+      method = "socket";
+      await DeliveryHelper.sendMessages(connections, {
         churchId,
         conversationId: "alert",
         action: "privateMessage",
         data: {}
       });
-      for (const [index, conn] of connections.entries()) {
-        await this.logDelivery(churchId, personId, contentType, contentId, "socket", index < deliveryCount, conn.socketId, index < deliveryCount ? undefined : "Socket delivery failed");
+      for (const conn of connections) {
+        await this.logDelivery(churchId, personId, contentType, contentId, "socket", true, conn.socketId);
       }
-      if (deliveryCount > 0) method = "socket";
     }
 
     // Handle push notifications
@@ -549,16 +540,16 @@ export class NotificationHelper {
     // Handle web socket notifications
     const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
-      const deliveryCount = await DeliveryHelper.sendMessages(connections, {
+      method = "socket";
+      await DeliveryHelper.sendMessages(connections, {
         churchId,
         conversationId: "alert",
         action: "notification",
         data: {}
       });
-      for (const [index, conn] of connections.entries()) {
-        await this.logDelivery(churchId, personId, contentType, notificationId, "socket", index < deliveryCount, conn.socketId, index < deliveryCount ? undefined : "Socket delivery failed");
+      for (const conn of connections) {
+        await this.logDelivery(churchId, personId, contentType, notificationId, "socket", true, conn.socketId);
       }
-      if (deliveryCount > 0) method = "socket";
     }
 
     // Handle push notifications
