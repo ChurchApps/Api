@@ -21,8 +21,13 @@ export class McpController extends BaseHttpController {
 
     // Stateless mode: no session id, a fresh server+transport per request.
     // Fits Lambda's request model and keeps the path safe when running
-    // behind a load balancer with no sticky sessions.
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    // behind a load balancer with no sticky sessions. enableJsonResponse
+    // forces single request/response (no SSE) — API Gateway REST buffers
+    // responses and can't stream, so the SSE default 504s at 30s.
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true
+    });
     const server = buildMcpServer(req.headers.authorization as string | undefined);
 
     res.on("close", () => {
