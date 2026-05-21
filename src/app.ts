@@ -198,6 +198,17 @@ export const createApp = async () => {
 
   const app = server.build();
 
+  // Wire MCP module: hand it the built Express app for synthetic in-process
+  // dispatch, and snapshot the registered route list for the listEndpoints tool.
+  try {
+    const { setExpressApp, buildRouteInventory } = await import("./modules/mcp/index.js");
+    setExpressApp(app);
+    const routes = buildRouteInventory();
+    console.log(`📡 MCP server ready at /mcp — ${routes.length} routes in inventory`);
+  } catch (error) {
+    console.warn("Failed to initialize MCP module:", (error as any)?.message || error);
+  }
+
   // Initialize messaging module after server is built but before returning
   try {
     const { initializeMessagingModule } = await import("./modules/messaging/index.js");
@@ -224,7 +235,8 @@ async function loadModuleBindings(container: Container) {
       { name: "Doing", import: import("./modules/doing/controllers/index.js") },
       { name: "Giving", import: import("./modules/giving/controllers/index.js") },
       { name: "Messaging", import: import("./modules/messaging/controllers/index.js") },
-      { name: "Reporting", import: import("./modules/reporting/controllers/index.js") }
+      { name: "Reporting", import: import("./modules/reporting/controllers/index.js") },
+      { name: "MCP", import: import("./modules/mcp/index.js") }
     ];
 
     // Only load playground in development environment
