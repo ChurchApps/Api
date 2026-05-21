@@ -14,6 +14,7 @@
     "@churchapps/texting": "0.1.0",
     "@codegenie/serverless-express": "^4.15.0",
     "@hubspot/api-client": "^13.1.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@paypal/checkout-server-sdk": "^1.0.3",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
