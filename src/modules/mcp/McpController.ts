@@ -1,20 +1,20 @@
 // Exposes the MCP server over Streamable HTTP at POST /mcp. The Express
 // auth pipeline (CustomAuthProvider) has already resolved the bearer token
-// to a Principal on req.user before this controller runs — we just reject
-// unauthenticated calls and let the api_call tool re-present the same
-// Authorization header on each nested call.
+// to a Principal on httpContext.user before this controller runs — we just
+// reject unauthenticated calls and let the api_call tool re-present the
+// same Authorization header on each nested call.
 
-import { controller, httpPost } from "inversify-express-utils";
+import { BaseHttpController, controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildMcpServer } from "./McpServer.js";
 
 @controller("/mcp")
-export class McpController {
+export class McpController extends BaseHttpController {
   @httpPost("/")
   public async handle(req: express.Request, res: express.Response): Promise<void> {
-    const principal = (req as any).user;
-    if (!principal || !principal.churchId) {
+    const churchId = (this.httpContext?.user as any)?.details?.churchId;
+    if (!churchId) {
       res.status(401).json({ error: "Unauthorized — MCP requires a valid bearer token (cak_* API key or JWT)." });
       return;
     }
