@@ -73,6 +73,8 @@ export class Environment extends EnvironmentBase {
   static webPushPublicKey: string;
   static webPushPrivateKey: string;
   static webPushSubject: string;
+  static webPushPublicKeySource: string;
+  static webPushPrivateKeySource: string;
 
   // CORS configuration
   static corsOrigin: string;
@@ -240,6 +242,8 @@ export class Environment extends EnvironmentBase {
     this.webPushPublicKey = process.env.WEB_PUSH_PUBLIC_KEY || config.webPushPublicKey || "";
     this.webPushPrivateKey = process.env.WEB_PUSH_PRIVATE_KEY || "";
     this.webPushSubject = process.env.WEB_PUSH_SUBJECT || config.webPushSubject || "mailto:support@churchapps.org";
+    this.webPushPublicKeySource = process.env.WEB_PUSH_PUBLIC_KEY ? "env" : (config.webPushPublicKey ? `config:${this.currentEnvironment}` : "missing");
+    this.webPushPrivateKeySource = process.env.WEB_PUSH_PRIVATE_KEY ? "env" : "missing";
 
     console.log("✅ Configuration parameters loaded from environment variables");
   }

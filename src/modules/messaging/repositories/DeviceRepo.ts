@@ -83,6 +83,14 @@ export class DeviceRepo {
       .where("fcmToken", "=", fcmToken).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
+  public async loadByFcmTokenContains(churchId: string, substring: string): Promise<Device | undefined> {
+    return (await getDb().selectFrom("devices").selectAll()
+      .where("churchId", "=", churchId)
+      .where("fcmToken", "like", `%${substring}%`)
+      .orderBy("lastActiveDate", "desc")
+      .executeTakeFirst()) ?? null;
+  }
+
   public async loadByChurchId(churchId: string) {
     return getDb().selectFrom("devices").selectAll()
       .where("churchId", "=", churchId)
@@ -103,6 +111,14 @@ export class DeviceRepo {
 
   public async deleteByFcmTokenContains(substring: string) {
     await getDb().deleteFrom("devices").where("fcmToken", "like", `%${substring}%`).execute();
+  }
+
+  public async deleteByFcmTokenContainsExceptId(churchId: string, substring: string, keepId: string) {
+    await getDb().deleteFrom("devices")
+      .where("churchId", "=", churchId)
+      .where("id", "!=", keepId)
+      .where("fcmToken", "like", `%${substring}%`)
+      .execute();
   }
 
   public async delete(churchId: string, id: string) {

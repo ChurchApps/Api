@@ -15,12 +15,18 @@
 // Mock the WebPushHelper used inside NotificationHelper. We assert it gets called
 // with the encoded subscription string (and the right title/body/type/contentId).
 const sendBulkTypedMessagesMock = jest.fn() as jest.MockedFunction<any>;
-sendBulkTypedMessagesMock.mockResolvedValue([{ token: "webpush:fake", success: true, gone: false }]);
+sendBulkTypedMessagesMock.mockResolvedValue([{ token: "webpush:fake", success: true, gone: false, retryable: false }]);
 
 jest.mock("../WebPushHelper.js", () => ({
   WebPushHelper: {
     sendBulkTypedMessages: sendBulkTypedMessagesMock,
-    isWebPushToken: (t?: string) => !!t && t.startsWith("webpush:")
+    isWebPushToken: (t?: string) => !!t && t.startsWith("webpush:"),
+    getEndpointFromToken: (t?: string) => {
+      if (!t || !t.startsWith("webpush:")) return null;
+      const parsed = JSON.parse(t.substring("webpush:".length));
+      return parsed?.endpoint || null;
+    },
+    getConfigSummary: () => ({ instanceId: "test-instance" })
   }
 }));
 
@@ -53,6 +59,8 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
   beforeEach(() => {
     sendBulkTypedMessagesMock.mockClear();
     sendMessagesMock.mockClear();
+    sendBulkTypedMessagesMock.mockResolvedValue([{ token: "webpush:fake", success: true, gone: false, retryable: false }]);
+    sendMessagesMock.mockResolvedValue(0);
   });
 
   function buildRepos(opts: { connections?: any[]; devices?: any[]; pref?: any }) {
@@ -101,6 +109,8 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
   });
 
   it("delivers via socket when the recipient is online (push not invoked)", async () => {
+    sendMessagesMock.mockResolvedValueOnce(1);
+
     const repos = buildRepos({
       connections: [{ socketId: "abc", churchId: "CHU00000001" }],
       devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
@@ -143,6 +153,39 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
     expect(sendMessagesMock).not.toHaveBeenCalled();
     expect(sendBulkTypedMessagesMock).not.toHaveBeenCalled();
     expect(result).toBe("email");
+  });
+
+  it("keeps the item on the push track when the web push provider fails transiently", async () => {
+    sendBulkTypedMessagesMock.mockResolvedValueOnce([
+      {
+        token: "webpush:fake",
+        success: false,
+        gone: false,
+        retryable: true,
+        diagnosticCode: "push-provider-server-error",
+        statusCode: 503,
+        errorMessage: "temporary upstream failure"
+      }
+    ]);
+
+    const repos = buildRepos({
+      connections: [],
+      devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
+    });
+    NotificationHelper.init(repos);
+
+    const result = await NotificationHelper.attemptDeliveryWithEscalation(
+      "CHU00000001",
+      "PER00000001",
+      0,
+      "Title text",
+      "Body text",
+      "privateMessage",
+      "PMID00001"
+    );
+
+    expect(sendBulkTypedMessagesMock).toHaveBeenCalledTimes(1);
+    expect(result).toBe("push");
   });
 });
 

@@ -56,6 +56,48 @@ export class NotificationHelper {
     }
   };
 
+  private static deviceSortTime = (device: Device): number => {
+    const lastActive = device.lastActiveDate ? new Date(device.lastActiveDate).getTime() : 0;
+    const registered = device.registrationDate ? new Date(device.registrationDate).getTime() : 0;
+    return Math.max(lastActive, registered);
+  };
+
+  private static prepareWebPushDevices = (devices: Device[]): { activeTokens: string[]; staleTokens: string[]; activeDevices: Device[] } => {
+    const byEndpoint = new Map<string, Device>();
+    const staleTokens: string[] = [];
+
+    for (const device of devices) {
+      const token = device.fcmToken;
+      if (!WebPushHelper.isWebPushToken(token)) continue;
+
+      const endpoint = WebPushHelper.getEndpointFromToken(token);
+      if (!endpoint) {
+        staleTokens.push(token);
+        continue;
+      }
+
+      const existing = byEndpoint.get(endpoint);
+      if (!existing) {
+        byEndpoint.set(endpoint, device);
+        continue;
+      }
+
+      if (NotificationHelper.deviceSortTime(device) >= NotificationHelper.deviceSortTime(existing)) {
+        if (existing.fcmToken) staleTokens.push(existing.fcmToken);
+        byEndpoint.set(endpoint, device);
+      } else {
+        staleTokens.push(token);
+      }
+    }
+
+    const activeDevices = Array.from(byEndpoint.values());
+    return {
+      activeDevices,
+      activeTokens: activeDevices.map((device) => device.fcmToken).filter((token): token is string => !!token),
+      staleTokens: [...new Set(staleTokens.filter(Boolean))]
+    };
+  };
+
   // Escalation levels: 0=socket, 1=push, 2=email
   static attemptDeliveryWithEscalation = async (
     churchId: string,
@@ -68,9 +110,9 @@ export class NotificationHelper {
     navData?: Record<string, unknown>
   ): Promise<string> => {
     this.ensureInitialized();
-    const isPrivateMessage = contentType === "privateMessage";
-    const senderPersonId = isPrivateMessage ? String(navData?.personId || "") : "";
-    const conversationId = isPrivateMessage ? String(navData?.conversationId || "") : "";
+    // const isPrivateMessage = contentType === "privateMessage";
+    // const senderPersonId = isPrivateMessage ? String(navData?.personId || "") : "";
+    // const conversationId = isPrivateMessage ? String(navData?.conversationId || "") : "";
 
     // Level 0: Try Socket. Load connections and unread counts in parallel so the
     // socket payload can carry the fresh counts and the client avoids a round-trip.
@@ -123,7 +165,19 @@ export class NotificationHelper {
         const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
         const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
         const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
-        const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
+        const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens, activeDevices: activeWebPushDevices } = this.prepareWebPushDevices(devices);
+        console.info("[chat-push] devices loaded", {
+          churchId,
+          personId,
+          contentType,
+          contentId,
+          deviceCount: devices.length,
+          deviceIds: devices.map((device) => device.id),
+          expoPushCount: expoPushTokens.length,
+          webPushCount: webPushTokens.length,
+          staleWebPushCount: staleWebPushTokens.length,
+          allowPush: pref.allowPush
+        });
 
         let anyPushSent = false;
 
@@ -148,13 +202,72 @@ export class NotificationHelper {
         }
 
         if (webPushTokens.length > 0) {
+          if (staleWebPushTokens.length > 0) {
+            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+          }
+          console.info("[webpush] preparing notification send", {
+            ...WebPushHelper.getConfigSummary(),
+            churchId,
+            personId,
+            contentType,
+            contentId,
+            deviceIds: activeWebPushDevices.map((device) => device.id),
+            endpointHosts: [...new Set(activeWebPushDevices.map((device) => WebPushHelper.getEndpointFromToken(device.fcmToken || "")).filter(Boolean).map((endpoint) => {
+              try {
+                return new URL(endpoint).host;
+              } catch {
+                return "unknown";
+              }
+            }))],
+            staleDuplicateCount: staleWebPushTokens.length
+          });
           try {
             const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId, navData);
+            const retryableFailures = results.filter((r) => !r.success && r.retryable);
+            const nonRetryableFailures = results.filter((r) => !r.success && !r.retryable);
             await Promise.all(results.map((r) => {
-              const logPromise = this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, r.errorMessage);
+              const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
+              const logPromise = this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, details || undefined);
               return r.gone ? Promise.all([logPromise, this.deleteInvalidToken(r.token)]) : logPromise;
             }));
+            if (retryableFailures.length > 0) {
+              console.warn("[webpush] retryable delivery failures detected", {
+                churchId,
+                personId,
+                contentType,
+                contentId,
+                retryableCount: retryableFailures.length
+              });
+            }
+            if (nonRetryableFailures.length > 0) {
+              console.error("[webpush] non-retryable delivery failures detected", {
+                churchId,
+                personId,
+                contentType,
+                contentId,
+                failureCount: nonRetryableFailures.length,
+                diagnosticCodes: [...new Set(nonRetryableFailures.map((r) => r.diagnosticCode).filter(Boolean))]
+              });
+            }
             anyPushSent = anyPushSent || results.some((r) => r.success);
+            console.info("[chat-push] web push send results", {
+              churchId,
+              personId,
+              contentType,
+              contentId,
+              successCount: results.filter((r) => r.success).length,
+              retryableFailureCount: retryableFailures.length,
+              nonRetryableFailureCount: nonRetryableFailures.length,
+              failures: nonRetryableFailures.concat(retryableFailures).map((r) => ({
+                statusCode: r.statusCode,
+                diagnosticCode: r.diagnosticCode,
+                endpointHost: r.endpointHost,
+                errorMessage: r.errorMessage
+              }))
+            });
+            if (!anyPushSent && retryableFailures.length > 0) {
+              return "push";
+            }
           } catch (error) {
             console.error("Web push notification failed:", error);
             await Promise.all(webPushTokens.map((token) => this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))));
@@ -288,6 +401,18 @@ export class NotificationHelper {
         }
 
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
+        const recipientDevices = pm.notifyPersonId
+          ? await NotificationHelper.repos.device.loadForPerson(conversation.churchId, pm.notifyPersonId) as any[]
+          : [];
+        console.info("[chat-push] targets", {
+          churchId: conversation.churchId,
+          conversationId: conversation.id,
+          senderPersonId,
+          recipientPersonIds: pm.notifyPersonId ? [pm.notifyPersonId] : [],
+          deviceCount: recipientDevices.length,
+          deviceIds: recipientDevices.map((device) => device.id),
+          contentType: conversation.contentType
+        });
         if (!pm.notifyPersonId) {
           console.warn("[chat-push] private message notification skipped: recipient could not be resolved", {
             churchId: conversation.churchId,
@@ -350,6 +475,18 @@ export class NotificationHelper {
           .filter(([, subscribed]) => subscribed)
           .map(([personId]) => personId)
           .filter((pid) => pid !== senderPersonId);
+        const recipientDevices = subscribers.length > 0
+          ? ((await Promise.all(subscribers.map((personId) => NotificationHelper.repos.device.loadForPerson(conversation.churchId, personId)))) as any[][]).flat()
+          : [];
+        console.info("[chat-push] targets", {
+          churchId: conversation.churchId,
+          conversationId: conversation.id,
+          senderPersonId,
+          recipientPersonIds: subscribers,
+          deviceCount: recipientDevices.length,
+          deviceIds: recipientDevices.map((device) => device.id),
+          contentType: conversation.contentType
+        });
         if (subscribers.length > 0) {
           await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + conversation.title, undefined, senderPersonId);
         }
@@ -381,8 +518,20 @@ export class NotificationHelper {
 
     // don't notify people a second time about the same type of event.
     const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[] || [];
+    const suppressedPersonIds: string[] = [];
     for (let i = notifications.length - 1; i >= 0; i--) {
-      if (existing.length > 0 && ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) notifications.splice(i, 1);
+      if (existing.length > 0 && ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) {
+        suppressedPersonIds.push(notifications[i].personId);
+        notifications.splice(i, 1);
+      }
+    }
+    if (suppressedPersonIds.length > 0) {
+      console.info("[chat-push] notification suppressed by unread existing", {
+        churchId,
+        contentType,
+        contentId,
+        suppressedPersonIds
+      });
     }
     if (notifications.length > 0) {
       const promises: Promise<Notification>[] = [];
@@ -449,7 +598,7 @@ export class NotificationHelper {
       try {
         const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
         const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
-        const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
+        const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
 
         if (expoPushTokens.length > 0) {
           await ExpoPushHelper.sendBulkMessages(expoPushTokens, title, title);
@@ -457,11 +606,23 @@ export class NotificationHelper {
         }
 
         if (webPushTokens.length > 0) {
+          if (staleWebPushTokens.length > 0) {
+            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+          }
           const results = await WebPushHelper.sendBulkMessages(webPushTokens, title, title);
           for (const r of results) {
             if (r.gone) await this.deleteInvalidToken(r.token);
           }
+          const retryableFailures = results.filter((r) => !r.success && r.retryable);
+          if (retryableFailures.length > 0) {
+            console.warn("[webpush] notifyUser retryable failures", {
+              churchId,
+              personId,
+              retryableCount: retryableFailures.length
+            });
+          }
           if (results.some((r) => r.success)) method = "push";
+          else if (retryableFailures.length > 0) method = "push";
         }
       } catch (error) {
         // Log the error but don't throw - we still want to return the method if socket delivery worked
@@ -499,7 +660,7 @@ export class NotificationHelper {
     if (devices.length > 0) {
       const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
       const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
-      const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
+      const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
       const title = `New Message from ${senderName}`;
 
       if (expoPushTokens.length > 0) {
@@ -523,12 +684,17 @@ export class NotificationHelper {
 
       if (webPushTokens.length > 0) {
         try {
+          if (staleWebPushTokens.length > 0) {
+            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+          }
           const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, messageContent, "privateMessage", conversationId);
           for (const r of results) {
-            await this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, r.errorMessage);
+            const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
+            await this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, details || undefined);
             if (r.gone) await this.deleteInvalidToken(r.token);
           }
           if (results.some((r) => r.success)) method = "push";
+          else if (results.some((r) => r.retryable)) method = "push";
         } catch (error) {
           console.error("Web push notification failed for private message:", error);
           for (const token of webPushTokens) {
@@ -567,7 +733,7 @@ export class NotificationHelper {
     if (devices.length > 0) {
       const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
       const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
-      const webPushTokens = [...new Set(allTokens.filter((token) => WebPushHelper.isWebPushToken(token)))];
+      const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
 
       let title = "New Notification";
       if (notificationMessage.includes("Volunteer Requests:")) {
@@ -599,12 +765,17 @@ export class NotificationHelper {
 
       if (webPushTokens.length > 0) {
         try {
+          if (staleWebPushTokens.length > 0) {
+            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+          }
           const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, notificationMessage, "notification", notificationId);
           for (const r of results) {
-            await this.logDelivery(churchId, personId, contentType, notificationId, "push", r.success, r.token, r.errorMessage);
+            const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
+            await this.logDelivery(churchId, personId, contentType, notificationId, "push", r.success, r.token, details || undefined);
             if (r.gone) await this.deleteInvalidToken(r.token);
           }
           if (results.some((r) => r.success)) method = "push";
+          else if (results.some((r) => r.retryable)) method = "push";
         } catch (error) {
           console.error("Web push notification failed for general notification:", error);
           for (const token of webPushTokens) {
