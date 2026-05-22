@@ -7,6 +7,16 @@ import { WebPushHelper } from "./WebPushHelper.js";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
+export interface NotificationDebugStep {
+  step: string;
+  status: "start" | "ok" | "warn" | "error";
+  data?: Record<string, unknown>;
+}
+
+export interface NotificationDebugTrace {
+  steps: NotificationDebugStep[];
+}
+
 export class NotificationHelper {
   private static repos: Repos;
 
@@ -98,6 +108,11 @@ export class NotificationHelper {
     };
   };
 
+  private static addDebugStep(trace: NotificationDebugTrace | undefined, step: string, status: NotificationDebugStep["status"], data?: Record<string, unknown>) {
+    if (!trace) return;
+    trace.steps.push({ step, status, ...(data ? { data } : {}) });
+  }
+
   // Escalation levels: 0=socket, 1=push, 2=email
   static attemptDeliveryWithEscalation = async (
     churchId: string,
@@ -107,7 +122,8 @@ export class NotificationHelper {
     body: string,
     contentType: string,
     contentId: string,
-    navData?: Record<string, unknown>
+    navData?: Record<string, unknown>,
+    debugTrace?: NotificationDebugTrace
   ): Promise<string> => {
     this.ensureInitialized();
     // const isPrivateMessage = contentType === "privateMessage";
@@ -121,10 +137,16 @@ export class NotificationHelper {
     // suppress the OS-level push notification entirely.
     let socketDelivered = false;
     if (startLevel <= 0) {
+      this.addDebugStep(debugTrace, "delivery-load-socket-connections", "start", { churchId, personId, contentType, contentId });
       const [connections, countsRaw] = await Promise.all([
         NotificationHelper.repos.connection.loadForNotification(churchId, personId),
         NotificationHelper.repos.notification.loadNewCounts(churchId, personId)
       ]);
+      this.addDebugStep(debugTrace, "delivery-load-socket-connections", "ok", {
+        connectionCount: connections.length,
+        notificationCount: Number((countsRaw as any)?.notificationCount) || 0,
+        pmCount: Number((countsRaw as any)?.pmCount) || 0
+      });
       if (connections.length > 0) {
         const counts = {
           notificationCount: Number((countsRaw as any)?.notificationCount) || 0,
@@ -147,7 +169,12 @@ export class NotificationHelper {
           index < deliveryCount ? undefined : "Socket delivery failed"
         )));
         socketDelivered = deliveryCount > 0;
+        this.addDebugStep(debugTrace, "delivery-socket-send", deliveryCount > 0 ? "ok" : "warn", {
+          attemptedConnectionCount: connections.length,
+          deliveredCount: deliveryCount
+        });
         if (contentType !== "privateMessage" && deliveryCount > 0) {
+          this.addDebugStep(debugTrace, "delivery-stop-at-socket", "ok", { reason: "non-private-message socket delivery succeeded" });
           return "socket"; // Stop here, let 15-min timer escalate if unread
         }
       }
@@ -158,6 +185,10 @@ export class NotificationHelper {
     if (!pref) {
       pref = await this.createNotificationPref(churchId, personId);
     }
+    this.addDebugStep(debugTrace, "delivery-load-prefs", "ok", {
+      allowPush: pref.allowPush,
+      emailFrequency: pref.emailFrequency
+    });
 
     // Level 1: Try Push
     if (startLevel <= 1) {
@@ -178,6 +209,13 @@ export class NotificationHelper {
           staleWebPushCount: staleWebPushTokens.length,
           allowPush: pref.allowPush
         });
+        this.addDebugStep(debugTrace, "delivery-load-devices", devices.length > 0 ? "ok" : "warn", {
+          deviceCount: devices.length,
+          deviceIds: devices.map((device) => device.id),
+          expoPushCount: expoPushTokens.length,
+          webPushCount: webPushTokens.length,
+          staleWebPushCount: staleWebPushTokens.length
+        });
 
         let anyPushSent = false;
 
@@ -195,8 +233,10 @@ export class NotificationHelper {
               return logPromise;
             }));
             anyPushSent = true;
+            this.addDebugStep(debugTrace, "delivery-expo-push", "ok", { expoPushCount: expoPushTokens.length });
           } catch (error) {
             console.error("Push notification failed:", error);
+            this.addDebugStep(debugTrace, "delivery-expo-push", "error", { expoPushCount: expoPushTokens.length, error: String(error) });
             await Promise.all(expoPushTokens.map((token) => this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))));
           }
         }
@@ -227,6 +267,17 @@ export class NotificationHelper {
             const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId, navData);
             const retryableFailures = results.filter((r) => !r.success && r.retryable);
             const nonRetryableFailures = results.filter((r) => !r.success && !r.retryable);
+            this.addDebugStep(debugTrace, "delivery-webpush-send", results.some((r) => r.success) ? "ok" : (retryableFailures.length > 0 ? "warn" : "error"), {
+              webPushCount: webPushTokens.length,
+              successCount: results.filter((r) => r.success).length,
+              retryableFailureCount: retryableFailures.length,
+              nonRetryableFailureCount: nonRetryableFailures.length,
+              failures: results.filter((r) => !r.success).map((r) => ({
+                statusCode: r.statusCode,
+                diagnosticCode: r.diagnosticCode,
+                endpointHost: r.endpointHost
+              }))
+            });
             await Promise.all(results.map((r) => {
               const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
               const logPromise = this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, details || undefined);
@@ -268,33 +319,40 @@ export class NotificationHelper {
               }))
             });
             if (!anyPushSent && retryableFailures.length > 0) {
+              this.addDebugStep(debugTrace, "delivery-return-push-retryable", "warn", { reason: "retryable webpush failures" });
               return "push";
             }
           } catch (error) {
             console.error("Web push notification failed:", error);
+            this.addDebugStep(debugTrace, "delivery-webpush-send", "error", { webPushCount: webPushTokens.length, error: String(error) });
             await Promise.all(webPushTokens.map((token) => this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error))));
           }
         }
 
         if (anyPushSent) {
+          this.addDebugStep(debugTrace, "delivery-return-push", "ok", { anyPushSent });
           return "push"; // Stop here, let 15-min timer escalate if unread
         }
       }
     }
 
     if (socketDelivered) {
+      this.addDebugStep(debugTrace, "delivery-return-socket", "ok", { socketDelivered: true });
       return "socket";
     }
 
     // Level 2: Email
     if (pref.emailFrequency === "never") {
+      this.addDebugStep(debugTrace, "delivery-return-complete", "warn", { reason: "email frequency set to never" });
       return "complete"; // End of line, no email wanted
     } else if (pref.emailFrequency === "individual") {
       // Send email immediately - the sendEmailNotifications will handle this
       // For now, mark as "email" to indicate it's ready for immediate send
+      this.addDebugStep(debugTrace, "delivery-return-email", "ok", { emailFrequency: pref.emailFrequency });
       return "email";
     } else {
       // daily - wait for midnight timer
+      this.addDebugStep(debugTrace, "delivery-return-email", "ok", { emailFrequency: pref.emailFrequency });
       return "email";
     }
   };
@@ -369,15 +427,27 @@ export class NotificationHelper {
     return { notificationsEscalated: pendingNotifications.length, pmsEscalated: pendingPMs.length };
   };
 
-  static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string) => {
+  static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string, debugTrace?: NotificationDebugTrace) => {
     this.ensureInitialized();
+    this.addDebugStep(debugTrace, "notify-start", "start", {
+      churchId: conversation.churchId,
+      conversationId: conversation.id,
+      contentType: conversation.contentType,
+      senderPersonId,
+      messageId: message.id
+    });
     switch (conversation.contentType) {
       case "streamingLive":
         // don't send notifications for live stream chat room.
+        this.addDebugStep(debugTrace, "notify-skip-streaming-live", "warn", { reason: "streaming live chat disabled for notifications" });
         break;
       case "privateMessage": {
         const pm: PrivateMessage = await NotificationHelper.repos.privateMessage.loadByConversationId(conversation.churchId, conversation.id);
         if (!pm) {
+          this.addDebugStep(debugTrace, "notify-load-private-message-row", "error", {
+            churchId: conversation.churchId,
+            conversationId: conversation.id
+          });
           console.warn("[chat-push] private message notification skipped: conversation mapping not found", {
             churchId: conversation.churchId,
             conversationId: conversation.id,
@@ -385,9 +455,18 @@ export class NotificationHelper {
           });
           break;
         }
+        this.addDebugStep(debugTrace, "notify-load-private-message-row", "ok", {
+          privateMessageId: pm.id,
+          fromPersonId: pm.fromPersonId,
+          toPersonId: pm.toPersonId
+        });
 
         const participants = [pm.fromPersonId, pm.toPersonId].filter((value): value is string => !!value);
         if (!senderPersonId || !participants.includes(senderPersonId)) {
+          this.addDebugStep(debugTrace, "notify-validate-private-message-sender", "error", {
+            senderPersonId,
+            participants
+          });
           console.warn("[chat-push] private message notification skipped: sender is not a conversation participant", {
             churchId: conversation.churchId,
             conversationId: conversation.id,
@@ -401,6 +480,10 @@ export class NotificationHelper {
           await NotificationHelper.repos.privateMessage.save(pm);
           break;
         }
+        this.addDebugStep(debugTrace, "notify-validate-private-message-sender", "ok", {
+          senderPersonId,
+          participants
+        });
 
         pm.notifyPersonId = pm.fromPersonId === senderPersonId ? pm.toPersonId : pm.fromPersonId;
         const recipientDevices = pm.notifyPersonId
@@ -416,6 +499,11 @@ export class NotificationHelper {
           contentType: conversation.contentType
         });
         if (!pm.notifyPersonId) {
+          this.addDebugStep(debugTrace, "notify-resolve-private-message-recipient", "error", {
+            fromPersonId: pm.fromPersonId,
+            toPersonId: pm.toPersonId,
+            senderPersonId
+          });
           console.warn("[chat-push] private message notification skipped: recipient could not be resolved", {
             churchId: conversation.churchId,
             conversationId: conversation.id,
@@ -428,10 +516,19 @@ export class NotificationHelper {
           await NotificationHelper.repos.privateMessage.save(pm);
           break;
         }
+        this.addDebugStep(debugTrace, "notify-resolve-private-message-recipient", "ok", {
+          notifyPersonId: pm.notifyPersonId,
+          recipientDeviceCount: recipientDevices.length,
+          recipientDeviceIds: recipientDevices.map((device) => device.id)
+        });
 
         // Persist notifyPersonId first so the unread count query inside
         // attemptDeliveryWithEscalation includes this new message.
         await NotificationHelper.repos.privateMessage.save(pm);
+        this.addDebugStep(debugTrace, "notify-save-private-message-target", "ok", {
+          privateMessageId: pm.id,
+          notifyPersonId: pm.notifyPersonId
+        });
 
         // Use escalation logic - start at level 0 (socket)
         // navData.personId = the OTHER party in the chat (the sender), so the
@@ -445,11 +542,16 @@ export class NotificationHelper {
           message.content,
           "privateMessage",
           pm.id || conversation.id,
-          { personId: senderPersonId, conversationId: conversation.id }
+          { personId: senderPersonId, conversationId: conversation.id },
+          debugTrace
         );
 
         pm.deliveryMethod = deliveryMethod;
         await NotificationHelper.repos.privateMessage.save(pm);
+        this.addDebugStep(debugTrace, "notify-save-private-message-delivery-method", "ok", {
+          privateMessageId: pm.id,
+          deliveryMethod
+        });
         break;
       }
       default: {
