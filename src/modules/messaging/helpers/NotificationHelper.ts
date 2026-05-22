@@ -216,6 +216,10 @@ export class NotificationHelper {
           webPushCount: webPushTokens.length,
           staleWebPushCount: staleWebPushTokens.length
         });
+        if (staleWebPushTokens.length > 0) {
+          await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+          this.addDebugStep(debugTrace, "delivery-delete-stale-webpush-tokens", "warn", { staleWebPushCount: staleWebPushTokens.length });
+        }
 
         let anyPushSent = false;
 
@@ -242,9 +246,6 @@ export class NotificationHelper {
         }
 
         if (webPushTokens.length > 0) {
-          if (staleWebPushTokens.length > 0) {
-            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
-          }
           console.info("[webpush] preparing notification send", {
             ...WebPushHelper.getConfigSummary(),
             churchId,
@@ -703,6 +704,9 @@ export class NotificationHelper {
         const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
         const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
         const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
+        if (staleWebPushTokens.length > 0) {
+          await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+        }
 
         if (expoPushTokens.length > 0) {
           await ExpoPushHelper.sendBulkMessages(expoPushTokens, title, title);
@@ -710,9 +714,6 @@ export class NotificationHelper {
         }
 
         if (webPushTokens.length > 0) {
-          if (staleWebPushTokens.length > 0) {
-            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
-          }
           const results = await WebPushHelper.sendBulkMessages(webPushTokens, title, title);
           for (const r of results) {
             if (r.gone) await this.deleteInvalidToken(r.token);
@@ -766,6 +767,9 @@ export class NotificationHelper {
       const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
       const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
       const title = `New Message from ${senderName}`;
+      if (staleWebPushTokens.length > 0) {
+        await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+      }
 
       if (expoPushTokens.length > 0) {
         try {
@@ -788,9 +792,6 @@ export class NotificationHelper {
 
       if (webPushTokens.length > 0) {
         try {
-          if (staleWebPushTokens.length > 0) {
-            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
-          }
           const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, messageContent, "privateMessage", conversationId);
           for (const r of results) {
             const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
@@ -838,6 +839,9 @@ export class NotificationHelper {
       const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
       const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
       const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
+      if (staleWebPushTokens.length > 0) {
+        await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
+      }
 
       let title = "New Notification";
       if (notificationMessage.includes("Volunteer Requests:")) {
@@ -869,9 +873,6 @@ export class NotificationHelper {
 
       if (webPushTokens.length > 0) {
         try {
-          if (staleWebPushTokens.length > 0) {
-            await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
-          }
           const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, notificationMessage, "notification", notificationId);
           for (const r of results) {
             const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
