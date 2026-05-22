@@ -64,6 +64,29 @@ export class WebPushHelper {
     return { gone: false, retryable: true, diagnosticCode: "push-network-or-unknown-error" };
   }
 
+  private static explainDiagnosticCode(diagnosticCode: string): string {
+    switch (diagnosticCode) {
+      case "subscription-gone":
+        return "Push provider says the stored subscription is expired or no longer exists.";
+      case "vapid-auth-failed":
+        return "Push provider rejected the backend VAPID authentication. Check that the production private key matches the public key used by clients.";
+      case "invalid-payload-or-subscription":
+        return "Push provider rejected the request payload or the subscription object.";
+      case "push-provider-throttled":
+        return "Push provider temporarily throttled or asked for retry.";
+      case "push-provider-server-error":
+        return "Push provider returned a server error.";
+      case "push-network-or-unknown-error":
+        return "Network or unknown push delivery error while contacting the provider.";
+      case "invalid-subscription-token":
+        return "Stored token could not be decoded into a valid web push subscription.";
+      case "web-push-not-configured":
+        return "The backend does not have both VAPID keys loaded.";
+      default:
+        return "Unknown push diagnostic.";
+    }
+  }
+
   private static buildPayload(payload: Record<string, unknown>): string {
     return JSON.stringify({
       ...payload,
@@ -173,10 +196,24 @@ export class WebPushHelper {
     WebPushHelper.init();
 
     const body = WebPushHelper.buildPayload(payload);
+    const topic = WebPushHelper.fingerprint(`${payload.type || "notification"}:${payload.contentId || "unknown"}`).slice(0, 32);
+    console.info("[webpush] bulk send start", {
+      ...WebPushHelper.getConfigSummary(),
+      tokenCount: tokens.length,
+      payloadType: payload.type || "notification",
+      contentId: payload.contentId || "unknown",
+      topic,
+      bodyLength: body.length
+    });
     const results = await Promise.all(
       tokens.map(async (token): Promise<WebPushDispatchResult> => {
         const sub = WebPushHelper.decodeSubscription(token);
         if (!sub) {
+          console.warn("[webpush] skipped invalid stored token", {
+            ...WebPushHelper.getConfigSummary(),
+            payloadType: payload.type || "notification",
+            contentId: payload.contentId || "unknown"
+          });
           return {
             token,
             success: false,
@@ -187,17 +224,31 @@ export class WebPushHelper {
           };
         }
         const endpointSummary = WebPushHelper.summarizeEndpoint(sub.endpoint);
+        console.info("[webpush] send attempt", {
+          ...WebPushHelper.getConfigSummary(),
+          payloadType: payload.type || "notification",
+          contentId: payload.contentId || "unknown",
+          endpointHost: endpointSummary.endpointHost,
+          endpointFingerprint: endpointSummary.endpointFingerprint,
+          subscriptionKeyLengths: {
+            p256dh: sub.keys.p256dh.length,
+            auth: sub.keys.auth.length
+          },
+          topic
+        });
         try {
           await webpush.sendNotification(sub, body, {
             TTL: 60 * 60 * 24,
             urgency: "high",
-            topic: WebPushHelper.fingerprint(`${payload.type || "notification"}:${payload.contentId || "unknown"}`).slice(0, 32)
+            topic
           });
           console.info("[webpush] send success", {
             ...WebPushHelper.getConfigSummary(),
             endpointHost: endpointSummary.endpointHost,
             endpointFingerprint: endpointSummary.endpointFingerprint,
-            payloadType: payload.type || "notification"
+            payloadType: payload.type || "notification",
+            contentId: payload.contentId || "unknown",
+            topic
           });
           return {
             token,
@@ -214,8 +265,13 @@ export class WebPushHelper {
             ...WebPushHelper.getConfigSummary(),
             statusCode,
             diagnosticCode: classification.diagnosticCode,
+            diagnosticHelp: WebPushHelper.explainDiagnosticCode(classification.diagnosticCode),
             endpointHost: endpointSummary.endpointHost,
             endpointFingerprint: endpointSummary.endpointFingerprint,
+            payloadType: payload.type || "notification",
+            contentId: payload.contentId || "unknown",
+            topic,
+            responseHeaders: err?.headers,
             responseBody: err?.body,
             message: err?.message
           });
