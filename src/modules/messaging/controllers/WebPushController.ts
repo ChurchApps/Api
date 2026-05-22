@@ -138,26 +138,18 @@ export class WebPushController extends MessagingBaseController {
       if (device) {
         matchStrategy = "exactToken";
         matchedExistingDevice = true;
-        this.addStep(steps, "lookup-device-by-exact-token", "ok", {
-          matchedDeviceId: device.id
-        });
+        this.addStep(steps, "lookup-device-by-exact-token", "ok", { matchedDeviceId: device.id });
       } else {
-        this.addStep(steps, "lookup-device-by-exact-token", "warn", {
-          matchedDeviceId: null
-        });
+        this.addStep(steps, "lookup-device-by-exact-token", "warn", { matchedDeviceId: null });
       }
       if (!device) {
         device = await this.repos.device.loadByFcmTokenContains(au.churchId, normalizedEndpoint);
         if (device) {
           matchStrategy = "endpointContains";
           matchedExistingDevice = true;
-          this.addStep(steps, "lookup-device-by-endpoint", "ok", {
-            matchedDeviceId: device.id
-          });
+          this.addStep(steps, "lookup-device-by-endpoint", "ok", { matchedDeviceId: device.id });
         } else {
-          this.addStep(steps, "lookup-device-by-endpoint", "warn", {
-            matchedDeviceId: null
-          });
+          this.addStep(steps, "lookup-device-by-endpoint", "warn", { matchedDeviceId: null });
         }
       }
       const previousDevice = device ? {
