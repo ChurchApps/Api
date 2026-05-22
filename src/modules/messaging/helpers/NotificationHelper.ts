@@ -212,13 +212,15 @@ export class NotificationHelper {
             contentType,
             contentId,
             deviceIds: activeWebPushDevices.map((device) => device.id),
-            endpointHosts: [...new Set(activeWebPushDevices.map((device) => WebPushHelper.getEndpointFromToken(device.fcmToken || "")).filter(Boolean).map((endpoint) => {
-              try {
-                return new URL(endpoint).host;
-              } catch {
-                return "unknown";
-              }
-            }))],
+            endpointHosts: [
+              ...new Set(activeWebPushDevices.map((device) => WebPushHelper.getEndpointFromToken(device.fcmToken || "")).filter(Boolean).map((endpoint) => {
+                try {
+                  return new URL(endpoint).host;
+                } catch {
+                  return "unknown";
+                }
+              }))
+            ],
             staleDuplicateCount: staleWebPushTokens.length
           });
           try {
