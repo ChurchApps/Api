@@ -34,6 +34,22 @@ export class MessageController extends MessagingBaseController {
       req.body.forEach((message) => {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
+            console.info("[chat-push] message saved", {
+              route: "/messaging/messages/send",
+              churchId: savedMessage.churchId,
+              conversationId: savedMessage.conversationId,
+              messageId: savedMessage.id,
+              senderPersonId: savedMessage.personId || null,
+              messageType: savedMessage.messageType || "comment"
+            });
+            if (!savedMessage.personId) {
+              console.warn("[chat-push] anonymous send route saved message without personId", {
+                route: "/messaging/messages/send",
+                churchId: savedMessage.churchId,
+                conversationId: savedMessage.conversationId,
+                messageId: savedMessage.id
+              });
+            }
             // Load conversation and update stats in parallel - updateStats doesn't
             // depend on the result of loadById.
             const [conversation] = await Promise.all([
@@ -106,6 +122,15 @@ export class MessageController extends MessagingBaseController {
         if (!message.displayName && au?.firstName) message.displayName = au.firstName + " " + au.lastName;
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
+            console.info("[chat-push] message saved", {
+              route: "/messaging/messages",
+              churchId: savedMessage.churchId,
+              conversationId: savedMessage.conversationId,
+              messageId: savedMessage.id,
+              senderPersonId: savedMessage.personId || null,
+              authPersonId: au.personId || null,
+              messageType: savedMessage.messageType || "comment"
+            });
             // Load conversation and update stats in parallel - updateStats doesn't
             // depend on the result of loadById.
             const [conversation] = await Promise.all([
