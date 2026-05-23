@@ -197,6 +197,28 @@ export class WebPushController extends MessagingBaseController {
         keepDeviceId: device.id,
         endpointHost: endpointSummary.endpointHost
       });
+
+      const persistedDevice = await this.repos.device.loadById(au.churchId, device.id);
+      const persistedToken = persistedDevice?.fcmToken || "";
+      const persistedEndpoint = WebPushHelper.getEndpointFromToken(persistedToken);
+      const persistedEndpointSummary = persistedEndpoint ? WebPushHelper.getEndpointSummary(persistedEndpoint) : {};
+      const savedDeviceReadback = {
+        deviceFound: !!persistedDevice,
+        tokenLength: persistedToken.length,
+        tokenType: WebPushHelper.isWebPushToken(persistedToken) ? "webpush" : (persistedToken ? "other" : "empty"),
+        canDecodeEndpoint: !!persistedEndpoint,
+        endpointMatchesRequest: persistedEndpoint === normalizedEndpoint,
+        endpointHost: persistedEndpointSummary.endpointHost || null,
+        endpointFingerprint: persistedEndpointSummary.endpointFingerprint || null,
+        likelyTruncated: WebPushHelper.isWebPushToken(persistedToken) && !persistedEndpoint && persistedToken.length <= 255
+      };
+      this.addStep(
+        steps,
+        "verify-saved-device-readback",
+        savedDeviceReadback.canDecodeEndpoint && savedDeviceReadback.endpointMatchesRequest ? "ok" : "error",
+        savedDeviceReadback
+      );
+
       console.info("[webpush] subscription saved", {
         ...WebPushHelper.getConfigSummary(),
         churchId: au.churchId,
@@ -244,9 +266,12 @@ export class WebPushController extends MessagingBaseController {
           lastActiveDate: device.lastActiveDate || null,
           tokenType: WebPushHelper.isWebPushToken(device.fcmToken) ? "webpush" : "other"
         },
+        savedDeviceReadback,
         checks: {
           duplicateCleanupAttempted,
           savedDeviceLinkedToAuthPerson: !!(au.personId && device.personId === au.personId),
+          savedTokenDecodes: savedDeviceReadback.canDecodeEndpoint,
+          savedEndpointMatchesRequest: savedDeviceReadback.endpointMatchesRequest,
           hasPublicKey: !!Environment.webPushPublicKey,
           hasPrivateKey: !!Environment.webPushPrivateKey,
           webPushEnabled: WebPushHelper.isEnabled()
