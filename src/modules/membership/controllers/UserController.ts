@@ -555,10 +555,11 @@ export class UserController extends MembershipBaseController {
 
   @httpPost("/sendInviteEmail")
   public async sendInviteEmail(req: express.Request<{}, {}, { email: string; personName: string; contextName: string; churchName: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
+    return this.actionWrapper(req, res, async (au) => {
       const { email, personName, contextName, churchName } = req.body;
       if (!email || !contextName) return res.status(400).json({ errors: ["email and contextName are required"] });
 
+      const inviterEmail = au.email || undefined;
       let loginLink = "/";
       let isExistingUser = false;
       const user = await this.repos.user.loadByEmail(email);
@@ -568,10 +569,10 @@ export class UserController extends MembershipBaseController {
         loginLink = `/login?auth=${user.authGuid}`;
         await Promise.all([
           this.repos.user.save(user),
-          UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser)
+          UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser, inviterEmail)
         ]);
       } else {
-        await UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser);
+        await UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser, inviterEmail);
       }
 
       return this.json({ success: true }, 200);

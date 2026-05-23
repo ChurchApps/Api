@@ -105,6 +105,7 @@ export class EmailTemplateController extends MessagingBaseController {
       let successCount = 0;
       let failCount = 0;
       const from = Environment.supportEmail;
+      const replyTo = au.email || undefined;
 
       for (const member of eligible) {
         const person = { firstName: member.firstName, lastName: member.lastName, displayName: member.displayName, email: member.email };
@@ -112,7 +113,7 @@ export class EmailTemplateController extends MessagingBaseController {
         const resolvedBody = MergeFieldHelper.resolve(htmlContent, person, church);
 
         try {
-          await EmailHelper.sendTemplatedEmail(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
+          await EmailHelper.sendTemplatedEmail(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
           successCount++;
 
           const log: DeliveryLog = {
