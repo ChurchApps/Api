@@ -64,7 +64,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("deliveryMethod", sql`varchar(10)`)
     .addColumn("success", sql`bit(1)`)
     .addColumn("errorMessage", sql`varchar(500)`)
-    .addColumn("deliveryAddress", sql`varchar(255)`)
+    .addColumn("deliveryAddress", sql`text`)
     .addColumn("attemptTime", sql`datetime`)
     .modifyEnd(sql`ENGINE=InnoDB`)
     .execute();
@@ -82,7 +82,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("deviceId", sql`varchar(45)`)
     .addColumn("churchId", sql`char(11)`)
     .addColumn("personId", sql`char(11)`)
-    .addColumn("fcmToken", sql`varchar(255)`)
+    .addColumn("fcmToken", sql`text`)
     .addColumn("label", sql`varchar(45)`)
     .addColumn("registrationDate", sql`datetime`)
     .addColumn("lastActiveDate", sql`datetime`)
@@ -95,7 +95,6 @@ export async function up(db: Kysely<any>): Promise<void> {
 
   await db.schema.createIndex("idx_devices_appName_deviceId").on("devices").columns(["appName", "deviceId"]).execute();
   await db.schema.createIndex("idx_devices_personId_lastActiveDate").on("devices").columns(["personId", "lastActiveDate"]).execute();
-  await db.schema.createIndex("idx_devices_fcmToken").on("devices").columns(["fcmToken"]).execute();
   await db.schema.createIndex("idx_devices_pairingCode").on("devices").columns(["pairingCode"]).execute();
 
   // deviceContents
