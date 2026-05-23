@@ -12,118 +12,39 @@ interface WebPushEnrollBody {
   label?: string;
 }
 
-interface DebugStep {
-  step: string;
-  status: "start" | "ok" | "warn" | "error";
-  data?: Record<string, unknown>;
-}
-
 @controller("/messaging/webpush")
 export class WebPushController extends MessagingBaseController {
-  private addStep(steps: DebugStep[], step: string, status: DebugStep["status"], data?: Record<string, unknown>) {
-    steps.push({ step, status, ...(data ? { data } : {}) });
-  }
-
-  private buildDebugContext(req: express.Request, endpoint?: string) {
-    return {
-      route: req.path,
-      method: req.method,
-      timestamp: new Date().toISOString(),
-      config: WebPushHelper.getConfigSummary(),
-      endpoint: endpoint ? WebPushHelper.getEndpointSummary(endpoint) : undefined
-    };
-  }
-
   @httpGet("/publicKey")
   public async publicKey(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const summary = WebPushHelper.getConfigSummary();
-      const steps: DebugStep[] = [];
-      this.addStep(steps, "load-config-summary", "ok", summary as Record<string, unknown>);
       console.info("[webpush] publicKey requested", {
         ...summary,
         route: "/messaging/webpush/publicKey"
       });
-      this.addStep(steps, "evaluate-key-availability", WebPushHelper.isEnabled() ? "ok" : "warn", {
-        hasPublicKey: !!Environment.webPushPublicKey,
-        hasPrivateKey: !!Environment.webPushPrivateKey,
-        webPushEnabled: WebPushHelper.isEnabled()
-      });
-      const result: Record<string, unknown> = {
+      return {
         publicKey: Environment.webPushPublicKey || "",
-        enabled: WebPushHelper.isEnabled(),
-        keyFingerprint: summary.publicKeyFingerprint,
-        instanceId: summary.instanceId
+        enabled: WebPushHelper.isEnabled()
       };
-      this.addStep(steps, "build-response", "ok", {
-        publicKeyReturned: !!Environment.webPushPublicKey,
-        enabled: WebPushHelper.isEnabled(),
-        instanceId: summary.instanceId
-      });
-      result.debug = {
-        ...this.buildDebugContext(req),
-        steps,
-        checks: {
-          hasPublicKey: !!Environment.webPushPublicKey,
-          hasPrivateKey: !!Environment.webPushPrivateKey,
-          webPushEnabled: WebPushHelper.isEnabled(),
-          publicKeyServedToClient: !!Environment.webPushPublicKey
-        }
-      };
-      return result;
     });
   }
 
   @httpPost("/subscribe")
   public async subscribe(req: express.Request<{}, {}, WebPushEnrollBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const steps: DebugStep[] = [];
       const sub = req.body?.subscription;
-      this.addStep(steps, "receive-request", "start", {
-        hasSubscription: !!sub,
-        appName: req.body?.appName || "B1AppPwa"
-      });
       if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
-        this.addStep(steps, "validate-subscription-payload", "error", {
-          hasEndpoint: !!sub?.endpoint,
-          hasP256dh: !!sub?.keys?.p256dh,
-          hasAuth: !!sub?.keys?.auth
-        });
         return {
           success: false,
-          error: "invalid subscription",
-          debug: {
-            ...this.buildDebugContext(req),
-            steps
-          }
+          error: "invalid subscription"
         };
       }
-      this.addStep(steps, "validate-subscription-payload", "ok", {
-        hasEndpoint: true,
-        hasP256dh: true,
-        hasAuth: true
-      });
       const token = WebPushHelper.encodeSubscription(sub);
       const normalizedEndpoint = sub.endpoint.trim();
       const endpointSummary = WebPushHelper.getEndpointSummary(normalizedEndpoint);
-      this.addStep(steps, "encode-subscription", "ok", {
-        tokenType: WebPushHelper.isWebPushToken(token) ? "webpush" : "other",
-        encodedTokenLength: token.length,
-        endpointLength: normalizedEndpoint.length,
-        p256dhLength: sub.keys.p256dh.trim().length,
-        authLength: sub.keys.auth.trim().length,
-        endpointHost: endpointSummary.endpointHost,
-        endpointFingerprint: endpointSummary.endpointFingerprint
-      });
       console.info("[webpush] subscribe auth", {
         churchId: au.churchId,
         personId: au.personId,
-        userId: (au as any)?.userId || au.id,
-        principalId: au.id
-      });
-      this.addStep(steps, "load-auth-context", au.personId ? "ok" : "warn", {
-        churchId: au.churchId,
-        personId: au.personId || null,
         userId: (au as any)?.userId || au.id,
         principalId: au.id
       });
@@ -136,37 +57,12 @@ export class WebPushController extends MessagingBaseController {
         });
       }
 
-      let matchStrategy = "none";
-      let matchedExistingDevice = false;
       let device = await this.repos.device.loadByFcmToken(au.churchId, token);
-      if (device) {
-        matchStrategy = "exactToken";
-        matchedExistingDevice = true;
-        this.addStep(steps, "lookup-device-by-exact-token", "ok", { matchedDeviceId: device.id });
-      } else {
-        this.addStep(steps, "lookup-device-by-exact-token", "warn", { matchedDeviceId: null });
-      }
       if (!device) {
         device = await this.repos.device.loadByFcmTokenContains(au.churchId, normalizedEndpoint);
-        if (device) {
-          matchStrategy = "endpointContains";
-          matchedExistingDevice = true;
-          this.addStep(steps, "lookup-device-by-endpoint", "ok", { matchedDeviceId: device.id });
-        } else {
-          this.addStep(steps, "lookup-device-by-endpoint", "warn", { matchedDeviceId: null });
-        }
       }
-      const previousDevice = device ? {
-        id: device.id,
-        personId: device.personId || null,
-        appName: device.appName || null,
-        lastActiveDate: device.lastActiveDate || null,
-        registrationDate: device.registrationDate || null,
-        tokenType: WebPushHelper.isWebPushToken(device.fcmToken) ? "webpush" : "other"
-      } : null;
-      let duplicateCleanupAttempted = false;
+
       if (device) {
-        this.addStep(steps, "prepare-existing-device-update", "ok", previousDevice as Record<string, unknown>);
         device.personId = au.personId || device.personId;
         device.fcmToken = token;
         device.appName = req.body.appName || device.appName || "B1AppPwa";
@@ -174,10 +70,6 @@ export class WebPushController extends MessagingBaseController {
         device.deviceInfo = req.body.deviceInfo || device.deviceInfo;
         device.lastActiveDate = new Date();
         await this.repos.device.save(device);
-        this.addStep(steps, "save-existing-device", "ok", {
-          deviceId: device.id,
-          savedPersonId: device.personId || null
-        });
       } else {
         const newDevice: Device = {
           churchId: au.churchId,
@@ -190,40 +82,8 @@ export class WebPushController extends MessagingBaseController {
           lastActiveDate: new Date()
         };
         device = await this.repos.device.save(newDevice);
-        this.addStep(steps, "create-new-device", "ok", {
-          deviceId: device.id,
-          savedPersonId: device.personId || null
-        });
       }
-      duplicateCleanupAttempted = true;
       await this.repos.device.deleteByFcmTokenContainsExceptId(au.churchId, normalizedEndpoint, device.id);
-      this.addStep(steps, "cleanup-duplicate-devices", "ok", {
-        keepDeviceId: device.id,
-        endpointHost: endpointSummary.endpointHost
-      });
-
-      const persistedDevice = await this.repos.device.loadById(au.churchId, device.id);
-      const persistedToken = persistedDevice?.fcmToken || "";
-      const persistedEndpoint = WebPushHelper.getEndpointFromToken(persistedToken);
-      const persistedEndpointSummary = persistedEndpoint ? WebPushHelper.getEndpointSummary(persistedEndpoint) : {};
-      const savedDeviceReadback = {
-        deviceFound: !!persistedDevice,
-        expectedTokenLength: token.length,
-        tokenLength: persistedToken.length,
-        tokenLengthMatchesRequest: persistedToken.length === token.length,
-        tokenType: WebPushHelper.isWebPushToken(persistedToken) ? "webpush" : (persistedToken ? "other" : "empty"),
-        canDecodeEndpoint: !!persistedEndpoint,
-        endpointMatchesRequest: persistedEndpoint === normalizedEndpoint,
-        endpointHost: persistedEndpointSummary.endpointHost || null,
-        endpointFingerprint: persistedEndpointSummary.endpointFingerprint || null,
-        likelyTruncated: WebPushHelper.isWebPushToken(persistedToken) && persistedToken.length < token.length
-      };
-      this.addStep(
-        steps,
-        "verify-saved-device-readback",
-        savedDeviceReadback.canDecodeEndpoint && savedDeviceReadback.endpointMatchesRequest ? "ok" : "error",
-        savedDeviceReadback
-      );
 
       console.info("[webpush] subscription saved", {
         ...WebPushHelper.getConfigSummary(),
@@ -236,54 +96,7 @@ export class WebPushController extends MessagingBaseController {
         tokenType: WebPushHelper.isWebPushToken(device.fcmToken) ? "webpush" : "other",
         endpointHost: endpointSummary.endpointHost
       });
-      const result: Record<string, unknown> = { success: true, id: device.id };
-      this.addStep(steps, "build-response", "ok", {
-        success: true,
-        deviceId: device.id,
-        savedDeviceLinkedToAuthPerson: !!(au.personId && device.personId === au.personId)
-      });
-      result.debug = {
-        ...this.buildDebugContext(req, normalizedEndpoint),
-        steps,
-        auth: {
-          churchId: au.churchId,
-          personId: au.personId || null,
-          userId: (au as any)?.userId || au.id,
-          principalId: au.id,
-          missingPersonId: !au.personId
-        },
-        request: {
-          appName: req.body.appName || "B1AppPwa",
-          hasEndpoint: !!sub.endpoint,
-          hasP256dh: !!sub.keys?.p256dh,
-          hasAuth: !!sub.keys?.auth
-        },
-        lookup: {
-          matchedExistingDevice,
-          matchStrategy,
-          previousDevice
-        },
-        savedDevice: {
-          id: device.id,
-          churchId: device.churchId,
-          personId: device.personId || null,
-          appName: device.appName || null,
-          registrationDate: device.registrationDate || null,
-          lastActiveDate: device.lastActiveDate || null,
-          tokenType: WebPushHelper.isWebPushToken(device.fcmToken) ? "webpush" : "other"
-        },
-        savedDeviceReadback,
-        checks: {
-          duplicateCleanupAttempted,
-          savedDeviceLinkedToAuthPerson: !!(au.personId && device.personId === au.personId),
-          savedTokenDecodes: savedDeviceReadback.canDecodeEndpoint,
-          savedEndpointMatchesRequest: savedDeviceReadback.endpointMatchesRequest,
-          hasPublicKey: !!Environment.webPushPublicKey,
-          hasPrivateKey: !!Environment.webPushPrivateKey,
-          webPushEnabled: WebPushHelper.isEnabled()
-        }
-      };
-      return result;
+      return { success: true, id: device.id };
     });
   }
 

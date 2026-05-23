@@ -3,7 +3,7 @@ import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Message } from "../models/index.js";
 import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
-import { NotificationDebugTrace, NotificationHelper } from "../helpers/NotificationHelper.js";
+import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 const contentRoom = (contentType?: string, contentId?: string) =>
@@ -31,12 +31,9 @@ export class MessageController extends MessagingBaseController {
   public async send(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const promises: Promise<Message>[] = [];
-      const debug: NotificationDebugTrace[] = [];
       req.body.forEach((message) => {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
-            const debugTrace: NotificationDebugTrace = { steps: [] };
-            debug.push(debugTrace);
             console.info("[chat-push] message saved", {
               route: "/messaging/messages/send",
               churchId: savedMessage.churchId,
@@ -77,7 +74,7 @@ export class MessageController extends MessagingBaseController {
                 action: "conversationActivity",
                 data: { contentType: conv.contentType, contentId: conv.contentId, conversationId: conv.id, kind: "message" }
               }) : Promise.resolve(),
-              NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous", undefined, debugTrace)
+              NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous")
             ]);
 
             return savedMessage;
@@ -85,7 +82,7 @@ export class MessageController extends MessagingBaseController {
         );
       }) as any;
       const result = await Promise.all(promises);
-      return { messages: this.repos.message.convertAllToModel(result as any[]), debug };
+      return this.repos.message.convertAllToModel(result as any[]);
     }) as any;
   }
 
@@ -119,15 +116,12 @@ export class MessageController extends MessagingBaseController {
   public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<Message>[] = [];
-      const debug: NotificationDebugTrace[] = [];
       req.body.forEach((message) => {
         if (!message.churchId && au?.churchId) message.churchId = au.churchId;
         if (!message.personId && au?.personId) message.personId = au.personId;
         if (!message.displayName && au?.firstName) message.displayName = au.firstName + " " + au.lastName;
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
-            const debugTrace: NotificationDebugTrace = { steps: [] };
-            debug.push(debugTrace);
             console.info("[chat-push] message saved", {
               route: "/messaging/messages",
               churchId: savedMessage.churchId,
@@ -161,7 +155,7 @@ export class MessageController extends MessagingBaseController {
                 action: "conversationActivity",
                 data: { contentType: conv.contentType, contentId: conv.contentId, conversationId: conv.id, kind: "message" }
               }) : Promise.resolve(),
-              NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous", undefined, debugTrace)
+              NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous")
             ]);
 
             return savedMessage;
@@ -169,7 +163,7 @@ export class MessageController extends MessagingBaseController {
         );
       }) as any;
       const result = await Promise.all(promises);
-      return { messages: this.repos.message.convertAllToModel(result as any[]), debug };
+      return this.repos.message.convertAllToModel(result as any[]);
     }) as any;
   }
 
