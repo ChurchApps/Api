@@ -108,6 +108,10 @@ export class WebPushController extends MessagingBaseController {
       const endpointSummary = WebPushHelper.getEndpointSummary(normalizedEndpoint);
       this.addStep(steps, "encode-subscription", "ok", {
         tokenType: WebPushHelper.isWebPushToken(token) ? "webpush" : "other",
+        encodedTokenLength: token.length,
+        endpointLength: normalizedEndpoint.length,
+        p256dhLength: sub.keys.p256dh.trim().length,
+        authLength: sub.keys.auth.trim().length,
         endpointHost: endpointSummary.endpointHost,
         endpointFingerprint: endpointSummary.endpointFingerprint
       });
@@ -204,13 +208,15 @@ export class WebPushController extends MessagingBaseController {
       const persistedEndpointSummary = persistedEndpoint ? WebPushHelper.getEndpointSummary(persistedEndpoint) : {};
       const savedDeviceReadback = {
         deviceFound: !!persistedDevice,
+        expectedTokenLength: token.length,
         tokenLength: persistedToken.length,
+        tokenLengthMatchesRequest: persistedToken.length === token.length,
         tokenType: WebPushHelper.isWebPushToken(persistedToken) ? "webpush" : (persistedToken ? "other" : "empty"),
         canDecodeEndpoint: !!persistedEndpoint,
         endpointMatchesRequest: persistedEndpoint === normalizedEndpoint,
         endpointHost: persistedEndpointSummary.endpointHost || null,
         endpointFingerprint: persistedEndpointSummary.endpointFingerprint || null,
-        likelyTruncated: WebPushHelper.isWebPushToken(persistedToken) && !persistedEndpoint && persistedToken.length <= 255
+        likelyTruncated: WebPushHelper.isWebPushToken(persistedToken) && persistedToken.length < token.length
       };
       this.addStep(
         steps,
