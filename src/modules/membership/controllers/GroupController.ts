@@ -24,7 +24,7 @@ export class GroupController extends MembershipBaseController {
   public async getMyTag(@requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const result = this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.loadAllForPerson(au.personId)) as any[]);
-      return result.filter((g) => g.tags.indexOf(tag) > -1);
+      return result.filter((g) => (g.tags || "").indexOf(tag) > -1);
     });
   }
 
