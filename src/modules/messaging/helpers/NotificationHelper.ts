@@ -108,6 +108,25 @@ export class NotificationHelper {
     };
   };
 
+  private static summarizePushDeviceForDebug = (device: Device): Record<string, unknown> => {
+    const token = device.fcmToken || "";
+    const isExpo = token.startsWith("ExponentPushToken[");
+    const isWebPush = WebPushHelper.isWebPushToken(token);
+    const endpoint = isWebPush ? WebPushHelper.getEndpointFromToken(token) : null;
+    const endpointSummary = endpoint ? WebPushHelper.getEndpointSummary(endpoint) : {};
+
+    return {
+      id: device.id || null,
+      appName: device.appName || null,
+      tokenType: isExpo ? "expo" : (isWebPush ? "webpush" : (token ? "other" : "empty")),
+      tokenLength: token.length,
+      webPushCanDecodeEndpoint: isWebPush ? !!endpoint : undefined,
+      endpointHost: endpointSummary.endpointHost || undefined,
+      endpointFingerprint: endpointSummary.endpointFingerprint || undefined,
+      likelyTruncated: isWebPush && !endpoint && token.length <= 255 ? true : undefined
+    };
+  };
+
   private static addDebugStep(trace: NotificationDebugTrace | undefined, step: string, status: NotificationDebugStep["status"], data?: Record<string, unknown>) {
     if (!trace) return;
     trace.steps.push({ step, status, ...(data ? { data } : {}) });
@@ -154,7 +173,9 @@ export class NotificationHelper {
         };
         const deliveryCount = await DeliveryHelper.sendMessages(connections, {
           churchId,
-          conversationId: "alert",
+          conversationId: contentType === "privateMessage"
+            ? String(navData?.conversationId || "alert")
+            : "alert",
           action: contentType === "privateMessage" ? "privateMessage" : "notification",
           data: { counts }
         });
@@ -197,6 +218,7 @@ export class NotificationHelper {
         const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
         const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
         const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens, activeDevices: activeWebPushDevices } = this.prepareWebPushDevices(devices);
+        const deviceTokenDebug = devices.map((device) => this.summarizePushDeviceForDebug(device));
         console.info("[chat-push] devices loaded", {
           churchId,
           personId,
@@ -214,7 +236,8 @@ export class NotificationHelper {
           deviceIds: devices.map((device) => device.id),
           expoPushCount: expoPushTokens.length,
           webPushCount: webPushTokens.length,
-          staleWebPushCount: staleWebPushTokens.length
+          staleWebPushCount: staleWebPushTokens.length,
+          deviceTokenDebug
         });
         if (staleWebPushTokens.length > 0) {
           await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
