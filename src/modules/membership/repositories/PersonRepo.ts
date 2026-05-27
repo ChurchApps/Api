@@ -207,6 +207,16 @@ export class PersonRepo {
     return subResult;
   }
 
+  public async loadAlphabetical(churchId: string, pageSize: number, filterOptedOut?: boolean) {
+    let q = getDb().selectFrom("people").selectAll()
+      .where("churchId", "=", churchId)
+      .where("removed", "=", false as any);
+    if (filterOptedOut) q = q.where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]));
+    q = q.orderBy("lastName", "asc").orderBy("firstName", "asc");
+    if (pageSize > 0) q = q.limit(pageSize);
+    return q.execute();
+  }
+
   public async loadByHousehold(churchId: string, householdId: string) {
     return getDb().selectFrom("people").selectAll()
       .where("churchId", "=", churchId)

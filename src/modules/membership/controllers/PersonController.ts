@@ -95,6 +95,20 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/list")
+  public async getList(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      else {
+        const pageSize = req.query.pageSize ? Math.max(parseInt(req.query.pageSize as string, 10) || 0, 0) : 0;
+        const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
+        const data = (await this.repos.person.loadAlphabetical(au.churchId, pageSize, filterOptedOut)) as any[];
+        const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
+        return await this.filterPeople(result, au);
+      }
+    });
+  }
+
   @httpGet("/household/:householdId")
   public async getHouseholdMembers(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
