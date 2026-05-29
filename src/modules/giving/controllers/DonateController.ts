@@ -25,14 +25,26 @@ export class DonateController extends GivingBaseController {
       const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
 
       // Return gateway info without sensitive data
-      const publicGateways = gateways.map(gateway => ({
-        id: gateway.id,
-        provider: gateway.provider,
-        publicKey: gateway.publicKey,
-        productId: gateway.productId,
-        payFees: gateway.payFees,
-        currency: gateway.currency
-      }));
+      const publicGateways = gateways.map(gateway => {
+        const base: any = {
+          id: gateway.id,
+          provider: gateway.provider,
+          publicKey: gateway.publicKey,
+          productId: gateway.productId,
+          payFees: gateway.payFees,
+          currency: gateway.currency,
+          enabled: gateway.enabled,
+          environment: gateway.environment || null
+        };
+        // Include non-sensitive settings for frontend (e.g. sandbox flag)
+        if (gateway.settings) {
+          try {
+            const settings = typeof gateway.settings === "string" ? JSON.parse(gateway.settings) : gateway.settings;
+            base.settings = { sandbox: settings.sandbox || false };
+          } catch { /* ignore parse errors */ }
+        }
+        return base;
+      });
 
       return { gateways: publicGateways };
     });
@@ -170,24 +182,45 @@ export class DonateController extends GivingBaseController {
           if (this.shouldProcessDonation(provider, webhookResult.eventType!)) {
             const isPending = this.isPendingPayment(provider, webhookResult.eventType!);
             const isCompleted = this.isCompletedPayment(provider, webhookResult.eventType!);
-            const transactionId = webhookResult.eventData?.id;
+            // KingdomFunding puts the transaction ID at reference_number or transaction.id, not at the top-level id
+            const transactionId = webhookResult.eventData?.id
+              || webhookResult.eventData?.reference_number?.toString()
+              || webhookResult.eventData?.transaction?.id?.toString();
+
+            // Idempotency: always check for an existing donation by transactionId before creating.
+            // This protects against:
+            //   - Same webhook delivered twice (Cloud Tasks retries with same body.id are caught
+            //     by eventLog dedup above; retries with new delivery IDs are caught here)
+            //   - Multiple status webhooks for the same transaction (e.g., ACH succeeded then settled)
+            //   - The /donate/charge endpoint already logging the donation immediately, then the
+            //     async webhook arriving later
+            const existingDonation = transactionId
+              ? await this.repos.donation.loadByTransactionId(churchId, transactionId)
+              : null;
 
             if (isCompleted && transactionId) {
-              // Check if a pending donation already exists for this transaction
-              const existingDonation = await this.repos.donation.loadByTransactionId(churchId, transactionId);
               if (existingDonation) {
-                // Update existing pending donation to complete
+                // Update existing pending/in-flight donation to complete
                 await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
               } else {
-                // No pending donation found, create a new complete donation
+                // No prior donation found, create a new complete donation
                 await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
               }
             } else if (isPending) {
-              // Create a new pending donation for ACH payments
-              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "pending");
+              if (existingDonation) {
+                // Pending webhook for a transaction we already know about — no-op
+                console.log(`KingdomFunding webhook: skipping duplicate pending event for txnId=${transactionId}`);
+              } else {
+                // Create a new pending donation for ACH payments awaiting settlement
+                await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "pending");
+              }
             } else {
               // Regular completed donation (card payments, etc.)
-              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
+              if (existingDonation && transactionId) {
+                await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
+              } else {
+                await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
+              }
             }
           } else if (this.shouldCancelSubscription(provider, webhookResult.eventType!)) {
             await this.repos.subscription.delete(churchId, webhookResult.eventData.id);
@@ -203,29 +236,38 @@ export class DonateController extends GivingBaseController {
   }
 
   private shouldProcessDonation(provider: string, eventType: string): boolean {
-    const donationEvents = {
+    const donationEvents: Record<string, string[]> = {
       // payment_intent.processing is for ACH payments that are pending
       // payment_intent.succeeded is the new standard for ACH payments via Payment Intents API
       // charge.succeeded is kept for backward compatibility during migration
       stripe: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded", "payment_intent.processing"],
-      paypal: ["PAYMENT.CAPTURE.COMPLETED"]
+      paypal: ["PAYMENT.CAPTURE.COMPLETED"],
+      // KingdomFunding webhook events: "succeeded.charge" for card/ACH, "status.settled" for ACH settlement
+      kingdomfunding: ["succeeded.charge", "status.settled"],
     };
-    return donationEvents[provider as keyof typeof donationEvents]?.includes(eventType) || false;
+    return donationEvents[provider]?.includes(eventType) || false;
   }
 
   private isPendingPayment(provider: string, eventType: string): boolean {
-    // ACH payments start in "processing" state and later transition to "succeeded"
-    return provider === "stripe" && eventType === "payment_intent.processing";
+    // ACH payments start in "processing" state and later transition to "succeeded"/"settled"
+    if (provider === "stripe") return eventType === "payment_intent.processing";
+    // KingdomFunding ACH: initial charge succeeds but needs settlement confirmation
+    if (provider === "kingdomfunding") return eventType === "status.originated" || eventType === "status.pending";
+    return false;
   }
 
   private isCompletedPayment(provider: string, eventType: string): boolean {
-    // Check if this is a payment completion event (for updating pending -> complete)
-    return provider === "stripe" && eventType === "payment_intent.succeeded";
+    if (provider === "stripe") return eventType === "payment_intent.succeeded";
+    if (provider === "kingdomfunding") return eventType === "status.settled" || eventType === "succeeded.charge";
+    return false;
   }
 
   private shouldCancelSubscription(provider: string, eventType: string): boolean {
-    const cancellationEvents = { stripe: ["customer.subscription.deleted"], paypal: ["BILLING.SUBSCRIPTION.CANCELLED"] };
-    return cancellationEvents[provider as keyof typeof cancellationEvents]?.includes(eventType) || false;
+    const cancellationEvents: Record<string, string[]> = {
+      stripe: ["customer.subscription.deleted"],
+      paypal: ["BILLING.SUBSCRIPTION.CANCELLED"],
+    };
+    return cancellationEvents[provider]?.includes(eventType) || false;
   }
 
   @httpPost("/replay-stripe-events")
@@ -269,7 +311,6 @@ export class DonateController extends GivingBaseController {
           eventId: string;
           type: string;
           amount: number;
-          currency: string;
           created: Date;
           customer: string;
           status: "new" | "already_imported" | "imported" | "skipped" | "error";
@@ -278,7 +319,6 @@ export class DonateController extends GivingBaseController {
 
         for (const event of events) {
           const eventData = event.data.object as any;
-          const eventCurrency = (eventData.currency || stripeGateway.currency || "usd").toString().toLowerCase();
 
           // Skip subscription events (they're handled separately)
           const isSubscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
@@ -287,7 +327,6 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount: (eventData.amount || eventData.amount_paid || 0) / 100,
-              currency: eventCurrency,
               created: new Date(event.created * 1000),
               customer: eventData.customer || "",
               status: "skipped",
@@ -304,7 +343,6 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount: (eventData.amount || eventData.amount_paid || 0) / 100,
-              currency: eventCurrency,
               created: new Date(event.created * 1000),
               customer: eventData.customer || "",
               status: "already_imported"
@@ -325,7 +363,6 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount,
-              currency: eventCurrency,
               created: donationDate,
               customer: eventData.customer || "",
               status: "already_imported",
@@ -339,7 +376,6 @@ export class DonateController extends GivingBaseController {
               eventId: event.id,
               type: event.type,
               amount,
-              currency: eventCurrency,
               created: donationDate,
               customer: eventData.customer || "",
               status: "new"
@@ -354,7 +390,6 @@ export class DonateController extends GivingBaseController {
                 eventId: event.id,
                 type: event.type,
                 amount,
-                currency: eventCurrency,
                 created: donationDate,
                 customer: eventData.customer || "",
                 status: "imported"
@@ -364,7 +399,6 @@ export class DonateController extends GivingBaseController {
                 eventId: event.id,
                 type: event.type,
                 amount,
-                currency: eventCurrency,
                 created: donationDate,
                 customer: eventData.customer || "",
                 status: "error",
@@ -410,19 +444,134 @@ export class DonateController extends GivingBaseController {
       donationData.currency = normalizedCurrency;
 
       try {
+        // KingdomFunding + saveCard: create customer & payment method BEFORE charging,
+        // then charge with the saved pm-{id} instead of the single-use nonce.
+        // Flow: Create customer → Add payment method (nonce) → Charge with pm-{id}
+        // Uses GatewayService (not direct Axios) so credentials are decrypted and URLs are correct.
+        if (donationData.saveCard && gateway.provider?.toLowerCase() === "kingdomfunding") {
+          try {
+            const personEmail = donationData.person?.email || "";
+            const personName = donationData.person?.name || donationData.name || "";
+            const personId = donationData.person?.id;
+
+            // Step 1: Find or create customer via GatewayService
+            let customerId: string | undefined;
+            if (personId) {
+              const existingCustomer = await this.repos.customer.loadByPersonAndProvider(churchId, personId, "kingdomfunding") as any;
+              if (existingCustomer) customerId = existingCustomer.id;
+            }
+            if (!customerId) {
+              customerId = await GatewayService.createCustomer(gateway, personEmail, personName);
+              if (customerId && personId) {
+                await this.repos.customer.save({ id: customerId, churchId, personId, provider: "kingdomfunding" });
+              }
+            }
+
+            if (customerId) {
+              // Step 2: Attach payment method using nonce via GatewayService
+              const nonceToken = donationData.token || donationData.id || "";
+              const nonceSource = nonceToken.startsWith("nonce-") ? nonceToken : `nonce-${nonceToken}`;
+
+              const attachOptions: any = {
+                customerId,
+                source: nonceSource,
+                name: personName,
+              };
+              if (donationData.expiry_month) attachOptions.expiry_month = Number(donationData.expiry_month);
+              if (donationData.expiry_year) {
+                let ey = Number(donationData.expiry_year);
+                if (ey > 0 && ey < 100) ey += 2000;
+                attachOptions.expiry_year = ey;
+              }
+
+              let pm: any;
+              try {
+                pm = await GatewayService.attachPaymentMethod(gateway, nonceSource, attachOptions);
+              } catch (attachErr: any) {
+                // Customer doesn't exist on provider (stale local record) — recreate and retry
+                const status = attachErr.response?.status || attachErr.statusCode;
+                if (status === 404) {
+                  console.log(`Customer ${customerId} not found on Accept Blue, recreating...`);
+                  customerId = await GatewayService.createCustomer(gateway, personEmail, personName);
+                  if (customerId && personId) {
+                    await this.repos.customer.save({ id: customerId, churchId, personId, provider: "kingdomfunding" });
+                  }
+                  if (customerId) {
+                    attachOptions.customerId = customerId;
+                    pm = await GatewayService.attachPaymentMethod(gateway, nonceSource, attachOptions);
+                  } else {
+                    throw attachErr;
+                  }
+                } else {
+                  throw attachErr;
+                }
+              }
+
+              const savedPmId = pm?.id;
+              if (savedPmId) {
+                // Save payment method locally
+                const cardType = pm.card_type || donationData.cardBrand || "Card";
+                const last4 = pm.last_4 || donationData.cardLast4 || "";
+                await this.repos.gatewayPaymentMethod.save({
+                  churchId, gatewayId: gateway.id, customerId,
+                  externalId: String(savedPmId),
+                  methodType: donationData.type === "check" ? "bank" : "card",
+                  displayName: `${cardType} ****${last4}`,
+                  metadata: { card_type: cardType, last_4: last4 }
+                } as any);
+
+                // Step 3: Charge using the saved payment method instead of the nonce
+                donationData.paymentMethodId = String(savedPmId);
+                donationData.customerId = customerId;
+                delete donationData.id;     // Remove nonce so processCharge uses pm-{id}
+                delete donationData.token;
+              }
+            }
+          } catch (saveCardErr: any) {
+            console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.data || saveCardErr.message);
+            // Fall through — charge will proceed with original nonce
+          }
+        }
+
+        // KF saved payment method: the frontend sends id="54879" (a numeric PM ID from Accept Blue).
+        // The KF provider treats id as a nonce (nonce-54879) which is wrong.
+        // Detect numeric IDs and move them to paymentMethodId so the provider uses pm-{id} instead.
+        if (gateway.provider?.toLowerCase() === "kingdomfunding" && donationData.id && !donationData.paymentMethodId) {
+          const id = String(donationData.id);
+          if (/^\d+$/.test(id)) {
+            donationData.paymentMethodId = id;
+            delete donationData.id;
+          }
+        }
+
         const chargeResult = await GatewayService.processCharge(gateway, donationData);
 
         if (!chargeResult.success) {
-          return this.json({ error: chargeResult.error || "Charge processing failed" }, 400);
+          return this.json({ error: chargeResult.data?.error || chargeResult.error || "Charge processing failed" }, 400);
         }
 
-        // For PayPal, we need to log the events since it's captured immediately
-        if (gateway.provider === "paypal") {
-          await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repos);
-          await GatewayService.logDonation(gateway, churchId, chargeResult.data, this.repos);
+        // For PayPal and KingdomFunding, log the donation immediately (no webhook flow)
+        if (gateway.provider === "paypal" || gateway.provider?.toLowerCase() === "kingdomfunding") {
+          try {
+            await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repos);
+            const logData = {
+              ...chargeResult.data,
+              amount: donationData.amount,
+              funds: donationData.funds,
+              person: donationData.person,
+              notes: donationData.notes,
+            };
+            await GatewayService.logDonation(gateway, churchId, logData, this.repos, "complete");
+          } catch (logErr: any) {
+            console.error("Charge: Failed to log donation:", logErr?.message || logErr, logErr?.stack);
+          }
         }
 
-        await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
+        try {
+          await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
+        } catch (emailErr) {
+          console.warn("Charge: Failed to send confirmation email (non-fatal)", emailErr);
+        }
 
         return { ...chargeResult.data, provider: gateway.provider };
       } catch (error) {
@@ -435,7 +584,7 @@ export class DonateController extends GivingBaseController {
   @httpPost("/subscribe")
   public async subscribe(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID, provider, gatewayId, currency } = req.body;
+      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID, provider, gatewayId, currency, expiry_month, expiry_year, routing_number, account_number, account_type, sec_code, name: bankName } = req.body;
       const churchId = au.churchId || CHURCH_ID;
 
       // Validate required parameters
@@ -465,8 +614,24 @@ export class DonateController extends GivingBaseController {
           billing_cycle_anchor,
           proration_behavior,
           interval,
-          notes
+          notes,
+          person,
+          name: bankName || person?.name?.display || person?.name || "",
+          email: person?.email || "",
+          expiry_month,
+          expiry_year,
+          // ACH/bank fields for KingdomFunding recurring donations
+          routing_number,
+          account_number,
+          account_type,
+          sec_code,
         };
+
+        // For KF: pass existing local customer ID so provider can reuse it
+        if (gateway.provider?.toLowerCase() === "kingdomfunding" && person?.id && !subscriptionData.customerId) {
+          const existingKFCustomer = await this.repos.customer.loadByPersonAndProvider(churchId, person.id, "kingdomfunding") as any;
+          if (existingKFCustomer?.id) subscriptionData.customerId = existingKFCustomer.id;
+        }
 
         const subscriptionResult = await GatewayService.createSubscription(gateway, subscriptionData);
 
@@ -474,13 +639,19 @@ export class DonateController extends GivingBaseController {
           return this.json({ error: "Subscription creation failed" }, 400);
         }
 
+        // Save the KF customer ID locally (created during subscription on Accept Blue)
+        const abCustomerId = subscriptionResult.data?.customerId ? String(subscriptionResult.data.customerId) : customerId;
+        if (gateway.provider?.toLowerCase() === "kingdomfunding" && abCustomerId && person?.id) {
+          try {
+            await this.repos.customer.save({ id: abCustomerId, churchId, personId: person.id, provider: "kingdomfunding" });
+          } catch (_e) { /* customer may already exist, ignore */ }
+        }
+
         const subscription: Subscription = {
           id: subscriptionResult.subscriptionId,
           churchId,
           personId: person.id,
-          customerId,
-          gatewayId: gateway.id,
-          currency: normalizedCurrency
+          customerId: abCustomerId || customerId,
         };
 
         await this.repos.subscription.save(subscription);
@@ -497,9 +668,16 @@ export class DonateController extends GivingBaseController {
         });
 
         await Promise.all(promises);
-        await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring", normalizedCurrency);
 
-        return { ...subscriptionResult.data, provider: gateway.provider };
+        try {
+          await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
+        } catch (emailErr) {
+          console.warn("Subscribe: Failed to send confirmation email (non-fatal)", emailErr);
+        }
+
+        // Normalize status for frontend compatibility
+        const normalizedStatus = (subscriptionResult.data?.status || "active").toLowerCase();
+        return { ...subscriptionResult.data, provider: gateway.provider, status: normalizedStatus };
       } catch (error) {
         console.error("Subscription creation failed:", error);
         return this.json({ error: "Subscription creation failed" }, 500);
@@ -530,8 +708,7 @@ export class DonateController extends GivingBaseController {
             return this.json({ error: "Gateway not found" }, 404);
           }
 
-          const paymentType = type === "ach" ? "bank" as const : "card" as const;
-          calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId, currencyToUse, paymentType);
+          calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId, currencyToUse);
           gatewayProvider = gateway.provider;
         } else {
           // Legacy type-based calculation for backward compatibility
@@ -557,32 +734,27 @@ export class DonateController extends GivingBaseController {
     amount?: number,
     interval?: { interval_count: number; interval: string },
     billingCycleAnchor?: number,
-    donationType: "recurring" | "one-time" = "recurring",
-    currency: string = "USD"
+    donationType: "recurring" | "one-time" = "recurring"
   ) => {
     // Skip email if no recipient address
     if (!to) return;
 
     const contentRows: any[] = [];
     let totalFundAmount = 0;
-    const currencyCode = (currency || "USD").toUpperCase();
 
     funds.forEach((fund, index) => {
       totalFundAmount += fund.amount;
-      const formattedFund = CurrencyHelper.formatCurrencyWithLocale(fund.amount, currencyCode);
       if (donationType === "recurring") {
         const startDate = dayjs(billingCycleAnchor).format("MMM D, YYYY");
         contentRows.push(
-          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">${formattedFund}</td></tr>`
+          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`
         );
       } else {
-        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">${formattedFund}</td></tr>`);
+        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`);
       }
     });
 
     const transactionFee = amount! - totalFundAmount;
-    const formattedFee = CurrencyHelper.formatCurrencyWithLocale(transactionFee, currencyCode);
-    const formattedTotal = CurrencyHelper.formatCurrencyWithLocale(amount || 0, currencyCode);
 
     const domain = Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
 
@@ -606,12 +778,12 @@ export class DonateController extends GivingBaseController {
             <tr style="border-top: solid #dee2e6 1px">
               <td></td>
               <th style="font-size: 15px">Transaction Fee</th>
-              <td>${formattedFee}</td>
+              <td>$${CurrencyHelper.formatCurrency(transactionFee)}</td>
             </tr>
             <tr style="border-top: solid #dee2e6 1px">
               <td></td>
               <th style="font-size: 15px">Total</th>
-              <td>${formattedTotal}</td>
+              <td>$${amount}</td>
             </tr>
           `
       }
@@ -638,11 +810,11 @@ export class DonateController extends GivingBaseController {
           : `
             <tr style="border-top: solid #dee2e6 1px">
               <th style="font-size: 15px">Transaction Fee</th>
-              <td>${formattedFee}</td>
+              <td>$${CurrencyHelper.formatCurrency(transactionFee)}</td>
             </tr>
             <tr style="border-top: solid #dee2e6 1px">
               <th style="font-size: 15px">Total</th>
-              <td>${formattedTotal}</td>
+              <td>$${amount}</td>
             </tr>
           `
       }
@@ -700,7 +872,7 @@ export class DonateController extends GivingBaseController {
     const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
     const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
     if (stripeGateway) {
-      return await GatewayService.calculateFees(stripeGateway, amount, churchId, undefined, "bank");
+      return await GatewayService.calculateFees(stripeGateway, amount, churchId);
     }
 
     // Fallback to hardcoded calculation if no Stripe gateway found
@@ -722,6 +894,10 @@ export class DonateController extends GivingBaseController {
   public async captchaVerify(req: express.Request<{}, {}, { token: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
+        // In dev mode, always return human to speed up testing
+        if (Environment.currentEnvironment === "dev") {
+          return { response: "human" };
+        }
         // detecting if its a bot or a human
         const { token } = req.body;
         const response = await Axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${Environment.googleRecaptchaSecretKey}&response=${token}`);
@@ -755,6 +931,7 @@ export class DonateController extends GivingBaseController {
       }
     });
   }
+
 
   /**
    * Get gateway by provider name or ID using the centralized helper

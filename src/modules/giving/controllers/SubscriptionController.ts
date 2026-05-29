@@ -27,21 +27,30 @@ export class SubscriptionController extends GivingBaseController {
   public async save(req: express.Request<{}, {}, any[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<any>[] = [];
-      // Subscriptions are Stripe-only currently
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
-
-      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
-
-      const capabilities = GatewayService.getProviderCapabilities(gateway);
-      if (!capabilities?.supportsSubscriptions) {
-        return this.json({ error: `${gateway.provider} does not support subscription management` }, 400);
-      }
 
       for (const subscription of req.body) {
-        const existingSub = await this.repos.subscription.load(au.churchId, subscription.id);
-        const permission = au.checkAccess(Permissions.donations.edit) || (existingSub as any)?.personId === au.personId;
+        const existingSub = await this.repos.subscription.load(au.churchId, subscription.id) as any;
+        const permission = au.checkAccess(Permissions.donations.edit) || existingSub?.personId === au.personId;
+        if (!permission) continue;
 
-        if (permission) {
+        // Resolve gateway via provider param or by looking up the customer's provider
+        const provider = subscription.provider;
+        let gateway = provider
+          ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
+          : null;
+
+        if (!gateway && existingSub?.customerId) {
+          // Look up customer to determine which provider this subscription belongs to
+          const customer = await this.repos.customer.load(au.churchId, existingSub.customerId) as any;
+          const custProvider = customer?.provider || "stripe";
+          gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: custProvider }, this.repos.gateway).catch(() => null);
+        }
+
+        if (!gateway) {
+          gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
+        }
+
+        if (gateway) {
           promises.push(GatewayService.updateSubscription(gateway, subscription));
         }
       }
@@ -54,29 +63,33 @@ export class SubscriptionController extends GivingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string; reason?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const subscription = await this.repos.subscription.load(au.churchId, id);
-      const permission = au.checkAccess(Permissions.donations.edit) || (subscription as any)?.personId === au.personId;
+      const subscription = await this.repos.subscription.load(au.churchId, id) as any;
+      const permission = au.checkAccess(Permissions.donations.edit) || subscription?.personId === au.personId;
       if (!permission) return this.json(null, 401);
 
-      // Subscriptions are Stripe-only currently
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
-      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+      // Resolve gateway via provider query/body param or by looking up the customer's provider
+      const provider = req.query?.provider?.toString() || req.body?.provider;
+      let gateway = provider
+        ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
+        : null;
 
-      const capabilities = GatewayService.getProviderCapabilities(gateway);
-      if (!capabilities?.supportsSubscriptions) {
-        return this.json({ error: `${gateway.provider} does not support subscription management` }, 400);
+      if (!gateway && subscription?.customerId) {
+        const customer = await this.repos.customer.load(au.churchId, subscription.customerId) as any;
+        const custProvider = customer?.provider || "stripe";
+        gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: custProvider }, this.repos.gateway).catch(() => null);
       }
 
+      if (!gateway) {
+        gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
+      }
+
+      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+
       try {
-        const promises: Promise<any>[] = [];
-
         // Cancel subscription with the gateway
-        promises.push(GatewayService.cancelSubscription(gateway, id, req.body?.reason));
-
+        await GatewayService.cancelSubscription(gateway, id, req.body?.reason);
         // Delete from database
-        promises.push(this.repos.subscription.delete(au.churchId, id));
-
-        await Promise.all(promises);
+        await this.repos.subscription.delete(au.churchId, id);
         return this.json({ success: true });
       } catch (error) {
         console.error("Subscription cancellation failed:", error);
