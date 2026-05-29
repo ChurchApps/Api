@@ -246,9 +246,13 @@ export class NotificationHelper {
 
         let anyPushSent = false;
 
+        const badgeCountsRaw = await NotificationHelper.repos.notification.loadNewCounts(churchId, personId);
+        const badgeCount = (Number((badgeCountsRaw as any)?.notificationCount) || 0) + (Number((badgeCountsRaw as any)?.pmCount) || 0);
+        const pushNavData = { ...(navData || {}), badgeCount };
+
         if (expoPushTokens.length > 0) {
           try {
-            const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, body, contentType, contentId, navData);
+            const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, body, contentType, contentId, pushNavData);
             await Promise.all(expoPushTokens.map((token, i) => {
               const ticket = tickets?.[i];
               const success = ticket?.status === "ok";
@@ -288,7 +292,7 @@ export class NotificationHelper {
             staleDuplicateCount: staleWebPushTokens.length
           });
           try {
-            const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId, navData);
+            const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, body, contentType, contentId, pushNavData);
             const retryableFailures = results.filter((r) => !r.success && r.retryable);
             const nonRetryableFailures = results.filter((r) => !r.success && !r.retryable);
             this.addDebugStep(debugTrace, "delivery-webpush-send", results.some((r) => r.success) ? "ok" : (retryableFailures.length > 0 ? "warn" : "error"), {
