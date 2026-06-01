@@ -5,6 +5,7 @@
   "description": "Core APIs modular monolith for church management system",
   "main": "dist/index.js",
   "scripts": {
+    "preinstall": "node -e \"if(!(process.env.npm_config_user_agent||'').startsWith('yarn')){console.error('\\n[Api] This project uses Yarn (Berry). Run \\'yarn install\\' instead of npm/pnpm.\\n');process.exit(1)}\"",
     "initdb": "tsx tools/initdb.ts",
     "populateDemo": "tsx tools/initdb.ts --demo-only",
     "reset-demo": "tsx tools/reset-demo.ts",

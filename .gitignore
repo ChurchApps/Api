@@ -38,6 +38,9 @@ coverage/
 !.yarn/versions
 .pnp.*
 
+# npm is blocked (see preinstall guard); never commit an npm lockfile
+package-lock.json
+
 # Logs
 logs/
 *.log
