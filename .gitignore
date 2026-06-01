@@ -29,6 +29,15 @@ dist/
 coverage/
 .nyc_output/
 
+# Yarn Berry (Corepack-managed, node-modules linker + global cache)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
 # Logs
 logs/
 *.log
