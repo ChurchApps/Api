@@ -13,12 +13,15 @@ jobs:
         with:
           submodules: "true"
 
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "yarn"
 
       - name: Install Dependencies
-        run: npm ci
+        run: |
+          corepack enable
+          yarn install --immutable
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -65,7 +68,7 @@ jobs:
 
           echo ""
           echo "🔧 Initializing schemas for all configured modules..."
-          npm run initdb -- --schema-only
+          yarn initdb --schema-only
 
           echo ""
           echo "🎉 All module database schemas have been recreated successfully!"

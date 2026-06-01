@@ -5,6 +5,7 @@
   "description": "Core APIs modular monolith for church management system",
   "main": "dist/index.js",
   "scripts": {
+    "preinstall": "node -e \"if(!(process.env.npm_config_user_agent||'').startsWith('yarn')){console.error('\\n[Api] This project uses Yarn (Berry). Run \\'yarn install\\' instead of npm/pnpm.\\n');process.exit(1)}\"",
     "initdb": "tsx tools/initdb.ts",
     "populateDemo": "tsx tools/initdb.ts --demo-only",
     "reset-demo": "tsx tools/reset-demo.ts",
@@ -13,18 +14,18 @@
     "lint": "eslint --fix src/",
     "lint:check": "eslint .",
     "tsc": "tsc",
-    "copy-assets": "copyfiles -u 1 src/**/*.html src/**/*.css dist/",
-    "build-ignore-errors": "npm run clean && (npx tsc || true) && npm run copy-assets",
-    "build": "npm run clean && npx tsc --noEmitOnError false && npm run copy-assets && npm run build:playground",
-    "build:playground": "cd src/playground && npx tsc && copyfiles index.html dist/",
-    "build:prod": "npm run clean && (npx tsc -p tsconfig.prod.json --noEmitOnError false || true) && npm run copy-assets",
-    "build-layer": "rm -rf layer && mkdir -p layer/nodejs && cp tools/layer-package.json layer/nodejs/package.json && cd layer/nodejs && npm install --omit=dev --no-package-lock",
-    "rebuild-layer": "npm run clean-layer && npm run build-layer",
+    "copy-assets": "copyfiles -u 1 \"src/**/*.html\" \"src/**/*.css\" dist/",
+    "build-ignore-errors": "yarn clean && (yarn exec tsc || true) && yarn copy-assets",
+    "build": "yarn clean && yarn exec tsc --noEmitOnError false && yarn copy-assets && yarn build:playground",
+    "build:playground": "cd src/playground && yarn exec tsc && copyfiles index.html dist/",
+    "build:prod": "yarn clean && (yarn exec tsc -p tsconfig.prod.json --noEmitOnError false || true) && yarn copy-assets",
+    "build-layer": "rm -rf layer && mkdir -p layer/nodejs && cp tools/layer-package.json layer/nodejs/package.json && cd layer/nodejs && touch yarn.lock && yarn install",
+    "rebuild-layer": "yarn clean-layer && yarn build-layer",
     "clean-layer": "rm -rf layer",
     "serverless-local": "serverless offline --stage dev --httpPort 8084",
-    "deploy-demo": "npm run build:prod && serverless deploy --stage demo --alias current",
-    "deploy-staging": "npm run build:prod && serverless deploy --stage staging --alias current",
-    "deploy-prod": "npm run build:prod && serverless deploy --stage prod --alias current",
+    "deploy-demo": "yarn build:prod && serverless deploy --stage demo --alias current",
+    "deploy-staging": "yarn build:prod && serverless deploy --stage staging --alias current",
+    "deploy-prod": "yarn build:prod && serverless deploy --stage prod --alias current",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "migrate-env": "node tools/migrate-env.js",
@@ -117,5 +118,16 @@
   },
   "engines": {
     "node": ">=22.0.0"
+  },
+  "packageManager": "yarn@4.15.0",
+  "dependenciesMeta": {
+    "esbuild": {
+      "built": true
+    }
+  },
+  "resolutions": {
+    "zod": "3.25.76",
+    "axios": "1.13.4",
+    "@types/express": "4.17.25"
   }
 }

@@ -23,15 +23,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
+          cache: "yarn"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -41,23 +33,25 @@ jobs:
           aws-region: us-east-2
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          corepack enable
+          yarn install --immutable
 
       - name: Run linting and type check
         run: |
-          npm run lint:check
-          npm run tsc
+          yarn lint:check
+          yarn tsc
 
       - name: Build application
-        run: npm run build
+        run: yarn build
 
       - name: Prepare Lambda Layer
-        run: npm run build-layer
+        run: yarn build-layer
 
       - name: Deploy Core APIs to Demo
-        run: npx serverless deploy --stage demo --verbose
+        run: yarn serverless deploy --stage demo --verbose
 
       - name: Verify deployment
         run: |
           echo "Deployment completed for Demo environment"
-          npx serverless info --stage demo
+          yarn serverless info --stage demo

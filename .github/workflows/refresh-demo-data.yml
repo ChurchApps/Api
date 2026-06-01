@@ -15,12 +15,15 @@ jobs:
         with:
           submodules: "true"
 
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "yarn"
 
       - name: Install Dependencies
-        run: npm ci
+        run: |
+          corepack enable
+          yarn install --immutable
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -71,7 +74,7 @@ jobs:
 
           echo ""
           echo "📄 Populating demo data for all configured modules..."
-          npm run populateDemo
+          yarn populateDemo
 
           echo ""
           echo "🎉 All demo data has been repopulated successfully!"
