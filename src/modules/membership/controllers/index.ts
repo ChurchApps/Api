@@ -5,6 +5,7 @@ export { GroupMemberController } from "./GroupMemberController.js";
 export { GroupJoinRequestController } from "./GroupJoinRequestController.js";
 export { HouseholdController } from "./HouseholdController.js";
 export { PersonController } from "./PersonController.js";
+export { ListController } from "./ListController.js";
 export { MemberPermissionController } from "./MemberPermissionController.js";
 export { FormController } from "./FormController.js";
 export { FormSubmissionController } from "./FormSubmissionController.js";

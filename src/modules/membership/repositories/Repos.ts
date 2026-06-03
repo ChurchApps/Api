@@ -4,6 +4,7 @@ import {
   GroupJoinRequestRepo,
   GroupRepo,
   HouseholdRepo,
+  ListRepo,
   PersonRepo,
   AnswerRepo,
   FormRepo,
@@ -31,6 +32,7 @@ export class Repos {
   public groupJoinRequest: GroupJoinRequestRepo;
   public group: GroupRepo;
   public household: HouseholdRepo;
+  public list: ListRepo;
   public person: PersonRepo;
   public answer: AnswerRepo;
   public form: FormRepo;
@@ -71,6 +73,7 @@ export class Repos {
     this.groupJoinRequest = new GroupJoinRequestRepo();
     this.group = new GroupRepo();
     this.household = new HouseholdRepo();
+    this.list = new ListRepo();
     this.person = new PersonRepo();
     this.answer = new AnswerRepo();
     this.form = new FormRepo();
