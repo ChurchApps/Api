@@ -312,7 +312,9 @@ export class PersonRepo {
       ) sub
       GROUP BY ageGroup, gender`.execute(db);
 
-    const order = ["0-3", "4-11", "12-18", "19-25", "26-35", "36-50", "51-64", "65+"];
+    const order = [
+      "0-3", "4-11", "12-18", "19-25", "26-35", "36-50", "51-64", "65+"
+    ];
     const ageMap: { [group: string]: { group: string; female: number; male: number; unassigned: number } } = {};
     order.forEach((g) => (ageMap[g] = { group: g, female: 0, male: 0, unassigned: 0 }));
     (ageRows.rows as any[]).forEach((r) => {
