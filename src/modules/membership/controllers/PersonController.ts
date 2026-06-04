@@ -469,7 +469,7 @@ export class PersonController extends MembershipBaseController {
       const personIds = Array.isArray(req.body?.personIds) ? ArrayHelper.getUnique(req.body.personIds.filter((id) => typeof id === "string").map((id) => id.trim()).filter(Boolean)) : [];
       if (personIds.length === 0) return this.json({ error: "personIds is required" }, 400);
 
-      const allowedFields = ["membershipStatus", "maritalStatus", "gender", "optedOut"];
+      const allowedFields = ["membershipStatus", "maritalStatus", "gender", "optedOut", "campusId"];
       const updates: Record<string, any> = {};
       const rawUpdates = req.body?.updates || {};
       allowedFields.forEach((field) => {

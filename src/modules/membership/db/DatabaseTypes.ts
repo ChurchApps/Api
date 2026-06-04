@@ -38,6 +38,7 @@ export interface PeopleTable {
   photoUpdated?: Date;
   householdId?: string;
   householdRole?: string;
+  campusId?: string;
   conversationId?: string;
   optedOut?: boolean;
   nametagNotes?: string;

@@ -2,6 +2,7 @@ export class Plan {
   public id?: string;
   public churchId?: string;
   public ministryId?: string;
+  public campusId?: string;
   public planTypeId?: string;
   public name?: string;
   public serviceDate?: Date;

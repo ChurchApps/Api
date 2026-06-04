@@ -73,6 +73,7 @@ export class PersonRepo {
       photoUpdated: p.photoUpdated,
       householdId: person.householdId,
       householdRole: person.householdRole,
+      campusId: person.campusId,
       conversationId: person.conversationId,
       optedOut: person.optedOut,
       nametagNotes: person.nametagNotes,
@@ -111,6 +112,7 @@ export class PersonRepo {
       photoUpdated: p.photoUpdated,
       householdId: person.householdId,
       householdRole: person.householdRole,
+      campusId: person.campusId,
       conversationId: person.conversationId,
       optedOut: person.optedOut,
       nametagNotes: person.nametagNotes,
@@ -326,9 +328,21 @@ export class PersonRepo {
       bucket[key] += Number(r.count);
     });
 
+    // Campus distribution: join to campuses for the display name; NULL campusId
+    // rolls into "Unassigned". The campus id is returned so the chart can drill
+    // into a People search by campusId.
+    const campusRows = await sql<{ name: string; id: string | null; count: number }>`
+      SELECT COALESCE(c.name, 'Unassigned') AS name, p.campusId AS id, COUNT(*) AS count
+      FROM people p
+      LEFT JOIN campuses c ON c.id = p.campusId
+      WHERE p.churchId = ${churchId} AND p.removed = 0
+      GROUP BY p.campusId, c.name
+      ORDER BY COUNT(*) DESC`.execute(db);
+    const campus = (campusRows.rows as any[]).map((r) => ({ name: String(r.name), id: (r.id as string) || "", count: Number(r.count) }));
+
     const total = gender.reduce((sum, r) => sum + r.count, 0);
 
-    return { total, ageGroups: order.map((g) => ageMap[g]), membershipStatus, gender, maritalStatus };
+    return { total, ageGroups: order.map((g) => ageMap[g]), membershipStatus, gender, maritalStatus, campus };
   }
 
   protected rowToModel(row: any): Person {
@@ -359,6 +373,7 @@ export class PersonRepo {
       gender: row.gender,
       householdId: row.householdId,
       householdRole: row.householdRole,
+      campusId: row.campusId,
       maritalStatus: row.maritalStatus,
       nametagNotes: row.nametagNotes,
       donorNumber: row.donorNumber,

@@ -14,6 +14,7 @@ export { Repos } from "./Repos.js";
 
 export { AccessLogRepo } from "./AccessLogRepo.js";
 export { AuditLogRepo } from "./AuditLogRepo.js";
+export { CampusRepo } from "./CampusRepo.js";
 export { ChurchRepo } from "./ChurchRepo.js";
 export { DomainRepo } from "./DomainRepo.js";
 export { RoleRepo } from "./RoleRepo.js";

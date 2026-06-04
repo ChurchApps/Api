@@ -16,6 +16,7 @@ export class PlanRepo {
       id: model.id,
       churchId: model.churchId,
       ministryId: model.ministryId,
+      campusId: model.campusId,
       planTypeId: model.planTypeId,
       name: model.name,
       serviceDate: (model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]) as any,
@@ -35,6 +36,7 @@ export class PlanRepo {
   private async update(model: Plan): Promise<Plan> {
     await getDb().updateTable("plans").set({
       ministryId: model.ministryId,
+      campusId: model.campusId,
       planTypeId: model.planTypeId,
       name: model.name,
       serviceDate: (model.serviceDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0]) as any,

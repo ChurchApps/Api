@@ -76,9 +76,15 @@ BEGIN
     ('TIM00000001', 'CHU00000001', NULL, 'Sunday Morning Service', 
      DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (7 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 10 HOUR), 
      DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (7 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 11.5 HOUR), 'Worship,Technical'),
-    ('TIM00000002', 'CHU00000001', NULL, 'Thursday Practice', 
-     DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (5 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 19 HOUR), 
-     DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (5 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 21 HOUR), 'Worship,Technical');
+    ('TIM00000002', 'CHU00000001', NULL, 'Thursday Practice',
+     DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (5 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 19 HOUR),
+     DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (5 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 21 HOUR), 'Worship,Technical'),
+    -- Service time tied to PLA00000001 with a start time but NO end time — mirrors
+    -- churches that only set a service start. Exercises the Accept/Decline button
+    -- gating on the plan-detail Overview tab (discussion #863).
+    ('TIM00000003', 'CHU00000001', 'PLA00000001', 'Sunday Service',
+     DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (7 - DAYOFWEEK(CURDATE())) DAY), INTERVAL 10 HOUR),
+     NULL, 'Worship,Technical');
 
     -- Create Worship Plans
     -- PLA00000001 — upcoming Sunday (covers status-stats / hero card scenarios)
@@ -196,6 +202,10 @@ BEGIN
     INSERT INTO conjunctions (id, churchId, automationId, parentId, groupType) VALUES
     ('CNJ00000001', 'CHU00000001', 'AUT00000001', NULL, 'AND'),
     ('CNJ00000002', 'CHU00000001', 'AUT00000001', 'CNJ00000001', 'OR');
+
+    -- Single-site demo church: assign every plan to the Main Campus
+    -- (id matches membership.campuses / attendance.campuses Main Campus).
+    UPDATE plans SET campusId = 'CAM00000001' WHERE churchId = 'CHU00000001';
 
 END //
 DELIMITER ;

@@ -14,6 +14,7 @@ export class Person {
   public membershipStatus?: string;
   public householdId?: string;
   public householdRole?: string;
+  public campusId?: string;
   public photoUpdated?: Date;
   public photo?: string;
   public importKey?: string;

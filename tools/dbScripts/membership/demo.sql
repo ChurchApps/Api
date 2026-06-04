@@ -24,11 +24,17 @@ BEGIN
     TRUNCATE TABLE people;
     TRUNCATE TABLE households;
     TRUNCATE TABLE churches;
+    TRUNCATE TABLE campuses;
     SET FOREIGN_KEY_CHECKS = 1;
 
 -- Demo Church
-INSERT INTO churches (id, name, subDomain, address1, city, state, zip, country, latitude, longitude) VALUES 
+INSERT INTO churches (id, name, subDomain, address1, city, state, zip, country, latitude, longitude) VALUES
 ('CHU00000001', 'Grace Community Church', 'grace', '123 Main Street', 'Springfield', 'IL', '62701', 'US', 39.7817, -89.6501);
+
+-- Demo Campus (church-wide; id matches the attendance Main Campus so the two
+-- lists line up, mirroring tools/manual/campus-reconcile.sql).
+INSERT INTO campuses (id, churchId, name, address1, city, state, zip, timezone, removed) VALUES
+('CAM00000001', 'CHU00000001', 'Main Campus', '123 Main Street', 'Springfield', 'IL', '62701', 'America/Chicago', 0);
 
 -- Demo Households (25 households)
 INSERT INTO households (id, churchId, name) VALUES 
@@ -648,6 +654,10 @@ INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, action)
 
 INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
 ('RME00000099', 'CHU00000099', 'ROL00000099', 'USR00000002', '2024-01-01 00:00:00');
+
+-- Single-site demo church: assign every person and group to the Main Campus.
+UPDATE people SET campusId = 'CAM00000001' WHERE churchId = 'CHU00000001';
+UPDATE `groups` SET campusId = 'CAM00000001' WHERE churchId = 'CHU00000001';
 
 END $$
 DELIMITER ;

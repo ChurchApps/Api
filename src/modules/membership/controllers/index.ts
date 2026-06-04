@@ -12,6 +12,7 @@ export { FormSubmissionController } from "./FormSubmissionController.js";
 export { QuestionController } from "./QuestionController.js";
 export { AnswerController } from "./AnswerController.js";
 
+export { MembershipCampusController } from "./CampusController.js";
 export { ChurchController } from "./ChurchController.js";
 export { DomainController } from "./DomainController.js";
 export { PermissionController } from "./PermissionController.js";
