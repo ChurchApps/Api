@@ -1,3 +1,6 @@
+// DEPRECATED: campuses are mastered in the membership module (/membership/campuses).
+// This attendance model + its `campuses` table are frozen (read-only) and slated for
+// deletion once legacy readers (e.g. B1Checkin) are migrated off the attendance joins.
 export class Campus {
   public id?: string;
   public churchId?: string;

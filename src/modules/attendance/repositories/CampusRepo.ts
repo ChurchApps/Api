@@ -1,48 +1,13 @@
 import { injectable } from "inversify";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Campus } from "../models/index.js";
 
+// DEPRECATED: read-only/frozen — campuses are mastered in the membership module.
+// The write methods (save/create/update/delete) were removed; only the read
+// methods remain to serve legacy readers. Slated for deletion once those legacy
+// readers are migrated off the attendance campus joins.
 @injectable()
 export class CampusRepo {
-  public async save(model: Campus) {
-    return model.id ? this.update(model) : this.create(model);
-  }
-
-  private async create(model: Campus): Promise<Campus> {
-    model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("campuses").values({
-      id: model.id,
-      churchId: model.churchId,
-      name: model.name,
-      address1: model.address1,
-      address2: model.address2,
-      city: model.city,
-      state: model.state,
-      zip: model.zip,
-      removed: false
-    }).execute();
-    return model;
-  }
-
-  private async update(model: Campus): Promise<Campus> {
-    await getDb().updateTable("campuses").set({
-      name: model.name,
-      address1: model.address1,
-      address2: model.address2,
-      city: model.city,
-      state: model.state,
-      zip: model.zip
-    }).where("id", "=", model.id)
-      .where("churchId", "=", model.churchId)
-      .execute();
-    return model;
-  }
-
-  public async delete(churchId: string, id: string) {
-    await getDb().updateTable("campuses").set({ removed: true }).where("id", "=", id).where("churchId", "=", churchId).execute();
-  }
-
   public async load(churchId: string, id: string) {
     return (await getDb().selectFrom("campuses").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false).executeTakeFirst()) ?? null;
   }
