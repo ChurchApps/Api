@@ -274,6 +274,61 @@ export class PersonRepo {
     return result.rows;
   }
 
+  public async loadDemographics(churchId: string) {
+    const db = getDb();
+
+    // Direct free-text columns: null/blank buckets to "Unassigned".
+    const countByColumn = async (column: "gender" | "membershipStatus" | "maritalStatus") => {
+      const bucket = sql<string>`COALESCE(NULLIF(TRIM(${sql.ref(column)}), ''), 'Unassigned')`;
+      const rows = await db.selectFrom("people")
+        .select((eb) => [bucket.as("name"), eb.fn.countAll<number>().as("count")])
+        .where("churchId", "=", churchId)
+        .where("removed", "=", false as any)
+        .groupBy(bucket)
+        .orderBy(sql`COUNT(*)`, "desc")
+        .execute();
+      return rows.map((r) => ({ name: r.name as string, count: Number(r.count) }));
+    };
+
+    const [gender, membershipStatus, maritalStatus] = await Promise.all([countByColumn("gender"), countByColumn("membershipStatus"), countByColumn("maritalStatus")]);
+
+    // Age groups (people with a birthDate only), split by gender so the bar can stack.
+    const ageRows = await sql`SELECT
+        CASE
+          WHEN age BETWEEN 0 AND 3 THEN '0-3'
+          WHEN age BETWEEN 4 AND 11 THEN '4-11'
+          WHEN age BETWEEN 12 AND 18 THEN '12-18'
+          WHEN age BETWEEN 19 AND 25 THEN '19-25'
+          WHEN age BETWEEN 26 AND 35 THEN '26-35'
+          WHEN age BETWEEN 36 AND 50 THEN '36-50'
+          WHEN age BETWEEN 51 AND 64 THEN '51-64'
+          ELSE '65+'
+        END AS ageGroup,
+        COALESCE(NULLIF(TRIM(gender), ''), 'Unassigned') AS gender,
+        COUNT(*) AS count
+      FROM (
+        SELECT TIMESTAMPDIFF(YEAR, birthDate, CURDATE()) AS age, gender
+        FROM people WHERE churchId = ${churchId} AND removed = 0 AND birthDate IS NOT NULL
+      ) sub
+      GROUP BY ageGroup, gender`.execute(db);
+
+    const order = ["0-3", "4-11", "12-18", "19-25", "26-35", "36-50", "51-64", "65+"];
+    const ageMap: { [group: string]: { group: string; female: number; male: number; unassigned: number } } = {};
+    order.forEach((g) => (ageMap[g] = { group: g, female: 0, male: 0, unassigned: 0 }));
+    (ageRows.rows as any[]).forEach((r) => {
+      const bucket = ageMap[r.ageGroup];
+      if (!bucket) return;
+      // Anything that isn't male/female (custom values, blanks) rolls into "unassigned".
+      const g = String(r.gender).toLowerCase();
+      const key = g === "female" ? "female" : g === "male" ? "male" : "unassigned";
+      bucket[key] += Number(r.count);
+    });
+
+    const total = gender.reduce((sum, r) => sum + r.count, 0);
+
+    return { total, ageGroups: order.map((g) => ageMap[g]), membershipStatus, gender, maritalStatus };
+  }
+
   protected rowToModel(row: any): Person {
     const result: Person = {
       name: {

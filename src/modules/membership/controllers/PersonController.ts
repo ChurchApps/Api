@@ -109,6 +109,14 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/demographics")
+  public async getDemographics(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
+      else return await this.repos.person.loadDemographics(au.churchId);
+    });
+  }
+
   @httpGet("/household/:householdId")
   public async getHouseholdMembers(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
