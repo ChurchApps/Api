@@ -3,7 +3,7 @@ import express from "express";
 import { FileStorageHelper } from "@churchapps/apihelper";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Task } from "../models/index.js";
-import { Environment } from "../helpers/index.js";
+import { Environment, WorkflowHelper } from "../helpers/index.js";
 
 @controller("/doing/tasks")
 export class TaskController extends DoingBaseController {
@@ -26,6 +26,27 @@ export class TaskController extends DoingBaseController {
   public async getPersonDirectoryUpdate(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.task.loadForDirectoryUpdate(au.churchId, personId);
+    });
+  }
+
+  // --- Workflow board / cards ---
+
+  @httpGet("/board/:workflowId")
+  public async getBoard(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const [workflow, steps, cards] = await Promise.all([
+        this.repos.workflow.load(au.churchId, workflowId),
+        this.repos.workflowStep.loadForWorkflow(au.churchId, workflowId),
+        this.repos.task.loadByWorkflow(au.churchId, workflowId, "Open")
+      ]);
+      return { workflow, steps, cards };
+    });
+  }
+
+  @httpGet("/cards/my")
+  public async getMyCards(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      return await this.repos.task.loadCardsForPerson(au.churchId, au.personId, "Open");
     });
   }
 
@@ -60,6 +81,63 @@ export class TaskController extends DoingBaseController {
         result.push(await this.repos.task.save(task));
       }
       return result;
+    });
+  }
+
+  @httpPost("/addToWorkflow")
+  public async addToWorkflow(req: express.Request<{}, {}, { workflowId: string; stepId?: string; associatedWith: { type?: string; id?: string; label?: string } }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { workflowId, stepId, associatedWith } = req.body;
+      return await WorkflowHelper.addToWorkflow(au.churchId, workflowId, associatedWith || {}, this.actor(au), undefined, this.repos, stepId);
+    });
+  }
+
+  @httpPost("/bulkAddToWorkflow")
+  public async bulkAddToWorkflow(req: express.Request<{}, {}, { workflowId: string; people?: { id: string; label?: string }[]; listId?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { workflowId, people } = req.body;
+      const targets = (people || []).map((p) => ({ type: "person", id: p.id, label: p.label }));
+      return await WorkflowHelper.addPeopleToWorkflow(au.churchId, workflowId, targets, this.actor(au), undefined, this.repos);
+    });
+  }
+
+  private actor(au: { personId?: string; firstName?: string; lastName?: string }) {
+    return { type: "person", id: au.personId, label: au.firstName ? au.firstName + " " + au.lastName : "" };
+  }
+
+  @httpPost("/:id/moveStep")
+  public async moveStep(@requestParam("id") id: string, req: express.Request<{}, {}, { stepId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (!task) return this.json({}, 404);
+      return await WorkflowHelper.moveToStep(task, req.body.stepId, this.repos);
+    });
+  }
+
+  @httpPost("/:id/complete")
+  public async complete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (!task) return this.json({}, 404);
+      return await WorkflowHelper.complete(task, this.repos);
+    });
+  }
+
+  @httpPost("/:id/reassign")
+  public async reassign(@requestParam("id") id: string, req: express.Request<{}, {}, { assignedToType?: string; assignedToId?: string; assignedToLabel?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (!task) return this.json({}, 404);
+      return await WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos);
+    });
+  }
+
+  @httpPost("/:id/snooze")
+  public async snooze(@requestParam("id") id: string, req: express.Request<{}, {}, { days: number }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (!task) return this.json({}, 404);
+      return await WorkflowHelper.snooze(task, req.body.days, this.repos);
     });
   }
 

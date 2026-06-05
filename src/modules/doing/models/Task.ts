@@ -19,4 +19,10 @@ export class Task {
   public automationId?: string;
   public conversationId?: string;
   public data?: string;
+  // Workflow/card fields: a Task becomes a "card" when it has a workflowId.
+  public workflowId?: string;
+  public stepId?: string;
+  public dueDate?: Date;
+  public snoozedUntil?: Date;
+  public sort?: number;
 }

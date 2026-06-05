@@ -15,3 +15,7 @@ export { PlanTypeController } from "./PlanTypeController.js";
 export { PositionController } from "./PositionController.js";
 export { TaskController } from "./TaskController.js";
 export { TimeController } from "./TimeController.js";
+export { WorkflowController } from "./WorkflowController.js";
+export { WorkflowStepController } from "./WorkflowStepController.js";
+export { WorkflowCategoryController } from "./WorkflowCategoryController.js";
+export { FormWorkflowTriggerController } from "./FormWorkflowTriggerController.js";

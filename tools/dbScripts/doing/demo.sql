@@ -23,6 +23,10 @@ BEGIN
     TRUNCATE TABLE conditions;
     TRUNCATE TABLE automations;
     TRUNCATE TABLE actions;
+    TRUNCATE TABLE workflows;
+    TRUNCATE TABLE workflowSteps;
+    TRUNCATE TABLE workflowCategories;
+    TRUNCATE TABLE formWorkflowTriggers;
     SET FOREIGN_KEY_CHECKS = 1;
 
     -- Create automation for birthday cards (must be created before tasks that reference it)
@@ -195,6 +199,39 @@ BEGIN
     -- Birthday Card Tasks
     ('TSK00000008', 'CHU00000001', 8, 'Automation', DATE_SUB(NOW(), INTERVAL 6 DAY), NULL, 'Person', 'PER00000028', 'Emily Davis', 'Automation', 'AUT00000001', 'Birthday Card Automation', 'Person', 'PER00000069', 'Rachel Martin', 'Send Birthday Card to Emily Davis', 'Pending', 'AUT00000001', NULL, CONCAT('{"description": "Send birthday card to Emily Davis for their upcoming birthday. Address: 123 Main St, Anytown, USA", "dueDate": "', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 12 DAY), '%Y-%m-%d'), '"}')),
     ('TSK00000009', 'CHU00000001', 9, 'Automation', DATE_SUB(NOW(), INTERVAL 6 DAY), NULL, 'Person', 'PER00000029', 'Michael Wilson', 'Automation', 'AUT00000001', 'Birthday Card Automation', 'Person', 'PER00000069', 'Rachel Martin', 'Send Birthday Card to Michael Wilson', 'Pending', 'AUT00000001', NULL, CONCAT('{"description": "Send birthday card to Michael Wilson for their upcoming birthday. Address: 456 Oak Ave, Anytown, USA", "dueDate": "', DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL 17 DAY), '%Y-%m-%d'), '"}'));
+
+    -- ========================================
+    -- Workflows / Cards (Planning-Center-style pipelines)
+    -- ========================================
+    INSERT INTO workflowCategories (id, churchId, name, sort) VALUES
+    ('WFC00000001', 'CHU00000001', 'Assimilation', 1);
+
+    INSERT INTO workflows (id, churchId, name, categoryId, active, sort) VALUES
+    ('WFL00000001', 'CHU00000001', 'New Visitor Follow-up', 'WFC00000001', b'1', 1),
+    ('WFL00000002', 'CHU00000001', 'Membership Class', NULL, b'1', 2);
+
+    -- Steps. The "Call" step on the first workflow sets a 3-day expected response
+    -- so new cards entering it pick up a due date.
+    INSERT INTO workflowSteps (id, churchId, workflowId, name, sort, defaultAssignToType, defaultAssignToId, defaultAssignToLabel, expectedResponseDays) VALUES
+    ('WFS00000001', 'CHU00000001', 'WFL00000001', 'Greet', 1, NULL, NULL, NULL, 2),
+    ('WFS00000002', 'CHU00000001', 'WFL00000001', 'Call', 2, 'person', 'PER00000027', 'Michael Davis', 3),
+    ('WFS00000003', 'CHU00000001', 'WFL00000001', 'Connect to Group', 3, NULL, NULL, NULL, NULL),
+    ('WFS00000004', 'CHU00000001', 'WFL00000002', 'Invited', 1, NULL, NULL, NULL, NULL),
+    ('WFS00000005', 'CHU00000001', 'WFL00000002', 'Attended', 2, NULL, NULL, NULL, NULL);
+
+    -- Cards = tasks carrying a workflowId. status 'Open' so the board renders them.
+    -- TSK101 normal, TSK102 overdue (past dueDate), TSK103 snoozed, TSK104 assigned
+    -- to the demo user (PER00000082) for the "My Cards" view, TSK105 on the 2nd workflow.
+    INSERT INTO tasks (id, churchId, taskNumber, taskType, dateCreated, associatedWithType, associatedWithId, associatedWithLabel, createdByType, createdByLabel, assignedToType, assignedToId, assignedToLabel, title, status, workflowId, stepId, dueDate, snoozedUntil, sort) VALUES
+    ('TSK00000101', 'CHU00000001', 101, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000001', 'John Smith', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'John Smith', 'Open', 'WFL00000001', 'WFS00000001', DATE_ADD(NOW(), INTERVAL 2 DAY), NULL, 1),
+    ('TSK00000102', 'CHU00000001', 102, 'card', DATE_SUB(NOW(), INTERVAL 6 DAY), 'person', 'PER00000002', 'Maria Rodriguez', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'Maria Rodriguez', 'Open', 'WFL00000001', 'WFS00000001', DATE_SUB(NOW(), INTERVAL 2 DAY), NULL, 2),
+    ('TSK00000103', 'CHU00000001', 103, 'card', DATE_SUB(NOW(), INTERVAL 3 DAY), 'person', 'PER00000003', 'Sarah Thompson', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'Sarah Thompson', 'Open', 'WFL00000001', 'WFS00000002', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 3 DAY), 1),
+    ('TSK00000104', 'CHU00000001', 104, 'card', DATE_SUB(NOW(), INTERVAL 2 DAY), 'person', 'PER00000004', 'James Wilson', 'system', 'System', 'person', 'PER00000082', 'Demo User', 'James Wilson', 'Open', 'WFL00000001', 'WFS00000003', NULL, NULL, 1),
+    ('TSK00000105', 'CHU00000001', 105, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000005', 'Patricia Brown', 'system', 'System', 'person', 'PER00000069', 'Rachel Martin', 'Patricia Brown', 'Open', 'WFL00000002', 'WFS00000004', NULL, NULL, 1);
+
+    -- A form-submission trigger: submissions to this form drop the person on WFL1.
+    INSERT INTO formWorkflowTriggers (id, churchId, formId, workflowId, active) VALUES
+    ('FWT00000001', 'CHU00000001', 'FRM00000001', 'WFL00000001', b'1');
 
     -- ========================================
     -- Conjunctions (Boolean logic for automation conditions)

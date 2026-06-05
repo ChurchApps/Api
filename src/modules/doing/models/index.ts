@@ -12,3 +12,7 @@ export { PlanType } from "./PlanType.js";
 export { Position } from "./Position.js";
 export { Task } from "./Task.js";
 export { Time } from "./Time.js";
+export { Workflow } from "./Workflow.js";
+export { WorkflowStep } from "./WorkflowStep.js";
+export { WorkflowCategory } from "./WorkflowCategory.js";
+export { FormWorkflowTrigger } from "./FormWorkflowTrigger.js";

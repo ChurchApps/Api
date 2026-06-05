@@ -105,8 +105,17 @@ export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Con
 
     console.log("Scheduled tasks timer triggered");
 
-    // Add scheduled task processing logic here
-    // This is a placeholder for future scheduled task implementations
+    const doingRepos = await RepoManager.getRepos<any>("doing");
+
+    // Workflow card maintenance: overdue reminders + un-snooze sweep.
+    const { WorkflowHelper } = await import("../modules/doing/helpers/WorkflowHelper.js");
+    const overdueCount = await WorkflowHelper.processOverdue(doingRepos);
+    const unsnoozedCount = await WorkflowHelper.processSnoozed(doingRepos);
+    console.log(`[handleScheduledTasks] overdue=${overdueCount} unsnoozed=${unsnoozedCount}`);
+
+    // Recurring automations + workflow triggers (scheduled fallback for event-driven adds).
+    const { AutomationHelper: DoingAutomationHelper } = await import("../modules/doing/helpers/AutomationHelper.js");
+    await DoingAutomationHelper.checkAll(doingRepos);
 
     console.log("Scheduled tasks completed");
   } catch (error) {
