@@ -96,6 +96,11 @@ export const permissionsList: IPermission[] = [
   // Messaging API permissions
   { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
 
+  // Doing API permissions (Tasks, Workflows & Automations)
+  { apiName: "DoingApi", section: "Doing", action: "View", displaySection: "Tasks", displayAction: "View Workflows & Cards" },
+  { apiName: "DoingApi", section: "Doing", action: "Edit", displaySection: "Tasks", displayAction: "Edit All Cards & Tasks" },
+  { apiName: "DoingApi", section: "Doing", action: "Admin", displaySection: "Tasks", displayAction: "Manage Workflows & Automations" },
+
   // Lessons API permissions
   { apiName: "LessonsApi", section: "Schedules", action: "Edit", displaySection: "Lessons", displayAction: "Edit Schedules" },
   { apiName: "LessonsApi", section: "Content", action: "Edit", displaySection: "Lessons", displayAction: "Edit Content" }
@@ -111,7 +116,7 @@ export interface IPermission {
 
 export type ApiName = "MembershipApi" | "GivingApi" | "AttendanceApi" | "MessagingApi" | "DoingApi" | "ContentApi" | "LessonsApi";
 
-export type DisplaySection = "People and Groups" | "Donations" | "Attendance" | "Forms and Plans" | "Content" | "Messaging" | "Lessons";
+export type DisplaySection = "People and Groups" | "Donations" | "Attendance" | "Forms and Plans" | "Content" | "Messaging" | "Lessons" | "Tasks";
 
 export type ContentType =
   | "Roles"

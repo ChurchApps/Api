@@ -25,4 +25,7 @@ export class Task {
   public dueDate?: Date;
   public snoozedUntil?: Date;
   public sort?: number;
+  // When true, the card keeps its current assignee across step changes instead
+  // of re-assigning to each step's default (PCO-style "pinned assignment").
+  public pinnedAssignment?: boolean;
 }

@@ -1,7 +1,7 @@
 import { DateHelper } from "@churchapps/apihelper";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
-import { Action, Task, WorkflowStep } from "../models/index.js";
+import { Action, Task, Workflow, WorkflowStep } from "../models/index.js";
 
 interface AssignTarget {
   type?: string;
@@ -33,18 +33,22 @@ export class WorkflowHelper {
     return await this.createCard(churchId, workflowId, step, associated, createdBy, automationId, repos);
   }
 
-  // Bulk add: resolves the workflow's first step (and its on-enter actions) once,
-  // then creates a card per person — avoids re-querying them for every person.
+  // Bulk add: resolves the target step (and its on-enter actions) once, then
+  // creates a card per person — avoids re-querying them for every person.
+  // Defaults to the workflow's first step; pass stepId to add directly to a column.
   public static async addPeopleToWorkflow(
     churchId: string,
     workflowId: string,
     people: AssignTarget[],
     createdBy?: AssignTarget,
     automationId?: string,
-    repositories?: Repos
+    repositories?: Repos,
+    stepId?: string
   ): Promise<Task[]> {
     const repos = await this.getRepos(repositories);
-    const step = ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
+    const step = stepId
+      ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
+      : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
     if (!step) return [];
     const actions = step.id ? ((await repos.action.loadForStep(churchId, step.id)) as Action[]) : [];
     const result: Task[] = [];
@@ -101,7 +105,9 @@ export class WorkflowHelper {
 
     task.snoozedUntil = undefined;
     if (step.expectedResponseDays) task.dueDate = DateHelper.addDays(new Date(), Number(step.expectedResponseDays));
-    if (!task.assignedToId && step.defaultAssignToId) {
+    // Pinned cards keep their owner across steps; otherwise an unassigned card
+    // picks up the step's default assignee.
+    if (!task.pinnedAssignment && !task.assignedToId && step.defaultAssignToId) {
       task.assignedToType = step.defaultAssignToType;
       task.assignedToId = step.defaultAssignToId;
       task.assignedToLabel = step.defaultAssignToLabel;
@@ -122,9 +128,12 @@ export class WorkflowHelper {
     const data = action.actionData ? JSON.parse(action.actionData) : {};
     switch (action.actionType) {
       case "autoAssign":
-        task.assignedToType = data.assignedToType;
-        task.assignedToId = data.assignedToId;
-        task.assignedToLabel = data.assignedToLabel;
+        // A pinned card keeps its owner — don't let a step action reassign it.
+        if (!task.pinnedAssignment) {
+          task.assignedToType = data.assignedToType;
+          task.assignedToId = data.assignedToId;
+          task.assignedToLabel = data.assignedToLabel;
+        }
         break;
       case "autoAdvance":
         // Guard against auto-advance loops.
@@ -165,6 +174,64 @@ export class WorkflowHelper {
     const saved = await repos.task.save(task);
     await this.notifyAssignee(saved, `You have been assigned a card: ${saved.title || ""}`);
     return saved;
+  }
+
+  // Toggle whether a card keeps its current owner across step changes.
+  public static async setPinned(task: Task, pinned: boolean, repositories?: Repos): Promise<Task> {
+    const repos = await this.getRepos(repositories);
+    task.pinnedAssignment = pinned;
+    return await repos.task.save(task);
+  }
+
+  // Move a card to the neighbouring step (by sort order). direction: +1 = skip
+  // forward, -1 = send back. No-op (returns the card unchanged) at either end.
+  public static async moveRelative(task: Task, direction: 1 | -1, repositories?: Repos): Promise<Task> {
+    const repos = await this.getRepos(repositories);
+    const steps = (await repos.workflowStep.loadForWorkflow(task.churchId || "", task.workflowId || "")) as WorkflowStep[];
+    const index = steps.findIndex((s) => s.id === task.stepId);
+    if (index === -1) return task;
+    const target = steps[index + direction];
+    if (!target || !target.id) return task;
+    return await this.moveToStep(task, target.id, repos);
+  }
+
+  // Deep-copy a workflow: its steps and each step's on-enter actions get fresh
+  // ids. Cards are NOT copied. Returns the new workflow.
+  public static async duplicateWorkflow(churchId: string, workflowId: string, repositories?: Repos): Promise<Workflow | null> {
+    const repos = await this.getRepos(repositories);
+    const source = (await repos.workflow.load(churchId, workflowId)) as Workflow;
+    if (!source) return null;
+    const steps = (await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[];
+
+    const newWorkflow = (await repos.workflow.save({ churchId, name: `${source.name || "Workflow"} (copy)`, categoryId: source.categoryId, active: source.active, sort: source.sort })) as Workflow;
+    for (const step of steps) {
+      const actions = step.id ? ((await repos.action.loadForStep(churchId, step.id)) as Action[]) : [];
+      const newStep = (await repos.workflowStep.save({
+        churchId,
+        workflowId: newWorkflow.id,
+        name: step.name,
+        sort: step.sort,
+        defaultAssignToType: step.defaultAssignToType,
+        defaultAssignToId: step.defaultAssignToId,
+        defaultAssignToLabel: step.defaultAssignToLabel,
+        expectedResponseDays: step.expectedResponseDays
+      })) as WorkflowStep;
+      for (const action of actions) {
+        await repos.action.save({ churchId, stepId: newStep.id, actionType: action.actionType, actionData: action.actionData });
+      }
+    }
+    return newWorkflow;
+  }
+
+  // Create a workflow (and its steps) from a hardcoded starter template.
+  public static async createFromTemplate(churchId: string, template: { name: string; steps: { name: string; expectedResponseDays?: number }[] }, name?: string, repositories?: Repos): Promise<Workflow> {
+    const repos = await this.getRepos(repositories);
+    const workflow = (await repos.workflow.save({ churchId, name: name || template.name, active: true })) as Workflow;
+    let sort = 1;
+    for (const step of template.steps) {
+      await repos.workflowStep.save({ churchId, workflowId: workflow.id, name: step.name, sort: sort++, expectedResponseDays: step.expectedResponseDays });
+    }
+    return workflow;
   }
 
   // --- Scheduled sweeps (called from the timer lambda) ---

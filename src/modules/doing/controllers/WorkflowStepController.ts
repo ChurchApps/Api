@@ -2,12 +2,14 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { WorkflowStep } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/workflowSteps")
 export class WorkflowStepController extends DoingBaseController {
   @httpGet("/workflow/:workflowId")
   public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
       return await this.repos.workflowStep.loadForWorkflow(au.churchId, workflowId);
     });
   }
@@ -15,6 +17,7 @@ export class WorkflowStepController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
       return await this.repos.workflowStep.load(au.churchId, id);
     });
   }
@@ -22,6 +25,7 @@ export class WorkflowStepController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, WorkflowStep[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
       const promises: Promise<WorkflowStep>[] = [];
       req.body.forEach((step) => {
         step.churchId = au.churchId;
@@ -34,6 +38,7 @@ export class WorkflowStepController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
       await this.repos.workflowStep.delete(au.churchId, id);
       return {};
     });

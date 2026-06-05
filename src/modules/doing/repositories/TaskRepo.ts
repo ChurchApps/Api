@@ -39,7 +39,8 @@ export class TaskRepo {
       stepId: task.stepId,
       dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
       snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
-      sort: task.sort
+      sort: task.sort,
+      pinnedAssignment: task.pinnedAssignment ?? false
     }).execute();
     return task;
   }
@@ -69,7 +70,8 @@ export class TaskRepo {
       stepId: task.stepId,
       dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
       snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
-      sort: task.sort
+      sort: task.sort,
+      pinnedAssignment: task.pinnedAssignment ?? false
     }).where("id", "=", task.id).where("churchId", "=", task.churchId).execute();
     return task;
   }
