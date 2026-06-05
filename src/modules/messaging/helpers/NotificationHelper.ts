@@ -17,12 +17,6 @@ export interface NotificationDebugTrace {
   steps: NotificationDebugStep[];
 }
 
-export interface CreateNotificationOptions {
-  deliveryStartLevel?: number;
-  deliveryTitle?: string;
-  navData?: Record<string, unknown>;
-}
-
 export class NotificationHelper {
   private static repos: Repos;
 
@@ -633,7 +627,7 @@ export class NotificationHelper {
     }
   };
 
-  static createNotifications = async (peopleIds: string[], churchId: string, contentType: string, contentId: string, message: string, link?: string, triggeredByPersonId?: string, options?: CreateNotificationOptions) => {
+  static createNotifications = async (peopleIds: string[], churchId: string, contentType: string, contentId: string, message: string, link?: string, triggeredByPersonId?: string) => {
     this.ensureInitialized();
     const notifications: Notification[] = [];
     peopleIds.forEach((personId: string) => {
@@ -690,12 +684,12 @@ export class NotificationHelper {
           const deliveryMethod = await NotificationHelper.attemptDeliveryWithEscalation(
             n.churchId,
             n.personId,
-            options?.deliveryStartLevel ?? 0,
-            options?.deliveryTitle || title,
+            0, // Start at socket level
+            title,
             n.message,
             "notification",
             notification.id,
-            { innerType: n.contentType, innerId: n.contentId, ...(n.link ? { link: n.link } : {}), ...(options?.navData || {}) }
+            { innerType: n.contentType, innerId: n.contentId }
           );
 
           // Save the delivery method
