@@ -90,4 +90,4 @@ layers/
 *.pem
 *.key
 *.crt
-config.bat
+.env
