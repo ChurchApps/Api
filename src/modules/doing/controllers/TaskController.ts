@@ -30,8 +30,6 @@ export class TaskController extends DoingBaseController {
     });
   }
 
-  // --- Workflow board / cards ---
-
   @httpGet("/board/:workflowId")
   public async getBoard(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -77,8 +75,10 @@ export class TaskController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Task[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // Member-submitted directory updates are self-service; staff task creation requires Edit.
+      // Member directory updates are self-service; staff task creation requires Edit.
       if (req.query?.type !== "directoryUpdate" && !au.checkAccess(Permissions.doing.edit)) return this.json({}, 401);
+      // Cards must use the card endpoints (which run routing + per-card permissions).
+      if (req.body.some((task) => task.workflowId || task.stepId)) return this.json({ message: "Workflow cards must use the card endpoints" }, 400);
       const result: Task[] = [];
       for (const task of req.body) {
         task.churchId = au.churchId;
@@ -112,11 +112,11 @@ export class TaskController extends DoingBaseController {
     return { type: "person", id: au.personId, label: au.firstName ? au.firstName + " " + au.lastName : "" };
   }
 
-  // --- Bulk card operations (declared before the /:id/* routes so "bulk" isn't captured as an id) ---
+  // Bulk routes are declared before /:id/* so "bulk" isn't captured as an id.
 
   @httpPost("/bulk/moveStep")
   public async bulkMoveStep(req: express.Request<{}, {}, { ids: string[]; stepId: string }>, res: express.Response): Promise<any> {
-    return this.bulkApply(req, res, async (task) => WorkflowHelper.moveToStep(task, req.body.stepId, this.repos));
+    return this.bulkApply(req, res, async (task) => WorkflowHelper.moveToStep(task, req.body.stepId, this.repos, true));
   }
 
   @httpPost("/bulk/complete")
@@ -135,12 +135,10 @@ export class TaskController extends DoingBaseController {
     return this.bulkApply(req, res, async (task) => WorkflowHelper.snooze(task, req.body.days, this.repos));
   }
 
-  // Loads each requested card, enforces per-card edit permission, applies the
-  // operation, and reports which ids were updated vs. skipped (not-found/denied).
+  // Applies op to each editable card, reporting updated vs. skipped (missing/denied) ids.
   private async bulkApply(req: express.Request<{}, {}, { ids: string[] }>, res: express.Response, op: (task: Task) => Promise<Task>): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const ids = req.body.ids || [];
-      // Load all cards concurrently, then apply the (write) operations sequentially.
       const tasks = (await Promise.all(ids.map((id) => this.repos.task.load(au.churchId, id)))) as (Task | null)[];
       const updated: string[] = [];
       const skipped: string[] = [];
@@ -157,74 +155,50 @@ export class TaskController extends DoingBaseController {
     });
   }
 
-  @httpPost("/:id/moveStep")
-  public async moveStep(@requestParam("id") id: string, req: express.Request<{}, {}, { stepId: string }>, res: express.Response): Promise<any> {
+  // Single-card analogue of bulkApply: load, enforce per-card edit permission, run op.
+  private async withCard(req: express.Request, res: express.Response, id: string, op: (task: Task) => Promise<any>): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const task = (await this.repos.task.load(au.churchId, id)) as Task;
       if (!task) return this.json({}, 404);
       if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.moveToStep(task, req.body.stepId, this.repos);
+      return await op(task);
     });
+  }
+
+  @httpPost("/:id/moveStep")
+  public async moveStep(@requestParam("id") id: string, req: express.Request<{}, {}, { stepId: string }>, res: express.Response): Promise<any> {
+    // Manual placement: suppress onEnter routing so the card stays where it was dropped.
+    return this.withCard(req, res, id, (task) => WorkflowHelper.moveToStep(task, req.body.stepId, this.repos, true));
   }
 
   @httpPost("/:id/skip")
   public async skip(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const task = (await this.repos.task.load(au.churchId, id)) as Task;
-      if (!task) return this.json({}, 404);
-      if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.moveRelative(task, 1, this.repos);
-    });
+    return this.withCard(req, res, id, (task) => WorkflowHelper.moveRelative(task, 1, this.repos));
   }
 
   @httpPost("/:id/sendBack")
   public async sendBack(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const task = (await this.repos.task.load(au.churchId, id)) as Task;
-      if (!task) return this.json({}, 404);
-      if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.moveRelative(task, -1, this.repos);
-    });
+    return this.withCard(req, res, id, (task) => WorkflowHelper.moveRelative(task, -1, this.repos));
   }
 
   @httpPost("/:id/complete")
   public async complete(@requestParam("id") id: string, req: express.Request<{}, {}, { routeId?: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const task = (await this.repos.task.load(au.churchId, id)) as Task;
-      if (!task) return this.json({}, 404);
-      if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.complete(task, this.repos, req.body?.routeId);
-    });
+    return this.withCard(req, res, id, (task) => WorkflowHelper.complete(task, this.repos, req.body?.routeId));
   }
 
   @httpPost("/:id/reassign")
   public async reassign(@requestParam("id") id: string, req: express.Request<{}, {}, { assignedToType?: string; assignedToId?: string; assignedToLabel?: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const task = (await this.repos.task.load(au.churchId, id)) as Task;
-      if (!task) return this.json({}, 404);
-      if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos);
-    });
+    return this.withCard(req, res, id, (task) => WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos));
   }
 
   @httpPost("/:id/pin")
   public async pin(@requestParam("id") id: string, req: express.Request<{}, {}, { pinned: boolean }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const task = (await this.repos.task.load(au.churchId, id)) as Task;
-      if (!task) return this.json({}, 404);
-      if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.setPinned(task, req.body.pinned !== false, this.repos);
-    });
+    return this.withCard(req, res, id, (task) => WorkflowHelper.setPinned(task, req.body.pinned !== false, this.repos));
   }
 
   @httpPost("/:id/snooze")
   public async snooze(@requestParam("id") id: string, req: express.Request<{}, {}, { days: number }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      const task = (await this.repos.task.load(au.churchId, id)) as Task;
-      if (!task) return this.json({}, 404);
-      if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.snooze(task, req.body.days, this.repos);
-    });
+    return this.withCard(req, res, id, (task) => WorkflowHelper.snooze(task, req.body.days, this.repos));
   }
 
   private async savePhoto(churchId: string, base64Str: string, task: Task) {

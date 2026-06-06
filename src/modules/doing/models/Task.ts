@@ -19,13 +19,11 @@ export class Task {
   public automationId?: string;
   public conversationId?: string;
   public data?: string;
-  // Workflow/card fields: a Task becomes a "card" when it has a workflowId.
+  // Card fields (a Task is a "card" when workflowId is set).
   public workflowId?: string;
   public stepId?: string;
   public dueDate?: Date;
   public snoozedUntil?: Date;
   public sort?: number;
-  // When true, the card keeps its current assignee across step changes instead
-  // of re-assigning to each step's default (PCO-style "pinned assignment").
   public pinnedAssignment?: boolean;
 }

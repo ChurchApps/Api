@@ -15,8 +15,7 @@ export class ConjunctionHelper {
     return peopleIds;
   }
 
-  // Evaluate a WorkflowStepRoute's condition tree, returning the ids of the people
-  // who match (or ["*"] for everyone). Empty tree -> nobody matches.
+  // Ids of people matching a step route's condition tree (["*"] = everyone, [] = none).
   public static async getPeopleIdsForStepRoute(churchId: string, stepRouteId: string, repositories?: Repos) {
     const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
     const conjunctions = (await repos.conjunction.loadForStepRoute(churchId, stepRouteId)) as Conjunction[];
@@ -28,7 +27,6 @@ export class ConjunctionHelper {
     return this.getPeopleFromTree(tree);
   }
 
-  // True when the given person satisfies a personMatch route's conditions.
   public static async personMatchesStepRoute(churchId: string, stepRouteId: string, personId: string, repositories?: Repos) {
     const ids = await this.getPeopleIdsForStepRoute(churchId, stepRouteId, repositories);
     return ids.indexOf("*") > -1 || ids.indexOf(personId) > -1;

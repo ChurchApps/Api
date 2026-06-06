@@ -11,12 +11,12 @@ export class ActionRepo {
 
   private async create(model: Action): Promise<Action> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("actions").values({ id: model.id, churchId: model.churchId, automationId: model.automationId, stepId: model.stepId, actionType: model.actionType, actionData: model.actionData }).execute();
+    await getDb().insertInto("actions").values({ id: model.id, churchId: model.churchId, automationId: model.automationId, actionType: model.actionType, actionData: model.actionData }).execute();
     return model;
   }
 
   private async update(model: Action): Promise<Action> {
-    await getDb().updateTable("actions").set({ automationId: model.automationId, stepId: model.stepId, actionType: model.actionType, actionData: model.actionData }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("actions").set({ automationId: model.automationId, actionType: model.actionType, actionData: model.actionData }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -34,9 +34,5 @@ export class ActionRepo {
 
   public async loadForAutomation(churchId: string, automationId: string) {
     return getDb().selectFrom("actions").selectAll().where("automationId", "=", automationId).where("churchId", "=", churchId).execute();
-  }
-
-  public async loadForStep(churchId: string, stepId: string) {
-    return getDb().selectFrom("actions").selectAll().where("stepId", "=", stepId).where("churchId", "=", churchId).execute();
   }
 }

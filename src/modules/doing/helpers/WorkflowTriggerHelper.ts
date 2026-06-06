@@ -11,8 +11,7 @@ interface SubmissionLike {
 }
 
 export class WorkflowTriggerHelper {
-  // Called (cross-module, best-effort) after a form submission is saved. Adds the
-  // submitting person to any workflow configured as a destination for that form.
+  // After a form submission, add the person to any workflow that form triggers.
   public static async onFormSubmission(submission: SubmissionLike | SubmissionLike[]): Promise<void> {
     const submissions = Array.isArray(submission) ? submission : [submission];
     try {

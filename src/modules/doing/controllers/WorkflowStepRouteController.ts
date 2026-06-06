@@ -30,8 +30,7 @@ export class WorkflowStepRouteController extends DoingBaseController {
       for (const route of req.body) {
         route.churchId = au.churchId;
         const saved = (await this.repos.workflowStepRoute.save(route)) as WorkflowStepRoute;
-        // A personMatch route evaluates a condition tree; give it a root conjunction
-        // (AND) to hang conditions off of, mirroring an automation's root.
+        // personMatch routes need a root conjunction to hang conditions off of.
         if (saved.kind === "personMatch") {
           const existing = (await this.repos.conjunction.loadForStepRoute(au.churchId, saved.id || "")) as Conjunction[];
           if (!existing || existing.length === 0) {

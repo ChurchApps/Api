@@ -189,9 +189,11 @@ export class TaskRepo {
     return (result as any)?.taskNumber ?? 1;
   }
 
+  // Plain-task lists exclude cards (workflowId set); cards have the board / my-cards.
   public async loadForPerson(churchId: string, personId: string, status: string) {
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
+      .where("workflowId", "is", null)
       .where((eb) =>
         eb.or([
           eb.and([eb("assignedToType", "=", "person"), eb("assignedToId", "=", personId)]),
@@ -206,6 +208,7 @@ export class TaskRepo {
     if (groupIds.length === 0) return [];
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
+      .where("workflowId", "is", null)
       .where((eb) =>
         eb.or([
           eb.and([eb("assignedToType", "=", "group"), eb("assignedToId", "in", groupIds)]),
@@ -224,8 +227,6 @@ export class TaskRepo {
       .where("associatedWithId", "=", personId)
       .execute();
   }
-
-  // --- Workflow / card queries ---
 
   public async loadByWorkflow(churchId: string, workflowId: string, status = "Open") {
     return getDb().selectFrom("tasks").selectAll()
@@ -258,7 +259,6 @@ export class TaskRepo {
     return (result as any)?.sort ?? 1;
   }
 
-  // Open cards that are past due and not currently snoozed (all churches, for the scheduled sweep).
   public async loadOverdueAllChurches() {
     return getDb().selectFrom("tasks").selectAll()
       .where("workflowId", "is not", null)
@@ -269,7 +269,6 @@ export class TaskRepo {
       .execute();
   }
 
-  // Open cards whose snooze window has elapsed (all churches, for the scheduled sweep).
   public async loadSnoozedDueAllChurches() {
     return getDb().selectFrom("tasks").selectAll()
       .where("workflowId", "is not", null)
@@ -278,8 +277,6 @@ export class TaskRepo {
       .where("snoozedUntil", "<=", sql`now()` as any)
       .execute();
   }
-
-  // --- Reporting aggregates ---
 
   public async countByStep(churchId: string, workflowId: string) {
     return getDb().selectFrom("tasks")

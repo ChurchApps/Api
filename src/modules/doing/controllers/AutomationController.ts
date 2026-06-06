@@ -7,10 +7,8 @@ import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/automations")
 export class AutomationController extends DoingBaseController {
-  // Internal cron hook that triggers automation execution. It is unauthenticated
-  // (no church/user context), so it is gated by a shared secret and fails closed:
-  // the caller must send an x-internal-key header matching INTERNAL_API_KEY. If the
-  // env var is not configured the endpoint is disabled entirely, never left open.
+  // Internal cron hook (no user context). Gated by the INTERNAL_API_KEY shared secret;
+  // fails closed if the header is missing or the env var isn't configured.
   @httpGet("/check")
   public async tempCheck(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

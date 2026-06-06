@@ -1,7 +1,7 @@
 import { DateHelper } from "@churchapps/apihelper";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
-import { Action, Task, Workflow, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
+import { Task, Workflow, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
 
 interface AssignTarget {
@@ -15,8 +15,6 @@ export class WorkflowHelper {
     return repositories || (await RepoManager.getRepos<Repos>("doing"));
   }
 
-  // Add a person to a workflow as a card. Defaults to the first step; pass stepId
-  // to drop the card directly on a specific step (e.g. a Kanban column's "+").
   public static async addToWorkflow(
     churchId: string,
     workflowId: string,
@@ -34,9 +32,6 @@ export class WorkflowHelper {
     return await this.createCard(churchId, workflowId, step, associated, createdBy, automationId, repos);
   }
 
-  // Bulk add: resolves the target step (and its on-enter actions) once, then
-  // creates a card per person — avoids re-querying them for every person.
-  // Defaults to the workflow's first step; pass stepId to add directly to a column.
   public static async addPeopleToWorkflow(
     churchId: string,
     workflowId: string,
@@ -51,10 +46,10 @@ export class WorkflowHelper {
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
     if (!step) return [];
-    const actions = step.id ? ((await repos.action.loadForStep(churchId, step.id)) as Action[]) : [];
+    const baseSort = await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || "");
     const result: Task[] = [];
-    for (const p of people) {
-      result.push(await this.createCard(churchId, workflowId, step, p, createdBy, automationId, repos, actions));
+    for (let i = 0; i < people.length; i++) {
+      result.push(await this.createCard(churchId, workflowId, step, people[i], createdBy, automationId, repos, baseSort + i));
     }
     return result;
   }
@@ -67,7 +62,7 @@ export class WorkflowHelper {
     createdBy?: AssignTarget,
     automationId?: string,
     repos?: Repos,
-    actions?: Action[]
+    sort?: number
   ): Promise<Task> {
     const task: Task = {
       churchId,
@@ -84,54 +79,37 @@ export class WorkflowHelper {
       workflowId,
       stepId: step.id,
       automationId,
-      sort: await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || "")
+      sort: sort ?? (await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || ""))
     };
-    await this.onStepEnter(task, step, repos, 0, actions);
+    await this.onStepEnter(task, step, repos, 0);
     return await repos.task.save(task);
   }
 
-  // Move an existing card to a different step, applying that step's on-enter logic.
-  public static async moveToStep(task: Task, newStepId: string, repositories?: Repos): Promise<Task> {
+  // suppressRoutes skips onEnter auto-routing so an explicit manual move stays put.
+  public static async moveToStep(task: Task, newStepId: string, repositories?: Repos, suppressRoutes = false): Promise<Task> {
     const repos = await this.getRepos(repositories);
     const step = (await repos.workflowStep.load(task.churchId || "", newStepId)) as WorkflowStep;
     task.stepId = newStepId;
     task.sort = await repos.task.loadMaxSortForStep(task.churchId || "", task.workflowId || "", newStepId);
-    if (step) await this.onStepEnter(task, step, repos, 0);
+    if (step) await this.onStepEnter(task, step, repos, 0, suppressRoutes);
     return await repos.task.save(task);
   }
 
-  // Central step-entry logic: due date from expectedResponseDays, default assignee, and on-enter actions.
-  public static async onStepEnter(task: Task, step: WorkflowStep, repositories?: Repos, depth = 0, preloadedActions?: Action[]): Promise<void> {
+  public static async onStepEnter(task: Task, step: WorkflowStep, repositories?: Repos, depth = 0, suppressRoutes = false): Promise<void> {
     const repos = await this.getRepos(repositories);
 
     task.snoozedUntil = undefined;
     if (step.expectedResponseDays) task.dueDate = DateHelper.addDays(new Date(), Number(step.expectedResponseDays));
-    // Pinned cards keep their owner across steps; otherwise an unassigned card
-    // picks up the step's default assignee.
     if (!task.pinnedAssignment && !task.assignedToId && step.defaultAssignToId) {
       task.assignedToType = step.defaultAssignToType;
       task.assignedToId = step.defaultAssignToId;
       task.assignedToLabel = step.defaultAssignToLabel;
     }
 
-    if (!step.id) return;
-    const actions = preloadedActions ?? ((await repos.action.loadForStep(task.churchId || "", step.id)) as Action[]);
-    for (const action of actions) {
-      try {
-        await this.runStepAction(task, action, repos, depth);
-      } catch {
-        // One failed action shouldn't block the transition.
-      }
-    }
-
-    // Conditional auto-routing: the first matching onEnter route advances the card.
+    if (!step.id || suppressRoutes) return;
     await this.applyEntryRoutes(task, step, repos, depth);
   }
 
-  // Evaluate a step's onEnter routes (in sort order) when a card lands on it.
-  // The first route that matches — a personMatch whose condition tree includes the
-  // card's person, or an unconditional `always` — advances the card to its target,
-  // recursing through that step's own entry logic. The depth guard prevents loops.
   private static async applyEntryRoutes(task: Task, step: WorkflowStep, repos: Repos, depth: number): Promise<void> {
     if (depth >= 5 || !step.id) return;
     const routes = (await repos.workflowStepRoute.loadForStep(task.churchId || "", step.id)) as WorkflowStepRoute[];
@@ -151,44 +129,10 @@ export class WorkflowHelper {
           await this.onStepEnter(task, next, repos, depth + 1);
         }
       }
-      // First matching route wins, whether or not it had a usable target.
       return;
     }
   }
 
-  private static async runStepAction(task: Task, action: Action, repos: Repos, depth: number): Promise<void> {
-    const data = action.actionData ? JSON.parse(action.actionData) : {};
-    switch (action.actionType) {
-      case "autoAssign":
-        // A pinned card keeps its owner — don't let a step action reassign it.
-        if (!task.pinnedAssignment) {
-          task.assignedToType = data.assignedToType;
-          task.assignedToId = data.assignedToId;
-          task.assignedToLabel = data.assignedToLabel;
-        }
-        break;
-      case "autoAdvance":
-        // Guard against auto-advance loops.
-        if (depth < 5 && data.targetStepId && data.targetStepId !== task.stepId) {
-          const next = (await repos.workflowStep.load(task.churchId || "", data.targetStepId)) as WorkflowStep;
-          if (next) {
-            task.stepId = next.id;
-            task.sort = await repos.task.loadMaxSortForStep(task.churchId || "", task.workflowId || "", next.id || "");
-            await this.onStepEnter(task, next, repos, depth + 1);
-          }
-        }
-        break;
-      case "sendEmail":
-      case "sendText":
-        await this.notifyAssignee(task, data.message || `Workflow update for ${task.associatedWithLabel}`);
-        break;
-    }
-  }
-
-  // Complete a card. When a routeId is supplied (an onComplete "outcome" the user
-  // picked), the card is routed by that outcome: a route with a targetStepId moves
-  // the card to that step (re-running its entry logic); a route with no target — or
-  // no routeId at all — closes the card.
   public static async complete(task: Task, repositories?: Repos, routeId?: string): Promise<Task> {
     const repos = await this.getRepos(repositories);
     if (routeId) {
@@ -216,15 +160,13 @@ export class WorkflowHelper {
     return saved;
   }
 
-  // Toggle whether a card keeps its current owner across step changes.
   public static async setPinned(task: Task, pinned: boolean, repositories?: Repos): Promise<Task> {
     const repos = await this.getRepos(repositories);
     task.pinnedAssignment = pinned;
     return await repos.task.save(task);
   }
 
-  // Move a card to the neighbouring step (by sort order). direction: +1 = skip
-  // forward, -1 = send back. No-op (returns the card unchanged) at either end.
+  // direction: +1 = skip forward, -1 = send back. Manual move, so routes don't re-fire.
   public static async moveRelative(task: Task, direction: 1 | -1, repositories?: Repos): Promise<Task> {
     const repos = await this.getRepos(repositories);
     const steps = (await repos.workflowStep.loadForWorkflow(task.churchId || "", task.workflowId || "")) as WorkflowStep[];
@@ -232,11 +174,9 @@ export class WorkflowHelper {
     if (index === -1) return task;
     const target = steps[index + direction];
     if (!target || !target.id) return task;
-    return await this.moveToStep(task, target.id, repos);
+    return await this.moveToStep(task, target.id, repos, true);
   }
 
-  // Deep-copy a workflow: its steps and each step's on-enter actions get fresh
-  // ids. Cards are NOT copied. Returns the new workflow.
   public static async duplicateWorkflow(churchId: string, workflowId: string, repositories?: Repos): Promise<Workflow | null> {
     const repos = await this.getRepos(repositories);
     const source = (await repos.workflow.load(churchId, workflowId)) as Workflow;
@@ -244,37 +184,62 @@ export class WorkflowHelper {
     const steps = (await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[];
 
     const newWorkflow = (await repos.workflow.save({ churchId, name: `${source.name || "Workflow"} (copy)`, categoryId: source.categoryId, active: source.active, sort: source.sort })) as Workflow;
-    for (const step of steps) {
-      const actions = step.id ? ((await repos.action.loadForStep(churchId, step.id)) as Action[]) : [];
-      const newStep = (await repos.workflowStep.save({
-        churchId,
-        workflowId: newWorkflow.id,
-        name: step.name,
-        sort: step.sort,
-        defaultAssignToType: step.defaultAssignToType,
-        defaultAssignToId: step.defaultAssignToId,
-        defaultAssignToLabel: step.defaultAssignToLabel,
-        expectedResponseDays: step.expectedResponseDays
-      })) as WorkflowStep;
-      for (const action of actions) {
-        await repos.action.save({ churchId, stepId: newStep.id, actionType: action.actionType, actionData: action.actionData });
+    const createdStepIds: string[] = [];
+    try {
+      for (const step of steps) {
+        const newStep = (await repos.workflowStep.save({
+          churchId,
+          workflowId: newWorkflow.id,
+          name: step.name,
+          sort: step.sort,
+          defaultAssignToType: step.defaultAssignToType,
+          defaultAssignToId: step.defaultAssignToId,
+          defaultAssignToLabel: step.defaultAssignToLabel,
+          expectedResponseDays: step.expectedResponseDays
+        })) as WorkflowStep;
+        if (newStep.id) createdStepIds.push(newStep.id);
       }
+    } catch (err) {
+      await this.rollbackWorkflow(repos, churchId, newWorkflow.id, createdStepIds, "duplicateWorkflow", err);
+      throw err;
     }
     return newWorkflow;
   }
 
-  // Create a workflow (and its steps) from a hardcoded starter template.
   public static async createFromTemplate(churchId: string, template: { name: string; steps: { name: string; expectedResponseDays?: number }[] }, name?: string, repositories?: Repos): Promise<Workflow> {
     const repos = await this.getRepos(repositories);
     const workflow = (await repos.workflow.save({ churchId, name: name || template.name, active: true })) as Workflow;
-    let sort = 1;
-    for (const step of template.steps) {
-      await repos.workflowStep.save({ churchId, workflowId: workflow.id, name: step.name, sort: sort++, expectedResponseDays: step.expectedResponseDays });
+    const createdStepIds: string[] = [];
+    try {
+      let sort = 1;
+      for (const step of template.steps) {
+        const newStep = (await repos.workflowStep.save({ churchId, workflowId: workflow.id, name: step.name, sort: sort++, expectedResponseDays: step.expectedResponseDays })) as WorkflowStep;
+        if (newStep.id) createdStepIds.push(newStep.id);
+      }
+    } catch (err) {
+      await this.rollbackWorkflow(repos, churchId, workflow.id, createdStepIds, "createFromTemplate", err);
+      throw err;
     }
     return workflow;
   }
 
-  // --- Scheduled sweeps (called from the timer lambda) ---
+  private static async rollbackWorkflow(repos: Repos, churchId: string, workflowId: string | undefined, stepIds: string[], op: string, cause: unknown): Promise<void> {
+    console.error(`[WorkflowHelper] ${op} failed; rolling back partial workflow`, cause);
+    for (const id of stepIds) {
+      try {
+        await repos.workflowStep.delete(churchId, id);
+      } catch (cleanupErr) {
+        console.error(`[WorkflowHelper] ${op} rollback: failed to delete step ${id}`, cleanupErr);
+      }
+    }
+    if (workflowId) {
+      try {
+        await repos.workflow.delete(churchId, workflowId);
+      } catch (cleanupErr) {
+        console.error(`[WorkflowHelper] ${op} rollback: failed to delete workflow ${workflowId}`, cleanupErr);
+      }
+    }
+  }
 
   public static async processOverdue(repositories?: Repos): Promise<number> {
     const repos = await this.getRepos(repositories);
@@ -296,14 +261,13 @@ export class WorkflowHelper {
     return cards.length;
   }
 
-  // Best-effort in-app notification to the card assignee (person only). No-op if messaging isn't initialized.
   private static async notifyAssignee(task: Task, message: string): Promise<void> {
     if (task.assignedToType !== "person" || !task.assignedToId) return;
     try {
       const { NotificationHelper } = await import("../../messaging/helpers/NotificationHelper.js");
       await NotificationHelper.createNotifications([task.assignedToId], task.churchId || "", "task", task.id || "", message);
-    } catch {
-      // messaging not available in this process; skip.
+    } catch (err) {
+      console.warn(`[WorkflowHelper] notifyAssignee skipped for task ${task.id || "?"}:`, (err as Error)?.message || err);
     }
   }
 }

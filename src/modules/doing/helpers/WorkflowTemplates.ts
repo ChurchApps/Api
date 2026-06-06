@@ -5,8 +5,7 @@ export interface WorkflowTemplate {
   steps: { name: string; expectedResponseDays?: number }[];
 }
 
-// Hardcoded starter templates offered when creating a new workflow. These give
-// churches a sensible multi-step process to clone instead of building from scratch.
+// Starter templates offered when creating a new workflow.
 export class WorkflowTemplates {
   public static readonly all: WorkflowTemplate[] = [
     {
