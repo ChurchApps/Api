@@ -218,6 +218,14 @@ export const createApp = async () => {
   } catch (error) {
     console.warn("Failed to initialize messaging module:", (error as any)?.message || error);
   }
+
+  // Register the doing module's cross-module services (e.g. workflow triggers)
+  try {
+    const { initializeDoingModule } = await import("./modules/doing/index.js");
+    initializeDoingModule();
+  } catch (error) {
+    console.warn("Failed to initialize doing module:", (error as any)?.message || error);
+  }
   return app;
 };
 

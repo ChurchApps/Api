@@ -1,6 +1,7 @@
 import { DateHelper } from "@churchapps/apihelper";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
+import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { Task, Workflow, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
 
@@ -286,8 +287,7 @@ export class WorkflowHelper {
   private static async notifyAssignee(task: Task, message: string): Promise<void> {
     if (task.assignedToType !== "person" || !task.assignedToId) return;
     try {
-      const { NotificationHelper } = await import("../../messaging/helpers/NotificationHelper.js");
-      await NotificationHelper.createNotifications([task.assignedToId], task.churchId || "", "task", task.id || "", message);
+      await NotificationService.createNotifications([task.assignedToId], task.churchId || "", "task", task.id || "", message);
     } catch (err) {
       console.warn(`[WorkflowHelper] notifyAssignee skipped for task ${task.id || "?"}:`, (err as Error)?.message || err);
     }

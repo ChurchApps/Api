@@ -5,6 +5,7 @@ import { FormSubmission, Answer, Form, Church } from "../models/index.js";
 import { Permissions, EmailHelper, Environment } from "../helpers/index.js";
 import { MemberPermission, Person } from "../models/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { WorkflowTriggerService } from "../../../shared/helpers/index.js";
 import axios from "axios";
 
 @controller("/membership/formsubmissions")
@@ -59,8 +60,6 @@ export class FormSubmissionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (req.body?.length > 0) {
         const results: any[] = [];
-        // Add submitters to any workflow configured as a destination for their form.
-        const { WorkflowTriggerHelper } = await import("../../doing/helpers/WorkflowTriggerHelper.js");
         for (const formSubmission of req.body) {
           const { formId } = formSubmission;
           let { churchId } = formSubmission;
@@ -91,7 +90,8 @@ export class FormSubmissionController extends MembershipBaseController {
 
               results.push(savedSubmissions);
               await WebhookDispatcher.emit(churchId, "form.submission.created", savedSubmissions);
-              await WorkflowTriggerHelper.onFormSubmission(savedSubmissions);
+              // Add submitters to any workflow configured as a destination for their form.
+              await WorkflowTriggerService.onFormSubmission(savedSubmissions);
 
               await this.sendEmails(formSubmission, form, churchId);
             }
