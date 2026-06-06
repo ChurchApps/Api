@@ -77,6 +77,7 @@ export class CuratedEventRepo {
         "ce.curatedCalendarId",
         sql`ce.groupId`.as("curatedGroupId"),
         "ce.eventId",
+        sql`e.id`.as("realEventId"),
         "e.groupId",
         "e.title",
         "e.description",
