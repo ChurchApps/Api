@@ -7,14 +7,15 @@ import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/automations")
 export class AutomationController extends DoingBaseController {
-  // Internal cron hook. Unauthenticated for backward compatibility, but when
-  // INTERNAL_API_KEY is configured the caller must send a matching x-internal-key
-  // header. Leave the env var unset to preserve the legacy open behavior.
+  // Internal cron hook that triggers automation execution. It is unauthenticated
+  // (no church/user context), so it is gated by a shared secret and fails closed:
+  // the caller must send an x-internal-key header matching INTERNAL_API_KEY. If the
+  // env var is not configured the endpoint is disabled entirely, never left open.
   @httpGet("/check")
   public async tempCheck(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const requiredKey = process.env.INTERNAL_API_KEY;
-      if (requiredKey && req.header("x-internal-key") !== requiredKey) return this.json({}, 401);
+      if (!requiredKey || req.header("x-internal-key") !== requiredKey) return this.json({}, 401);
       await AutomationHelper.checkAll();
       return { success: true };
     });

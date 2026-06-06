@@ -38,4 +38,11 @@ export class ConditionRepo {
       .where("churchId", "=", churchId)
       .execute();
   }
+
+  public async loadForStepRoute(churchId: string, stepRouteId: string) {
+    return getDb().selectFrom("conditions").selectAll()
+      .where("conjunctionId", "in", getDb().selectFrom("conjunctions").select("id").where("stepRouteId", "=", stepRouteId))
+      .where("churchId", "=", churchId)
+      .execute();
+  }
 }

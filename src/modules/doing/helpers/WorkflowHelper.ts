@@ -1,7 +1,8 @@
 import { DateHelper } from "@churchapps/apihelper";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
-import { Action, Task, Workflow, WorkflowStep } from "../models/index.js";
+import { Action, Task, Workflow, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
+import { ConjunctionHelper } from "./ConjunctionHelper.js";
 
 interface AssignTarget {
   type?: string;
@@ -122,6 +123,37 @@ export class WorkflowHelper {
         // One failed action shouldn't block the transition.
       }
     }
+
+    // Conditional auto-routing: the first matching onEnter route advances the card.
+    await this.applyEntryRoutes(task, step, repos, depth);
+  }
+
+  // Evaluate a step's onEnter routes (in sort order) when a card lands on it.
+  // The first route that matches — a personMatch whose condition tree includes the
+  // card's person, or an unconditional `always` — advances the card to its target,
+  // recursing through that step's own entry logic. The depth guard prevents loops.
+  private static async applyEntryRoutes(task: Task, step: WorkflowStep, repos: Repos, depth: number): Promise<void> {
+    if (depth >= 5 || !step.id) return;
+    const routes = (await repos.workflowStepRoute.loadForStep(task.churchId || "", step.id)) as WorkflowStepRoute[];
+    const onEnter = routes.filter((r) => r.trigger === "onEnter");
+    for (const route of onEnter) {
+      let matched = false;
+      if (route.kind === "always") matched = true;
+      else if (route.kind === "personMatch" && task.associatedWithType === "person" && task.associatedWithId) {
+        matched = await ConjunctionHelper.personMatchesStepRoute(task.churchId || "", route.id || "", task.associatedWithId, repos);
+      }
+      if (!matched) continue;
+      if (route.targetStepId && route.targetStepId !== task.stepId) {
+        const next = (await repos.workflowStep.load(task.churchId || "", route.targetStepId)) as WorkflowStep;
+        if (next) {
+          task.stepId = next.id;
+          task.sort = await repos.task.loadMaxSortForStep(task.churchId || "", task.workflowId || "", next.id || "");
+          await this.onStepEnter(task, next, repos, depth + 1);
+        }
+      }
+      // First matching route wins, whether or not it had a usable target.
+      return;
+    }
   }
 
   private static async runStepAction(task: Task, action: Action, repos: Repos, depth: number): Promise<void> {
@@ -153,8 +185,16 @@ export class WorkflowHelper {
     }
   }
 
-  public static async complete(task: Task, repositories?: Repos): Promise<Task> {
+  // Complete a card. When a routeId is supplied (an onComplete "outcome" the user
+  // picked), the card is routed by that outcome: a route with a targetStepId moves
+  // the card to that step (re-running its entry logic); a route with no target — or
+  // no routeId at all — closes the card.
+  public static async complete(task: Task, repositories?: Repos, routeId?: string): Promise<Task> {
     const repos = await this.getRepos(repositories);
+    if (routeId) {
+      const route = (await repos.workflowStepRoute.load(task.churchId || "", routeId)) as WorkflowStepRoute;
+      if (route && route.targetStepId) return await this.moveToStep(task, route.targetStepId, repos);
+    }
     task.status = "Closed";
     task.dateClosed = new Date();
     return await repos.task.save(task);

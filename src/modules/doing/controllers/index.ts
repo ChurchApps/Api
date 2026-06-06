@@ -17,5 +17,6 @@ export { TaskController } from "./TaskController.js";
 export { TimeController } from "./TimeController.js";
 export { WorkflowController } from "./WorkflowController.js";
 export { WorkflowStepController } from "./WorkflowStepController.js";
+export { WorkflowStepRouteController } from "./WorkflowStepRouteController.js";
 export { WorkflowCategoryController } from "./WorkflowCategoryController.js";
 export { FormWorkflowTriggerController } from "./FormWorkflowTriggerController.js";

@@ -36,12 +36,13 @@ export class TaskController extends DoingBaseController {
   public async getBoard(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
-      const [workflow, steps, cards] = await Promise.all([
+      const [workflow, steps, cards, routes] = await Promise.all([
         this.repos.workflow.load(au.churchId, workflowId),
         this.repos.workflowStep.loadForWorkflow(au.churchId, workflowId),
-        this.repos.task.loadByWorkflow(au.churchId, workflowId, "Open")
+        this.repos.task.loadByWorkflow(au.churchId, workflowId, "Open"),
+        this.repos.workflowStepRoute.loadForWorkflow(au.churchId, workflowId)
       ]);
-      return { workflow, steps, cards };
+      return { workflow, steps, cards, routes };
     });
   }
 
@@ -187,12 +188,12 @@ export class TaskController extends DoingBaseController {
   }
 
   @httpPost("/:id/complete")
-  public async complete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async complete(@requestParam("id") id: string, req: express.Request<{}, {}, { routeId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const task = (await this.repos.task.load(au.churchId, id)) as Task;
       if (!task) return this.json({}, 404);
       if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await WorkflowHelper.complete(task, this.repos);
+      return await WorkflowHelper.complete(task, this.repos, req.body?.routeId);
     });
   }
 

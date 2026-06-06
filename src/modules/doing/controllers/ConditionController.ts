@@ -22,6 +22,14 @@ export class ConditionController extends DoingBaseController {
     });
   }
 
+  @httpGet("/stepRoute/:id")
+  public async getForStepRoute(@requestParam("id") stepRouteId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      return await this.repos.condition.loadForStepRoute(au.churchId, stepRouteId);
+    });
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Condition[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -25,6 +25,7 @@ BEGIN
     TRUNCATE TABLE actions;
     TRUNCATE TABLE workflows;
     TRUNCATE TABLE workflowSteps;
+    TRUNCATE TABLE workflowStepRoutes;
     TRUNCATE TABLE workflowCategories;
     TRUNCATE TABLE formWorkflowTriggers;
     SET FOREIGN_KEY_CHECKS = 1;
@@ -208,7 +209,8 @@ BEGIN
 
     INSERT INTO workflows (id, churchId, name, categoryId, active, sort) VALUES
     ('WFL00000001', 'CHU00000001', 'New Visitor Follow-up', 'WFC00000001', b'1', 1),
-    ('WFL00000002', 'CHU00000001', 'Membership Class', NULL, b'1', 2);
+    ('WFL00000002', 'CHU00000001', 'Membership Class', NULL, b'1', 2),
+    ('WFL00000003', 'CHU00000001', 'Visit Follow-up', NULL, b'1', 3);
 
     -- Steps. The "Call" step on the first workflow sets a 3-day expected response
     -- so new cards entering it pick up a due date.
@@ -217,7 +219,10 @@ BEGIN
     ('WFS00000002', 'CHU00000001', 'WFL00000001', 'Call', 2, 'person', 'PER00000027', 'Michael Davis', 3),
     ('WFS00000003', 'CHU00000001', 'WFL00000001', 'Connect to Group', 3, NULL, NULL, NULL, NULL),
     ('WFS00000004', 'CHU00000001', 'WFL00000002', 'Invited', 1, NULL, NULL, NULL, NULL),
-    ('WFS00000005', 'CHU00000001', 'WFL00000002', 'Attended', 2, NULL, NULL, NULL, NULL);
+    ('WFS00000005', 'CHU00000001', 'WFL00000002', 'Attended', 2, NULL, NULL, NULL, NULL),
+    -- WFL00000003 "Visit Follow-up" — dedicated to exercising outcome routing.
+    ('WFS00000006', 'CHU00000001', 'WFL00000003', 'Contact', 1, NULL, NULL, NULL, NULL),
+    ('WFS00000007', 'CHU00000001', 'WFL00000003', 'Scheduled', 2, NULL, NULL, NULL, NULL);
 
     -- Cards = tasks carrying a workflowId. status 'Open' so the board renders them.
     -- TSK101 normal, TSK102 overdue (past dueDate), TSK103 snoozed, TSK104 assigned
@@ -232,6 +237,30 @@ BEGIN
     -- A form-submission trigger: submissions to this form drop the person on WFL1.
     INSERT INTO formWorkflowTriggers (id, churchId, formId, workflowId, active) VALUES
     ('FWT00000001', 'CHU00000001', 'FRM00000001', 'WFL00000001', b'1');
+
+    -- ========================================
+    -- Conditional routing ("if this then that")
+    -- ========================================
+    -- Outcome buttons on the Visit Follow-up "Contact" step (WFS6): "Reached" advances
+    -- the card to "Scheduled" (WFS7); "Not Interested" has no target, so it closes the card.
+    -- An automatic (personMatch) route on the Membership Class "Invited" step (WFS4):
+    -- anyone whose last name is "Smith" is auto-advanced to "Attended" (WFS5) on entry.
+    INSERT INTO workflowStepRoutes (id, churchId, workflowId, stepId, sort, `trigger`, kind, label, targetStepId) VALUES
+    ('WSR00000001', 'CHU00000001', 'WFL00000003', 'WFS00000006', 1, 'onComplete', 'outcome', 'Reached', 'WFS00000007'),
+    ('WSR00000002', 'CHU00000001', 'WFL00000003', 'WFS00000006', 2, 'onComplete', 'outcome', 'Not Interested', NULL),
+    ('WSR00000003', 'CHU00000001', 'WFL00000002', 'WFS00000004', 1, 'onEnter', 'personMatch', NULL, 'WFS00000005');
+
+    -- Condition tree for the personMatch route (lastName = 'Smith').
+    INSERT INTO conjunctions (id, churchId, stepRouteId, parentId, groupType) VALUES
+    ('CNJ00000010', 'CHU00000001', 'WSR00000003', NULL, 'and');
+    INSERT INTO conditions (id, churchId, conjunctionId, field, fieldData, operator, value, label) VALUES
+    ('CON00000010', 'CHU00000001', 'CNJ00000010', 'lastName', '{}', '=', 'Smith', 'Last name is Smith');
+
+    -- Dedicated cards on the Visit Follow-up "Contact" step (WFS6) for exercising
+    -- the outcome buttons (isolated from TSK101-105 which other tests mutate).
+    INSERT INTO tasks (id, churchId, taskNumber, taskType, dateCreated, associatedWithType, associatedWithId, associatedWithLabel, createdByType, createdByLabel, assignedToType, assignedToId, assignedToLabel, title, status, workflowId, stepId, dueDate, snoozedUntil, sort) VALUES
+    ('TSK00000106', 'CHU00000001', 106, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000006', 'Linda Davis', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'Linda Davis', 'Open', 'WFL00000003', 'WFS00000006', NULL, NULL, 1),
+    ('TSK00000107', 'CHU00000001', 107, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000007', 'Robert Miller', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'Robert Miller', 'Open', 'WFL00000003', 'WFS00000006', NULL, NULL, 2);
 
     -- ========================================
     -- Conjunctions (Boolean logic for automation conditions)

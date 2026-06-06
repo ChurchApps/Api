@@ -16,6 +16,7 @@ import {
   MembershipRepo,
   WorkflowRepo,
   WorkflowStepRepo,
+  WorkflowStepRouteRepo,
   WorkflowCategoryRepo,
   FormWorkflowTriggerRepo
 } from "./index.js";
@@ -38,6 +39,7 @@ export class Repos {
   public membership: MembershipRepo;
   public workflow: WorkflowRepo;
   public workflowStep: WorkflowStepRepo;
+  public workflowStepRoute: WorkflowStepRouteRepo;
   public workflowCategory: WorkflowCategoryRepo;
   public formWorkflowTrigger: FormWorkflowTriggerRepo;
 
@@ -65,6 +67,7 @@ export class Repos {
     this.membership = new MembershipRepo();
     this.workflow = new WorkflowRepo();
     this.workflowStep = new WorkflowStepRepo();
+    this.workflowStepRoute = new WorkflowStepRouteRepo();
     this.workflowCategory = new WorkflowCategoryRepo();
     this.formWorkflowTrigger = new FormWorkflowTriggerRepo();
   }

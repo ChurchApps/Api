@@ -15,6 +15,25 @@ export class ConjunctionHelper {
     return peopleIds;
   }
 
+  // Evaluate a WorkflowStepRoute's condition tree, returning the ids of the people
+  // who match (or ["*"] for everyone). Empty tree -> nobody matches.
+  public static async getPeopleIdsForStepRoute(churchId: string, stepRouteId: string, repositories?: Repos) {
+    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
+    const conjunctions = (await repos.conjunction.loadForStepRoute(churchId, stepRouteId)) as Conjunction[];
+    if (!conjunctions || conjunctions.length === 0) return [];
+    let conditions = (await repos.condition.loadForStepRoute(churchId, stepRouteId)) as Condition[];
+    conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions, repos);
+    const tree = this.buildTree(conjunctions, conditions);
+    if (!tree) return [];
+    return this.getPeopleFromTree(tree);
+  }
+
+  // True when the given person satisfies a personMatch route's conditions.
+  public static async personMatchesStepRoute(churchId: string, stepRouteId: string, personId: string, repositories?: Repos) {
+    const ids = await this.getPeopleIdsForStepRoute(churchId, stepRouteId, repositories);
+    return ids.indexOf("*") > -1 || ids.indexOf(personId) > -1;
+  }
+
   public static buildTree(allConjunctions: Conjunction[], allConditions: Condition[]) {
     allConjunctions.forEach((ac) => {
       if (ac.parentId === null) ac.parentId = "";
