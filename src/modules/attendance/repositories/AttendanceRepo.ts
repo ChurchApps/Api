@@ -7,8 +7,9 @@ import { AttendanceRecord } from "../models/index.js";
 @injectable()
 export class AttendanceRepo {
 
+
   public async loadTree(churchId: string) {
-    const rows = await sql<any>`SELECT c.id as campusId, IFNULL(c.name, 'Unassigned') as campusName, s.id as serviceId, s.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName FROM campuses c LEFT JOIN services s on s.campusId = c.id AND IFNULL(s.removed, 0) = 0 LEFT JOIN serviceTimes st on st.serviceId = s.id AND IFNULL(st.removed, 0) = 0 WHERE(c.id is NULL or c.churchId = ${churchId}) AND IFNULL(c.removed, 0) = 0 ORDER by campusName, serviceName, serviceTimeName`.execute(getDb());
+    const rows = await sql<any>`SELECT s.campusId as campusId, c.name as campusName, s.id as serviceId, s.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName FROM services s LEFT JOIN campuses c on c.id = s.campusId AND IFNULL(c.removed, 0) = 0 LEFT JOIN serviceTimes st on st.serviceId = s.id AND IFNULL(st.removed, 0) = 0 WHERE s.churchId = ${churchId} AND IFNULL(s.removed, 0) = 0 ORDER by campusName, serviceName, serviceTimeName`.execute(getDb());
     return rows.rows;
   }
 
