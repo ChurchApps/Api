@@ -1,5 +1,5 @@
 // trigger: onEnter | onComplete. kind: outcome | personMatch | always.
-// targetStepId null = complete/close the card.
+// targetWorkflowId (onComplete only) hands off to another workflow; else targetStepId moves within; both null = close.
 export class WorkflowStepRoute {
   public id?: string;
   public churchId?: string;
@@ -10,4 +10,5 @@ export class WorkflowStepRoute {
   public kind?: string;
   public label?: string;
   public targetStepId?: string;
+  public targetWorkflowId?: string;
 }

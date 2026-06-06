@@ -137,11 +137,33 @@ export class WorkflowHelper {
     const repos = await this.getRepos(repositories);
     if (routeId) {
       const route = (await repos.workflowStepRoute.load(task.churchId || "", routeId)) as WorkflowStepRoute;
+      if (route && route.targetWorkflowId && route.targetWorkflowId !== task.workflowId) {
+        return await this.handOffToWorkflow(task, route.targetWorkflowId, repos);
+      }
       if (route && route.targetStepId) return await this.moveToStep(task, route.targetStepId, repos);
     }
+    return await this.closeCard(task, repos);
+  }
+
+  private static async closeCard(task: Task, repos: Repos): Promise<Task> {
     task.status = "Closed";
     task.dateClosed = new Date();
     return await repos.task.save(task);
+  }
+
+  // Close the source card and start a fresh card for the same person in the target workflow.
+  private static async handOffToWorkflow(task: Task, targetWorkflowId: string, repos: Repos): Promise<Task> {
+    if (task.associatedWithId) {
+      await this.addToWorkflow(
+        task.churchId || "",
+        targetWorkflowId,
+        { type: task.associatedWithType || "person", id: task.associatedWithId, label: task.associatedWithLabel },
+        { type: "system", label: "System" },
+        undefined,
+        repos
+      );
+    }
+    return await this.closeCard(task, repos);
   }
 
   public static async snooze(task: Task, days: number, repositories?: Repos): Promise<Task> {

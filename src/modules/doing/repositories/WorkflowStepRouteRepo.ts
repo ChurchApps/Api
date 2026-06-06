@@ -20,7 +20,8 @@ export class WorkflowStepRouteRepo {
       trigger: model.trigger,
       kind: model.kind,
       label: model.label,
-      targetStepId: model.targetStepId
+      targetStepId: model.targetStepId,
+      targetWorkflowId: model.targetWorkflowId
     }).execute();
     return model;
   }
@@ -33,7 +34,8 @@ export class WorkflowStepRouteRepo {
       trigger: model.trigger,
       kind: model.kind,
       label: model.label,
-      targetStepId: model.targetStepId
+      targetStepId: model.targetStepId,
+      targetWorkflowId: model.targetWorkflowId
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }

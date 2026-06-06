@@ -67,6 +67,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("kind", sql`varchar(20)`)
     .addColumn("label", sql`varchar(255)`)
     .addColumn("targetStepId", sql`char(11)`)
+    .addColumn("targetWorkflowId", sql`char(11)`)
     .modifyEnd(sql`ENGINE=InnoDB`)
     .execute();
   await db.schema.createIndex("idx_workflowStepRoutes_churchId_stepId").on("workflowStepRoutes").columns(["churchId", "stepId"]).execute();

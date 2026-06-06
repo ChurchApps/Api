@@ -245,10 +245,12 @@ BEGIN
     -- the card to "Scheduled" (WFS7); "Not Interested" has no target, so it closes the card.
     -- An automatic (personMatch) route on the Membership Class "Invited" step (WFS4):
     -- anyone whose last name is "Smith" is auto-advanced to "Attended" (WFS5) on entry.
-    INSERT INTO workflowStepRoutes (id, churchId, workflowId, stepId, sort, `trigger`, kind, label, targetStepId) VALUES
-    ('WSR00000001', 'CHU00000001', 'WFL00000003', 'WFS00000006', 1, 'onComplete', 'outcome', 'Reached', 'WFS00000007'),
-    ('WSR00000002', 'CHU00000001', 'WFL00000003', 'WFS00000006', 2, 'onComplete', 'outcome', 'Not Interested', NULL),
-    ('WSR00000003', 'CHU00000001', 'WFL00000002', 'WFS00000004', 1, 'onEnter', 'personMatch', NULL, 'WFS00000005');
+    -- WSR4 is a cross-workflow hand-off: "Connect to Group" (WFS3) -> "Membership Class" (WFL2).
+    INSERT INTO workflowStepRoutes (id, churchId, workflowId, stepId, sort, `trigger`, kind, label, targetStepId, targetWorkflowId) VALUES
+    ('WSR00000001', 'CHU00000001', 'WFL00000003', 'WFS00000006', 1, 'onComplete', 'outcome', 'Reached', 'WFS00000007', NULL),
+    ('WSR00000002', 'CHU00000001', 'WFL00000003', 'WFS00000006', 2, 'onComplete', 'outcome', 'Not Interested', NULL, NULL),
+    ('WSR00000003', 'CHU00000001', 'WFL00000002', 'WFS00000004', 1, 'onEnter', 'personMatch', NULL, 'WFS00000005', NULL),
+    ('WSR00000004', 'CHU00000001', 'WFL00000001', 'WFS00000003', 1, 'onComplete', 'outcome', 'Enroll in Class', NULL, 'WFL00000002');
 
     -- Condition tree for the personMatch route (lastName = 'Smith').
     INSERT INTO conjunctions (id, churchId, stepRouteId, parentId, groupType) VALUES
@@ -261,6 +263,10 @@ BEGIN
     INSERT INTO tasks (id, churchId, taskNumber, taskType, dateCreated, associatedWithType, associatedWithId, associatedWithLabel, createdByType, createdByLabel, assignedToType, assignedToId, assignedToLabel, title, status, workflowId, stepId, dueDate, snoozedUntil, sort) VALUES
     ('TSK00000106', 'CHU00000001', 106, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000006', 'Linda Davis', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'Linda Davis', 'Open', 'WFL00000003', 'WFS00000006', NULL, NULL, 1),
     ('TSK00000107', 'CHU00000001', 107, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000007', 'Robert Miller', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'Robert Miller', 'Open', 'WFL00000003', 'WFS00000006', NULL, NULL, 2);
+
+    -- Card for exercising the cross-workflow hand-off (WSR4); PER6 isn't a "Smith" so it won't auto-advance.
+    INSERT INTO tasks (id, churchId, taskNumber, taskType, dateCreated, associatedWithType, associatedWithId, associatedWithLabel, createdByType, createdByLabel, assignedToType, assignedToId, assignedToLabel, title, status, workflowId, stepId, dueDate, snoozedUntil, sort) VALUES
+    ('TSK00000108', 'CHU00000001', 108, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000006', 'Handoff Tester', 'system', 'System', 'person', 'PER00000027', 'Michael Davis', 'Handoff Tester', 'Open', 'WFL00000001', 'WFS00000003', NULL, NULL, 2);
 
     -- ========================================
     -- Conjunctions (Boolean logic for automation conditions)
