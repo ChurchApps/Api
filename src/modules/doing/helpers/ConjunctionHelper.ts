@@ -9,7 +9,7 @@ export class ConjunctionHelper {
     const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
     const conjunctions = await repos.conjunction.loadForAutomation(automation.churchId || "", automation.id || "");
     let conditions = (await repos.condition.loadForAutomation(automation.churchId || "", automation.id || "")) as Condition[];
-    conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions, repos);
+    conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions);
     const tree = this.buildTree(conjunctions as Conjunction[], conditions);
     const peopleIds = this.getPeopleFromTree(tree);
     return peopleIds;
@@ -21,7 +21,7 @@ export class ConjunctionHelper {
     const conjunctions = (await repos.conjunction.loadForStepRoute(churchId, stepRouteId)) as Conjunction[];
     if (!conjunctions || conjunctions.length === 0) return [];
     let conditions = (await repos.condition.loadForStepRoute(churchId, stepRouteId)) as Condition[];
-    conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions, repos);
+    conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions);
     const tree = this.buildTree(conjunctions, conditions);
     if (!tree) return [];
     return this.getPeopleFromTree(tree);

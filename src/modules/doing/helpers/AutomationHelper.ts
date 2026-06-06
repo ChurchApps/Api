@@ -3,6 +3,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { Action, Automation, Task } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 export class AutomationHelper {
   public static async checkAll(repositories?: Repos) {
@@ -34,7 +35,7 @@ export class AutomationHelper {
 
     if (triggeredPeopleIds.length > 0) {
       const actions: Action[] = (await repos.action.loadForAutomation(automation.churchId || "", automation.id || "")) as Action[];
-      const people: { id: string; displayName: string }[] = (await repos.membership.loadPeople(automation.churchId || "", triggeredPeopleIds)) as { id: string; displayName: string }[];
+      const people: { id: string; displayName: string }[] = await getMembershipModuleGateway().loadPeople(automation.churchId || "", triggeredPeopleIds);
       for (const action of actions) {
         if (action.actionType === "task") {
           await this.createTasks(automation, people, JSON.parse(action.actionData || "{}"), repos);

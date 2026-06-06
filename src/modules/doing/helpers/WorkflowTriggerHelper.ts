@@ -2,6 +2,7 @@ import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { FormWorkflowTrigger } from "../models/index.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 interface SubmissionLike {
   churchId?: string;
@@ -21,7 +22,7 @@ export class WorkflowTriggerHelper {
         if (sub.contentType !== "person" || !sub.contentId) continue;
         const triggers = (await repos.formWorkflowTrigger.loadByForm(sub.churchId, sub.formId)) as FormWorkflowTrigger[];
         if (triggers.length === 0) continue;
-        const people = (await repos.membership.loadPeople(sub.churchId, [sub.contentId])) as { id: string; displayName: string }[];
+        const people = await getMembershipModuleGateway().loadPeople(sub.churchId, [sub.contentId]);
         const label = people[0]?.displayName;
         for (const trigger of triggers) {
           if (!trigger.workflowId) continue;

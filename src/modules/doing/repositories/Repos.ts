@@ -13,7 +13,6 @@ import {
   PositionRepo,
   TaskRepo,
   TimeRepo,
-  MembershipRepo,
   WorkflowRepo,
   WorkflowStepRepo,
   WorkflowStepRouteRepo,
@@ -36,7 +35,6 @@ export class Repos {
   public position: PositionRepo;
   public task: TaskRepo;
   public time: TimeRepo;
-  public membership: MembershipRepo;
   public workflow: WorkflowRepo;
   public workflowStep: WorkflowStepRepo;
   public workflowStepRoute: WorkflowStepRouteRepo;
@@ -64,7 +62,6 @@ export class Repos {
     this.position = new PositionRepo();
     this.task = new TaskRepo();
     this.time = new TimeRepo();
-    this.membership = new MembershipRepo();
     this.workflow = new WorkflowRepo();
     this.workflowStep = new WorkflowStepRepo();
     this.workflowStepRoute = new WorkflowStepRouteRepo();

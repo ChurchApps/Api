@@ -12,7 +12,6 @@ export { PlanTypeRepo } from "./PlanTypeRepo.js";
 export { PositionRepo } from "./PositionRepo.js";
 export { TaskRepo } from "./TaskRepo.js";
 export { TimeRepo } from "./TimeRepo.js";
-export { MembershipRepo } from "./MembershipRepo.js";
 export { WorkflowRepo } from "./WorkflowRepo.js";
 export { WorkflowStepRepo } from "./WorkflowStepRepo.js";
 export { WorkflowStepRouteRepo } from "./WorkflowStepRouteRepo.js";

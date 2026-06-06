@@ -3,7 +3,7 @@ import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Registration, RegistrationMember } from "../models/index.js";
 import { Permissions, RegistrationHelper } from "../helpers/index.js";
-import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 interface RegisterRequest {
   churchId: string;
@@ -42,33 +42,13 @@ export class RegistrationController extends ContentBaseController {
 
       if (data.guestInfo) {
         // Look up or create guest person via membership module
-        const membershipRepos: any = await RepoManager.getRepos("membership");
-        const existing = await membershipRepos.person.searchEmail(data.churchId, data.guestInfo.email);
-        if (existing && existing.length > 0) {
-          personId = existing[0].id;
-          householdId = existing[0].householdId;
-          email = existing[0].email;
-        } else {
-          // Create new person + household
-          const household = await membershipRepos.household.save({ churchId: data.churchId, name: data.guestInfo.lastName });
-          householdId = household.id;
-          const person = await membershipRepos.person.save({
-            churchId: data.churchId,
-            firstName: data.guestInfo.firstName,
-            lastName: data.guestInfo.lastName,
-            email: data.guestInfo.email,
-            mobilePhone: data.guestInfo.phone || null,
-            householdId: household.id,
-            householdRole: "Head",
-            membershipStatus: "Guest"
-          });
-          personId = person.id;
-          email = data.guestInfo.email;
-        }
+        const guest = await getMembershipModuleGateway().getOrCreateGuestPerson(data.churchId, data.guestInfo);
+        personId = guest.personId;
+        householdId = guest.householdId;
+        email = guest.email;
       } else if (personId) {
         // Authenticated user — look up their info
-        const membershipRepos: any = await RepoManager.getRepos("membership");
-        const person = await membershipRepos.person.load(data.churchId, personId);
+        const person = await getMembershipModuleGateway().loadPerson(data.churchId, personId);
         if (person) {
           householdId = person.householdId;
           email = person.email;
@@ -115,8 +95,7 @@ export class RegistrationController extends ContentBaseController {
 
       // Send confirmation email
       try {
-        const membershipRepos: any = await RepoManager.getRepos("membership");
-        const church = await membershipRepos.church?.load(data.churchId);
+        const church = await getMembershipModuleGateway().loadChurch(data.churchId);
         const churchName = church?.name || "Church";
         await RegistrationHelper.sendConfirmationEmail(email, churchName, event, registration, members);
       } catch (e) {
@@ -189,12 +168,11 @@ export class RegistrationController extends ContentBaseController {
 
       // Send cancellation email
       try {
-        const membershipRepos: any = await RepoManager.getRepos("membership");
-        const person = registration.personId ? await membershipRepos.person.load(au.churchId, registration.personId) : null;
+        const person = registration.personId ? await getMembershipModuleGateway().loadPerson(au.churchId, registration.personId) : null;
         const email = person?.email;
         if (email) {
           const event = await this.repos.event.load(au.churchId, registration.eventId);
-          const church = await membershipRepos.church?.load(au.churchId);
+          const church = await getMembershipModuleGateway().loadChurch(au.churchId);
           await RegistrationHelper.sendCancellationEmail(email, church?.name || "Church", event);
         }
       } catch (e) {

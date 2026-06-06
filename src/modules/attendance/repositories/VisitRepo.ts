@@ -87,6 +87,13 @@ export class VisitRepo {
     return getDb().selectFrom("visits").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).execute();
   }
 
+  // People who have visited before but not since the cutoff (their most recent visit predates it).
+  public async loadPersonIdsAbsentSince(churchId: string, since: Date): Promise<string[]> {
+    const cutoff = DateHelper.toMysqlDateOnly(since);
+    const rows = await sql<{ personId: string }>`SELECT personId FROM visits WHERE churchId=${churchId} GROUP BY personId HAVING MAX(visitDate) < ${cutoff}`.execute(getDb());
+    return rows.rows.map((r) => r.personId);
+  }
+
   public async loadConsecutiveWeekStreaks(churchId: string, personIds: string[]): Promise<Record<string, number>> {
     if (personIds.length === 0) return {};
     const rows = await sql<any>`SELECT personId, YEARWEEK(visitDate, 3) AS yw FROM visits WHERE churchId = ${churchId} AND personId IN (${sql.join(personIds)}) GROUP BY personId, yw ORDER BY personId, yw DESC`.execute(getDb());

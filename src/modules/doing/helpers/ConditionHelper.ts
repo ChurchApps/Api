@@ -1,21 +1,19 @@
-import { Repos } from "../repositories/index.js";
-import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { Condition } from "../models/index.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 export class ConditionHelper {
-  public static async getPeopleIdsMatchingConditions(conditions: Condition[], repositories?: Repos) {
+  public static async getPeopleIdsMatchingConditions(conditions: Condition[]) {
     const promises: Promise<Condition>[] = [];
-    conditions.forEach((c) => promises.push(ConditionHelper.getPeopleIdsMatchingCondition(c, repositories)));
+    conditions.forEach((c) => promises.push(ConditionHelper.getPeopleIdsMatchingCondition(c)));
     const result = await Promise.all(promises);
     return result;
   }
 
-  private static async getPeopleIdsMatchingCondition(condition: Condition, repositories?: Repos) {
-    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
+  private static async getPeopleIdsMatchingCondition(condition: Condition) {
     condition.matchingIds = [];
     switch (condition.field) {
       case "today": condition.matchingIds = this.evalSimpleCondition(condition) ? ["*"] : []; break;
-      default: condition.matchingIds = await repos.membership.loadIdsMatchingCondition(condition); break;
+      default: condition.matchingIds = await getMembershipModuleGateway().loadIdsMatchingCondition(condition as any); break;
     }
     return condition;
   }

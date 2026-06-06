@@ -1,0 +1,165 @@
+import { sql } from "kysely";
+import { RepoManager } from "../infrastructure/RepoManager.js";
+import { KyselyPool } from "../infrastructure/KyselyPool.js";
+
+// Gateway: the only seam through which other modules read/write membership data.
+// Method signatures are the contract; the Db implementation below is swappable for
+// an HTTP one if membership ever becomes a separate service.
+
+interface ConditionInput {
+  churchId: string;
+  field: string;
+  operator: string;
+  value?: string;
+  fieldData?: string;
+}
+
+interface GuestInfo {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface MembershipModuleGateway {
+  loadIdsMatchingCondition(condition: ConditionInput): Promise<string[]>;
+  loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]>;
+  loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
+  loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string } | null>;
+  searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
+  loadPerson(churchId: string, personId: string): Promise<{ id: string; householdId: string; email: string } | null>;
+  getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
+}
+
+class MembershipModuleGatewayDb implements MembershipModuleGateway {
+  private static readonly ALLOWED_FIELDS = new Set([
+    "firstName",
+    "lastName",
+    "middleName",
+    "nickName",
+    "displayName",
+    "email",
+    "homePhone",
+    "workPhone",
+    "mobilePhone",
+    "birthDate",
+    "anniversary",
+    "membershipStatus",
+    "gender",
+    "city",
+    "state",
+    "zip",
+    "maritalStatus"
+  ]);
+  private static readonly ALLOWED_OPERATORS = new Set(["=", "!=", ">", "<", ">=", "<=", "LIKE"]);
+
+  private getDb() {
+    return KyselyPool.getDb("membership") as any;
+  }
+
+  private async repos() {
+    return RepoManager.getRepos<any>("membership");
+  }
+
+  private getDBField(condition: ConditionInput) {
+    if (!MembershipModuleGatewayDb.ALLOWED_FIELDS.has(condition.field)) {
+      throw new Error(`Invalid condition field: ${condition.field}`);
+    }
+    const fieldData = condition.fieldData ? JSON.parse(condition.fieldData) : {};
+    let result = condition.field;
+    switch (fieldData.datePart) {
+      case "dayOfWeek": result = "dayOfWeek(" + condition.field + ")"; break;
+      case "dayOfMonth": result = "dayOfMonth(" + condition.field + ")"; break;
+      case "month": result = "month(" + condition.field + ")"; break;
+      case "years": result = "TIMESTAMPDIFF(YEAR, " + condition.field + ", CURDATE())"; break;
+    }
+    return result;
+  }
+
+  private getDBValue(condition: ConditionInput) {
+    let result = condition.value;
+    switch (condition.value) {
+      case "{currentMonth}": result = (new Date().getMonth() + 1).toString(); break;
+      case "{prevMonth}":
+        result = new Date().getMonth().toString();
+        if (result === "0") result = "12";
+        break;
+      case "{nextMonth}":
+        result = (new Date().getMonth() + 2).toString();
+        if (result === "13") result = "1";
+        break;
+    }
+    return result;
+  }
+
+  public async loadIdsMatchingCondition(condition: ConditionInput): Promise<string[]> {
+    if (!MembershipModuleGatewayDb.ALLOWED_OPERATORS.has(condition.operator)) {
+      throw new Error(`Invalid condition operator: ${condition.operator}`);
+    }
+    const dbField = this.getDBField(condition);
+    const dbValue = this.getDBValue(condition);
+
+    const rows = (await this.getDb().selectFrom("people")
+      .select("id")
+      .where("churchId", "=", condition.churchId)
+      .where("removed", "=", 0)
+      .where(sql`${sql.raw(dbField)} ${sql.raw(condition.operator)} ${dbValue}`)
+      .execute()) as { id: string }[];
+
+    return rows.map((r) => r.id);
+  }
+
+  public async loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]> {
+    if (personIds.length === 0) return [];
+    return this.getDb().selectFrom("people")
+      .select(["id", "displayName"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("id", "in", personIds)
+      .execute();
+  }
+
+  public async loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]> {
+    const repos = await this.repos();
+    const members = await repos.groupMember.loadForPerson(churchId, personId);
+    return Array.isArray(members) ? members : [];
+  }
+
+  public async loadChurch(churchId: string) {
+    const repos = await this.repos();
+    return (await repos.church.loadById(churchId)) ?? null;
+  }
+
+  public async searchPersonByEmail(churchId: string, email: string) {
+    const repos = await this.repos();
+    return (await repos.person.searchEmail(churchId, email)) ?? [];
+  }
+
+  public async loadPerson(churchId: string, personId: string) {
+    const repos = await this.repos();
+    return (await repos.person.load(churchId, personId)) ?? null;
+  }
+
+  public async getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo) {
+    const repos = await this.repos();
+    const existing = await repos.person.searchEmail(churchId, guestInfo.email);
+    if (existing && existing.length > 0) {
+      return { personId: existing[0].id, householdId: existing[0].householdId, email: existing[0].email };
+    }
+    const household = await repos.household.save({ churchId, name: guestInfo.lastName });
+    const person = await repos.person.save({
+      churchId,
+      firstName: guestInfo.firstName,
+      lastName: guestInfo.lastName,
+      email: guestInfo.email,
+      mobilePhone: guestInfo.phone || null,
+      householdId: household.id,
+      householdRole: "Head",
+      membershipStatus: "Guest"
+    });
+    return { personId: person.id, householdId: household.id, email: guestInfo.email };
+  }
+}
+
+let _instance: MembershipModuleGateway;
+export const getMembershipModuleGateway = (): MembershipModuleGateway => (_instance ??= new MembershipModuleGatewayDb());
