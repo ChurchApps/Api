@@ -3,12 +3,17 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Automation } from "../models/index.js";
 import { AutomationHelper } from "../helpers/AutomationHelper.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/automations")
 export class AutomationController extends DoingBaseController {
+  // Internal cron hook (no user context). Gated by the INTERNAL_API_KEY shared secret;
+  // fails closed if the header is missing or the env var isn't configured.
   @httpGet("/check")
   public async tempCheck(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      const requiredKey = process.env.INTERNAL_API_KEY;
+      if (!requiredKey || req.header("x-internal-key") !== requiredKey) return this.json({}, 401);
       await AutomationHelper.checkAll();
       return { success: true };
     });
@@ -17,6 +22,7 @@ export class AutomationController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.automation.load(au.churchId, id);
     });
   }
@@ -24,6 +30,7 @@ export class AutomationController extends DoingBaseController {
   @httpGet("/")
   public async getForAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.automation.loadAll(au.churchId);
     });
   }
@@ -31,6 +38,7 @@ export class AutomationController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Automation[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const promises: Promise<Automation>[] = [];
       req.body.forEach((automation) => {
         automation.churchId = au.churchId;
@@ -44,6 +52,7 @@ export class AutomationController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       await this.repos.automation.delete(au.churchId, id);
       return {};
     });

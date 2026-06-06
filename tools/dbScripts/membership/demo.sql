@@ -471,6 +471,25 @@ INSERT INTO userChurches (id, userId, churchId, personId) VALUES
 INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
 ('RME00000003', 'CHU00000001', 'ROL00000001', 'USR00000003', '2024-01-01 00:00:00');
 
+-- Workflow Volunteer: a NON-domain-admin user with only DoingApi/Tasks/View.
+-- Used by serving-workflows tests to exercise the "Edit Assigned Cards" permission
+-- tier — they can view the board and work cards assigned to them, but not others.
+-- Linked to PER00000069 (Rachel Martin), who is the assignee of card TSK00000105.
+INSERT INTO roles (id, churchId, name) VALUES
+('ROL00000010', 'CHU00000001', 'Workflow Volunteer');
+
+INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, action) VALUES
+('RPM00000010', 'CHU00000001', 'ROL00000010', 'DoingApi', 'Tasks', 'View');
+
+INSERT INTO users (id, email, password, displayName, firstName, lastName, registrationDate) VALUES
+('USR00000010', 'volunteer@b1.church', '$2a$10$qBWddIw2QMUlRrX9/6Cdz.nW.L5FqE45R1NTLF.V71LyhjY6I0lFu', 'Rachel Martin', 'Rachel', 'Martin', '2024-01-01 00:00:00');
+
+INSERT INTO userChurches (id, userId, churchId, personId) VALUES
+('UCH00000010', 'USR00000010', 'CHU00000001', 'PER00000069');
+
+INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
+('RME00000010', 'CHU00000001', 'ROL00000010', 'USR00000010', '2024-01-01 00:00:00');
+
 -- Add Demo User Family to Groups
 INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VALUES
 -- Main worship service (whole family)

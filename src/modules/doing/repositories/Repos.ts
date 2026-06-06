@@ -13,7 +13,12 @@ import {
   PositionRepo,
   TaskRepo,
   TimeRepo,
-  MembershipRepo
+  MembershipRepo,
+  WorkflowRepo,
+  WorkflowStepRepo,
+  WorkflowStepRouteRepo,
+  WorkflowCategoryRepo,
+  FormWorkflowTriggerRepo
 } from "./index.js";
 
 export class Repos {
@@ -32,6 +37,11 @@ export class Repos {
   public task: TaskRepo;
   public time: TimeRepo;
   public membership: MembershipRepo;
+  public workflow: WorkflowRepo;
+  public workflowStep: WorkflowStepRepo;
+  public workflowStepRoute: WorkflowStepRouteRepo;
+  public workflowCategory: WorkflowCategoryRepo;
+  public formWorkflowTrigger: FormWorkflowTriggerRepo;
 
   private static _current: Repos = null;
   public static getCurrent = () => {
@@ -55,5 +65,10 @@ export class Repos {
     this.task = new TaskRepo();
     this.time = new TimeRepo();
     this.membership = new MembershipRepo();
+    this.workflow = new WorkflowRepo();
+    this.workflowStep = new WorkflowStepRepo();
+    this.workflowStepRoute = new WorkflowStepRouteRepo();
+    this.workflowCategory = new WorkflowCategoryRepo();
+    this.formWorkflowTrigger = new FormWorkflowTriggerRepo();
   }
 }

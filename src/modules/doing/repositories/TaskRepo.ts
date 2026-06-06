@@ -34,7 +34,13 @@ export class TaskRepo {
       status: task.status,
       automationId: task.automationId,
       conversationId: task.conversationId,
-      data: task.data
+      data: task.data,
+      workflowId: task.workflowId,
+      stepId: task.stepId,
+      dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
+      snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
+      sort: task.sort,
+      pinnedAssignment: task.pinnedAssignment ?? false
     }).execute();
     return task;
   }
@@ -59,7 +65,13 @@ export class TaskRepo {
       status: task.status,
       automationId: task.automationId,
       conversationId: task.conversationId,
-      data: task.data
+      data: task.data,
+      workflowId: task.workflowId,
+      stepId: task.stepId,
+      dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
+      snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
+      sort: task.sort,
+      pinnedAssignment: task.pinnedAssignment ?? false
     }).where("id", "=", task.id).where("churchId", "=", task.churchId).execute();
     return task;
   }
@@ -177,9 +189,11 @@ export class TaskRepo {
     return (result as any)?.taskNumber ?? 1;
   }
 
+  // Plain-task lists exclude cards (workflowId set); cards have the board / my-cards.
   public async loadForPerson(churchId: string, personId: string, status: string) {
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
+      .where("workflowId", "is", null)
       .where((eb) =>
         eb.or([
           eb.and([eb("assignedToType", "=", "person"), eb("assignedToId", "=", personId)]),
@@ -194,6 +208,7 @@ export class TaskRepo {
     if (groupIds.length === 0) return [];
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
+      .where("workflowId", "is", null)
       .where((eb) =>
         eb.or([
           eb.and([eb("assignedToType", "=", "group"), eb("assignedToId", "in", groupIds)]),
@@ -210,6 +225,92 @@ export class TaskRepo {
       .where("status", "=", "Open")
       .where("churchId", "=", churchId)
       .where("associatedWithId", "=", personId)
+      .execute();
+  }
+
+  public async loadByWorkflow(churchId: string, workflowId: string, status = "Open") {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("workflowId", "=", workflowId)
+      .where("status", "=", status)
+      .orderBy("sort")
+      .orderBy("taskNumber")
+      .execute();
+  }
+
+  public async loadCardsForPerson(churchId: string, personId: string, status = "Open") {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("workflowId", "is not", null)
+      .where("status", "=", status)
+      .where((eb) =>
+        eb.and([eb("assignedToType", "=", "person"), eb("assignedToId", "=", personId)]))
+      .orderBy("dueDate")
+      .execute();
+  }
+
+  public async loadMaxSortForStep(churchId: string, workflowId: string, stepId: string) {
+    const result = (await getDb().selectFrom("tasks")
+      .select(sql`max(ifnull(sort, 0)) + 1`.as("sort"))
+      .where("churchId", "=", churchId)
+      .where("workflowId", "=", workflowId)
+      .where("stepId", "=", stepId)
+      .executeTakeFirst()) ?? null;
+    return (result as any)?.sort ?? 1;
+  }
+
+  public async loadOverdueAllChurches() {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("workflowId", "is not", null)
+      .where("status", "=", "Open")
+      .where("dueDate", "is not", null)
+      .where("dueDate", "<", sql`now()` as any)
+      .where((eb) => eb.or([eb("snoozedUntil", "is", null), eb("snoozedUntil", "<", sql`now()` as any)]))
+      .execute();
+  }
+
+  public async loadSnoozedDueAllChurches() {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("workflowId", "is not", null)
+      .where("status", "=", "Open")
+      .where("snoozedUntil", "is not", null)
+      .where("snoozedUntil", "<=", sql`now()` as any)
+      .execute();
+  }
+
+  public async countByStep(churchId: string, workflowId: string) {
+    return getDb().selectFrom("tasks")
+      .select("stepId")
+      .select(sql`count(*)`.as("count"))
+      .where("churchId", "=", churchId)
+      .where("workflowId", "=", workflowId)
+      .where("status", "=", "Open")
+      .groupBy("stepId")
+      .execute();
+  }
+
+  public async loadOverdue(churchId: string, workflowId: string) {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("workflowId", "=", workflowId)
+      .where("status", "=", "Open")
+      .where("dueDate", "is not", null)
+      .where("dueDate", "<", sql`now()` as any)
+      .where((eb) => eb.or([eb("snoozedUntil", "is", null), eb("snoozedUntil", "<", sql`now()` as any)]))
+      .orderBy("dueDate")
+      .execute();
+  }
+
+  public async throughput(churchId: string, workflowId: string, since: Date) {
+    return getDb().selectFrom("tasks")
+      .select(sql`date(dateClosed)`.as("day"))
+      .select(sql`count(*)`.as("count"))
+      .where("churchId", "=", churchId)
+      .where("workflowId", "=", workflowId)
+      .where("status", "=", "Closed")
+      .where("dateClosed", ">=", DateHelper.toMysqlDate(since) as any)
+      .groupBy(sql`date(dateClosed)`)
+      .orderBy(sql`date(dateClosed)`)
       .execute();
   }
 }

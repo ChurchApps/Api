@@ -2,6 +2,7 @@ import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { Action, Automation, Task } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
+import { WorkflowHelper } from "./WorkflowHelper.js";
 
 export class AutomationHelper {
   public static async checkAll(repositories?: Repos) {
@@ -37,6 +38,8 @@ export class AutomationHelper {
       for (const action of actions) {
         if (action.actionType === "task") {
           await this.createTasks(automation, people, JSON.parse(action.actionData || "{}"), repos);
+        } else if (action.actionType === "addToWorkflow") {
+          await this.addToWorkflows(automation, people, JSON.parse(action.actionData || "{}"), repos);
         }
       }
     }
@@ -70,5 +73,17 @@ export class AutomationHelper {
       result.push(await repos.task.save(task));
     }
     return result;
+  }
+
+  public static async addToWorkflows(
+    automation: Automation,
+    people: { id: string; displayName: string }[],
+    details: { workflowId?: string },
+    repositories?: Repos
+  ) {
+    if (!details.workflowId) return [];
+    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
+    const targets = people.map((p) => ({ type: "person", id: p.id, label: p.displayName }));
+    return await WorkflowHelper.addPeopleToWorkflow(automation.churchId || "", details.workflowId, targets, { type: "system", label: "System" }, automation.id, repos);
   }
 }

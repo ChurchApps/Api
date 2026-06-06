@@ -19,4 +19,11 @@ export class Task {
   public automationId?: string;
   public conversationId?: string;
   public data?: string;
+  // Card fields (a Task is a "card" when workflowId is set).
+  public workflowId?: string;
+  public stepId?: string;
+  public dueDate?: Date;
+  public snoozedUntil?: Date;
+  public sort?: number;
+  public pinnedAssignment?: boolean;
 }

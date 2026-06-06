@@ -59,6 +59,8 @@ export class FormSubmissionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (req.body?.length > 0) {
         const results: any[] = [];
+        // Add submitters to any workflow configured as a destination for their form.
+        const { WorkflowTriggerHelper } = await import("../../doing/helpers/WorkflowTriggerHelper.js");
         for (const formSubmission of req.body) {
           const { formId } = formSubmission;
           let { churchId } = formSubmission;
@@ -89,6 +91,7 @@ export class FormSubmissionController extends MembershipBaseController {
 
               results.push(savedSubmissions);
               await WebhookDispatcher.emit(churchId, "form.submission.created", savedSubmissions);
+              await WorkflowTriggerHelper.onFormSubmission(savedSubmissions);
 
               await this.sendEmails(formSubmission, form, churchId);
             }
