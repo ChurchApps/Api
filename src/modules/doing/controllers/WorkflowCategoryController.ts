@@ -9,7 +9,7 @@ export class WorkflowCategoryController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowCategory.load(au.churchId, id);
     });
   }
@@ -17,7 +17,7 @@ export class WorkflowCategoryController extends DoingBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.workflowCategory.loadAll(au.churchId);
     });
   }
@@ -25,7 +25,7 @@ export class WorkflowCategoryController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, WorkflowCategory[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const promises: Promise<WorkflowCategory>[] = [];
       req.body.forEach((category) => {
         category.churchId = au.churchId;
@@ -38,7 +38,7 @@ export class WorkflowCategoryController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       await this.repos.workflowCategory.delete(au.churchId, id);
       return {};
     });

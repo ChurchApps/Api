@@ -33,7 +33,7 @@ export class TaskController extends DoingBaseController {
   @httpGet("/board/:workflowId")
   public async getBoard(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       const [workflow, steps, cards, routes] = await Promise.all([
         this.repos.workflow.load(au.churchId, workflowId),
         this.repos.workflowStep.loadForWorkflow(au.churchId, workflowId),
@@ -76,7 +76,7 @@ export class TaskController extends DoingBaseController {
   public async save(req: express.Request<{}, {}, Task[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       // Member directory updates are self-service; staff task creation requires Edit.
-      if (req.query?.type !== "directoryUpdate" && !au.checkAccess(Permissions.doing.edit)) return this.json({}, 401);
+      if (req.query?.type !== "directoryUpdate" && !au.checkAccess(Permissions.tasks.edit)) return this.json({}, 401);
       // Cards must use the card endpoints (which run routing + per-card permissions).
       if (req.body.some((task) => task.workflowId || task.stepId)) return this.json({ message: "Workflow cards must use the card endpoints" }, 400);
       const result: Task[] = [];
@@ -92,7 +92,7 @@ export class TaskController extends DoingBaseController {
   @httpPost("/addToWorkflow")
   public async addToWorkflow(req: express.Request<{}, {}, { workflowId: string; stepId?: string; associatedWith: { type?: string; id?: string; label?: string } }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.edit)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.edit)) return this.json({}, 401);
       const { workflowId, stepId, associatedWith } = req.body;
       return await WorkflowHelper.addToWorkflow(au.churchId, workflowId, associatedWith || {}, this.actor(au), undefined, this.repos, stepId);
     });
@@ -101,7 +101,7 @@ export class TaskController extends DoingBaseController {
   @httpPost("/bulkAddToWorkflow")
   public async bulkAddToWorkflow(req: express.Request<{}, {}, { workflowId: string; stepId?: string; people?: { id: string; label?: string }[]; listId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.edit)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.edit)) return this.json({}, 401);
       const { workflowId, stepId, people } = req.body;
       const targets = (people || []).map((p) => ({ type: "person", id: p.id, label: p.label }));
       return await WorkflowHelper.addPeopleToWorkflow(au.churchId, workflowId, targets, this.actor(au), undefined, this.repos, stepId);

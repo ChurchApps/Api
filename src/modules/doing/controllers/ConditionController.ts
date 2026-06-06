@@ -9,7 +9,7 @@ export class ConditionController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.condition.load(au.churchId, id);
     });
   }
@@ -17,7 +17,7 @@ export class ConditionController extends DoingBaseController {
   @httpGet("/automation/:id")
   public async getForAutomation(@requestParam("id") automationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.condition.loadForAutomation(au.churchId, automationId);
     });
   }
@@ -25,7 +25,7 @@ export class ConditionController extends DoingBaseController {
   @httpGet("/stepRoute/:id")
   public async getForStepRoute(@requestParam("id") stepRouteId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.condition.loadForStepRoute(au.churchId, stepRouteId);
     });
   }
@@ -33,7 +33,7 @@ export class ConditionController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Condition[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const promises: Promise<Condition>[] = [];
       req.body.forEach((condition) => {
         condition.churchId = au.churchId;
@@ -47,7 +47,7 @@ export class ConditionController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       await this.repos.condition.delete(au.churchId, id);
       return {};
     });

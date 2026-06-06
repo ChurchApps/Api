@@ -44,8 +44,8 @@ export class Permissions extends BasePermissions {
 
   static texting = { send: { contentType: "Texting", action: "Send" } };
 
-  // Doing API permissions (to be defined during migration)
-  static doing = { view: { contentType: "Doing", action: "View" }, edit: { contentType: "Doing", action: "Edit" }, admin: { contentType: "Doing", action: "Admin" } };
+  // DoingApi service permissions — contentType is "Tasks" (covers Tasks, Workflows & Automations)
+  static tasks = { view: { contentType: "Tasks", action: "View" }, edit: { contentType: "Tasks", action: "Edit" }, admin: { contentType: "Tasks", action: "Admin" } };
 
   // General admin permissions
   static admin = { editSettings: { contentType: "Admin", action: "Edit Settings" } };
@@ -97,9 +97,9 @@ export const permissionsList: IPermission[] = [
   { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
 
   // Doing API permissions (Tasks, Workflows & Automations)
-  { apiName: "DoingApi", section: "Doing", action: "View", displaySection: "Tasks", displayAction: "View Workflows & Cards" },
-  { apiName: "DoingApi", section: "Doing", action: "Edit", displaySection: "Tasks", displayAction: "Edit All Cards & Tasks" },
-  { apiName: "DoingApi", section: "Doing", action: "Admin", displaySection: "Tasks", displayAction: "Manage Workflows & Automations" },
+  { apiName: "DoingApi", section: "Tasks", action: "View", displaySection: "Tasks", displayAction: "View Workflows & Cards" },
+  { apiName: "DoingApi", section: "Tasks", action: "Edit", displaySection: "Tasks", displayAction: "Edit All Cards & Tasks" },
+  { apiName: "DoingApi", section: "Tasks", action: "Admin", displaySection: "Tasks", displayAction: "Manage Workflows & Automations" },
 
   // Lessons API permissions
   { apiName: "LessonsApi", section: "Schedules", action: "Edit", displaySection: "Lessons", displayAction: "Edit Schedules" },
@@ -138,7 +138,7 @@ export type ContentType =
   | "Domain"
   | "Server"
   | "Messaging"
-  | "Doing"
+  | "Tasks"
   | "Admin"
   | "Texting"
   | "Registrations"

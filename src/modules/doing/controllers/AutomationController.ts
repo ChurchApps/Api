@@ -22,7 +22,7 @@ export class AutomationController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.automation.load(au.churchId, id);
     });
   }
@@ -30,7 +30,7 @@ export class AutomationController extends DoingBaseController {
   @httpGet("/")
   public async getForAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.automation.loadAll(au.churchId);
     });
   }
@@ -38,7 +38,7 @@ export class AutomationController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Automation[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const promises: Promise<Automation>[] = [];
       req.body.forEach((automation) => {
         automation.churchId = au.churchId;
@@ -52,7 +52,7 @@ export class AutomationController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.doing.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       await this.repos.automation.delete(au.churchId, id);
       return {};
     });

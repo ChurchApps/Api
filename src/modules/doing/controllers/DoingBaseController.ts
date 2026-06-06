@@ -13,7 +13,7 @@ export class DoingBaseController extends BaseController {
 
   // Editable by anyone with Doing Edit, or by the person the card is assigned to.
   public canEditCard(au: AuthenticatedUser, task: Task): boolean {
-    if (au.checkAccess(Permissions.doing.edit)) return true;
+    if (au.checkAccess(Permissions.tasks.edit)) return true;
     return task?.assignedToType === "person" && !!task?.assignedToId && task.assignedToId === au.personId;
   }
 }
