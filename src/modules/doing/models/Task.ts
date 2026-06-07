@@ -17,6 +17,7 @@ export class Task {
   public title?: string;
   public status?: string;
   public automationId?: string;
+  public triggerId?: string;
   public conversationId?: string;
   public data?: string;
   // Card fields (a Task is a "card" when workflowId is set).

@@ -33,6 +33,7 @@ export class TaskRepo {
       title: task.title,
       status: task.status,
       automationId: task.automationId,
+      triggerId: task.triggerId,
       conversationId: task.conversationId,
       data: task.data,
       workflowId: task.workflowId,
@@ -64,6 +65,7 @@ export class TaskRepo {
       title: task.title,
       status: task.status,
       automationId: task.automationId,
+      triggerId: task.triggerId,
       conversationId: task.conversationId,
       data: task.data,
       workflowId: task.workflowId,
@@ -179,6 +181,18 @@ export class TaskRepo {
       .where("dateCreated", ">", threshold)
       .orderBy("taskNumber")
       .execute();
+  }
+
+  // Dedup for oncePerSubject event triggers: is this subject already in this workflow
+  // (any status)? Keyed on workflow+subject, not the trigger, so a "create" and a
+  // later "edit-to-Guest" — two triggers feeding one workflow — add the person once.
+  public async loadBySubjectInWorkflow(churchId: string, workflowId: string, associatedWithType: string, associatedWithId: string) {
+    return (await getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("workflowId", "=", workflowId)
+      .where("associatedWithType", "=", associatedWithType)
+      .where("associatedWithId", "=", associatedWithId)
+      .executeTakeFirst()) ?? null;
   }
 
   private async loadNextTaskNumber(churchId: string) {

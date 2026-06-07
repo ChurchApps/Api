@@ -26,8 +26,10 @@ export interface MembershipModuleGateway {
   loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]>;
   loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string } | null>;
+  loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
-  loadPerson(churchId: string, personId: string): Promise<{ id: string; householdId: string; email: string } | null>;
+  // Returns the full person row; the listed fields are the ones event triggers filter on.
+  loadPerson(churchId: string, personId: string): Promise<{ id: string; householdId: string; email: string; membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date } | null>;
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
 }
 
@@ -128,6 +130,11 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
   public async loadChurch(churchId: string) {
     const repos = await this.repos();
     return (await repos.church.loadById(churchId)) ?? null;
+  }
+
+  public async loadGroup(churchId: string, groupId: string) {
+    const repos = await this.repos();
+    return (await repos.group.load(churchId, groupId)) ?? null;
   }
 
   public async searchPersonByEmail(churchId: string, email: string) {

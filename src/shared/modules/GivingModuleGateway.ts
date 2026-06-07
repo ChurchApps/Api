@@ -4,6 +4,7 @@ import { RepoManager } from "../infrastructure/RepoManager.js";
 export interface GivingModuleGateway {
   loadDonationsByPerson(churchId: string, personId: string): Promise<any[]>;
   loadCustomersByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadFundDonations(churchId: string, donationId: string): Promise<{ fundId: string; amount: number }[]>;
 }
 
 class GivingModuleGatewayDb implements GivingModuleGateway {
@@ -17,6 +18,10 @@ class GivingModuleGatewayDb implements GivingModuleGateway {
 
   public async loadCustomersByPerson(churchId: string, personId: string) {
     return (await this.repos()).customer.loadByPersonId(churchId, personId);
+  }
+
+  public async loadFundDonations(churchId: string, donationId: string) {
+    return (await this.repos()).fundDonation.loadByDonationId(churchId, donationId);
   }
 }
 

@@ -20,3 +20,4 @@ export { WorkflowStepController } from "./WorkflowStepController.js";
 export { WorkflowStepRouteController } from "./WorkflowStepRouteController.js";
 export { WorkflowCategoryController } from "./WorkflowCategoryController.js";
 export { FormWorkflowTriggerController } from "./FormWorkflowTriggerController.js";
+export { WorkflowTriggerController } from "./WorkflowTriggerController.js";

@@ -1,4 +1,4 @@
-import type { Action, Assignment, Automation, BlockoutDate, Condition, Conjunction, ContentProviderAuth, FormWorkflowTrigger, Plan, PlanItem, PlanItemTime, PlanType, Position, Task, Time, Workflow, WorkflowCategory, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
+import type { Action, Assignment, Automation, BlockoutDate, Condition, Conjunction, ContentProviderAuth, FormWorkflowTrigger, Plan, PlanItem, PlanItemTime, PlanType, Position, Task, Time, Workflow, WorkflowCategory, WorkflowStep, WorkflowStepRoute, WorkflowTrigger } from "../models/index.js";
 
 export interface DoingDatabase {
   actions: Action;
@@ -9,6 +9,7 @@ export interface DoingDatabase {
   conjunctions: Omit<Conjunction, "conjunctions" | "conditions" | "matchingIds">;
   contentProviderAuths: ContentProviderAuth;
   formWorkflowTriggers: FormWorkflowTrigger;
+  workflowTriggers: WorkflowTrigger;
   plans: Plan;
   planItems: Omit<PlanItem, "children">;
   planItemTimes: PlanItemTime;

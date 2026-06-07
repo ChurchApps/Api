@@ -28,6 +28,7 @@ BEGIN
     TRUNCATE TABLE workflowStepRoutes;
     TRUNCATE TABLE workflowCategories;
     TRUNCATE TABLE formWorkflowTriggers;
+    TRUNCATE TABLE workflowTriggers;
     SET FOREIGN_KEY_CHECKS = 1;
 
     -- Create automation for birthday cards (must be created before tasks that reference it)
@@ -237,6 +238,12 @@ BEGIN
     -- A form-submission trigger: submissions to this form drop the person on WFL1.
     INSERT INTO formWorkflowTriggers (id, churchId, formId, workflowId, active) VALUES
     ('FWT00000001', 'CHU00000001', 'FRM00000001', 'WFL00000001', b'1');
+
+    -- Event-driven triggers: a new person who is (or becomes) a Guest is dropped on
+    -- WFL1 "New Visitor Follow-up". oncePerSubject keeps repeated edits from re-adding.
+    INSERT INTO workflowTriggers (id, churchId, name, eventType, workflowId, stepId, conditions, oncePerSubject, active) VALUES
+    ('WKT00000001', 'CHU00000001', 'New Guest Follow-up (created)', 'person.created', 'WFL00000001', NULL, '{"type":"group","conjunction":"AND","children":[{"type":"condition","field":"person.membershipStatus","operator":"=","value":"Guest"}]}', b'1', b'1'),
+    ('WKT00000002', 'CHU00000001', 'New Guest Follow-up (status change)', 'person.updated', 'WFL00000001', NULL, '{"type":"group","conjunction":"AND","children":[{"type":"condition","field":"person.membershipStatus","operator":"=","value":"Guest"}]}', b'1', b'1');
 
     -- ========================================
     -- Conditional routing ("if this then that")
