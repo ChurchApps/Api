@@ -1,4 +1,4 @@
-import type { Assignment, BlockoutDate, Condition, Conjunction, ContentProviderAuth, Plan, PlanItem, PlanItemTime, PlanType, Position, Task, Time, Workflow, WorkflowCategory, WorkflowStep, WorkflowStepRoute, WorkflowTrigger } from "../models/index.js";
+import type { Assignment, BlockoutDate, Condition, Conjunction, ContentProviderAuth, Plan, PlanItem, PlanItemTime, PlanType, Position, Task, Time, Workflow, WorkflowCategory, WorkflowStep, WorkflowStepAction, WorkflowStepRoute, WorkflowTrigger } from "../models/index.js";
 
 export interface DoingDatabase {
   assignments: Assignment;
@@ -17,5 +17,6 @@ export interface DoingDatabase {
   workflows: Workflow;
   workflowCategories: WorkflowCategory;
   workflowSteps: WorkflowStep;
+  workflowStepActions: WorkflowStepAction;
   workflowStepRoutes: WorkflowStepRoute;
 }

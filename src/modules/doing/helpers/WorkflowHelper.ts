@@ -4,6 +4,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { Task, Workflow, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
+import { StepActionHelper } from "./StepActionHelper.js";
 
 interface AssignTarget {
   type?: string;
@@ -12,6 +13,9 @@ interface AssignTarget {
 }
 
 export class WorkflowHelper {
+  // Guards against route/action cycles while allowing long legit journeys.
+  private static readonly MAX_STEP_DEPTH = 25;
+
   private static async getRepos(repositories?: Repos) {
     return repositories || (await RepoManager.getRepos<Repos>("doing"));
   }
@@ -108,11 +112,40 @@ export class WorkflowHelper {
     }
 
     if (!step.id || suppressRoutes) return;
+
+    // Action steps run their automation, then auto-advance (no human ever works them).
+    if (step.stepType === "action") {
+      if (depth >= WorkflowHelper.MAX_STEP_DEPTH) return;
+      const parked = await StepActionHelper.execute(task, step, repos);
+      if (parked) return; // a delay snoozed the card; it rests here until the snooze wakes it
+      await this.advanceActionStep(task, step, repos, depth);
+      return;
+    }
+
     await this.applyEntryRoutes(task, step, repos, depth);
   }
 
-  private static async applyEntryRoutes(task: Task, step: WorkflowStep, repos: Repos, depth: number): Promise<void> {
-    if (depth >= 5 || !step.id) return;
+  // Advance a card off an action step: prefer a matching onEnter route, else the next step by sort.
+  private static async advanceActionStep(task: Task, step: WorkflowStep, repos: Repos, depth: number): Promise<void> {
+    const advanced = await this.applyEntryRoutes(task, step, repos, depth);
+    if (advanced) return;
+    const steps = (await repos.workflowStep.loadForWorkflow(task.churchId || "", task.workflowId || "")) as WorkflowStep[];
+    const index = steps.findIndex((s) => s.id === step.id);
+    const next = index === -1 ? undefined : steps[index + 1];
+    if (next?.id) {
+      task.stepId = next.id;
+      task.sort = await repos.task.loadMaxSortForStep(task.churchId || "", task.workflowId || "", next.id);
+      await this.onStepEnter(task, next, repos, depth + 1);
+    } else {
+      // An action step with no following step ends the journey.
+      task.status = "Closed";
+      task.dateClosed = new Date();
+    }
+  }
+
+  // Returns true when a matched route advanced the card to another step.
+  private static async applyEntryRoutes(task: Task, step: WorkflowStep, repos: Repos, depth: number): Promise<boolean> {
+    if (depth >= WorkflowHelper.MAX_STEP_DEPTH || !step.id) return false;
     const routes = (await repos.workflowStepRoute.loadForStep(task.churchId || "", step.id)) as WorkflowStepRoute[];
     const onEnter = routes.filter((r) => r.trigger === "onEnter");
     for (const route of onEnter) {
@@ -128,10 +161,12 @@ export class WorkflowHelper {
           task.stepId = next.id;
           task.sort = await repos.task.loadMaxSortForStep(task.churchId || "", task.workflowId || "", next.id || "");
           await this.onStepEnter(task, next, repos, depth + 1);
+          return true;
         }
       }
-      return;
+      return false;
     }
+    return false;
   }
 
   public static async complete(task: Task, repositories?: Repos, routeId?: string): Promise<Task> {
@@ -215,12 +250,19 @@ export class WorkflowHelper {
           workflowId: newWorkflow.id,
           name: step.name,
           sort: step.sort,
+          stepType: step.stepType,
           defaultAssignToType: step.defaultAssignToType,
           defaultAssignToId: step.defaultAssignToId,
           defaultAssignToLabel: step.defaultAssignToLabel,
           expectedResponseDays: step.expectedResponseDays
         })) as WorkflowStep;
         if (newStep.id) createdStepIds.push(newStep.id);
+        if (step.id && newStep.id) {
+          const actions = (await repos.workflowStepAction.loadForStep(churchId, step.id)) as any[];
+          for (const action of actions) {
+            await repos.workflowStepAction.save({ churchId, stepId: newStep.id, sort: action.sort, actionType: action.actionType, config: action.config });
+          }
+        }
       }
     } catch (err) {
       await this.rollbackWorkflow(repos, churchId, newWorkflow.id, createdStepIds, "duplicateWorkflow", err);
@@ -278,8 +320,15 @@ export class WorkflowHelper {
     const cards = (await repos.task.loadSnoozedDueAllChurches()) as Task[];
     for (const card of cards) {
       card.snoozedUntil = undefined;
-      await repos.task.save(card);
-      await this.notifyAssignee(card, `Snooze ended: ${card.title || card.associatedWithLabel || ""}`);
+      const step = card.stepId ? ((await repos.workflowStep.load(card.churchId || "", card.stepId)) as WorkflowStep) : null;
+      if (step && step.stepType === "action") {
+        // The card was parked by a delay action; on wake, advance past the action step.
+        await this.advanceActionStep(card, step, repos, 0);
+        await repos.task.save(card);
+      } else {
+        await repos.task.save(card);
+        await this.notifyAssignee(card, `Snooze ended: ${card.title || card.associatedWithLabel || ""}`);
+      }
     }
     return cards.length;
   }

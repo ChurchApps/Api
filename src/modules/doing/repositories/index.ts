@@ -12,6 +12,7 @@ export { TaskRepo } from "./TaskRepo.js";
 export { TimeRepo } from "./TimeRepo.js";
 export { WorkflowRepo } from "./WorkflowRepo.js";
 export { WorkflowStepRepo } from "./WorkflowStepRepo.js";
+export { WorkflowStepActionRepo } from "./WorkflowStepActionRepo.js";
 export { WorkflowStepRouteRepo } from "./WorkflowStepRouteRepo.js";
 export { WorkflowCategoryRepo } from "./WorkflowCategoryRepo.js";
 export { WorkflowTriggerRepo } from "./WorkflowTriggerRepo.js";

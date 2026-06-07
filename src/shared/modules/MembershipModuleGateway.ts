@@ -31,6 +31,10 @@ export interface MembershipModuleGateway {
   // Returns the full person row; the listed fields are the ones event triggers filter on.
   loadPerson(churchId: string, personId: string): Promise<{ id: string; householdId: string; email: string; membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date } | null>;
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
+  // Idempotent: adds the person to the group only if not already a member.
+  addGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
+  // Sets a single allowed person field; throws on a field outside the allow-list.
+  setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void>;
 }
 
 class MembershipModuleGatewayDb implements MembershipModuleGateway {
@@ -165,6 +169,22 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       membershipStatus: "Guest"
     });
     return { personId: person.id, householdId: household.id, email: guestInfo.email };
+  }
+
+  public async addGroupMember(churchId: string, groupId: string, personId: string): Promise<void> {
+    const repos = await this.repos();
+    const existing = await repos.groupMember.loadForPerson(churchId, personId);
+    if (Array.isArray(existing) && existing.some((m: any) => m.groupId === groupId)) return;
+    await repos.groupMember.save({ churchId, groupId, personId, leader: false });
+  }
+
+  public async setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {
+    if (!MembershipModuleGatewayDb.ALLOWED_FIELDS.has(field)) throw new Error(`Invalid person field: ${field}`);
+    await this.getDb().updateTable("people")
+      .set({ [field]: value })
+      .where("churchId", "=", churchId)
+      .where("id", "=", personId)
+      .execute();
   }
 }
 

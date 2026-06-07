@@ -12,6 +12,7 @@ export { Task } from "./Task.js";
 export { Time } from "./Time.js";
 export { Workflow } from "./Workflow.js";
 export { WorkflowStep } from "./WorkflowStep.js";
+export { WorkflowStepAction } from "./WorkflowStepAction.js";
 export { WorkflowStepRoute } from "./WorkflowStepRoute.js";
 export { WorkflowCategory } from "./WorkflowCategory.js";
 export { WorkflowTrigger } from "./WorkflowTrigger.js";

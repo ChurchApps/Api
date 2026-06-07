@@ -13,6 +13,7 @@ import {
   TimeRepo,
   WorkflowRepo,
   WorkflowStepRepo,
+  WorkflowStepActionRepo,
   WorkflowStepRouteRepo,
   WorkflowCategoryRepo,
   WorkflowTriggerRepo
@@ -33,6 +34,7 @@ export class Repos {
   public time: TimeRepo;
   public workflow: WorkflowRepo;
   public workflowStep: WorkflowStepRepo;
+  public workflowStepAction: WorkflowStepActionRepo;
   public workflowStepRoute: WorkflowStepRouteRepo;
   public workflowCategory: WorkflowCategoryRepo;
   public workflowTrigger: WorkflowTriggerRepo;
@@ -58,6 +60,7 @@ export class Repos {
     this.time = new TimeRepo();
     this.workflow = new WorkflowRepo();
     this.workflowStep = new WorkflowStepRepo();
+    this.workflowStepAction = new WorkflowStepActionRepo();
     this.workflowStepRoute = new WorkflowStepRouteRepo();
     this.workflowCategory = new WorkflowCategoryRepo();
     this.workflowTrigger = new WorkflowTriggerRepo();
