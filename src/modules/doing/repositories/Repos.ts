@@ -17,7 +17,7 @@ import {
   WorkflowStepRepo,
   WorkflowStepRouteRepo,
   WorkflowCategoryRepo,
-  FormWorkflowTriggerRepo
+  WorkflowTriggerRepo
 } from "./index.js";
 
 export class Repos {
@@ -39,7 +39,7 @@ export class Repos {
   public workflowStep: WorkflowStepRepo;
   public workflowStepRoute: WorkflowStepRouteRepo;
   public workflowCategory: WorkflowCategoryRepo;
-  public formWorkflowTrigger: FormWorkflowTriggerRepo;
+  public workflowTrigger: WorkflowTriggerRepo;
 
   private static _current: Repos = null;
   public static getCurrent = () => {
@@ -66,6 +66,6 @@ export class Repos {
     this.workflowStep = new WorkflowStepRepo();
     this.workflowStepRoute = new WorkflowStepRouteRepo();
     this.workflowCategory = new WorkflowCategoryRepo();
-    this.formWorkflowTrigger = new FormWorkflowTriggerRepo();
+    this.workflowTrigger = new WorkflowTriggerRepo();
   }
 }

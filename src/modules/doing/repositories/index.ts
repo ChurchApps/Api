@@ -16,5 +16,5 @@ export { WorkflowRepo } from "./WorkflowRepo.js";
 export { WorkflowStepRepo } from "./WorkflowStepRepo.js";
 export { WorkflowStepRouteRepo } from "./WorkflowStepRouteRepo.js";
 export { WorkflowCategoryRepo } from "./WorkflowCategoryRepo.js";
-export { FormWorkflowTriggerRepo } from "./FormWorkflowTriggerRepo.js";
+export { WorkflowTriggerRepo } from "./WorkflowTriggerRepo.js";
 export { Repos } from "./Repos.js";

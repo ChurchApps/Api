@@ -5,7 +5,6 @@ import { FormSubmission, Answer, Form, Church } from "../models/index.js";
 import { Permissions, EmailHelper, Environment } from "../helpers/index.js";
 import { MemberPermission, Person } from "../models/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
-import { WorkflowTriggerService } from "../../../shared/helpers/index.js";
 import axios from "axios";
 
 @controller("/membership/formsubmissions")
@@ -89,9 +88,9 @@ export class FormSubmissionController extends MembershipBaseController {
               }
 
               results.push(savedSubmissions);
+              // Submitters land in workflows via the unified trigger engine, which
+              // subscribes to this event (form.submission.created) on the internal bus.
               await WebhookDispatcher.emit(churchId, "form.submission.created", savedSubmissions);
-              // Add submitters to any workflow configured as a destination for their form.
-              await WorkflowTriggerService.onFormSubmission(savedSubmissions);
 
               await this.sendEmails(formSubmission, form, churchId);
             }

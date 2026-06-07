@@ -1,6 +1,7 @@
 import { Webhook } from "../../modules/membership/models/index.js";
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { formatForConnector } from "./WebhookFormatters.js";
+import { InternalEventBus } from "../events/InternalEventBus.js";
 
 // In-process webhook event emitter. Called from controllers (or repos) right
 // after a mutation. emit() does a cached subscription lookup (so churches with
@@ -21,6 +22,9 @@ export class WebhookDispatcher {
   public static async emit(churchId: string, event: string, payload: any): Promise<void> {
     try {
       if (!churchId) return;
+      // In-process subscribers (e.g. workflow event triggers) fire even for churches
+      // with no external webhooks; publish never throws.
+      await InternalEventBus.publish(churchId, event, payload);
       const repos = await RepoManager.getRepos<any>("membership");
       const hooks = await WebhookDispatcher.getHooks(repos, churchId);
       if (hooks.length === 0) return;
