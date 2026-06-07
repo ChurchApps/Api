@@ -1,7 +1,5 @@
 import {
-  ActionRepo,
   AssignmentRepo,
-  AutomationRepo,
   BlockoutDateRepo,
   ConditionRepo,
   ConjunctionRepo,
@@ -21,9 +19,7 @@ import {
 } from "./index.js";
 
 export class Repos {
-  public action: ActionRepo;
   public assignment: AssignmentRepo;
-  public automation: AutomationRepo;
   public blockoutDate: BlockoutDateRepo;
   public condition: ConditionRepo;
   public conjunction: ConjunctionRepo;
@@ -48,9 +44,7 @@ export class Repos {
   };
 
   constructor() {
-    this.action = new ActionRepo();
     this.assignment = new AssignmentRepo();
-    this.automation = new AutomationRepo();
     this.blockoutDate = new BlockoutDateRepo();
     this.condition = new ConditionRepo();
     this.conjunction = new ConjunctionRepo();

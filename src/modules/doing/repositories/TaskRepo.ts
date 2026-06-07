@@ -114,73 +114,24 @@ export class TaskRepo {
     return query.execute();
   }
 
-  public async loadByAutomationIdContent(churchId: string, automationId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
+  // Dedup for scheduled rules: which of these subjects already have a card from this
+  // trigger within the recurs window? Mirrors the old automation dedup, keyed on triggerId.
+  public async loadByTriggerIdContent(churchId: string, triggerId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
     if (associatedWithIds.length === 0) return [];
-    let result: any[] = [];
+    let query = getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("triggerId", "=", triggerId)
+      .where("associatedWithType", "=", associatedWithType)
+      .where("associatedWithId", "in", associatedWithIds);
+    const threshold = new Date();
     switch (recurs) {
-      case "yearly":
-        result = await this.loadByAutomationIdContentYearly(churchId, automationId, associatedWithType, associatedWithIds);
-        break;
-      case "monthly":
-        result = await this.loadByAutomationIdContentMonthly(churchId, automationId, associatedWithType, associatedWithIds);
-        break;
-      case "weekly":
-        result = await this.loadByAutomationIdContentWeekly(churchId, automationId, associatedWithType, associatedWithIds);
-        break;
-      default:
-        result = await this.loadByAutomationIdContentNoRepeat(churchId, automationId, associatedWithType, associatedWithIds);
-        break;
+      case "yearly": threshold.setFullYear(threshold.getFullYear() - 1); query = query.where("dateCreated", ">", threshold); break;
+      case "monthly": threshold.setMonth(threshold.getMonth() - 1); query = query.where("dateCreated", ">", threshold); break;
+      case "weekly": threshold.setDate(threshold.getDate() - 7); query = query.where("dateCreated", ">", threshold); break;
+      case "daily": threshold.setDate(threshold.getDate() - 1); query = query.where("dateCreated", ">", threshold); break;
+      default: break; // no repeat: any prior card from this trigger dedups
     }
-    return result;
-  }
-
-  private async loadByAutomationIdContentNoRepeat(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    return getDb().selectFrom("tasks").selectAll()
-      .where("churchId", "=", churchId)
-      .where("automationId", "=", automationId)
-      .where("associatedWithType", "=", associatedWithType)
-      .where("associatedWithId", "in", associatedWithIds)
-      .orderBy("taskNumber")
-      .execute();
-  }
-
-  private async loadByAutomationIdContentYearly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const threshold = new Date();
-    threshold.setFullYear(threshold.getFullYear() - 1);
-    return getDb().selectFrom("tasks").selectAll()
-      .where("churchId", "=", churchId)
-      .where("automationId", "=", automationId)
-      .where("associatedWithType", "=", associatedWithType)
-      .where("associatedWithId", "in", associatedWithIds)
-      .where("dateCreated", ">", threshold)
-      .orderBy("taskNumber")
-      .execute();
-  }
-
-  private async loadByAutomationIdContentMonthly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const threshold = new Date();
-    threshold.setMonth(threshold.getMonth() - 1);
-    return getDb().selectFrom("tasks").selectAll()
-      .where("churchId", "=", churchId)
-      .where("automationId", "=", automationId)
-      .where("associatedWithType", "=", associatedWithType)
-      .where("associatedWithId", "in", associatedWithIds)
-      .where("dateCreated", ">", threshold)
-      .orderBy("taskNumber")
-      .execute();
-  }
-
-  private async loadByAutomationIdContentWeekly(churchId: string, automationId: string, associatedWithType: string, associatedWithIds: string[]) {
-    const threshold = new Date();
-    threshold.setDate(threshold.getDate() - 7);
-    return getDb().selectFrom("tasks").selectAll()
-      .where("churchId", "=", churchId)
-      .where("automationId", "=", automationId)
-      .where("associatedWithType", "=", associatedWithType)
-      .where("associatedWithId", "in", associatedWithIds)
-      .where("dateCreated", ">", threshold)
-      .orderBy("taskNumber")
-      .execute();
+    return query.orderBy("taskNumber").execute();
   }
 
   // Dedup for oncePerSubject event triggers: is this subject already in this workflow

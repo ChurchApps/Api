@@ -14,11 +14,11 @@ export class ConditionController extends DoingBaseController {
     });
   }
 
-  @httpGet("/automation/:id")
-  public async getForAutomation(@requestParam("id") automationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  @httpGet("/trigger/:id")
+  public async getForTrigger(@requestParam("id") triggerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
-      return await this.repos.condition.loadForAutomation(au.churchId, automationId);
+      return await this.repos.condition.loadForTrigger(au.churchId, triggerId);
     });
   }
 

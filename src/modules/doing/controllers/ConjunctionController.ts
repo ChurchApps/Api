@@ -14,11 +14,11 @@ export class ConjunctionController extends DoingBaseController {
     });
   }
 
-  @httpGet("/automation/:id")
-  public async getForAutomation(@requestParam("id") automationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  @httpGet("/trigger/:id")
+  public async getForTrigger(@requestParam("id") triggerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
-      return await this.repos.conjunction.loadForAutomation(au.churchId, automationId);
+      return await this.repos.conjunction.loadForTrigger(au.churchId, triggerId);
     });
   }
 
@@ -34,9 +34,9 @@ export class ConjunctionController extends DoingBaseController {
   public async save(req: express.Request<{}, {}, Conjunction[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
-      // A conjunction belongs to exactly one owner: automationId XOR stepRouteId.
-      const ownerInvalid = req.body.some((c) => (c.automationId ? 1 : 0) + (c.stepRouteId ? 1 : 0) !== 1);
-      if (ownerInvalid) return this.json({ message: "A conjunction must belong to exactly one of automationId or stepRouteId" }, 400);
+      // A conjunction belongs to exactly one owner: triggerId XOR stepRouteId.
+      const ownerInvalid = req.body.some((c) => (c.triggerId ? 1 : 0) + (c.stepRouteId ? 1 : 0) !== 1);
+      if (ownerInvalid) return this.json({ message: "A conjunction must belong to exactly one of triggerId or stepRouteId" }, 400);
       const promises: Promise<Conjunction>[] = [];
       req.body.forEach((conjunction) => {
         conjunction.churchId = au.churchId;

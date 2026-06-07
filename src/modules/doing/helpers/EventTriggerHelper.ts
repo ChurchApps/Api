@@ -1,6 +1,6 @@
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
-import { WorkflowTrigger, Task } from "../models/index.js";
+import { WorkflowTrigger } from "../models/index.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
 import { getMembershipModuleGateway, getGivingModuleGateway } from "../../../shared/modules/index.js";
 
@@ -126,13 +126,9 @@ export class EventTriggerHelper {
             const people = await getMembershipModuleGateway().loadPeople(churchId, [subject.id]);
             subject.label = people[0]?.displayName;
           }
-          const card = (await WorkflowHelper.addToWorkflow(
-            churchId, t.workflowId, subject, { type: "system", label: "Trigger" }, undefined, repos, t.stepId || undefined
-          )) as Task | null;
-          if (card) {
-            card.triggerId = t.id;
-            await repos.task.save(card);
-          }
+          await WorkflowHelper.addToWorkflow(
+            churchId, t.workflowId, subject, { type: "system", label: "Trigger" }, t.id, repos, t.stepId || undefined
+          );
         }
       }
     } catch {

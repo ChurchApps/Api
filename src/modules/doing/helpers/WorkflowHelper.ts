@@ -21,7 +21,7 @@ export class WorkflowHelper {
     workflowId: string,
     associated: AssignTarget,
     createdBy?: AssignTarget,
-    automationId?: string,
+    triggerId?: string,
     repositories?: Repos,
     stepId?: string
   ): Promise<Task | null> {
@@ -30,7 +30,7 @@ export class WorkflowHelper {
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
     if (!step) return null;
-    return await this.createCard(churchId, workflowId, step, associated, createdBy, automationId, repos);
+    return await this.createCard(churchId, workflowId, step, associated, createdBy, triggerId, repos);
   }
 
   public static async addPeopleToWorkflow(
@@ -38,7 +38,7 @@ export class WorkflowHelper {
     workflowId: string,
     people: AssignTarget[],
     createdBy?: AssignTarget,
-    automationId?: string,
+    triggerId?: string,
     repositories?: Repos,
     stepId?: string
   ): Promise<Task[]> {
@@ -50,7 +50,7 @@ export class WorkflowHelper {
     const baseSort = await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || "");
     const result: Task[] = [];
     for (let i = 0; i < people.length; i++) {
-      result.push(await this.createCard(churchId, workflowId, step, people[i], createdBy, automationId, repos, baseSort + i));
+      result.push(await this.createCard(churchId, workflowId, step, people[i], createdBy, triggerId, repos, baseSort + i));
     }
     return result;
   }
@@ -61,7 +61,7 @@ export class WorkflowHelper {
     step: WorkflowStep,
     associated: AssignTarget,
     createdBy?: AssignTarget,
-    automationId?: string,
+    triggerId?: string,
     repos?: Repos,
     sort?: number
   ): Promise<Task> {
@@ -79,7 +79,7 @@ export class WorkflowHelper {
       status: "Open",
       workflowId,
       stepId: step.id,
-      automationId,
+      triggerId,
       sort: sort ?? (await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || ""))
     };
     await this.onStepEnter(task, step, repos, 0);
