@@ -16,6 +16,14 @@ export class WorkflowTriggerController extends DoingBaseController {
     });
   }
 
+  @httpGet("/workflow/:workflowId")
+  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
+      return await this.repos.workflowTrigger.loadByWorkflow(au.churchId, workflowId);
+    });
+  }
+
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -185,7 +185,7 @@ export class TaskRepo {
 
   // Dedup for oncePerSubject event triggers: is this subject already in this workflow
   // (any status)? Keyed on workflow+subject, not the trigger, so a "create" and a
-  // later "edit-to-Guest" — two triggers feeding one workflow — add the person once.
+  // later "edit-to-Visitor" — two triggers feeding one workflow — add the person once.
   public async loadBySubjectInWorkflow(churchId: string, workflowId: string, associatedWithType: string, associatedWithId: string) {
     return (await getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)

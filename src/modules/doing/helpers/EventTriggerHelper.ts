@@ -14,13 +14,14 @@ type FilterNode =
   | { type: "group"; conjunction: "AND" | "OR"; children: FilterNode[] }
   | { type: "condition"; field: string; operator: string; value: string };
 
+// Canonical membership statuses (mirror B1Admin people/helpers/MembershipStatusOptions.ts).
 const MEMBERSHIP_STATUS_OPTIONS = [
   { value: "Visitor", label: "Visitor" },
   { value: "Regular Attendee", label: "Regular Attendee" },
   { value: "Member", label: "Member" },
   { value: "Staff", label: "Staff" },
-  { value: "Guest", label: "Guest" },
-  { value: "Inactive", label: "Inactive" }
+  { value: "Inactive", label: "Inactive" },
+  { value: "Deceased", label: "Deceased" }
 ];
 
 export interface TriggerFieldDef {
@@ -68,6 +69,12 @@ export const EVENT_DEFS: TriggerEventDef[] = [
       { key: "group.name", label: "Group Name", type: "string" },
       { key: "group.categoryName", label: "Category", type: "string" }
     ]
+  },
+  {
+    eventType: "form.submission.created", label: "Form · Submitted", recordType: "form", fields: [
+      { key: "formSubmission.formId", label: "Form", type: "select", optionsSource: "forms" },
+      { key: "person.membershipStatus", label: "Submitter Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS }
+    ]
   }
 ];
 
@@ -95,25 +102,25 @@ export class EventTriggerHelper {
       const triggers = (await repos.workflowTrigger.loadByEventType(churchId, event)) as WorkflowTrigger[];
       if (triggers.length === 0) return;
 
+      // Most events resolve to one subject; some (e.g. multi-person form posts) to several.
       const resolved = await EventTriggerHelper.resolve(churchId, event, payload);
-      if (!resolved) return; // unmapped event / anonymous donation
-      const { subject, facts } = resolved;
-
-      for (const t of triggers) {
-        if (!t.workflowId) continue;
-        if (!EventTriggerHelper.matches(facts, EventTriggerHelper.parseConditions(t.conditions))) continue;
-        if (EventTriggerHelper.toBool(t.oncePerSubject) && subject.id
-          && (await repos.task.loadBySubjectInWorkflow(churchId, t.workflowId, subject.type, subject.id))) continue;
-        if (subject.type === "person" && subject.id && !subject.label) {
-          const people = await getMembershipModuleGateway().loadPeople(churchId, [subject.id]);
-          subject.label = people[0]?.displayName;
-        }
-        const card = (await WorkflowHelper.addToWorkflow(
-          churchId, t.workflowId, subject, { type: "system", label: "Trigger" }, undefined, repos, t.stepId || undefined
-        )) as Task | null;
-        if (card) {
-          card.triggerId = t.id;
-          await repos.task.save(card);
+      for (const { subject, facts } of resolved) {
+        for (const t of triggers) {
+          if (!t.workflowId) continue;
+          if (!EventTriggerHelper.matches(facts, EventTriggerHelper.parseConditions(t.conditions))) continue;
+          if (EventTriggerHelper.toBool(t.oncePerSubject) && subject.id
+            && (await repos.task.loadBySubjectInWorkflow(churchId, t.workflowId, subject.type, subject.id))) continue;
+          if (subject.type === "person" && subject.id && !subject.label) {
+            const people = await getMembershipModuleGateway().loadPeople(churchId, [subject.id]);
+            subject.label = people[0]?.displayName;
+          }
+          const card = (await WorkflowHelper.addToWorkflow(
+            churchId, t.workflowId, subject, { type: "system", label: "Trigger" }, undefined, repos, t.stepId || undefined
+          )) as Task | null;
+          if (card) {
+            card.triggerId = t.id;
+            await repos.task.save(card);
+          }
         }
       }
     } catch {
@@ -122,25 +129,25 @@ export class EventTriggerHelper {
   }
 
   // Per-record-type logic: load related records (cross-module via gateways), then
-  // return the card subject and a flat facts map. One case per event.
-  private static async resolve(churchId: string, event: string, payload: any): Promise<{ subject: Subject; facts: Record<string, any> } | null> {
+  // return the card subject(s) + a flat facts map. One case per event; [] = no subject.
+  private static async resolve(churchId: string, event: string, payload: any): Promise<{ subject: Subject; facts: Record<string, any> }[]> {
     switch (event) {
       case "person.created":
       case "person.updated":
-        return {
+        return [{
           subject: { type: "person", id: payload.id, label: payload.displayName },
           facts: {
             "person.membershipStatus": payload.membershipStatus,
             "person.gender": payload.gender,
             "person.maritalStatus": payload.maritalStatus
           }
-        };
+        }];
 
       case "donation.created": {
-        if (!payload.personId) return null; // anonymous donation has no subject
+        if (!payload.personId) return []; // anonymous donation has no subject
         const person = await getMembershipModuleGateway().loadPerson(churchId, payload.personId);
         const funds = await getGivingModuleGateway().loadFundDonations(churchId, payload.id);
-        return {
+        return [{
           subject: { type: "person", id: payload.personId },
           facts: {
             "donation.amount": payload.amount,
@@ -148,25 +155,41 @@ export class EventTriggerHelper {
             "person.membershipStatus": person?.membershipStatus,
             "fundDonation.fundId": funds.map((f) => f.fundId)
           }
-        };
+        }];
       }
 
       case "group.member.added": {
         const group = await getMembershipModuleGateway().loadGroup(churchId, payload.groupId);
-        return {
+        return [{
           subject: { type: "person", id: payload.personId },
           facts: { "group.id": payload.groupId, "group.name": group?.name }
-        };
+        }];
       }
 
       case "group.created":
-        return {
+        return [{
           subject: { type: "group", id: payload.id, label: payload.name },
           facts: { "group.name": payload.name, "group.categoryName": payload.categoryName }
-        };
+        }];
+
+      case "form.submission.created": {
+        // payload is a submission (or, defensively, an array of them). The subject is
+        // the person the submission is about (contentType "person").
+        const subs = Array.isArray(payload) ? payload : [payload];
+        const out: { subject: Subject; facts: Record<string, any> }[] = [];
+        for (const sub of subs) {
+          if (sub?.contentType !== "person" || !sub.contentId) continue;
+          const person = await getMembershipModuleGateway().loadPerson(churchId, sub.contentId);
+          out.push({
+            subject: { type: "person", id: sub.contentId },
+            facts: { "formSubmission.formId": sub.formId, "person.membershipStatus": person?.membershipStatus }
+          });
+        }
+        return out;
+      }
 
       default:
-        return null;
+        return [];
     }
   }
 

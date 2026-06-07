@@ -12,4 +12,3 @@ export { ValidationHelper } from "./ValidationHelper.js";
 export { StripeHelper } from "./StripeHelper.js";
 export { CollectionHelper } from "./CollectionHelper.js";
 export { NotificationService, type CreateNotificationsFn } from "./NotificationService.js";
-export { WorkflowTriggerService, type OnFormSubmissionFn, type FormSubmissionLike } from "./WorkflowTriggerService.js";

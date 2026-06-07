@@ -27,7 +27,6 @@ BEGIN
     TRUNCATE TABLE workflowSteps;
     TRUNCATE TABLE workflowStepRoutes;
     TRUNCATE TABLE workflowCategories;
-    TRUNCATE TABLE formWorkflowTriggers;
     TRUNCATE TABLE workflowTriggers;
     SET FOREIGN_KEY_CHECKS = 1;
 
@@ -235,15 +234,14 @@ BEGIN
     ('TSK00000104', 'CHU00000001', 104, 'card', DATE_SUB(NOW(), INTERVAL 2 DAY), 'person', 'PER00000004', 'James Wilson', 'system', 'System', 'person', 'PER00000082', 'Demo User', 'James Wilson', 'Open', 'WFL00000001', 'WFS00000003', NULL, NULL, 1),
     ('TSK00000105', 'CHU00000001', 105, 'card', DATE_SUB(NOW(), INTERVAL 1 DAY), 'person', 'PER00000005', 'Patricia Brown', 'system', 'System', 'person', 'PER00000069', 'Rachel Martin', 'Patricia Brown', 'Open', 'WFL00000002', 'WFS00000004', NULL, NULL, 1);
 
-    -- A form-submission trigger: submissions to this form drop the person on WFL1.
-    INSERT INTO formWorkflowTriggers (id, churchId, formId, workflowId, active) VALUES
-    ('FWT00000001', 'CHU00000001', 'FRM00000001', 'WFL00000001', b'1');
-
-    -- Event-driven triggers: a new person who is (or becomes) a Guest is dropped on
-    -- WFL1 "New Visitor Follow-up". oncePerSubject keeps repeated edits from re-adding.
+    -- Unified workflow triggers (event-driven). A new person who is (or becomes) a
+    -- Visitor is dropped on WFL1 "New Visitor Follow-up" (oncePerSubject keeps repeated
+    -- edits from re-adding). The third is a form-submission trigger — form submissions
+    -- run through the same engine via the form.submission.created event.
     INSERT INTO workflowTriggers (id, churchId, name, eventType, workflowId, stepId, conditions, oncePerSubject, active) VALUES
-    ('WKT00000001', 'CHU00000001', 'New Guest Follow-up (created)', 'person.created', 'WFL00000001', NULL, '{"type":"group","conjunction":"AND","children":[{"type":"condition","field":"person.membershipStatus","operator":"=","value":"Guest"}]}', b'1', b'1'),
-    ('WKT00000002', 'CHU00000001', 'New Guest Follow-up (status change)', 'person.updated', 'WFL00000001', NULL, '{"type":"group","conjunction":"AND","children":[{"type":"condition","field":"person.membershipStatus","operator":"=","value":"Guest"}]}', b'1', b'1');
+    ('WKT00000001', 'CHU00000001', 'New Visitor Follow-up (created)', 'person.created', 'WFL00000001', NULL, '{"type":"group","conjunction":"AND","children":[{"type":"condition","field":"person.membershipStatus","operator":"=","value":"Visitor"}]}', b'1', b'1'),
+    ('WKT00000002', 'CHU00000001', 'New Visitor Follow-up (status change)', 'person.updated', 'WFL00000001', NULL, '{"type":"group","conjunction":"AND","children":[{"type":"condition","field":"person.membershipStatus","operator":"=","value":"Visitor"}]}', b'1', b'1'),
+    ('WKT00000003', 'CHU00000001', 'Visitor Card Form Submission', 'form.submission.created', 'WFL00000001', NULL, '{"type":"group","conjunction":"AND","children":[{"type":"condition","field":"formSubmission.formId","operator":"=","value":"FRM00000001"}]}', b'0', b'1');
 
     -- ========================================
     -- Conditional routing ("if this then that")
