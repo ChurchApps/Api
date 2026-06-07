@@ -51,7 +51,10 @@ export const EVENT_DEFS: TriggerEventDef[] = [
   { eventType: "person.created", label: "Person · Created", recordType: "person", fields: PERSON_FIELDS },
   { eventType: "person.updated", label: "Person · Updated", recordType: "person", fields: PERSON_FIELDS },
   {
-    eventType: "donation.created", label: "Donation · Created", recordType: "donation", fields: [
+    eventType: "donation.created",
+    label: "Donation · Created",
+    recordType: "donation",
+    fields: [
       { key: "donation.amount", label: "Amount", type: "number" },
       { key: "donation.method", label: "Method", type: "string" },
       { key: "person.membershipStatus", label: "Donor Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS },
@@ -59,19 +62,28 @@ export const EVENT_DEFS: TriggerEventDef[] = [
     ]
   },
   {
-    eventType: "group.member.added", label: "Group · Member Joined", recordType: "group", fields: [
+    eventType: "group.member.added",
+    label: "Group · Member Joined",
+    recordType: "group",
+    fields: [
       { key: "group.id", label: "Group", type: "select", optionsSource: "groups" },
       { key: "group.name", label: "Group Name", type: "string" }
     ]
   },
   {
-    eventType: "group.created", label: "Group · Created", recordType: "group", fields: [
+    eventType: "group.created",
+    label: "Group · Created",
+    recordType: "group",
+    fields: [
       { key: "group.name", label: "Group Name", type: "string" },
       { key: "group.categoryName", label: "Category", type: "string" }
     ]
   },
   {
-    eventType: "form.submission.created", label: "Form · Submitted", recordType: "form", fields: [
+    eventType: "form.submission.created",
+    label: "Form · Submitted",
+    recordType: "form",
+    fields: [
       { key: "formSubmission.formId", label: "Form", type: "select", optionsSource: "forms" },
       { key: "person.membershipStatus", label: "Submitter Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS }
     ]
@@ -134,43 +146,51 @@ export class EventTriggerHelper {
     switch (event) {
       case "person.created":
       case "person.updated":
-        return [{
-          subject: { type: "person", id: payload.id, label: payload.displayName },
-          facts: {
-            "person.membershipStatus": payload.membershipStatus,
-            "person.gender": payload.gender,
-            "person.maritalStatus": payload.maritalStatus
+        return [
+          {
+            subject: { type: "person", id: payload.id, label: payload.displayName },
+            facts: {
+              "person.membershipStatus": payload.membershipStatus,
+              "person.gender": payload.gender,
+              "person.maritalStatus": payload.maritalStatus
+            }
           }
-        }];
+        ];
 
       case "donation.created": {
         if (!payload.personId) return []; // anonymous donation has no subject
         const person = await getMembershipModuleGateway().loadPerson(churchId, payload.personId);
         const funds = await getGivingModuleGateway().loadFundDonations(churchId, payload.id);
-        return [{
-          subject: { type: "person", id: payload.personId },
-          facts: {
-            "donation.amount": payload.amount,
-            "donation.method": payload.method,
-            "person.membershipStatus": person?.membershipStatus,
-            "fundDonation.fundId": funds.map((f) => f.fundId)
+        return [
+          {
+            subject: { type: "person", id: payload.personId },
+            facts: {
+              "donation.amount": payload.amount,
+              "donation.method": payload.method,
+              "person.membershipStatus": person?.membershipStatus,
+              "fundDonation.fundId": funds.map((f) => f.fundId)
+            }
           }
-        }];
+        ];
       }
 
       case "group.member.added": {
         const group = await getMembershipModuleGateway().loadGroup(churchId, payload.groupId);
-        return [{
-          subject: { type: "person", id: payload.personId },
-          facts: { "group.id": payload.groupId, "group.name": group?.name }
-        }];
+        return [
+          {
+            subject: { type: "person", id: payload.personId },
+            facts: { "group.id": payload.groupId, "group.name": group?.name }
+          }
+        ];
       }
 
       case "group.created":
-        return [{
-          subject: { type: "group", id: payload.id, label: payload.name },
-          facts: { "group.name": payload.name, "group.categoryName": payload.categoryName }
-        }];
+        return [
+          {
+            subject: { type: "group", id: payload.id, label: payload.name },
+            facts: { "group.name": payload.name, "group.categoryName": payload.categoryName }
+          }
+        ];
 
       case "form.submission.created": {
         // payload is a submission (or, defensively, an array of them). The subject is
