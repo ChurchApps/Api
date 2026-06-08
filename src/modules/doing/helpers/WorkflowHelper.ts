@@ -100,6 +100,9 @@ export class WorkflowHelper {
     return await repos.task.save(task);
   }
 
+  // Runs when a card enters a step: set due date + default assignee, then (on automatic
+  // entry only) run the step's on-enter actions and apply auto-routes. Manual moves pass
+  // suppressRoutes so a sent-back/dragged card stays put and its actions don't re-fire.
   public static async onStepEnter(task: Task, step: WorkflowStep, repositories?: Repos, depth = 0, suppressRoutes = false): Promise<void> {
     const repos = await this.getRepos(repositories);
 
@@ -111,36 +114,15 @@ export class WorkflowHelper {
       task.assignedToLabel = step.defaultAssignToLabel;
     }
 
-    if (!step.id || suppressRoutes) return;
+    if (!step.id || suppressRoutes || depth >= WorkflowHelper.MAX_STEP_DEPTH) return;
 
-    // Action steps run their automation, then auto-advance (no human ever works them).
-    if (step.stepType === "action") {
-      if (depth >= WorkflowHelper.MAX_STEP_DEPTH) return;
-      const parked = await StepActionHelper.execute(task, step, repos);
-      if (parked) return; // a delay snoozed the card; it rests here until the snooze wakes it
-      await this.advanceActionStep(task, step, repos, depth);
-      return;
-    }
+    // Automations run on entry. A delay parks the card (returns true); it rests on the
+    // step until the snooze wakes it and processSnoozed resumes the remaining actions.
+    const parked = await StepActionHelper.execute(task, step, repos, 0);
+    if (parked) return;
 
+    // No matching auto-route leaves the card resting here for a human to work.
     await this.applyEntryRoutes(task, step, repos, depth);
-  }
-
-  // Advance a card off an action step: prefer a matching onEnter route, else the next step by sort.
-  private static async advanceActionStep(task: Task, step: WorkflowStep, repos: Repos, depth: number): Promise<void> {
-    const advanced = await this.applyEntryRoutes(task, step, repos, depth);
-    if (advanced) return;
-    const steps = (await repos.workflowStep.loadForWorkflow(task.churchId || "", task.workflowId || "")) as WorkflowStep[];
-    const index = steps.findIndex((s) => s.id === step.id);
-    const next = index === -1 ? undefined : steps[index + 1];
-    if (next?.id) {
-      task.stepId = next.id;
-      task.sort = await repos.task.loadMaxSortForStep(task.churchId || "", task.workflowId || "", next.id);
-      await this.onStepEnter(task, next, repos, depth + 1);
-    } else {
-      // An action step with no following step ends the journey.
-      task.status = "Closed";
-      task.dateClosed = new Date();
-    }
   }
 
   // Returns true when a matched route advanced the card to another step.
@@ -250,7 +232,6 @@ export class WorkflowHelper {
           workflowId: newWorkflow.id,
           name: step.name,
           sort: step.sort,
-          stepType: step.stepType,
           defaultAssignToType: step.defaultAssignToType,
           defaultAssignToId: step.defaultAssignToId,
           defaultAssignToLabel: step.defaultAssignToLabel,
@@ -320,10 +301,12 @@ export class WorkflowHelper {
     const cards = (await repos.task.loadSnoozedDueAllChurches()) as Task[];
     for (const card of cards) {
       card.snoozedUntil = undefined;
+      const cursor = StepActionHelper.readActionCursor(card);
       const step = card.stepId ? ((await repos.workflowStep.load(card.churchId || "", card.stepId)) as WorkflowStep) : null;
-      if (step && step.stepType === "action") {
-        // The card was parked by a delay action; on wake, advance past the action step.
-        await this.advanceActionStep(card, step, repos, 0);
+      if (step && cursor && cursor.stepId === card.stepId) {
+        // The card was parked mid-sequence by a delay action; resume the remaining actions.
+        const parked = await StepActionHelper.execute(card, step, repos, cursor.index);
+        if (!parked) await this.applyEntryRoutes(card, step, repos, 0);
         await repos.task.save(card);
       } else {
         await repos.task.save(card);

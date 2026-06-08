@@ -10,15 +10,23 @@ interface HistoryEntry {
   message: string;
 }
 
-// Runs the automated actions of an "action" step. Each action is best-effort
+interface ActionCursor {
+  stepId: string;
+  index: number;
+}
+
+// Runs a step's on-enter actions when a card enters it. Each action is best-effort
 // (a single failure is logged and skipped, never breaking the card flow). The
-// "delay" action is special: it parks the card (snooze) and returns true so the
-// caller leaves the card resting on the step until the snooze wakes it.
+// "delay" action is special: it parks the card (snooze), saves a cursor to the next
+// action, and returns true so the caller leaves the card resting on the step. When the
+// snooze wakes, processSnoozed calls execute again from the saved cursor (drip support).
 export class StepActionHelper {
-  // Returns true when the card is parked (a delay), false when it should advance.
-  public static async execute(task: Task, step: WorkflowStep, repos: Repos): Promise<boolean> {
+  // Returns true when the card is parked (a delay), false when the sequence finished.
+  // startIndex resumes a drip after a delay woke; 0 runs the whole list.
+  public static async execute(task: Task, step: WorkflowStep, repos: Repos, startIndex = 0): Promise<boolean> {
     const actions = (await repos.workflowStepAction.loadForStep(task.churchId || "", step.id || "")) as WorkflowStepAction[];
-    for (const action of actions) {
+    for (let i = startIndex; i < actions.length; i++) {
+      const action = actions[i];
       const config = this.parseConfig(action.config);
       try {
         switch (action.actionType) {
@@ -27,6 +35,7 @@ export class StepActionHelper {
             if (days > 0) {
               task.snoozedUntil = DateHelper.addDays(new Date(), days);
               this.appendHistory(task, `Waiting ${days} day(s)`);
+              this.setActionCursor(task, { stepId: step.id || "", index: i + 1 });
               return true;
             }
             break;
@@ -56,7 +65,39 @@ export class StepActionHelper {
         console.warn(`[StepActionHelper] action ${action.actionType} failed for card ${task.id || "?"}:`, (err as Error)?.message || err);
       }
     }
+    this.clearActionCursor(task);
     return false;
+  }
+
+  // The action cursor (where a drip paused at a delay) lives in the card's data JSON
+  // alongside history, so a woken card can resume the remaining on-enter actions.
+  public static readActionCursor(task: Task): ActionCursor | null {
+    const data = this.parseData(task);
+    const c = data.actionCursor;
+    return c && typeof c.stepId === "string" && typeof c.index === "number" ? c : null;
+  }
+
+  private static setActionCursor(task: Task, cursor: ActionCursor): void {
+    const data = this.parseData(task);
+    data.actionCursor = cursor;
+    task.data = JSON.stringify(data);
+  }
+
+  private static clearActionCursor(task: Task): void {
+    const data = this.parseData(task);
+    if (data.actionCursor === undefined) return;
+    delete data.actionCursor;
+    task.data = JSON.stringify(data);
+  }
+
+  private static parseData(task: Task): any {
+    if (!task.data) return {};
+    try {
+      const parsed = JSON.parse(task.data);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
   }
 
   private static parseConfig(config?: string): Record<string, any> {
@@ -70,14 +111,7 @@ export class StepActionHelper {
 
   // Action history lives in the card's data JSON so it stays self-contained in the doing module.
   public static appendHistory(task: Task, message: string): void {
-    let data: any = {};
-    if (task.data) {
-      try {
-        data = JSON.parse(task.data);
-      } catch {
-        data = {};
-      }
-    }
+    const data = this.parseData(task);
     const history: HistoryEntry[] = Array.isArray(data.history) ? data.history : [];
     history.push({ date: new Date().toISOString(), message });
     data.history = history;

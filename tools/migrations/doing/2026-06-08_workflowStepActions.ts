@@ -1,12 +1,10 @@
 import { type Kysely, sql } from "kysely";
 
-// Action steps: a workflowStep can be stepType='action', which performs automated
-// actions (send email, wait, add to group, note, set field, webhook) on entry and
-// then auto-advances the card. stepType defaults to 'human' (today's behavior).
+// On-enter step actions: any workflowStep can carry an ordered list of automated
+// actions (send email, wait, add to group, note, set field, webhook) that run when a
+// card enters the step. A "wait" action parks the card and resumes on snooze wake.
 
 export async function up(db: Kysely<any>): Promise<void> {
-  await db.schema.alterTable("workflowSteps").addColumn("stepType", sql`varchar(20)`, (col) => col.defaultTo("human")).execute();
-
   await db.schema
     .createTable("workflowStepActions")
     .ifNotExists()
@@ -24,5 +22,4 @@ export async function up(db: Kysely<any>): Promise<void> {
 export async function down(db: Kysely<any>): Promise<void> {
   await db.schema.dropIndex("idx_workflowStepActions_churchId_stepId").on("workflowStepActions").ifExists().execute();
   await db.schema.dropTable("workflowStepActions").ifExists().execute();
-  await db.schema.alterTable("workflowSteps").dropColumn("stepType").execute();
 }
