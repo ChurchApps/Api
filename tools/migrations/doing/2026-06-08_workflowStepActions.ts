@@ -1,8 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// On-enter step actions: any workflowStep can carry an ordered list of automated
-// actions (send email, wait, add to group, note, set field, webhook) that run when a
-// card enters the step. A "wait" action parks the card and resumes on snooze wake.
+// On-enter step actions: a step's ordered workflowStepActions run when a card enters it.
 
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema

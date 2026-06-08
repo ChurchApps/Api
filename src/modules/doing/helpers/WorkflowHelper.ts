@@ -100,9 +100,7 @@ export class WorkflowHelper {
     return await repos.task.save(task);
   }
 
-  // Runs when a card enters a step: set due date + default assignee, then (on automatic
-  // entry only) run the step's on-enter actions and apply auto-routes. Manual moves pass
-  // suppressRoutes so a sent-back/dragged card stays put and its actions don't re-fire.
+  // Manual moves pass suppressRoutes so a sent-back/dragged card stays put (no actions, no routing).
   public static async onStepEnter(task: Task, step: WorkflowStep, repositories?: Repos, depth = 0, suppressRoutes = false): Promise<void> {
     const repos = await this.getRepos(repositories);
 
@@ -116,12 +114,10 @@ export class WorkflowHelper {
 
     if (!step.id || suppressRoutes || depth >= WorkflowHelper.MAX_STEP_DEPTH) return;
 
-    // Automations run on entry. A delay parks the card (returns true); it rests on the
-    // step until the snooze wakes it and processSnoozed resumes the remaining actions.
+    // A delay parks the card; processSnoozed resumes the rest on wake.
     const parked = await StepActionHelper.execute(task, step, repos, 0);
     if (parked) return;
 
-    // No matching auto-route leaves the card resting here for a human to work.
     await this.applyEntryRoutes(task, step, repos, depth);
   }
 
@@ -304,7 +300,7 @@ export class WorkflowHelper {
       const cursor = StepActionHelper.readActionCursor(card);
       const step = card.stepId ? ((await repos.workflowStep.load(card.churchId || "", card.stepId)) as WorkflowStep) : null;
       if (step && cursor && cursor.stepId === card.stepId) {
-        // The card was parked mid-sequence by a delay action; resume the remaining actions.
+        // Resume a drip parked by a delay; otherwise it's an ordinary human snooze.
         const parked = await StepActionHelper.execute(card, step, repos, cursor.index);
         if (!parked) await this.applyEntryRoutes(card, step, repos, 0);
         await repos.task.save(card);

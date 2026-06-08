@@ -15,14 +15,10 @@ interface ActionCursor {
   index: number;
 }
 
-// Runs a step's on-enter actions when a card enters it. Each action is best-effort
-// (a single failure is logged and skipped, never breaking the card flow). The
-// "delay" action is special: it parks the card (snooze), saves a cursor to the next
-// action, and returns true so the caller leaves the card resting on the step. When the
-// snooze wakes, processSnoozed calls execute again from the saved cursor (drip support).
+// Runs a step's on-enter actions (best-effort). A "delay" parks the card and saves a
+// cursor so processSnoozed can resume the rest after the wait (drip support).
 export class StepActionHelper {
-  // Returns true when the card is parked (a delay), false when the sequence finished.
-  // startIndex resumes a drip after a delay woke; 0 runs the whole list.
+  // Returns true when parked (a delay); startIndex resumes after a wake.
   public static async execute(task: Task, step: WorkflowStep, repos: Repos, startIndex = 0): Promise<boolean> {
     const actions = (await repos.workflowStepAction.loadForStep(task.churchId || "", step.id || "")) as WorkflowStepAction[];
     for (let i = startIndex; i < actions.length; i++) {
@@ -69,8 +65,7 @@ export class StepActionHelper {
     return false;
   }
 
-  // The action cursor (where a drip paused at a delay) lives in the card's data JSON
-  // alongside history, so a woken card can resume the remaining on-enter actions.
+  // The drip cursor lives in task.data alongside history so a woken card can resume.
   public static readActionCursor(task: Task): ActionCursor | null {
     const data = this.parseData(task);
     const c = data.actionCursor;
