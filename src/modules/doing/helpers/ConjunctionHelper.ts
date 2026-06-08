@@ -1,18 +1,20 @@
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
-import { Automation, Condition, Conjunction } from "../models/index.js";
+import { Condition, Conjunction } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { ConditionHelper } from "./ConditionHelper.js";
 
 export class ConjunctionHelper {
-  public static async getPeopleIds(automation: Automation, repositories?: Repos) {
+  // Ids of people matching a scheduled rule's condition tree (["*"] = everyone, [] = none).
+  public static async getPeopleIdsForTrigger(churchId: string, triggerId: string, repositories?: Repos) {
     const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
-    const conjunctions = await repos.conjunction.loadForAutomation(automation.churchId || "", automation.id || "");
-    let conditions = (await repos.condition.loadForAutomation(automation.churchId || "", automation.id || "")) as Condition[];
+    const conjunctions = (await repos.conjunction.loadForTrigger(churchId, triggerId)) as Conjunction[];
+    if (!conjunctions || conjunctions.length === 0) return [];
+    let conditions = (await repos.condition.loadForTrigger(churchId, triggerId)) as Condition[];
     conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions);
-    const tree = this.buildTree(conjunctions as Conjunction[], conditions);
-    const peopleIds = this.getPeopleFromTree(tree);
-    return peopleIds;
+    const tree = this.buildTree(conjunctions, conditions);
+    if (!tree) return [];
+    return this.getPeopleFromTree(tree);
   }
 
   // Ids of people matching a step route's condition tree (["*"] = everyone, [] = none).

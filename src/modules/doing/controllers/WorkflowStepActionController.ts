@@ -1,38 +1,37 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { Action } from "../models/index.js";
+import { WorkflowStepAction } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 
-@controller("/doing/actions")
-export class ActionController extends DoingBaseController {
-  @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+@controller("/doing/workflowStepActions")
+export class WorkflowStepActionController extends DoingBaseController {
+  @httpGet("/step/:stepId")
+  public async getForStep(@requestParam("stepId") stepId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
-      return await this.repos.action.load(au.churchId, id);
+      return await this.repos.workflowStepAction.loadForStep(au.churchId, stepId);
     });
   }
 
-  @httpGet("/automation/:id")
-  public async getForAutomation(@requestParam("id") automationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  @httpGet("/workflow/:workflowId")
+  public async getForWorkflow(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
-      return await this.repos.action.loadForAutomation(au.churchId, automationId);
+      return await this.repos.workflowStepAction.loadForWorkflow(au.churchId, workflowId);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Action[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, WorkflowStepAction[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
-      const promises: Promise<Action>[] = [];
+      const promises: Promise<WorkflowStepAction>[] = [];
       req.body.forEach((action) => {
         action.churchId = au.churchId;
-        promises.push(this.repos.action.save(action));
+        promises.push(this.repos.workflowStepAction.save(action));
       });
-      const result = await Promise.all(promises);
-      return result;
+      return await Promise.all(promises);
     });
   }
 
@@ -40,7 +39,7 @@ export class ActionController extends DoingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
-      await this.repos.action.delete(au.churchId, id);
+      await this.repos.workflowStepAction.delete(au.churchId, id);
       return {};
     });
   }

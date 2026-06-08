@@ -32,9 +32,9 @@ export class ConditionRepo {
     return getDb().selectFrom("conditions").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  public async loadForAutomation(churchId: string, automationId: string) {
+  public async loadForTrigger(churchId: string, triggerId: string) {
     return getDb().selectFrom("conditions").selectAll()
-      .where("conjunctionId", "in", getDb().selectFrom("conjunctions").select("id").where("automationId", "=", automationId))
+      .where("conjunctionId", "in", getDb().selectFrom("conjunctions").select("id").where("triggerId", "=", triggerId))
       .where("churchId", "=", churchId)
       .execute();
   }

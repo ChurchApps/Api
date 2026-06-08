@@ -113,9 +113,9 @@ export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Con
     const unsnoozedCount = await WorkflowHelper.processSnoozed(doingRepos);
     console.log(`[handleScheduledTasks] overdue=${overdueCount} unsnoozed=${unsnoozedCount}`);
 
-    // Recurring automations + workflow triggers (scheduled fallback for event-driven adds).
-    const { AutomationHelper: DoingAutomationHelper } = await import("../modules/doing/helpers/AutomationHelper.js");
-    await DoingAutomationHelper.checkAll(doingRepos);
+    // Recurring scheduled rules (pull path of the unified RuleEngine).
+    const { RuleEngine } = await import("../modules/doing/helpers/RuleEngine.js");
+    await RuleEngine.runScheduled(doingRepos);
 
     console.log("Scheduled tasks completed");
   } catch (error) {

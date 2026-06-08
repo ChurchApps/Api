@@ -15,7 +15,9 @@ export class WorkflowTriggerRepo {
       id: model.id,
       churchId: model.churchId,
       name: model.name,
-      eventType: model.eventType,
+      triggerKind: model.triggerKind || "event",
+      eventType: model.eventType || null,
+      recurs: model.recurs || null,
       workflowId: model.workflowId,
       stepId: model.stepId || null,
       conditions: model.conditions || null,
@@ -28,7 +30,9 @@ export class WorkflowTriggerRepo {
   private async update(model: WorkflowTrigger): Promise<WorkflowTrigger> {
     await getDb().updateTable("workflowTriggers").set({
       name: model.name,
-      eventType: model.eventType,
+      triggerKind: model.triggerKind || "event",
+      eventType: model.eventType || null,
+      recurs: model.recurs || null,
       workflowId: model.workflowId,
       stepId: model.stepId || null,
       conditions: model.conditions || null,
@@ -57,6 +61,7 @@ export class WorkflowTriggerRepo {
   public async loadByEventType(churchId: string, eventType: string) {
     return getDb().selectFrom("workflowTriggers").selectAll()
       .where("churchId", "=", churchId)
+      .where("triggerKind", "=", "event")
       .where("eventType", "=", eventType)
       .where("active", "=", true as any)
       .execute();
@@ -68,8 +73,17 @@ export class WorkflowTriggerRepo {
       .select("eventType")
       .distinct()
       .where("churchId", "=", churchId)
+      .where("triggerKind", "=", "event")
       .where("active", "=", true as any)
       .execute();
     return rows.map((r: any) => r.eventType).filter(Boolean);
+  }
+
+  // Scheduled rules across all churches — the pull path run by the cron/timer.
+  public async loadScheduledAllChurches() {
+    return getDb().selectFrom("workflowTriggers").selectAll()
+      .where("triggerKind", "=", "schedule")
+      .where("active", "=", true as any)
+      .execute();
   }
 }

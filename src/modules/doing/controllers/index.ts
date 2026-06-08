@@ -1,6 +1,4 @@
-export { ActionController } from "./ActionController.js";
 export { AssignmentController } from "./AssignmentController.js";
-export { AutomationController } from "./AutomationController.js";
 export { BlockoutDateController } from "./BlockoutDateController.js";
 export { ConditionController } from "./ConditionController.js";
 export { ConjunctionController } from "./ConjunctionController.js";
@@ -17,6 +15,7 @@ export { TaskController } from "./TaskController.js";
 export { TimeController } from "./TimeController.js";
 export { WorkflowController } from "./WorkflowController.js";
 export { WorkflowStepController } from "./WorkflowStepController.js";
+export { WorkflowStepActionController } from "./WorkflowStepActionController.js";
 export { WorkflowStepRouteController } from "./WorkflowStepRouteController.js";
 export { WorkflowCategoryController } from "./WorkflowCategoryController.js";
 export { WorkflowTriggerController } from "./WorkflowTriggerController.js";

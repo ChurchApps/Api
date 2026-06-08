@@ -1,6 +1,4 @@
-export { ActionRepo } from "./ActionRepo.js";
 export { AssignmentRepo } from "./AssignmentRepo.js";
-export { AutomationRepo } from "./AutomationRepo.js";
 export { BlockoutDateRepo } from "./BlockoutDateRepo.js";
 export { ConditionRepo } from "./ConditionRepo.js";
 export { ConjunctionRepo } from "./ConjunctionRepo.js";
@@ -14,6 +12,7 @@ export { TaskRepo } from "./TaskRepo.js";
 export { TimeRepo } from "./TimeRepo.js";
 export { WorkflowRepo } from "./WorkflowRepo.js";
 export { WorkflowStepRepo } from "./WorkflowStepRepo.js";
+export { WorkflowStepActionRepo } from "./WorkflowStepActionRepo.js";
 export { WorkflowStepRouteRepo } from "./WorkflowStepRouteRepo.js";
 export { WorkflowCategoryRepo } from "./WorkflowCategoryRepo.js";
 export { WorkflowTriggerRepo } from "./WorkflowTriggerRepo.js";

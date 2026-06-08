@@ -34,13 +34,14 @@ export class TaskController extends DoingBaseController {
   public async getBoard(@requestParam("workflowId") workflowId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
-      const [workflow, steps, cards, routes] = await Promise.all([
+      const [workflow, steps, cards, routes, actions] = await Promise.all([
         this.repos.workflow.load(au.churchId, workflowId),
         this.repos.workflowStep.loadForWorkflow(au.churchId, workflowId),
         this.repos.task.loadByWorkflow(au.churchId, workflowId, "Open"),
-        this.repos.workflowStepRoute.loadForWorkflow(au.churchId, workflowId)
+        this.repos.workflowStepRoute.loadForWorkflow(au.churchId, workflowId),
+        this.repos.workflowStepAction.loadForWorkflow(au.churchId, workflowId)
       ]);
-      return { workflow, steps, cards, routes };
+      return { workflow, steps, cards, routes, actions };
     });
   }
 
