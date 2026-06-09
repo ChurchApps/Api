@@ -31,7 +31,8 @@ export class AttendanceRepo {
   public async loadByCampusId(churchId: string, campusId: string, startDate: Date, endDate: Date) {
     const start = DateHelper.toMysqlDate(startDate);
     const end = DateHelper.toMysqlDate(endDate);
-    const rows = await sql<any>`SELECT v.*, c.id as campusId, c.name as campusName FROM visits v INNER JOIN services ser on ser.id = v.serviceId INNER JOIN campuses c on c.id = ser.campusId WHERE v.churchId=${churchId} AND ser.campusId=${campusId} AND v.visitDate BETWEEN ${start} AND ${end}`.execute(getDb());
+
+    const rows = await sql<any>`SELECT v.*, ser.campusId as campusId, c.name as campusName FROM visits v INNER JOIN services ser on ser.id = v.serviceId LEFT JOIN campuses c on c.id = ser.campusId AND IFNULL(c.removed, 0)=0 WHERE v.churchId=${churchId} AND ser.campusId=${campusId} AND v.visitDate BETWEEN ${start} AND ${end}`.execute(getDb());
     return rows.rows;
   }
 

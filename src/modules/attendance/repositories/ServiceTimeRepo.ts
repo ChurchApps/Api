@@ -45,12 +45,12 @@ export class ServiceTimeRepo {
   }
 
   public async loadNamesWithCampusService(churchId: string) {
-    const rows = await sql<any>`SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName FROM serviceTimes st INNER JOIN services s on s.Id=st.serviceId INNER JOIN campuses c on c.Id=s.campusId WHERE s.churchId=${churchId} AND st.removed=0 AND s.removed=0 AND c.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
+    const rows = await sql<any>`SELECT st.*, concat_ws(' - ', c.name, s.name, st.name) as longName FROM serviceTimes st INNER JOIN services s on s.Id=st.serviceId LEFT JOIN campuses c on c.Id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND st.removed=0 AND s.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
     return rows.rows;
   }
 
   public async loadNamesByServiceId(churchId: string, serviceId: string) {
-    const rows = await sql<any>`SELECT st.*, concat(c.name, ' - ', s.name, ' - ', st.name) as longName FROM serviceTimes st INNER JOIN services s on s.id=st.serviceId INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=${churchId} AND s.id=${serviceId} AND st.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
+    const rows = await sql<any>`SELECT st.*, concat_ws(' - ', c.name, s.name, st.name) as longName FROM serviceTimes st INNER JOIN services s on s.id=st.serviceId LEFT JOIN campuses c on c.id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND s.id=${serviceId} AND st.removed=0 ORDER BY c.name, s.name, st.name`.execute(getDb());
     return rows.rows;
   }
 

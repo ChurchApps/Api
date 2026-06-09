@@ -45,7 +45,7 @@ export class ServiceRepo {
   }
 
   public async loadWithCampus(churchId: string) {
-    const rows = await sql<any>`SELECT s.*, c.name as campusName FROM services s INNER JOIN campuses c on c.id=s.campusId WHERE s.churchId=${churchId} AND s.removed=0 and c.removed=0 ORDER BY c.name, s.name`.execute(getDb());
+    const rows = await sql<any>`SELECT s.*, c.name as campusName FROM services s LEFT JOIN campuses c on c.id=s.campusId AND IFNULL(c.removed, 0)=0 WHERE s.churchId=${churchId} AND s.removed=0 ORDER BY c.name, s.name`.execute(getDb());
     return rows.rows;
   }
 
