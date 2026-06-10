@@ -27,7 +27,7 @@ export class UserHelper {
     });
   }
 
-  
+
   public static syncCrossModulePermissions(lucs: LoginUserChurch[]) {
     lucs.forEach((luc) => {
       const has = (keyName: string) => {
