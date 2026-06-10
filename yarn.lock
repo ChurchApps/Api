@@ -1097,15 +1097,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/apihelper@npm:^0.6.0":
-  version: 0.6.0
-  resolution: "@churchapps/apihelper@npm:0.6.0"
+"@churchapps/apihelper@npm:^0.7.0":
+  version: 0.7.0
+  resolution: "@churchapps/apihelper@npm:0.7.0"
   dependencies:
     "@aws-sdk/client-s3": "npm:^3.862.0"
     "@aws-sdk/client-ses": "npm:^3.862.0"
     "@aws-sdk/client-ssm": "npm:^3.862.0"
     "@aws-sdk/s3-presigned-post": "npm:^3.862.0"
-    "@churchapps/helpers": "npm:1.5.0"
     dotenv: "npm:^17.2.1"
     express: "npm:^4.21.2"
     inversify: "npm:^6.2.2"
@@ -1115,20 +1114,22 @@ __metadata:
     nodemailer: "npm:^7.0.5"
     winston: "npm:^3.17.0"
     winston-cloudwatch: "npm:^6.3.0"
-  checksum: 10c0/6a82b5d0c903308b4b14fe866785bfed52cecf6e91759b078b4b13687b093371aec6acf3267e8e6e8b46112354e512c63951f3233b17cd25f762d0c1ccb27e38
+  peerDependencies:
+    "@churchapps/helpers": ^1.5.5
+  checksum: 10c0/e2339f3b0966a5e8a5e81635d98ed9458f718b9547fc70e9da3231f99b9b9fc234566e7093cbebcd7f4dea41ac2b5cb74b655217532c55b706bbaa32bebb83c7
   languageName: node
   linkType: hard
 
-"@churchapps/content-providers@npm:^0.3.0":
-  version: 0.3.0
-  resolution: "@churchapps/content-providers@npm:0.3.0"
-  checksum: 10c0/6ac1e992929e5b8a657e9231ab34839d962603ebfc86dda166e8971624fdabe0e0afd011f9a1f447c8df2f9dc35ff82a6aeaa7daf35c2224c28ce5c37fca224e
+"@churchapps/content-providers@npm:^0.3.1":
+  version: 0.3.1
+  resolution: "@churchapps/content-providers@npm:0.3.1"
+  checksum: 10c0/9fe16677d57fd443efb92d5c28eba9d6ddd4d31c0ea0349e4cb45e046be1369d7470592dc8e2b49444e16d87f7b57b94a696ead0e3ac47012fdfb6b0295a3128
   languageName: node
   linkType: hard
 
-"@churchapps/helpers@npm:1.5.0":
-  version: 1.5.0
-  resolution: "@churchapps/helpers@npm:1.5.0"
+"@churchapps/helpers@npm:^1.6.1":
+  version: 1.6.1
+  resolution: "@churchapps/helpers@npm:1.6.1"
   dependencies:
     dayjs: "npm:^1.11.20"
   peerDependencies:
@@ -1136,16 +1137,16 @@ __metadata:
   peerDependenciesMeta:
     rrule:
       optional: true
-  checksum: 10c0/4d6975dbe7c2bd4bdc244c61f11be1322051ef2d5ffb9e84870c473e0448561b8d786c927ce6946ac3c527ac482c2c2b32e62cad7ed7890e816d6a01b23ac8c0
+  checksum: 10c0/b2a90eacd94ee369947c477f79f8d38bfc4ff4c8fd82ad7a0e2fbddcb36e5e4f3722e47069bfd7a61be0cd31358cdb594fdaca8e3af260560f108c5cbae02184
   languageName: node
   linkType: hard
 
-"@churchapps/texting@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "@churchapps/texting@npm:0.2.0"
+"@churchapps/texting@npm:^0.2.1":
+  version: 0.2.1
+  resolution: "@churchapps/texting@npm:0.2.1"
   dependencies:
     axios: "npm:^1.11.0"
-  checksum: 10c0/84b5a37db6d6dc9b1919e64176b9b1d53ec3959669a983925c66591df78df7c4d9d302ada9b3171babd4c440de5e8c0f8c14b4b5211d87b0e95efade2ba7784b
+  checksum: 10c0/33d5595f836396dfef4e2ba0a769e15720c6b28514ee5772916f145a4d13c708b3712f6eab55fa2e093cdaeef52964b04ab6b6e4860e81bef18ddd38abc4d17e
   languageName: node
   linkType: hard
 
@@ -3557,9 +3558,10 @@ __metadata:
     "@aws-sdk/client-ses": "npm:^3.862.0"
     "@aws-sdk/client-ssm": "npm:^3.862.0"
     "@aws-sdk/lib-storage": "npm:^3.862.0"
-    "@churchapps/apihelper": "npm:^0.6.0"
-    "@churchapps/content-providers": "npm:^0.3.0"
-    "@churchapps/texting": "npm:^0.2.0"
+    "@churchapps/apihelper": "npm:^0.7.0"
+    "@churchapps/content-providers": "npm:^0.3.1"
+    "@churchapps/helpers": "npm:^1.6.1"
+    "@churchapps/texting": "npm:^0.2.1"
     "@codegenie/serverless-express": "npm:^4.15.0"
     "@hubspot/api-client": "npm:^13.1.0"
     "@modelcontextprotocol/sdk": "npm:^1.29.0"

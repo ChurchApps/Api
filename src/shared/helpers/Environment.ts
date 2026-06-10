@@ -1,11 +1,5 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { EnvironmentBase } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export class Environment extends EnvironmentBase {
   // Current environment and server configuration
@@ -88,31 +82,7 @@ export class Environment extends EnvironmentBase {
 
   static async init(environment: string) {
     environment = environment.toLowerCase();
-    let file = "dev.json";
-    if (environment === "demo") file = "demo.json";
-    if (environment === "staging") file = "staging.json";
-    if (environment === "prod") file = "prod.json";
-    if (environment === "railway") file = "railway.json";
-
-    // In Lambda, __dirname is /var/task/dist/src/shared/helpers
-    // Config files are at /var/task/config
-    let physicalPath: string;
-
-    // Check if we're in actual Lambda (not serverless-local)
-    const isActualLambda = process.env.AWS_LAMBDA_FUNCTION_NAME && __dirname.startsWith("/var/task");
-
-    if (isActualLambda) {
-      // In Lambda, config is at root level
-      physicalPath = path.resolve("/var/task/config", file);
-    } else {
-      // In local development, resolve from the project root
-      const projectRoot = path.resolve(__dirname, "../../../");
-      physicalPath = path.resolve(projectRoot, "config", file);
-    }
-
-    const json = fs.readFileSync(physicalPath, "utf8");
-    const data = JSON.parse(json);
-    await this.populateBase(data, "API", environment);
+    const data = await this.initBase(environment, { appName: "API", fileMap: { railway: "railway.json" } });
 
     // Set current environment and server config
     this.currentEnvironment = environment;
