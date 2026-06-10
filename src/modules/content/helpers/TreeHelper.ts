@@ -124,6 +124,51 @@ export class TreeHelper {
     return result;
   }
 
+  // Replaces a page's (or block's) entire content with a snapshot tree, assigning new ids.
+  static async deleteAndRestoreContent(churchId: string, pageId: string, blockId: string, snapshot: any) {
+    const repos = await RepoManager.getRepos<Repos>("content");
+    let existingSections: Section[] = [];
+    if (pageId) existingSections = await repos.section.loadForPage(churchId, pageId);
+    else if (blockId) existingSections = await repos.section.loadForBlock(churchId, blockId);
+
+    for (const section of existingSections) {
+      const elements = await repos.element.loadForSection(churchId, section.id);
+      for (const element of elements) await repos.element.delete(churchId, element.id);
+      await repos.section.delete(churchId, section.id);
+    }
+
+    for (const sectionData of snapshot.sections || []) {
+      const section: Section = { ...sectionData, id: undefined, churchId };
+      delete (section as any).elements;
+      const savedSection = await repos.section.insert(section);
+      for (const elementData of sectionData.elements || []) {
+        await this.restoreElement(churchId, savedSection.id, elementData, {});
+      }
+    }
+  }
+
+  private static async restoreElement(churchId: string, sectionId: string, elementData: any, idMap: Record<string, string>) {
+    const repos = await RepoManager.getRepos<Repos>("content");
+    const oldId = elementData.id;
+    const element: Element = {
+      ...elementData,
+      id: undefined,
+      sectionId,
+      churchId,
+      parentId: elementData.parentId ? (idMap[elementData.parentId] || elementData.parentId) : null
+    };
+    const childElements = element.elements;
+    delete element.elements;
+    const savedElement = await repos.element.insert(element);
+    idMap[oldId] = savedElement.id;
+
+    if (childElements && childElements.length > 0) {
+      for (const child of childElements) {
+        await this.restoreElement(churchId, sectionId, child, idMap);
+      }
+    }
+  }
+
   static async duplicateElement(element: Element, sectionId: string, parentId: string, blockId?: string) {
     const repos = await RepoManager.getRepos<Repos>("content");
     const el = { ...element };

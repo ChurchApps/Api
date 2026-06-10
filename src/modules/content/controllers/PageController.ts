@@ -19,16 +19,83 @@ export class PageController2 extends ContentBaseController {
 
       let result: Page = {};
       if (page?.id !== undefined) {
-        const sections = await this.repos.section.loadForPage(churchId, page.id);
-        const allElements: Element[] = await this.repos.element.loadForPage(churchId, page.id);
-        TreeHelper.populateAnswers(allElements);
-        TreeHelper.populateAnswers(sections);
         result = page;
-        result.sections = TreeHelper.buildTree(sections, allElements);
-        await TreeHelper.insertBlocks(result.sections, allElements, churchId);
+        // Public (url-based) requests serve the published snapshot when one exists; the
+        // editor's id-based requests always see the working tree.
+        const snapshot = url && page.publishedAt ? await this.loadPublishedSnapshot(churchId, page.id) : null;
+        if (snapshot) {
+          result.sections = snapshot.sections || [];
+          const allElements = this.flattenTreeElements(result.sections);
+          TreeHelper.populateAnswers(allElements);
+          TreeHelper.populateAnswers(result.sections);
+          await TreeHelper.insertBlocks(result.sections, allElements, churchId);
+        } else {
+          const sections = await this.repos.section.loadForPage(churchId, page.id);
+          const allElements: Element[] = await this.repos.element.loadForPage(churchId, page.id);
+          TreeHelper.populateAnswers(allElements);
+          TreeHelper.populateAnswers(sections);
+          result.sections = TreeHelper.buildTree(sections, allElements);
+          await TreeHelper.insertBlocks(result.sections, allElements, churchId);
+        }
         if (url) this.removeTreeFields(result);
       }
       return result;
+    });
+  }
+
+  private async loadPublishedSnapshot(churchId: string, pageId: string): Promise<{ sections: Section[] } | null> {
+    const published = await this.repos.page.loadPublished(churchId, pageId);
+    if (!published?.publishedJSON) return null;
+    try {
+      return JSON.parse(published.publishedJSON);
+    } catch {
+      return null;
+    }
+  }
+
+  private flattenTreeElements(sections: Section[]): Element[] {
+    const result: Element[] = [];
+    const collect = (elements?: Element[]) => {
+      elements?.forEach((e) => {
+        result.push(e);
+        collect(e.elements);
+      });
+    };
+    sections?.forEach((s) => collect(s.elements));
+    return result;
+  }
+
+  @httpPost("/:id/publish")
+  public async publish(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const page = await this.repos.page.load(au.churchId, id);
+      if (!page) return this.json({}, 404);
+      const sections = await this.repos.section.loadForPage(au.churchId, page.id);
+      const allElements: Element[] = await this.repos.element.loadForPage(au.churchId, page.id);
+      const tree = TreeHelper.buildTree(sections, allElements);
+      const publishedAt = await this.repos.page.savePublished(au.churchId, page.id, JSON.stringify({ sections: tree }));
+      return { publishedAt };
+    });
+  }
+
+  @httpPost("/:id/discard")
+  public async discard(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const snapshot = await this.loadPublishedSnapshot(au.churchId, id);
+      if (!snapshot) return this.json({ error: "Page has no published version" }, 400);
+      await TreeHelper.deleteAndRestoreContent(au.churchId, id, null, snapshot);
+      return { success: true };
+    });
+  }
+
+  @httpDelete("/:id/published")
+  public async unpublish(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      await this.repos.page.savePublished(au.churchId, id, null);
+      return this.json({});
     });
   }
 

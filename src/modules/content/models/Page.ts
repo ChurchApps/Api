@@ -6,6 +6,8 @@ export class Page {
   public url?: string;
   public title?: string;
   public layout?: string;
+  public publishedJSON?: string;
+  public publishedAt?: Date;
 
   public sections?: Section[];
 }

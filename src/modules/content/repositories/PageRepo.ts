@@ -34,16 +34,29 @@ export class PageRepo {
     await getDb().deleteFrom("pages").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
+  // publishedJSON (a full page snapshot) is intentionally excluded from loads; use loadPublished.
+  private static readonly summaryColumns = ["id", "churchId", "url", "title", "layout", "publishedAt"] as const;
+
   public async load(churchId: string, id: string): Promise<Page | undefined> {
-    return (await getDb().selectFrom("pages").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+    return (await getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(churchId: string): Promise<Page[]> {
-    return getDb().selectFrom("pages").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("churchId", "=", churchId).execute() as any;
   }
 
   public async loadByUrl(churchId: string, url: string) {
-    return (await getDb().selectFrom("pages").selectAll().where("url", "=", url).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+    return (await getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("url", "=", url).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  public async loadPublished(churchId: string, id: string): Promise<Page | undefined> {
+    return (await getDb().selectFrom("pages").select(["id", "publishedJSON", "publishedAt"]).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) as any ?? null;
+  }
+
+  public async savePublished(churchId: string, id: string, publishedJSON: string | null): Promise<Date | null> {
+    const publishedAt = publishedJSON ? new Date() : null;
+    await getDb().updateTable("pages").set({ publishedJSON, publishedAt }).where("id", "=", id).where("churchId", "=", churchId).execute();
+    return publishedAt;
   }
 
   public convertToModel(_churchId: string, data: any) { return data as Page; }
@@ -55,7 +68,8 @@ export class PageRepo {
       churchId: row.churchId,
       url: row.url,
       title: row.title,
-      layout: row.layout
+      layout: row.layout,
+      publishedAt: row.publishedAt
     };
   }
 }

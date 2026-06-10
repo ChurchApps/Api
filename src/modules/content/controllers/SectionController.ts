@@ -1,9 +1,10 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
-import { Section } from "../models/index.js";
+import { Element, Section } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { TreeHelper } from "../helpers/TreeHelper.js";
+import * as churchappsHelpers from "@churchapps/helpers";
 
 @controller("/content/sections")
 export class SectionController extends ContentBaseController {
@@ -55,6 +56,60 @@ export class SectionController extends ContentBaseController {
         return result;
       }
     });
+  }
+
+  // Creates a section plus its full nested element tree in one call (section templates, AI generation).
+  @httpPost("/tree")
+  public async saveTree(req: express.Request<{}, {}, { section: Section }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const section = req.body?.section;
+      if (!section || (!section.pageId && !section.blockId)) return this.json({ errors: ["section with a pageId or blockId is required"] }, 400);
+      const errors = this.validateJson([section]);
+      this.collectElements(section.elements).forEach((element, index) => {
+        this.validateElement(element, index).forEach((e) => errors.push(e));
+      });
+      if (errors.length > 0) return this.json({ errors }, 400);
+      this.prepareTree(section, au.churchId);
+      const result = await TreeHelper.duplicateSection(section);
+      if (section.blockId) await this.repos.section.updateSortForBlock(au.churchId, section.blockId);
+      else await this.repos.section.updateSort(au.churchId, section.pageId, section.zone);
+      return result;
+    });
+  }
+
+  private collectElements(elements: Element[], result: Element[] = []): Element[] {
+    elements?.forEach((e) => {
+      result.push(e);
+      this.collectElements(e.elements, result);
+    });
+    return result;
+  }
+
+  private validateElement(element: Element, index: number): string[] {
+    const errors: string[] = [];
+    const validate = (churchappsHelpers as any).validateElementAnswers;
+    ["answersJSON", "stylesJSON", "animationsJSON"].forEach((field) => {
+      const value = (element as any)[field];
+      if (!value) return;
+      try { JSON.parse(value); } catch { errors.push("elements[" + index + "]: " + field + " is not valid JSON"); }
+    });
+    if (errors.length === 0 && element.answersJSON && typeof validate === "function" && element.elementType) {
+      validate(element.elementType, JSON.parse(element.answersJSON)).forEach((e: string) => errors.push("elements[" + index + "]: " + e));
+    }
+    return errors;
+  }
+
+  private prepareTree(section: Section, churchId: string) {
+    section.id = undefined;
+    section.churchId = churchId;
+    const prepareElement = (element: Element) => {
+      element.id = undefined;
+      element.churchId = churchId;
+      element.blockId = section.blockId || undefined;
+      element.elements?.forEach(prepareElement);
+    };
+    section.elements?.forEach(prepareElement);
   }
 
   // Unparseable JSON here breaks every subsequent tree load for the page.

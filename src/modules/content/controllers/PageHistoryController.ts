@@ -1,8 +1,9 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
-import { PageHistory, Section, Element } from "../models/index.js";
+import { PageHistory } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
+import { TreeHelper } from "../helpers/TreeHelper.js";
 
 @controller("/content/pageHistory")
 export class PageHistoryController extends ContentBaseController {
@@ -64,7 +65,7 @@ export class PageHistoryController extends ContentBaseController {
       const snapshot = JSON.parse(history.snapshotJSON);
 
       // Delete existing sections and elements, then restore from snapshot
-      await this.deleteAndRestoreContent(au.churchId, history.pageId, history.blockId, snapshot);
+      await TreeHelper.deleteAndRestoreContent(au.churchId, history.pageId, history.blockId, snapshot);
 
       return { success: true, snapshot };
     });
@@ -79,69 +80,9 @@ export class PageHistoryController extends ContentBaseController {
       if (!snapshot || !snapshot.sections) return this.json({ error: "Invalid snapshot" }, 400);
 
       // Delete existing sections and elements, then restore from snapshot
-      await this.deleteAndRestoreContent(au.churchId, pageId, blockId, snapshot);
+      await TreeHelper.deleteAndRestoreContent(au.churchId, pageId, blockId, snapshot);
 
       return { success: true };
     });
-  }
-
-  private async deleteAndRestoreContent(churchId: string, pageId: string, blockId: string, snapshot: any) {
-    // Delete existing sections and elements for this page/block
-    let existingSections: Section[] = [];
-    if (pageId) {
-      existingSections = await this.repos.section.loadForPage(churchId, pageId);
-    } else if (blockId) {
-      existingSections = await this.repos.section.loadForBlock(churchId, blockId);
-    }
-
-    for (const section of existingSections) {
-      // Delete all elements in this section
-      const elements = await this.repos.element.loadForSection(churchId, section.id);
-      for (const element of elements) {
-        await this.repos.element.delete(churchId, element.id);
-      }
-      // Delete the section
-      await this.repos.section.delete(churchId, section.id);
-    }
-
-    // Now restore sections and elements from snapshot with NEW IDs
-    for (const sectionData of snapshot.sections || []) {
-      const section: Section = {
-        ...sectionData,
-        id: undefined,
-        churchId
-      };
-      delete (section as any).elements;
-      const savedSection = await this.repos.section.insert(section);
-
-      // Restore elements for this section with new IDs
-      for (const elementData of sectionData.elements || []) {
-        await this.restoreElement(churchId, savedSection.id, elementData, {});
-      }
-    }
-  }
-
-  private async restoreElement(churchId: string, sectionId: string, elementData: any, idMap: Record<string, string>) {
-    const oldId = elementData.id;
-
-    const element: Element = {
-      ...elementData,
-      id: undefined,
-      sectionId,
-      churchId,
-      // Update parentId if it was remapped
-      parentId: elementData.parentId ? (idMap[elementData.parentId] || elementData.parentId) : null
-    };
-    const childElements = element.elements;
-    delete element.elements;
-    const savedElement = await this.repos.element.insert(element);
-    idMap[oldId] = savedElement.id;
-
-    // Restore child elements recursively
-    if (childElements && childElements.length > 0) {
-      for (const child of childElements) {
-        await this.restoreElement(churchId, sectionId, child, idMap);
-      }
-    }
   }
 }
