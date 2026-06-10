@@ -91,3 +91,5 @@ layers/
 *.key
 *.crt
 .env
+
+playground-app/.yarn/
