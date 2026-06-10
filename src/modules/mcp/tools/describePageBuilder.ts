@@ -76,7 +76,7 @@ You'll need the user's \`churchId\` for the tree endpoint. Get it from \`GET /me
 - \`iframe\` — \`{ iframeSrc:"https://...", iframeHeight:"600" }\`.
 
 ### Reusable
-- \`block\` — References an existing reusable block. \`{ blockId:"<id of a Block>" }\`.
+- \`block\` — References an existing reusable block. \`{ targetBlockId:"<id of a Block>" }\`.
 
 ## Auto-creation gotchas
 

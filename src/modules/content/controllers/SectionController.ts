@@ -39,6 +39,8 @@ export class SectionController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
+        const validationErrors = this.validateJson(req.body);
+        if (validationErrors.length > 0) return this.json({ errors: validationErrors }, 400);
         const promises: Promise<Section>[] = [];
         req.body.forEach((section) => {
           section.churchId = au.churchId;
@@ -53,6 +55,19 @@ export class SectionController extends ContentBaseController {
         return result;
       }
     });
+  }
+
+  // Unparseable JSON here breaks every subsequent tree load for the page.
+  private validateJson(sections: Section[]): string[] {
+    const errors: string[] = [];
+    sections.forEach((section, index) => {
+      ["answersJSON", "stylesJSON", "animationsJSON"].forEach((field) => {
+        const value = (section as any)[field];
+        if (!value) return;
+        try { JSON.parse(value); } catch { errors.push("sections[" + index + "]: " + field + " is not valid JSON"); }
+      });
+    });
+    return errors;
   }
 
   @httpDelete("/:id")

@@ -32,6 +32,14 @@ export class PageController2 extends ContentBaseController {
     });
   }
 
+  @httpGet("/public/:churchId")
+  public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const pages: Page[] = await this.repos.page.loadAll(churchId);
+      return pages.map((p) => ({ url: p.url, title: p.title }));
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -5,6 +5,7 @@ import { Element } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TreeHelper } from "../helpers/TreeHelper.js";
+import * as churchappsHelpers from "@churchapps/helpers";
 
 @controller("/content/elements")
 export class ElementController extends ContentBaseController {
@@ -35,6 +36,8 @@ export class ElementController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
+        const validationErrors = this.validateAnswers(req.body);
+        if (validationErrors.length > 0) return this.json({ errors: validationErrors }, 400);
         const promises: Promise<Element>[] = [];
         req.body.forEach((element) => {
           element.churchId = au.churchId;
@@ -50,6 +53,32 @@ export class ElementController extends ContentBaseController {
         return result;
       }
     });
+  }
+
+  // Rejects unparseable answersJSON (it would break tree loads) and, once the installed
+  // @churchapps/helpers ships validateElementAnswers (>=1.7), type-level schema violations.
+  private validateAnswers(elements: Element[]): string[] {
+    const validate = (churchappsHelpers as any).validateElementAnswers;
+    const errors: string[] = [];
+    elements.forEach((element, index) => {
+      ["stylesJSON", "animationsJSON"].forEach((field) => {
+        const value = (element as any)[field];
+        if (!value) return;
+        try { JSON.parse(value); } catch { errors.push("elements[" + index + "]: " + field + " is not valid JSON"); }
+      });
+      if (!element.answersJSON) return;
+      let answers: unknown;
+      try {
+        answers = JSON.parse(element.answersJSON);
+      } catch {
+        errors.push("elements[" + index + "]: answersJSON is not valid JSON");
+        return;
+      }
+      if (typeof validate === "function" && element.elementType) {
+        validate(element.elementType, answers).forEach((e: string) => errors.push("elements[" + index + "]: " + e));
+      }
+    });
+    return errors;
   }
 
   @httpDelete("/:id")
@@ -104,18 +133,22 @@ export class ElementController extends ContentBaseController {
     }
   }
 
+  // Tolerates comma strings, arrays (older saves round-tripped `[]` back into answersJSON), and missing values.
+  private parseNumberList(value: any): number[] {
+    if (typeof value === "string" && value.length > 0) return value.split(",").map((c: string) => parseInt(c, 0)).filter((n: number) => !isNaN(n));
+    if (Array.isArray(value)) return value.map((c: any) => parseInt(c, 0)).filter((n: number) => !isNaN(n));
+    return [];
+  }
+
   private async checkRows(elements: Element[]) {
     for (const element of elements) {
       if (element.elementType === "row") {
         element.answers = JSON.parse(element.answersJSON);
-        const cols: number[] = [];
-        element.answers.columns.split(",").forEach((c: string) => cols.push(parseInt(c, 0)));
-        const mobileSizes: number[] = [];
-        element.answers.mobileSizes?.split(",").forEach((c: string) => mobileSizes.push(parseInt(c, 0)));
-        if (mobileSizes.length !== cols.length) element.answers.mobileSizes = [];
-        const mobileOrder: number[] = [];
-        element.answers.mobileOrder?.split(",").forEach((c: string) => mobileOrder.push(parseInt(c, 0)));
-        if (mobileOrder.length !== cols.length) element.answers.mobileOrder = [];
+        const cols: number[] = this.parseNumberList(element.answers.columns);
+        let mobileSizes: number[] = this.parseNumberList(element.answers.mobileSizes);
+        if (mobileSizes.length !== cols.length) { mobileSizes = []; delete element.answers.mobileSizes; }
+        let mobileOrder: number[] = this.parseNumberList(element.answers.mobileOrder);
+        if (mobileOrder.length !== cols.length) { mobileOrder = []; delete element.answers.mobileOrder; }
 
         const allElements: Element[] = await this.repos.element.loadForSection(element.churchId, element.sectionId);
         const children = ArrayHelper.getAll(allElements, "parentId", element.id);
@@ -134,21 +167,21 @@ export class ElementController extends ContentBaseController {
     for (let i = 0; i < children.length && i < cols.length; i++) {
       children[i].answers = JSON.parse(children[i].answersJSON);
       let shouldSave = false;
-      if (children[i].answers.size !== cols[i] || children[i].sort !== i) {
+      if (children[i].answers.size !== cols[i] || children[i].sort !== i + 1) {
         children[i].answers.size = cols[i];
         children[i].sort = i + 1;
         shouldSave = true;
       }
-      if ((children[i].answers.mobileSize && mobileSizes.length < i) || (!children[i].answers.mobileSize && mobileSizes.length >= i) || children[i].answers.mobileSize !== mobileSizes[i]) {
-        if (!children[i].answers.mobileSize) children[i].answers.mobileSize = [];
-        if (mobileSizes.length < i) delete children[i].answers.mobileSize;
-        else children[i].answers.mobileSize = mobileSizes[i];
+      const desiredMobileSize = mobileSizes.length > i ? mobileSizes[i] : undefined;
+      if (children[i].answers.mobileSize !== desiredMobileSize) {
+        if (desiredMobileSize === undefined) delete children[i].answers.mobileSize;
+        else children[i].answers.mobileSize = desiredMobileSize;
         shouldSave = true;
       }
-      if ((children[i].answers.mobileOrder && mobileOrder.length < i) || (!children[i].answers.mobileOrder && mobileOrder.length >= i) || children[i].answers.mobileOrder !== mobileOrder[i]) {
-        if (!children[i].answers.mobileOrder) children[i].answers.mobileOrder = [];
-        if (mobileOrder.length < i) delete children[i].answers.mobileOrder;
-        else children[i].answers.mobileOrder = mobileOrder[i];
+      const desiredMobileOrder = mobileOrder.length > i ? mobileOrder[i] : undefined;
+      if (children[i].answers.mobileOrder !== desiredMobileOrder) {
+        if (desiredMobileOrder === undefined) delete children[i].answers.mobileOrder;
+        else children[i].answers.mobileOrder = desiredMobileOrder;
         shouldSave = true;
       }
       if (shouldSave) {
@@ -160,7 +193,9 @@ export class ElementController extends ContentBaseController {
     // Add new columns
     if (cols.length > children.length) {
       for (let i = children.length; i < cols.length; i++) {
-        const answers = { size: cols[i] };
+        const answers: any = { size: cols[i] };
+        if (mobileSizes.length > i) answers.mobileSize = mobileSizes[i];
+        if (mobileOrder.length > i) answers.mobileOrder = mobileOrder[i];
         const column: Element = {
           churchId: row.churchId,
           sectionId: row.sectionId,

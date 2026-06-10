@@ -318,8 +318,8 @@ BEGIN
 
     -- Pages
     INSERT INTO pages (id, churchId, url, title, layout) VALUES
-    ('PAG00000001', 'CHU00000001', '/', 'Home', 'default'),
-    ('PAG00000002', 'CHU00000001', '/ministries', 'Ministries', 'default');
+    ('PAG00000001', 'CHU00000001', '/', 'Home', 'headerFooter'),
+    ('PAG00000002', 'CHU00000001', '/ministries', 'Ministries', 'headerFooter');
 
     -- Sections (Home Page)
     INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES
