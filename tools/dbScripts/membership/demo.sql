@@ -580,20 +580,20 @@ INSERT INTO forms (id, churchId, name, contentType, createdTime, modifiedTime, r
 -- ========================================
 INSERT INTO questions (id, churchId, formId, parentId, title, description, fieldType, placeholder, sort, choices, removed, required) VALUES
 -- Visitor Information Card
-('QST00000001', 'CHU00000001', 'FRM00000001', NULL, 'First Name', NULL, 'textField', 'Enter first name', 1, NULL, b'0', b'1'),
-('QST00000002', 'CHU00000001', 'FRM00000001', NULL, 'Last Name', NULL, 'textField', 'Enter last name', 2, NULL, b'0', b'1'),
-('QST00000003', 'CHU00000001', 'FRM00000001', NULL, 'Email Address', NULL, 'textField', 'Enter email', 3, NULL, b'0', b'1'),
-('QST00000004', 'CHU00000001', 'FRM00000001', NULL, 'Phone Number', NULL, 'textField', 'Enter phone', 4, NULL, b'0', b'0'),
-('QST00000005', 'CHU00000001', 'FRM00000001', NULL, 'How did you hear about us?', NULL, 'dropdown', NULL, 5, 'Friend or Family,Online Search,Social Media,Drive By,Community Event,Other', b'0', b'0'),
+('QST00000001', 'CHU00000001', 'FRM00000001', NULL, 'First Name', NULL, 'Textbox', 'Enter first name', 1, NULL, b'0', b'1'),
+('QST00000002', 'CHU00000001', 'FRM00000001', NULL, 'Last Name', NULL, 'Textbox', 'Enter last name', 2, NULL, b'0', b'1'),
+('QST00000003', 'CHU00000001', 'FRM00000001', NULL, 'Email Address', NULL, 'Textbox', 'Enter email', 3, NULL, b'0', b'1'),
+('QST00000004', 'CHU00000001', 'FRM00000001', NULL, 'Phone Number', NULL, 'Textbox', 'Enter phone', 4, NULL, b'0', b'0'),
+('QST00000005', 'CHU00000001', 'FRM00000001', NULL, 'How did you hear about us?', NULL, 'Multiple Choice', NULL, 5, '[{"value":"Friend or Family","text":"Friend or Family"},{"value":"Online Search","text":"Online Search"},{"value":"Social Media","text":"Social Media"},{"value":"Drive By","text":"Drive By"},{"value":"Community Event","text":"Community Event"},{"value":"Other","text":"Other"}]', b'0', b'0'),
 -- VBS Registration
-('QST00000006', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Full Name', NULL, 'textField', 'Enter child name', 1, NULL, b'0', b'1'),
-('QST00000007', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Age', NULL, 'textField', 'Enter age', 2, NULL, b'0', b'1'),
-('QST00000008', 'CHU00000001', 'FRM00000002', NULL, 'Allergies or Special Needs', 'Please list any allergies or special needs we should know about.', 'textArea', NULL, 3, NULL, b'0', b'0'),
-('QST00000009', 'CHU00000001', 'FRM00000002', NULL, 'Emergency Contact Phone', NULL, 'textField', 'Enter phone', 4, NULL, b'0', b'1'),
+('QST00000006', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Full Name', NULL, 'Textbox', 'Enter child name', 1, NULL, b'0', b'1'),
+('QST00000007', 'CHU00000001', 'FRM00000002', NULL, 'Child''s Age', NULL, 'Textbox', 'Enter age', 2, NULL, b'0', b'1'),
+('QST00000008', 'CHU00000001', 'FRM00000002', NULL, 'Allergies or Special Needs', 'Please list any allergies or special needs we should know about.', 'Text Area', NULL, 3, NULL, b'0', b'0'),
+('QST00000009', 'CHU00000001', 'FRM00000002', NULL, 'Emergency Contact Phone', NULL, 'Textbox', 'Enter phone', 4, NULL, b'0', b'1'),
 -- Small Group Interest Survey
-('QST00000010', 'CHU00000001', 'FRM00000003', NULL, 'What day of the week works best?', NULL, 'dropdown', NULL, 1, 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday', b'0', b'1'),
-('QST00000011', 'CHU00000001', 'FRM00000003', NULL, 'What topics interest you most?', 'Select all that apply.', 'checkboxes', NULL, 2, 'Bible Study,Prayer,Fellowship,Community Service,Parenting,Marriage', b'0', b'0'),
-('QST00000012', 'CHU00000001', 'FRM00000003', NULL, 'Any additional comments?', NULL, 'textArea', 'Share your thoughts...', 3, NULL, b'0', b'0');
+('QST00000010', 'CHU00000001', 'FRM00000003', NULL, 'What day of the week works best?', NULL, 'Multiple Choice', NULL, 1, '[{"value":"Monday","text":"Monday"},{"value":"Tuesday","text":"Tuesday"},{"value":"Wednesday","text":"Wednesday"},{"value":"Thursday","text":"Thursday"},{"value":"Friday","text":"Friday"},{"value":"Saturday","text":"Saturday"}]', b'0', b'1'),
+('QST00000011', 'CHU00000001', 'FRM00000003', NULL, 'What topics interest you most?', 'Select all that apply.', 'Checkbox', NULL, 2, '[{"value":"Bible Study","text":"Bible Study"},{"value":"Prayer","text":"Prayer"},{"value":"Fellowship","text":"Fellowship"},{"value":"Community Service","text":"Community Service"},{"value":"Parenting","text":"Parenting"},{"value":"Marriage","text":"Marriage"}]', b'0', b'0'),
+('QST00000012', 'CHU00000001', 'FRM00000003', NULL, 'Any additional comments?', NULL, 'Text Area', 'Share your thoughts...', 3, NULL, b'0', b'0');
 
 -- ========================================
 -- Form Submissions
