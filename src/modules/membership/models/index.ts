@@ -4,6 +4,8 @@ export { GroupMember } from "./GroupMember.js";
 export { GroupJoinRequest } from "./GroupJoinRequest.js";
 export { Household } from "./Household.js";
 export { List } from "./List.js";
+export { ListMember } from "./ListMember.js";
+export * from "./ListRules.js";
 export { MemberPermission } from "./MemberPermission.js";
 export { ContactInfo } from "./ContactInfo.js";
 export { Name } from "./Name.js";

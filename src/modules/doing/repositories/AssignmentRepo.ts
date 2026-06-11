@@ -75,6 +75,21 @@ export class AssignmentRepo {
     return getDb().selectFrom("assignments").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).execute();
   }
 
+  // People assigned to a position on a plan whose serviceDate falls in the window;
+  // no window means anyone ever assigned.
+  public async loadPersonIdsByServiceDateRange(churchId: string, startDate?: Date, endDate?: Date): Promise<string[]> {
+    let query = getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .select("a.personId")
+      .distinct()
+      .where("a.churchId", "=", churchId);
+    if (startDate) query = query.where("pl.serviceDate", ">=", startDate as any);
+    if (endDate) query = query.where("pl.serviceDate", "<=", endDate as any);
+    const rows = await query.execute();
+    return rows.map((r: any) => r.personId).filter((id: string) => !!id);
+  }
+
   public async loadUnconfirmedByServiceDateRange(churchId?: string) {
     let query = getDb().selectFrom("assignments as a")
       .innerJoin("positions as p", "p.id", "a.positionId")

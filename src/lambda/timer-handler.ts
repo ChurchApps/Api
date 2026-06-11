@@ -72,6 +72,12 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     await contentRepos.streamingService.advanceRecurringServices();
     console.log("[handleMidnightTimer] advanceRecurringServices completed in", Date.now() - startTime, "ms");
 
+    // Re-evaluate auto-refresh Lists (saved filters) and run their attached actions.
+    console.log("[handleMidnightTimer] Refreshing auto-refresh lists...");
+    const { ListRefreshHelper } = await import("../modules/membership/helpers/ListRefreshHelper.js");
+    const listResult = await ListRefreshHelper.refreshAutoLists();
+    console.log("[handleMidnightTimer] refreshAutoLists result:", JSON.stringify(listResult));
+
     console.log("[handleMidnightTimer] Processing daily email notifications...");
     const result = await NotificationHelper.sendEmailNotifications("daily");
     console.log("[handleMidnightTimer] sendEmailNotifications result:", JSON.stringify(result));
