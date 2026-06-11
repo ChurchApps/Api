@@ -15,4 +15,7 @@ export class Plan {
   public providerPlanName?: string;
   public signupDeadlineHours?: number;
   public showVolunteerNames?: boolean;
+  public prepared?: boolean;
+  public autoReplaceOnDecline?: boolean;
+  public lastAutofillRunId?: string;
 }

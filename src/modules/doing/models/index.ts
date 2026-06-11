@@ -8,6 +8,7 @@ export { PlanItem } from "./PlanItem.js";
 export { PlanItemTime } from "./PlanItemTime.js";
 export { PlanType } from "./PlanType.js";
 export { Position } from "./Position.js";
+export { SchedulingPreference } from "./SchedulingPreference.js";
 export { Task } from "./Task.js";
 export { Time } from "./Time.js";
 export { Workflow } from "./Workflow.js";

@@ -18,6 +18,7 @@ BEGIN
     TRUNCATE TABLE plans;
     TRUNCATE TABLE planTypes;
     TRUNCATE TABLE positions;
+    TRUNCATE TABLE schedulingPreferences;
     TRUNCATE TABLE times;
     TRUNCATE TABLE tasks;
     TRUNCATE TABLE conditions;

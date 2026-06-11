@@ -8,6 +8,7 @@ export { PlanItemRepo } from "./PlanItemRepo.js";
 export { PlanItemTimeRepo } from "./PlanItemTimeRepo.js";
 export { PlanTypeRepo } from "./PlanTypeRepo.js";
 export { PositionRepo } from "./PositionRepo.js";
+export { SchedulingPreferenceRepo } from "./SchedulingPreferenceRepo.js";
 export { TaskRepo } from "./TaskRepo.js";
 export { TimeRepo } from "./TimeRepo.js";
 export { WorkflowRepo } from "./WorkflowRepo.js";

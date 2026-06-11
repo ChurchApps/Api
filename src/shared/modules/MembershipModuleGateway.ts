@@ -25,6 +25,9 @@ export interface MembershipModuleGateway {
   loadIdsMatchingCondition(condition: ConditionInput): Promise<string[]>;
   loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]>;
   loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
+  loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]>;
+  // Every person sharing a household with any of personIds (the input people included).
+  loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]>;
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string } | null>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
@@ -129,6 +132,33 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     const repos = await this.repos();
     const members = await repos.groupMember.loadForPerson(churchId, personId);
     return Array.isArray(members) ? members : [];
+  }
+
+  public async loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]> {
+    const rows = (await this.getDb().selectFrom("groupMembers")
+      .select("personId")
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .execute()) as { personId: string }[];
+    return rows.map((r) => r.personId).filter((id) => !!id);
+  }
+
+  public async loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]> {
+    if (personIds.length === 0) return [];
+    const seeds = (await this.getDb().selectFrom("people")
+      .select(["id", "householdId"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("id", "in", personIds)
+      .execute()) as { id: string; householdId: string }[];
+    const householdIds = [...new Set(seeds.map((p) => p.householdId).filter((id) => !!id))];
+    if (householdIds.length === 0) return seeds;
+    return this.getDb().selectFrom("people")
+      .select(["id", "householdId"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("householdId", "in", householdIds)
+      .execute();
   }
 
   public async loadChurch(churchId: string) {

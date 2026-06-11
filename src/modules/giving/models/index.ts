@@ -1,3 +1,4 @@
+export { Campaign } from "./Campaign.js";
 export { Donation } from "./Donation.js";
 export { DonationBatch } from "./DonationBatch.js";
 export { DonationSummary } from "./DonationSummary.js";
@@ -10,5 +11,6 @@ export { CheckoutDetails } from "./CheckoutDetails.js";
 export { Customer } from "./Customer.js";
 export type { PaymentDetails } from "./PaymentDetails.js";
 export { EventLog } from "./EventLog.js";
+export { Pledge } from "./Pledge.js";
 export { Subscription } from "./Subscription.js";
 export { SubscriptionFund } from "./SubscriptionFund.js";
