@@ -15,6 +15,11 @@ export { EventRepo } from "./EventRepo.js";
 export { EventExceptionRepo } from "./EventExceptionRepo.js";
 export { CuratedCalendarRepo } from "./CuratedCalendarRepo.js";
 export { CuratedEventRepo } from "./CuratedEventRepo.js";
+export { RoomRepo } from "./RoomRepo.js";
+export { ResourceRepo } from "./ResourceRepo.js";
+export { EventBookingRepo } from "./EventBookingRepo.js";
+export { CalendarBlockoutRepo } from "./CalendarBlockoutRepo.js";
+export { EventTemplateRepo } from "./EventTemplateRepo.js";
 
 export { RegistrationRepo } from "./RegistrationRepo.js";
 export { RegistrationMemberRepo } from "./RegistrationMemberRepo.js";

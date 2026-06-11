@@ -14,6 +14,10 @@ export { SubDomainHelper } from "./SubDomainHelper.js";
 export { PollyHelper } from "./PollyHelper.js";
 export { CalendarHelper } from "./CalendarHelper.js";
 export { RegistrationHelper } from "./RegistrationHelper.js";
+export { RecurrenceHelper } from "./RecurrenceHelper.js";
+export { ConflictHelper } from "./ConflictHelper.js";
+export { IcsHelper } from "./IcsHelper.js";
+export { ApprovalHelper } from "./ApprovalHelper.js";
 
 // Re-export from shared helpers for convenience
 export { Environment } from "../../../shared/helpers/Environment.js";

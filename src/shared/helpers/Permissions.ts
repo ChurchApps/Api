@@ -39,6 +39,9 @@ export class Permissions extends BasePermissions {
 
   static registrations = { view: { contentType: "Registrations", action: "View" }, edit: { contentType: "Registrations", action: "Edit" } };
 
+  // Conflict-Resolver role: approve/reject event and room/resource requests without full content-edit rights
+  static calendars = { admin: { contentType: "Calendars", action: "Admin" } };
+
   // Messaging API permissions (to be defined during migration)
   static messaging = { view: { contentType: "Messaging", action: "View" }, edit: { contentType: "Messaging", action: "Edit" }, admin: { contentType: "Messaging", action: "Admin" } };
 
@@ -91,6 +94,7 @@ export const permissionsList: IPermission[] = [
   { apiName: "ContentApi", section: "Chat", action: "Host", displaySection: "Content", displayAction: "Host Chat" },
   { apiName: "ContentApi", section: "Registrations", action: "View", displaySection: "Content", displayAction: "View Registrations" },
   { apiName: "ContentApi", section: "Registrations", action: "Edit", displaySection: "Content", displayAction: "Edit Registrations" },
+  { apiName: "ContentApi", section: "Calendars", action: "Admin", displaySection: "Content", displayAction: "Resolve Calendar Conflicts & Approvals" },
 
   // Messaging API permissions
   { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
@@ -144,6 +148,7 @@ export type ContentType =
   | "Admin"
   | "Texting"
   | "Registrations"
-  | "Schedules";
+  | "Schedules"
+  | "Calendars";
 
 export type Actions = "Admin" | "Edit" | "View" | "Send" | "Edit Self" | "View Members" | "View Summary" | "Checkin" | "Host" | "Edit Settings";

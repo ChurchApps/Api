@@ -16,4 +16,6 @@ export class Event {
   registrationCloseDate?: Date;
   tags?: string;
   formId?: string;
+  approvalStatus?: string;
+  requestedBy?: string;
 }
