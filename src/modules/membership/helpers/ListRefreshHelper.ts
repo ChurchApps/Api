@@ -3,6 +3,7 @@ import { List } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { getDoingModuleGateway, getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { Environment } from "./index.js";
 import { ListRuleHelper } from "./ListRuleHelper.js";
 
@@ -33,6 +34,8 @@ export class ListRefreshHelper {
     const removed = Array.from(cachedIds).filter((id) => !currentIds.has(id));
     await repos.listMember.addPersonIds(list.churchId, list.id, added);
     await repos.listMember.removePersonIds(list.churchId, list.id, removed);
+    for (const personId of added) await WebhookDispatcher.emit(list.churchId, "list.member.added", { listId: list.id, listName: list.name, personId });
+    for (const personId of removed) await WebhookDispatcher.emit(list.churchId, "list.member.removed", { listId: list.id, listName: list.name, personId });
     if (added.length > 0) await this.runActions(repos, list, added);
     if (list.notifyOnChange && (added.length > 0 || removed.length > 0)) await this.notifyCreator(repos, list, added.length, removed.length);
     return { added, removed };

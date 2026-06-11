@@ -48,17 +48,25 @@ export class StepActionHelper {
           case "addToGroup":
             await this.addToGroup(task, config);
             break;
+          case "removeFromGroup":
+            await this.removeFromGroup(task, config);
+            break;
           case "addToWorkflow":
             await this.addToWorkflow(task, config, repos);
             break;
           case "setField":
             await this.setField(task, config);
             break;
+          case "createTask":
+            await this.createTask(task, config, repos);
+            break;
           default:
             break;
         }
       } catch (err) {
-        console.warn(`[StepActionHelper] action ${action.actionType} failed for card ${task.id || "?"}:`, (err as Error)?.message || err);
+        const message = (err as Error)?.message || String(err);
+        this.appendHistory(task, `Action ${action.actionType} failed: ${message}`);
+        console.warn(`[StepActionHelper] action ${action.actionType} failed for card ${task.id || "?"}:`, message);
       }
     }
     this.clearActionCursor(task);
@@ -155,6 +163,34 @@ export class StepActionHelper {
     if (task.associatedWithType !== "person" || !task.associatedWithId || !config.groupId) return;
     await getMembershipModuleGateway().addGroupMember(task.churchId || "", config.groupId, task.associatedWithId);
     this.appendHistory(task, config.groupLabel ? `Added to group: ${config.groupLabel}` : "Added to group");
+  }
+
+  private static async removeFromGroup(task: Task, config: Record<string, any>): Promise<void> {
+    if (task.associatedWithType !== "person" || !task.associatedWithId || !config.groupId) return;
+    await getMembershipModuleGateway().removeGroupMember(task.churchId || "", config.groupId, task.associatedWithId);
+    this.appendHistory(task, config.groupLabel ? `Removed from group: ${config.groupLabel}` : "Removed from group");
+  }
+
+  // Creates a standalone (non-card) task about the card's person, assigned per config.
+  private static async createTask(task: Task, config: Record<string, any>, repos: Repos): Promise<void> {
+    if (!config.title) return;
+    await repos.task.save({
+      churchId: task.churchId,
+      taskType: "FollowUp",
+      dateCreated: new Date(),
+      associatedWithType: task.associatedWithType,
+      associatedWithId: task.associatedWithId,
+      associatedWithLabel: task.associatedWithLabel,
+      createdByType: "system",
+      createdByLabel: "Automation",
+      assignedToType: config.assignedToType,
+      assignedToId: config.assignedToId,
+      assignedToLabel: config.assignedToLabel,
+      title: config.title,
+      status: "Pending",
+      data: config.description ? JSON.stringify({ description: config.description }) : undefined
+    });
+    this.appendHistory(task, `Task created: ${config.title}`);
   }
 
   private static async addToWorkflow(task: Task, config: Record<string, any>, repos: Repos): Promise<void> {

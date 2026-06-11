@@ -4,6 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions, UserChurchHelper } from "../helpers/index.js";
 import { GroupJoinRequest, GroupMember } from "../models/index.js";
 import { NotificationService } from "../../../shared/helpers/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @controller("/membership/groupjoinrequests")
 export class GroupJoinRequestController extends MembershipBaseController {
@@ -58,6 +59,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
         status: "pending"
       };
       const saved = await this.repos.groupJoinRequest.save(request);
+      await WebhookDispatcher.emit(au.churchId, "group.member.requested", saved);
 
       try {
         const leaders = (await this.repos.groupMember.loadLeadersForGroup(au.churchId, groupId)) as any[];

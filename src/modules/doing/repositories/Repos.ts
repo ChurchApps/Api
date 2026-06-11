@@ -1,5 +1,6 @@
 import {
   AssignmentRepo,
+  AutomationExecutionRepo,
   BlockoutDateRepo,
   ConditionRepo,
   ConjunctionRepo,
@@ -22,6 +23,7 @@ import {
 
 export class Repos {
   public assignment: AssignmentRepo;
+  public automationExecution: AutomationExecutionRepo;
   public blockoutDate: BlockoutDateRepo;
   public condition: ConditionRepo;
   public conjunction: ConjunctionRepo;
@@ -49,6 +51,7 @@ export class Repos {
 
   constructor() {
     this.assignment = new AssignmentRepo();
+    this.automationExecution = new AutomationExecutionRepo();
     this.blockoutDate = new BlockoutDateRepo();
     this.condition = new ConditionRepo();
     this.conjunction = new ConjunctionRepo();

@@ -36,8 +36,14 @@ export interface MembershipModuleGateway {
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
   // Idempotent: adds the person to the group only if not already a member.
   addGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
+  // Idempotent: removes the person's membership row(s) for the group.
+  removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
   // Sets a single allowed person field; throws on a field outside the allow-list.
   setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void>;
+  // Every non-removed person with the fields event-trigger conditions filter on (run-now).
+  loadPeopleForAutomation(churchId: string): Promise<{ id: string; displayName: string; membershipStatus?: string; gender?: string; maritalStatus?: string }[]>;
+  loadList(churchId: string, listId: string): Promise<{ id: string; name: string } | null>;
+  loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]>;
 }
 
 class MembershipModuleGatewayDb implements MembershipModuleGateway {
@@ -206,6 +212,40 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     const existing = await repos.groupMember.loadForPerson(churchId, personId);
     if (Array.isArray(existing) && existing.some((m: any) => m.groupId === groupId)) return;
     await repos.groupMember.save({ churchId, groupId, personId, leader: false });
+  }
+
+  public async removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void> {
+    await this.getDb().deleteFrom("groupMembers")
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .where("personId", "=", personId)
+      .execute();
+  }
+
+  public async loadPeopleForAutomation(churchId: string) {
+    return this.getDb().selectFrom("people")
+      .select(["id", "displayName", "membershipStatus", "gender", "maritalStatus"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .execute();
+  }
+
+  public async loadList(churchId: string, listId: string) {
+    const row = await this.getDb().selectFrom("lists")
+      .select(["id", "name"])
+      .where("churchId", "=", churchId)
+      .where("id", "=", listId)
+      .executeTakeFirst();
+    return row ?? null;
+  }
+
+  public async loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]> {
+    const rows = (await this.getDb().selectFrom("listMembers")
+      .select("personId")
+      .where("churchId", "=", churchId)
+      .where("listId", "=", listId)
+      .execute()) as { personId: string }[];
+    return rows.map((r) => r.personId).filter((id) => !!id);
   }
 
   public async setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {

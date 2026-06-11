@@ -1,4 +1,5 @@
 export { Assignment } from "./Assignment.js";
+export { AutomationExecution } from "./AutomationExecution.js";
 export { BlockoutDate } from "./BlockoutDate.js";
 export { Condition } from "./Condition.js";
 export { Conjunction } from "./Conjunction.js";

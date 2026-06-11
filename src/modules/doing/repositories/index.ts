@@ -1,4 +1,5 @@
 export { AssignmentRepo } from "./AssignmentRepo.js";
+export { AutomationExecutionRepo } from "./AutomationExecutionRepo.js";
 export { BlockoutDateRepo } from "./BlockoutDateRepo.js";
 export { ConditionRepo } from "./ConditionRepo.js";
 export { ConjunctionRepo } from "./ConjunctionRepo.js";

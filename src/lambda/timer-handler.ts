@@ -78,6 +78,11 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     const listResult = await ListRefreshHelper.refreshAutoLists();
     console.log("[handleMidnightTimer] refreshAutoLists result:", JSON.stringify(listResult));
 
+    // Automation execution history retention (>= 32 days required; we keep 90).
+    console.log("[handleMidnightTimer] Purging old automation executions...");
+    const doingRepos = await RepoManager.getRepos<any>("doing");
+    await doingRepos.automationExecution.purgeOld();
+
     console.log("[handleMidnightTimer] Processing daily email notifications...");
     const result = await NotificationHelper.sendEmailNotifications("daily");
     console.log("[handleMidnightTimer] sendEmailNotifications result:", JSON.stringify(result));
@@ -122,6 +127,11 @@ export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Con
     // Recurring scheduled rules (pull path of the unified RuleEngine).
     const { RuleEngine } = await import("../modules/doing/helpers/RuleEngine.js");
     await RuleEngine.runScheduled(doingRepos);
+
+    // Retry queue: re-attempt automation executions whose backoff window arrived.
+    const { ExecutionHelper } = await import("../modules/doing/helpers/ExecutionHelper.js");
+    const retried = await ExecutionHelper.processDue(doingRepos);
+    console.log(`[handleScheduledTasks] executionRetries=${retried}`);
 
     console.log("Scheduled tasks completed");
   } catch (error) {

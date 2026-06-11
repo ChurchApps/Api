@@ -1,18 +1,15 @@
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { WorkflowTrigger } from "../models/index.js";
-import { WorkflowHelper } from "./WorkflowHelper.js";
-import { getMembershipModuleGateway, getGivingModuleGateway } from "../../../shared/modules/index.js";
+import { ExecutionHelper } from "./ExecutionHelper.js";
+import { FilterMatcher } from "./FilterMatcher.js";
+import { getMembershipModuleGateway, getGivingModuleGateway, getAttendanceModuleGateway } from "../../../shared/modules/index.js";
 
 interface Subject {
   type: string;
   id?: string;
   label?: string;
 }
-
-type FilterNode =
-  | { type: "group"; conjunction: "AND" | "OR"; children: FilterNode[] }
-  | { type: "condition"; field: string; operator: string; value: string };
 
 // Canonical membership statuses (mirror B1Admin people/helpers/MembershipStatusOptions.ts).
 const MEMBERSHIP_STATUS_OPTIONS = [
@@ -45,6 +42,11 @@ const PERSON_FIELDS: TriggerFieldDef[] = [
   { key: "person.maritalStatus", label: "Marital Status", type: "select", options: [{ value: "Single", label: "Single" }, { value: "Married", label: "Married" }, { value: "Divorced", label: "Divorced" }, { value: "Widowed", label: "Widowed" }] }
 ];
 
+const GROUP_FIELDS: TriggerFieldDef[] = [
+  { key: "group.id", label: "Group", type: "select", optionsSource: "groups" },
+  { key: "group.name", label: "Group Name", type: "string" }
+];
+
 // The triggerable events. Each lists the fields a condition may reference; the
 // resolve() switch below must produce a matching fact for each key.
 export const EVENT_DEFS: TriggerEventDef[] = [
@@ -57,19 +59,14 @@ export const EVENT_DEFS: TriggerEventDef[] = [
     fields: [
       { key: "donation.amount", label: "Amount", type: "number" },
       { key: "donation.method", label: "Method", type: "string" },
+      { key: "donation.isFirstTime", label: "First-Time Donor", type: "select", options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
       { key: "person.membershipStatus", label: "Donor Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS },
       { key: "fundDonation.fundId", label: "Fund", type: "select", optionsSource: "funds" }
     ]
   },
-  {
-    eventType: "group.member.added",
-    label: "Group · Member Joined",
-    recordType: "group",
-    fields: [
-      { key: "group.id", label: "Group", type: "select", optionsSource: "groups" },
-      { key: "group.name", label: "Group Name", type: "string" }
-    ]
-  },
+  { eventType: "group.member.added", label: "Group · Member Joined", recordType: "group", fields: GROUP_FIELDS },
+  { eventType: "group.member.removed", label: "Group · Member Left", recordType: "group", fields: GROUP_FIELDS },
+  { eventType: "group.member.requested", label: "Group · Join Requested", recordType: "group", fields: GROUP_FIELDS },
   {
     eventType: "group.created",
     label: "Group · Created",
@@ -86,6 +83,42 @@ export const EVENT_DEFS: TriggerEventDef[] = [
     fields: [
       { key: "formSubmission.formId", label: "Form", type: "select", optionsSource: "forms" },
       { key: "person.membershipStatus", label: "Submitter Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS }
+    ]
+  },
+  {
+    eventType: "attendance.recorded",
+    label: "Check-In · Recorded",
+    recordType: "attendance",
+    fields: [
+      { key: "group.id", label: "Group", type: "select", optionsSource: "groups" },
+      { key: "person.membershipStatus", label: "Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS }
+    ]
+  },
+  {
+    eventType: "registration.created",
+    label: "Event · Registration Created",
+    recordType: "registration",
+    fields: [
+      { key: "registration.eventId", label: "Event", type: "select", optionsSource: "events" },
+      { key: "person.membershipStatus", label: "Registrant Membership Status", type: "select", options: MEMBERSHIP_STATUS_OPTIONS }
+    ]
+  },
+  {
+    eventType: "list.member.added",
+    label: "List · Member Added",
+    recordType: "list",
+    fields: [
+      { key: "list.id", label: "List", type: "select", optionsSource: "lists" },
+      { key: "list.name", label: "List Name", type: "string" }
+    ]
+  },
+  {
+    eventType: "list.member.removed",
+    label: "List · Member Removed",
+    recordType: "list",
+    fields: [
+      { key: "list.id", label: "List", type: "select", optionsSource: "lists" },
+      { key: "list.name", label: "List Name", type: "string" }
     ]
   }
 ];
@@ -119,16 +152,15 @@ export class EventTriggerHelper {
       for (const { subject, facts } of resolved) {
         for (const t of triggers) {
           if (!t.workflowId) continue;
-          if (!EventTriggerHelper.matches(facts, EventTriggerHelper.parseConditions(t.conditions))) continue;
-          if (EventTriggerHelper.toBool(t.oncePerSubject) && subject.id
+          if (!FilterMatcher.matches(facts, FilterMatcher.parseConditions(t.conditions))) continue;
+          if (FilterMatcher.toBool(t.oncePerSubject) && subject.id
             && (await repos.task.loadBySubjectInWorkflow(churchId, t.workflowId, subject.type, subject.id))) continue;
           if (subject.type === "person" && subject.id && !subject.label) {
             const people = await getMembershipModuleGateway().loadPeople(churchId, [subject.id]);
             subject.label = people[0]?.displayName;
           }
-          await WorkflowHelper.addToWorkflow(
-            churchId, t.workflowId, subject, { type: "system", label: "Trigger" }, t.id, repos, t.stepId || undefined
-          );
+          // Records the execution and creates the card; failures land in history + retry.
+          await ExecutionHelper.startAndAttempt(t, subject, event, repos);
         }
       }
     } catch {
@@ -157,12 +189,14 @@ export class EventTriggerHelper {
         if (!payload.personId) return []; // anonymous donation has no subject
         const person = await getMembershipModuleGateway().loadPerson(churchId, payload.personId);
         const funds = await getGivingModuleGateway().loadFundDonations(churchId, payload.id);
+        const donationCount = await getGivingModuleGateway().loadDonationCountForPerson(churchId, payload.personId);
         return [
           {
             subject: { type: "person", id: payload.personId },
             facts: {
               "donation.amount": payload.amount,
               "donation.method": payload.method,
+              "donation.isFirstTime": donationCount <= 1 ? "true" : "false",
               "person.membershipStatus": person?.membershipStatus,
               "fundDonation.fundId": funds.map((f) => f.fundId)
             }
@@ -170,7 +204,9 @@ export class EventTriggerHelper {
         ];
       }
 
-      case "group.member.added": {
+      case "group.member.added":
+      case "group.member.removed":
+      case "group.member.requested": {
         const group = await getMembershipModuleGateway().loadGroup(churchId, payload.groupId);
         return [
           {
@@ -204,62 +240,50 @@ export class EventTriggerHelper {
         return out;
       }
 
+      case "attendance.recorded": {
+        // payload is a Visit; the group can live on the visit itself (group check-in)
+        // or on the sessions of its visitSessions (service check-in).
+        if (!payload.personId) return [];
+        const groupIds = new Set<string>();
+        if (payload.groupId) groupIds.add(payload.groupId);
+        const sessionIds = (payload.visitSessions || []).map((vs: any) => vs?.sessionId).filter(Boolean);
+        if (sessionIds.length > 0) {
+          const fromSessions = await getAttendanceModuleGateway().loadSessionGroupIds(churchId, sessionIds);
+          fromSessions.forEach((id) => groupIds.add(id));
+        }
+        const person = await getMembershipModuleGateway().loadPerson(churchId, payload.personId);
+        return [
+          {
+            subject: { type: "person", id: payload.personId },
+            facts: { "group.id": Array.from(groupIds), "person.membershipStatus": person?.membershipStatus }
+          }
+        ];
+      }
+
+      case "registration.created": {
+        if (!payload.personId) return [];
+        const person = await getMembershipModuleGateway().loadPerson(churchId, payload.personId);
+        return [
+          {
+            subject: { type: "person", id: payload.personId },
+            facts: { "registration.eventId": payload.eventId, "person.membershipStatus": person?.membershipStatus }
+          }
+        ];
+      }
+
+      case "list.member.added":
+      case "list.member.removed":
+        if (!payload.personId) return [];
+        return [
+          {
+            subject: { type: "person", id: payload.personId },
+            facts: { "list.id": payload.listId, "list.name": payload.listName }
+          }
+        ];
+
       default:
         return [];
     }
-  }
-
-  public static matches(facts: Record<string, any>, node: FilterNode | null): boolean {
-    if (!node) return true;
-    if (node.type === "group") {
-      const children = node.children || [];
-      if (children.length === 0) return true;
-      return node.conjunction === "OR"
-        ? children.some((c) => EventTriggerHelper.matches(facts, c))
-        : children.every((c) => EventTriggerHelper.matches(facts, c));
-    }
-    const actual = facts[node.field];
-    const test = (a: any) => EventTriggerHelper.compare(a, node.operator, node.value);
-    return Array.isArray(actual) ? actual.some(test) : test(actual);
-  }
-
-  private static compare(actual: any, operator: string, value: string): boolean {
-    const missing = actual === null || actual === undefined;
-    switch (operator) {
-      case "=": return !missing && String(actual) === String(value);
-      case "!=": return missing || String(actual) !== String(value);
-      case "contains": return !missing && String(actual).toLowerCase().includes(String(value).toLowerCase());
-      case ">": return !missing && Number(actual) > Number(value);
-      case "<": return !missing && Number(actual) < Number(value);
-      case ">=": return !missing && Number(actual) >= Number(value);
-      case "<=": return !missing && Number(actual) <= Number(value);
-      case "in": return !missing && EventTriggerHelper.toList(value).includes(String(actual));
-      case "notIn": return missing || !EventTriggerHelper.toList(value).includes(String(actual));
-      default: return false;
-    }
-  }
-
-  private static toList(value: string): string[] {
-    return String(value || "").split(",").map((v) => v.trim()).filter(Boolean);
-  }
-
-  private static parseConditions(json?: string): FilterNode | null {
-    if (!json) return null;
-    try {
-      const parsed = JSON.parse(json);
-      return parsed && typeof parsed === "object" ? (parsed as FilterNode) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  // bit(1) columns can come back as Buffer / number / boolean depending on the driver.
-  private static toBool(v: any): boolean {
-    if (v === null || v === undefined) return true; // oncePerSubject defaults true
-    if (Buffer.isBuffer(v)) return v[0] === 1;
-    if (typeof v === "number") return v === 1;
-    if (typeof v === "string") return v === "1" || v.toLowerCase() === "true";
-    return !!v;
   }
 
   private static async eventTypesForChurch(churchId: string, repos: Repos): Promise<Set<string>> {
