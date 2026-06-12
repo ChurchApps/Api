@@ -1,9 +1,10 @@
-import { AttendanceRepo, CampusRepo, GroupServiceTimeRepo, ServiceRepo, ServiceTimeRepo, SessionRepo, VisitRepo, VisitSessionRepo } from "./index.js";
+import { AttendanceRepo, CampusRepo, GroupServiceTimeRepo, LabelTemplateRepo, ServiceRepo, ServiceTimeRepo, SessionRepo, VisitRepo, VisitSessionRepo } from "./index.js";
 
 export class Repos {
   public attendance: AttendanceRepo;
   public campus: CampusRepo;
   public groupServiceTime: GroupServiceTimeRepo;
+  public labelTemplate: LabelTemplateRepo;
   public service: ServiceRepo;
   public serviceTime: ServiceTimeRepo;
   public session: SessionRepo;
@@ -16,6 +17,7 @@ export class Repos {
     this.attendance = new AttendanceRepo();
     this.campus = new CampusRepo();
     this.groupServiceTime = new GroupServiceTimeRepo();
+    this.labelTemplate = new LabelTemplateRepo();
     this.service = new ServiceRepo();
     this.serviceTime = new ServiceTimeRepo();
     this.session = new SessionRepo();

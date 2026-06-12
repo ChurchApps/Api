@@ -6,7 +6,7 @@ export const WEBHOOK_EVENTS: Record<string, string[]> = {
   groupMember: ["group.member.added", "group.member.removed", "group.member.requested"],
   household: ["household.created", "household.updated", "household.destroyed"],
   donation: ["donation.created", "donation.updated"],
-  attendance: ["attendance.recorded"],
+  attendance: ["attendance.recorded", "attendance.checkout"],
   session: ["session.created"],
   formSubmission: ["form.submission.created"],
   event: ["event.created", "event.updated", "event.destroyed"],

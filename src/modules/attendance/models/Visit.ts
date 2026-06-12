@@ -10,6 +10,10 @@ export class Visit {
   public visitDate?: Date;
   public checkinTime?: Date;
   public addedBy?: string;
+  public securityCode?: string;
+  public checkoutTime?: Date;
+  public checkedOutBy?: string;
+  public checkedOutById?: string;
 
   // public person?: Person;
   public visitSessions?: VisitSession[];

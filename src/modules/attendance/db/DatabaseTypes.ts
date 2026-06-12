@@ -1,4 +1,4 @@
-import type { Campus, GroupServiceTime, Service, ServiceTime, Session, Visit, VisitSession } from "../models/index.js";
+import type { Campus, GroupServiceTime, LabelTemplate, Service, ServiceTime, Session, Visit, VisitSession } from "../models/index.js";
 
 interface SoftDelete {
   removed?: boolean;
@@ -7,6 +7,7 @@ interface SoftDelete {
 export interface AttendanceDatabase {
   campuses: Campus & SoftDelete;
   groupServiceTimes: Omit<GroupServiceTime, "serviceTime">;
+  labelTemplates: LabelTemplate;
   services: Omit<Service, "campus"> & SoftDelete;
   serviceTimes: Omit<ServiceTime, "longName"> & SoftDelete;
   sessions: Omit<Session, "displayName">;

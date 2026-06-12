@@ -23,6 +23,7 @@ const SAMPLES: Record<string, (churchId: string) => any> = {
   "donation.updated": (churchId) => ({ id: "smpl_donation", churchId, personId: "smpl_person", batchId: "smpl_batch", donationDate: new Date().toISOString(), amount: 50, currency: "USD", method: "card", status: "complete" }),
 
   "attendance.recorded": (churchId) => ({ id: "smpl_visit", churchId, personId: "smpl_person", visitDate: new Date().toISOString(), checkinTime: new Date().toISOString() }),
+  "attendance.checkout": (churchId) => ({ id: "smpl_visit", churchId, personId: "smpl_person", visitDate: new Date().toISOString(), checkoutTime: new Date().toISOString(), checkedOutBy: "Sample Parent" }),
 
   "session.created": (churchId) => ({ id: "smpl_session", churchId, groupId: "smpl_group", serviceTimeId: "smpl_servicetime", sessionDate: new Date().toISOString() }),
 
