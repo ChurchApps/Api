@@ -42,6 +42,18 @@ export const handle15MinTimer = async (_event: ScheduledEvent, _context: Context
     console.log("[handle15MinTimer] Processing individual email notifications...");
     const emailResult = await NotificationHelper.sendEmailNotifications("individual");
     console.log("[handle15MinTimer] sendEmailNotifications result:", JSON.stringify(emailResult));
+
+    console.log("[handle15MinTimer] Sending approval digest emails...");
+    const { ApprovalHelper } = await import("../modules/content/helpers/ApprovalHelper.js");
+    const digestResult = await ApprovalHelper.sendApprovalDigests();
+    console.log("[handle15MinTimer] sendApprovalDigests result:", JSON.stringify(digestResult));
+
+    console.log("[handle15MinTimer] Processing due automation executions...");
+    const { ExecutionHelper } = await import("../modules/doing/helpers/ExecutionHelper.js");
+    const doingRepos = await RepoManager.getRepos<any>("doing");
+    const retried = await ExecutionHelper.processDue(doingRepos);
+    console.log(`[handle15MinTimer] executionRetries=${retried}`);
+
     console.log("[handle15MinTimer] ========== TIMER COMPLETE ==========");
     console.log("[handle15MinTimer] Total execution time:", Date.now() - startTime, "ms");
   } catch (error) {
@@ -66,11 +78,26 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     await AutomationHelper.remindServiceRequests();
     console.log("[handleMidnightTimer] remindServiceRequests completed in", Date.now() - startTime, "ms");
 
+    console.log("[handleMidnightTimer] Calling AutomationHelper.remindGroupAttendance...");
+    await AutomationHelper.remindGroupAttendance();
+    console.log("[handleMidnightTimer] remindGroupAttendance completed in", Date.now() - startTime, "ms");
+
     // Advance recurring streaming services
     console.log("[handleMidnightTimer] Advancing recurring streaming services...");
     const contentRepos = await RepoManager.getRepos<any>("content");
     await contentRepos.streamingService.advanceRecurringServices();
     console.log("[handleMidnightTimer] advanceRecurringServices completed in", Date.now() - startTime, "ms");
+
+    // Re-evaluate auto-refresh Lists (saved filters) and run their attached actions.
+    console.log("[handleMidnightTimer] Refreshing auto-refresh lists...");
+    const { ListRefreshHelper } = await import("../modules/membership/helpers/ListRefreshHelper.js");
+    const listResult = await ListRefreshHelper.refreshAutoLists();
+    console.log("[handleMidnightTimer] refreshAutoLists result:", JSON.stringify(listResult));
+
+    // Automation execution history retention (>= 32 days required; we keep 90).
+    console.log("[handleMidnightTimer] Purging old automation executions...");
+    const doingRepos = await RepoManager.getRepos<any>("doing");
+    await doingRepos.automationExecution.purgeOld();
 
     console.log("[handleMidnightTimer] Processing daily email notifications...");
     const result = await NotificationHelper.sendEmailNotifications("daily");

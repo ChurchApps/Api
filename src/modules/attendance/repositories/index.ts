@@ -1,6 +1,7 @@
 export { AttendanceRepo } from "./AttendanceRepo.js";
 export { CampusRepo } from "./CampusRepo.js";
 export { GroupServiceTimeRepo } from "./GroupServiceTimeRepo.js";
+export { LabelTemplateRepo } from "./LabelTemplateRepo.js";
 export { ServiceRepo } from "./ServiceRepo.js";
 export { ServiceTimeRepo } from "./ServiceTimeRepo.js";
 export { SessionRepo } from "./SessionRepo.js";

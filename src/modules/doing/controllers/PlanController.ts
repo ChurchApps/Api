@@ -1,9 +1,11 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
+import { UniqueIdHelper } from "@churchapps/apihelper";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 @controller("/doing/plans")
 export class PlanController extends DoingBaseController {
@@ -195,16 +197,41 @@ export class PlanController extends DoingBaseController {
   public async autofill(@requestParam("id") id: string, req: express.Request<{}, {}, { teams: { positionId: string; personIds: string[] }[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
-      const plan = await this.repos.plan.load(au.churchId, id);
+      const plan = (await this.repos.plan.load(au.churchId, id)) as Plan;
       const positions: Position[] = (await this.repos.position.loadByPlanId(au.churchId, id)) as Position[];
       const assignments = (await this.repos.assignment.loadByPlanId(au.churchId, id)) as any[];
       const blockoutDates = (await this.repos.blockoutDate.loadUpcoming(au.churchId)) as any[];
       const lastServed = (await this.repos.assignment.loadLastServed(au.churchId)) as any[];
       const assignmentsOnSameDate = (await this.repos.assignment.loadByServiceDate(au.churchId, plan.serviceDate || new Date(), id)) as any[];
+      const times = (await this.repos.time.loadByPlanId(au.churchId, id)) as Time[];
 
-      await PlanHelper.autofill(positions, assignments, blockoutDates, req.body.teams, lastServed, assignmentsOnSameDate);
+      const teams = req.body.teams || [];
+      const candidateIds = [...new Set(teams.flatMap((t) => t.personIds || []))];
+      const preferences = (await this.repos.schedulingPreference.loadByPersonIds(au.churchId, candidateIds)) as any[];
+      const monthServeCounts = await this.repos.assignment.loadMonthServeCounts(au.churchId, plan.serviceDate || new Date());
+      let householdPeople: { id: string; householdId: string }[] = [];
+      try {
+        householdPeople = await getMembershipModuleGateway().loadHouseholdPeople(au.churchId, candidateIds);
+      } catch {
+        householdPeople = [];
+      }
 
-      return plan;
+      const runId = UniqueIdHelper.shortId();
+      const created = await PlanHelper.autofill({ plan, positions, assignments, blockoutDates, teams, lastServed, assignmentsOnSameDate, preferences, monthServeCounts, householdPeople, times }, runId);
+
+      return { plan, created: created.length, runId: created.length > 0 ? runId : null };
+    });
+  }
+
+  @httpPost("/autofill/:id/undo")
+  public async autofillUndo(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
+      const plan = (await this.repos.plan.load(au.churchId, id)) as Plan;
+      if (!plan?.lastAutofillRunId) return { removed: 0 };
+      const removed = await this.repos.assignment.deleteUnconfirmedByRunId(au.churchId, plan.lastAutofillRunId);
+      await this.repos.plan.updateLastAutofillRunId(au.churchId, id, null);
+      return { removed };
     });
   }
 

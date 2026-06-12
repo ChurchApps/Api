@@ -8,6 +8,9 @@ export interface DoingModuleGateway {
   loadPosition(churchId: string, positionId: string): Promise<any | null>;
   loadPlan(churchId: string, planId: string): Promise<{ ministryId?: string } | null>;
   loadPlanType(churchId: string, planTypeId: string): Promise<{ ministryId?: string } | null>;
+  // List-condition provider: people scheduled to serve in the window (any plan).
+  loadServingPersonIds(churchId: string, startDate?: Date, endDate?: Date): Promise<string[]>;
+  addPersonToWorkflow(churchId: string, workflowId: string, personId: string, personLabel?: string): Promise<void>;
 }
 
 class DoingModuleGatewayDb implements DoingModuleGateway {
@@ -37,6 +40,15 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
 
   public async loadPlanType(churchId: string, planTypeId: string) {
     return (await (await this.repos()).planType.load(churchId, planTypeId)) ?? null;
+  }
+
+  public async loadServingPersonIds(churchId: string, startDate?: Date, endDate?: Date) {
+    return (await this.repos()).assignment.loadPersonIdsByServiceDateRange(churchId, startDate, endDate);
+  }
+
+  public async addPersonToWorkflow(churchId: string, workflowId: string, personId: string, personLabel?: string) {
+    const { WorkflowHelper } = await import("../../modules/doing/helpers/WorkflowHelper.js");
+    await WorkflowHelper.addToWorkflow(churchId, workflowId, { type: "person", id: personId, label: personLabel }, { type: "system", label: "List" }, undefined, await this.repos());
   }
 }
 

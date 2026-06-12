@@ -14,6 +14,11 @@ import {
   EventExceptionRepo,
   CuratedCalendarRepo,
   CuratedEventRepo,
+  RoomRepo,
+  ResourceRepo,
+  EventBookingRepo,
+  CalendarBlockoutRepo,
+  EventTemplateRepo,
   RegistrationRepo,
   RegistrationMemberRepo,
   SettingRepo,
@@ -46,6 +51,11 @@ export class Repos {
   public eventException: EventExceptionRepo;
   public curatedCalendar: CuratedCalendarRepo;
   public curatedEvent: CuratedEventRepo;
+  public room: RoomRepo;
+  public resource: ResourceRepo;
+  public eventBooking: EventBookingRepo;
+  public calendarBlockout: CalendarBlockoutRepo;
+  public eventTemplate: EventTemplateRepo;
   public registration: RegistrationRepo;
   public registrationMember: RegistrationMemberRepo;
   public setting: SettingRepo;
@@ -79,6 +89,11 @@ export class Repos {
     this.eventException = new EventExceptionRepo();
     this.curatedCalendar = new CuratedCalendarRepo();
     this.curatedEvent = new CuratedEventRepo();
+    this.room = new RoomRepo();
+    this.resource = new ResourceRepo();
+    this.eventBooking = new EventBookingRepo();
+    this.calendarBlockout = new CalendarBlockoutRepo();
+    this.eventTemplate = new EventTemplateRepo();
     this.registration = new RegistrationRepo();
     this.registrationMember = new RegistrationMemberRepo();
     this.setting = new SettingRepo();

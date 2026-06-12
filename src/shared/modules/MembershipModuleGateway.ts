@@ -25,6 +25,9 @@ export interface MembershipModuleGateway {
   loadIdsMatchingCondition(condition: ConditionInput): Promise<string[]>;
   loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]>;
   loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
+  loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]>;
+  // Every person sharing a household with any of personIds (the input people included).
+  loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]>;
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string } | null>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
@@ -33,8 +36,14 @@ export interface MembershipModuleGateway {
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
   // Idempotent: adds the person to the group only if not already a member.
   addGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
+  // Idempotent: removes the person's membership row(s) for the group.
+  removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
   // Sets a single allowed person field; throws on a field outside the allow-list.
   setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void>;
+  // Every non-removed person with the fields event-trigger conditions filter on (run-now).
+  loadPeopleForAutomation(churchId: string): Promise<{ id: string; displayName: string; membershipStatus?: string; gender?: string; maritalStatus?: string }[]>;
+  loadList(churchId: string, listId: string): Promise<{ id: string; name: string } | null>;
+  loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]>;
 }
 
 class MembershipModuleGatewayDb implements MembershipModuleGateway {
@@ -131,6 +140,33 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     return Array.isArray(members) ? members : [];
   }
 
+  public async loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]> {
+    const rows = (await this.getDb().selectFrom("groupMembers")
+      .select("personId")
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .execute()) as { personId: string }[];
+    return rows.map((r) => r.personId).filter((id) => !!id);
+  }
+
+  public async loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]> {
+    if (personIds.length === 0) return [];
+    const seeds = (await this.getDb().selectFrom("people")
+      .select(["id", "householdId"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("id", "in", personIds)
+      .execute()) as { id: string; householdId: string }[];
+    const householdIds = [...new Set(seeds.map((p) => p.householdId).filter((id) => !!id))];
+    if (householdIds.length === 0) return seeds;
+    return this.getDb().selectFrom("people")
+      .select(["id", "householdId"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("householdId", "in", householdIds)
+      .execute();
+  }
+
   public async loadChurch(churchId: string) {
     const repos = await this.repos();
     return (await repos.church.loadById(churchId)) ?? null;
@@ -176,6 +212,43 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     const existing = await repos.groupMember.loadForPerson(churchId, personId);
     if (Array.isArray(existing) && existing.some((m: any) => m.groupId === groupId)) return;
     await repos.groupMember.save({ churchId, groupId, personId, leader: false });
+    await repos.groupMemberHistory.log(churchId, groupId, personId, "joined");
+  }
+
+  public async removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void> {
+    const result = await this.getDb().deleteFrom("groupMembers")
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .where("personId", "=", personId)
+      .execute();
+    const deleted = Number(result?.[0]?.numDeletedRows ?? 0);
+    if (deleted > 0) await (await this.repos()).groupMemberHistory.log(churchId, groupId, personId, "left");
+  }
+
+  public async loadPeopleForAutomation(churchId: string) {
+    return this.getDb().selectFrom("people")
+      .select(["id", "displayName", "membershipStatus", "gender", "maritalStatus"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .execute();
+  }
+
+  public async loadList(churchId: string, listId: string) {
+    const row = await this.getDb().selectFrom("lists")
+      .select(["id", "name"])
+      .where("churchId", "=", churchId)
+      .where("id", "=", listId)
+      .executeTakeFirst();
+    return row ?? null;
+  }
+
+  public async loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]> {
+    const rows = (await this.getDb().selectFrom("listMembers")
+      .select("personId")
+      .where("churchId", "=", churchId)
+      .where("listId", "=", listId)
+      .execute()) as { personId: string }[];
+    return rows.map((r) => r.personId).filter((id) => !!id);
   }
 
   public async setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {

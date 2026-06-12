@@ -1,2 +1,1 @@
-// Attendance-specific helpers would go here
-// All common helpers are available in ../../../shared/helpers
+export { SecurityCodeHelper } from "./SecurityCodeHelper.js";

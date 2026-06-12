@@ -1,3 +1,4 @@
+export { CampaignRepo } from "./CampaignRepo.js";
 export { DonationBatchRepo } from "./DonationBatchRepo.js";
 export { DonationRepo } from "./DonationRepo.js";
 export { FundDonationRepo } from "./FundDonationRepo.js";
@@ -6,6 +7,7 @@ export { GatewayRepo } from "./GatewayRepo.js";
 export { CustomerRepo } from "./CustomerRepo.js";
 export { GatewayPaymentMethodRepo } from "./GatewayPaymentMethodRepo.js";
 export { EventLogRepo } from "./EventLogRepo.js";
+export { PledgeRepo } from "./PledgeRepo.js";
 export { SubscriptionRepo } from "./SubscriptionRepo.js";
 export { SubscriptionFundsRepo } from "./SubscriptionFundsRepo.js";
 export { Repos } from "./Repos.js";

@@ -7,6 +7,7 @@ BEGIN
 -- Truncate all tables in correct order to respect foreign key constraints
 TRUNCATE TABLE visitSessions;
 TRUNCATE TABLE visits;
+TRUNCATE TABLE labelTemplates;
 TRUNCATE TABLE sessions;
 TRUNCATE TABLE groupServiceTimes;
 TRUNCATE TABLE serviceTimes;

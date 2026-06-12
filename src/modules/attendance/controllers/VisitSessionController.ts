@@ -4,6 +4,7 @@ import axios from "axios";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { VisitSession, Visit, Session, ServiceTime } from "../models/index.js";
 import { Permissions, Environment } from "../../../shared/helpers/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @controller("/attendance/visitsessions")
 export class VisitSessionController extends AttendanceBaseController {
@@ -43,6 +44,7 @@ export class VisitSessionController extends AttendanceBaseController {
         if (existingSession == null) {
           const vs: VisitSession = { churchId: au.churchId, sessionId, visitId: visit.id };
           await this.repos.visitSession.save(vs);
+          await WebhookDispatcher.emit(au.churchId, "attendance.recorded", { ...visit, visitSessions: [vs] });
         }
         return {};
       }

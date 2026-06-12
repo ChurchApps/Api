@@ -27,7 +27,7 @@ export class GroupMemberController extends MembershipBaseController {
   public async getbasic(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const result = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
-      return this.repos.groupMember.convertAllToBasicModel(au.churchId, result);
+      return this.repos.groupMember.convertAllToBasicModel(au.churchId, this.filterMinors(result, au, groupId));
     });
   }
 
@@ -50,13 +50,23 @@ export class GroupMemberController extends MembershipBaseController {
       if (!hasAccess) return this.json({}, 401);
       else {
         let result = null;
-        if (req.query.groupId !== undefined) result = await this.repos.groupMember.loadForGroup(au.churchId, req.query.groupId.toString());
+        if (req.query.groupId !== undefined) result = this.filterMinors((await this.repos.groupMember.loadForGroup(au.churchId, req.query.groupId.toString())) as any[], au, req.query.groupId.toString());
         else if (req.query.groupIds !== undefined) result = await this.repos.groupMember.loadForGroups(au.churchId, req.query.groupIds.toString().split(","));
         else if (req.query.personId !== undefined) result = await this.repos.groupMember.loadForPerson(au.churchId, req.query.personId.toString());
         else result = await this.repos.groupMember.loadAll(au.churchId);
         return this.repos.groupMember.convertAllToModel(au.churchId, result);
       }
     });
+  }
+
+  // Under-13 privacy: regular members see the roster without known minors;
+  // staff and the group's leaders see everyone. Unknown birthDate stays visible.
+  private filterMinors(rows: any[], au: any, groupId: string): any[] {
+    if (!Array.isArray(rows)) return rows;
+    if (au.checkAccess(Permissions.groupMembers.view) || au.leaderGroupIds?.includes(groupId)) return rows;
+    const cutoff = new Date();
+    cutoff.setFullYear(cutoff.getFullYear() - 13);
+    return rows.filter((r) => !r.birthDate || new Date(r.birthDate) <= cutoff);
   }
 
   @httpPost("/")
@@ -72,7 +82,10 @@ export class GroupMemberController extends MembershipBaseController {
         const isNew = !gm.id;
         promises.push(
           this.repos.groupMember.save(gm).then(async (saved) => {
-            if (isNew) await WebhookDispatcher.emit(au.churchId, "group.member.added", saved);
+            if (isNew) {
+              await this.repos.groupMemberHistory.log(au.churchId, saved.groupId, saved.personId, "joined");
+              await WebhookDispatcher.emit(au.churchId, "group.member.added", saved);
+            }
             return saved;
           })
         );
@@ -106,6 +119,7 @@ export class GroupMemberController extends MembershipBaseController {
       for (const personId of newPersonIds) {
         const saved = await this.repos.groupMember.save({ churchId: au.churchId, groupId, personId, leader: false });
         await UserChurchHelper.createForGroupMember(au.churchId, personId);
+        await this.repos.groupMemberHistory.log(au.churchId, groupId, personId, "joined");
         await WebhookDispatcher.emit(au.churchId, "group.member.added", saved);
         added.push(saved);
       }
@@ -128,7 +142,10 @@ export class GroupMemberController extends MembershipBaseController {
       const toRemove = existing.filter((gm) => personIds.indexOf(gm.personId) !== -1);
 
       await this.repos.groupMember.deleteForGroupAndPeople(au.churchId, groupId, toRemove.map((gm) => gm.personId));
-      for (const gm of toRemove) await WebhookDispatcher.emit(au.churchId, "group.member.removed", gm);
+      for (const gm of toRemove) {
+        await this.repos.groupMemberHistory.log(au.churchId, groupId, gm.personId, "left");
+        await WebhookDispatcher.emit(au.churchId, "group.member.removed", gm);
+      }
 
       return this.json({ success: true, removedIds: toRemove.map((gm) => gm.personId), count: toRemove.length });
     });
@@ -154,6 +171,7 @@ export class GroupMemberController extends MembershipBaseController {
       const member: GroupMember = { churchId: au.churchId, groupId, personId: au.personId, leader: false };
       const saved = await this.repos.groupMember.save(member);
       await UserChurchHelper.createForGroupMember(au.churchId, saved.personId);
+      await this.repos.groupMemberHistory.log(au.churchId, groupId, saved.personId, "joined");
       await WebhookDispatcher.emit(au.churchId, "group.member.added", saved);
       return this.repos.groupMember.convertToModel(au.churchId, saved);
     });
@@ -165,6 +183,7 @@ export class GroupMemberController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const existing = await this.repos.groupMember.load(au.churchId, id);
       await this.repos.groupMember.delete(au.churchId, id);
+      if (existing) await this.repos.groupMemberHistory.log(au.churchId, (existing as any).groupId, (existing as any).personId, "left");
       await WebhookDispatcher.emit(au.churchId, "group.member.removed", existing ?? { id, churchId: au.churchId });
       return {};
     });

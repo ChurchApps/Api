@@ -18,6 +18,7 @@ BEGIN
     TRUNCATE TABLE plans;
     TRUNCATE TABLE planTypes;
     TRUNCATE TABLE positions;
+    TRUNCATE TABLE schedulingPreferences;
     TRUNCATE TABLE times;
     TRUNCATE TABLE tasks;
     TRUNCATE TABLE conditions;
@@ -26,6 +27,8 @@ BEGIN
     TRUNCATE TABLE workflowStepRoutes;
     TRUNCATE TABLE workflowCategories;
     TRUNCATE TABLE workflowTriggers;
+    TRUNCATE TABLE workflowStepActions;
+    TRUNCATE TABLE automationExecutions;
     SET FOREIGN_KEY_CHECKS = 1;
 
     -- Create Plan Types

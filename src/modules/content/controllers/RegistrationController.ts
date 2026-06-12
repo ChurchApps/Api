@@ -4,6 +4,7 @@ import { ContentBaseController } from "./ContentBaseController.js";
 import { Registration, RegistrationMember } from "../models/index.js";
 import { Permissions, RegistrationHelper } from "../helpers/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 interface RegisterRequest {
   churchId: string;
@@ -92,6 +93,8 @@ export class RegistrationController extends ContentBaseController {
           members.push(saved);
         }
       }
+
+      await WebhookDispatcher.emit(data.churchId, "registration.created", { ...registration, members });
 
       // Send confirmation email
       try {
