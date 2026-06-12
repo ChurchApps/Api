@@ -18,6 +18,9 @@ BEGIN
     TRUNCATE TABLE users;
     TRUNCATE TABLE userChurches;
     TRUNCATE TABLE groupMembers;
+    TRUNCATE TABLE groupMemberHistory;
+    TRUNCATE TABLE lists;
+    TRUNCATE TABLE listMembers;
     TRUNCATE TABLE associatedGroups;
     TRUNCATE TABLE notes;
     TRUNCATE TABLE `groups`;

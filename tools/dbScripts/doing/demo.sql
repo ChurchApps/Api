@@ -27,6 +27,8 @@ BEGIN
     TRUNCATE TABLE workflowStepRoutes;
     TRUNCATE TABLE workflowCategories;
     TRUNCATE TABLE workflowTriggers;
+    TRUNCATE TABLE workflowStepActions;
+    TRUNCATE TABLE automationExecutions;
     SET FOREIGN_KEY_CHECKS = 1;
 
     -- Create Plan Types

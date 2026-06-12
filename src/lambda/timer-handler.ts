@@ -42,6 +42,18 @@ export const handle15MinTimer = async (_event: ScheduledEvent, _context: Context
     console.log("[handle15MinTimer] Processing individual email notifications...");
     const emailResult = await NotificationHelper.sendEmailNotifications("individual");
     console.log("[handle15MinTimer] sendEmailNotifications result:", JSON.stringify(emailResult));
+
+    console.log("[handle15MinTimer] Sending approval digest emails...");
+    const { ApprovalHelper } = await import("../modules/content/helpers/ApprovalHelper.js");
+    const digestResult = await ApprovalHelper.sendApprovalDigests();
+    console.log("[handle15MinTimer] sendApprovalDigests result:", JSON.stringify(digestResult));
+
+    console.log("[handle15MinTimer] Processing due automation executions...");
+    const { ExecutionHelper } = await import("../modules/doing/helpers/ExecutionHelper.js");
+    const doingRepos = await RepoManager.getRepos<any>("doing");
+    const retried = await ExecutionHelper.processDue(doingRepos);
+    console.log(`[handle15MinTimer] executionRetries=${retried}`);
+
     console.log("[handle15MinTimer] ========== TIMER COMPLETE ==========");
     console.log("[handle15MinTimer] Total execution time:", Date.now() - startTime, "ms");
   } catch (error) {
@@ -131,11 +143,6 @@ export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Con
     // Recurring scheduled rules (pull path of the unified RuleEngine).
     const { RuleEngine } = await import("../modules/doing/helpers/RuleEngine.js");
     await RuleEngine.runScheduled(doingRepos);
-
-    // Retry queue: re-attempt automation executions whose backoff window arrived.
-    const { ExecutionHelper } = await import("../modules/doing/helpers/ExecutionHelper.js");
-    const retried = await ExecutionHelper.processDue(doingRepos);
-    console.log(`[handleScheduledTasks] executionRetries=${retried}`);
 
     console.log("Scheduled tasks completed");
   } catch (error) {

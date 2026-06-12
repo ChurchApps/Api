@@ -138,8 +138,16 @@ export class EventController extends ContentBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Event[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      // else {
+      const hasStaffAccess = au.checkAccess(Permissions.content.edit) || au.checkAccess(Permissions.calendars.admin);
+      if (!hasStaffAccess) {
+        for (const event of req.body) {
+          if (!event.groupId || !au.leaderGroupIds?.includes(event.groupId)) return this.json({}, 401);
+          if (event.id) {
+            const existing = await this.repos.event.load(au.churchId, event.id);
+            if (!existing || !existing.groupId || !au.leaderGroupIds?.includes(existing.groupId)) return this.json({}, 401);
+          }
+        }
+      }
       const promises: Promise<Event>[] = [];
       req.body.forEach((event) => {
         event.churchId = au.churchId;
@@ -153,7 +161,6 @@ export class EventController extends ContentBaseController {
       });
       const result = await Promise.all(promises);
       return result;
-      // }
     });
   }
 
