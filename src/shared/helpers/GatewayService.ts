@@ -167,6 +167,15 @@ export class GatewayService {
     return [];
   }
 
+  static async getSubscription(gateway: any, subscriptionId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (typeof provider.getSubscription === "function") {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.getSubscription(config, subscriptionId);
+    }
+    return null;
+  }
+
   static async getCustomerPaymentMethods(gateway: any, customer: any): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.getCustomerPaymentMethods) {

@@ -175,12 +175,39 @@ export class PaymentMethodController extends GivingBaseController {
               });
             }
           } else if (gateway.provider?.toLowerCase() === "kingdomfunding" && Array.isArray(rawPaymentMethods)) {
-            // Only show KF payment methods that have a local record (user hasn't "deleted" them)
-            const localRecords = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
+            // Soft-delete model: a payment method only appears if it has a local
+            // gatewayPaymentMethods record. Users can "delete" without revoking the
+            // card at the gateway (which would break any other system using it).
+            //
+            // Bootstrap path: if the local table is empty for this customer but the
+            // gateway has cards (e.g. first load of a church that already had Kingdom
+            // Funding cards, or after a local DB clear during dev/migration), auto-import
+            // them as a one-time seed so the soft-delete model has something to track.
+            let localRecords = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
+            if (localRecords.length === 0 && rawPaymentMethods.length > 0) {
+              for (const pm of rawPaymentMethods) {
+                const pmId = String(pm.id);
+                const isBank = pm.type === "check";
+                const last4 = pm.last_4 || pm.last4 || "";
+                const cardType = pm.card_type || pm.type || (isBank ? "Bank" : "Card");
+                try {
+                  await this.repos.gatewayPaymentMethod.save({
+                    churchId: au.churchId,
+                    gatewayId: gateway.id,
+                    customerId: customer.id,
+                    externalId: pmId,
+                    methodType: isBank ? "bank" : "card",
+                    displayName: `${cardType} •••• ${last4}`.trim(),
+                    metadata: { status: "active", brand: cardType, last4 }
+                  });
+                } catch (e) { /* ignore individual import failures */ }
+              }
+              localRecords = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
+            }
             const localExternalIds = new Set(localRecords.map((r: any) => String(r.externalId)));
             for (const pm of rawPaymentMethods) {
               const pmId = String(pm.id);
-              if (!localExternalIds.has(pmId)) continue; // Skip payment methods removed by user
+              if (!localExternalIds.has(pmId)) continue; // soft-deleted by user
               const cardType = pm.card_type || pm.type || "Card";
               const last4 = pm.last_4 || pm.last4 || "";
               normalizedMethods.push({
@@ -620,7 +647,6 @@ export class PaymentMethodController extends GivingBaseController {
       }
 
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: resolvedProvider }, this.repos.gateway).catch(() => null);
-      console.log("[PM Delete] resolvedProvider:", resolvedProvider, "gateway found:", !!gateway, "pmId:", id, "customerId:", customerId);
 
       let permission = false;
       if (gateway) {
@@ -638,31 +664,24 @@ export class PaymentMethodController extends GivingBaseController {
           }
         }
       }
-      console.log("[PM Delete] permission:", permission);
       if (!permission) return this.json({}, 401);
 
       try {
-        console.log("[PM Delete] Calling detachPaymentMethod for", resolvedProvider, "pmId:", id);
-
-        let remoteDeleteOk = false;
         try {
           if (id.startsWith("ba_")) {
             await GatewayService.deleteBankAccount(gateway, customerId, id);
           } else {
             await GatewayService.detachPaymentMethod(gateway, id);
           }
-          remoteDeleteOk = true;
         } catch (detachErr: any) {
           const msg = detachErr?.message || "";
           if (resolvedProvider === "kingdomfunding" && msg.includes("active recurring")) {
             // Try to cancel linked subscriptions, then retry
-            console.log("[PM Delete] PM has active recurring schedules, attempting to cancel and retry...");
             try {
               const provider = GatewayFactory.getProvider(gateway.provider);
               const config = GatewayService.getGatewayConfig(gateway);
               const schedules = await (provider as any).getCustomerSubscriptions(config, customerId);
               const activeSchedules = (schedules || []).filter((s: any) => s.payment_method_id?.toString() === id && s.active !== false);
-              console.log("[PM Delete] Cancelling", activeSchedules.length, "active subscriptions");
               for (const schedule of activeSchedules) {
                 try {
                   await provider.cancelSubscription(config, schedule.id.toString());
@@ -672,7 +691,6 @@ export class PaymentMethodController extends GivingBaseController {
                 }
               }
               await GatewayService.detachPaymentMethod(gateway, id);
-              remoteDeleteOk = true;
             } catch (retryErr: any) {
               // Could not delete from Accept Blue — proceed to clean up locally only
               console.warn("[PM Delete] Could not delete PM from provider, cleaning up local records only:", retryErr?.message || retryErr);
@@ -688,7 +706,6 @@ export class PaymentMethodController extends GivingBaseController {
           await this.repos.gatewayPaymentMethod.deleteByExternalId(au.churchId, gateway.id, id);
         }
 
-        console.log("[PM Delete] Done. Remote delete:", remoteDeleteOk ? "success" : "skipped (local cleanup only)");
         return this.json({});
       } catch (e: any) {
         return this.json({

@@ -69,7 +69,9 @@ export class CustomerController extends GivingBaseController {
             const providerName = gw.provider?.toLowerCase();
 
             if (providerName === "kingdomfunding") {
-              // Skip inactive/canceled schedules
+              // Accept Blue uses `active` as the lifecycle flag — cancelled schedules
+              // are returned with active:false. (Their `status` field stays "active"
+              // even after cancellation, so don't rely on it.)
               if (!sub.active) continue;
 
               // Normalize Accept Blue recurring-schedule to Stripe-like format.

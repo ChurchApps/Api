@@ -69,10 +69,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
    * The API docs show webhook CRUD but we'll handle setup in the admin UI.
    * This method is a no-op placeholder; ensureWebhookExists() is the real entry point.
    */
-  async createWebhookEndpoint(config: GatewayConfig, webhookUrl: string): Promise<{ id: string; secret?: string }> {
-    // KingdomFunding webhook creation is done via the Control Panel
-    // Return empty — the admin should set this up manually or via ensureWebhookExists
-    console.log("KingdomFunding: createWebhookEndpoint called (webhooks configured via Control Panel)", { webhookUrl });
+  async createWebhookEndpoint(_config: GatewayConfig, _webhookUrl: string): Promise<{ id: string; secret?: string }> {
+    // KingdomFunding webhook creation is done via the Control Panel, not via API.
     return { id: "", secret: "" };
   }
 
@@ -518,7 +516,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
           // If the payment method already exists for this customer, reuse it
           const existingPm = pmErr.response?.data?.error_details?.payment_method;
           if (existingPm?.id) {
-            console.log("KingdomFunding: Payment method already exists, reusing", { pmId: existingPm.id });
             paymentMethodId = existingPm.id;
           } else {
             console.error("KingdomFunding: Failed to create payment method", pmErr.response?.data || pmErr.message);
@@ -650,16 +647,12 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   async cancelSubscription(config: GatewayConfig, subscriptionId: string, _reason?: string): Promise<void> {
     try {
       const baseUrl = this.getBaseUrl(config);
-      console.log("KingdomFunding cancelSubscription: deactivating schedule", { subscriptionId, url: `${baseUrl}/recurring-schedules/${subscriptionId}` });
-
       // Deactivate by setting active: false
-      const response = await Axios.patch(
+      await Axios.patch(
         `${baseUrl}/recurring-schedules/${subscriptionId}`,
         { active: false },
         this.axiosConfig(config)
       );
-
-      console.log("KingdomFunding: Recurring schedule deactivated", { subscriptionId, responseData: response.data });
     } catch (error: any) {
       console.error("KingdomFunding cancelSubscription error:", {
         subscriptionId,
@@ -788,14 +781,40 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     }
   }
 
-  async getCustomerSubscriptions(config: GatewayConfig, customerId: string): Promise<any> {
+  async getSubscription(config: GatewayConfig, subscriptionId: string): Promise<any> {
     try {
       const baseUrl = this.getBaseUrl(config);
       const response = await Axios.get(
-        `${baseUrl}/customers/${customerId}/recurring-schedules`,
-        { ...this.axiosConfig(config), timeout: 15000 }
+        `${baseUrl}/recurring-schedules/${subscriptionId}`,
+        this.axiosConfig(config)
       );
-      return response.data || [];
+      return response.data || null;
+    } catch (error: any) {
+      console.error("KingdomFunding getSubscription error:", error.response?.data || error.message);
+      return null;
+    }
+  }
+
+  async getCustomerSubscriptions(config: GatewayConfig, customerId: string): Promise<any> {
+    try {
+      const baseUrl = this.getBaseUrl(config);
+      // Accept Blue paginates (default ~10/page) and may ignore per_page. Walk pages
+      // until we get an empty batch OR a page returns no new IDs (param ignored case).
+      const all: any[] = [];
+      const seen = new Set<string>();
+      for (let page = 1; page <= 50; page++) {
+        const response = await Axios.get(
+          `${baseUrl}/customers/${customerId}/recurring-schedules`,
+          { ...this.axiosConfig(config), timeout: 15000, params: { page, per_page: 100 } }
+        );
+        const batch: any[] = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+        if (batch.length === 0) break;
+        const fresh = batch.filter((s: any) => !seen.has(String(s.id)));
+        if (fresh.length === 0) break;
+        fresh.forEach((s: any) => seen.add(String(s.id)));
+        all.push(...fresh);
+      }
+      return all;
     } catch (error: any) {
       console.error("KingdomFunding getCustomerSubscriptions error:", error.response?.data || error.message);
       return [];
@@ -835,14 +854,21 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       const payload: any = {};
 
+      // Accept Blue requires expiry_month / expiry_year as integers (not strings).
+      // Frontend tokenization returns them as strings — coerce here defensively.
+      const expMonth = options.expiry_month != null && options.expiry_month !== ""
+        ? Number(options.expiry_month) : undefined;
+      const expYear = options.expiry_year != null && options.expiry_year !== ""
+        ? Number(options.expiry_year) : undefined;
+
       const pmIdStr = paymentMethodId ? String(paymentMethodId) : "";
       if (options.source || pmIdStr.startsWith("nonce-") || pmIdStr.startsWith("ref-")) {
         // Save from a nonce token or transaction reference
         payload.source = options.source || pmIdStr;
         // Only auto-prefix with nonce- if it's not already prefixed
         if (!payload.source.startsWith("nonce-") && !payload.source.startsWith("ref-")) payload.source = `nonce-${payload.source}`;
-        if (options.expiry_month) payload.expiry_month = options.expiry_month;
-        if (options.expiry_year) payload.expiry_year = options.expiry_year;
+        if (expMonth != null && !Number.isNaN(expMonth)) payload.expiry_month = expMonth;
+        if (expYear != null && !Number.isNaN(expYear)) payload.expiry_year = expYear;
       } else if (options.routing_number) {
         // Save a check/ACH payment method
         payload.routing_number = options.routing_number;
@@ -853,19 +879,30 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       } else {
         // Save card data
         payload.card = options.card;
-        payload.expiry_month = options.expiry_month;
-        payload.expiry_year = options.expiry_year;
+        if (expMonth != null && !Number.isNaN(expMonth)) payload.expiry_month = expMonth;
+        if (expYear != null && !Number.isNaN(expYear)) payload.expiry_year = expYear;
         payload.name = options.name || "";
         if (options.avs_zip) payload.avs_zip = options.avs_zip;
       }
 
-      const response = await Axios.post(
-        `${baseUrl}/customers/${customerId}/payment-methods`,
-        payload,
-        this.axiosConfig(config)
-      );
-
-      return response.data;
+      try {
+        const response = await Axios.post(
+          `${baseUrl}/customers/${customerId}/payment-methods`,
+          payload,
+          this.axiosConfig(config)
+        );
+        return response.data;
+      } catch (err: any) {
+        // Accept Blue rejects duplicate card adds with an Invalid state error and
+        // returns the EXISTING payment_method in error_details. Treat that as success
+        // and reuse the existing payment-method ID.
+        const errDetails = err.response?.data?.error_details;
+        const existing = errDetails?.payment_method;
+        if (existing?.id) {
+          return existing;
+        }
+        throw err;
+      }
     } catch (error: any) {
       console.error("KingdomFunding attachPaymentMethod error:", JSON.stringify(error.response?.data) || error.message);
       throw new Error(error.response?.data?.error_message || error.message || "Failed to save payment method");
@@ -879,7 +916,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   async detachPaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId?: string): Promise<any> {
     try {
       const baseUrl = this.getBaseUrl(config);
-      console.log("KingdomFunding detachPaymentMethod:", { paymentMethodId, customerId });
       const response = await Axios.delete(
         `${baseUrl}/payment-methods/${paymentMethodId}`,
         this.axiosConfig(config)

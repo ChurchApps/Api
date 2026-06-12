@@ -64,14 +64,30 @@ export class SubscriptionController extends GivingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string; reason?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const subscription = await this.repos.subscription.load(au.churchId, id) as any;
-      const permission = au.checkAccess(Permissions.donations.edit) || subscription?.personId === au.personId;
-      if (!permission) return this.json(null, 401);
+      let permission = au.checkAccess(Permissions.donations.edit) || subscription?.personId === au.personId;
 
       // Resolve gateway via provider query/body param or by looking up the customer's provider
       const provider = req.query?.provider?.toString() || req.body?.provider;
       let gateway = provider
         ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
         : null;
+
+      // KingdomFunding subscriptions are not persisted in the local `subscription`
+      // table, so the personId-on-subscription check above can never grant access.
+      // Fall back to verifying that the schedule's customer_id matches the
+      // requester's KF customer record for this church.
+      if (!permission && !subscription && provider?.toLowerCase() === "kingdomfunding" && gateway) {
+        const schedule = await GatewayService.getSubscription(gateway, id).catch(() => null);
+        const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
+        if (remoteCustomerId) {
+          const ownerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, provider).catch(() => null) as any;
+          if (ownerCustomer && String(ownerCustomer.id) === remoteCustomerId) {
+            permission = true;
+          }
+        }
+      }
+
+      if (!permission) return this.json(null, 401);
 
       if (!gateway && subscription?.customerId) {
         const customer = await this.repos.customer.load(au.churchId, subscription.customerId) as any;

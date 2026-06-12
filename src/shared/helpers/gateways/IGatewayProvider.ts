@@ -55,6 +55,7 @@ export interface IGatewayProvider {
   // Customer management
   createCustomer?(config: GatewayConfig, email: string, name: string): Promise<string>;
   getCustomerSubscriptions?(config: GatewayConfig, customerId: string): Promise<any>;
+  getSubscription?(config: GatewayConfig, subscriptionId: string): Promise<any>;
   getCustomerPaymentMethods?(config: GatewayConfig, customer: any): Promise<any>;
 
   // Payment method management
