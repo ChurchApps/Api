@@ -1,6 +1,6 @@
 import { List, ListRuleCondition, ListRuleGroup, SearchCondition } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
-import { getAttendanceModuleGateway, getDoingModuleGateway, getGivingModuleGateway } from "../../../shared/modules/index.js";
+import { getAttendanceModuleGateway, getGivingModuleGateway } from "../../../shared/modules/index.js";
 import { PersonConditionHelper } from "./PersonConditionHelper.js";
 
 interface EvalContext {
@@ -65,12 +65,7 @@ export class ListRuleHelper {
         }
         return new Set(await getAttendanceModuleGateway().loadAttendeePersonIds(ctx.churchId, scope, start, end));
       }
-      case "serving": {
-        const hasWindow = c.daysAgo !== undefined || c.from !== undefined || c.to !== undefined;
-        if (!hasWindow) return new Set(await getDoingModuleGateway().loadServingPersonIds(ctx.churchId));
-        const { start, end } = this.getWindow(c);
-        return new Set(await getDoingModuleGateway().loadServingPersonIds(ctx.churchId, start, end));
-      }
+      // ponytail: "serving" case removed — no B1Admin producer; add back when UI ships the filter
       case "list": return this.evalList(c, ctx);
       default: return new Set();
     }
@@ -93,28 +88,14 @@ export class ListRuleHelper {
 
   private static async evalForm(c: ListRuleCondition, ctx: EvalContext): Promise<Set<string>> {
     if (!c.entityId) return new Set();
-    if (c.field === "answer") {
-      const question: any = await ctx.repos.question.load(ctx.churchId, c.entityId);
-      if (!question) return new Set();
-      const answers = await ctx.repos.answer.loadForQuestionWithPerson(ctx.churchId, c.entityId);
-      const ids = new Set<string>();
-      answers.forEach((a) => {
-        if (a.personId && this.matchAnswer(question.fieldType, a.value, c.operator ?? "contains", c.value ?? "")) ids.add(a.personId);
-      });
-      return ids;
-    }
-    // "submitted": anyone with a person-attached submission of the form, optionally windowed.
-    const submissions = (await ctx.repos.formSubmission.loadByFormId(ctx.churchId, c.entityId)) as any[];
-    const { start, end } = this.getWindow(c);
-    const windowed = c.daysAgo !== undefined || c.from !== undefined || c.to !== undefined;
+    // ponytail: only "answer" field is produced by B1Admin; "submitted" path removed
+    if (c.field !== "answer") return new Set();
+    const question: any = await ctx.repos.question.load(ctx.churchId, c.entityId);
+    if (!question) return new Set();
+    const answers = await ctx.repos.answer.loadForQuestionWithPerson(ctx.churchId, c.entityId);
     const ids = new Set<string>();
-    (submissions || []).forEach((s) => {
-      if (s.contentType !== "person" || !s.contentId) return;
-      if (windowed) {
-        const date = s.submissionDate ? new Date(s.submissionDate) : null;
-        if (!date || date < start || date > end) return;
-      }
-      ids.add(s.contentId);
+    answers.forEach((a) => {
+      if (a.personId && this.matchAnswer(question.fieldType, a.value, c.operator ?? "contains", c.value ?? "")) ids.add(a.personId);
     });
     return ids;
   }

@@ -4,7 +4,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
-export interface PendingBookingRow {
+interface PendingBookingRow {
   id?: string;
   churchId?: string;
   eventId?: string;
@@ -19,7 +19,7 @@ export interface PendingBookingRow {
   resourceApprovalGroupId?: string;
 }
 
-export interface ApprovalDigest {
+interface ApprovalDigest {
   churchId: string;
   approvalGroupId: string;
   bookingIds: string[];
@@ -27,15 +27,11 @@ export interface ApprovalDigest {
 }
 
 export class ApprovalHelper {
-  // Auto-approval-if-requester-is-member: no approval group means no approval
-  // needed; members of the approval group skip the queue.
   public static determineStatus(approvalGroupId: string | null | undefined, requesterGroupIds: string[]): "approved" | "pending" {
     if (!approvalGroupId) return "approved";
     return requesterGroupIds.includes(approvalGroupId) ? "approved" : "pending";
   }
 
-  // Groups pending bookings by church + approval group so each group's
-  // approvers get one digest email covering everything new.
   public static buildDigests(rows: PendingBookingRow[]): ApprovalDigest[] {
     const byKey = new Map<string, ApprovalDigest>();
     for (const row of rows) {
@@ -55,8 +51,6 @@ export class ApprovalHelper {
     return Array.from(byKey.values());
   }
 
-  // 30-minute batched approvals: one email per approver per approval group,
-  // covering every request since the last digest. Called from the 30-min timer.
   public static async sendApprovalDigests(): Promise<{ digests: number; emails: number }> {
     const repos = await RepoManager.getRepos<Repos>("content");
     const pending = await repos.eventBooking.loadUnnotifiedPending();

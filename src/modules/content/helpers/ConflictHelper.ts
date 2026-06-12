@@ -10,8 +10,7 @@ export interface ProposedBooking {
   resources: { resourceId: string; quantity: number }[];
 }
 
-// A booking row joined with its event's schedule (EventBookingRepo.loadActiveFor*).
-export interface BookingWithEvent {
+interface BookingWithEvent {
   id?: string;
   eventId?: string;
   roomId?: string;
@@ -55,7 +54,6 @@ export class ConflictHelper {
     return result;
   }
 
-  // One conflict per (room, other event) pair, reported at the first overlapping occurrence.
   private static findRoomConflicts(proposed: ProposedBooking, occurrences: Occurrence[], ctx: ConflictContext): Conflict[] {
     const result: Conflict[] = [];
     for (const roomId of proposed.roomIds || []) {
@@ -82,7 +80,6 @@ export class ConflictHelper {
     return result;
   }
 
-  // Over-allocation: requested quantity plus overlapping booked quantities exceeds the resource total.
   private static findResourceConflicts(proposed: ProposedBooking, occurrences: Occurrence[], ctx: ConflictContext): Conflict[] {
     const result: Conflict[] = [];
     for (const req of proposed.resources || []) {
@@ -111,8 +108,6 @@ export class ConflictHelper {
     return result;
   }
 
-  // Church-wide blockouts (no room/resource) block everything; targeted ones
-  // only block when their room/resource is part of the proposal.
   private static findBlockoutConflicts(proposed: ProposedBooking, occurrences: Occurrence[], ctx: ConflictContext): Conflict[] {
     const result: Conflict[] = [];
     const resourceIds = (proposed.resources || []).map((r) => r.resourceId);

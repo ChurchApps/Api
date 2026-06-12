@@ -96,14 +96,7 @@ export class AutomationHelper {
         processedPeople.add(personKey);
 
         const position: any = await doing.loadPosition(assignment.churchId, assignment.positionId);
-
-        let subDomain = this.subdomainCache[assignment.churchId];
-        if (!subDomain) {
-          const church = await getMembershipModuleGateway().loadChurch(assignment.churchId);
-          subDomain = church.subDomain;
-          this.subdomainCache[assignment.churchId] = subDomain;
-        }
-
+        const subDomain = await this.getSubDomain(assignment.churchId);
         const serviceDateStr = new Date(assignment.serviceDate).toLocaleDateString("en-US", {
           weekday: "long",
           year: "numeric",

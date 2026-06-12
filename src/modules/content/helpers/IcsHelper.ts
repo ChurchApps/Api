@@ -1,4 +1,4 @@
-export interface ParsedIcsEvent {
+interface ParsedIcsEvent {
   title?: string;
   description?: string;
   start?: Date;
@@ -7,10 +7,6 @@ export interface ParsedIcsEvent {
   recurrenceRule?: string;
 }
 
-// Minimal iCalendar (RFC 5545) VEVENT parser for .ics import. Handles line
-// unfolding, DATE vs DATE-TIME values (UTC "Z" and floating/TZID times — the
-// latter treated as server-local), DURATION fallback, RRULE passthrough and
-// text unescaping. Deliberately not a full spec implementation.
 export class IcsHelper {
   public static parseEvents(icsText: string): ParsedIcsEvent[] {
     const lines = this.unfoldLines(icsText);

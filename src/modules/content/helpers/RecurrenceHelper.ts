@@ -4,7 +4,7 @@ import * as rrulePkg from "rrule";
 // Jest's CJS transform exposes the named exports. Resolve both shapes.
 const RRule = ((rrulePkg as any).RRule ?? (rrulePkg as any).default?.RRule) as typeof rrulePkg.RRule;
 
-export interface OccurrenceSource {
+interface OccurrenceSource {
   start: Date | string;
   end: Date | string;
   recurrenceRule?: string;
@@ -15,15 +15,9 @@ export interface Occurrence {
   end: Date;
 }
 
-// Server-side twin of apphelper's EventHelper.getRange. rrule iterates in UTC,
-// so local wall-clock components are mapped into fake-UTC dates for iteration
-// and back out afterwards — BYDAY etc. then track the event's local day no
-// matter what timezone the server runs in. Occurrence times are forced to the
-// event's local time-of-day so they hold steady across DST.
+// ponytail: rrule iterates in UTC; local dates are mapped to fake-UTC and back so BYDAY tracks local day across server timezone/DST.
 export class RecurrenceHelper {
-  public static readonly MAX_OCCURRENCES = 200;
-
-  public static getOccurrences(event: OccurrenceSource, windowStart: Date, windowEnd: Date, max: number = RecurrenceHelper.MAX_OCCURRENCES): Occurrence[] {
+  public static getOccurrences(event: OccurrenceSource, windowStart: Date, windowEnd: Date, max = 200): Occurrence[] {
     const start = new Date(event.start);
     const end = new Date(event.end);
     const duration = Math.max(end.getTime() - start.getTime(), 0);

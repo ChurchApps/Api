@@ -25,8 +25,6 @@ export class PersonConditionHelper {
       case "anniversaryMonth":
         data.forEach((p) => { p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversary); });
         return ArrayHelper.getAllOperator(data, "anniversaryMonth", c.value, c.operator, "number");
-      case "anniversary":
-        return ArrayHelper.getAllOperator(data, "anniversary", c.value, c.operator);
       case "phone": {
         const matched = ArrayHelper.getAllOperator(data, "homePhone", c.value, c.operator)
           .concat(ArrayHelper.getAllOperator(data, "workPhone", c.value, c.operator))

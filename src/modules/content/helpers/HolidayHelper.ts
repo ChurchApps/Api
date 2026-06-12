@@ -13,7 +13,7 @@ export class HolidayHelper {
     return all.filter((h) => h.date >= s && h.date <= e);
   }
 
-  public static forYear(y: number): Holiday[] {
+  private static forYear(y: number): Holiday[] {
     const easter = this.easter(y);
     const goodFriday = new Date(easter);
     goodFriday.setDate(easter.getDate() - 2);

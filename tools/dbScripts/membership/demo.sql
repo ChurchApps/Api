@@ -402,7 +402,7 @@ INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VAL
 ('GME00000083', 'CHU00000001', 'GRP00000029', 'PER00000056', '2024-01-01', 1), -- Christopher Thomas (Financial Peace leader)
 ('GME00000084', 'CHU00000001', 'GRP00000029', 'PER00000057', '2024-01-01', 0), -- Amanda Thomas
 ('GME00000085', 'CHU00000001', 'GRP00000029', 'PER00000068', '2024-01-01', 0), -- Kevin Martin
-('GME00000086', 'CHU00000001', 'GRP00000029', 'PER00000069', '2024-01-01', 0), -- Rachel Martin
+('GME00000086', 'CHU00000001', 'GRP00000029', 'PER00000069', '2024-01-01', 1), -- Rachel Martin (Financial Peace leader; used by event-permissions Playwright test)
 
 -- Special Events (VBS)
 ('GME00000087', 'CHU00000001', 'GRP00000030', 'PER00000003', '2024-01-01', 0), -- James Smith
