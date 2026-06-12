@@ -212,14 +212,17 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     const existing = await repos.groupMember.loadForPerson(churchId, personId);
     if (Array.isArray(existing) && existing.some((m: any) => m.groupId === groupId)) return;
     await repos.groupMember.save({ churchId, groupId, personId, leader: false });
+    await repos.groupMemberHistory.log(churchId, groupId, personId, "joined");
   }
 
   public async removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void> {
-    await this.getDb().deleteFrom("groupMembers")
+    const result = await this.getDb().deleteFrom("groupMembers")
       .where("churchId", "=", churchId)
       .where("groupId", "=", groupId)
       .where("personId", "=", personId)
       .execute();
+    const deleted = Number(result?.[0]?.numDeletedRows ?? 0);
+    if (deleted > 0) await (await this.repos()).groupMemberHistory.log(churchId, groupId, personId, "left");
   }
 
   public async loadPeopleForAutomation(churchId: string) {

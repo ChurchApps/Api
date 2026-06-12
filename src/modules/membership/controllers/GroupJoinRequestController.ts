@@ -102,6 +102,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       };
       await this.repos.groupMember.save(member);
       await UserChurchHelper.createForGroupMember(au.churchId, member.personId);
+      await this.repos.groupMemberHistory.log(au.churchId, request.groupId, request.personId, "joined");
 
       request.status = "approved";
       request.decidedBy = au.personId;

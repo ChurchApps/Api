@@ -3,7 +3,7 @@ import express from "express";
 import * as ics from "ics";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Event, EventBooking } from "../models/index.js";
-import { CalendarHelper, Permissions } from "../helpers/index.js";
+import { CalendarHelper, HolidayHelper, Permissions } from "../helpers/index.js";
 import { ApprovalHelper } from "../helpers/ApprovalHelper.js";
 import { ConflictHelper, ProposedBooking } from "../helpers/ConflictHelper.js";
 import { IcsHelper } from "../helpers/IcsHelper.js";
@@ -115,6 +115,16 @@ export class EventController extends ContentBaseController {
       const result = await this.repos.event.loadPublicForGroup(churchId, groupId);
       await CalendarHelper.addExceptionDates(result, this.repos);
       return result;
+    });
+  }
+
+  // Holidays in a date window, for the bulk-event "skip holidays" preview.
+  @httpGet("/holidays")
+  public async holidays(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async () => {
+      const start = req.query.start ? new Date(req.query.start.toString()) : new Date();
+      const end = req.query.end ? new Date(req.query.end.toString()) : new Date(start.getFullYear() + 1, start.getMonth(), start.getDate());
+      return HolidayHelper.getHolidays(start, end);
     });
   }
 

@@ -1,5 +1,6 @@
 export { AssociatedGroupRepo } from "./AssociatedGroupRepo.js";
 export { GroupMemberRepo } from "./GroupMemberRepo.js";
+export { GroupMemberHistoryRepo } from "./GroupMemberHistoryRepo.js";
 export { GroupJoinRequestRepo } from "./GroupJoinRequestRepo.js";
 export { GroupRepo } from "./GroupRepo.js";
 export { HouseholdRepo } from "./HouseholdRepo.js";

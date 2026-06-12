@@ -66,6 +66,10 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     await AutomationHelper.remindServiceRequests();
     console.log("[handleMidnightTimer] remindServiceRequests completed in", Date.now() - startTime, "ms");
 
+    console.log("[handleMidnightTimer] Calling AutomationHelper.remindGroupAttendance...");
+    await AutomationHelper.remindGroupAttendance();
+    console.log("[handleMidnightTimer] remindGroupAttendance completed in", Date.now() - startTime, "ms");
+
     // Advance recurring streaming services
     console.log("[handleMidnightTimer] Advancing recurring streaming services...");
     const contentRepos = await RepoManager.getRepos<any>("content");

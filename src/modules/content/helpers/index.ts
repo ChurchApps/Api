@@ -15,6 +15,7 @@ export { PollyHelper } from "./PollyHelper.js";
 export { CalendarHelper } from "./CalendarHelper.js";
 export { RegistrationHelper } from "./RegistrationHelper.js";
 export { RecurrenceHelper } from "./RecurrenceHelper.js";
+export { HolidayHelper } from "./HolidayHelper.js";
 export { ConflictHelper } from "./ConflictHelper.js";
 export { IcsHelper } from "./IcsHelper.js";
 export { ApprovalHelper } from "./ApprovalHelper.js";

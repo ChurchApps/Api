@@ -19,6 +19,7 @@ export class GroupRepo {
       categoryName: group.categoryName,
       name: group.name,
       trackAttendance: group.trackAttendance,
+      attendanceReminders: group.attendanceReminders,
       parentPickup: group.parentPickup,
       printNametag: group.printNametag,
       about: group.about,
@@ -41,6 +42,7 @@ export class GroupRepo {
       categoryName: group.categoryName,
       name: group.name,
       trackAttendance: group.trackAttendance,
+      attendanceReminders: group.attendanceReminders,
       parentPickup: group.parentPickup,
       printNametag: group.printNametag,
       about: group.about,
@@ -119,6 +121,14 @@ export class GroupRepo {
       .execute();
   }
 
+  // Cross-church: the midnight reminder timer sweeps every church in one pass.
+  public async loadAttendanceReminderGroups() {
+    return getDb().selectFrom("groups").selectAll()
+      .where("attendanceReminders", "=", 1 as any)
+      .where("removed", "=", false as any)
+      .execute();
+  }
+
   public async loadByIds(churchId: string, ids: string[]) {
     if (!ids.length) return [];
     return getDb().selectFrom("groups").selectAll().where("churchId", "=", churchId).where("id", "in", ids).orderBy("name").execute();
@@ -169,6 +179,7 @@ export class GroupRepo {
       categoryName: row.categoryName,
       name: row.name,
       trackAttendance: row.trackAttendance,
+      attendanceReminders: row.attendanceReminders,
       parentPickup: row.parentPickup,
       printNametag: row.printNametag,
       memberCount: row.memberCount,
