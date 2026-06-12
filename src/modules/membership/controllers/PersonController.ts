@@ -6,7 +6,7 @@ import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { Environment, Permissions, PersonHelper, UserChurchHelper } from "../helpers/index.js";
+import { Environment, Permissions, PersonConditionHelper, PersonHelper, UserChurchHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
 
@@ -358,43 +358,7 @@ export class PersonController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
       else {
         let data: any[] = (await this.repos.person.loadAll(au.churchId)) as any[];
-        req.body.forEach((c) => {
-          switch (c.field) {
-            case "age":
-              data.forEach((p) => {
-                p.age = PersonHelper.getAge(p.birthDate);
-              });
-              data = ArrayHelper.getAllOperator(data, "age", c.value, c.operator, "number");
-              break;
-            case "yearsMarried":
-              data.forEach((p) => {
-                p.yearsMarried = PersonHelper.getAge(p.anniversary);
-              });
-              data = ArrayHelper.getAllOperator(data, "yearsMarried", c.value, c.operator, "number");
-              break;
-            case "birthMonth":
-              data.forEach((p) => {
-                p.birthMonth = PersonHelper.getBirthMonth(p.birthDate);
-              });
-              data = ArrayHelper.getAllOperator(data, "birthMonth", c.value, c.operator, "number");
-              break;
-            case "anniversaryMonth":
-              data.forEach((p) => {
-                p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversary);
-              });
-              data = ArrayHelper.getAllOperator(data, "anniversaryMonth", c.value, c.operator, "number");
-              break;
-            case "anniversary": data = ArrayHelper.getAllOperator(data, "anniversary", c.value, c.operator); break;
-            case "phone":
-              data = ArrayHelper.getAllOperator(data, "homePhone", c.value, c.operator)
-                .concat(ArrayHelper.getAllOperator(data, "workPhone", c.value, c.operator))
-                .concat(ArrayHelper.getAllOperator(data, "cellPhone", c.value, c.operator));
-              data = ArrayHelper.getUnique(data);
-              break;
-            case "id": data = ArrayHelper.getAllOperatorArray(data, c.field, c.value.split(","), c.operator); break;
-            default: data = ArrayHelper.getAllOperator(data, c.field, c.value, c.operator); break;
-          }
-        });
+        data = PersonConditionHelper.apply(data, req.body);
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
         return await this.filterPeople(result, au);
       }

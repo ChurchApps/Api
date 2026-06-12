@@ -78,6 +78,89 @@ export class GroupController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/health/summary")
+  public async healthSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.view)) return this.json({}, 401);
+      const since = new Date();
+      since.setDate(since.getDate() - 90);
+      const [groups, members, history] = await Promise.all([
+        this.repos.group.loadByTag(au.churchId, "standard"),
+        this.repos.groupMember.loadHealthSummary(au.churchId),
+        this.repos.groupMemberHistory.loadCountsSince(au.churchId, since)
+      ]);
+      return (groups as any[]).map((g) => {
+        const m = (members as any[]).find((r) => r.groupId === g.id);
+        const joins90 = Number((history as any[]).find((h) => h.groupId === g.id && h.action === "joined")?.count || 0);
+        const leaves90 = Number((history as any[]).find((h) => h.groupId === g.id && h.action === "left")?.count || 0);
+        const memberCount = Number(m?.memberCount || 0);
+        return {
+          groupId: g.id,
+          name: g.name,
+          categoryName: g.categoryName,
+          memberCount,
+          leaderCount: Number(m?.leaderCount || 0),
+          averageAge: m?.averageAge === null || m?.averageAge === undefined ? null : Math.round(Number(m.averageAge)),
+          femaleCount: Number(m?.femaleCount || 0),
+          maleCount: Number(m?.maleCount || 0),
+          joins90,
+          leaves90,
+          churnRate90: this.churnRate(memberCount, joins90, leaves90)
+        };
+      });
+    });
+  }
+
+  @httpGet("/:id/health")
+  public async health(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.view) && !au.leaderGroupIds?.includes(id)) return this.json({}, 401);
+      const since = new Date();
+      since.setDate(since.getDate() - 90);
+      const [summary, history, monthlyRows, demographics] = await Promise.all([
+        this.repos.groupMember.loadHealthSummary(au.churchId),
+        this.repos.groupMemberHistory.loadCountsSince(au.churchId, since),
+        this.repos.groupMemberHistory.loadMonthlyStats(au.churchId, id, 12),
+        this.repos.groupMember.loadDemographicsForGroup(au.churchId, id)
+      ]);
+      const m = (summary as any[]).find((r) => r.groupId === id);
+      const joins90 = Number((history as any[]).find((h) => h.groupId === id && h.action === "joined")?.count || 0);
+      const leaves90 = Number((history as any[]).find((h) => h.groupId === id && h.action === "left")?.count || 0);
+      const memberCount = Number(m?.memberCount || 0);
+
+      // Fill the last 12 calendar months so charts get a continuous axis.
+      const monthly: { month: string; joins: number; leaves: number }[] = [];
+      const cursor = new Date();
+      cursor.setDate(1);
+      cursor.setMonth(cursor.getMonth() - 11);
+      for (let i = 0; i < 12; i++) {
+        const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+        const joins = Number((monthlyRows as any[]).find((r) => r.month === key && r.action === "joined")?.count || 0);
+        const leaves = Number((monthlyRows as any[]).find((r) => r.month === key && r.action === "left")?.count || 0);
+        monthly.push({ month: key, joins, leaves });
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+
+      return {
+        memberCount,
+        leaderCount: Number(m?.leaderCount || 0),
+        averageAge: m?.averageAge === null || m?.averageAge === undefined ? null : Math.round(Number(m.averageAge)),
+        joins90,
+        leaves90,
+        churnRate90: this.churnRate(memberCount, joins90, leaves90),
+        monthly,
+        demographics
+      };
+    });
+  }
+
+  // Leaves over the period as a percent of the period's starting size (one decimal).
+  private churnRate(memberCount: number, joins: number, leaves: number): number {
+    const startCount = memberCount - joins + leaves;
+    const base = startCount > 0 ? startCount : memberCount + leaves;
+    return base > 0 ? Math.round((leaves / base) * 1000) / 10 : 0;
+  }
+
   @httpGet("/:id/plans")
   public async getPlans(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -5,4 +5,5 @@ export class Assignment {
   public personId?: string;
   public status?: string;
   public notified?: Date;
+  public autofillRunId?: string;
 }

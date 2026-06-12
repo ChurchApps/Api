@@ -1,9 +1,12 @@
 export { AssociatedGroup } from "./AssociatedGroup.js";
 export { Group } from "./Group.js";
 export { GroupMember } from "./GroupMember.js";
+export { GroupMemberHistory } from "./GroupMemberHistory.js";
 export { GroupJoinRequest } from "./GroupJoinRequest.js";
 export { Household } from "./Household.js";
 export { List } from "./List.js";
+export { ListMember } from "./ListMember.js";
+export * from "./ListRules.js";
 export { MemberPermission } from "./MemberPermission.js";
 export { ContactInfo } from "./ContactInfo.js";
 export { Name } from "./Name.js";

@@ -4,6 +4,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Visit, VisitSession, Session } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { SecurityCodeHelper } from "../helpers/index.js";
 
 interface IdCache {
   [name: string]: string;
@@ -114,12 +115,20 @@ export class VisitController extends AttendanceBaseController {
         const deleteVisitIds: string[] = [];
         const deleteVisitSessionIds: string[] = [];
 
+        let securityCode = "";
+        for (let attempt = 0; attempt < 5; attempt++) {
+          securityCode = SecurityCodeHelper.generate();
+          const clashes = await this.repos.visit.loadByCodeToday(au.churchId, securityCode);
+          if (clashes.length === 0) break;
+        }
+
         const submittedVisits = [...req.body];
         submittedVisits.forEach((sv) => {
           sv.churchId = au.churchId;
           sv.visitDate = currentDate;
           sv.checkinTime = new Date();
           sv.addedBy = au.id;
+          if (!sv.securityCode) sv.securityCode = securityCode;
           sv.visitSessions.forEach(async (vs) => {
             vs.sessionId = await this.getSessionId(au.churchId, vs.session.serviceTimeId, vs.session.groupId, currentDate);
             vs.churchId = au.churchId;
@@ -145,7 +154,34 @@ export class VisitController extends AttendanceBaseController {
         await Promise.all(promises);
 
         const streaks = await this.repos.visit.loadConsecutiveWeekStreaks(au.churchId, peopleIds);
-        return { streaks };
+        return { streaks, securityCode };
+      }
+    });
+  }
+
+  @httpGet("/code/:code")
+  public async getByCode(@requestParam("code") code: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
+      else {
+        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByCodeToday(au.churchId, code)) as any);
+        await this.populateSessions(au.churchId, visits);
+        return visits;
+      }
+    });
+  }
+
+  @httpPost("/checkout")
+  public async checkout(req: express.Request<{}, {}, { visitIds: string[]; checkedOutBy?: string; checkedOutById?: string }>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
+      else {
+        const { visitIds, checkedOutBy, checkedOutById } = req.body;
+        if (!visitIds || visitIds.length === 0) return [];
+        await this.repos.visit.checkout(au.churchId, visitIds, checkedOutBy, checkedOutById);
+        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadByIds(au.churchId, visitIds)) as any);
+        for (const visit of visits) await WebhookDispatcher.emit(au.churchId, "attendance.checkout", visit);
+        return visits;
       }
     });
   }
@@ -202,6 +238,18 @@ export class VisitController extends AttendanceBaseController {
         await this.repos.visit.delete(au.churchId, id);
         return this.json({});
       }
+    });
+  }
+
+  private async populateSessions(churchId: string, visits: Visit[]) {
+    if (visits.length === 0) return;
+    const visitIds = visits.map((v) => v.id);
+    const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(churchId, (await this.repos.visitSession.loadByVisitIds(churchId, visitIds)) as any);
+    const sessionIds = visitSessions.map((vs) => vs.sessionId);
+    const sessions: Session[] = sessionIds.length === 0 ? [] : this.repos.session.convertAllToModel(churchId, (await this.repos.session.loadByIds(churchId, sessionIds)) as any);
+    visits.forEach((v) => {
+      v.visitSessions = visitSessions.filter((vs) => vs.visitId === v.id);
+      v.visitSessions.forEach((vs) => (vs.session = sessions.find((s) => s.id === vs.sessionId)));
     });
   }
 

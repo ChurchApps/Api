@@ -169,6 +169,8 @@ functions:
       # Database connections for messaging notifications
       MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/membershipApi/connectionString, ''}
       MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/messagingApi/connectionString, ''}
+      CONTENT_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/contentApi/connectionString, ''}
+      DOING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/doingApi/connectionString, ''}
     events:
       - schedule:
           rate: rate(30 minutes)

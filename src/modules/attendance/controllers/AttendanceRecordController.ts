@@ -41,6 +41,22 @@ export class AttendanceRecordController extends AttendanceBaseController {
     });
   }
 
+  @httpGet("/groupsummary")
+  public async groupSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.viewSummary)) return this.json({}, 401);
+      const weeks = Math.max(parseInt(req.query.weeks?.toString() || "", 10) || 13, 1);
+      const rows = (await this.repos.attendance.loadGroupSummary(au.churchId, weeks)) as any[];
+      return rows.map((r) => ({
+        groupId: r.groupId,
+        sessionCount: Number(r.sessionCount),
+        totalVisits: Number(r.totalVisits),
+        averageAttendance: Number(r.sessionCount) > 0 ? Math.round((Number(r.totalVisits) / Number(r.sessionCount)) * 10) / 10 : 0,
+        lastSessionDate: r.lastSessionDate
+      }));
+    });
+  }
+
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {

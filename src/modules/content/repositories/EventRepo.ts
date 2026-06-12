@@ -33,7 +33,9 @@ export class EventRepo {
       registrationOpenDate: m.registrationOpenDate,
       registrationCloseDate: m.registrationCloseDate,
       tags: m.tags,
-      formId: m.formId
+      formId: m.formId,
+      approvalStatus: m.approvalStatus,
+      requestedBy: m.requestedBy
     } as any).execute();
     return model;
   }
@@ -58,7 +60,9 @@ export class EventRepo {
       registrationOpenDate: m.registrationOpenDate,
       registrationCloseDate: m.registrationCloseDate,
       tags: m.tags,
-      formId: m.formId
+      formId: m.formId,
+      approvalStatus: m.approvalStatus,
+      requestedBy: m.requestedBy
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -95,6 +99,24 @@ export class EventRepo {
       .where("churchId", "=", churchId)
       .where("tags", "like", "%" + tag + "%")
       .orderBy("start").execute() as any;
+  }
+
+  public async loadPendingApproval(churchId: string): Promise<Event[]> {
+    return getDb().selectFrom("events").selectAll()
+      .where("churchId", "=", churchId)
+      .where("approvalStatus", "=", "pending")
+      .orderBy("start").execute() as any;
+  }
+
+  // Events with an approved booking for the room, for per-room iCal feeds.
+  public async loadForRoom(churchId: string, roomId: string): Promise<Event[]> {
+    return getDb().selectFrom("events")
+      .innerJoin("eventBookings", "eventBookings.eventId", "events.id")
+      .selectAll("events")
+      .where("events.churchId", "=", churchId)
+      .where("eventBookings.roomId", "=", roomId)
+      .where("eventBookings.status", "=", "approved")
+      .orderBy("events.start").execute() as any;
   }
 
   public async loadRegistrationEnabled(churchId: string): Promise<Event[]> {
@@ -156,7 +178,9 @@ export class EventRepo {
       registrationOpenDate: row.registrationOpenDate,
       registrationCloseDate: row.registrationCloseDate,
       tags: row.tags,
-      formId: row.formId
+      formId: row.formId,
+      approvalStatus: row.approvalStatus,
+      requestedBy: row.requestedBy
     };
   }
 }

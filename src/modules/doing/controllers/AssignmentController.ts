@@ -3,6 +3,7 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Assignment, Plan, Position } from "../models/index.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
+import { PlanHelper } from "../helpers/PlanHelper.js";
 
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
@@ -10,6 +11,15 @@ export class AssignmentController extends DoingBaseController {
   public async getMy(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.assignment.loadByByPersonId(au.churchId, au.personId);
+    });
+  }
+
+  @httpGet("/monthCounts")
+  public async getMonthCounts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const dateString = typeof req.query.date === "string" ? req.query.date : "";
+      const date = dateString ? new Date(dateString) : new Date();
+      return await this.repos.assignment.loadMonthServeCounts(au.churchId, date);
     });
   }
 
@@ -55,7 +65,14 @@ export class AssignmentController extends DoingBaseController {
       if (assignment.personId !== au.personId) throw new Error("Invalid Assignment");
       else {
         assignment.status = "Declined";
-        return await this.repos.assignment.save(assignment);
+        const result = await this.repos.assignment.save(assignment);
+        try {
+          await PlanHelper.autoReplaceDeclined(au.churchId, assignment, this.repos);
+        } catch (e) {
+          // A replacement failure must never block the decline itself.
+          console.error("autoReplaceDeclined failed:", e);
+        }
+        return result;
       }
     });
   }
@@ -127,6 +144,8 @@ export class AssignmentController extends DoingBaseController {
       req.body.forEach((assignment) => {
         assignment.churchId = au.churchId;
         if (!assignment.status) assignment.status = "Unconfirmed";
+        // JSON bodies carry notified as an ISO string, which MySQL rejects for DATETIME.
+        if (assignment.notified) assignment.notified = new Date(assignment.notified);
         promises.push(this.repos.assignment.save(assignment));
       });
       const result = await Promise.all(promises);

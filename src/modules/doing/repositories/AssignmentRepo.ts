@@ -12,12 +12,12 @@ export class AssignmentRepo {
 
   private async create(model: Assignment): Promise<Assignment> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("assignments").values({ id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified }).execute();
+    await getDb().insertInto("assignments").values({ id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified, autofillRunId: model.autofillRunId }).execute();
     return model;
   }
 
   private async update(model: Assignment): Promise<Assignment> {
-    await getDb().updateTable("assignments").set({ positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("assignments").set({ positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified, autofillRunId: model.autofillRunId }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -71,8 +71,55 @@ export class AssignmentRepo {
       .execute();
   }
 
+  // Member-facing: penciled-in (prepared) plans stay hidden until published.
   public async loadByByPersonId(churchId: string, personId: string) {
-    return getDb().selectFrom("assignments").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).execute();
+    return getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .selectAll("a")
+      .where("a.churchId", "=", churchId)
+      .where("a.personId", "=", personId)
+      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
+      .execute();
+  }
+
+  // Non-declined assignments per person for plans in the calendar month of the given date.
+  public async loadMonthServeCounts(churchId: string, serviceDate: Date): Promise<{ personId: string; count: number }[]> {
+    const rows = await getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .select(["a.personId", sql<number>`COUNT(*)`.as("count")])
+      .where("a.churchId", "=", churchId)
+      .where((eb) => eb.or([eb("a.status", "is", null), eb("a.status", "!=", "Declined")]))
+      .where(sql`YEAR(pl.serviceDate)`, "=", sql`YEAR(${serviceDate})`)
+      .where(sql`MONTH(pl.serviceDate)`, "=", sql`MONTH(${serviceDate})`)
+      .groupBy("a.personId")
+      .execute();
+    return rows as any;
+  }
+
+  public async deleteUnconfirmedByRunId(churchId: string, autofillRunId: string) {
+    const result = await getDb().deleteFrom("assignments")
+      .where("churchId", "=", churchId)
+      .where("autofillRunId", "=", autofillRunId)
+      .where("status", "=", "Unconfirmed")
+      .executeTakeFirst();
+    return Number(result?.numDeletedRows ?? 0);
+  }
+
+  // People assigned to a position on a plan whose serviceDate falls in the window;
+  // no window means anyone ever assigned.
+  public async loadPersonIdsByServiceDateRange(churchId: string, startDate?: Date, endDate?: Date): Promise<string[]> {
+    let query = getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .select("a.personId")
+      .distinct()
+      .where("a.churchId", "=", churchId);
+    if (startDate) query = query.where("pl.serviceDate", ">=", startDate as any);
+    if (endDate) query = query.where("pl.serviceDate", "<=", endDate as any);
+    const rows = await query.execute();
+    return rows.map((r: any) => r.personId).filter((id: string) => !!id);
   }
 
   public async loadUnconfirmedByServiceDateRange(churchId?: string) {

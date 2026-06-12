@@ -26,7 +26,8 @@ jest.mock("../WebPushHelper.js", () => ({
       const parsed = JSON.parse(t.substring("webpush:".length));
       return parsed?.endpoint || null;
     },
-    getConfigSummary: () => ({ instanceId: "test-instance" })
+    getConfigSummary: () => ({ instanceId: "test-instance" }),
+    getEndpointSummary: () => ({ endpointHost: "example.com" })
   }
 }));
 

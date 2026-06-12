@@ -21,7 +21,8 @@ export class VisitRepo {
       groupId: model.groupId,
       visitDate: visitDate as any,
       checkinTime: checkinTime as any,
-      addedBy: model.addedBy
+      addedBy: model.addedBy,
+      securityCode: model.securityCode
     }).execute();
     return model;
   }
@@ -35,7 +36,8 @@ export class VisitRepo {
       groupId: model.groupId,
       visitDate: visitDate as any,
       checkinTime: checkinTime as any,
-      addedBy: model.addedBy
+      addedBy: model.addedBy,
+      securityCode: model.securityCode
     }).where("id", "=", model.id)
       .where("churchId", "=", model.churchId)
       .execute();
@@ -81,6 +83,26 @@ export class VisitRepo {
 
     if (data?.visitDate) result = new Date(data.visitDate);
     return result;
+  }
+
+  public async loadByIds(churchId: string, ids: string[]) {
+    return getDb().selectFrom("visits").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
+  }
+
+  public async loadByCodeToday(churchId: string, code: string) {
+    const today = DateHelper.toMysqlDateOnly(new Date());
+    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate=${today} AND UPPER(securityCode)=UPPER(${code}) AND checkoutTime IS NULL`.execute(getDb());
+    return rows.rows;
+  }
+
+  public async checkout(churchId: string, visitIds: string[], checkedOutBy?: string, checkedOutById?: string) {
+    await getDb().updateTable("visits").set({
+      checkoutTime: DateHelper.toMysqlDate(new Date()) as any,
+      checkedOutBy,
+      checkedOutById
+    }).where("churchId", "=", churchId)
+      .where("id", "in", visitIds)
+      .execute();
   }
 
   public async loadForPerson(churchId: string, personId: string) {
@@ -160,7 +182,11 @@ export class VisitRepo {
       serviceId: row.serviceId,
       groupId: row.groupId,
       visitDate: row.visitDate,
-      checkinTime: row.checkinTime
+      checkinTime: row.checkinTime,
+      securityCode: row.securityCode,
+      checkoutTime: row.checkoutTime,
+      checkedOutBy: row.checkedOutBy,
+      checkedOutById: row.checkedOutById
     };
   }
 }

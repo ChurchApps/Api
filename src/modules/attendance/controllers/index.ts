@@ -2,6 +2,7 @@ export { AttendanceBaseController } from "./AttendanceBaseController.js";
 export { AttendanceRecordController } from "./AttendanceRecordController.js";
 export { CampusController } from "./CampusController.js";
 export { GroupServiceTimeController } from "./GroupServiceTimeController.js";
+export { LabelTemplateController } from "./LabelTemplateController.js";
 export { ServiceController } from "./ServiceController.js";
 export { ServiceTimeController } from "./ServiceTimeController.js";
 export { SessionController } from "./SessionController.js";

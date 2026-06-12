@@ -1,10 +1,12 @@
 import {
   AssociatedGroupRepo,
   GroupMemberRepo,
+  GroupMemberHistoryRepo,
   GroupJoinRequestRepo,
   GroupRepo,
   HouseholdRepo,
   ListRepo,
+  ListMemberRepo,
   PersonRepo,
   AnswerRepo,
   FormRepo,
@@ -29,10 +31,12 @@ import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, Use
 export class Repos {
   public associatedGroup: AssociatedGroupRepo;
   public groupMember: GroupMemberRepo;
+  public groupMemberHistory: GroupMemberHistoryRepo;
   public groupJoinRequest: GroupJoinRequestRepo;
   public group: GroupRepo;
   public household: HouseholdRepo;
   public list: ListRepo;
+  public listMember: ListMemberRepo;
   public person: PersonRepo;
   public answer: AnswerRepo;
   public form: FormRepo;
@@ -71,10 +75,12 @@ export class Repos {
   constructor() {
     this.associatedGroup = new AssociatedGroupRepo();
     this.groupMember = new GroupMemberRepo();
+    this.groupMemberHistory = new GroupMemberHistoryRepo();
     this.groupJoinRequest = new GroupJoinRequestRepo();
     this.group = new GroupRepo();
     this.household = new HouseholdRepo();
     this.list = new ListRepo();
+    this.listMember = new ListMemberRepo();
     this.person = new PersonRepo();
     this.answer = new AnswerRepo();
     this.form = new FormRepo();

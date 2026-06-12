@@ -55,7 +55,7 @@ export class GroupMemberRepo {
       .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
       .selectAll("gm")
       .select([
-        "p.photoUpdated", "p.displayName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole"
+        "p.photoUpdated", "p.displayName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole", "p.birthDate"
       ])
       .where("gm.churchId", "=", churchId)
       .where("gm.groupId", "=", groupId)
@@ -112,6 +112,70 @@ export class GroupMemberRepo {
       .select(["g.name", "g.tags"])
       .where("gm.personId", "in", peopleIds)
       .execute();
+  }
+
+  // Per-group member aggregates for the health comparison view.
+  public async loadHealthSummary(churchId: string) {
+    const rows = await sql<any>`SELECT gm.groupId,
+        COUNT(*) AS memberCount,
+        SUM(CASE WHEN gm.leader = 1 THEN 1 ELSE 0 END) AS leaderCount,
+        AVG(TIMESTAMPDIFF(YEAR, p.birthDate, CURDATE())) AS averageAge,
+        SUM(CASE WHEN LOWER(TRIM(p.gender)) = 'female' THEN 1 ELSE 0 END) AS femaleCount,
+        SUM(CASE WHEN LOWER(TRIM(p.gender)) = 'male' THEN 1 ELSE 0 END) AS maleCount
+      FROM groupMembers gm
+      INNER JOIN people p ON p.id = gm.personId AND IFNULL(p.removed, 0) = 0
+      WHERE gm.churchId = ${churchId}
+      GROUP BY gm.groupId`.execute(getDb());
+    return rows.rows;
+  }
+
+  // Same buckets as PersonRepo.loadDemographics, scoped to one group's members.
+  public async loadDemographicsForGroup(churchId: string, groupId: string) {
+    const db = getDb();
+    const genderRows = await sql<any>`SELECT COALESCE(NULLIF(TRIM(p.gender), ''), 'Unassigned') AS name, COUNT(*) AS count
+      FROM groupMembers gm
+      INNER JOIN people p ON p.id = gm.personId AND IFNULL(p.removed, 0) = 0
+      WHERE gm.churchId = ${churchId} AND gm.groupId = ${groupId}
+      GROUP BY name ORDER BY count DESC`.execute(db);
+
+    const ageRows = await sql<any>`SELECT
+        CASE
+          WHEN age BETWEEN 0 AND 3 THEN '0-3'
+          WHEN age BETWEEN 4 AND 11 THEN '4-11'
+          WHEN age BETWEEN 12 AND 18 THEN '12-18'
+          WHEN age BETWEEN 19 AND 25 THEN '19-25'
+          WHEN age BETWEEN 26 AND 35 THEN '26-35'
+          WHEN age BETWEEN 36 AND 50 THEN '36-50'
+          WHEN age BETWEEN 51 AND 64 THEN '51-64'
+          ELSE '65+'
+        END AS ageGroup,
+        COALESCE(NULLIF(TRIM(gender), ''), 'Unassigned') AS gender,
+        COUNT(*) AS count
+      FROM (
+        SELECT TIMESTAMPDIFF(YEAR, p.birthDate, CURDATE()) AS age, p.gender
+        FROM groupMembers gm
+        INNER JOIN people p ON p.id = gm.personId AND IFNULL(p.removed, 0) = 0
+        WHERE gm.churchId = ${churchId} AND gm.groupId = ${groupId} AND p.birthDate IS NOT NULL
+      ) sub
+      GROUP BY ageGroup, gender`.execute(db);
+
+    const order = [
+      "0-3", "4-11", "12-18", "19-25", "26-35", "36-50", "51-64", "65+"
+    ];
+    const ageMap: { [group: string]: { group: string; female: number; male: number; unassigned: number } } = {};
+    order.forEach((g) => (ageMap[g] = { group: g, female: 0, male: 0, unassigned: 0 }));
+    (ageRows.rows as any[]).forEach((r) => {
+      const bucket = ageMap[r.ageGroup];
+      if (!bucket) return;
+      const g = String(r.gender).toLowerCase();
+      const key = g === "female" ? "female" : g === "male" ? "male" : "unassigned";
+      bucket[key] += Number(r.count);
+    });
+
+    return {
+      gender: (genderRows.rows as any[]).map((r) => ({ name: r.name as string, count: Number(r.count) })),
+      ageGroups: order.map((g) => ageMap[g])
+    };
   }
 
   public saveAll(models: GroupMember[]) {

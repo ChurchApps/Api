@@ -11,6 +11,7 @@ export { PlanItemController } from "./PlanItemController.js";
 export { PlanItemTimeController } from "./PlanItemTimeController.js";
 export { PlanTypeController } from "./PlanTypeController.js";
 export { PositionController } from "./PositionController.js";
+export { SchedulingPreferenceController } from "./SchedulingPreferenceController.js";
 export { TaskController } from "./TaskController.js";
 export { TimeController } from "./TimeController.js";
 export { WorkflowController } from "./WorkflowController.js";

@@ -50,6 +50,18 @@ export class AnswerRepo {
     return getDb().selectFrom("answers").selectAll().where("churchId", "=", churchId).execute();
   }
 
+  // Answers to one question across all person-attached submissions, with the person id.
+  public async loadForQuestionWithPerson(churchId: string, questionId: string): Promise<{ value: string; personId: string }[]> {
+    const rows = await getDb().selectFrom("answers as a")
+      .innerJoin("formSubmissions as fs", "fs.id", "a.formSubmissionId")
+      .select(["a.value as value", "fs.contentId as personId"])
+      .where("a.churchId", "=", churchId)
+      .where("a.questionId", "=", questionId)
+      .where("fs.contentType", "=", "person")
+      .execute();
+    return rows as any[];
+  }
+
   public saveAll(models: Answer[]) {
     const promises: Promise<Answer>[] = [];
     models.forEach((model) => { promises.push(this.save(model)); });

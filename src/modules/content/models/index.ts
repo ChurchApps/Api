@@ -15,6 +15,11 @@ export { Event } from "./Event.js";
 export { EventException } from "./EventException.js";
 export { CuratedCalendar } from "./CuratedCalendar.js";
 export { CuratedEvent } from "./CuratedEvent.js";
+export { Room } from "./Room.js";
+export { Resource } from "./Resource.js";
+export { EventBooking } from "./EventBooking.js";
+export { CalendarBlockout } from "./CalendarBlockout.js";
+export { EventTemplate } from "./EventTemplate.js";
 
 export { Registration, RegistrationMember } from "./Registration.js";
 

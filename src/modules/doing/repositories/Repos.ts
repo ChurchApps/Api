@@ -1,5 +1,6 @@
 import {
   AssignmentRepo,
+  AutomationExecutionRepo,
   BlockoutDateRepo,
   ConditionRepo,
   ConjunctionRepo,
@@ -9,6 +10,7 @@ import {
   PlanItemTimeRepo,
   PlanTypeRepo,
   PositionRepo,
+  SchedulingPreferenceRepo,
   TaskRepo,
   TimeRepo,
   WorkflowRepo,
@@ -21,6 +23,7 @@ import {
 
 export class Repos {
   public assignment: AssignmentRepo;
+  public automationExecution: AutomationExecutionRepo;
   public blockoutDate: BlockoutDateRepo;
   public condition: ConditionRepo;
   public conjunction: ConjunctionRepo;
@@ -30,6 +33,7 @@ export class Repos {
   public planItemTime: PlanItemTimeRepo;
   public planType: PlanTypeRepo;
   public position: PositionRepo;
+  public schedulingPreference: SchedulingPreferenceRepo;
   public task: TaskRepo;
   public time: TimeRepo;
   public workflow: WorkflowRepo;
@@ -47,6 +51,7 @@ export class Repos {
 
   constructor() {
     this.assignment = new AssignmentRepo();
+    this.automationExecution = new AutomationExecutionRepo();
     this.blockoutDate = new BlockoutDateRepo();
     this.condition = new ConditionRepo();
     this.conjunction = new ConjunctionRepo();
@@ -56,6 +61,7 @@ export class Repos {
     this.planItemTime = new PlanItemTimeRepo();
     this.planType = new PlanTypeRepo();
     this.position = new PositionRepo();
+    this.schedulingPreference = new SchedulingPreferenceRepo();
     this.task = new TaskRepo();
     this.time = new TimeRepo();
     this.workflow = new WorkflowRepo();

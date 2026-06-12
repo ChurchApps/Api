@@ -28,7 +28,10 @@ export class PlanRepo {
       providerPlanId: model.providerPlanId,
       providerPlanName: model.providerPlanName,
       signupDeadlineHours: model.signupDeadlineHours,
-      showVolunteerNames: model.showVolunteerNames
+      showVolunteerNames: model.showVolunteerNames,
+      prepared: model.prepared,
+      autoReplaceOnDecline: model.autoReplaceOnDecline,
+      lastAutofillRunId: model.lastAutofillRunId
     }).execute();
     return model;
   }
@@ -48,13 +51,21 @@ export class PlanRepo {
       providerPlanId: model.providerPlanId,
       providerPlanName: model.providerPlanName,
       signupDeadlineHours: model.signupDeadlineHours,
-      showVolunteerNames: model.showVolunteerNames
+      showVolunteerNames: model.showVolunteerNames,
+      prepared: model.prepared,
+      autoReplaceOnDecline: model.autoReplaceOnDecline,
+      lastAutofillRunId: model.lastAutofillRunId
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
   public async delete(churchId: string, id: string) {
     await getDb().deleteFrom("plans").where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  // Targeted update — a full save() would round-trip serviceDate through toISOString.
+  public async updateLastAutofillRunId(churchId: string, planId: string, runId: string | null) {
+    await getDb().updateTable("plans").set({ lastAutofillRunId: runId }).where("id", "=", planId).where("churchId", "=", churchId).execute();
   }
 
   public async load(churchId: string, id: string) {
@@ -104,6 +115,7 @@ export class PlanRepo {
       .distinct()
       .where("p.churchId", "=", churchId)
       .where("pos.allowSelfSignup", "=", true as any)
+      .where((eb) => eb.or([eb("p.prepared", "is", null), eb("p.prepared", "=", false as any)]))
       .where("p.serviceDate", ">=", sql`CURDATE()` as any)
       .orderBy("p.serviceDate", "asc")
       .execute();

@@ -1,4 +1,5 @@
 export { GivingBaseController } from "./GivingBaseController.js";
+export { CampaignController } from "./CampaignController.js";
 export { DonationBatchController } from "./DonationBatchController.js";
 export { DonationController } from "./DonationController.js";
 
@@ -7,6 +8,7 @@ export { FundDonationController } from "./FundDonationController.js";
 export { PaymentMethodController } from "./PaymentMethodController.js";
 export { CustomerController } from "./CustomerController.js";
 export { EventLogController } from "./EventLogController.js";
+export { PledgeController } from "./PledgeController.js";
 export { SubscriptionController } from "./SubscriptionController.js";
 export { SubscriptionFundController } from "./SubscriptionFundController.js";
 export { FundController } from "./FundController.js";

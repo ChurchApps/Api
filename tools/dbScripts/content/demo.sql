@@ -21,6 +21,11 @@ BEGIN
     TRUNCATE TABLE curatedEvents;
     TRUNCATE TABLE curatedCalendars;
     TRUNCATE TABLE eventExceptions;
+    TRUNCATE TABLE eventBookings;
+    TRUNCATE TABLE calendarBlockouts;
+    TRUNCATE TABLE eventTemplates;
+    TRUNCATE TABLE rooms;
+    TRUNCATE TABLE resources;
     TRUNCATE TABLE events;
     TRUNCATE TABLE arrangementKeys;
     TRUNCATE TABLE arrangements;

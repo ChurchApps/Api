@@ -3,6 +3,7 @@ import { Environment } from "../src/shared/helpers/Environment";
 import { KyselyPool } from "../src/shared/infrastructure/KyselyPool";
 import { NotificationHelper } from "../src/modules/messaging/helpers/NotificationHelper";
 import { RepoManager } from "../src/shared/infrastructure/RepoManager";
+import { ApprovalHelper } from "../src/modules/content/helpers/ApprovalHelper";
 
 async function run() {
   try {
@@ -20,6 +21,10 @@ async function run() {
     console.log("Processing individual email notifications...");
     const emailResult = await NotificationHelper.sendEmailNotifications("individual");
     console.log("sendEmailNotifications result:", JSON.stringify(emailResult));
+
+    console.log("Sending calendar approval digests...");
+    const approvalResult = await ApprovalHelper.sendApprovalDigests();
+    console.log("sendApprovalDigests result:", JSON.stringify(approvalResult));
 
     console.log("30-minute timer completed successfully.");
     await KyselyPool.destroyAll();
