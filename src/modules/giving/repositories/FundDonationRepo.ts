@@ -37,19 +37,28 @@ export class FundDonationRepo {
   }
 
   public async load(churchId: string, id: string) {
-    return (await getDb().selectFrom("fundDonations").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+    // return (await getDb().selectFrom("fundDonations").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+    const result = await sql<any>`
+    SELECT fd.*, d.currency
+    FROM fundDonations fd
+    INNER JOIN donations d ON d.id = fd.donationId
+    WHERE fd.id = ${id} AND fd.churchId = ${churchId}
+    `.execute(getDb());
+    return result.rows[0] ?? null;
   }
 
   public async loadAll(churchId: string) {
-    const rows = await getDb().selectFrom("fundDonations").selectAll()
-      .where("churchId", "=", churchId)
-      .execute();
-    return rows;
+    const result = await sql<any>`
+      SELECT fd.*, d.currency
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      WHERE fd.churchId = ${churchId}`.execute(getDb());
+    return result.rows;
   }
 
   public async loadAllByDate(churchId: string, startDate: Date, endDate: Date) {
     const result = await sql<any>`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId
       WHERE fd.churchId = ${churchId}
@@ -59,26 +68,28 @@ export class FundDonationRepo {
   }
 
   public async loadByDonationId(churchId: string, donationId: string) {
-    const rows = await getDb().selectFrom("fundDonations").selectAll()
-      .where("churchId", "=", churchId)
-      .where("donationId", "=", donationId)
-      .execute();
-    return rows;
+    const result = await sql<any>`
+      SELECT fd.*, d.currency
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      WHERE fd.churchId = ${churchId} AND fd.donationId = ${donationId}
+      `.execute(getDb());
+    return result.rows;
   }
 
   public async loadByPersonId(churchId: string, personId: string) {
     const result = await sql<any>`
-      SELECT fd.*
-      FROM donations d
-      INNER JOIN fundDonations fd on fd.churchId = d.churchId and fd.donationId = d.id
-      WHERE d.churchId = ${churchId} AND d.personId = ${personId}
+      SELECT fd.*, d.currency
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      WHERE fd.churchId = ${churchId} AND d.personId = ${personId}
       ORDER BY d.donationDate`.execute(getDb());
     return result.rows;
   }
 
   public async loadByFundId(churchId: string, fundId: string) {
     const result = await sql<any>`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId
       WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
@@ -88,7 +99,7 @@ export class FundDonationRepo {
 
   public async loadByFundIdDate(churchId: string, fundId: string, startDate: Date, endDate: Date) {
     const result = await sql<any>`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId
       WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
@@ -100,7 +111,7 @@ export class FundDonationRepo {
   public async loadByFundName(churchId: string, fundName: string) {
     const pattern = `%${fundName}%`;
     const result = await sql<any>`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId
       INNER JOIN funds f ON f.id = fd.fundId
@@ -112,7 +123,7 @@ export class FundDonationRepo {
   public async loadByFundNameDate(churchId: string, fundName: string, startDate: Date, endDate: Date) {
     const pattern = `%${fundName}%`;
     const result = await sql<any>`
-      SELECT fd.*, d.donationDate, d.batchId, d.personId
+      SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId
       INNER JOIN funds f ON f.id = fd.fundId
@@ -123,13 +134,14 @@ export class FundDonationRepo {
   }
 
   private rowToModel(data: any): FundDonation {
-    const result: FundDonation = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount };
+    const result: any = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount, currency: data?.currency };
     if (data.batchId !== undefined) {
       result.donation = {
         id: result.donationId,
         donationDate: data.donationDate,
         batchId: data.batchId,
-        personId: data.personId
+        personId: data.personId,
+        currency: data.currency
       };
     }
     return result;
