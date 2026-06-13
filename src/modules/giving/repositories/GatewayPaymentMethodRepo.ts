@@ -58,6 +58,15 @@ export class GatewayPaymentMethodRepo {
     return row ? this.rowToModel(row) : null;
   }
 
+  public async loadByExternalIdAcrossGateways(churchId: string, externalId: string): Promise<GatewayPaymentMethod | null> {
+    const row = (await getDb().selectFrom("gatewayPaymentMethods").selectAll()
+      .where("churchId", "=", churchId)
+      .where("externalId", "=", externalId)
+      .limit(1)
+      .executeTakeFirst()) ?? null;
+    return row ? this.rowToModel(row) : null;
+  }
+
   public async deleteByExternalId(churchId: string, gatewayId: string, externalId: string): Promise<void> {
     await getDb().deleteFrom("gatewayPaymentMethods")
       .where("churchId", "=", churchId)

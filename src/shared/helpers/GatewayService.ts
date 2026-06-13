@@ -167,6 +167,15 @@ export class GatewayService {
     return [];
   }
 
+  static async getSubscription(gateway: any, subscriptionId: string): Promise<any> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (typeof provider.getSubscription === "function") {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.getSubscription(config, subscriptionId);
+    }
+    return null;
+  }
+
   static async getCustomerPaymentMethods(gateway: any, customer: any): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.getCustomerPaymentMethods) {
@@ -498,6 +507,27 @@ export class GatewayService {
         minTransactionAmount: 100, // $1.00
         maxTransactionAmount: 10000000, // $100,000.00
         notes: ["Webhooks limited; polling recommended", "ACH available via tokenised transactions"]
+      },
+      kingdomfunding: {
+        supportsOneTimePayments: true,
+        supportsSubscriptions: true,
+        supportsVault: true,
+        supportsACH: true,
+        supportsRefunds: true,
+        supportsPartialRefunds: true,
+        supportsWebhooks: true,
+        supportsOrders: false,
+        supportedPaymentMethods: ["card", "ach"],
+        supportedCurrencies: ["usd"],
+        requiresPlansForSubscriptions: false,
+        requiresCustomerForSubscription: true,
+        supportsInstantCapture: true,
+        supportsManualCapture: false,
+        supportsSCA: false,
+        maxRefundWindow: 180,
+        minTransactionAmount: 1,
+        maxTransactionAmount: 2000000000,
+        notes: ["Powered by KingdomFunding", "Reusable saved payment methods", "Single-step recurring schedules"]
       }
     };
 
