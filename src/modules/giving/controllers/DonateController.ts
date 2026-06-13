@@ -243,7 +243,7 @@ export class DonateController extends GivingBaseController {
       stripe: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded", "payment_intent.processing"],
       paypal: ["PAYMENT.CAPTURE.COMPLETED"],
       // KingdomFunding webhook events: "succeeded.charge" for card/ACH, "status.settled" for ACH settlement
-      kingdomfunding: ["succeeded.charge", "status.settled"],
+      kingdomfunding: ["succeeded.charge", "status.settled"]
     };
     return donationEvents[provider]?.includes(eventType) || false;
   }
@@ -265,7 +265,7 @@ export class DonateController extends GivingBaseController {
   private shouldCancelSubscription(provider: string, eventType: string): boolean {
     const cancellationEvents: Record<string, string[]> = {
       stripe: ["customer.subscription.deleted"],
-      paypal: ["BILLING.SUBSCRIPTION.CANCELLED"],
+      paypal: ["BILLING.SUBSCRIPTION.CANCELLED"]
     };
     return cancellationEvents[provider]?.includes(eventType) || false;
   }
@@ -475,7 +475,7 @@ export class DonateController extends GivingBaseController {
               const attachOptions: any = {
                 customerId,
                 source: nonceSource,
-                name: personName,
+                name: personName
               };
               if (donationData.expiry_month) attachOptions.expiry_month = Number(donationData.expiry_month);
               if (donationData.expiry_year) {
@@ -513,7 +513,9 @@ export class DonateController extends GivingBaseController {
                 const cardType = pm.card_type || donationData.cardBrand || "Card";
                 const last4 = pm.last_4 || donationData.cardLast4 || "";
                 await this.repos.gatewayPaymentMethod.save({
-                  churchId, gatewayId: gateway.id, customerId,
+                  churchId,
+                  gatewayId: gateway.id,
+                  customerId,
                   externalId: String(savedPmId),
                   methodType: donationData.type === "check" ? "bank" : "card",
                   displayName: `${cardType} ****${last4}`,
@@ -559,7 +561,7 @@ export class DonateController extends GivingBaseController {
               amount: donationData.amount,
               funds: donationData.funds,
               person: donationData.person,
-              notes: donationData.notes,
+              notes: donationData.notes
             };
             await GatewayService.logDonation(gateway, churchId, logData, this.repos, "complete");
           } catch (logErr: any) {
@@ -568,7 +570,7 @@ export class DonateController extends GivingBaseController {
         }
 
         try {
-          await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time");
+          await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
         } catch (emailErr) {
           console.warn("Charge: Failed to send confirmation email (non-fatal)", emailErr);
         }
@@ -624,7 +626,7 @@ export class DonateController extends GivingBaseController {
           routing_number,
           account_number,
           account_type,
-          sec_code,
+          sec_code
         };
 
         // For KF: pass existing local customer ID so provider can reuse it
@@ -651,7 +653,7 @@ export class DonateController extends GivingBaseController {
           id: subscriptionResult.subscriptionId,
           churchId,
           personId: person.id,
-          customerId: abCustomerId || customerId,
+          customerId: abCustomerId || customerId
         };
 
         await this.repos.subscription.save(subscription);
@@ -670,7 +672,7 @@ export class DonateController extends GivingBaseController {
         await Promise.all(promises);
 
         try {
-          await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring");
+          await this.sendEmails(person.email, req.body?.church, funds, amount, interval, billing_cycle_anchor, "recurring", normalizedCurrency);
         } catch (emailErr) {
           console.warn("Subscribe: Failed to send confirmation email (non-fatal)", emailErr);
         }
@@ -734,27 +736,32 @@ export class DonateController extends GivingBaseController {
     amount?: number,
     interval?: { interval_count: number; interval: string },
     billingCycleAnchor?: number,
-    donationType: "recurring" | "one-time" = "recurring"
+    donationType: "recurring" | "one-time" = "recurring",
+    currency: string = "USD"
   ) => {
     // Skip email if no recipient address
     if (!to) return;
 
     const contentRows: any[] = [];
     let totalFundAmount = 0;
+    const currencyCode = (currency || "USD").toUpperCase();
 
     funds.forEach((fund, index) => {
       totalFundAmount += fund.amount;
+      const formattedFund = CurrencyHelper.formatCurrencyWithLocale(fund.amount, currencyCode);
       if (donationType === "recurring") {
         const startDate = dayjs(billingCycleAnchor).format("MMM D, YYYY");
         contentRows.push(
-          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`
+          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">${formattedFund}</td></tr>`
         );
       } else {
-        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">$${fund.amount}</td></tr>`);
+        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${fund.name}</td><td style="font-size: 15px">${formattedFund}</td></tr>`);
       }
     });
 
     const transactionFee = amount! - totalFundAmount;
+    const formattedFee = CurrencyHelper.formatCurrencyWithLocale(transactionFee, currencyCode);
+    const formattedTotal = CurrencyHelper.formatCurrencyWithLocale(amount || 0, currencyCode);
 
     const domain = Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
 
@@ -778,12 +785,12 @@ export class DonateController extends GivingBaseController {
             <tr style="border-top: solid #dee2e6 1px">
               <td></td>
               <th style="font-size: 15px">Transaction Fee</th>
-              <td>$${CurrencyHelper.formatCurrency(transactionFee)}</td>
+              <td>${formattedFee}</td>
             </tr>
             <tr style="border-top: solid #dee2e6 1px">
               <td></td>
               <th style="font-size: 15px">Total</th>
-              <td>$${amount}</td>
+              <td>${formattedTotal}</td>
             </tr>
           `
       }
@@ -810,11 +817,11 @@ export class DonateController extends GivingBaseController {
           : `
             <tr style="border-top: solid #dee2e6 1px">
               <th style="font-size: 15px">Transaction Fee</th>
-              <td>$${CurrencyHelper.formatCurrency(transactionFee)}</td>
+              <td>${formattedFee}</td>
             </tr>
             <tr style="border-top: solid #dee2e6 1px">
               <th style="font-size: 15px">Total</th>
-              <td>$${amount}</td>
+              <td>${formattedTotal}</td>
             </tr>
           `
       }
@@ -894,10 +901,6 @@ export class DonateController extends GivingBaseController {
   public async captchaVerify(req: express.Request<{}, {}, { token: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
-        // In dev mode, always return human to speed up testing
-        if (Environment.currentEnvironment === "dev") {
-          return { response: "human" };
-        }
         // detecting if its a bot or a human
         const { token } = req.body;
         const response = await Axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${Environment.googleRecaptchaSecretKey}&response=${token}`);

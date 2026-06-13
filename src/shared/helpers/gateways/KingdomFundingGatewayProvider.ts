@@ -111,7 +111,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     }
 
     // Verify HMAC-SHA256 signature
-    const rawBody = typeof body === "string" ? body : JSON.stringify(body);
+    const rawBody = Buffer.isBuffer(body) ? body.toString("utf-8") : typeof body === "string" ? body : JSON.stringify(body);
     const expectedSignature = crypto
       .createHmac("sha256", webhookSecret)
       .update(rawBody, "utf-8")
@@ -136,11 +136,23 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
     // Parse the event payload
     // KingdomFunding webhook schema: { type, subType, event, id, timestamp, data }
-    const eventType = body.type || "";          // "succeeded", "declined", "error", "status", "updated", "closed"
-    const eventSubType = body.subType || "";    // "charge", "credit", "refund", "adjust", "void", "settled", etc.
-    const eventCategory = body.event || "";     // "transaction" or "batch"
-    const eventId = body.id || "";
-    const eventData = body.data || {};
+    // Webhook routes preserve req.body as the raw string/buffer for HMAC verification,
+    // so the verified payload must be parsed here.
+    let event: any = body;
+    if (typeof body === "string" || Buffer.isBuffer(body)) {
+      try {
+        event = JSON.parse(rawBody);
+      } catch {
+        console.error("KingdomFunding webhook: malformed JSON payload; rejecting.");
+        return { success: false, shouldProcess: false };
+      }
+    }
+
+    const eventType = event.type || "";          // "succeeded", "declined", "error", "status", "updated", "closed"
+    const eventSubType = event.subType || "";    // "charge", "credit", "refund", "adjust", "void", "settled", etc.
+    const eventCategory = event.event || "";     // "transaction" or "batch"
+    const eventId = event.id || "";
+    const eventData = event.data || {};
 
     // Determine if we should process this as a donation
     const isTransactionEvent = eventCategory === "transaction";
@@ -164,8 +176,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         status_code: eventData.status_code,
         auth_amount: eventData.auth_amount,
         card_type: eventData.card_type,
-        last_4: eventData.last_4,
-      },
+        last_4: eventData.last_4
+      }
     };
   }
 
@@ -202,7 +214,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       const payload: any = {
         amount: donationData.amount,
         source,
-        name: donationData.name || donationData.person?.name || "",
+        name: donationData.name || donationData.person?.name || ""
       };
 
       // Add expiry data if provided (required for nonce charges)
@@ -221,7 +233,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         payload.billing_info = donationData.billing_info || {
           first_name: person.firstName || person.first_name || "",
           last_name: person.lastName || person.last_name || "",
-          email: person.email || "",
+          email: person.email || ""
         };
       }
 
@@ -249,7 +261,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
             reference_number: result.reference_number,
             auth_amount: result.auth_amount,
             card_type: result.card_type,
-            last_4: result.last_4,
+            last_4: result.last_4
           }
         };
       }
@@ -291,7 +303,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       const payload: any = {
         amount: donationData.amount,
-        name: donationData.name || donationData.person?.name || "",
+        name: donationData.name || donationData.person?.name || ""
       };
 
       if (donationData.paymentMethodId) {
@@ -331,7 +343,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
             ...result,
             status: "active",
             reference_number: result.reference_number,
-            auth_amount: result.auth_amount,
+            auth_amount: result.auth_amount
           }
         };
       }
@@ -387,7 +399,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       "WEEKLY": "weekly",
       "MONTHLY": "monthly",
       "QUARTERLY": "quarterly",
-      "ANNUAL": "annually",
+      "ANNUAL": "annually"
     };
 
     return map[lower] || map[str] || "monthly";
@@ -441,7 +453,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       if (startsToday && (nonceSource || isBank)) {
         const chargePayload: any = {
           amount: subscriptionData.amount,
-          name,
+          name
         };
 
         if (isBank) {
@@ -464,7 +476,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         referenceNumber = chargeResponse.data?.reference_number;
         if (!referenceNumber) {
           const errMsg = chargeResponse.data?.error_message || "Initial charge failed";
-          console.error("KingdomFunding: Initial recurring charge failed", chargeResponse.data);
+          console.error("KingdomFunding: Initial recurring charge failed:", errMsg);
           return { success: false, subscriptionId: "", data: { error: errMsg } };
         }
       }
@@ -518,7 +530,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
           if (existingPm?.id) {
             paymentMethodId = existingPm.id;
           } else {
-            console.error("KingdomFunding: Failed to create payment method", pmErr.response?.data || pmErr.message);
+            console.error("KingdomFunding: Failed to create payment method", pmErr.response?.data?.error_message || pmErr.message);
             return { success: false, subscriptionId: "", data: { error: "Failed to save payment method for recurring donation" } };
           }
         }
@@ -564,7 +576,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         frequency,
         next_run_date: nextRunDate,
         num_left: 0,  // 0 = ongoing
-        active: true,
+        active: true
       };
 
       const response = await Axios.post(
@@ -591,13 +603,12 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
           paymentMethodId: String(paymentMethodId),
           frequency,
           nextRunDate,
-          initialChargeRef: referenceNumber ? String(referenceNumber) : undefined,
+          initialChargeRef: referenceNumber ? String(referenceNumber) : undefined
         }
       };
     } catch (error: any) {
       const errData = error.response?.data || {};
-      console.error("KingdomFunding createSubscription error:", errData.error_message || errData.message || error.message);
-      if (error.response?.data) console.error("KingdomFunding createSubscription response data:", JSON.stringify(error.response.data));
+      console.error("KingdomFunding createSubscription error:", error.response?.status, errData.error_message || errData.message || error.message);
       return {
         success: false,
         subscriptionId: "",
@@ -657,8 +668,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       console.error("KingdomFunding cancelSubscription error:", {
         subscriptionId,
         status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
+        message: error.response?.data?.error_message || error.message
       });
       throw new Error(error.response?.data?.error_message || error.message || "Failed to cancel subscription");
     }
@@ -675,9 +685,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     try {
       const baseUrl = this.getBaseUrl(config);
 
-      const payload: any = {
-        reference_number: parseInt(refundData.reference_number || refundData.transactionId, 10),
-      };
+      const payload: any = { reference_number: parseInt(refundData.reference_number || refundData.transactionId, 10) };
 
       // If amount provided, partial refund; otherwise full refund
       if (refundData.amount) {
@@ -760,7 +768,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         identifier: email || name || "donor",
         email: email || undefined,
         first_name: firstName || undefined,
-        last_name: lastName || undefined,
+        last_name: lastName || undefined
       };
 
       const response = await Axios.post(
@@ -776,7 +784,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       return String(customerId);
     } catch (error: any) {
-      console.error("KingdomFunding createCustomer error:", error.response?.data || error.message);
+      console.error("KingdomFunding createCustomer error:", error.response?.status, error.response?.data?.error_message || error.message);
       throw new Error(error.response?.data?.error_message || error.message || "Failed to create customer");
     }
   }
@@ -790,7 +798,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       );
       return response.data || null;
     } catch (error: any) {
-      console.error("KingdomFunding getSubscription error:", error.response?.data || error.message);
+      console.error("KingdomFunding getSubscription error:", error.response?.status, error.response?.data?.error_message || error.message);
       return null;
     }
   }
@@ -816,7 +824,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       }
       return all;
     } catch (error: any) {
-      console.error("KingdomFunding getCustomerSubscriptions error:", error.response?.data || error.message);
+      console.error("KingdomFunding getCustomerSubscriptions error:", error.response?.status, error.response?.data?.error_message || error.message);
       return [];
     }
   }
@@ -833,7 +841,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       );
       return response.data || [];
     } catch (error: any) {
-      console.error("KingdomFunding getCustomerPaymentMethods error:", error.response?.data || error.message);
+      console.error("KingdomFunding getCustomerPaymentMethods error:", error.response?.status, error.response?.data?.error_message || error.message);
       return [];
     }
   }
@@ -894,17 +902,18 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         return response.data;
       } catch (err: any) {
         // Accept Blue rejects duplicate card adds with an Invalid state error and
-        // returns the EXISTING payment_method in error_details. Treat that as success
-        // and reuse the existing payment-method ID.
-        const errDetails = err.response?.data?.error_details;
-        const existing = errDetails?.payment_method;
-        if (existing?.id) {
+        // returns the EXISTING payment_method in error_details. Treat only that case
+        // as success and reuse the existing payment-method ID.
+        const errData = err.response?.data;
+        const existing = errData?.error_details?.payment_method;
+        const isDuplicate = /duplicate|already exist|invalid state/i.test(`${errData?.error_message || ""} ${errData?.error_type || ""} ${errData?.error_code || ""}`);
+        if (isDuplicate && existing?.id) {
           return existing;
         }
         throw err;
       }
     } catch (error: any) {
-      console.error("KingdomFunding attachPaymentMethod error:", JSON.stringify(error.response?.data) || error.message);
+      console.error("KingdomFunding attachPaymentMethod error:", error.response?.status, error.response?.data?.error_message || error.message);
       throw new Error(error.response?.data?.error_message || error.message || "Failed to save payment method");
     }
   }
@@ -922,7 +931,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       );
       return response.data;
     } catch (error: any) {
-      console.error("KingdomFunding detachPaymentMethod error:", error.response?.data || error.message, { paymentMethodId, customerId });
+      console.error("KingdomFunding detachPaymentMethod error:", error.response?.status, error.response?.data?.error_message || error.message, { paymentMethodId, customerId });
       throw new Error(error.response?.data?.error_message || error.message || "Failed to remove payment method");
     }
   }
@@ -1009,6 +1018,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         method,
         methodDetails,
         notes: `KingdomFunding ref: ${refNumber}`,
+        status
       };
 
       const savedDonation = await repos.donation.save(donation);
@@ -1021,7 +1031,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
             churchId,
             donationId: savedDonation.id,
             fundId: fund.fundId || fund.id || "",
-            amount: fund.amount || 0,
+            amount: fund.amount || 0
           };
           await repos.fundDonation.save(fundDonation);
         }
@@ -1031,7 +1041,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
           churchId,
           donationId: savedDonation.id,
           fundId: eventData.fundId,
-          amount,
+          amount
         };
         await repos.fundDonation.save(fundDonation);
       }
@@ -1050,12 +1060,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     repos: any
   ): Promise<void> {
     try {
-      const donation = await repos.donation.loadByTransactionId(churchId, transactionId);
-      if (donation) {
-        // Update the donation status
-        // The method field can encode the status for now
-        await repos.donation.save({ ...donation, notes: `${donation.notes || ""} [status: ${status}]` });
-      }
+      await repos.donation.updateStatus(churchId, transactionId, status);
     } catch (err) {
       console.error("KingdomFunding updateDonationStatus error:", err);
     }

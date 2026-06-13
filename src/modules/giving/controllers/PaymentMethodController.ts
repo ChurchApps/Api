@@ -133,31 +133,43 @@ export class PaymentMethodController extends GivingBaseController {
               if (customerData.cards?.data) {
                 for (const pm of customerData.cards.data) {
                   normalizedMethods.push({
-                    id: pm.id, type: "card", provider: "stripe",
-                    name: pm.card?.brand || "Card", last4: pm.card?.last4,
+                    id: pm.id,
+                    type: "card",
+                    provider: "stripe",
+                    name: pm.card?.brand || "Card",
+                    last4: pm.card?.last4,
                     customerId: pm.customer || customerData.customer?.id,
-                    gatewayId: gateway.id, status: "active"
+                    gatewayId: gateway.id,
+                    status: "active"
                   });
                 }
               }
               if (customerData.banks?.data) {
                 for (const bank of customerData.banks.data) {
                   normalizedMethods.push({
-                    id: bank.id, type: "bank", provider: "stripe",
+                    id: bank.id,
+                    type: "bank",
+                    provider: "stripe",
                     name: bank.us_bank_account?.bank_name || "Bank Account",
                     last4: bank.us_bank_account?.last4,
                     customerId: bank.customer || customerData.customer?.id,
-                    gatewayId: gateway.id, status: "active"
+                    gatewayId: gateway.id,
+                    status: "active"
                   });
                 }
               }
               if (customerData.legacyBanks?.data) {
                 for (const bank of customerData.legacyBanks.data) {
                   normalizedMethods.push({
-                    id: bank.id, type: "bank", provider: "stripe",
-                    name: "Bank Account", last4: bank.last4,
+                    id: bank.id,
+                    type: "bank",
+                    provider: "stripe",
+                    name: "Bank Account",
+                    last4: bank.last4,
                     customerId: bank.customer || customerData.customer?.id,
-                    gatewayId: gateway.id, status: bank.status || "new", isLegacy: true
+                    gatewayId: gateway.id,
+                    status: bank.status || "new",
+                    isLegacy: true
                   });
                 }
               }
@@ -168,8 +180,11 @@ export class PaymentMethodController extends GivingBaseController {
             for (const method of rawPaymentMethods) {
               const record = lookup.get(method?.id);
               normalizedMethods.push({
-                id: method.id, type: "paypal", provider: "paypal",
-                name: record?.displayName || "PayPal", email: method.email,
+                id: method.id,
+                type: "paypal",
+                provider: "paypal",
+                name: record?.displayName || "PayPal",
+                email: method.email,
                 customerId: record?.customerId || customer.id,
                 gatewayId: gateway.id
               });
@@ -178,32 +193,7 @@ export class PaymentMethodController extends GivingBaseController {
             // Soft-delete model: a payment method only appears if it has a local
             // gatewayPaymentMethods record. Users can "delete" without revoking the
             // card at the gateway (which would break any other system using it).
-            //
-            // Bootstrap path: if the local table is empty for this customer but the
-            // gateway has cards (e.g. first load of a church that already had Kingdom
-            // Funding cards, or after a local DB clear during dev/migration), auto-import
-            // them as a one-time seed so the soft-delete model has something to track.
-            let localRecords = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
-            if (localRecords.length === 0 && rawPaymentMethods.length > 0) {
-              for (const pm of rawPaymentMethods) {
-                const pmId = String(pm.id);
-                const isBank = pm.type === "check";
-                const last4 = pm.last_4 || pm.last4 || "";
-                const cardType = pm.card_type || pm.type || (isBank ? "Bank" : "Card");
-                try {
-                  await this.repos.gatewayPaymentMethod.save({
-                    churchId: au.churchId,
-                    gatewayId: gateway.id,
-                    customerId: customer.id,
-                    externalId: pmId,
-                    methodType: isBank ? "bank" : "card",
-                    displayName: `${cardType} •••• ${last4}`.trim(),
-                    metadata: { status: "active", brand: cardType, last4 }
-                  });
-                } catch (e) { /* ignore individual import failures */ }
-              }
-              localRecords = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
-            }
+            const localRecords = await this.repos.gatewayPaymentMethod.loadByCustomer(au.churchId, gateway.id, customer.id!);
             const localExternalIds = new Set(localRecords.map((r: any) => String(r.externalId)));
             for (const pm of rawPaymentMethods) {
               const pmId = String(pm.id);
@@ -211,11 +201,14 @@ export class PaymentMethodController extends GivingBaseController {
               const cardType = pm.card_type || pm.type || "Card";
               const last4 = pm.last_4 || pm.last4 || "";
               normalizedMethods.push({
-                id: pmId, type: pm.type === "check" ? "bank" : "card",
+                id: pmId,
+                type: pm.type === "check" ? "bank" : "card",
                 provider: "kingdomfunding",
-                name: cardType, last4,
+                name: cardType,
+                last4,
                 customerId: customer.id,
-                gatewayId: gateway.id, status: "active"
+                gatewayId: gateway.id,
+                status: "active"
               });
             }
           }
