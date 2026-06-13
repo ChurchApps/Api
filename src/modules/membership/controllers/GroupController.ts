@@ -233,7 +233,7 @@ export class GroupController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.groups.edit)) return this.json({}, 401);
       else {
         const group: Group = await this.repos.group.load(au.churchId, id);
-        if (group.tags.indexOf("ministry") > -1) {
+        if ((group.tags || "").indexOf("ministry") > -1) {
           const AllTeams = (await this.repos.group.loadByTag(au.churchId, "team")) as any[];
           const ministryTeams = ArrayHelper.getAll(AllTeams, "categoryName", id);
           const ids = ArrayHelper.getIds(ministryTeams, "id");

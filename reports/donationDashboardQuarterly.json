@@ -15,7 +15,7 @@
         " WHERE d.churchId=:churchId",
         " AND d.donationDate BETWEEN :startDate AND :endDate",
         " AND (:fundId='' OR fd.fundId = :fundId)",
-        " GROUP BY YEAR(d.donationDate), QUARTER(d.donationDate), f.name",
+        " GROUP BY YEAR(d.donationDate), QUARTER(d.donationDate), d.donationDate, f.name",
         " ORDER BY YEAR(d.donationDate), QUARTER(d.donationDate), f.name"
       ]
     }
