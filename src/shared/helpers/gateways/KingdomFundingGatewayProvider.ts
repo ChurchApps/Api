@@ -953,7 +953,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   async logDonation(
-    config: GatewayConfig,
+    _config: GatewayConfig,
     churchId: string,
     eventData: any,
     repos: any,

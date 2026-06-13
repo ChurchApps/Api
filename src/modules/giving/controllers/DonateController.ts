@@ -586,7 +586,11 @@ export class DonateController extends GivingBaseController {
   @httpPost("/subscribe")
   public async subscribe(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes, churchId: CHURCH_ID, provider, gatewayId, currency, expiry_month, expiry_year, routing_number, account_number, account_type, sec_code, name: bankName } = req.body;
+      const {
+        id, amount, customerId, type, billing_cycle_anchor, proration_behavior, interval, funds, person, notes,
+        churchId: CHURCH_ID, provider, gatewayId, currency, expiry_month, expiry_year, routing_number,
+        account_number, account_type, sec_code, name: bankName
+      } = req.body;
       const churchId = au.churchId || CHURCH_ID;
 
       // Validate required parameters
@@ -646,7 +650,7 @@ export class DonateController extends GivingBaseController {
         if (gateway.provider?.toLowerCase() === "kingdomfunding" && abCustomerId && person?.id) {
           try {
             await this.repos.customer.save({ id: abCustomerId, churchId, personId: person.id, provider: "kingdomfunding" });
-          } catch (_e) { /* customer may already exist, ignore */ }
+          } catch { /* customer may already exist, ignore */ }
         }
 
         const subscription: Subscription = {

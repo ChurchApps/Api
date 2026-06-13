@@ -358,7 +358,7 @@ export class StripeHelper {
     const donation: Donation = await givingRepos.donation.save(donationData);
     const promises: Promise<FundDonation>[] = [];
     funds.forEach((fund: any) => {
-      const fundId = (fund?.subscriptionId && fund.subscriptionId !== '') ? fund.fundId : fund.id;
+      const fundId = (fund?.subscriptionId && fund.subscriptionId !== "") ? fund.fundId : fund.id;
       const fundDonation: FundDonation = { churchId, amount: fund.amount, donationId: donation.id, fundId: fundId };
       promises.push(givingRepos.fundDonation.save(fundDonation));
     });

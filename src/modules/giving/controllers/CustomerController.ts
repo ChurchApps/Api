@@ -89,10 +89,10 @@ export class CustomerController extends GivingBaseController {
                 plan: {
                   amount: amountCents,
                   interval: this.mapKFFrequencyToInterval(sub.frequency),
-                  interval_count: 1,
+                  interval_count: 1
                 },
                 provider: providerName,
-                gatewayId: gw.id,
+                gatewayId: gw.id
               });
             } else {
               allSubscriptions.push({ ...sub, provider: providerName, gatewayId: gw.id });
