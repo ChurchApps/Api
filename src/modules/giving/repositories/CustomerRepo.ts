@@ -6,16 +6,18 @@ import { Customer } from "../models/index.js";
 export class CustomerRepo {
 
   public async save(model: Customer): Promise<Customer> {
-    // Check if customer already exists in database
-    const existing = await this.loadByPersonId(model.churchId!, model.personId!);
+    // Scope the lookup by provider: a person can have one customer record per
+    // provider (Stripe + KingdomFunding + ...). Keying on personId alone let a
+    // second provider's save clobber the first provider's customer row.
+    const provider = model.provider ?? "stripe";
+    const existing = await this.loadByPersonAndProvider(model.churchId!, model.personId!, provider);
 
     if (existing) {
-      // Customer exists - update with new Stripe customer ID if provided
       const oldId = existing.id;
       const newId = model.id || existing.id;
 
       if (newId !== oldId) {
-        // If the customer ID changed (new Stripe customer), delete old and create new
+        // External customer id changed for this same provider — replace the row
         await this.delete(model.churchId!, oldId!);
         return await this.create(model);
       } else {
@@ -24,7 +26,7 @@ export class CustomerRepo {
         return await this.update(model);
       }
     } else {
-      // Customer doesn't exist, create it
+      // No customer for this person+provider yet, create it
       return await this.create(model);
     }
   }

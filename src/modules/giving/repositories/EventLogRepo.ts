@@ -4,6 +4,13 @@ import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { EventLog } from "../models/index.js";
 
+// MySQL duplicate-key (errno 1062 / ER_DUP_ENTRY) surfaced through mysql2/kysely.
+export function isDuplicateKeyError(err: any): boolean {
+  return err?.errno === 1062
+    || err?.code === "ER_DUP_ENTRY"
+    || /duplicate entry/i.test(err?.message || "");
+}
+
 @injectable()
 export class EventLogRepo {
 
@@ -19,19 +26,30 @@ export class EventLogRepo {
 
   private async create(model: EventLog): Promise<EventLog> {
     if (!model.id) model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("eventLogs").values({
-      id: model.id,
-      churchId: model.churchId,
-      customerId: model.customerId,
-      provider: model.provider,
-      providerId: model.providerId,
-      eventType: model.eventType,
-      message: model.message,
-      status: model.status,
-      created: model.created,
-      resolved: false
-    } as any).execute();
-    return model;
+    try {
+      await getDb().insertInto("eventLogs").values({
+        id: model.id,
+        churchId: model.churchId,
+        customerId: model.customerId,
+        provider: model.provider,
+        providerId: model.providerId,
+        eventType: model.eventType,
+        message: model.message,
+        status: model.status,
+        created: model.created,
+        resolved: false
+      } as any).execute();
+      return model;
+    } catch (err) {
+      // A concurrent webhook delivery already inserted this provider event
+      // (UNIQUE(churchId, providerId)). Treat as idempotent success and return
+      // the winning row instead of 500-ing, which would trigger a retry storm.
+      if (isDuplicateKeyError(err) && model.churchId && model.providerId) {
+        const existing = await this.loadByProviderId(model.churchId as string, model.providerId);
+        if (existing) return existing;
+      }
+      throw err;
+    }
   }
 
   private async update(model: EventLog): Promise<EventLog> {
