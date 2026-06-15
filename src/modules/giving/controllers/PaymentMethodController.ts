@@ -617,6 +617,36 @@ export class PaymentMethodController extends GivingBaseController {
     });
   }
 
+  /**
+   * Confirm a payment method belongs to the given customer before a non-admin can delete it.
+   * Non-Stripe PMs are tracked in gatewayPaymentMethods (the source of truth); Stripe PMs are
+   * verified against the customer's live payment methods at the gateway.
+   */
+  private async verifyPaymentMethodOwnership(churchId: string, gateway: any, paymentMethodId: string, customerId: string): Promise<boolean> {
+    const prov = gateway.provider?.toLowerCase();
+    if (prov === "paypal" || prov === "kingdomfunding") {
+      const record = await this.repos.gatewayPaymentMethod.loadByExternalId(churchId, gateway.id, paymentMethodId)
+        || await this.repos.gatewayPaymentMethod.loadByExternalIdAcrossGateways(churchId, paymentMethodId);
+      return !!record && String(record.customerId) === String(customerId);
+    }
+    try {
+      const customerData = await this.repos.customer.load(churchId, customerId);
+      const customer = customerData ? this.repos.customer.convertToModel(churchId, customerData as any) : null;
+      if (!customer) return false;
+      const pmList = await GatewayService.getCustomerPaymentMethods(gateway, customer);
+      const ids = new Set<string>();
+      for (const cd of (Array.isArray(pmList) ? pmList : [])) {
+        for (const coll of [cd?.cards?.data, cd?.banks?.data, cd?.legacyBanks?.data]) {
+          for (const pm of (coll || [])) ids.add(String(pm.id));
+        }
+      }
+      return ids.has(String(paymentMethodId));
+    } catch (e) {
+      console.error("[PM Delete] Stripe ownership verification failed:", e);
+      return false;
+    }
+  }
+
   @httpDelete("/:id/:customerid")
   public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -650,7 +680,12 @@ export class PaymentMethodController extends GivingBaseController {
             const customerData = await this.repos.customer.load(au.churchId, customerId);
             if (customerData) {
               const customer = this.repos.customer.convertToModel(au.churchId, customerData as any);
-              permission = customer.personId === au.personId;
+              // A non-admin must own the customer AND the payment method must belong to that
+              // customer — otherwise a donor could delete another donor's PM by supplying their
+              // own customerId (which passes the personId check) with the victim's PM id.
+              if (customer.personId === au.personId) {
+                permission = await this.verifyPaymentMethodOwnership(au.churchId, gateway, id, customerId);
+              }
             }
           } catch (permErr) {
             console.error("[PM Delete] Permission check error:", permErr);

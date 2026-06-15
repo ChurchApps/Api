@@ -37,14 +37,28 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   // ─── Helpers ──────────────────────────────────────────────
 
   private getBaseUrl(config: GatewayConfig): string {
+    const env = (config.environment || "").toLowerCase();
+    // An explicit environment is authoritative — never let a production source key that
+    // happens to contain "test"/"develop" silently route real charges to the sandbox host.
+    if (env === "production" || env === "prod") return "https://api.accept.blue/api/v2";
     const key = config.privateKey || "";
-    // Sandbox uses develop subdomain; production uses main API domain
-    const isDev = config.environment === "sandbox"
+    const isDev = env === "sandbox"
       || (config.settings as any)?.sandbox === true
       || key.includes("sandbox") || key.includes("test") || key.includes("develop");
     return isDev
       ? "https://api.develop.accept.blue/api/v2"
       : "https://api.accept.blue/api/v2";
+  }
+
+  /** Add whole months to a date, clamping the day so Jan 31 + 1mo = Feb 28/29 (not Mar 3). */
+  private addMonthsClamped(date: Date, months: number): Date {
+    const d = new Date(date.getTime());
+    const day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + months);
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    d.setDate(Math.min(day, lastDay));
+    return d;
   }
 
   private getAuthHeader(config: GatewayConfig): string {
@@ -548,17 +562,17 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       if (startsToday) {
         // Already charged today, schedule starts on the next cycle
-        const next = new Date();
+        let next = new Date();
         switch (frequency) {
           case "daily": next.setDate(next.getDate() + 1); break;
           case "weekly": next.setDate(next.getDate() + 7); break;
           case "biweekly": next.setDate(next.getDate() + 14); break;
-          case "monthly": next.setMonth(next.getMonth() + 1); break;
-          case "bimonthly": next.setMonth(next.getMonth() + 2); break;
-          case "quarterly": next.setMonth(next.getMonth() + 3); break;
-          case "biannually": next.setMonth(next.getMonth() + 6); break;
+          case "monthly": next = this.addMonthsClamped(next, 1); break;
+          case "bimonthly": next = this.addMonthsClamped(next, 2); break;
+          case "quarterly": next = this.addMonthsClamped(next, 3); break;
+          case "biannually": next = this.addMonthsClamped(next, 6); break;
           case "annually": next.setFullYear(next.getFullYear() + 1); break;
-          default: next.setMonth(next.getMonth() + 1); break;
+          default: next = this.addMonthsClamped(next, 1); break;
         }
         nextRunDate = next.toISOString().split("T")[0];
       } else {
@@ -746,7 +760,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     }
 
     const fixedFee = customFixedFee ?? 0.3;
-    const percentFee = customPercentFee ?? 0.029;
+    // Clamp to [0, 0.99] so a misconfigured fee (>=100%) can't divide by zero or go negative.
+    const percentFee = Math.min(Math.max(customPercentFee ?? 0.029, 0), 0.99);
     return Math.round(((amount + fixedFee) / (1 - percentFee) - amount) * 100) / 100;
   }
 
@@ -952,6 +967,53 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     }
   }
 
+  /**
+   * Recover fund allocation for a webhook-created donation (recurring auto-charge or ACH
+   * settlement) that arrives with no fund data. Looks up the donor's subscription via the
+   * gateway customer id and uses its designated funds; falls back to the General Fund so a
+   * donation is never recorded unallocated.
+   */
+  private async recoverFunds(
+    churchId: string,
+    eventData: any,
+    amount: number,
+    repos: any
+  ): Promise<Array<{ fundId: string; amount: number }>> {
+    try {
+      const customerId = eventData.customer?.customer_id
+        || eventData.transaction?.customer?.customer_id
+        || eventData.customer_id;
+      if (customerId) {
+        const subs = await repos.subscription.loadByCustomerId(churchId, String(customerId));
+        const candidates = Array.isArray(subs) ? subs : subs ? [subs] : [];
+        let best: { funds: Array<{ fundId: string; amount: number }>; gap: number } | null = null;
+        for (const sub of candidates) {
+          if (!sub?.id) continue;
+          const sfRaw = await repos.subscriptionFunds.loadBySubscriptionId(churchId, String(sub.id));
+          const funds = (sfRaw || [])
+            .filter((f: any) => f.fundId)
+            .map((f: any) => ({ fundId: String(f.fundId), amount: Number(f.amount) || 0 }));
+          if (!funds.length) continue;
+          const total = funds.reduce((s, f) => s + f.amount, 0);
+          // The charged amount may exceed the designated total when the donor covers fees;
+          // pick the subscription whose fund total best fits within the charge.
+          const gap = amount - total;
+          if (gap >= -0.01 && (best === null || gap < best.gap)) best = { funds, gap };
+        }
+        if (best) return best.funds;
+      }
+    } catch (err) {
+      console.error("KingdomFunding recoverFunds: subscription lookup failed", err);
+    }
+    try {
+      const general = await repos.fund.getOrCreateGeneral(churchId);
+      if (general?.id) return [{ fundId: String(general.id), amount }];
+    } catch (err) {
+      console.error("KingdomFunding recoverFunds: General Fund fallback failed", err);
+    }
+    return [];
+  }
+
   async logDonation(
     _config: GatewayConfig,
     churchId: string,
@@ -1023,27 +1085,25 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       const savedDonation = await repos.donation.save(donation);
 
-      // Allocate funds: subscription funds, charge funds array, or single fund fallback
-      const fundsArray = eventData.subscriptionFunds || eventData.funds || [];
-      if (fundsArray.length > 0) {
-        for (const fund of fundsArray) {
-          const fundDonation: FundDonation = {
-            churchId,
-            donationId: savedDonation.id,
-            fundId: fund.fundId || fund.id || "",
-            amount: fund.amount || 0
-          };
-          await repos.fundDonation.save(fundDonation);
-        }
-      } else if (eventData.fundId) {
-        // Single fund donation — use the total amount
+      // Allocate funds from the synchronous /charge path (subscriptionFunds/funds/fundId).
+      // Webhook-created donations (recurring auto-charges, ACH settlements) carry none, so
+      // recover from the originating subscription — otherwise the money is recorded but left
+      // unallocated and fund reports undercount.
+      let fundsArray: any[] = eventData.subscriptionFunds || eventData.funds || [];
+      if (fundsArray.length === 0 && eventData.fundId) {
+        fundsArray = [{ fundId: eventData.fundId, amount }];
+      }
+      if (fundsArray.length === 0) {
+        fundsArray = await this.recoverFunds(churchId, eventData, amount, repos);
+      }
+      for (const fund of fundsArray) {
         const fundDonation: FundDonation = {
           churchId,
           donationId: savedDonation.id,
-          fundId: eventData.fundId,
-          amount
+          fundId: fund.fundId || fund.id || "",
+          amount: fund.amount || 0
         };
-        await repos.fundDonation.save(fundDonation);
+        if (fundDonation.fundId) await repos.fundDonation.save(fundDonation);
       }
 
       return savedDonation;

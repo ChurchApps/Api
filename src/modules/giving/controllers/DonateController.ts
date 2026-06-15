@@ -182,10 +182,14 @@ export class DonateController extends GivingBaseController {
           if (this.shouldProcessDonation(provider, webhookResult.eventType!)) {
             const isPending = this.isPendingPayment(provider, webhookResult.eventType!);
             const isCompleted = this.isCompletedPayment(provider, webhookResult.eventType!);
-            // KingdomFunding puts the transaction ID at reference_number or transaction.id, not at the top-level id
-            const transactionId = webhookResult.eventData?.id
-              || webhookResult.eventData?.reference_number?.toString()
-              || webhookResult.eventData?.transaction?.id?.toString();
+            // KingdomFunding puts the transaction ID at reference_number or transaction.id, not at
+            // the top-level id. Check every candidate so the idempotency match is reliable even if
+            // the webhook surfaces the id under a different field than the /charge response stored.
+            const candidateIds = [
+              webhookResult.eventData?.id,
+              webhookResult.eventData?.reference_number,
+              webhookResult.eventData?.transaction?.id
+            ].map((v) => (v == null ? "" : String(v))).filter((v) => v !== "");
 
             // Idempotency: always check for an existing donation by transactionId before creating.
             // This protects against:
@@ -194,9 +198,13 @@ export class DonateController extends GivingBaseController {
             //   - Multiple status webhooks for the same transaction (e.g., ACH succeeded then settled)
             //   - The /donate/charge endpoint already logging the donation immediately, then the
             //     async webhook arriving later
-            const existingDonation = transactionId
-              ? await this.repos.donation.loadByTransactionId(churchId, transactionId)
-              : null;
+            let existingDonation = null;
+            let matchedId: string | undefined = candidateIds[0];
+            for (const cid of candidateIds) {
+              const found = await this.repos.donation.loadByTransactionId(churchId, cid);
+              if (found) { existingDonation = found; matchedId = cid; break; }
+            }
+            const transactionId = matchedId;
 
             if (isCompleted && transactionId) {
               if (existingDonation) {
@@ -530,7 +538,9 @@ export class DonateController extends GivingBaseController {
               }
             }
           } catch (saveCardErr: any) {
-            console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.data || saveCardErr.message);
+            // Log only the gateway's error message/status — never the raw response body, which
+            // can contain donor PII (billing name, last_4, AVS zip).
+            console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.status || "", saveCardErr.response?.data?.error_message || saveCardErr.message);
             // Fall through — charge will proceed with original nonce
           }
         }
@@ -874,7 +884,8 @@ export class DonateController extends GivingBaseController {
       if (data?.transFeeCC && data.transFeeCC !== null && data.transFeeCC !== undefined && data.transFeeCC !== "") customPercentFee = +data.transFeeCC / 100;
     }
     const fixedFee = customFixedFee ?? 0.3;
-    const fixedPercent = customPercentFee ?? 0.029;
+    // Clamp to [0, 0.99] so a misconfigured fee can't divide by zero or go negative.
+    const fixedPercent = Math.min(Math.max(customPercentFee ?? 0.029, 0), 0.99);
     return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   };
 
@@ -895,7 +906,8 @@ export class DonateController extends GivingBaseController {
       if (data?.flatRateACH && data.flatRateACH !== null && data.flatRateACH !== undefined && data.flatRateACH !== "") customPercentFee = +data.flatRateACH / 100;
       if (data?.hardLimitACH && data.hardLimitACH !== null && data.hardLimitACH !== undefined && data.hardLimitACH !== "") customMaxFee = +data.hardLimitACH;
     }
-    const fixedPercent = customPercentFee ?? 0.008;
+    // Clamp to [0, 0.99] so a misconfigured fee can't divide by zero or go negative.
+    const fixedPercent = Math.min(Math.max(customPercentFee ?? 0.008, 0), 0.99);
     const fixedMaxFee = customMaxFee ?? 5.0;
     const fee = Math.round((amount / (1 - fixedPercent) - amount) * 100) / 100;
     return Math.min(fee, fixedMaxFee);

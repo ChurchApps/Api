@@ -30,8 +30,6 @@ export class SubscriptionController extends GivingBaseController {
 
       for (const subscription of req.body) {
         const existingSub = await this.repos.subscription.load(au.churchId, subscription.id) as any;
-        const permission = au.checkAccess(Permissions.donations.edit) || existingSub?.personId === au.personId;
-        if (!permission) continue;
 
         // Resolve gateway via provider param or by looking up the customer's provider
         const provider = subscription.provider;
@@ -49,6 +47,21 @@ export class SubscriptionController extends GivingBaseController {
         if (!gateway) {
           gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
         }
+
+        let permission = au.checkAccess(Permissions.donations.edit) || existingSub?.personId === au.personId;
+
+        // A KF schedule may have no local subscription row (legacy / gateway-created), which would
+        // make the personId check above silently fail and skip the edit. Verify ownership via the
+        // remote schedule's customer_id, mirroring the delete path.
+        if (!permission && !existingSub && provider?.toLowerCase() === "kingdomfunding" && gateway) {
+          const schedule = await GatewayService.getSubscription(gateway, subscription.id).catch(() => null);
+          const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
+          if (remoteCustomerId) {
+            const ownerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, provider).catch(() => null) as any;
+            if (ownerCustomer && String(ownerCustomer.id) === remoteCustomerId) permission = true;
+          }
+        }
+        if (!permission) continue;
 
         if (gateway) {
           promises.push(GatewayService.updateSubscription(gateway, subscription));
