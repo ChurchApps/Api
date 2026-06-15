@@ -12,6 +12,7 @@ const fullSet = [
   "Donations__View Summary",
   "Donations__Edit",
   "Attendance__View Summary",
+  "Content__Edit",
   "Server__Admin",
   "MembershipApi_People__View", // reporting-style, apiName-prefixed
   "Groups_abc12345678_Edit" // a content-id-scoped permission
@@ -49,6 +50,15 @@ describe("filterPermissionsByScopes", () => {
 
   it("returns nothing for an unknown scope", () => {
     expect(filterPermissionsByScopes(fullSet, ["banana"])).toEqual([]);
+  });
+
+  it("plans scope (FreeShow) grants content edit without escalating", () => {
+    const result = filterPermissionsByScopes(fullSet, ["plans"]);
+    expect(result).not.toEqual([]); // regression: unknown scope used to strip every permission
+    expect(result).toContain("Content__Edit"); // cloud-backup upload + song import
+    expect(result).toContain("Group Members__View");
+    expect(result).not.toContain("Donations__Edit");
+    expect(result).not.toContain("Server__Admin");
   });
 
   it("never includes server admin via any scope", () => {

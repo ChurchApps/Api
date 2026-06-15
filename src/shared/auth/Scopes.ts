@@ -85,6 +85,17 @@ export const SCOPE_CATALOG: Record<string, PermPair[]> = {
     { contentType: "Schedules", action: "Edit" }
   ],
 
+  // Backwards compatible for FreeShow sync
+  plans: [
+    ...groupsRead,
+    ...messagingRead,
+    { contentType: "Content", action: "Edit" },
+    { contentType: "Plans", action: "Edit" },
+    { contentType: "Schedules", action: "Edit" },
+    { contentType: "Chat", action: "Host" },
+    { contentType: "Messaging", action: "Edit" }
+  ],
+
   "messaging:read": messagingRead,
   "messaging:write": [
     ...messagingRead,
