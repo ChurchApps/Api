@@ -19,7 +19,8 @@ export async function up(db: Kysely<any>): Promise<void> {
      AND e1.id > e2.id
   `.execute(db);
 
-  await db.schema.dropIndex("idx_eventLogs_providerId").on("eventLogs").ifExists().execute();
+  // MySQL has no DROP INDEX IF EXISTS; drop plainly and ignore "index doesn't exist" (errno 1091) to stay idempotent.
+  await db.schema.dropIndex("idx_eventLogs_providerId").on("eventLogs").execute().catch((e: { errno?: number }) => { if (e?.errno !== 1091) throw e; });
   await db.schema
     .createIndex("idx_eventLogs_church_provider")
     .on("eventLogs")
@@ -29,6 +30,6 @@ export async function up(db: Kysely<any>): Promise<void> {
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  await db.schema.dropIndex("idx_eventLogs_church_provider").on("eventLogs").ifExists().execute();
+  await db.schema.dropIndex("idx_eventLogs_church_provider").on("eventLogs").execute().catch((e: { errno?: number }) => { if (e?.errno !== 1091) throw e; });
   await db.schema.createIndex("idx_eventLogs_providerId").on("eventLogs").column("providerId").execute();
 }
