@@ -263,8 +263,9 @@ export class PaymentMethodController extends GivingBaseController {
 
       try {
         const buildAttachOptions = (custId: string) => {
-          const opts: any = { customer: custId, customerId: custId };
+          const opts: any = { customer: custId };
           if (gateway.provider?.toLowerCase() === "kingdomfunding") {
+            opts.customerId = custId; // Accept Blue reads customerId; Stripe 400s on the extra key
             // Detect ACH vs card based on which fields the frontend sent
             if (req.body.routing_number && req.body.account_number) {
               opts.routing_number = req.body.routing_number;
