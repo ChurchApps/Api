@@ -38,7 +38,8 @@ export class GroupController extends MembershipBaseController {
   @httpGet("/public/:churchId/slug/:slug")
   public async getPublicSlug(@requestParam("churchId") churchId: string, @requestParam("slug") slug: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repos.group.convertToModel(churchId, await this.repos.group.loadPublicSlug(churchId, slug));
+      const group = await this.repos.group.loadPublicSlug(churchId, slug);
+      return group ? this.repos.group.convertToModel(churchId, group) : this.json({ error: "Group not found" }, 404);
     });
   }
 
@@ -60,7 +61,8 @@ export class GroupController extends MembershipBaseController {
   @httpGet("/public/:churchId/:id")
   public async getPublic(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repos.group.convertToModel(churchId, await this.repos.group.load(churchId, id));
+      const group = await this.repos.group.load(churchId, id);
+      return group ? this.repos.group.convertToModel(churchId, group) : this.json({ error: "Group not found" }, 404);
     });
   }
 
