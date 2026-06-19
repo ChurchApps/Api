@@ -69,23 +69,24 @@ export class CustomerController extends GivingBaseController {
             const providerName = gw.provider?.toLowerCase();
 
             if (providerName === "kingdomfunding") {
-              // Accept Blue uses `active` as the lifecycle flag — cancelled schedules
-              // are returned with active:false. (Their `status` field stays "active"
-              // even after cancellation, so don't rely on it.)
-              if (!sub.active) continue;
+              // NMI subscriptions are normalized by the provider to { id, amount,
+              // nextRunDate, status, frequency }. NMI uses a status string rather than
+              // an `active` flag — skip clearly-inactive ones, but don't drop everything.
+              const subStatus = String(sub.status || "active").toLowerCase();
+              if (sub.active === false || ["cancelled", "canceled", "deleted", "complete", "completed"].includes(subStatus)) continue;
 
-              // Normalize Accept Blue recurring-schedule to Stripe-like format.
-              // Use next_run_date so the UI's "Start Date" column shows when the
-              // next charge will occur (more useful than schedule-creation timestamp).
-              const amountCents = Math.round((sub.amount || 0) * 100);
-              const anchorSrc = sub.next_run_date || sub.created_at;
+              // Normalize NMI recurring-schedule to the Stripe-like shape the UI expects.
+              // Prefer the next charge date so the UI's "Start Date" column is meaningful.
+              const amountCents = Math.round((Number(sub.amount) || 0) * 100);
+              const anchorSrc = sub.nextRunDate || sub.next_charge_date || sub.created_at;
+              const anchorMs = anchorSrc ? new Date(anchorSrc).getTime() : NaN;
               allSubscriptions.push({
                 id: String(sub.id),
                 status: "active",
-                billing_cycle_anchor: anchorSrc
-                  ? Math.floor(new Date(anchorSrc).getTime() / 1000)
+                billing_cycle_anchor: !isNaN(anchorMs)
+                  ? Math.floor(anchorMs / 1000)
                   : Math.floor(Date.now() / 1000),
-                default_payment_method: sub.payment_method_id ? String(sub.payment_method_id) : undefined,
+                default_payment_method: sub.customer_vault_id ? String(sub.customer_vault_id) : undefined,
                 plan: {
                   amount: amountCents,
                   interval: this.mapKFFrequencyToInterval(sub.frequency),
@@ -135,7 +136,7 @@ export class CustomerController extends GivingBaseController {
     });
   }
 
-  /** Map Accept Blue frequency names to Stripe-compatible interval names */
+  /** Map NMI/KingdomFunding frequency names to Stripe-compatible interval names */
   private mapKFFrequencyToInterval(frequency: string): string {
     switch (frequency?.toLowerCase()) {
       case "daily": return "day";

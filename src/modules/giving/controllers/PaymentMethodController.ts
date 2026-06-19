@@ -638,8 +638,8 @@ export class PaymentMethodController extends GivingBaseController {
         if (localRecord) {
           const gw = (await this.repos.gateway.loadAll(au.churchId) as any[]).find(g => g.id === localRecord.gatewayId);
           resolvedProvider = gw?.provider?.toLowerCase() || "paypal";
-        } else if (/^\d+$/.test(id)) {
-          // Numeric IDs are Accept Blue / KingdomFunding payment method IDs
+        } else if (/^\d+$/.test(id) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+          // KingdomFunding (NMI) Customer Vault ids — UUIDs (or legacy numeric ids)
           resolvedProvider = "kingdomfunding";
         } else {
           resolvedProvider = "paypal"; // fallback for backward compat
@@ -681,7 +681,14 @@ export class PaymentMethodController extends GivingBaseController {
               const provider = GatewayFactory.getProvider(gateway.provider);
               const config = GatewayService.getGatewayConfig(gateway);
               const schedules = await (provider as any).getCustomerSubscriptions(config, customerId);
-              const activeSchedules = (schedules || []).filter((s: any) => s.payment_method_id?.toString() === id && s.active !== false);
+              // NMI ties a schedule to the saved method via customer_vault_id; status is a
+              // string (no `active` flag), so treat anything not clearly inactive as active.
+              const activeSchedules = (schedules || []).filter((s: any) => {
+                const matchesMethod = s.customer_vault_id?.toString() === id || s.payment_method_id?.toString() === id;
+                const status = String(s.status || "active").toLowerCase();
+                const isActive = s.active !== false && !["cancelled", "canceled", "deleted", "complete", "completed"].includes(status);
+                return matchesMethod && isActive;
+              });
               for (const schedule of activeSchedules) {
                 try {
                   await provider.cancelSubscription(config, schedule.id.toString());
@@ -692,7 +699,7 @@ export class PaymentMethodController extends GivingBaseController {
               }
               await GatewayService.detachPaymentMethod(gateway, id);
             } catch (retryErr: any) {
-              // Could not delete from Accept Blue — proceed to clean up locally only
+              // Could not delete from NMI — proceed to clean up locally only
               console.warn("[PM Delete] Could not delete PM from provider, cleaning up local records only:", retryErr?.message || retryErr);
             }
           } else {

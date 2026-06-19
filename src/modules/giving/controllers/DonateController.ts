@@ -236,14 +236,21 @@ export class DonateController extends GivingBaseController {
   }
 
   private shouldProcessDonation(provider: string, eventType: string): boolean {
+    // KingdomFunding/NMI event types: transaction.<action>.<result> for cards/ACH sales,
+    // and check.* events for the ACH settlement lifecycle.
+    if (provider === "kingdomfunding") {
+      return (
+        eventType === "transaction.sale.success" ||
+        eventType === "transaction.auth.success" ||
+        eventType.startsWith("check.") // ACH status lifecycle (settled/returned/etc.)
+      );
+    }
     const donationEvents: Record<string, string[]> = {
       // payment_intent.processing is for ACH payments that are pending
       // payment_intent.succeeded is the new standard for ACH payments via Payment Intents API
       // charge.succeeded is kept for backward compatibility during migration
       stripe: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded", "payment_intent.processing"],
       paypal: ["PAYMENT.CAPTURE.COMPLETED"],
-      // KingdomFunding webhook events: "succeeded.charge" for card/ACH, "status.settled" for ACH settlement
-      kingdomfunding: ["succeeded.charge", "status.settled"],
     };
     return donationEvents[provider]?.includes(eventType) || false;
   }
@@ -251,14 +258,21 @@ export class DonateController extends GivingBaseController {
   private isPendingPayment(provider: string, eventType: string): boolean {
     // ACH payments start in "processing" state and later transition to "succeeded"/"settled"
     if (provider === "stripe") return eventType === "payment_intent.processing";
-    // KingdomFunding ACH: initial charge succeeds but needs settlement confirmation
-    if (provider === "kingdomfunding") return eventType === "status.originated" || eventType === "status.pending";
+    // KingdomFunding/NMI ACH: the check.* lifecycle starts pending/originated before settling.
+    if (provider === "kingdomfunding") return /^check\.(status\.)?(pending|originated|processing)/.test(eventType);
     return false;
   }
 
   private isCompletedPayment(provider: string, eventType: string): boolean {
     if (provider === "stripe") return eventType === "payment_intent.succeeded";
-    if (provider === "kingdomfunding") return eventType === "status.settled" || eventType === "succeeded.charge";
+    // NMI: card/ACH sale success, or the ACH check lifecycle reaching "settled".
+    if (provider === "kingdomfunding") {
+      return (
+        eventType === "transaction.sale.success" ||
+        eventType === "transaction.auth.success" ||
+        /^check\.(status\.)?settled/.test(eventType)
+      );
+    }
     return false;
   }
 
@@ -444,9 +458,9 @@ export class DonateController extends GivingBaseController {
       donationData.currency = normalizedCurrency;
 
       try {
-        // KingdomFunding + saveCard: create customer & payment method BEFORE charging,
-        // then charge with the saved pm-{id} instead of the single-use nonce.
-        // Flow: Create customer → Add payment method (nonce) → Charge with pm-{id}
+        // KingdomFunding (NMI) + saveCard: vault the payment method BEFORE charging,
+        // then charge the saved Customer Vault record instead of the single-use token.
+        // Flow: Create customer → Vault payment method (payment_token) → Charge by vault id.
         // Uses GatewayService (not direct Axios) so credentials are decrypted and URLs are correct.
         if (donationData.saveCard && gateway.provider?.toLowerCase() === "kingdomfunding") {
           try {
@@ -468,13 +482,13 @@ export class DonateController extends GivingBaseController {
             }
 
             if (customerId) {
-              // Step 2: Attach payment method using nonce via GatewayService
-              const nonceToken = donationData.token || donationData.id || "";
-              const nonceSource = nonceToken.startsWith("nonce-") ? nonceToken : `nonce-${nonceToken}`;
+              // Step 2: Vault the payment method using the raw NMI payment_token.
+              // (NMI tokens carry no "nonce-" prefix — that was an Accept Blue convention.)
+              const paymentToken = donationData.token || donationData.id || "";
 
               const attachOptions: any = {
                 customerId,
-                source: nonceSource,
+                source: paymentToken,
                 name: personName,
               };
               if (donationData.expiry_month) attachOptions.expiry_month = Number(donationData.expiry_month);
@@ -486,19 +500,19 @@ export class DonateController extends GivingBaseController {
 
               let pm: any;
               try {
-                pm = await GatewayService.attachPaymentMethod(gateway, nonceSource, attachOptions);
+                pm = await GatewayService.attachPaymentMethod(gateway, paymentToken, attachOptions);
               } catch (attachErr: any) {
                 // Customer doesn't exist on provider (stale local record) — recreate and retry
                 const status = attachErr.response?.status || attachErr.statusCode;
                 if (status === 404) {
-                  console.log(`Customer ${customerId} not found on Accept Blue, recreating...`);
+                  console.log(`Customer ${customerId} not found on NMI, recreating...`);
                   customerId = await GatewayService.createCustomer(gateway, personEmail, personName);
                   if (customerId && personId) {
                     await this.repos.customer.save({ id: customerId, churchId, personId, provider: "kingdomfunding" });
                   }
                   if (customerId) {
                     attachOptions.customerId = customerId;
-                    pm = await GatewayService.attachPaymentMethod(gateway, nonceSource, attachOptions);
+                    pm = await GatewayService.attachPaymentMethod(gateway, paymentToken, attachOptions);
                   } else {
                     throw attachErr;
                   }
@@ -520,25 +534,26 @@ export class DonateController extends GivingBaseController {
                   metadata: { card_type: cardType, last_4: last4 }
                 } as any);
 
-                // Step 3: Charge using the saved payment method instead of the nonce
+                // Step 3: Charge the saved Customer Vault record instead of the one-time token.
                 donationData.paymentMethodId = String(savedPmId);
                 donationData.customerId = customerId;
-                delete donationData.id;     // Remove nonce so processCharge uses pm-{id}
+                delete donationData.id;     // Remove the token so processCharge uses the vault id
                 delete donationData.token;
               }
             }
           } catch (saveCardErr: any) {
-            console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.data || saveCardErr.message);
-            // Fall through — charge will proceed with original nonce
+            console.warn("Charge: Failed to vault payment method before charge (non-fatal, charging with one-time token):", saveCardErr.response?.data || saveCardErr.message);
+            // Fall through — charge will proceed with the original one-time token
           }
         }
 
-        // KF saved payment method: the frontend sends id="54879" (a numeric PM ID from Accept Blue).
-        // The KF provider treats id as a nonce (nonce-54879) which is wrong.
-        // Detect numeric IDs and move them to paymentMethodId so the provider uses pm-{id} instead.
+        // KF saved payment method: for a saved method the frontend sends `id` = the stored
+        // Customer Vault id (a UUID), not a fresh Collect.js token. Move it to paymentMethodId
+        // so the provider charges by customer_vault_id instead of mistaking it for a payment_token.
         if (gateway.provider?.toLowerCase() === "kingdomfunding" && donationData.id && !donationData.paymentMethodId) {
           const id = String(donationData.id);
-          if (/^\d+$/.test(id)) {
+          const isVaultId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || /^\d+$/.test(id);
+          if (isVaultId) {
             donationData.paymentMethodId = id;
             delete donationData.id;
           }
@@ -560,6 +575,9 @@ export class DonateController extends GivingBaseController {
               funds: donationData.funds,
               person: donationData.person,
               notes: donationData.notes,
+              // Carry the payment type so ACH charges are labeled correctly — NMI's
+              // token-sale response doesn't echo bank details to infer it from.
+              paymentType: donationData.type,
             };
             await GatewayService.logDonation(gateway, churchId, logData, this.repos, "complete");
           } catch (logErr: any) {
@@ -639,7 +657,7 @@ export class DonateController extends GivingBaseController {
           return this.json({ error: "Subscription creation failed" }, 400);
         }
 
-        // Save the KF customer ID locally (created during subscription on Accept Blue)
+        // Save the KF customer ID locally (the NMI Customer Vault id created during subscription)
         const abCustomerId = subscriptionResult.data?.customerId ? String(subscriptionResult.data.customerId) : customerId;
         if (gateway.provider?.toLowerCase() === "kingdomfunding" && abCustomerId && person?.id) {
           try {
