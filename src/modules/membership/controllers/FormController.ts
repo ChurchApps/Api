@@ -85,7 +85,7 @@ export class FormController extends MembershipBaseController {
         memberPermissionPromises.push(this.repos.memberPermission.save(memberPermission));
       });
       await Promise.all(memberPermissionPromises);
-      return [...formResult, newStandAloneFormResult];
+      return [...formResult, ...newStandAloneFormResult];
     });
   }
 
