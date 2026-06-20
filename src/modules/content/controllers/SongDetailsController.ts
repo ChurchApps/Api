@@ -28,16 +28,17 @@ export class SongDetailsController extends ContentBaseController {
       if (!sd.praiseChartsId) return null;
       const existing = await this.repos.songDetail.loadByPraiseChartsId(sd.praiseChartsId);
       if (existing) return existing;
-      else {
+      try {
         const { songDetails, links } = await PraiseChartsHelper.load(sd.praiseChartsId);
         await MusicBrainzHelper.appendDetails(songDetails, links);
-
         const result = await this.repos.songDetail.save(songDetails);
         links.forEach(async (link) => {
           link.songDetailId = result.id;
           await this.repos.songDetailLink.save(link);
         });
         return result;
+      } catch {
+        return await this.repos.songDetail.save(sd);
       }
     });
   }

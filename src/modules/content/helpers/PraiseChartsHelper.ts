@@ -147,6 +147,7 @@ export class PraiseChartsHelper {
     const response = await fetch(url);
     if (response.ok) {
       const data = await response.json();
+      if (!data.arrangements?.items?.length) throw new Error("No results from PraiseCharts");
       const songDetails = this.convertItemToSongDetail(data.arrangements.items[0]);
       this.appendDetails(data.arrangements.items[0], songDetails);
       const links = this.getLinks(data.arrangements.items[0]);
@@ -176,11 +177,11 @@ export class PraiseChartsHelper {
 
   static appendDetails(item: any, sd: SongDetail) {
     sd.bpm = item.bpm;
-    sd.keySignature = item.details.original_key;
+    sd.keySignature = item.details?.original_key;
     sd.seconds = item.seconds;
     sd.thumbnail = ""; // Can only use for PC branded search
-    sd.meter = item.details.meter;
-    sd.tones = item.details.keys;
+    sd.meter = item.details?.meter;
+    sd.tones = item.details?.keys;
   }
 
   private static getLinks(item: any) {
