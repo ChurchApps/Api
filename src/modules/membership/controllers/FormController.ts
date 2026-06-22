@@ -89,6 +89,21 @@ export class FormController extends MembershipBaseController {
     });
   }
 
+  @httpPost("/duplicate/:id")
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!await this.formAccess(au, id)) return this.json({}, 401);
+      const form = await this.repos.form.load(au.churchId, id);
+      if (!form) return this.json({}, 404);
+      const questions = await this.repos.question.loadForForm(au.churchId, id);
+      const savedForm = await this.repos.form.save({ ...form, id: undefined, name: form.name + " (Copy)", archived: false });
+      for (const q of questions) {
+        await this.repos.question.save({ ...q, id: undefined, formId: savedForm.id });
+      }
+      return savedForm;
+    });
+  }
+
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
