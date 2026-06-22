@@ -19,6 +19,10 @@ export class EventBookingRepo {
       resourceId: model.resourceId,
       quantity: model.quantity,
       status: model.status,
+      setupMinutes: model.setupMinutes ?? null,
+      teardownMinutes: model.teardownMinutes ?? null,
+      startTime: model.startTime ? DateHelper.toMysqlDate(model.startTime) : null,
+      endTime: model.endTime ? DateHelper.toMysqlDate(model.endTime) : null,
       requestedBy: model.requestedBy,
       requestedDate: model.requestedDate ? DateHelper.toMysqlDate(model.requestedDate) : null,
       resolvedBy: model.resolvedBy,
@@ -32,6 +36,10 @@ export class EventBookingRepo {
     await getDb().updateTable("eventBookings").set({
       quantity: model.quantity,
       status: model.status,
+      setupMinutes: model.setupMinutes ?? null,
+      teardownMinutes: model.teardownMinutes ?? null,
+      startTime: model.startTime ? DateHelper.toMysqlDate(model.startTime) : null,
+      endTime: model.endTime ? DateHelper.toMysqlDate(model.endTime) : null,
       resolvedBy: model.resolvedBy,
       resolvedDate: model.resolvedDate ? DateHelper.toMysqlDate(model.resolvedDate) : null,
       notifiedDate: model.notifiedDate ? DateHelper.toMysqlDate(model.notifiedDate) : null
@@ -108,6 +116,33 @@ export class EventBookingRepo {
       .where("eventBookings.resourceId", "in", resourceIds)
       .where("eventBookings.status", "!=", "rejected");
     if (excludeEventId) query = query.where("eventBookings.eventId", "!=", excludeEventId);
+    return query.execute() as any;
+  }
+
+  // Non-rejected bookings for the availability calendar: recurring events are always
+  // included (expanded client-side); one-time events only if they overlap the window.
+  public async loadForCalendar(churchId: string, start: Date, end: Date, roomId?: string, resourceId?: string): Promise<any[]> {
+    let query = getDb().selectFrom("eventBookings")
+      .innerJoin("events", "events.id", "eventBookings.eventId")
+      .leftJoin("rooms", "rooms.id", "eventBookings.roomId")
+      .leftJoin("resources", "resources.id", "eventBookings.resourceId")
+      .selectAll("eventBookings")
+      .select([
+        "events.title as eventTitle",
+        "events.start as eventStart",
+        "events.end as eventEnd",
+        "events.recurrenceRule as eventRecurrenceRule",
+        "rooms.name as roomName",
+        "resources.name as resourceName"
+      ])
+      .where("eventBookings.churchId", "=", churchId)
+      .where("eventBookings.status", "!=", "rejected")
+      .where((eb) => eb.or([
+        eb.and([eb("events.recurrenceRule", "is not", null), eb("events.recurrenceRule", "!=", "")]),
+        eb.and([eb("events.start", "<", DateHelper.toMysqlDate(end) as any), eb("events.end", ">", DateHelper.toMysqlDate(start) as any)])
+      ]));
+    if (roomId) query = query.where("eventBookings.roomId", "=", roomId);
+    if (resourceId) query = query.where("eventBookings.resourceId", "=", resourceId);
     return query.execute() as any;
   }
 

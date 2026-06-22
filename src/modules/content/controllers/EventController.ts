@@ -173,6 +173,10 @@ export class EventController extends ContentBaseController {
         start: req.body.start,
         end: req.body.end,
         recurrenceRule: req.body.recurrenceRule,
+        setupMinutes: req.body.setupMinutes,
+        teardownMinutes: req.body.teardownMinutes,
+        startTime: req.body.startTime,
+        endTime: req.body.endTime,
         roomIds: req.body.roomIds || [],
         resources: req.body.resources || []
       };

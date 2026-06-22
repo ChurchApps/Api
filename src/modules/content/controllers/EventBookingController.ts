@@ -17,6 +17,17 @@ export class EventBookingController extends ContentBaseController {
     });
   }
 
+  @httpGet("/calendar")
+  public async getCalendar(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const start = req.query.startTime ? new Date(req.query.startTime.toString()) : new Date();
+      const end = req.query.endTime ? new Date(req.query.endTime.toString()) : new Date(start.getFullYear() + 1, start.getMonth(), start.getDate());
+      const roomId = req.query.roomId?.toString();
+      const resourceId = req.query.resourceId?.toString();
+      return await this.repos.eventBooking.loadForCalendar(au.churchId, start, end, roomId, resourceId);
+    });
+  }
+
   // Approvals inbox. Conflict resolvers (or content editors) see everything;
   // approval-group members see the requests routed to their groups.
   @httpGet("/pending")
@@ -127,7 +138,18 @@ export class EventBookingController extends ContentBaseController {
     const roomIds = row.roomId ? [row.roomId] : [];
     const resources = row.resourceId ? [{ resourceId: row.resourceId, quantity: row.quantity || 1 }] : [];
     return ConflictHelper.findConflicts(
-      { eventId: row.eventId, start: row.eventStart, end: row.eventEnd, recurrenceRule: row.eventRecurrenceRule, roomIds, resources },
+      {
+        eventId: row.eventId,
+        start: row.eventStart,
+        end: row.eventEnd,
+        recurrenceRule: row.eventRecurrenceRule,
+        setupMinutes: row.setupMinutes,
+        teardownMinutes: row.teardownMinutes,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        roomIds,
+        resources
+      },
       {
         windowStart,
         windowEnd,

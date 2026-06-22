@@ -270,6 +270,36 @@ BEGIN
         DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 1 MONTH), INTERVAL '19:00:00' HOUR_SECOND),
         DATE_ADD(DATE_ADD(CURDATE(), INTERVAL 1 MONTH), INTERVAL '18:00:00' HOUR_SECOND));
 
+    -- Rooms
+    INSERT INTO rooms (id, churchId, name, description, capacity, approvalGroupId) VALUES
+    ('RM000000001', 'CHU00000001', 'Sanctuary', 'Main worship space', 300, NULL),
+    ('RM000000002', 'CHU00000001', 'Fellowship Hall', 'Large multi-purpose hall', 150, NULL),
+    ('RM000000003', 'CHU00000001', 'Youth Room', 'Youth ministry meeting room', 40, 'GRP00000013');
+
+    -- Resources
+    INSERT INTO resources (id, churchId, name, description, quantity, approvalGroupId) VALUES
+    ('RS000000001', 'CHU00000001', 'Projector', 'Portable HD projector', 3, NULL),
+    ('RS000000002', 'CHU00000001', 'Round Tables', '8-person round tables', 20, NULL),
+    ('RS000000003', 'CHU00000001', 'Church Van', '12-passenger van', 2, 'GRP00000021');
+
+    -- Event Templates
+    INSERT INTO eventTemplates (id, churchId, name, title, description, durationMinutes, visibility, roomIds, resourcesJson) VALUES
+    ('TPL00000001', 'CHU00000001', 'Sunday Service', 'Sunday Morning Service', 'Weekly worship service', 90, 'public', 'RM000000001', '[{"resourceId":"RS000000001","quantity":1}]');
+
+    -- Calendar Blockout (Sanctuary unavailable for maintenance next week)
+    INSERT INTO calendarBlockouts (id, churchId, roomId, resourceId, startTime, endTime, reason) VALUES
+    ('BLK00000001', 'CHU00000001', 'RM000000001', NULL,
+        DATE_ADD(CURDATE(), INTERVAL 7 DAY) + INTERVAL '08:00:00' HOUR_SECOND,
+        DATE_ADD(CURDATE(), INTERVAL 7 DAY) + INTERVAL '17:00:00' HOUR_SECOND,
+        'Floor refinishing');
+
+    -- Event Bookings (approved recurring bookings + a pending request for the approvals inbox)
+    INSERT INTO eventBookings (id, churchId, eventId, roomId, resourceId, quantity, status, requestedBy, requestedDate) VALUES
+    ('EB000000001', 'CHU00000001', 'EVT00000001', 'RM000000001', NULL, 1, 'approved', NULL, NOW()),
+    ('EB000000002', 'CHU00000001', 'EVT00000012', 'RM000000002', NULL, 1, 'approved', NULL, NOW()),
+    ('EB000000003', 'CHU00000001', 'EVT00000016', 'RM000000001', NULL, 1, 'pending', NULL, NOW()),
+    ('EB000000004', 'CHU00000001', 'EVT00000016', NULL, 'RS000000001', 1, 'pending', NULL, NOW());
+
     -- Curated Calendars
     INSERT INTO curatedCalendars (id, churchId, name) VALUES
     ('CAL00000001', 'CHU00000001', 'Youth Ministry Calendar'),

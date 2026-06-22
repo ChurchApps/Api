@@ -92,6 +92,60 @@ describe("ConflictHelper resource conflicts", () => {
   });
 });
 
+describe("ConflictHelper booking windows", () => {
+  // Proposed event is 6-8pm but reserves the room 8am-5pm; an unrelated 2pm booking now conflicts.
+  it("uses the proposed absolute window instead of the event time", () => {
+    const ctx = baseContext({ roomBookings: [{ id: "b1", eventId: "e2", roomId: "room1", eventTitle: "Afternoon Meeting", eventStart: d("2026-07-10T14:00:00"), eventEnd: d("2026-07-10T15:00:00") }] });
+    // Without the window the 6-8pm event would not overlap a 2-3pm booking.
+    expect(ConflictHelper.findConflicts(proposed(), ctx)).toHaveLength(0);
+    const result = ConflictHelper.findConflicts(proposed({ startTime: d("2026-07-10T08:00:00"), endTime: d("2026-07-10T17:00:00") }), ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("room");
+  });
+
+  // A multi-day Fri-Sun reservation overlaps a Saturday booking.
+  it("supports multi-day reservation windows", () => {
+    const ctx = baseContext({ roomBookings: [{ id: "b1", eventId: "e2", roomId: "room1", eventTitle: "Saturday Workshop", eventStart: d("2026-07-11T10:00:00"), eventEnd: d("2026-07-11T12:00:00") }] });
+    const result = ConflictHelper.findConflicts(proposed({ startTime: d("2026-07-10T00:00:00"), endTime: d("2026-07-12T23:59:00") }), ctx);
+    expect(result).toHaveLength(1);
+  });
+
+  // Setup/teardown padding applies to every occurrence of a recurring proposal.
+  it("pads each recurring occurrence by setup/teardown minutes", () => {
+    const ctx = baseContext({ roomBookings: [{ id: "b1", eventId: "e2", roomId: "room1", eventTitle: "Saturday Setup Crew", eventStart: d("2026-07-11T12:00:00"), eventEnd: d("2026-07-11T13:00:00") }] });
+    // Weekly-Friday 6-8pm proposal; the conflicting booking is Saturday noon, so no raw overlap.
+    const weekly = { recurrenceRule: "FREQ=WEEKLY;BYDAY=FR" };
+    expect(ConflictHelper.findConflicts(proposed(weekly), ctx)).toHaveLength(0);
+    // With a 24h teardown the Friday occurrence now stretches into Saturday and conflicts.
+    const result = ConflictHelper.findConflicts(proposed({ ...weekly, teardownMinutes: 60 * 24 }), ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].conflictingEventTitle).toBe("Saturday Setup Crew");
+  });
+
+  it("honors an existing booking's setup padding", () => {
+    // Existing 7-8pm event reserves 2 hours of setup (5pm start); proposed 6-8pm overlaps the setup.
+    const ctx = baseContext({ roomBookings: [{ id: "b1", eventId: "e2", roomId: "room1", eventTitle: "Padded", eventStart: d("2026-07-10T19:00:00"), eventEnd: d("2026-07-10T20:00:00"), setupMinutes: 120 }] });
+    expect(ConflictHelper.findConflicts(proposed(), ctx)).toHaveLength(1);
+  });
+
+  // Absolute window overrides setup/teardown when both are present.
+  it("lets an absolute window override offsets", () => {
+    const ctx = baseContext({ roomBookings: [{ id: "b1", eventId: "e2", roomId: "room1", eventTitle: "Morning", eventStart: d("2026-07-10T08:00:00"), eventEnd: d("2026-07-10T09:00:00") }] });
+    // Huge teardown would overlap, but the absolute 6-8pm window wins and does not reach 8am.
+    const result = ConflictHelper.findConflicts(proposed({ teardownMinutes: 99999, startTime: d("2026-07-10T18:00:00"), endTime: d("2026-07-10T20:00:00") }), ctx);
+    expect(result).toHaveLength(0);
+  });
+
+  // An existing booking's own absolute window is honored over its event time.
+  it("honors an existing booking's absolute window", () => {
+    const ctx = baseContext({ roomBookings: [{ id: "b1", eventId: "e2", roomId: "room1", eventTitle: "All-day Setup", eventStart: d("2026-07-10T19:00:00"), eventEnd: d("2026-07-10T20:00:00"), startTime: d("2026-07-10T08:00:00"), endTime: d("2026-07-10T22:00:00") }] });
+    // Proposed 6-8pm event overlaps the existing 8am-10pm reservation even though the other event is 7-8pm.
+    const result = ConflictHelper.findConflicts(proposed(), ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].conflictingEventTitle).toBe("All-day Setup");
+  });
+});
+
 describe("ConflictHelper blockout conflicts", () => {
   it("flags a room-specific blockout overlapping the proposal", () => {
     const ctx = baseContext({ blockouts: [{ id: "blk1", churchId: "c1", roomId: "room1", startTime: d("2026-07-10T00:00:00"), endTime: d("2026-07-11T00:00:00"), reason: "Floor refinishing" }] });

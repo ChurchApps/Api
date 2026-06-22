@@ -6,6 +6,10 @@ export class EventBooking {
   resourceId?: string;
   quantity?: number;
   status?: string;
+  setupMinutes?: number;
+  teardownMinutes?: number;
+  startTime?: Date;
+  endTime?: Date;
   requestedBy?: string;
   requestedDate?: Date;
   resolvedBy?: string;

@@ -6,8 +6,28 @@ export interface ProposedBooking {
   start: Date | string;
   end: Date | string;
   recurrenceRule?: string;
+  // Per-occurrence padding applied before/after each event occurrence (recurrence-aware).
+  setupMinutes?: number;
+  teardownMinutes?: number;
+  // Optional absolute reservation window; when set the bookings are reserved for
+  // exactly [startTime, endTime] (may span days) and override the offsets above.
+  startTime?: Date | string;
+  endTime?: Date | string;
   roomIds: string[];
   resources: { resourceId: string; quantity: number }[];
+}
+
+interface WindowSource {
+  start?: Date | string;
+  end?: Date | string;
+  recurrenceRule?: string;
+  eventStart?: Date | string;
+  eventEnd?: Date | string;
+  eventRecurrenceRule?: string;
+  setupMinutes?: number;
+  teardownMinutes?: number;
+  startTime?: Date | string;
+  endTime?: Date | string;
 }
 
 interface BookingWithEvent {
@@ -16,6 +36,10 @@ interface BookingWithEvent {
   roomId?: string;
   resourceId?: string;
   quantity?: number;
+  setupMinutes?: number;
+  teardownMinutes?: number;
+  startTime?: Date | string;
+  endTime?: Date | string;
   eventTitle?: string;
   eventStart?: Date | string;
   eventEnd?: Date | string;
@@ -45,7 +69,7 @@ export interface Conflict {
 
 export class ConflictHelper {
   public static findConflicts(proposed: ProposedBooking, ctx: ConflictContext): Conflict[] {
-    const occurrences = RecurrenceHelper.getOccurrences(proposed, ctx.windowStart, ctx.windowEnd);
+    const occurrences = this.windowsFor(proposed, ctx);
     if (occurrences.length === 0) return [];
     const result: Conflict[] = [];
     result.push(...this.findRoomConflicts(proposed, occurrences, ctx));
@@ -91,7 +115,7 @@ export class ConflictHelper {
         for (const booking of ctx.resourceBookings) {
           if (booking.resourceId !== req.resourceId) continue;
           if (proposed.eventId && booking.eventId === proposed.eventId) continue;
-          const otherOccurrences = RecurrenceHelper.getOccurrences({ start: booking.eventStart, end: booking.eventEnd, recurrenceRule: booking.eventRecurrenceRule }, ctx.windowStart, ctx.windowEnd);
+          const otherOccurrences = this.windowsFor(booking, ctx);
           if (otherOccurrences.some((o) => RecurrenceHelper.overlaps(occ.start, occ.end, o.start, o.end))) booked += booking.quantity || 1;
         }
         if (requested + booked > total) {
@@ -134,12 +158,28 @@ export class ConflictHelper {
   }
 
   private static firstOverlap(booking: BookingWithEvent, occurrences: Occurrence[], ctx: ConflictContext): Date | null {
-    const otherOccurrences = RecurrenceHelper.getOccurrences({ start: booking.eventStart, end: booking.eventEnd, recurrenceRule: booking.eventRecurrenceRule }, ctx.windowStart, ctx.windowEnd);
+    const otherOccurrences = this.windowsFor(booking, ctx);
     for (const occ of occurrences) {
       for (const other of otherOccurrences) {
         if (RecurrenceHelper.overlaps(occ.start, occ.end, other.start, other.end)) return occ.start;
       }
     }
     return null;
+  }
+
+  // The time window(s) a booking reserves. An absolute startTime/endTime is a fixed
+  // one-off span (overrides everything). Otherwise the event's occurrences, each padded
+  // by setupMinutes before and teardownMinutes after (recurrence-aware).
+  private static windowsFor(src: WindowSource, ctx: ConflictContext): Occurrence[] {
+    if (src.startTime && src.endTime) return [{ start: new Date(src.startTime), end: new Date(src.endTime) }];
+    const occurrences = RecurrenceHelper.getOccurrences(
+      { start: src.start ?? src.eventStart, end: src.end ?? src.eventEnd, recurrenceRule: src.recurrenceRule ?? src.eventRecurrenceRule },
+      ctx.windowStart,
+      ctx.windowEnd
+    );
+    const setupMs = (src.setupMinutes || 0) * 60000;
+    const teardownMs = (src.teardownMinutes || 0) * 60000;
+    if (!setupMs && !teardownMs) return occurrences;
+    return occurrences.map((o) => ({ start: new Date(o.start.getTime() - setupMs), end: new Date(o.end.getTime() + teardownMs) }));
   }
 }
