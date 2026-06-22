@@ -5,7 +5,6 @@ export type PayloadAction =
   | "deleteMessage"
   | "callout"
   | "attendance"
-  | "prayerRequest"
   | "socketId"
   | "privateMessage"
   | "privateRoomAdded"
