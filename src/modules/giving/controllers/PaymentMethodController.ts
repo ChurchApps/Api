@@ -324,14 +324,16 @@ export class PaymentMethodController extends GivingBaseController {
               const isBank = pm?.type === "check"
                 || pm?.account_type
                 || !!pm?.routing_number
-                || !!req.body.routing_number;
+                || !!req.body.routing_number
+                || req.body.type === "bank"; // Collect.js ACH token carries no raw bank fields, only the type flag
 
               if (isBank) {
                 methodType = "bank";
                 const acctType = pm?.account_type || req.body.account_type || "checking";
                 const last4 = pm?.last4
                   || (pm?.account_number ? String(pm.account_number).slice(-4) : "")
-                  || (req.body.account_number ? String(req.body.account_number).slice(-4) : "");
+                  || (req.body.account_number ? String(req.body.account_number).slice(-4) : "")
+                  || req.body.cardLast4 || ""; // Collect.js ACH token sends the account last4 as cardLast4
                 const acctLabel = acctType.charAt(0).toUpperCase() + acctType.slice(1);
                 displayName = `Bank ${acctLabel} •••• ${last4}`.trim();
               } else {
@@ -345,7 +347,7 @@ export class PaymentMethodController extends GivingBaseController {
             const existing = await this.repos.gatewayPaymentMethod.loadByExternalId(cId, gateway.id, tokenId);
             const isBankRecord = methodType === "bank";
             const recordLast4 = isBankRecord
-              ? (pm?.last4 || (pm?.account_number ? String(pm.account_number).slice(-4) : "") || (req.body.account_number ? String(req.body.account_number).slice(-4) : ""))
+              ? (pm?.last4 || (pm?.account_number ? String(pm.account_number).slice(-4) : "") || (req.body.account_number ? String(req.body.account_number).slice(-4) : "") || req.body.cardLast4 || "")
               : (pm?.last_4 || req.body.cardLast4 || "");
             const record: GatewayPaymentMethod = {
               id: existing?.id,
