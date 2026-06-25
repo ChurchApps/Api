@@ -69,16 +69,14 @@ export class CustomerController extends GivingBaseController {
             const providerName = gw.provider?.toLowerCase();
 
             if (providerName === "kingdomfunding") {
-              // Accept Blue uses `active` as the lifecycle flag — cancelled schedules
-              // are returned with active:false. (Their `status` field stays "active"
-              // even after cancellation, so don't rely on it.)
+              // The provider marks cancelled/expired schedules active:false — skip those.
               if (!sub.active) continue;
 
-              // Normalize Accept Blue recurring-schedule to Stripe-like format.
-              // Use next_run_date so the UI's "Start Date" column shows when the
-              // next charge will occur (more useful than schedule-creation timestamp).
+              // Normalize the NMI recurring schedule to the Stripe-like shape the UI expects.
+              // Use next_run_date so the "Start Date" column shows the next charge date.
               const amountCents = Math.round((sub.amount || 0) * 100);
               const anchorSrc = sub.next_run_date || sub.created_at;
+              const freq = this.mapKFFrequency(sub.frequency);
               allSubscriptions.push({
                 id: String(sub.id),
                 status: "active",
@@ -88,8 +86,8 @@ export class CustomerController extends GivingBaseController {
                 default_payment_method: sub.payment_method_id ? String(sub.payment_method_id) : undefined,
                 plan: {
                   amount: amountCents,
-                  interval: this.mapKFFrequencyToInterval(sub.frequency),
-                  interval_count: 1
+                  interval: freq.interval,
+                  interval_count: freq.interval_count
                 },
                 provider: providerName,
                 gatewayId: gw.id
@@ -135,18 +133,18 @@ export class CustomerController extends GivingBaseController {
     });
   }
 
-  /** Map Accept Blue frequency names to Stripe-compatible interval names */
-  private mapKFFrequencyToInterval(frequency: string): string {
+  /** Map Kingdom Funding (NMI) frequency names to a Stripe-compatible interval + count. */
+  private mapKFFrequency(frequency: string): { interval: string; interval_count: number } {
     switch (frequency?.toLowerCase()) {
-      case "daily": return "day";
-      case "weekly": return "week";
-      case "biweekly": return "week"; // 2 weeks — interval_count would be 2
-      case "monthly": return "month";
-      case "bimonthly": return "month"; // 2 months
-      case "quarterly": return "month"; // 3 months
-      case "biannually": return "month"; // 6 months
-      case "annually": return "year";
-      default: return "month";
+      case "daily": return { interval: "day", interval_count: 1 };
+      case "weekly": return { interval: "week", interval_count: 1 };
+      case "biweekly": return { interval: "week", interval_count: 2 };
+      case "monthly": return { interval: "month", interval_count: 1 };
+      case "bimonthly": return { interval: "month", interval_count: 2 };
+      case "quarterly": return { interval: "month", interval_count: 3 };
+      case "biannually": return { interval: "month", interval_count: 6 };
+      case "annually": return { interval: "year", interval_count: 1 };
+      default: return { interval: "month", interval_count: 1 };
     }
   }
 }
