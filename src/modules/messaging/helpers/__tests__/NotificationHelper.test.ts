@@ -258,3 +258,28 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
     expect(saved.deliveryMethod).toBe("complete");
   });
 });
+
+describe("NotificationHelper.processScheduledNotifications", () => {
+  const originalSend = NotificationHelper.sendGroupPush;
+  afterEach(() => { (NotificationHelper as any).sendGroupPush = originalSend; });
+
+  it("only delivers rows it successfully claims, so overlapping sweeps can't double-send", async () => {
+    const sendSpy = jest.fn().mockResolvedValue({ recipientCount: 1, successCount: 1, skippedCount: 0 });
+    (NotificationHelper as any).sendGroupPush = sendSpy;
+
+    const due = [
+      { id: "SN1", churchId: "CHU1", groupId: "GRP1", title: "A", message: "m", link: "", imageUrl: "", senderPersonId: "PER1" },
+      { id: "SN2", churchId: "CHU1", groupId: "GRP2", title: "B", message: "m", link: "", imageUrl: "", senderPersonId: "PER1" }
+    ];
+    // SN2 was already claimed by another runner -> markSent returns false for it.
+    const markSent = jest.fn(async (_churchId: string, id: string) => id === "SN1");
+    NotificationHelper.init({ scheduledNotification: { loadDue: jest.fn(async () => due), markSent } } as any);
+
+    const result = await NotificationHelper.processScheduledNotifications();
+
+    expect(markSent).toHaveBeenCalledTimes(2);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    expect(sendSpy.mock.calls[0][1]).toBe("GRP1");
+    expect(result).toEqual({ due: 2, sent: 1 });
+  });
+});

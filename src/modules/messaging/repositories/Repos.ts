@@ -1,4 +1,4 @@
-import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, EmailTemplateRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
+import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, EmailTemplateRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, ScheduledNotificationRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
 
 export class Repos {
   public blockedIp: BlockedIpRepo;
@@ -11,6 +11,7 @@ export class Repos {
   public message: MessageRepo;
   public notification: NotificationRepo;
   public notificationPreference: NotificationPreferenceRepo;
+  public scheduledNotification: ScheduledNotificationRepo;
   public privateMessage: PrivateMessageRepo;
   public textingProvider: TextingProviderRepo;
   public sentText: SentTextRepo;
@@ -28,6 +29,7 @@ export class Repos {
     this.message = new MessageRepo();
     this.notification = new NotificationRepo();
     this.notificationPreference = new NotificationPreferenceRepo();
+    this.scheduledNotification = new ScheduledNotificationRepo();
     this.privateMessage = new PrivateMessageRepo();
     this.textingProvider = new TextingProviderRepo();
     this.sentText = new SentTextRepo();

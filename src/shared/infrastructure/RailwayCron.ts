@@ -45,6 +45,13 @@ const runScheduledTasks = async (): Promise<void> => {
   await processServiceRequestReminders();
 };
 
+const runScheduledNotifications = async (): Promise<void> => {
+  const { NotificationHelper } = await import("../../modules/messaging/helpers/NotificationHelper.js");
+  const repos = await RepoManager.getRepos<any>("messaging");
+  NotificationHelper.init(repos);
+  await NotificationHelper.processScheduledNotifications();
+};
+
 const runWebhookDeliveries = async (): Promise<void> => {
   const { WebhookDeliveryWorker } = await import("../webhooks/index.js");
   const repos = await RepoManager.getRepos<any>("membership");
@@ -58,6 +65,7 @@ export const startRailwayCron = (): void => {
 
   setInterval(() => void safe("30-min timer", runThirtyMinute), THIRTY_MINUTES_MS);
   setInterval(() => void safe("webhook deliveries", runWebhookDeliveries), ONE_MINUTE_MS);
+  setInterval(() => void safe("scheduled notifications", runScheduledNotifications), ONE_MINUTE_MS);
 
   const scheduleDaily = (label: string, fn: () => Promise<void>): void => {
     setTimeout(() => {

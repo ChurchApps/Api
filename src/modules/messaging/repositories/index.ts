@@ -7,6 +7,7 @@ export { DeviceContentRepo } from "./DeviceContentRepo.js";
 export { MessageRepo } from "./MessageRepo.js";
 export { NotificationRepo } from "./NotificationRepo.js";
 export { NotificationPreferenceRepo } from "./NotificationPreferenceRepo.js";
+export { ScheduledNotificationRepo } from "./ScheduledNotificationRepo.js";
 export { PrivateMessageRepo } from "./PrivateMessageRepo.js";
 export { TextingProviderRepo } from "./TextingProviderRepo.js";
 export { SentTextRepo } from "./SentTextRepo.js";

@@ -6,6 +6,7 @@ import { ExpoPushHelper } from "./ExpoPushHelper.js";
 import { WebPushHelper } from "./WebPushHelper.js";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
 export interface NotificationDebugStep {
   step: string;
@@ -21,6 +22,21 @@ export interface CreateNotificationOptions {
   deliveryStartLevel?: number;
   deliveryTitle?: string;
   navData?: Record<string, unknown>;
+}
+
+interface GroupMemberDetail {
+  personId: string;
+  displayName: string;
+}
+
+export interface GroupPushPreview {
+  totalMembers: number;
+  eligibleCount: number;
+  noDeviceCount: number;
+  pushDisabledCount: number;
+  excludedSenderCount: number;
+  webPushDeviceCount: number;
+  eligiblePersonIds: string[];
 }
 
 export class NotificationHelper {
@@ -709,6 +725,122 @@ export class NotificationHelper {
       const result = await Promise.all(promises);
       return result;
     } else return [];
+  };
+
+  private static getGroupMemberDetails = async (churchId: string, groupId: string): Promise<GroupMemberDetail[]> => {
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const members: any[] = await membershipRepos.groupMember.loadForGroup(churchId, groupId);
+    return members
+      .filter((m) => !!m.personId)
+      .map((m) => ({
+        personId: m.personId,
+        displayName: m.person?.name?.display || m.displayName || ""
+      }));
+  };
+
+  private static prefAllowsPush = (pref: NotificationPreference | undefined): boolean => {
+    if (!pref) return true;
+    const value = pref.allowPush as any;
+    if (Buffer.isBuffer(value)) return value[0] !== 0;
+    return value !== false && value !== 0 && value !== "0";
+  };
+
+  static getGroupPushPreview = async (churchId: string, groupId: string, senderPersonId: string): Promise<GroupPushPreview> => {
+    this.ensureInitialized();
+    const members = await this.getGroupMemberDetails(churchId, groupId);
+    const memberPersonIds = [...new Set(members.map((m) => m.personId).filter(Boolean))];
+    const senderIsMember = memberPersonIds.includes(senderPersonId);
+    const candidatePersonIds = memberPersonIds.filter((id) => id !== senderPersonId);
+    const candidateSet = new Set(candidatePersonIds);
+
+    const devices: Device[] = (await NotificationHelper.repos.device.loadByChurchId(churchId)) as any[];
+    const webPushDevices = devices.filter((device) => {
+      return !!device.personId && candidateSet.has(device.personId) && WebPushHelper.isWebPushToken(device.fcmToken);
+    });
+    const peopleWithWebPush = new Set(webPushDevices.map((device) => device.personId));
+
+    const prefs: NotificationPreference[] = (await NotificationHelper.repos.notificationPreference.loadByPersonIds(candidatePersonIds)) as any[];
+    const prefByPersonId = new Map<string, NotificationPreference>();
+    prefs
+      .filter((pref) => pref.churchId === churchId)
+      .forEach((pref) => prefByPersonId.set(pref.personId, pref));
+
+    const eligiblePersonIds = candidatePersonIds.filter((personId) => {
+      return peopleWithWebPush.has(personId) && this.prefAllowsPush(prefByPersonId.get(personId));
+    });
+
+    const pushDisabledCount = candidatePersonIds.filter((personId) => {
+      return peopleWithWebPush.has(personId) && !this.prefAllowsPush(prefByPersonId.get(personId));
+    }).length;
+
+    return {
+      totalMembers: memberPersonIds.length,
+      eligibleCount: eligiblePersonIds.length,
+      noDeviceCount: candidatePersonIds.filter((personId) => !peopleWithWebPush.has(personId)).length,
+      pushDisabledCount,
+      excludedSenderCount: senderIsMember ? 1 : 0,
+      webPushDeviceCount: webPushDevices.length,
+      eligiblePersonIds
+    };
+  };
+
+  // Computes fresh eligibility and delivers immediately. Shared by the live POST
+  // and the scheduled-notification cron sweep so recipients are always resolved
+  // at send time, not when the send was scheduled.
+  static sendGroupPush = async (churchId: string, groupId: string, title: string, message: string, link: string, imageUrl: string, senderPersonId: string) => {
+    const preview = await this.getGroupPushPreview(churchId, groupId, senderPersonId);
+    const { eligiblePersonIds, ...result } = preview;
+    if (eligiblePersonIds.length === 0) {
+      return { ...result, recipientCount: 0, successCount: 0, skippedCount: 0 };
+    }
+
+    const contentId = `${groupId}:${Date.now()}`;
+    const notificationLink = link || `/mobile/groups/${groupId}`;
+    const notifications = await this.createNotifications(
+      eligiblePersonIds,
+      churchId,
+      "groupPushNotification",
+      contentId,
+      message,
+      notificationLink,
+      senderPersonId,
+      {
+        deliveryStartLevel: 1,
+        deliveryTitle: title,
+        navData: {
+          innerType: "group",
+          innerId: groupId,
+          link: notificationLink,
+          ...(imageUrl ? { image: imageUrl } : {})
+        }
+      }
+    );
+
+    const pushCount = notifications.filter((n) => n.deliveryMethod === "push").length;
+    return {
+      ...result,
+      recipientCount: eligiblePersonIds.length,
+      successCount: pushCount,
+      skippedCount: eligiblePersonIds.length - pushCount
+    };
+  };
+
+  static processScheduledNotifications = async () => {
+    this.ensureInitialized();
+    const due = (await NotificationHelper.repos.scheduledNotification.loadDue()) as any[];
+    let sent = 0;
+    for (const s of due) {
+      // Claim first so overlapping sweeps can't double-send.
+      const claimed = await NotificationHelper.repos.scheduledNotification.markSent(s.churchId, s.id);
+      if (!claimed) continue;
+      try {
+        await this.sendGroupPush(s.churchId, s.groupId, s.title, s.message, s.link || "", s.imageUrl || "", s.senderPersonId);
+        sent++;
+      } catch (e) {
+        console.error("[scheduled-notification] send failed for " + s.id, e);
+      }
+    }
+    return { due: due.length, sent };
   };
 
   static notifyUser = async (churchId: string, personId: string, title: string = "New Notification") => {
