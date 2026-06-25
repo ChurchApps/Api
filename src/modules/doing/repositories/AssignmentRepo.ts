@@ -50,6 +50,23 @@ export class AssignmentRepo {
       .execute();
   }
 
+  // Non-declined assignments on a plan, with position label, for reminders.
+  public async loadForReminder(churchId: string, planId: string): Promise<any[]> {
+    return getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .select([
+        "a.id",
+        "a.personId",
+        "a.status",
+        sql`p.name`.as("positionName"),
+        "p.categoryName"
+      ])
+      .where("a.churchId", "=", churchId)
+      .where("p.planId", "=", planId)
+      .where("a.status", "in", ["Accepted", "Unconfirmed"])
+      .execute();
+  }
+
   public async loadByPlanIds(churchId: string, planIds: string[]) {
     if (planIds.length === 0) return [];
     return getDb().selectFrom("assignments as a")

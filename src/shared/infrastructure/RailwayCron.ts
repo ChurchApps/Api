@@ -40,11 +40,6 @@ const runMidnight = async (): Promise<void> => {
   await NotificationHelper.sendEmailNotifications("daily");
 };
 
-const runScheduledTasks = async (): Promise<void> => {
-  const { processServiceRequestReminders } = await import("./ScheduledTaskRunner.js");
-  await processServiceRequestReminders();
-};
-
 const runWebhookDeliveries = async (): Promise<void> => {
   const { WebhookDeliveryWorker } = await import("../webhooks/index.js");
   const repos = await RepoManager.getRepos<any>("membership");
@@ -67,5 +62,4 @@ export const startRailwayCron = (): void => {
   };
 
   scheduleDaily("midnight timer", runMidnight);
-  scheduleDaily("scheduled tasks", runScheduledTasks);
 };

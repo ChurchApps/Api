@@ -4,6 +4,7 @@ import { DoingBaseController } from "./DoingBaseController.js";
 import { Assignment, Plan, Position } from "../models/index.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
 import { PlanHelper } from "../helpers/PlanHelper.js";
+import { ReminderTokenHelper } from "../helpers/ReminderTokenHelper.js";
 
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
@@ -75,6 +76,43 @@ export class AssignmentController extends DoingBaseController {
         return result;
       }
     });
+  }
+
+  // Unauthenticated accept/decline from an email link; the signed token is the auth.
+  @httpGet("/public/respond")
+  public async respond(req: express.Request, res: express.Response): Promise<void> {
+    const page = (title: string, msg: string) =>
+      `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +
+      `<body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:0 20px;text-align:center;"><h2>${title}</h2><p style="color:#555;">${msg}</p></body></html>`;
+    try {
+      const payload = ReminderTokenHelper.verify(req.query.token as string);
+      if (!payload) { res.status(400).send(page("Link expired", "This link is no longer valid. Please open the app to respond.")); return; }
+
+      const repos = await this.getRepos<any>();
+      const assignment = (await repos.assignment.load(payload.churchId, payload.assignmentId)) as Assignment;
+      if (!assignment) { res.status(404).send(page("Not found", "We couldn't find that serving request.")); return; }
+
+      const target = payload.action === "accept" ? "Accepted" : "Declined";
+      if (assignment.status !== target) {
+        assignment.status = target;
+        await repos.assignment.save(assignment);
+        if (target === "Declined") {
+          try {
+            await PlanHelper.autoReplaceDeclined(payload.churchId, assignment, repos);
+          } catch (e) {
+            console.error("autoReplaceDeclined failed:", e);
+          }
+        }
+      }
+
+      res.status(200).send(page(
+        target === "Accepted" ? "You're confirmed" : "Thanks for letting us know",
+        target === "Accepted" ? "Thank you for serving — see you then!" : "No problem — we'll find someone else to fill in."
+      ));
+    } catch (e) {
+      console.error("[respond] failed:", e);
+      res.status(500).send(page("Something went wrong", "Please try again, or open the app to respond."));
+    }
   }
 
   @httpPost("/signup")

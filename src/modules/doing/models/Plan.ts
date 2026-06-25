@@ -18,4 +18,5 @@ export class Plan {
   public prepared?: boolean;
   public autoReplaceOnDecline?: boolean;
   public lastAutofillRunId?: string;
+  public remindersSent?: string;
 }
