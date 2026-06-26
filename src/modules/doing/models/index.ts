@@ -7,6 +7,7 @@ export { ContentProviderAuth } from "./ContentProviderAuth.js";
 export { Plan } from "./Plan.js";
 export { PlanItem } from "./PlanItem.js";
 export { PlanItemTime } from "./PlanItemTime.js";
+export { PlanTemplate } from "./PlanTemplate.js";
 export { PlanType } from "./PlanType.js";
 export { Position } from "./Position.js";
 export { SchedulingPreference } from "./SchedulingPreference.js";

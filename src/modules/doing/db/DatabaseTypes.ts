@@ -1,4 +1,4 @@
-import type { Assignment, AutomationExecution, BlockoutDate, Condition, Conjunction, ContentProviderAuth, Plan, PlanItem, PlanItemTime, PlanType, Position, SchedulingPreference, Task, Time, Workflow, WorkflowCategory, WorkflowStep, WorkflowStepAction, WorkflowStepRoute, WorkflowTrigger } from "../models/index.js";
+import type { Assignment, AutomationExecution, BlockoutDate, Condition, Conjunction, ContentProviderAuth, Plan, PlanItem, PlanItemTime, PlanTemplate, PlanType, Position, SchedulingPreference, Task, Time, Workflow, WorkflowCategory, WorkflowStep, WorkflowStepAction, WorkflowStepRoute, WorkflowTrigger } from "../models/index.js";
 
 export interface DoingDatabase {
   assignments: Assignment;
@@ -11,6 +11,7 @@ export interface DoingDatabase {
   plans: Plan;
   planItems: Omit<PlanItem, "children">;
   planItemTimes: PlanItemTime;
+  planTemplates: PlanTemplate;
   planTypes: PlanType;
   positions: Position;
   schedulingPreferences: SchedulingPreference;

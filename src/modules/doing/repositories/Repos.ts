@@ -8,6 +8,7 @@ import {
   PlanRepo,
   PlanItemRepo,
   PlanItemTimeRepo,
+  PlanTemplateRepo,
   PlanTypeRepo,
   PositionRepo,
   SchedulingPreferenceRepo,
@@ -31,6 +32,7 @@ export class Repos {
   public plan: PlanRepo;
   public planItem: PlanItemRepo;
   public planItemTime: PlanItemTimeRepo;
+  public planTemplate: PlanTemplateRepo;
   public planType: PlanTypeRepo;
   public position: PositionRepo;
   public schedulingPreference: SchedulingPreferenceRepo;
@@ -59,6 +61,7 @@ export class Repos {
     this.plan = new PlanRepo();
     this.planItem = new PlanItemRepo();
     this.planItemTime = new PlanItemTimeRepo();
+    this.planTemplate = new PlanTemplateRepo();
     this.planType = new PlanTypeRepo();
     this.position = new PositionRepo();
     this.schedulingPreference = new SchedulingPreferenceRepo();

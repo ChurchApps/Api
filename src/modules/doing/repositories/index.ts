@@ -7,6 +7,7 @@ export { ContentProviderAuthRepo } from "./ContentProviderAuthRepo.js";
 export { PlanRepo } from "./PlanRepo.js";
 export { PlanItemRepo } from "./PlanItemRepo.js";
 export { PlanItemTimeRepo } from "./PlanItemTimeRepo.js";
+export { PlanTemplateRepo } from "./PlanTemplateRepo.js";
 export { PlanTypeRepo } from "./PlanTypeRepo.js";
 export { PositionRepo } from "./PositionRepo.js";
 export { SchedulingPreferenceRepo } from "./SchedulingPreferenceRepo.js";

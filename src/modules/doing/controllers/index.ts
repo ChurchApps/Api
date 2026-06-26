@@ -9,6 +9,7 @@ export { PlanController } from "./PlanController.js";
 export { PlanFeedController } from "./PlanFeedController.js";
 export { PlanItemController } from "./PlanItemController.js";
 export { PlanItemTimeController } from "./PlanItemTimeController.js";
+export { PlanTemplateController } from "./PlanTemplateController.js";
 export { PlanTypeController } from "./PlanTypeController.js";
 export { PositionController } from "./PositionController.js";
 export { SchedulingPreferenceController } from "./SchedulingPreferenceController.js";
