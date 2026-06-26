@@ -337,234 +337,234 @@ BEGIN
 
     -- Blocks (Reusable Components)
     INSERT INTO blocks (id, churchId, blockType, name) VALUES
-    -- Header and Footer Blocks
+    -- Header / Navigation / Footer Blocks (footer is populated with real content below)
     ('BLK00000001', 'CHU00000001', 'header', 'Main Header'),
     ('BLK00000002', 'CHU00000001', 'footerBlock', 'Main Footer'),
-    ('BLK00000003', 'CHU00000001', 'navigation', 'Main Navigation'),
-
-    -- Reusable Content Blocks
-    ('BLK00000004', 'CHU00000001', 'hero', 'Welcome Hero'),
-    ('BLK00000005', 'CHU00000001', 'cta', 'Contact CTA'),
-    ('BLK00000006', 'CHU00000001', 'feature', 'Ministry Feature'),
-    ('BLK00000007', 'CHU00000001', 'testimonial', 'Member Testimonial'),
-    ('BLK00000008', 'CHU00000001', 'event', 'Upcoming Event'),
-    ('BLK00000009', 'CHU00000001', 'sermon', 'Latest Sermon'),
-    ('BLK00000010', 'CHU00000001', 'gallery', 'Photo Gallery');
+    ('BLK00000003', 'CHU00000001', 'navigation', 'Main Navigation');
 
     -- Pages
     INSERT INTO pages (id, churchId, url, title, layout) VALUES
     ('PAG00000001', 'CHU00000001', '/', 'Home', 'headerFooter'),
-    ('PAG00000002', 'CHU00000001', '/ministries', 'Ministries', 'headerFooter');
+    ('PAG00000002', 'CHU00000001', '/ministries', 'Ministries', 'headerFooter'),
+    ('PAG00000003', 'CHU00000001', '/about', 'About', 'headerFooter'),
+    ('PAG00000004', 'CHU00000001', '/events', 'Events', 'headerFooter');
 
-    -- Sections (Home Page)
+    -- Sections
     INSERT INTO sections (id, churchId, pageId, blockId, zone, background, textColor, headingColor, linkColor, sort, targetBlockId, answersJSON, stylesJSON, animationsJSON) VALUES
-    -- Hero Section with background image
-    ('SEC00000001', 'CHU00000001', 'PAG00000001', NULL, 'main', '/tempLibrary/backgrounds/worship.jpg', 'light', NULL, NULL, 1, NULL, NULL, NULL, NULL),
+    -- ===== Home Page (PAG00000001) =====
+    -- Hero: full-bleed worship photo with dark overlay
+    ('SEC00000001', 'CHU00000001', 'PAG00000001', NULL, 'main', '/tempLibrary/backgrounds/worship.jpg', 'light', 'var(--light)', NULL, 1, NULL, '{"overlayColor": "#0B2434", "backgroundOpacity": "0.55", "focalPoint": "center"}', '{"all": {"padding-top": "130px", "padding-bottom": "130px"}}', NULL),
+    -- Welcome + three info cards
+    ('SEC00000002', 'CHU00000001', 'PAG00000001', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', NULL, 2, NULL, NULL, NULL, NULL),
+    -- About strip (text + building photo)
+    ('SEC00000003', 'CHU00000001', 'PAG00000001', NULL, 'main', 'var(--lightAccent)', 'dark', 'var(--accent)', NULL, 3, NULL, NULL, NULL, NULL),
+    -- Ministries: four photo cards
+    ('SEC00000004', 'CHU00000001', 'PAG00000001', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', NULL, 4, NULL, NULL, NULL, NULL),
+    -- Latest message (embedded video) on dark
+    ('SEC00000005', 'CHU00000001', 'PAG00000001', NULL, 'main', 'var(--dark)', 'light', 'var(--light)', NULL, 5, NULL, NULL, NULL, NULL),
+    -- Upcoming events calendar
+    ('SEC00000006', 'CHU00000001', 'PAG00000001', NULL, 'main', 'var(--lightAccent)', 'dark', 'var(--accent)', NULL, 6, NULL, NULL, NULL, NULL),
+    -- FAQ accordions
+    ('SEC00000007', 'CHU00000001', 'PAG00000001', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', NULL, 7, NULL, NULL, NULL, NULL),
+    -- Giving call-to-action (gradient)
+    ('SEC00000008', 'CHU00000001', 'PAG00000001', NULL, 'main', 'linear-gradient(135deg, #2A6F97 0%, #1B4965 100%)', 'light', 'var(--light)', NULL, 8, NULL, NULL, '{"all": {"padding-top": "90px", "padding-bottom": "90px"}}', NULL),
+    -- Visit us: contact details + map
+    ('SEC00000009', 'CHU00000001', 'PAG00000001', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', 'var(--darkAccent)', 9, NULL, NULL, NULL, NULL),
 
-    -- Service Times Section
-    ('SEC00000002', 'CHU00000001', 'PAG00000001', NULL, 'main', 'var(--light)', 'var(--accent)', 'var(--accent)', 'var(--darkAccent)', 2, NULL, NULL, NULL, NULL),
+    -- ===== Ministries Page (PAG00000002) =====
+    ('SEC00000010', 'CHU00000001', 'PAG00000002', NULL, 'main', '/tempLibrary/backgrounds/kids.jpg', 'light', 'var(--light)', NULL, 1, NULL, '{"overlayColor": "#0B2434", "backgroundOpacity": "0.5", "focalPoint": "center"}', '{"all": {"padding-top": "110px", "padding-bottom": "110px"}}', NULL),
+    ('SEC00000011', 'CHU00000001', 'PAG00000002', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', NULL, 2, NULL, NULL, NULL, NULL),
+    ('SEC00000012', 'CHU00000001', 'PAG00000002', NULL, 'main', 'var(--lightAccent)', 'dark', 'var(--accent)', NULL, 3, NULL, NULL, NULL, NULL),
 
-    -- About Pastor Section
-    ('SEC00000003', 'CHU00000001', 'PAG00000001', NULL, 'main', '#FFFFFF', 'dark', NULL, NULL, 3, NULL, NULL, NULL, NULL),
+    -- ===== About Page (PAG00000003) =====
+    ('SEC00000013', 'CHU00000001', 'PAG00000003', NULL, 'main', '/tempLibrary/headers/worship.jpg', 'light', 'var(--light)', NULL, 1, NULL, '{"overlayColor": "#0B2434", "backgroundOpacity": "0.5", "focalPoint": "center"}', '{"all": {"padding-top": "110px", "padding-bottom": "110px"}}', NULL),
+    ('SEC00000014', 'CHU00000001', 'PAG00000003', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', NULL, 2, NULL, NULL, NULL, NULL),
+    ('SEC00000015', 'CHU00000001', 'PAG00000003', NULL, 'main', 'var(--lightAccent)', 'dark', 'var(--accent)', NULL, 3, NULL, NULL, NULL, NULL),
+    ('SEC00000016', 'CHU00000001', 'PAG00000003', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', NULL, 4, NULL, NULL, NULL, NULL),
+    ('SEC00000017', 'CHU00000001', 'PAG00000003', NULL, 'main', 'linear-gradient(135deg, #2A6F97 0%, #1B4965 100%)', 'light', 'var(--light)', NULL, 5, NULL, NULL, '{"all": {"padding-top": "90px", "padding-bottom": "90px"}}', NULL),
 
-    -- Ministries Section
-    ('SEC00000004', 'CHU00000001', 'PAG00000001', NULL, 'main', '/tempLibrary/backgrounds/kids.jpg', 'light', NULL, NULL, 4, NULL, NULL, NULL, NULL),
+    -- ===== Events Page (PAG00000004) =====
+    ('SEC00000018', 'CHU00000001', 'PAG00000004', NULL, 'main', '/tempLibrary/backgrounds/crowd.jpg', 'light', 'var(--light)', NULL, 1, NULL, '{"overlayColor": "#0B2434", "backgroundOpacity": "0.5", "focalPoint": "center"}', '{"all": {"padding-top": "110px", "padding-bottom": "110px"}}', NULL),
+    ('SEC00000019', 'CHU00000001', 'PAG00000004', NULL, 'main', '#FFFFFF', 'dark', 'var(--accent)', NULL, 2, NULL, NULL, NULL, NULL),
+    ('SEC00000020', 'CHU00000001', 'PAG00000004', NULL, 'main', 'var(--lightAccent)', 'dark', 'var(--accent)', NULL, 3, NULL, NULL, NULL, NULL),
 
-    -- Latest Sermons Section
-    ('SEC00000005', 'CHU00000001', 'PAG00000001', NULL, 'main', 'var(--dark)', 'var(--light)', 'var(--light)', 'var(--lightAccent)', 5, NULL, NULL, NULL, NULL),
+    -- ===== Footer Block (BLK00000002) — renders site-wide in the footer zone =====
+    ('SEC00000021', 'CHU00000001', NULL, 'BLK00000002', 'siteFooter', 'var(--dark)', 'light', 'var(--light)', 'var(--lightAccent)', 1, NULL, NULL, NULL, NULL),
+    ('SEC00000022', 'CHU00000001', NULL, 'BLK00000002', 'siteFooter', 'var(--dark)', 'light', 'var(--light)', 'var(--lightAccent)', 2, NULL, NULL, '{"all": {"padding-top": "16px", "padding-bottom": "16px"}}', NULL);
 
-    -- Main Church Calendar Section
-    ('SEC00000008', 'CHU00000001', 'PAG00000001', NULL, 'main', '#FFFFFF', 'dark', NULL, NULL, 6, NULL, NULL, NULL, NULL),
-
-    -- FAQ Section
-    ('SEC00000006', 'CHU00000001', 'PAG00000001', NULL, 'main', '#f8f9fa', 'dark', NULL, NULL, 7, NULL, NULL, NULL, NULL),
-
-    -- Contact & Location Section
-    ('SEC00000007', 'CHU00000001', 'PAG00000001', NULL, 'main', '/tempLibrary/backgrounds/crowd.jpg', 'light', NULL, NULL, 8, NULL, NULL, NULL, NULL),
-
-    -- Ministries Page Section (groups browser)
-    ('SEC00000009', 'CHU00000001', 'PAG00000002', NULL, 'main', '#FFFFFF', 'dark', NULL, NULL, 1, NULL, NULL, NULL, NULL);
-
-    -- Elements (Home Page)
+    -- Elements
     INSERT INTO elements (id, churchId, sectionId, blockId, elementType, sort, parentId, answersJSON, stylesJSON, animationsJSON) VALUES
-    -- Hero Section
+
+    -- ========== Home Page ==========
+    -- Hero
     ('ELE00000001', 'CHU00000001', 'SEC00000001', NULL, 'text', 1, NULL,
-      '{"text": "<h1>Welcome to Grace Community Church</h1><h3><em>A place to belong, grow, and serve together</em></h3><p>Join us this Sunday as we worship, learn, and connect with God and each other.</p>", "textAlignment": "center"}',
+      '{"text": "<h1>Welcome Home to Grace Community Church</h1><h3>A place to belong, grow, and serve &mdash; together.</h3><p>Join us this Sunday at 9:00 &amp; 11:00 AM in Springfield. However you come, come as you are.</p><p><a class=''btn btn-light btn-large'' href=''/about''>Plan Your Visit</a> &nbsp; <a class=''btn btn-transparentLight btn-large'' href=''/stream''>Watch Online</a></p>", "textAlignment": "center"}',
       NULL,
-      NULL),
+      '{"onShow": "fadeIn", "onShowSpeed": "slow"}'),
 
-    -- Service Times Section
+    -- Welcome + three info cards
     ('ELE00000002', 'CHU00000001', 'SEC00000002', NULL, 'text', 1, NULL,
-      '{"text": "<h2>Sunday Service Times</h2><h3>Morning Worship: 9:00 AM &amp; 11:00 AM</h3><h3>Sunday School: 10:00 AM</h3><h3>Evening Service: 6:00 PM</h3><p><strong>What to Expect:</strong> Casual dress, friendly people, inspiring music, and biblical teaching that applies to your daily life.</p>", "textAlignment": "center"}',
-      NULL,
-      NULL),
+      '{"text": "<h2>We&rsquo;re So Glad You&rsquo;re Here</h2><p>However you found us, we would love to meet you in person this weekend. Here is what to know before your first visit.</p>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000003', 'CHU00000001', 'SEC00000002', NULL, 'row', 2, NULL, '{"columns": "4,4,4"}', NULL, NULL),
+    ('ELE00000004', 'CHU00000001', 'SEC00000002', NULL, 'column', 1, 'ELE00000003', '{"size": 4, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000005', 'CHU00000001', 'SEC00000002', NULL, 'card', 1, 'ELE00000004',
+      '{"title": "Sunday Services", "titleAlignment": "center", "photo": "/tempLibrary/backgrounds/worship.jpg", "photoAlt": "Sunday worship", "text": "<p><strong>9:00 &amp; 11:00 AM</strong></p><p>Modern worship and practical, biblical teaching. Sunday School for all ages at 10:00 AM.</p>", "textAlignment": "center"}',
+      NULL, '{"onShow": "fadeIn", "onShowSpeed": "normal"}'),
+    ('ELE00000006', 'CHU00000001', 'SEC00000002', NULL, 'column', 2, 'ELE00000003', '{"size": 4, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000007', 'CHU00000001', 'SEC00000002', NULL, 'card', 1, 'ELE00000006',
+      '{"title": "Where to Find Us", "titleAlignment": "center", "photo": "/tempLibrary/building.jpg", "photoAlt": "Our building", "text": "<p>123 Main Street<br>Springfield, IL 62701</p><p>Free, easy parking right on site.</p>", "textAlignment": "center"}',
+      NULL, '{"onShow": "fadeIn", "onShowSpeed": "normal"}'),
+    ('ELE00000008', 'CHU00000001', 'SEC00000002', NULL, 'column', 3, 'ELE00000003', '{"size": 4, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000009', 'CHU00000001', 'SEC00000002', NULL, 'card', 1, 'ELE00000008',
+      '{"title": "What to Expect", "titleAlignment": "center", "photo": "/tempLibrary/bible.jpg", "photoAlt": "Open Bible", "text": "<p>Friendly faces, casual dress, and a welcome that feels like family &mdash; in about 75 minutes.</p>", "textAlignment": "center", "url": "/about"}',
+      NULL, '{"onShow": "fadeIn", "onShowSpeed": "normal"}'),
 
-    -- About Pastor Section with Photo
-    ('ELE00000003', 'CHU00000001', 'SEC00000003', NULL, 'textWithPhoto', 1, NULL,
-      '{"photoPosition": "right", "photo": "/tempLibrary/pastor.jpg", "text": "<h1>Meet Pastor John Smith</h1><p><strong>Welcome to our church family!</strong></p><p>Pastor John has been serving Grace Community Church since 2010. He is passionate about helping people discover God''s love and purpose for their lives.</p><p><strong>Education:</strong> M.Div. from Seminary, B.A. in Theology<br><strong>Family:</strong> Married to Sarah, father of three children<br><strong>Hobbies:</strong> Reading, hiking, and coffee</p><p><em>&quot;My heart''s desire is to see every person experience the transforming love of Jesus Christ.&quot;</em></p>"}',
-      NULL,
-      NULL),
+    -- About strip (text + building photo)
+    ('ELE00000010', 'CHU00000001', 'SEC00000003', NULL, 'textWithPhoto', 1, NULL,
+      '{"photoPosition": "left", "photo": "/tempLibrary/building.jpg", "photoAlt": "Grace Community Church building", "text": "<h2>A Church for the Whole Family</h2><p>For more than thirty years, Grace Community Church has been a home for people at every stage of life. We are an ordinary group of people following an extraordinary Savior &mdash; learning to love God, love each other, and serve our city.</p><p>Whether you are exploring faith for the first time or have followed Jesus for decades, there is a place for you here.</p><p><a class=''btn btn-accent btn-large'' href=''/about''>Learn More About Us</a></p>"}',
+      NULL, NULL),
 
-    -- Ministries Section
-    ('ELE00000004', 'CHU00000001', 'SEC00000004', NULL, 'row', 1, NULL,
-      '{"columns": "3,3,3,3"}',
-      NULL,
-      NULL),
+    -- Ministries: four photo cards
+    ('ELE00000011', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, NULL,
+      '{"text": "<h2>Ministries for Every Stage of Life</h2><p>From your littlest ones to seasoned saints, there is a place to grow and belong.</p>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000012', 'CHU00000001', 'SEC00000004', NULL, 'row', 2, NULL, '{"columns": "3,3,3,3"}', NULL, NULL),
+    ('ELE00000013', 'CHU00000001', 'SEC00000004', NULL, 'column', 1, 'ELE00000012', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000014', 'CHU00000001', 'SEC00000004', NULL, 'card', 1, 'ELE00000013',
+      '{"title": "Children", "titleAlignment": "center", "photo": "/tempLibrary/backgrounds/kids.jpg", "photoAlt": "Children ministry", "text": "<p>Safe, fun, age-appropriate programs for nursery through 5th grade every Sunday.</p>", "textAlignment": "center", "url": "/ministries"}',
+      NULL, NULL),
+    ('ELE00000015', 'CHU00000001', 'SEC00000004', NULL, 'column', 2, 'ELE00000012', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000016', 'CHU00000001', 'SEC00000004', NULL, 'card', 1, 'ELE00000015',
+      '{"title": "Youth", "titleAlignment": "center", "photo": "/tempLibrary/teen-praying.jpg", "photoAlt": "Youth ministry", "text": "<p>Middle and high schoolers connect through fun, real talk, and mission.</p>", "textAlignment": "center", "url": "/ministries"}',
+      NULL, NULL),
+    ('ELE00000017', 'CHU00000001', 'SEC00000004', NULL, 'column', 3, 'ELE00000012', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000018', 'CHU00000001', 'SEC00000004', NULL, 'card', 1, 'ELE00000017',
+      '{"title": "Worship", "titleAlignment": "center", "photo": "/tempLibrary/backgrounds/worship.jpg", "photoAlt": "Worship", "text": "<p>Lift your voice with our worship team and choir &mdash; singers and musicians welcome.</p>", "textAlignment": "center", "url": "/ministries"}',
+      NULL, NULL),
+    ('ELE00000019', 'CHU00000001', 'SEC00000004', NULL, 'column', 4, 'ELE00000012', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000020', 'CHU00000001', 'SEC00000004', NULL, 'card', 1, 'ELE00000019',
+      '{"title": "Small Groups", "titleAlignment": "center", "photo": "/tempLibrary/backgrounds/crowd.jpg", "photoAlt": "Small groups", "text": "<p>Do life together in homes across the city throughout the week.</p>", "textAlignment": "center", "url": "/ministries"}',
+      NULL, NULL),
+    ('ELE00000021', 'CHU00000001', 'SEC00000004', NULL, 'text', 3, NULL,
+      '{"text": "<p><a class=''btn btn-accent btn-large'' href=''/ministries''>Explore All Ministries</a></p>", "textAlignment": "center"}',
+      NULL, NULL),
 
-    ('ELE00000005', 'CHU00000001', 'SEC00000004', NULL, 'column', 1, 'ELE00000004',
-      '{"size": 3}',
-      NULL,
-      NULL),
+    -- Latest message (embedded video) on dark
+    ('ELE00000022', 'CHU00000001', 'SEC00000005', NULL, 'text', 1, NULL,
+      '{"text": "<h2>This Week&rsquo;s Message</h2><p>Missed Sunday, or want to revisit the message? Watch the latest from our worship services.</p>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000023', 'CHU00000001', 'SEC00000005', NULL, 'row', 2, NULL, '{"columns": "2,8,2"}', NULL, NULL),
+    ('ELE00000024', 'CHU00000001', 'SEC00000005', NULL, 'column', 1, 'ELE00000023', '{"size": 2, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000025', 'CHU00000001', 'SEC00000005', NULL, 'column', 2, 'ELE00000023', '{"size": 8, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000026', 'CHU00000001', 'SEC00000005', NULL, 'video', 1, 'ELE00000025', '{"videoType": "youtube", "videoId": "OfIX1X5-Wbw"}', NULL, NULL),
+    ('ELE00000027', 'CHU00000001', 'SEC00000005', NULL, 'column', 3, 'ELE00000023', '{"size": 2, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000028', 'CHU00000001', 'SEC00000005', NULL, 'text', 3, NULL,
+      '{"text": "<p><a class=''btn btn-transparentLight btn-large'' href=''/sermons''>Browse All Sermons</a></p>", "textAlignment": "center"}',
+      NULL, NULL),
 
-    ('ELE00000006', 'CHU00000001', 'SEC00000004', NULL, 'column', 2, 'ELE00000004',
-      '{"size": 3}',
-      NULL,
-      NULL),
+    -- Upcoming events calendar
+    ('ELE00000029', 'CHU00000001', 'SEC00000006', NULL, 'text', 1, NULL,
+      '{"text": "<h2>Upcoming Events</h2><p>There is always something happening at Grace. Here is what is coming up.</p>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000030', 'CHU00000001', 'SEC00000006', NULL, 'calendar', 2, NULL, '{"calendarType": "curated", "calendarId": "CAL00000004"}', NULL, NULL),
 
-    ('ELE00000007', 'CHU00000001', 'SEC00000004', NULL, 'column', 3, 'ELE00000004',
-      '{"size": 3}',
-      NULL,
-      NULL),
+    -- FAQ accordions
+    ('ELE00000031', 'CHU00000001', 'SEC00000007', NULL, 'text', 1, NULL, '{"text": "<h2>Frequently Asked Questions</h2>", "textAlignment": "center"}', NULL, NULL),
+    ('ELE00000032', 'CHU00000001', 'SEC00000007', NULL, 'faq', 2, NULL,
+      '{"title": "What should I wear?", "description": "<p>Come as you are! You will see everything from jeans to button-downs. There is no dress code &mdash; just be comfortable.</p>", "headingType": "accordion", "iconColor": "#2A6F97"}',
+      NULL, NULL),
+    ('ELE00000033', 'CHU00000001', 'SEC00000007', NULL, 'faq', 3, NULL,
+      '{"title": "What about my kids?", "description": "<p>We have safe, fun, age-appropriate programs for newborns through 5th grade during every service, plus a dedicated youth ministry.</p>", "headingType": "accordion", "iconColor": "#2A6F97"}',
+      NULL, NULL),
+    ('ELE00000034', 'CHU00000001', 'SEC00000007', NULL, 'faq', 4, NULL,
+      '{"title": "How long is the service?", "description": "<p>Services run about 75 minutes, including worship and the message.</p>", "headingType": "accordion", "iconColor": "#2A6F97"}',
+      NULL, NULL),
+    ('ELE00000035', 'CHU00000001', 'SEC00000007', NULL, 'faq', 5, NULL,
+      '{"title": "Where do I park?", "description": "<p>Free parking is available in our lot and on surrounding streets. Look for our greeters near the main entrance.</p>", "headingType": "accordion", "iconColor": "#2A6F97"}',
+      NULL, NULL),
+    ('ELE00000036', 'CHU00000001', 'SEC00000007', NULL, 'faq', 6, NULL,
+      '{"title": "How can I get involved?", "description": "<p>The best next step is a small group or serving on a team. Stop by the Welcome Center on Sunday, or explore our ministries online.</p>", "headingType": "accordion", "iconColor": "#2A6F97"}',
+      NULL, NULL),
 
-    ('ELE00000008', 'CHU00000001', 'SEC00000004', NULL, 'column', 4, 'ELE00000004',
-      '{"size": 3}',
-      NULL,
-      NULL),
+    -- Giving call-to-action
+    ('ELE00000037', 'CHU00000001', 'SEC00000008', NULL, 'text', 1, NULL,
+      '{"text": "<h2>Generosity Changes Everything</h2><p>Your giving fuels ministry to children, students, and families &mdash; here at home and around the world. Thank you for partnering with us.</p><p><a class=''btn btn-light btn-large'' href=''/donate''>Give Online</a></p>", "textAlignment": "center"}',
+      NULL, NULL),
 
-    ('ELE00000009', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000005',
-      '{"text": "<h2>Children''s Ministry</h2><p>Nursery through 5th grade programs with engaging lessons, games, and activities that teach kids about God''s love.</p><p><strong>Ages:</strong> 0-11 years<br><strong>When:</strong> Every Sunday</p>", "textAlignment": "center"}',
-      NULL,
-      NULL),
+    -- Visit us: contact details + map
+    ('ELE00000038', 'CHU00000001', 'SEC00000009', NULL, 'text', 1, NULL,
+      '{"text": "<h2>Visit Us This Sunday</h2><p>We would love to meet you. Here is everything you need to find us.</p>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000039', 'CHU00000001', 'SEC00000009', NULL, 'row', 2, NULL, '{"columns": "6,6"}', NULL, NULL),
+    ('ELE00000040', 'CHU00000001', 'SEC00000009', NULL, 'column', 1, 'ELE00000039', '{"size": 6, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000041', 'CHU00000001', 'SEC00000009', NULL, 'text', 1, 'ELE00000040',
+      '{"text": "<h3>Grace Community Church</h3><p>123 Main Street<br>Springfield, IL 62701</p><p><strong>Phone:</strong> (555) 123-4567<br><strong>Email:</strong> <a href=''mailto:info@gracechurch.org''>info@gracechurch.org</a></p><p><strong>Office Hours:</strong><br>Monday&ndash;Friday, 9:00 AM &ndash; 5:00 PM</p>"}',
+      NULL, NULL),
+    ('ELE00000042', 'CHU00000001', 'SEC00000009', NULL, 'column', 2, 'ELE00000039', '{"size": 6, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000043', 'CHU00000001', 'SEC00000009', NULL, 'map', 1, 'ELE00000042',
+      '{"mapAddress": "123 Main Street, Springfield, IL 62701", "mapZoom": "15", "mapLabel": "Grace Community Church"}',
+      NULL, NULL),
 
-    ('ELE00000010', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000006',
-      '{"text": "<h2>Youth Ministry</h2><p>Middle and high school students connect through fun activities, deep discussions, and mission trips.</p><p><strong>Ages:</strong> 12-18 years<br><strong>When:</strong> Sundays &amp; Wednesdays</p>", "textAlignment": "center"}',
-      NULL,
-      NULL),
+    -- ========== Ministries Page ==========
+    ('ELE00000044', 'CHU00000001', 'SEC00000010', NULL, 'text', 1, NULL,
+      '{"text": "<h1>Ministries</h1><h3>Find your place to grow, connect, and serve.</h3>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000045', 'CHU00000001', 'SEC00000011', NULL, 'text', 1, NULL,
+      '{"text": "<h2>Get Connected</h2><p>The church was never meant to be experienced from the sidelines. Whatever your age or season, we have a community where you can belong and make a difference. Use the directory below to find a group that fits.</p>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000046', 'CHU00000001', 'SEC00000012', NULL, 'groups', 1, NULL, '{"title": "Find a Group", "showSearch": "true", "showCategory": "true"}', NULL, NULL),
 
-    ('ELE00000011', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000007',
-      '{"text": "<h2>Small Groups</h2><p>Adult small groups meet throughout the week for Bible study, prayer, and fellowship in homes.</p><p><strong>When:</strong> Various times<br><strong>Where:</strong> Member homes</p>", "textAlignment": "center"}',
-      NULL,
-      NULL),
+    -- ========== About Page ==========
+    ('ELE00000047', 'CHU00000001', 'SEC00000013', NULL, 'text', 1, NULL,
+      '{"text": "<h1>About Grace</h1><h3>Helping others follow Jesus.</h3>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000048', 'CHU00000001', 'SEC00000014', NULL, 'textWithPhoto', 1, NULL,
+      '{"photoPosition": "right", "photo": "/tempLibrary/teen-praying.jpg", "photoAlt": "Praying together", "text": "<h2>Our Mission</h2><p>Our mission is the compass that guides everything we do. It is our simple, local expression of the Great Commission:</p><p><strong>Helping others follow Jesus.</strong></p><p>Every ministry, gathering, and serving opportunity flows from that single purpose &mdash; making disciples who make disciples.</p>"}',
+      NULL, NULL),
+    ('ELE00000049', 'CHU00000001', 'SEC00000015', NULL, 'textWithPhoto', 1, NULL,
+      '{"photoPosition": "left", "photo": "/tempLibrary/praise.jpg", "photoAlt": "Worship in song", "text": "<h2>What We Value</h2><h4>The Bible is for everyone.</h4><p>God&rsquo;s Word speaks to every person, and growth happens when we make studying it a daily habit.</p><h4>Every member is a missionary.</h4><p>Ordinary disciples, released to love their neighbors and city.</p><h4>Growth happens in community.</h4><p>Faith is best lived out in real relationships.</p><h4>The next generation is worth our sacrifice.</h4><p>We gladly give our time and resources for kids and students.</p>"}',
+      NULL, NULL),
+    ('ELE00000050', 'CHU00000001', 'SEC00000016', NULL, 'textWithPhoto', 1, NULL,
+      '{"photoPosition": "right", "photo": "/tempLibrary/pastor.jpg", "photoAlt": "Pastor John Smith", "text": "<h2>Meet Pastor John Smith</h2><p>Pastor John has led Grace Community Church since 2010 with a passion for helping people discover God&rsquo;s love and purpose for their lives.</p><p>He holds an M.Div. and a B.A. in Theology, and is married to Sarah; together they have three children. When he is not preparing a message, you will likely find him hiking or hunting down a great cup of coffee.</p><p><em>&ldquo;My heart&rsquo;s desire is to see every person experience the transforming love of Jesus Christ.&rdquo;</em></p>"}',
+      NULL, NULL),
+    ('ELE00000051', 'CHU00000001', 'SEC00000017', NULL, 'text', 1, NULL,
+      '{"text": "<h2>Come See for Yourself</h2><p>The best way to get to know Grace is to join us this Sunday. We will save you a seat.</p><p><a class=''btn btn-light btn-large'' href=''/''>Plan Your Visit</a></p>", "textAlignment": "center"}',
+      NULL, NULL),
 
-    ('ELE00000012', 'CHU00000001', 'SEC00000004', NULL, 'text', 1, 'ELE00000008',
-      '{"text": "<h2>Music Ministry</h2><p>Worship team, choir, and special music opportunities for all ages and skill levels.</p><p><strong>Rehearsals:</strong> Thursdays<br><strong>Performances:</strong> Sundays</p>", "textAlignment": "center"}',
-      NULL,
-      NULL),
+    -- ========== Events Page ==========
+    ('ELE00000052', 'CHU00000001', 'SEC00000018', NULL, 'text', 1, NULL,
+      '{"text": "<h1>Events</h1><h3>Life is better when we do it together.</h3>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000053', 'CHU00000001', 'SEC00000019', NULL, 'text', 1, NULL,
+      '{"text": "<h2>What&rsquo;s Coming Up</h2><p>Browse upcoming services, studies, and special events.</p>", "textAlignment": "center"}',
+      NULL, NULL),
+    ('ELE00000054', 'CHU00000001', 'SEC00000019', NULL, 'calendar', 2, NULL, '{"calendarType": "curated", "calendarId": "CAL00000004"}', NULL, NULL),
+    ('ELE00000055', 'CHU00000001', 'SEC00000020', NULL, 'text', 1, NULL,
+      '{"text": "<h2>Need to Register?</h2><p>Sign up for VBS, conferences, retreats, and more through our groups and event pages.</p><p><a class=''btn btn-accent btn-large'' href=''/groups''>Browse Groups &amp; Sign Up</a></p>", "textAlignment": "center"}',
+      NULL, NULL),
 
-    -- Latest Sermons Section
-    ('ELE00000013', 'CHU00000001', 'SEC00000005', NULL, 'text', 1, NULL,
-      '{"text": "<h2>Latest Sermons</h2>", "textAlignment": "center"}',
-      NULL,
-      NULL),
-
-    ('ELE00000014', 'CHU00000001', 'SEC00000005', NULL, 'row', 2, NULL,
-      '{"columns": "6,6"}',
-      NULL,
-      NULL),
-
-    ('ELE00000015', 'CHU00000001', 'SEC00000005', NULL, 'column', 1, 'ELE00000014',
-      '{"size": 6}',
-      NULL,
-      NULL),
-
-    ('ELE00000016', 'CHU00000001', 'SEC00000005', NULL, 'column', 2, 'ELE00000014',
-      '{"size": 6}',
-      NULL,
-      NULL),
-
-    ('ELE00000017', 'CHU00000001', 'SEC00000005', NULL, 'text', 1, 'ELE00000015',
-      '{"text": "<h3>&quot;The Power of Faith&quot;</h3><p><strong>January 4, 2026</strong></p><p>Exploring how faith transforms our lives and strengthens our relationship with God. Join us as we dive into practical ways to grow in faith.</p><p><em>[Watch Online] [Download Audio]</em></p>"}',
-      NULL,
-      NULL),
-
-    ('ELE00000018', 'CHU00000001', 'SEC00000005', NULL, 'text', 1, 'ELE00000016',
-      '{"text": "<h3>&quot;Walking in Love&quot;</h3><p><strong>December 28, 2025</strong></p><p>Understanding God''s love and how to share it with others in our daily lives. A message of hope for the new year.</p><p><em>[Watch Online] [Download Audio]</em></p>"}',
-      NULL,
-      NULL),
-
-    -- FAQ Section
-    ('ELE00000019', 'CHU00000001', 'SEC00000006', NULL, 'text', 1, NULL,
-      '{"text": "<h2>Frequently Asked Questions</h2>", "textAlignment": "center"}',
-      NULL,
-      NULL),
-
-    ('ELE00000020', 'CHU00000001', 'SEC00000006', NULL, 'row', 2, NULL,
-      '{"columns": "6,6"}',
-      NULL,
-      NULL),
-
-    ('ELE00000021', 'CHU00000001', 'SEC00000006', NULL, 'column', 1, 'ELE00000020',
-      '{"size": 6}',
-      NULL,
-      NULL),
-
-    ('ELE00000022', 'CHU00000001', 'SEC00000006', NULL, 'column', 2, 'ELE00000020',
-      '{"size": 6}',
-      NULL,
-      NULL),
-
-    ('ELE00000023', 'CHU00000001', 'SEC00000006', NULL, 'text', 1, 'ELE00000021',
-      '{"text": "<p><strong>What should I wear?</strong><br>Come as you are! We have people in everything from jeans to suits.</p><p><strong>What about my kids?</strong><br>We have age-appropriate programs for all children during services.</p><p><strong>Where do I park?</strong><br>Plenty of free parking is available in our lot and on surrounding streets.</p>"}',
-      NULL,
-      NULL),
-
-    ('ELE00000024', 'CHU00000001', 'SEC00000006', NULL, 'text', 1, 'ELE00000022',
-      '{"text": "<p><strong>How long is the service?</strong><br>Services typically last about 75 minutes including worship and message.</p><p><strong>Do I need to bring anything?</strong><br>Just yourself! Bibles and bulletins are provided.</p><p><strong>Can I get involved?</strong><br>Absolutely! We have ministries for every interest and skill level.</p>"}',
-      NULL,
-      NULL),
-
-    -- Contact & Location Section
-    ('ELE00000025', 'CHU00000001', 'SEC00000007', NULL, 'text', 1, NULL,
-      '{"text": "<h2>Visit Us This Sunday</h2><p><strong>We would love to meet you!</strong></p><p>Come as you are and experience God''s love in our community.</p>", "textAlignment": "center"}',
-      NULL,
-      NULL),
-
-    ('ELE00000026', 'CHU00000001', 'SEC00000007', NULL, 'row', 2, NULL,
-      '{"columns": "6,6"}',
-      NULL,
-      NULL),
-
-    ('ELE00000027', 'CHU00000001', 'SEC00000007', NULL, 'column', 1, 'ELE00000026',
-      '{"size": 6}',
-      NULL,
-      NULL),
-
-    ('ELE00000028', 'CHU00000001', 'SEC00000007', NULL, 'column', 2, 'ELE00000026',
-      '{"size": 6}',
-      NULL,
-      NULL),
-
-    ('ELE00000029', 'CHU00000001', 'SEC00000007', NULL, 'text', 1, 'ELE00000027',
-      '{"text": "<h3>Contact Information</h3><p><strong>Address:</strong><br>123 Church Street<br>Anytown, USA 12345</p><p><strong>Phone:</strong> (555) 123-4567<br><strong>Email:</strong> info@gracechurch.org</p><p><strong>Office Hours:</strong><br>Monday-Friday: 9 AM - 5 PM</p>", "textAlignment": "center"}',
-      NULL,
-      NULL),
-
-    ('ELE00000030', 'CHU00000001', 'SEC00000007', NULL, 'map', 1, 'ELE00000028',
-      '{"mapAddress": "123 Church Street, Anytown, USA 12345", "mapZoom": "16"}',
-      NULL,
-      NULL),
-
-    -- Main Church Calendar Section
-    ('ELE00000031', 'CHU00000001', 'SEC00000008', NULL, 'text', 1, NULL,
-      '{"text": "<h2>Upcoming Events</h2>", "textAlignment": "center"}',
-      NULL,
-      NULL),
-
-    ('ELE00000032', 'CHU00000001', 'SEC00000008', NULL, 'text', 2, NULL,
-      '{"text": "Stay connected with all the exciting things happening at Grace Community Church!", "textAlignment": "center"}',
-      NULL,
-      NULL),
-
-    ('ELE00000033', 'CHU00000001', 'SEC00000008', NULL, 'calendar', 3, NULL,
-      '{"calendarType": "curated", "calendarId": "CAL00000004"}',
-      NULL,
-      NULL),
-
-    -- Ministries Page: Groups browser element
-    ('ELE00000034', 'CHU00000001', 'SEC00000009', NULL, 'groups', 1, NULL,
-      '{"title": "Find a Group"}',
-      NULL,
-      NULL);
+    -- ========== Footer Block (BLK00000002) ==========
+    ('ELE00000056', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'row', 1, NULL, '{"columns": "3,3,3,3"}', NULL, NULL),
+    ('ELE00000057', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'column', 1, 'ELE00000056', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000058', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'text', 1, 'ELE00000057',
+      '{"text": "<h3>Grace Community Church</h3><p>A place to belong, grow, and serve together in Springfield, IL.</p>"}',
+      NULL, NULL),
+    ('ELE00000059', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'column', 2, 'ELE00000056', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000060', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'text', 1, 'ELE00000059',
+      '{"text": "<h4>Explore</h4><p><a href=''/''>Home</a><br><a href=''/about''>About</a><br><a href=''/ministries''>Ministries</a><br><a href=''/sermons''>Sermons</a><br><a href=''/events''>Events</a><br><a href=''/donate''>Give</a></p>"}',
+      NULL, NULL),
+    ('ELE00000061', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'column', 3, 'ELE00000056', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000062', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'text', 1, 'ELE00000061',
+      '{"text": "<h4>Service Times</h4><p>Sundays<br>9:00 &amp; 11:00 AM<br>Sunday School at 10:00 AM</p>"}',
+      NULL, NULL),
+    ('ELE00000063', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'column', 4, 'ELE00000056', '{"size": 3, "mobileSize": 12}', NULL, NULL),
+    ('ELE00000064', 'CHU00000001', 'SEC00000021', 'BLK00000002', 'text', 1, 'ELE00000063',
+      '{"text": "<h4>Visit Us</h4><p>123 Main Street<br>Springfield, IL 62701</p><p>(555) 123-4567<br><a href=''mailto:info@gracechurch.org''>info@gracechurch.org</a></p>"}',
+      NULL, NULL),
+    ('ELE00000065', 'CHU00000001', 'SEC00000022', 'BLK00000002', 'text', 1, NULL,
+      '{"text": "<p>&copy; 2026 Grace Community Church. All rights reserved.</p>", "textAlignment": "center"}',
+      NULL, NULL);
 
     -- Playlists
     INSERT INTO playlists (id, churchId, title, description, publishDate, thumbnail) VALUES
@@ -659,7 +659,7 @@ BEGIN
     ('LNK00000003', 'CHU00000001', 'website', '/ministries', 'url', NULL, 'groups', 'Ministries', 3, NULL, NULL, 'everyone', NULL),
     ('LNK00000004', 'CHU00000001', 'website', '/sermons', 'url', NULL, 'play_circle', 'Sermons', 4, NULL, NULL, 'everyone', NULL),
     ('LNK00000005', 'CHU00000001', 'website', '/events', 'url', NULL, 'event', 'Events', 5, NULL, NULL, 'everyone', NULL),
-    ('LNK00000006', 'CHU00000001', 'website', '/give', 'url', NULL, 'favorite', 'Give', 6, NULL, NULL, 'everyone', NULL),
+    ('LNK00000006', 'CHU00000001', 'website', '/donate', 'url', NULL, 'volunteer_activism', 'Give', 6, NULL, NULL, 'everyone', NULL),
     -- Streaming-page tab so /stream renders the live chat container.
     ('LNK00000007', 'CHU00000001', 'streamingTab', '', 'chat', NULL, 'chat', 'Chat', 1, NULL, NULL, 'everyone', NULL),
     -- B1 mobile dashboard tabs (b1Tab category) — these populate the mobile
@@ -673,13 +673,14 @@ BEGIN
     -- ========================================
     -- Global Styles
     -- ========================================
-    INSERT INTO globalStyles (id, churchId, fonts, palette, typography, spacing, borderRadius, customCss, customJS) VALUES
+    INSERT INTO globalStyles (id, churchId, fonts, palette, typography, spacing, borderRadius, navStyles, customCss, customJS) VALUES
     ('GST00000001', 'CHU00000001',
-      '{"heading": "Open Sans", "body": "Roboto"}',
-      '{"light": "#FFFFFF", "lightAccent": "#E8F0FE", "accent": "#1976D2", "darkAccent": "#1565C0", "dark": "#212121"}',
-      '{"headingSize": "2rem", "bodySize": "1rem"}',
-      '{"sectionPadding": "60px", "elementSpacing": "20px"}',
-      '{"button": "8px", "card": "12px"}',
+      '{"heading": "Poppins", "body": "Inter"}',
+      '{"light": "#FFFFFF", "lightAccent": "#DCEAF2", "accent": "#2A6F97", "darkAccent": "#1B4965", "dark": "#0B2434", "radius": {"sm": "6px", "md": "12px", "lg": "18px", "xl": "28px"}, "shadow": {"sm": "0 1px 3px rgba(11,36,52,0.08)", "md": "0 6px 18px rgba(11,36,52,0.12)", "lg": "0 16px 40px rgba(11,36,52,0.18)"}, "typeScale": 1.05}',
+      '{"headingSize": "2.25rem", "bodySize": "1.05rem"}',
+      '{"sectionPadding": "80px", "elementSpacing": "24px"}',
+      '{"button": "8px", "card": "14px"}',
+      '{"solid": {"backgroundColor": "#FFFFFF", "linkColor": "#0B2434", "linkHoverColor": "#2A6F97", "activeColor": "#2A6F97"}, "transparent": {"linkColor": "#FFFFFF", "linkHoverColor": "#DCEAF2", "activeColor": "#FFFFFF"}}',
       NULL,
       NULL);
 
