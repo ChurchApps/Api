@@ -2,6 +2,7 @@ import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { PlanHelper } from "../helpers/PlanHelper.js";
+import { MatrixEmailHelper } from "../helpers/MatrixEmailHelper.js";
 import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
@@ -232,6 +233,18 @@ export class PlanController extends DoingBaseController {
       const removed = await this.repos.assignment.deleteUnconfirmedByRunId(au.churchId, plan.lastAutofillRunId);
       await this.repos.plan.updateLastAutofillRunId(au.churchId, id, null);
       return { removed };
+    });
+  }
+
+  @httpPost("/notifyRange")
+  public async notifyRange(req: express.Request<{}, {}, { startDate?: string; endDate?: string; ministryId?: string; planTypeId?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { startDate, endDate, ministryId, planTypeId } = req.body || {};
+      if (!startDate || !endDate) return this.json({ error: "Missing required parameters: startDate, endDate" }, 400);
+      if (!ministryId) return this.json({ error: "ministryId is required" }, 400);
+      if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
+      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
+      return await MatrixEmailHelper.sendConsolidated(au.churchId, rows);
     });
   }
 

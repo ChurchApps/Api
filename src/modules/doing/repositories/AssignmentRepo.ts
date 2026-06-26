@@ -181,9 +181,14 @@ export class AssignmentRepo {
       .select([
         "pl.serviceDate",
         "pl.ministryId",
+        sql`pl.id`.as("planId"),
+        sql`pl.name`.as("planName"),
+        sql`p.id`.as("positionId"),
         "p.categoryName",
         sql`p.name`.as("positionName"),
+        "p.groupId",
         sql`p.count`.as("needed"),
+        sql`a.id`.as("assignmentId"),
         "a.personId",
         "a.status"
       ])
