@@ -86,8 +86,7 @@ export class SongDetailRepo {
 
   public async loadForChurch(churchId: string) {
     return getDb().selectFrom("songs as s")
-      .innerJoin("arrangements as a", "a.songId", "s.id")
-      .innerJoin("songDetails as sd", "sd.id", "a.songDetailId")
+      .innerJoin("songDetails as sd", "sd.id", "s.songDetailId")
       .selectAll("sd")
       .select(["s.id as songId", "s.churchId"])
       .where("s.churchId", "=", churchId)

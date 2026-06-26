@@ -34,6 +34,7 @@ export class SongHelper {
     const songDetail = await repos.songDetail.save(customSongDetail);
     const customSong: Song = {
       churchId,
+      songDetailId: songDetail.id,
       name: customSongDetail.title,
       dateAdded: new Date()
     };
@@ -102,7 +103,7 @@ export class SongHelper {
     }
   }
 
-  private static async findExistingSongByCCLI(churchId: string, ccliNumber?: string): Promise<SongDetail | null> {
+  private static async findExistingSongByCCLI(churchId: string, ccliNumber?: string): Promise<Arrangement | null> {
     if (!ccliNumber) return null;
 
     const repos = await RepoManager.getRepos<Repos>("content");
@@ -111,7 +112,7 @@ export class SongHelper {
       const songDetail = await repos.songDetail.loadGlobal(existingByCCLI.songDetailId);
       if (songDetail) {
         const existingArrangement = await repos.arrangement.loadBySongDetailId(churchId, songDetail.id);
-        if (existingArrangement.length > 0) return songDetail;
+        if (existingArrangement.length > 0) return existingArrangement[0];
       }
     }
     return null;
@@ -194,6 +195,7 @@ export class SongHelper {
     // Create new Song
     const song: Song = {
       churchId,
+      songDetailId: songDetail.id,
       name: songDetail.title,
       dateAdded: new Date()
     };

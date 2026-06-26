@@ -5,5 +5,9 @@ export class Arrangement {
   songDetailId?: string;
   name?: string;
   lyrics?: string;
+  bpm?: number;
+  seconds?: number;
+  meter?: string;
+  sequence?: string;
   freeShowId?: string;
 }

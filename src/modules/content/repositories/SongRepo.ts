@@ -15,6 +15,7 @@ export class SongRepo {
     await getDb().insertInto("songs").values({
       id: model.id,
       churchId: model.churchId,
+      songDetailId: model.songDetailId,
       name: model.name,
       dateAdded: model.dateAdded ? DateHelper.toMysqlDate(model.dateAdded) : model.dateAdded
     } as any).execute();
@@ -23,6 +24,7 @@ export class SongRepo {
 
   private async update(model: Song): Promise<Song> {
     await getDb().updateTable("songs").set({
+      songDetailId: model.songDetailId,
       name: model.name,
       dateAdded: model.dateAdded ? DateHelper.toMysqlDate(model.dateAdded) : model.dateAdded
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
@@ -46,7 +48,7 @@ export class SongRepo {
     return getDb().selectFrom("songs as s")
       .innerJoin("arrangements as a", "a.songId", "s.id")
       .innerJoin("arrangementKeys as ak", "ak.arrangementId", "a.id")
-      .innerJoin("songDetails as sd", "sd.id", "a.songDetailId")
+      .innerJoin("songDetails as sd", "sd.id", "s.songDetailId")
       .selectAll("sd")
       .select(["ak.id as arrangementKeyId", "ak.keySignature as arrangementKeySignature", "ak.shortDescription"])
       .where("s.churchId", "=", churchId)
@@ -64,6 +66,7 @@ export class SongRepo {
     return {
       id: row.id,
       churchId: row.churchId,
+      songDetailId: row.songDetailId,
       name: row.name,
       dateAdded: row.dateAdded
     };

@@ -18,6 +18,10 @@ export class ArrangementRepo {
       songDetailId: model.songDetailId,
       name: model.name,
       lyrics: model.lyrics,
+      bpm: model.bpm,
+      seconds: model.seconds,
+      meter: model.meter,
+      sequence: model.sequence,
       freeShowId: model.freeShowId
     } as any).execute();
     return model;
@@ -29,8 +33,12 @@ export class ArrangementRepo {
       songDetailId: model.songDetailId,
       name: model.name,
       lyrics: model.lyrics,
+      bpm: model.bpm,
+      seconds: model.seconds,
+      meter: model.meter,
+      sequence: model.sequence,
       freeShowId: model.freeShowId
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -69,6 +77,10 @@ export class ArrangementRepo {
       songDetailId: row.songDetailId,
       name: row.name,
       lyrics: row.lyrics,
+      bpm: row.bpm,
+      seconds: row.seconds,
+      meter: row.meter,
+      sequence: row.sequence,
       freeShowId: row.freeShowId
     };
   }

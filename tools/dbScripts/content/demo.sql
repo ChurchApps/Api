@@ -36,20 +36,20 @@ BEGIN
     SET FOREIGN_KEY_CHECKS = 1;
 
     -- Songs
-    INSERT INTO songs (id, churchId, name, dateAdded) VALUES
+    INSERT INTO songs (id, churchId, songDetailId, name, dateAdded) VALUES
     -- Modern Worship Songs
-    ('SON00000001', 'CHU00000001', 'What a Beautiful Name', '2024-01-01'),
-    ('SON00000002', 'CHU00000001', 'Good Good Father', '2024-01-01'),
-    ('SON00000003', 'CHU00000001', 'Reckless Love', '2024-01-01'),
-    ('SON00000004', 'CHU00000001', 'Build My Life', '2024-01-01'),
-    ('SON00000005', 'CHU00000001', 'Graves Into Gardens', '2024-01-01'),
+    ('SON00000001', 'CHU00000001', 'SDT00000001', 'What a Beautiful Name', '2024-01-01'),
+    ('SON00000002', 'CHU00000001', 'SDT00000002', 'Good Good Father', '2024-01-01'),
+    ('SON00000003', 'CHU00000001', 'SDT00000003', 'Reckless Love', '2024-01-01'),
+    ('SON00000004', 'CHU00000001', 'SDT00000004', 'Build My Life', '2024-01-01'),
+    ('SON00000005', 'CHU00000001', 'SDT00000005', 'Graves Into Gardens', '2024-01-01'),
 
     -- Classic Hymns
-    ('SON00000006', 'CHU00000001', 'Amazing Grace', '2024-01-01'),
-    ('SON00000007', 'CHU00000001', 'How Great Thou Art', '2024-01-01'),
-    ('SON00000008', 'CHU00000001', 'Great Is Thy Faithfulness', '2024-01-01'),
-    ('SON00000009', 'CHU00000001', 'Be Thou My Vision', '2024-01-01'),
-    ('SON00000010', 'CHU00000001', 'It Is Well With My Soul', '2024-01-01');
+    ('SON00000006', 'CHU00000001', 'SDT00000006', 'Amazing Grace', '2024-01-01'),
+    ('SON00000007', 'CHU00000001', 'SDT00000007', 'How Great Thou Art', '2024-01-01'),
+    ('SON00000008', 'CHU00000001', 'SDT00000008', 'Great Is Thy Faithfulness', '2024-01-01'),
+    ('SON00000009', 'CHU00000001', 'SDT00000009', 'Be Thou My Vision', '2024-01-01'),
+    ('SON00000010', 'CHU00000001', 'SDT00000010', 'It Is Well With My Soul', '2024-01-01');
 
     -- Song Details
     INSERT INTO songDetails (id, praiseChartsId, musicBrainzId, title, artist, album, language, thumbnail, releaseDate, bpm, keySignature, seconds, meter, tones) VALUES
