@@ -195,6 +195,38 @@ export class PlanHelper {
     return created;
   }
 
+  static async notifyLeadersOfResponse(churchId: string, assignment: Assignment, repositories?: Repos): Promise<void> {
+    try {
+      const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
+      const position = (await repos.position.load(churchId, assignment.positionId)) as Position;
+      if (!position) return;
+      const plan = (await repos.plan.load(churchId, position.planId)) as Plan;
+      if (!plan?.ministryId) return;
+
+      const gateway = getMembershipModuleGateway();
+      const leaderIds = (await gateway.loadGroupLeaderPersonIds(churchId, plan.ministryId))
+        .filter((id) => id !== assignment.personId);
+      if (leaderIds.length === 0) return;
+
+      const [[responder], church] = await Promise.all([
+        gateway.loadPeople(churchId, [assignment.personId]),
+        gateway.loadChurch(churchId)
+      ]);
+      const planUrl = `https://${church?.subDomain || "app"}.b1.church/my/plans?id=${plan.id}`;
+      const dateStr = plan.serviceDate
+        ? new Date(plan.serviceDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
+        : "";
+      const name = responder?.displayName || "A volunteer";
+      const verb = assignment.status === "Accepted" ? "accepted" : "declined";
+      const role = position.name ? ` as ${position.name}` : "";
+      const message = `${name} ${verb} serving${role} for ${plan.name}${dateStr ? ` on ${dateStr}` : ""}`;
+
+      await NotificationService.createNotifications(leaderIds, churchId, "assignment", plan.id, message, planUrl, assignment.personId);
+    } catch (e) {
+      console.error("notifyLeadersOfResponse failed:", e);
+    }
+  }
+
   // true = a preferred time matches this plan, false = preference set but no match,
   // null = no preference (or no times to compare) — ranks the same as a match.
   static matchesPreferredTime(preferredTimes: string | undefined, times: Time[]): boolean | null {

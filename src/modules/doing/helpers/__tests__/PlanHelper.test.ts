@@ -12,10 +12,16 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "id
 
 const loadGroupMemberPersonIdsMock = jest.fn();
 const loadHouseholdPeopleMock = jest.fn().mockResolvedValue([]);
+const loadGroupLeaderPersonIdsMock = jest.fn();
+const loadPeopleMock = jest.fn();
+const loadChurchMock = jest.fn();
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({
     loadGroupMemberPersonIds: loadGroupMemberPersonIdsMock,
-    loadHouseholdPeople: loadHouseholdPeopleMock
+    loadHouseholdPeople: loadHouseholdPeopleMock,
+    loadGroupLeaderPersonIds: loadGroupLeaderPersonIdsMock,
+    loadPeople: loadPeopleMock,
+    loadChurch: loadChurchMock
   })
 }));
 
@@ -304,5 +310,55 @@ describe("PlanHelper.autoReplaceDeclined", () => {
     expect(created.length).toBe(1);
     expect(notifyMock).not.toHaveBeenCalled();
     expect(saved[0].notified).toBeUndefined();
+  });
+});
+
+describe("PlanHelper.notifyLeadersOfResponse", () => {
+  const position = { id: "pos1", churchId: "c1", planId: "plan1", name: "Usher" };
+  const plan = { id: "plan1", churchId: "c1", ministryId: "min1", name: "Sunday AM", serviceDate: SERVICE_DATE };
+  const accepted = { id: "a1", churchId: "c1", positionId: "pos1", personId: "vol1", status: "Accepted" };
+
+  const buildRepos = (p: any = plan, pos: any = position) => ({
+    position: { load: jest.fn(async () => pos) },
+    plan: { load: jest.fn(async () => p) }
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    loadGroupLeaderPersonIdsMock.mockResolvedValue(["leader1", "leader2", "vol1"]);
+    loadPeopleMock.mockResolvedValue([{ id: "vol1", displayName: "Jane Doe" }]);
+    loadChurchMock.mockResolvedValue({ subDomain: "demo", name: "Demo Church" });
+  });
+
+  it("alerts the ministry leaders, excluding the responder, with name/role/plan/response", async () => {
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos() as any);
+    expect(loadGroupLeaderPersonIdsMock).toHaveBeenCalledWith("c1", "min1");
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    const [ids, churchId, contentType, contentId, message] = notifyMock.mock.calls[0];
+    expect(ids).toEqual(["leader1", "leader2"]);
+    expect(churchId).toBe("c1");
+    expect(contentType).toBe("assignment");
+    expect(contentId).toBe("plan1");
+    expect(message).toContain("Jane Doe");
+    expect(message).toContain("accepted");
+    expect(message).toContain("Usher");
+    expect(message).toContain("Sunday AM");
+  });
+
+  it("says 'declined' for a declined response", async () => {
+    await PlanHelper.notifyLeadersOfResponse("c1", { ...accepted, status: "Declined" } as any, buildRepos() as any);
+    expect(notifyMock.mock.calls[0][4]).toContain("declined");
+  });
+
+  it("does nothing when the plan has no ministry", async () => {
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos({ ...plan, ministryId: undefined }) as any);
+    expect(loadGroupLeaderPersonIdsMock).not.toHaveBeenCalled();
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when the only leader is the responder", async () => {
+    loadGroupLeaderPersonIdsMock.mockResolvedValue(["vol1"]);
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos() as any);
+    expect(notifyMock).not.toHaveBeenCalled();
   });
 });

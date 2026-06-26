@@ -26,6 +26,7 @@ export interface MembershipModuleGateway {
   loadPeople(churchId: string, personIds: string[]): Promise<{ id: string; displayName: string }[]>;
   loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
   loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]>;
+  loadGroupLeaderPersonIds(churchId: string, groupId: string): Promise<string[]>;
   // Every person sharing a household with any of personIds (the input people included).
   loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]>;
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string } | null>;
@@ -145,6 +146,16 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .select("personId")
       .where("churchId", "=", churchId)
       .where("groupId", "=", groupId)
+      .execute()) as { personId: string }[];
+    return rows.map((r) => r.personId).filter((id) => !!id);
+  }
+
+  public async loadGroupLeaderPersonIds(churchId: string, groupId: string): Promise<string[]> {
+    const rows = (await this.getDb().selectFrom("groupMembers")
+      .select("personId")
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .where("leader", "=", 1)
       .execute()) as { personId: string }[];
     return rows.map((r) => r.personId).filter((id) => !!id);
   }

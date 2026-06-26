@@ -54,7 +54,9 @@ export class AssignmentController extends DoingBaseController {
       if (assignment.personId !== au.personId) throw new Error("Invalid Assignment");
       else {
         assignment.status = "Accepted";
-        return await this.repos.assignment.save(assignment);
+        const result = await this.repos.assignment.save(assignment);
+        await PlanHelper.notifyLeadersOfResponse(au.churchId, assignment, this.repos);
+        return result;
       }
     });
   }
@@ -73,6 +75,7 @@ export class AssignmentController extends DoingBaseController {
           // A replacement failure must never block the decline itself.
           console.error("autoReplaceDeclined failed:", e);
         }
+        await PlanHelper.notifyLeadersOfResponse(au.churchId, assignment, this.repos);
         return result;
       }
     });
@@ -103,6 +106,7 @@ export class AssignmentController extends DoingBaseController {
             console.error("autoReplaceDeclined failed:", e);
           }
         }
+        await PlanHelper.notifyLeadersOfResponse(payload.churchId, assignment, repos);
       }
 
       res.status(200).send(page(
