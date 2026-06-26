@@ -80,7 +80,7 @@ export class GroupRepo {
       .selectAll("g")
       .select((eb) => eb.selectFrom("groupMembers as gm").whereRef("gm.groupId", "=", "g.id").select(eb.fn.countAll().as("count")).as("memberCount"))
       .where("g.churchId", "=", churchId)
-      .where("g.removed", "=", 0 as any)
+      .where("g.removed", "=", false as any)
       .where("g.tags", "like", "%" + tag + "%")
       .orderBy("g.categoryName")
       .orderBy("g.name")
@@ -92,7 +92,7 @@ export class GroupRepo {
       .selectAll("g")
       .select((eb) => eb.selectFrom("groupMembers as gm").whereRef("gm.groupId", "=", "g.id").select(eb.fn.countAll().as("count")).as("memberCount"))
       .where("g.churchId", "=", churchId)
-      .where("g.removed", "=", 0 as any)
+      .where("g.removed", "=", false as any)
       .orderBy("g.categoryName")
       .orderBy("g.name")
       .execute();
@@ -104,7 +104,7 @@ export class GroupRepo {
       .selectAll("g")
       .distinct()
       .where("gm.personId", "=", personId)
-      .where("g.removed", "=", 0 as any)
+      .where("g.removed", "=", false as any)
       .orderBy("g.name")
       .execute();
   }
@@ -115,7 +115,7 @@ export class GroupRepo {
       .selectAll("g")
       .distinct()
       .where("gm.personId", "=", personId)
-      .where("g.removed", "=", 0 as any)
+      .where("g.removed", "=", false as any)
       .where("g.tags", "like", "%standard%")
       .orderBy("g.name")
       .execute();
@@ -150,7 +150,7 @@ export class GroupRepo {
       .leftJoin("services as s", "s.id", "st.serviceId")
       .select(["g.id", "g.categoryName", "g.name"])
       .where("g.churchId", "=", churchId)
-      .where("g.removed", "=", 0 as any);
+      .where("g.removed", "=", false as any);
     if (serviceTimeId !== "0") query = query.where("gst.serviceTimeId", "=", serviceTimeId);
     if (serviceId !== "0") query = query.where("st.serviceId", "=", serviceId);
     if (campusId !== "0") query = query.where("s.campusId", "=", campusId);
