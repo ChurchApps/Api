@@ -73,7 +73,7 @@ export class RoleMemberController extends MembershipBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const member = await this.repos.roleMember.loadById(id, au.churchId);
-      const hasAccess = await this.checkAccess([member], Permissions.roles.view, au);
+      const hasAccess = await this.checkAccess([member], Permissions.roles.edit, au);
       if (!hasAccess) return this.json({}, 401);
       else {
         await this.repos.roleMember.delete(id, au.churchId);
@@ -83,9 +83,10 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpDelete("/self/:churchId/:userId")
-  public async deleteSelf(@requestParam("churchId") churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
-      await this.repos.roleMember.deleteSelf(churchId, userId);
+  public async deleteSelf(@requestParam("churchId") _churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (userId !== au.id && !au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
+      await this.repos.roleMember.deleteSelf(au.churchId, userId);
       return this.json([], 200);
     });
   }

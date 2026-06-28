@@ -4,6 +4,7 @@ import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Device } from "../models/index.js";
 import { WebPushHelper, WebPushSubscriptionPayload } from "../helpers/WebPushHelper.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 interface WebPushEnrollBody {
   subscription: WebPushSubscriptionPayload;
@@ -113,6 +114,8 @@ export class WebPushController extends MessagingBaseController {
   @httpDelete("/subscription/:id")
   public async deleteById(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
+      const existing = await this.repos.device.loadById(au.churchId, id);
+      if (existing?.personId !== au.personId && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.device.delete(au.churchId, id);
       return { success: true };
     });

@@ -20,7 +20,7 @@ export class NotificationPreferenceController extends MessagingBaseController {
   public async save(req: express.Request<{}, {}, NotificationPreference[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<NotificationPreference>[] = [];
-      req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.notificationPreference.save(item)); });
+      req.body.forEach((item) => { item.churchId = au.churchId; item.personId = au.personId; promises.push(this.repos.notificationPreference.save(item)); });
       const result = await Promise.all(promises);
       return this.repos.notificationPreference.convertAllToModel(result);
     });

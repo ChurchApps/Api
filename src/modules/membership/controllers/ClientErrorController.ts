@@ -4,6 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 
 @controller("/membership/clientErrors")
 export class ClientErrorController extends MembershipBaseController {
+  // authz-exempt: self-service — every record is scoped to au.churchId before save; any authenticated user may log their own church's client errors
   @httpPost("/")
   public async save(req: express.Request<{}, {}, any[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

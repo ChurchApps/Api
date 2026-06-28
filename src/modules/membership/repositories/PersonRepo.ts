@@ -135,8 +135,8 @@ export class PersonRepo {
     await getDb().updateTable("people").set(fields).where("id", "in", ids).where("churchId", "=", churchId).execute();
   }
 
-  public async updateOptedOut(personId: string, optedOut: boolean) {
-    await getDb().updateTable("people").set({ optedOut: optedOut as any }).where("id", "=", personId).execute();
+  public async updateOptedOut(churchId: string, personId: string, optedOut: boolean) {
+    await getDb().updateTable("people").set({ optedOut: optedOut as any }).where("id", "=", personId).where("churchId", "=", churchId).execute();
   }
 
   public async updateHousehold(person: Person) {

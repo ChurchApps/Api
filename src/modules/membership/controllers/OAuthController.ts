@@ -28,6 +28,7 @@ export class OAuthController extends MembershipBaseController {
     };
   }
 
+  // authz-exempt: self-service — issues an auth code for the caller's own userChurch (loadByUserId(au.id, au.churchId)); user consents on their own behalf
   @httpPost("/authorize")
   public async authorize(req: express.Request<{}, {}, { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -84,11 +85,12 @@ export class OAuthController extends MembershipBaseController {
         return this.handleDeviceCodeGrant(device_code, client_id, res);
       }
 
-      // Validate client: require client_secret for all grant types except refresh_token
-      // (public clients like device-flow TV apps may not have a client_secret)
+      // Validate client. Only public (secret-less) clients may omit client_secret on
+      // the refresh_token grant; if the client has a secret on file it must still match.
       let client;
       if (grant_type === "refresh_token" && !client_secret) {
         client = (await this.repos.oAuthClient.loadByClientId(client_id)) as any;
+        if (client?.clientSecret) return this.json({ error: "invalid_client" }, 400);
       } else {
         client = (await this.repos.oAuthClient.loadByClientIdAndSecret(client_id, client_secret)) as any;
       }
@@ -389,6 +391,7 @@ export class OAuthController extends MembershipBaseController {
    * Deny device authorization
    * POST /oauth/device/deny
    */
+  // authz-exempt: open to any authenticated user — only marks a pending device code "denied" (blocks pairing); no data access or escalation, holder of the on-screen user_code may decline
   @httpPost("/device/deny")
   public async denyDevice(req: express.Request<{}, {}, { user_code: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {

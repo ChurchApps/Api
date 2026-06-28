@@ -4,6 +4,7 @@ import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Conversation, Message } from "../models/index.js";
 import { ArrayHelper, EncryptionHelper } from "@churchapps/apihelper";
 import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 const contentRoom = (contentType?: string, contentId?: string) =>
   contentType && contentId ? `content-${contentType}-${contentId}` : null;
@@ -114,6 +115,7 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
+  // authz-exempt: self-service — every conversation's churchId is forced to au.churchId from the JWT before save
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Conversation[]>, res: express.Response): Promise<Conversation[]> {
     return this.actionWrapper(req, res, async (au) => {
@@ -213,6 +215,7 @@ export class ConversationController extends MessagingBaseController {
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.conversation.delete(au.churchId, id);
     }) as any;
   }

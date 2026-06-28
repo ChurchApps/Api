@@ -2,7 +2,7 @@ import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { AssociatedGroup } from "../models/index.js";
-import { PlanAuth } from "../../../shared/helpers/index.js";
+import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/membership/associatedGroups")
 export class AssociatedGroupController extends MembershipBaseController {
@@ -35,6 +35,7 @@ export class AssociatedGroupController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, AssociatedGroup[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       for (const item of req.body) {
         if (item.contentType === "planType") {
           if (!await PlanAuth.canEditPlanType(au, item.contentId)) return this.json({}, 401);
@@ -50,6 +51,7 @@ export class AssociatedGroupController extends MembershipBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const assoc: any = await this.repos.associatedGroup.load(au.churchId, id);
       if (assoc?.contentType === "planType") {
         if (!await PlanAuth.canEditPlanType(au, assoc.contentId)) return this.json({}, 401);

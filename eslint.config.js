@@ -5,6 +5,7 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
+const authzPlugin = require("./tools/eslint-rules/authz.cjs");
 
 export default [
   {
@@ -129,6 +130,15 @@ export default [
           project: "./tsconfig.json"
         }
       }
+    }
+  },
+    {
+    files: ["src/modules/**/controllers/**/*.ts"],
+    plugins: { authz: authzPlugin },
+    rules: {
+      // ponytail: backlog cleared — all handlers gated or // authz-exempt annotated; rules now enforcing
+      "authz/require-checkaccess": "error",
+      "authz/no-untrusted-churchid": "error"
     }
   },
   {

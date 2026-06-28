@@ -136,14 +136,6 @@ export class ChurchController extends MembershipBaseController {
     });
   }
 
-  @httpGet("/test")
-  public async test(req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
-      HubspotHelper.register("6", "Test Church6", "John", "Doe5", "123 Main St", "Anytown", "TX", "12345", "USA", "jdoe6@gmail.com", "Test App");
-      return this.json({ success: true }, 200);
-    });
-  }
-
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
@@ -308,6 +300,7 @@ export class ChurchController extends MembershipBaseController {
     return result;
   }
 
+  // authz-exempt: open to any authenticated user — self-service church registration; caller becomes owner via RoleHelper(savedChurch.id, au.id)
   @httpPost("/add", ...churchRegisterValidation)
   public async addChurch(req: express.Request<{}, {}, RegisterChurchRequest>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -369,6 +362,7 @@ export class ChurchController extends MembershipBaseController {
   @httpPost("/select")
   public async select(req: express.Request<{}, {}, { churchId: string; subDomain: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      // authz-exempt: selection target validated against au's own permissions below
       let { churchId } = req.body;
       if (req.body.subDomain && !churchId) {
         const selectedChurch: Church = await this.repos.church.loadBySubDomain(req.body.subDomain);

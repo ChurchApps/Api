@@ -2,6 +2,7 @@ import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversi
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { SongDetailLink } from "../models/index.js";
+import { Permissions } from "../helpers/index.js";
 import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper.js";
 
 @controller("/content/songDetailLinks")
@@ -22,7 +23,8 @@ export class SongDetailLinkController extends ContentBaseController {
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, SongDetailLink[]>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<SongDetailLink>[] = [];
       req.body.forEach((sd) => {
         promises.push(this.repos.songDetailLink.save(sd));
@@ -43,7 +45,8 @@ export class SongDetailLinkController extends ContentBaseController {
 
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.songDetailLink.delete(id);
       return null;
     });

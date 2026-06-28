@@ -15,6 +15,7 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/guest-register")
   public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: { firstName: string, lastName: string, email?: string, phone?: string }[] }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: anon endpoint; churchId is the public registration target
       const { churchId, members } = req.body;
       if (!churchId) return this.json({ error: "churchId is required" }, 400);
       if (!members || !Array.isArray(members) || members.length === 0) return this.json({ error: "At least one member is required" }, 400);
@@ -46,6 +47,7 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/public/email")
   public async publicEmail(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: anon contact endpoint; churchId is the public target church
       const churchId = req.body.churchId;
       const personId = req.body.personId;
       const subject = req.body.subject;
@@ -127,6 +129,7 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/loadOrCreate")
   public async loadOrCreate(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: anon endpoint; churchId is the public target church
       const { churchId, email, firstName, lastName } = req.body;
       const person: Person = await PersonHelper.getPerson(churchId, email, firstName, lastName, false);
       return { id: person.id, name: person.name, contactInfo: person.contactInfo };

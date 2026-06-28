@@ -7,15 +7,19 @@ import { Question } from "../models/index.js";
 export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/up")
   public async moveQuestionUp(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
-      return await this.repos.question.moveQuestionUp(id);
+    return this.actionWrapper(req, res, async (au) => {
+      const formId = req?.query?.formId?.toString() || null;
+      if (!this.formAccess(au, formId)) return this.json({}, 401);
+      return await this.repos.question.moveQuestionUp(au.churchId, id);
     });
   }
 
   @httpGet("/sort/:id/down")
   public async moveQuestionDown(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
-      return await this.repos.question.moveQuestionDown(id);
+    return this.actionWrapper(req, res, async (au) => {
+      const formId = req?.query?.formId?.toString() || null;
+      if (!this.formAccess(au, formId)) return this.json({}, 401);
+      return await this.repos.question.moveQuestionDown(au.churchId, id);
     });
   }
 
@@ -46,6 +50,7 @@ export class QuestionController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: gated by this.formAccess(au, question.formId) — only form admins/editors may add questions; churchId forced to au.churchId
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Question[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -53,7 +58,7 @@ export class QuestionController extends MembershipBaseController {
       const questions = req.body;
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
-        if (this.formAccess(au, question.formId)) {
+        if (await this.formAccess(au, question.formId)) {
           const availableQuestions = (await this.repos.question.loadForForm(au.churchId, question.formId)) as any[];
           const maxValue = Math.max(...(availableQuestions as any[]).map((q: any) => q.sort));
           const addBy = i + 1;
@@ -68,11 +73,12 @@ export class QuestionController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: gated by this.formAccess(au, formId) — only form admins/editors may delete questions; delete scoped to au.churchId
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
-      if (!this.formAccess(au, formId)) return this.json({}, 401);
+      if (!(await this.formAccess(au, formId))) return this.json({}, 401);
       else {
         await this.repos.question.delete(au.churchId, id);
         return this.json({});

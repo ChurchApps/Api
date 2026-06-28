@@ -16,14 +16,6 @@ export class DomainController extends MembershipBaseController {
     });
   }
 
-  @httpGet("/test")
-  public async test(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
-      const jsonData = await CaddyHelper.generateJsonData();
-      return jsonData;
-    });
-  }
-
   @httpGet("/caddy/init")
   public async caddyInit(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

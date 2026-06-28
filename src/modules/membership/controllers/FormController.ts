@@ -27,6 +27,7 @@ export class FormController extends MembershipBaseController {
   @httpGet("/standalone/:id")
   public async getStandAlone(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      // authz-exempt: churchId identifies the embeddable public form's owner church
       const churchId = req?.query?.churchId.toString();
       const form = this.repos.form.convertToModel("", await this.repos.form.load(churchId, id));
       if (form.contentType !== "form" || (!au.id && form.restricted)) return this.json({ restricted: true }, 401);
@@ -89,6 +90,7 @@ export class FormController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: gated by this.formAccess(au, id) — enforces forms.admin/edit or per-member form permission
   @httpPost("/duplicate/:id")
   public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -104,10 +106,11 @@ export class FormController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: gated by this.formAccess(au, id) — enforces forms.admin/edit or per-member form permission
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.formAccess(au, id)) return this.json({}, 401);
+      if (!(await this.formAccess(au, id))) return this.json({}, 401);
       else {
         await this.repos.form.delete(au.churchId, id);
         return this.json({});

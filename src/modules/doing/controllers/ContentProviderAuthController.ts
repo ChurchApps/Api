@@ -2,6 +2,7 @@ import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { ContentProviderAuth } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/contentProviderAuths")
 export class ContentProviderAuthController extends DoingBaseController {
@@ -53,6 +54,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, ContentProviderAuth[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const promises: Promise<ContentProviderAuth>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.contentProviderAuth.save(item)); });
       const result = await Promise.all(promises);
@@ -63,6 +65,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       await this.repos.contentProviderAuth.delete(au.churchId, id);
       return {};
     });

@@ -1,5 +1,6 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
+import path from "path";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { File } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
@@ -60,8 +61,9 @@ export class FileController extends ContentBaseController {
         const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, req.body.contentType, req.body.contentId);
         if (totalBytes?.size > 100000000) return this.json({}, 401);
         else {
-          let key = "/" + au.churchId + "/files/" + req.body.fileName;
-          if (req.body.contentId) key = "/" + au.churchId + "/files/" + req.body.contentType + "/" + req.body.contentId + "/" + req.body.fileName;
+          const safeName = path.basename(req.body.fileName).replace(/\.\.+/g, ".");
+          let key = "/" + au.churchId + "/files/" + safeName;
+          if (req.body.contentId) key = "/" + au.churchId + "/files/" + req.body.contentType + "/" + req.body.contentId + "/" + safeName;
           const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key) : {};
           return result;
         }
@@ -83,6 +85,8 @@ export class FileController extends ContentBaseController {
   }
 
   private async saveFile(churchId: string, file: File) {
+    // strip path separators and parent refs to prevent traversal
+    file.fileName = path.basename(file.fileName).replace(/\.\.+/g, ".");
     const key = "/" + churchId + "/files/" + file.fileName;
     if (file.id) {
       // delete existing uploadFile

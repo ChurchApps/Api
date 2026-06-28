@@ -6,6 +6,7 @@ import { TextingProvider, SentText, DeliveryLog } from "../models/index.js";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import { getProvider, type TextingProviderConfig } from "@churchapps/texting";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 interface GroupMemberDetail {
   personId: string;
@@ -36,6 +37,7 @@ export class TextingController extends MessagingBaseController {
   @httpPost("/providers")
   public async saveProvider(req: express.Request<{}, {}, TextingProvider[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const saved = await Promise.all(
         req.body.map(async (provider) => {
           provider.churchId = au.churchId;
@@ -71,6 +73,7 @@ export class TextingController extends MessagingBaseController {
   @httpDelete("/providers/:id")
   public async deleteProvider(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       await this.repos.textingProvider.delete(au.churchId, id);
       return this.json({});
     });
@@ -96,6 +99,7 @@ export class TextingController extends MessagingBaseController {
   @httpPost("/send")
   public async sendToGroup(req: express.Request<{}, {}, { groupId: string; message: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const { groupId, message } = req.body;
       if (!groupId || !message) return this.json({ error: "groupId and message are required" }, 400);
 
@@ -186,6 +190,7 @@ export class TextingController extends MessagingBaseController {
   @httpPost("/sendPerson")
   public async sendToPerson(req: express.Request<{}, {}, { personId: string; phoneNumber: string; message: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const { personId, phoneNumber, message } = req.body;
       if (!personId || !phoneNumber || !message) return this.json({ error: "personId, phoneNumber, and message are required" }, 400);
 

@@ -59,6 +59,7 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Notification[]>, res: express.Response): Promise<Notification[]> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const promises: Promise<Notification>[] = [];
       req.body.forEach((notification) => {
         notification.churchId = au.churchId;
@@ -72,6 +73,7 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/markRead/:churchId/:personId")
   public async markRead(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
+      if (personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       await this.repos.notification.markRead(au.churchId, personId);
     }) as any;
   }
@@ -79,6 +81,7 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/sendTest")
   public async sendTestNotification(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const { personId, title } = req.body;
       const method = await NotificationHelper.notifyUser(au.churchId, personId, title || "Test Notification");
       return { method, success: true };
@@ -105,6 +108,7 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/create")
   public async create(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       return await NotificationHelper.createNotifications(req.body.peopleIds, au.churchId, req.body.contentType, req.body.contentId, req.body.message, req.body?.link, au.personId);
     }) as any;
   }
@@ -161,42 +165,13 @@ export class NotificationController extends MessagingBaseController {
 
   @httpPost("/ping")
   public async ping(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
-    return this.actionWrapperAnon(req, res, async () => {
-      return await NotificationHelper.createNotifications([req.body.personId], req.body.churchId, req.body.contentType, req.body.contentId, req.body.message, undefined, req.body.triggeredByPersonId);
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
+      return await NotificationHelper.createNotifications([req.body.personId], au.churchId, req.body.contentType, req.body.contentId, req.body.message, undefined, req.body.triggeredByPersonId);
     }) as any;
   }
 
-  @httpGet("/tmpEmail")
-  public async tmpEmail(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
-    return this.actionWrapperAnon(req, res, async () => {
-      console.log("[tmpEmail] Endpoint called, initializing NotificationHelper...");
-      NotificationHelper.init(this.repos);
-      console.log("[tmpEmail] Calling sendEmailNotifications('daily')...");
-      const result = await NotificationHelper.sendEmailNotifications("daily");
-      console.log("[tmpEmail] Complete, result:", JSON.stringify(result));
-      return result;
-    }) as any;
-  }
-
-  /*
-  @httpGet("/tmp15Min")
-  public async tmp15Min(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
-    return this.actionWrapperAnon(req, res, async () => {
-      console.log("[tmp15Min] Endpoint called, initializing NotificationHelper...");
-      NotificationHelper.init(this.repos);
-
-      console.log("[tmp15Min] Step 1: Escalating unread notifications...");
-      const escalationResult = await NotificationHelper.escalateDelivery();
-      console.log("[tmp15Min] escalateDelivery result:", JSON.stringify(escalationResult));
-
-      console.log("[tmp15Min] Step 2: Processing individual email notifications...");
-      const emailResult = await NotificationHelper.sendEmailNotifications("individual");
-      console.log("[tmp15Min] sendEmailNotifications result:", JSON.stringify(emailResult));
-
-      return { escalationResult, emailResult };
-    }) as any;
-  }*/
-
+  // authz-exempt: self-service — deletes only the caller's own notifications, scoped by au.churchId + au.personId from the JWT
   @httpDelete("/my")
   public async deleteMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
@@ -207,6 +182,8 @@ export class NotificationController extends MessagingBaseController {
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
+      const existing = await this.repos.notification.loadById(au.churchId, id);
+      if (existing?.personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       await this.repos.notification.delete(au.churchId, id);
     }) as any;
   }

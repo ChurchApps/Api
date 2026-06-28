@@ -2,9 +2,11 @@ import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversi
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Device } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 @controller("/messaging/devices")
 export class DeviceController extends MessagingBaseController {
+  // authz-exempt: self-service device registration — lookup and new device churchId are forced to au.churchId from the JWT
   @httpPost("/enroll")
   public async enroll(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -125,23 +127,27 @@ export class DeviceController extends MessagingBaseController {
     }) as any;
   }
 
+  // authz-exempt: self-service device registration — every device's churchId is forced to au.churchId from the JWT before save
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Device[]>, res: express.Response): Promise<Device[]> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<Device>[] = [];
       req.body.forEach((device) => {
+        device.churchId = au.churchId;
         device.lastActiveDate = new Date();
         if (!device.registrationDate) device.registrationDate = new Date();
         promises.push(this.repos.device.save(device));
       }) as any;
       const result = await Promise.all(promises);
-      return this.repos.device.convertAllToModel("", result as any[]);
+      return this.repos.device.convertAllToModel(au.churchId, result as any[]);
     }) as any;
   }
 
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
+      const existing = await this.repos.device.loadById(au.churchId, id);
+      if (existing?.personId !== au.personId && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.device.delete(au.churchId, id);
     }) as any;
   }

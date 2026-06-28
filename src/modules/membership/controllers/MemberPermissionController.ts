@@ -40,26 +40,28 @@ export class MemberPermissionController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: gated by this.formAccess(au, contentId) — only form admins/editors may manage a form's member permissions; churchId forced to au.churchId
   @httpPost("/")
   public async save(req: express.Request<{}, {}, MemberPermission[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<MemberPermission>[] = [];
-      req.body.forEach((memberPermission: MemberPermission) => {
-        if (this.formAccess(au, memberPermission.contentId)) {
+      for (const memberPermission of req.body) {
+        if (await this.formAccess(au, memberPermission.contentId)) {
           memberPermission.churchId = au.churchId;
           promises.push(this.repos.memberPermission.save(memberPermission));
         }
-      });
+      }
       const result = await Promise.all(promises);
       return this.repos.memberPermission.convertAllToModel(au.churchId, result);
     });
   }
 
+  // authz-exempt: gated by this.formAccess(au, formId) — only form admins/editors may delete a form's member permissions; delete scoped to au.churchId
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId.toString();
-      if (!this.formAccess(au, formId)) return this.json({}, 401);
+      if (!(await this.formAccess(au, formId))) return this.json({}, 401);
       else {
         await this.repos.memberPermission.delete(au.churchId, id);
         return this.json({});
@@ -67,11 +69,12 @@ export class MemberPermissionController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: gated by this.formAccess(au, formId) — only form admins/editors may delete a member's form permissions; delete scoped to au.churchId
   @httpDelete("/member/:id")
   public async deleteByMemberId(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId.toString();
-      if (!formId || !this.formAccess(au, formId)) return this.json({}, 401);
+      if (!formId || !(await this.formAccess(au, formId))) return this.json({}, 401);
       else {
         await this.repos.memberPermission.deleteByMemberId(au.churchId, id, formId);
         return this.json({});

@@ -54,6 +54,7 @@ export class FormSubmissionController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: open form submission — public forms accept any submitter; restricted forms gated by this.formAccess(au, formId), churchId derived from the loaded form not the request
   @httpPost("/")
   public async save(req: express.Request<{}, {}, FormSubmission[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

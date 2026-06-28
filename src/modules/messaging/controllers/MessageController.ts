@@ -31,6 +31,11 @@ export class MessageController extends MessagingBaseController {
   public async send(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const promises: Promise<Message>[] = [];
+      for (const message of req.body) {
+        const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(message.churchId, message.conversationId));
+        if (!conv?.id || conv.allowAnonymousPosts !== true) return this.json({ error: "Anonymous posting not allowed" }, 401);
+        message.personId = null;
+      }
       req.body.forEach((message) => {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
@@ -89,8 +94,9 @@ export class MessageController extends MessagingBaseController {
   @httpPost("/setCallout")
   public async setCallout(req: express.Request<{}, {}, Message>, res: express.Response): Promise<Message> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const message = req.body;
-      if (!message.churchId && au?.churchId) message.churchId = au.churchId;
+      message.churchId = au.churchId;
 
       // Send real-time callout update
       await DeliveryHelper.sendConversationMessages({
@@ -117,7 +123,7 @@ export class MessageController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<Message>[] = [];
       req.body.forEach((message) => {
-        if (!message.churchId && au?.churchId) message.churchId = au.churchId;
+        message.churchId = au.churchId;
         if (!message.personId && au?.personId) message.personId = au.personId;
         if (!message.displayName && au?.firstName) message.displayName = au.firstName + " " + au.lastName;
         promises.push(

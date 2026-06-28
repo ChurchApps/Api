@@ -86,6 +86,7 @@ export class ContentSettingController extends ContentBaseController {
     });
   }
 
+  // authz-exempt: self-service — deleteForUser scopes to caller's own row via au.churchId + au.id
   @httpDelete("/my/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

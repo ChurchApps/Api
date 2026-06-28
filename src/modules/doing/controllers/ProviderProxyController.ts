@@ -106,6 +106,7 @@ export class ProviderProxyController extends DoingBaseController {
     return provider;
   }
 
+  // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/browse")
   public async browse(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -124,6 +125,7 @@ export class ProviderProxyController extends DoingBaseController {
     });
   }
 
+  // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getPresentations")
   public async getPresentations(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -142,6 +144,7 @@ export class ProviderProxyController extends DoingBaseController {
     });
   }
 
+  // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getPlaylist")
   public async getPlaylist(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -166,6 +169,7 @@ export class ProviderProxyController extends DoingBaseController {
     });
   }
 
+  // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getInstructions")
   public async getInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -188,6 +192,7 @@ export class ProviderProxyController extends DoingBaseController {
     });
   }
 
+  // authz-exempt: self-service — read-only provider proxy, auth scoped by au.churchId (connecting providers gated by plans.edit in ContentProviderAuthController)
   @httpPost("/getExpandedInstructions")
   public async getExpandedInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

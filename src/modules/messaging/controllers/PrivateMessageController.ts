@@ -13,6 +13,7 @@ export class PrivateMessageController extends MessagingBaseController {
       const promises: Promise<PrivateMessage>[] = [];
       req.body.forEach((conv) => {
         conv.churchId = au.churchId;
+        conv.fromPersonId = au.personId;
         const promise = this.repos.privateMessage.save(conv).then((c) => {
           // For direct private message API, use generic notification since we don't have message content
           // Private messages through conversations use the typed notification in checkShouldNotify
@@ -77,6 +78,7 @@ export class PrivateMessageController extends MessagingBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = (await this.repos.privateMessage.loadById(au.churchId, id)) as any;
+      if (result?.fromPersonId !== au.personId && result?.toPersonId !== au.personId) return this.json({}, 401);
       if (result.notifyPersonId === au.personId) {
         result.notifyPersonId = null;
         await this.repos.privateMessage.save(result);

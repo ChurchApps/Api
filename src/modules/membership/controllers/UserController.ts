@@ -198,6 +198,7 @@ export class UserController extends MembershipBaseController {
     }
   }
 
+  // authz-exempt: open to any authenticated user — onboarding helper; provisions an inert user (random temp password, email-verification required) and returns no credentials (password nulled)
   @httpPost("/loadOrCreate", ...loadOrCreateValidation)
   public async loadOrCreate(req: express.Request<{}, {}, LoadCreateUserRequest>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
@@ -456,7 +457,9 @@ export class UserController extends MembershipBaseController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      let user = await this.repos.user.load(req.body.userId || au.id);
+      const workingUserId = req.body.userId || au.id;
+      if (workingUserId !== au.id && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      let user = await this.repos.user.load(workingUserId);
       if (user !== null) {
         user.firstName = req.body.firstName;
         user.lastName = req.body.lastName;
@@ -471,6 +474,7 @@ export class UserController extends MembershipBaseController {
   public async updateEmail(req: express.Request<{}, {}, { email: string; userId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const workingUserId = req.body.userId || au.id;
+      if (workingUserId !== au.id && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -495,12 +499,14 @@ export class UserController extends MembershipBaseController {
 
   @httpPost("/updateOptedOut")
   public async updateOptedOut(req: express.Request<{}, {}, { personId: string; optedOut: boolean }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
-      await this.repos.person.updateOptedOut(req.body.personId, req.body.optedOut);
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+      await this.repos.person.updateOptedOut(au.churchId, req.body.personId, req.body.optedOut);
       return this.json({}, 200);
     });
   }
 
+  // authz-exempt: self-service — only ever loads/updates au.id (the JWT caller's own user); no request-supplied target id
   @httpPost("/updatePassword", body("newPassword").isLength({ min: 6 }).withMessage("must be at least 6 chars long"))
   public async updatePassword(req: express.Request<{}, {}, { newPassword: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -557,6 +563,7 @@ export class UserController extends MembershipBaseController {
   @httpPost("/sendInviteEmail")
   public async sendInviteEmail(req: express.Request<{}, {}, { email: string; personName: string; contextName: string; churchName: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const { email, personName, contextName, churchName } = req.body;
       if (!email || !contextName) return res.status(400).json({ errors: ["email and contextName are required"] });
 
@@ -580,6 +587,7 @@ export class UserController extends MembershipBaseController {
     });
   }
 
+  // authz-exempt: self-service — deletes only au.id (caller's own user, userChurch, roleMembers); no request-supplied target id
   @httpDelete("/")
   public async Delete(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

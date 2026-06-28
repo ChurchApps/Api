@@ -2,6 +2,7 @@ import { controller, httpPost, requestParam, httpDelete, httpGet } from "inversi
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { DeviceContent } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 @controller("/messaging/devicecontents")
 export class DeviceContentController extends MessagingBaseController {
@@ -16,6 +17,7 @@ export class DeviceContentController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, DeviceContent[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<DeviceContent>[] = [];
       req.body.forEach((deviceContent) => {
         deviceContent.churchId = au.churchId;
@@ -29,6 +31,7 @@ export class DeviceContentController extends MessagingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.deviceContent.delete(au.churchId, id);
       return this.json({});
     });

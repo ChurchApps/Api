@@ -6,6 +6,7 @@ import { EmailTemplate, DeliveryLog } from "../models/index.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
 import { EmailHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 interface GroupMemberEmailDetail {
   personId: string;
@@ -64,6 +65,7 @@ export class EmailTemplateController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, EmailTemplate[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const saved = await Promise.all(
         req.body.map(async (template) => {
           template.churchId = au.churchId;
@@ -78,6 +80,7 @@ export class EmailTemplateController extends MessagingBaseController {
   @httpPost("/send")
   public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const { subject, htmlContent, groupId, personIds } = req.body;
       if (!subject || !htmlContent) return this.json({ error: "subject and htmlContent are required" }, 400);
       if (!groupId && (!personIds || personIds.length === 0)) return this.json({ error: "groupId or personIds is required" }, 400);
@@ -155,6 +158,7 @@ export class EmailTemplateController extends MessagingBaseController {
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.emailTemplate.delete(au.churchId, id);
       return this.json({});
     });

@@ -5,9 +5,10 @@ import { PollyHelper } from "../helpers/PollyHelper.js";
 
 @controller("/content/support")
 export class SupportController extends ContentBaseController {
+  // authz-exempt: open to any authenticated user — SSML→MP3 via Polly, no church data touched
   @httpPost("/createAudio")
   public async post(req: express.Request<{}, {}, { ssml: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async () => {
       // const ssmlTest = "<speak>This is a test of the SSML to MP3 conversion.</speak>";
       const ssml = req.body.ssml;
       const data = await PollyHelper.SsmlToMp3(ssml);

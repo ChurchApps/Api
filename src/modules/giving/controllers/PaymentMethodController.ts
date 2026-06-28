@@ -9,102 +9,6 @@ import { GatewayPaymentMethod } from "../models/index.js";
 @controller("/giving/paymentmethods")
 export class PaymentMethodController extends GivingBaseController {
 
-  @httpGet("/test/personid/:id")
-  public async testGetPersonPaymentMethods(@requestParam("id") id: string, _req: express.Request<{}, {}, null>, _res: express.Response): Promise<any> {
-    // Test endpoint without auth for debugging - initialize repos manually
-    const { RepoManager } = await import("../../../shared/infrastructure/RepoManager.js");
-    this.repos = await RepoManager.getRepos("giving");
-
-    const churchId = "AOjIt0W-SeY"; // hardcoded for testing
-
-    const gateway = await GatewayService.getGatewayForChurch(churchId, {}, this.repos.gateway).catch(() => null);
-
-    if (!gateway) {
-      console.log("No gateway found for church");
-      return [];
-    }
-
-    // Check if provider supports vault/stored payment methods
-    const capabilities = GatewayService.getProviderCapabilities(gateway);
-    if (!capabilities?.supportsVault) {
-      console.log("Provider doesn't support vault");
-      return []; // Return empty array for providers without vault support
-    }
-
-    let customer = await this.repos.customer.loadByPersonAndProvider(churchId, id, gateway.provider);
-    if (!customer) {
-      customer = await this.repos.customer.loadByPersonId(churchId, id);
-    }
-
-
-    if (!customer) return [];
-    const rawPaymentMethods = await GatewayService.getCustomerPaymentMethods(gateway, customer);
-
-
-    // Normalize payment methods to consistent format
-    const normalizedMethods: any[] = [];
-
-    console.log("Gateway provider:", gateway.provider, "->", gateway.provider?.toLowerCase());
-
-    if (gateway.provider?.toLowerCase() === "stripe" && Array.isArray(rawPaymentMethods)) {
-      console.log("Processing Stripe payment methods");
-      for (const customerData of rawPaymentMethods) {
-        console.log("Processing customerData, has cards.data:", !!customerData.cards?.data);
-        // Handle Stripe payment methods (cards)
-        if (customerData.cards?.data) {
-          for (const pm of customerData.cards.data) {
-            // Stripe PaymentMethod object structure
-            normalizedMethods.push({
-              id: pm.id,
-              type: "card",
-              provider: "stripe",
-              name: pm.card?.brand || "Card",
-              last4: pm.card?.last4,
-              customerId: pm.customer || customerData.customer?.id,
-              status: "active"
-            });
-          }
-        }
-
-        // Handle Stripe bank accounts (PaymentMethod API - us_bank_account)
-        if (customerData.banks?.data) {
-          for (const bank of customerData.banks.data) {
-            // Stripe PaymentMethod (us_bank_account) object structure
-            normalizedMethods.push({
-              id: bank.id,
-              type: "bank",
-              provider: "stripe",
-              name: bank.us_bank_account?.bank_name || "Bank Account",
-              last4: bank.us_bank_account?.last4,
-              customerId: bank.customer || customerData.customer?.id,
-              status: "active"
-            });
-          }
-        }
-
-        // Handle legacy Stripe bank accounts (Sources API - deprecated)
-        if (customerData.legacyBanks?.data) {
-          for (const bank of customerData.legacyBanks.data) {
-            // Legacy Stripe Source (bank_account) object structure
-            normalizedMethods.push({
-              id: bank.id,
-              type: "bank",
-              provider: "stripe",
-              name: "Bank Account",
-              last4: bank.last4,
-              customerId: bank.customer || customerData.customer?.id,
-              status: bank.status || "new",
-              isLegacy: true  // Flag to identify legacy sources
-            });
-          }
-        }
-      }
-    }
-
-    console.log("Normalized methods:", normalizedMethods);
-    return normalizedMethods;
-  }
-
   @httpGet("/personid/:id")
   public async getPersonPaymentMethods(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -224,8 +128,10 @@ export class PaymentMethodController extends GivingBaseController {
   @httpPost("/addcard")
   public async addCard(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      // authz-exempt: gated to au.personId or donations.edit below; cId prefers au.churchId, body churchId only a fallback
       const { id, personId, customerId, email, name, churchId, provider } = req.body;
       const cId = au?.churchId || churchId;
+      if (!au.checkAccess(Permissions.donations.edit) && personId !== au.personId) return this.json({}, 401);
       // Default to Stripe for card operations, but allow frontend to specify provider
       const gateway = await GatewayService.getGatewayForChurch(cId, { provider: provider || "stripe" }, this.repos.gateway).catch(() => null);
 
@@ -424,6 +330,7 @@ export class PaymentMethodController extends GivingBaseController {
   @httpPost("/ach-setup-intent")
   public async createACHSetupIntent(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      // authz-exempt: gated to au.personId or donations.edit below; cId prefers au.churchId, body churchId only a fallback
       const { personId, customerId, email, name, churchId } = req.body;
       const cId = au?.churchId || churchId;
       // ACH SetupIntent is Stripe-only
@@ -490,6 +397,7 @@ export class PaymentMethodController extends GivingBaseController {
   @httpPost("/ach-setup-intent-anon")
   public async createACHSetupIntentAnon(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: public guest-donation flow; churchId required to resolve the public widget gateway
       const { email, name, churchId, gatewayId } = req.body;
 
       if (!churchId) {

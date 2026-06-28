@@ -34,7 +34,9 @@ export class ReportController extends ReportingBaseController {
   @httpGet("/:keyName")
   public async get(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
+      if (!/^[A-Za-z0-9_-]+$/.test(keyName)) return this.json({}, 400);
       const reportPath = path.join(process.cwd(), "reports", `${keyName}.json`);
+      if (!path.resolve(reportPath).startsWith(path.resolve(process.cwd(), "reports") + path.sep)) return this.json({}, 400);
 
       if (!fs.existsSync(reportPath)) {
         return this.json({ error: "Report not found" }, 404);
@@ -49,7 +51,9 @@ export class ReportController extends ReportingBaseController {
   @httpGet("/:keyName/run")
   public async run(@requestParam("keyName") keyName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!/^[A-Za-z0-9_-]+$/.test(keyName)) return this.json({}, 400);
       const reportPath = path.join(process.cwd(), "reports", `${keyName}.json`);
+      if (!path.resolve(reportPath).startsWith(path.resolve(process.cwd(), "reports") + path.sep)) return this.json({}, 400);
 
       if (!fs.existsSync(reportPath)) {
         return this.json({ error: "Report not found" }, 404);

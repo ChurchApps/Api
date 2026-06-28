@@ -79,6 +79,7 @@ export class ArrangementController extends ContentBaseController {
   @httpPost("/freeShow/missing")
   public async getMissingFreeShowArrangements(req: express.Request<{}, {}, { freeShowIds: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const { freeShowIds } = req.body;
       if (!freeShowIds || !Array.isArray(freeShowIds)) {
         return this.json({ error: "Invalid request body. Expected array of freeShowIds" }, 400);

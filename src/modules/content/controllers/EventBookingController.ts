@@ -63,11 +63,13 @@ export class EventBookingController extends ContentBaseController {
     });
   }
 
+  // authz-exempt: gated by resolveBooking(...) → canResolve(au)/approval-group membership
   @httpPost("/:id/approve")
   public async approve(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.resolveBooking(req, res, id, "approved");
   }
 
+  // authz-exempt: gated by resolveBooking(...) → canResolve(au)/approval-group membership
   @httpPost("/:id/reject")
   public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.resolveBooking(req, res, id, "rejected");

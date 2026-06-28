@@ -2,6 +2,7 @@ import { controller, httpGet, httpPost, requestParam } from "inversify-express-u
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { SongDetail } from "../models/index.js";
+import { Permissions } from "../helpers/index.js";
 import { PraiseChartsHelper } from "../helpers/PraiseChartsHelper.js";
 import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper.js";
 
@@ -23,7 +24,8 @@ export class SongDetailsController extends ContentBaseController {
 
   @httpPost("/create")
   public async post(req: express.Request<{}, {}, SongDetail>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const sd = req.body;
       if (!sd.praiseChartsId) return null;
       const existing = await this.repos.songDetail.loadByPraiseChartsId(sd.praiseChartsId);
@@ -45,7 +47,8 @@ export class SongDetailsController extends ContentBaseController {
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, SongDetail[]>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<SongDetail>[] = [];
       req.body.forEach((sd) => {
         promises.push(this.repos.songDetail.save(sd));

@@ -126,6 +126,7 @@ export class RegistrationController extends ContentBaseController {
   @httpGet("/event/:eventId/count")
   public async getCountForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: public count for the public event's church
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "churchId required" }, 400);
       const count = await this.repos.registration.countActiveForEvent(churchId, eventId);
@@ -136,6 +137,7 @@ export class RegistrationController extends ContentBaseController {
   @httpGet("/person/:personId")
   public async getForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (au.personId !== personId && !au.checkAccess(Permissions.registrations.view)) return this.json({}, 401);
       const registrations = await this.repos.registration.loadForPerson(au.churchId, personId);
       // Load event details for each registration
       for (const reg of registrations) {
@@ -163,6 +165,7 @@ export class RegistrationController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
+      if (registration.personId !== au.personId && !au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       if (registration.status === "cancelled") return this.json({ error: "Already cancelled" }, 400);
 
       registration.status = "cancelled";

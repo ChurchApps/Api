@@ -6,9 +6,10 @@ import { Environment } from "../helpers/index.js";
 
 @controller("/content/stock")
 export class StockController extends ContentBaseController {
+  // authz-exempt: open to any authenticated user — Pexels stock-photo search, no church data touched
   @httpPost("/search")
   public async getUploadUrl(req: express.Request<{}, {}, { term: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async () => {
       const key = Environment.pexelsKey;
       const client = Pexels.createClient(key);
       const response: Pexels.PhotosWithTotalResults = (await client.photos.search({

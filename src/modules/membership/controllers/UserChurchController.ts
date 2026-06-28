@@ -8,8 +8,10 @@ import { Permissions } from "../helpers/index.js";
 export class UserChurchController extends MembershipBaseController {
   @httpPatch("/:userId")
   public async update(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
-      const { churchId, appName } = req.body;
+    return this.actionWrapper(req, res, async (au) => {
+      if (userId !== au.id && !au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+      const { appName } = req.body;
+      const churchId = au.churchId;
       await this.repos.accessLog.create({ appName: appName || "", churchId, userId });
       const existing = await this.repos.userChurch.loadByUserId(userId, churchId);
       if (!existing) {
@@ -32,7 +34,7 @@ export class UserChurchController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, UserChurch, { userId: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const userId = req.query.userId || au.id;
+      const userId = (req.query.userId && au.checkAccess(Permissions.people.edit)) ? req.query.userId : au.id;
       const record = await this.repos.userChurch.loadByUserId(userId, au.churchId);
       let result: any = {};
       if (record) {
@@ -81,13 +83,14 @@ export class UserChurchController extends MembershipBaseController {
   @httpDelete("/record/:userId/:churchId/:personId")
   public async deleteRecord(
     @requestParam("userId") userId: string,
-    @requestParam("churchId") churchId: string,
+    @requestParam("churchId") _churchId: string,
     @requestParam("personId") personId: string,
       req: express.Request,
       res: express.Response
   ): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
-      await this.repos.userChurch.deleteRecord(userId, churchId, personId);
+    return this.actionWrapper(req, res, async (au) => {
+      if (userId !== au.id && !au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
+      await this.repos.userChurch.deleteRecord(userId, au.churchId, personId);
       return this.json({});
     });
   }

@@ -1,37 +1,11 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
-import path from "path";
-import { fileURLToPath } from "url";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Donation } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
-import { EmailHelper } from "@churchapps/apihelper";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 @controller("/giving/donations")
 export class DonationController extends GivingBaseController {
-  @httpGet("/testEmail")
-  public async testEmail(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
-      let error = "";
-      try {
-        await EmailHelper.sendEmail({
-          from: "support@churchapps.org",
-          to: "jeremy@livecs.org",
-          subject: "Test Email",
-          body: "Test Email"
-        });
-      } catch (e) {
-        error = (e as any).toString();
-      }
-      const filePath = path.join(__dirname, "../../src/tools/templates/test.html");
-      const result = { dir: __dirname, filePath, error };
-      return result;
-    });
-  }
-
   @httpGet("/kpis")
   public async getKpis(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

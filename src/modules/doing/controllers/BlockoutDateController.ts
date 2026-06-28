@@ -2,6 +2,7 @@ import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { BlockoutDate } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/blockoutDates")
 export class BlockoutDateController extends DoingBaseController {
@@ -39,12 +40,14 @@ export class BlockoutDateController extends DoingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, BlockoutDate[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const canEditOthers = au.checkAccess(Permissions.plans.edit);
       const promises: Promise<BlockoutDate>[] = [];
-      req.body.forEach((blockoutDate) => {
+      for (const blockoutDate of req.body) {
         blockoutDate.churchId = au.churchId;
         if (!blockoutDate.personId) blockoutDate.personId = au.personId;
+        if (blockoutDate.personId !== au.personId && !canEditOthers) return this.json({}, 401);
         promises.push(this.repos.blockoutDate.save(blockoutDate));
-      });
+      }
       const result = await Promise.all(promises);
       return result;
     });
@@ -53,6 +56,9 @@ export class BlockoutDateController extends DoingBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const blockoutDate = (await this.repos.blockoutDate.load(au.churchId, id)) as BlockoutDate;
+      if (!blockoutDate) return {};
+      if (blockoutDate.personId !== au.personId && !au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       await this.repos.blockoutDate.delete(au.churchId, id);
       return {};
     });
