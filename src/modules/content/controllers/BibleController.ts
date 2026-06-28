@@ -2,6 +2,7 @@ import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { BibleSourceFactory } from "../helpers/BibleSourceFactory.js";
+import { Permissions } from "../helpers/index.js";
 import { BibleTranslation, BibleVerseText } from "../models/index.js";
 
 @controller("/content/bibles")
@@ -38,7 +39,8 @@ export class BibleController extends ContentBaseController {
 
   @httpGet("/updateCopyrights")
   public async updateCopyrights(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const translations = await this.repos.bibleTranslation.loadNeedingCopyrights();
       for (const translation of translations) {
         const copyright = await BibleSourceFactory.getCopyright(translation.source || "api.bible", translation.sourceKey);
@@ -152,7 +154,8 @@ export class BibleController extends ContentBaseController {
 
   @httpGet("/updateTranslations/:source")
   public async updateTranslationsFromSource(@requestParam("source") source: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const dbResult = await this.repos.bibleTranslation.loadAll();
       const apiResult = await BibleSourceFactory.getTranslations(source);
       const toSave: BibleTranslation[] = [];
@@ -174,7 +177,8 @@ export class BibleController extends ContentBaseController {
 
   @httpGet("/updateTranslations")
   public async updateTranslations(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const dbResult = await this.repos.bibleTranslation.loadAll();
       const apiResult = await BibleSourceFactory.getAllTranslations();
       const toSave: BibleTranslation[] = [];

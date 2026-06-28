@@ -50,8 +50,10 @@ export class PersonController extends MembershipBaseController {
       // authz-exempt: anon contact endpoint; churchId is the public target church
       const churchId = req.body.churchId;
       const personId = req.body.personId;
-      const subject = req.body.subject;
-      const body = req.body.body;
+      // Escape attacker-supplied subject/body before they're injected raw into the HTML email template (anon endpoint).
+      // The body is allowed to keep simple <br> line breaks (the legit contact-group-leader form sends those); everything else is neutralized.
+      const subject = this.escapeHtml(req.body.subject);
+      const body = this.escapeHtml(req.body.body).replace(/&lt;br\s*\/?&gt;/gi, "<br />");
       const appName = req.body.appName;
 
       const person: Person = await this.repos.person.load(churchId, personId);
@@ -60,6 +62,11 @@ export class PersonController extends MembershipBaseController {
       await EmailHelper.sendTemplatedEmail(Environment.supportEmail, person.email, appName, null, subject, body);
       return { success: true };
     });
+  }
+
+  private escapeHtml(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   @httpGet("/timeline")

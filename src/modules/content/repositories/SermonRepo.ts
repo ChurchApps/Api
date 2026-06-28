@@ -69,11 +69,12 @@ export class SermonRepo {
     return getDb().selectFrom("sermons").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
   }
 
-  public async loadTimeline(sermonIds: string[]) {
+  public async loadTimeline(churchId: string, sermonIds: string[]) {
     if (!sermonIds || sermonIds.length === 0) return [];
     const result = await sql`select 'sermon' as postType, id as postId, title, description, thumbnail
       from sermons
-      where id in (${sql.join(sermonIds.map(id => sql`${id}`), sql`,`)})`.execute(getDb());
+      where churchId = ${churchId}
+      and id in (${sql.join(sermonIds.map(id => sql`${id}`), sql`,`)})`.execute(getDb());
     return result.rows;
   }
 

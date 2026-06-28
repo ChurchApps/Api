@@ -37,6 +37,10 @@ export class FileController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(req.body[0].contentId) === -1) {
         return this.json({}, 401);
       } else {
+        const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, req.body[0].fileType, req.body[0].contentId);
+        if (totalBytes?.size > 100000000) return this.json({}, 401);
+        const decoded = req.body[0].fileContents ? Buffer.byteLength(req.body[0].fileContents.split(",").pop() || "", "base64") : 0;
+        if (decoded > 26214400) return this.json({ error: "File too large" }, 400);
         const promises: Promise<File>[] = [];
         req.body.forEach((file) => {
           file.churchId = au.churchId;

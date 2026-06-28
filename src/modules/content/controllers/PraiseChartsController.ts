@@ -87,7 +87,7 @@ export class PraiseChartsController extends ContentBaseController {
 
       let fileName = "praisecharts.pdf";
       if (req.query.file_name) {
-        fileName = req.query.file_name.toString();
+        fileName = path.basename(req.query.file_name.toString()).replace(/\.\.+/g, ".");
       }
       let mimeType = "application/pdf";
       const fileType = fileName.split(".")[1].toLowerCase();
