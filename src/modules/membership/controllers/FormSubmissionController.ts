@@ -72,7 +72,7 @@ export class FormSubmissionController extends MembershipBaseController {
           } else {
             if (!churchId) churchId = form.churchId;
             if (!churchId && au) churchId = au.churchId;
-            if (form.restricted && !this.formAccess(au, formId)) {
+            if (form.restricted && !(await this.formAccess(au, formId))) {
               results.push({ error: `You're not allowed to submit ${form.name}` });
             } else {
               formSubmission.churchId = churchId;
@@ -93,7 +93,11 @@ export class FormSubmissionController extends MembershipBaseController {
               // subscribes to this event (form.submission.created) on the internal bus.
               await WebhookDispatcher.emit(churchId, "form.submission.created", savedSubmissions);
 
-              await this.sendEmails(formSubmission, form, churchId);
+              try {
+                await this.sendEmails(formSubmission, form, churchId);
+              } catch (err) {
+                console.error("Form submission notifications failed (non-fatal):", err);
+              }
             }
           }
         }

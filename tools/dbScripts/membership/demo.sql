@@ -599,6 +599,26 @@ INSERT INTO questions (id, churchId, formId, parentId, title, description, field
 ('QST00000012', 'CHU00000001', 'FRM00000003', NULL, 'Any additional comments?', NULL, 'Text Area', 'Share your thoughts...', 3, NULL, b'0', b'0');
 
 -- ========================================
+-- Standalone public forms (contentType='form')
+-- Exercises the anonymous flow: GET /forms/standalone + GET /questions/unrestricted + POST /formsubmissions.
+-- FRM00000004 is public (restricted=0); FRM00000005 is members-only (restricted=1).
+-- ========================================
+INSERT INTO forms (id, churchId, name, contentType, createdTime, modifiedTime, restricted, archived, removed, thankYouMessage) VALUES
+('FRM00000004', 'CHU00000001', 'VBS Registration (Public)', 'form', '2025-07-01 10:00:00', '2025-07-01 10:00:00', b'0', b'0', b'0', 'Your child is registered for Vacation Bible School! See you there.'),
+('FRM00000005', 'CHU00000001', 'Members Only Survey', 'form', '2025-07-01 10:00:00', '2025-07-01 10:00:00', b'1', b'0', b'0', 'Thank you for your feedback!');
+
+INSERT INTO questions (id, churchId, formId, parentId, title, description, fieldType, placeholder, sort, choices, removed, required) VALUES
+('QST00000013', 'CHU00000001', 'FRM00000004', NULL, 'Child Full Name', NULL, 'Textbox', 'Enter child name', 1, NULL, b'0', b'1'),
+('QST00000014', 'CHU00000001', 'FRM00000004', NULL, 'Emergency Contact Phone', NULL, 'Textbox', 'Enter phone', 2, NULL, b'0', b'1'),
+('QST00000015', 'CHU00000001', 'FRM00000005', NULL, 'Feedback', NULL, 'Text Area', NULL, 1, NULL, b'0', b'0');
+
+-- A leader subscribed to email/push notifications for FRM00000004 submissions.
+-- This makes an anonymous submit fire the notification path (emails + the
+-- /notifications/ping push) — the path that regressed and 401'd the submit.
+INSERT INTO memberPermissions (id, churchId, memberId, contentType, contentId, action, emailNotification) VALUES
+('MPR00000001', 'CHU00000001', 'PER00000001', 'form', 'FRM00000004', 'admin', b'1');
+
+-- ========================================
 -- Form Submissions
 -- ========================================
 INSERT INTO formSubmissions (id, churchId, formId, contentType, contentId, submissionDate, submittedBy) VALUES
