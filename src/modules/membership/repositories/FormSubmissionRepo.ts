@@ -62,6 +62,7 @@ export class FormSubmissionRepo {
     return getDb().selectFrom("formSubmissions").selectAll()
       .where("churchId", "=", churchId)
       .where("formId", "=", formId)
+      .orderBy("submissionDate", "desc")
       .execute();
   }
 
