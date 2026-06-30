@@ -40,6 +40,7 @@ export class EmailTemplateController extends MessagingBaseController {
   @httpGet("/preview/:groupId")
   public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!await this.canAccessCrossApi(au, Permissions.groupMembers.edit)) return this.json({}, 401);
       const members = await this.getGroupMemberEmailDetails(groupId, au.jwt);
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
       const noEmail = members.filter(m => !m.email || m.email.trim() === "");
@@ -80,7 +81,7 @@ export class EmailTemplateController extends MessagingBaseController {
   @httpPost("/send")
   public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
+      if (!await this.canAccessCrossApi(au, Permissions.groupMembers.edit)) return this.json({}, 401);
       const { subject, htmlContent, groupId, personIds } = req.body;
       if (!subject || !htmlContent) return this.json({ error: "subject and htmlContent are required" }, 400);
       if (!groupId && (!personIds || personIds.length === 0)) return this.json({ error: "groupId or personIds is required" }, 400);

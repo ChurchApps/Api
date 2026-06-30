@@ -27,7 +27,7 @@ export class NotificationController extends MessagingBaseController {
   @httpGet("/groupPreview/:groupId")
   public async previewGroupPush(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canSendGroupPush(au))) return this.json({ error: "Unauthorized" }, 401);
+      if (!(await this.canAccessCrossApi(au, Permissions.groupMembers.edit))) return this.json({ error: "Unauthorized" }, 401);
 
       const preview = await this.getGroupPushPreview(au.churchId, groupId, au.personId);
       const { eligiblePersonIds: _eligiblePersonIds, ...result } = preview;
@@ -117,7 +117,7 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/group/send")
   public async sendGroupPush(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canSendGroupPush(au))) return this.json({ error: "Unauthorized" }, 401);
+      if (!(await this.canAccessCrossApi(au, Permissions.groupMembers.edit))) return this.json({ error: "Unauthorized" }, 401);
 
       const groupId = (req.body?.groupId || "").trim();
       const title = (req.body?.title || "").trim();
@@ -198,20 +198,6 @@ export class NotificationController extends MessagingBaseController {
         personId: m.personId,
         displayName: m.person?.name?.display || m.displayName || ""
       }));
-  }
-
-  private async canSendGroupPush(au: any): Promise<boolean> {
-    if (au.checkAccess(Permissions.groupMembers.edit)) return true;
-    if (!au.id || !au.churchId) return false;
-
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const userChurch = await membershipRepos.rolePermission.loadUserPermissionInChurch(au.id, au.churchId);
-    const membershipApi = userChurch?.apis?.find((api: any) => api.keyName === "MembershipApi");
-
-    return !!membershipApi?.permissions?.some((permission: any) => {
-      if (permission.contentType === "Domain" && permission.action === "Admin") return true;
-      return permission.contentType === Permissions.groupMembers.edit.contentType && permission.action === Permissions.groupMembers.edit.action;
-    });
   }
 
   private prefAllowsPush(pref: NotificationPreference | undefined): boolean {
