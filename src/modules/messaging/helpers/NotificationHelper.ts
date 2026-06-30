@@ -1,9 +1,11 @@
 import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
-import { Conversation, DeliveryLog, Device, Message, PrivateMessage, Notification, NotificationPreference } from "../models/index.js";
+import { Conversation, DeliveryLog, Device, Message, PrivateMessage, Notification, NotificationPreference, NotificationPreferenceOverride } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { DeliveryHelper } from "./DeliveryHelper.js";
 import { ExpoPushHelper } from "./ExpoPushHelper.js";
 import { WebPushHelper } from "./WebPushHelper.js";
+import { NotificationCategoryHelper } from "./NotificationCategoryHelper.js";
+import { PreferenceGateHelper } from "./PreferenceGateHelper.js";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
@@ -21,6 +23,7 @@ export interface CreateNotificationOptions {
   deliveryStartLevel?: number;
   deliveryTitle?: string;
   navData?: Record<string, unknown>;
+  category?: string; // preference opt-out axis (architecture §2.6); derived if omitted
 }
 
 export class NotificationHelper {
@@ -148,9 +151,11 @@ export class NotificationHelper {
     contentType: string,
     contentId: string,
     navData?: Record<string, unknown>,
+    category?: string,
     debugTrace?: NotificationDebugTrace
   ): Promise<string> => {
     this.ensureInitialized();
+    const effectiveCategory = category ?? NotificationCategoryHelper.categoryFor(contentType, navData?.innerType as string | undefined);
     // const isPrivateMessage = contentType === "privateMessage";
     // const senderPersonId = isPrivateMessage ? String(navData?.personId || "") : "";
     // const conversationId = isPrivateMessage ? String(navData?.conversationId || "") : "";
@@ -212,14 +217,20 @@ export class NotificationHelper {
     if (!pref) {
       pref = await this.createNotificationPref(churchId, personId);
     }
+    const overrides: NotificationPreferenceOverride[] = (await NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId)) as any[] || [];
     this.addDebugStep(debugTrace, "delivery-load-prefs", "ok", {
       allowPush: pref.allowPush,
-      emailFrequency: pref.emailFrequency
+      emailFrequency: pref.emailFrequency,
+      category: effectiveCategory
     });
 
-    // Level 1: Try Push
+    // Level 1: Try Push (gated by the preference precedence rules)
     if (startLevel <= 1) {
-      if (pref.allowPush) {
+      const pushGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "push", { pref, overrides });
+      if (!pushGate.allow) {
+        this.addDebugStep(debugTrace, "delivery-push-gated", "warn", { reason: pushGate.reason, decision: pushGate.decision });
+      }
+      if (pushGate.allow) {
         const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
         const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
         const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
@@ -375,20 +386,15 @@ export class NotificationHelper {
       return "socket";
     }
 
-    // Level 2: Email
-    if (pref.emailFrequency === "never") {
-      this.addDebugStep(debugTrace, "delivery-return-complete", "warn", { reason: "email frequency set to never" });
+    // Level 2: Email (gated). Covers emailFrequency="never" (channel_off) and
+    // per-category email opt-out; otherwise it's queued for the digest path.
+    const emailGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "email", { pref, overrides });
+    if (!emailGate.allow) {
+      this.addDebugStep(debugTrace, "delivery-return-complete", "warn", { reason: emailGate.reason || "email suppressed" });
       return "complete"; // End of line, no email wanted
-    } else if (pref.emailFrequency === "individual") {
-      // Send email immediately - the sendEmailNotifications will handle this
-      // For now, mark as "email" to indicate it's ready for immediate send
-      this.addDebugStep(debugTrace, "delivery-return-email", "ok", { emailFrequency: pref.emailFrequency });
-      return "email";
-    } else {
-      // daily - wait for midnight timer
-      this.addDebugStep(debugTrace, "delivery-return-email", "ok", { emailFrequency: pref.emailFrequency });
-      return "email";
     }
+    this.addDebugStep(debugTrace, "delivery-return-email", "ok", { emailFrequency: pref.emailFrequency });
+    return "email";
   };
 
   static escalateDelivery = async () => {
@@ -577,6 +583,7 @@ export class NotificationHelper {
           "privateMessage",
           pm.id || conversation.id,
           { personId: senderPersonId, conversationId: conversation.id },
+          undefined, // category derived from contentType ("privateMessage" -> direct_messages)
           debugTrace
         );
 
@@ -635,6 +642,7 @@ export class NotificationHelper {
 
   static createNotifications = async (peopleIds: string[], churchId: string, contentType: string, contentId: string, message: string, link?: string, triggeredByPersonId?: string, options?: CreateNotificationOptions) => {
     this.ensureInitialized();
+    const category = options?.category ?? NotificationCategoryHelper.categoryFor(contentType);
     const notifications: Notification[] = [];
     peopleIds.forEach((personId: string) => {
       const notification: Notification = {
@@ -646,7 +654,8 @@ export class NotificationHelper {
         isNew: true,
         message,
         link,
-        triggeredByPersonId
+        triggeredByPersonId,
+        category
       };
       notifications.push(notification);
     });
@@ -695,7 +704,8 @@ export class NotificationHelper {
             n.message,
             "notification",
             notification.id,
-            { innerType: n.contentType, innerId: n.contentId, ...(n.link ? { link: n.link } : {}), ...(options?.navData || {}) }
+            { innerType: n.contentType, innerId: n.contentId, ...(n.link ? { link: n.link } : {}), ...(options?.navData || {}) },
+            n.category
           );
 
           // Save the delivery method
@@ -709,6 +719,14 @@ export class NotificationHelper {
       const result = await Promise.all(promises);
       return result;
     } else return [];
+  };
+
+  // Legacy push paths historically fired without checking preferences (architecture §4.5).
+  // Route them through the gate so opt-outs / master mute / quiet hours are honored.
+  private static pushAllowed = async (churchId: string, personId: string, category: string): Promise<boolean> => {
+    const pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
+    const overrides = (await NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId)) as any[] || [];
+    return PreferenceGateHelper.evaluate(churchId, personId, category, "push", { pref, overrides }).allow;
   };
 
   static notifyUser = async (churchId: string, personId: string, title: string = "New Notification") => {
@@ -732,7 +750,8 @@ export class NotificationHelper {
     // Handle push notifications
     const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
-    if (devices.length > 0) {
+    const allowPush = await this.pushAllowed(churchId, personId, NotificationCategoryHelper.categoryFor("notification"));
+    if (devices.length > 0 && allowPush) {
       try {
         const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
         const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
@@ -795,7 +814,8 @@ export class NotificationHelper {
     // Handle push notifications
     const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
-    if (devices.length > 0) {
+    const allowPush = await this.pushAllowed(churchId, personId, "direct_messages");
+    if (devices.length > 0 && allowPush) {
       const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
       const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
       const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
@@ -868,7 +888,8 @@ export class NotificationHelper {
     // Handle push notifications
     const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
-    if (devices.length > 0) {
+    const allowPush = await this.pushAllowed(churchId, personId, NotificationCategoryHelper.categoryFor("notification"));
+    if (devices.length > 0 && allowPush) {
       const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
       const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
       const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
@@ -1019,10 +1040,22 @@ export class NotificationHelper {
         console.log("[NotificationHelper.sendEmailNotifications] No trigger personIds found, skipping reply-to lookup");
       }
 
-      todoPrefs.forEach((pref) => {
-        const notifications: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
-        const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
+      for (const pref of todoPrefs) {
+        const allPersonNotifs: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
+        const allPersonPms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
+
+        // Re-check the preference gate per category for the email channel; items
+        // the member opted out of are marked complete (not emailed, not re-queued).
+        const overrides = (await NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(pref.churchId, pref.personId)) as any[] || [];
+        const emailOk = (category: string) => PreferenceGateHelper.evaluate(pref.churchId, pref.personId, category, "email", { pref, overrides }).allow;
+        const notifications = allPersonNotifs.filter((n) => emailOk(n.category || NotificationCategoryHelper.categoryFor(n.contentType)));
+        const pms = allPersonPms.filter(() => emailOk("direct_messages"));
+        const suppressedNotifs = allPersonNotifs.filter((n) => !notifications.includes(n));
+        const suppressedPms = allPersonPms.filter((pm) => !pms.includes(pm));
+        if (suppressedNotifs.length > 0 || suppressedPms.length > 0) {
+          promises.push(...this.markMethod(suppressedNotifs, suppressedPms, "complete"));
+        }
 
         // Get sender/trigger email for reply-to
         // Priority: PM sender > notification triggeredBy
@@ -1042,7 +1075,7 @@ export class NotificationHelper {
         } else {
           console.log("[NotificationHelper.sendEmailNotifications] Skipping person " + pref.personId + " - no email or no items");
         }
-      });
+      }
     }
     console.log("[NotificationHelper.sendEmailNotifications] Waiting for " + promises.length + " promises to complete...");
     await Promise.all(promises);

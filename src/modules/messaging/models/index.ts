@@ -6,6 +6,7 @@ export { FcmMessage } from "./FcmMessage.js";
 export { Message } from "./Message.js";
 export { Notification } from "./Notification.js";
 export { NotificationPreference } from "./NotificationPreference.js";
+export { NotificationPreferenceOverride } from "./NotificationPreferenceOverride.js";
 export { PrivateMessage } from "./PrivateMessage.js";
 export { BlockedIp } from "./BlockedIp.js";
 export { DeliveryLog } from "./DeliveryLog.js";

@@ -10,4 +10,5 @@ export class Notification {
   public link?: string;
   public deliveryMethod?: string;
   public triggeredByPersonId?: string;
+  public category?: string;
 }
