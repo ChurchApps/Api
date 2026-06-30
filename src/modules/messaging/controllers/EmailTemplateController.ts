@@ -1,12 +1,12 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
-import axios from "axios";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { EmailTemplate, DeliveryLog } from "../models/index.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
 import { EmailHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
 interface GroupMemberEmailDetail {
   personId: string;
@@ -41,7 +41,7 @@ export class EmailTemplateController extends MessagingBaseController {
   public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await this.canAccessCrossApi(au, Permissions.groupMembers.edit)) return this.json({}, 401);
-      const members = await this.getGroupMemberEmailDetails(groupId, au.jwt);
+      const members = await this.getGroupMemberEmailDetails(au.churchId, groupId);
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
       const noEmail = members.filter(m => !m.email || m.email.trim() === "");
       return {
@@ -89,17 +89,18 @@ export class EmailTemplateController extends MessagingBaseController {
       // Load church name for merge fields
       let churchName = "";
       try {
-        const churchResp = await axios.get(Environment.membershipApi + "/churches/" + au.churchId, { headers: { Authorization: "Bearer " + au.jwt } });
-        churchName = churchResp.data?.name || "";
+        const membershipRepos = await RepoManager.getRepos<any>("membership");
+        const churchRow = await membershipRepos.church.load(au.churchId, au.churchId);
+        churchName = churchRow?.name || "";
       } catch { /* church name is optional */ }
       const church = { name: churchName };
 
       // Load recipients
       let members: GroupMemberEmailDetail[];
       if (groupId) {
-        members = await this.getGroupMemberEmailDetails(groupId, au.jwt);
+        members = await this.getGroupMemberEmailDetails(au.churchId, groupId);
       } else {
-        members = await this.getPersonEmailDetails(personIds, au.jwt);
+        members = await this.getPersonEmailDetails(au.churchId, personIds);
       }
 
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
@@ -165,29 +166,30 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  private async getGroupMemberEmailDetails(groupId: string, jwt: string): Promise<GroupMemberEmailDetail[]> {
-    const url = Environment.membershipApi + "/groupmembers?groupId=" + groupId;
-    const resp = await axios.get(url, { headers: { Authorization: "Bearer " + jwt } });
-    const members: any[] = resp.data || [];
-    return members.map((m: any) => ({
-      personId: m.personId,
-      firstName: m.person?.name?.first || "",
-      lastName: m.person?.name?.last || "",
-      displayName: m.person?.name?.display || "",
-      email: m.person?.contactInfo?.email || ""
+  private async getGroupMemberEmailDetails(churchId: string, groupId: string): Promise<GroupMemberEmailDetail[]> {
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const members: any[] = await membershipRepos.groupMember.loadForGroup(churchId, groupId);
+    const personIds = members.map((m: any) => m.personId).filter(Boolean);
+    if (!personIds.length) return [];
+    const people: any[] = await membershipRepos.person.loadByIds(churchId, personIds);
+    return people.map((p: any) => ({
+      personId: p.id,
+      firstName: p.firstName || "",
+      lastName: p.lastName || "",
+      displayName: p.displayName || "",
+      email: p.email || ""
     }));
   }
 
-  private async getPersonEmailDetails(personIds: string[], jwt: string): Promise<GroupMemberEmailDetail[]> {
-    const url = Environment.membershipApi + "/people/ids?ids=" + personIds.join(",");
-    const resp = await axios.get(url, { headers: { Authorization: "Bearer " + jwt } });
-    const people: any[] = resp.data || [];
+  private async getPersonEmailDetails(churchId: string, personIds: string[]): Promise<GroupMemberEmailDetail[]> {
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const people: any[] = await membershipRepos.person.loadByIds(churchId, personIds);
     return people.map((p: any) => ({
       personId: p.id,
-      firstName: p.name?.first || "",
-      lastName: p.name?.last || "",
-      displayName: p.name?.display || "",
-      email: p.contactInfo?.email || ""
+      firstName: p.firstName || "",
+      lastName: p.lastName || "",
+      displayName: p.displayName || "",
+      email: p.email || ""
     }));
   }
 }
