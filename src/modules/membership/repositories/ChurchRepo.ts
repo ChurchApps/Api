@@ -25,7 +25,8 @@ export class ChurchRepo {
       country: church.country,
       archivedDate: church.archivedDate,
       latitude: church.latitude,
-      longitude: church.longitude
+      longitude: church.longitude,
+      timeZone: church.timeZone
     }).execute();
     return church;
   }
@@ -42,7 +43,8 @@ export class ChurchRepo {
       country: church.country,
       archivedDate: church.archivedDate,
       latitude: church.latitude,
-      longitude: church.longitude
+      longitude: church.longitude,
+      timeZone: church.timeZone
     }).where("id", "=", church.id).execute();
     return church;
   }
@@ -174,7 +176,8 @@ export class ChurchRepo {
       subDomain: row.subDomain,
       archivedDate: row.archivedDate,
       latitude: row.latitude,
-      longitude: row.longitude
+      longitude: row.longitude,
+      timeZone: row.timeZone
     };
   }
 

@@ -16,7 +16,13 @@ export class NotificationPreferenceRepo {
       churchId: model.churchId,
       personId: model.personId,
       allowPush: model.allowPush,
-      emailFrequency: model.emailFrequency
+      emailFrequency: model.emailFrequency,
+      masterMute: model.masterMute,
+      quietHoursStart: model.quietHoursStart,
+      quietHoursEnd: model.quietHoursEnd,
+      timeZone: model.timeZone,
+      allowSms: model.allowSms,
+      maxPushPerDay: model.maxPushPerDay
     }).execute();
     return model;
   }
@@ -25,7 +31,13 @@ export class NotificationPreferenceRepo {
     await getDb().updateTable("notificationPreferences").set({
       personId: model.personId,
       allowPush: model.allowPush,
-      emailFrequency: model.emailFrequency
+      emailFrequency: model.emailFrequency,
+      masterMute: model.masterMute,
+      quietHoursStart: model.quietHoursStart,
+      quietHoursEnd: model.quietHoursEnd,
+      timeZone: model.timeZone,
+      allowSms: model.allowSms,
+      maxPushPerDay: model.maxPushPerDay
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -65,7 +77,13 @@ export class NotificationPreferenceRepo {
       churchId: data.churchId,
       personId: data.personId,
       allowPush: data.allowPush,
-      emailFrequency: data.emailFrequency
+      emailFrequency: data.emailFrequency,
+      masterMute: data.masterMute,
+      quietHoursStart: data.quietHoursStart,
+      quietHoursEnd: data.quietHoursEnd,
+      timeZone: data.timeZone,
+      allowSms: data.allowSms,
+      maxPushPerDay: data.maxPushPerDay
     };
   }
 

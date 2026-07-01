@@ -1,15 +1,16 @@
 const loadUpcomingForReminders = jest.fn();
 const loadForReminder = jest.fn();
-const markReminderSent = jest.fn();
-jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ plan: { loadUpcomingForReminders, markReminderSent }, assignment: { loadForReminder } })) } }));
+jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ plan: { loadUpcomingForReminders }, assignment: { loadForReminder } })) } }));
 
 const createNotifications = jest.fn(async () => []);
+const loadSentReminderKeys = jest.fn(async () => [] as string[]);
+const logReminderSends = jest.fn(async () => undefined);
 const loadChurch = jest.fn(async () => ({ subDomain: "demo", name: "Demo Church" }));
 const loadPeople = jest.fn(async () => [{ id: "p1", displayName: "Pat Smith" }, { id: "p2", displayName: "Sam Lee" }]);
 const loadPerson = jest.fn(async (_c: string, id: string) => ({ id, email: `${id}@example.com` }));
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({ loadChurch, loadPeople, loadPerson }),
-  getMessagingModuleGateway: () => ({ createNotifications })
+  getMessagingModuleGateway: () => ({ createNotifications, loadSentReminderKeys, logReminderSends })
 }));
 
 const sendTemplatedEmail = jest.fn(async () => undefined);
@@ -30,10 +31,13 @@ describe("ServingReminderHelper.parseOffsets", () => {
 });
 
 describe("ServingReminderHelper.sendReminders", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    loadSentReminderKeys.mockResolvedValue([]);
+  });
 
   it("reminds confirmed and unconfirmed at a configured offset, with accept/decline only for the unconfirmed", async () => {
-    loadUpcomingForReminders.mockResolvedValue([{ id: "plan1", churchId: "c1", name: "Sunday AM", serviceDate: "2026-07-01", notes: "Wear blue", reminderOffsets: "2", reminderMessage: "Arrive 30 min early", remindersSent: null, daysOut: 2 }]);
+    loadUpcomingForReminders.mockResolvedValue([{ id: "plan1", churchId: "c1", name: "Sunday AM", serviceDate: "2026-07-01", notes: "Wear blue", reminderOffsets: "2", reminderMessage: "Arrive 30 min early", daysOut: 2 }]);
     loadForReminder.mockResolvedValue([
       { id: "a1", personId: "p1", status: "Accepted", positionName: "Guitar", categoryName: "Worship" },
       { id: "a2", personId: "p2", status: "Unconfirmed", positionName: "Usher", categoryName: "Hospitality" }
@@ -44,7 +48,12 @@ describe("ServingReminderHelper.sendReminders", () => {
     expect(res).toEqual({ notifications: 2, emails: 2 });
     expect(createNotifications).toHaveBeenCalledTimes(1);
     expect(createNotifications.mock.calls[0][0]).toHaveLength(2);
-    expect(markReminderSent).toHaveBeenCalledWith("c1", "plan1", "2");
+    // Ledger: one 'sent' row per person for this plan, tagged as a cross-source plan reminder.
+    expect(logReminderSends).toHaveBeenCalledTimes(1);
+    const rows = logReminderSends.mock.calls[0][0] as any[];
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.personId).sort()).toEqual(["p1", "p2"]);
+    rows.forEach((r) => { expect(r).toMatchObject({ entityType: "plan", entityId: "plan1", category: "serving_schedule" }); expect(r.idempotencyKey).toHaveLength(64); });
 
     const p2Email = sendTemplatedEmail.mock.calls.find((c: any[]) => c[1] === "p2@example.com");
     const p1Email = sendTemplatedEmail.mock.calls.find((c: any[]) => c[1] === "p1@example.com");
@@ -53,18 +62,38 @@ describe("ServingReminderHelper.sendReminders", () => {
     expect(p2Email[5]).toContain("Arrive 30 min early"); // custom message included
   });
 
-  it("is idempotent: skips an offset already recorded in remindersSent", async () => {
-    loadUpcomingForReminders.mockResolvedValue([{ id: "plan1", churchId: "c1", name: "x", serviceDate: "2026-07-01", reminderOffsets: "2", remindersSent: "2", daysOut: 2 }]);
+  it("is idempotent: skips people already recorded in the shared ledger", async () => {
+    loadUpcomingForReminders.mockResolvedValue([{ id: "plan1", churchId: "c1", name: "x", serviceDate: "2026-07-01", reminderOffsets: "2", daysOut: 2 }]);
+    loadForReminder.mockResolvedValue([
+      { id: "a1", personId: "p1", status: "Accepted", positionName: "Guitar" },
+      { id: "a2", personId: "p2", status: "Unconfirmed", positionName: "Usher" }
+    ]);
+    loadSentReminderKeys.mockImplementation(async (keys: string[]) => keys); // every candidate already sent
+
     const res = await ServingReminderHelper.sendReminders();
     expect(res.notifications).toBe(0);
-    expect(loadForReminder).not.toHaveBeenCalled();
-    expect(markReminderSent).not.toHaveBeenCalled();
+    expect(createNotifications).not.toHaveBeenCalled();
+    expect(logReminderSends).not.toHaveBeenCalled();
+  });
+
+  it("only reminds the people not yet in the ledger (partial send)", async () => {
+    loadUpcomingForReminders.mockResolvedValue([{ id: "plan1", churchId: "c1", name: "x", serviceDate: "2026-07-01", reminderOffsets: "2", daysOut: 2 }]);
+    loadForReminder.mockResolvedValue([
+      { id: "a1", personId: "p1", status: "Accepted", positionName: "Guitar" },
+      { id: "a2", personId: "p2", status: "Accepted", positionName: "Usher" }
+    ]);
+    // p1 already sent (return only the first candidate key); p2 still fresh.
+    loadSentReminderKeys.mockImplementation(async (keys: string[]) => keys.slice(0, 1));
+
+    const res = await ServingReminderHelper.sendReminders();
+    expect(res.notifications).toBe(1);
+    expect(logReminderSends.mock.calls[0][0]).toHaveLength(1);
   });
 
   it("does not fire on a non-configured day or when reminders are disabled", async () => {
     loadUpcomingForReminders.mockResolvedValue([
-      { id: "planA", churchId: "c1", name: "x", serviceDate: "2026-07-04", reminderOffsets: "2", remindersSent: null, daysOut: 5 },
-      { id: "planB", churchId: "c1", name: "y", serviceDate: "2026-07-01", reminderOffsets: "", remindersSent: null, daysOut: 2 }
+      { id: "planA", churchId: "c1", name: "x", serviceDate: "2026-07-04", reminderOffsets: "2", daysOut: 5 },
+      { id: "planB", churchId: "c1", name: "y", serviceDate: "2026-07-01", reminderOffsets: "", daysOut: 2 }
     ]);
     const res = await ServingReminderHelper.sendReminders();
     expect(res.notifications).toBe(0);
@@ -72,10 +101,10 @@ describe("ServingReminderHelper.sendReminders", () => {
   });
 
   it("fires a day-of reminder when offsets include 0", async () => {
-    loadUpcomingForReminders.mockResolvedValue([{ id: "plan1", churchId: "c1", name: "Sunday AM", serviceDate: "2026-06-30", reminderOffsets: "0", remindersSent: null, daysOut: 0 }]);
+    loadUpcomingForReminders.mockResolvedValue([{ id: "plan1", churchId: "c1", name: "Sunday AM", serviceDate: "2026-06-30", reminderOffsets: "0", daysOut: 0 }]);
     loadForReminder.mockResolvedValue([{ id: "a1", personId: "p1", status: "Accepted", positionName: "Guitar" }]);
     const res = await ServingReminderHelper.sendReminders();
     expect(res.notifications).toBe(1);
-    expect(markReminderSent).toHaveBeenCalledWith("c1", "plan1", "0");
+    expect(logReminderSends.mock.calls[0][0][0]).toMatchObject({ entityId: "plan1", personId: "p1" });
   });
 });

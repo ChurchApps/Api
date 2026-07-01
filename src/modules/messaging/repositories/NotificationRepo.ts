@@ -22,6 +22,7 @@ export class NotificationRepo {
       link: model.link,
       deliveryMethod: model.deliveryMethod,
       triggeredByPersonId: model.triggeredByPersonId,
+      category: model.category,
       timeSent: sql`NOW()`,
       isNew: true as any
     }).execute();
@@ -172,7 +173,8 @@ export class NotificationRepo {
       message: data.message,
       link: data.link,
       deliveryMethod: data.deliveryMethod,
-      triggeredByPersonId: data.triggeredByPersonId
+      triggeredByPersonId: data.triggeredByPersonId,
+      category: data.category
     };
   }
 

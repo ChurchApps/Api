@@ -23,10 +23,12 @@ const safe = async (label: string, fn: () => Promise<unknown>): Promise<void> =>
 
 const runThirtyMinute = async (): Promise<void> => {
   const { NotificationHelper } = await import("../../modules/messaging/helpers/NotificationHelper.js");
+  const { scanReminders } = await import("../../modules/messaging/helpers/ReminderBootstrap.js");
   const repos = await RepoManager.getRepos<any>("messaging");
   NotificationHelper.init(repos);
   await NotificationHelper.escalateDelivery();
   await NotificationHelper.sendEmailNotifications("individual");
+  await scanReminders(repos); // reminder dispatcher — Pattern A, no new timer
 };
 
 const runMidnight = async (): Promise<void> => {
@@ -37,6 +39,8 @@ const runMidnight = async (): Promise<void> => {
   await AutomationHelper.remindServiceRequests();
   const contentRepos = await RepoManager.getRepos<any>("content");
   await contentRepos.streamingService.advanceRecurringServices();
+  const { expandReminders } = await import("../../modules/messaging/helpers/ReminderBootstrap.js");
+  await expandReminders(messagingRepos); // reminder expander — Pattern A
   await NotificationHelper.sendEmailNotifications("daily");
 };
 

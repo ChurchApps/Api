@@ -54,6 +54,12 @@ export const handle15MinTimer = async (_event: ScheduledEvent, _context: Context
     const retried = await ExecutionHelper.processDue(doingRepos);
     console.log(`[handle15MinTimer] executionRetries=${retried}`);
 
+    console.log("[handle15MinTimer] Dispatching due reminders...");
+    const { scanReminders } = await import("../modules/messaging/helpers/ReminderBootstrap.js");
+    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    const reminderResult = await scanReminders(messagingRepos);
+    console.log("[handle15MinTimer] scanReminders result:", JSON.stringify(reminderResult));
+
     console.log("[handle15MinTimer] ========== TIMER COMPLETE ==========");
     console.log("[handle15MinTimer] Total execution time:", Date.now() - startTime, "ms");
   } catch (error) {
@@ -98,6 +104,12 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     console.log("[handleMidnightTimer] Purging old automation executions...");
     const doingRepos = await RepoManager.getRepos<any>("doing");
     await doingRepos.automationExecution.purgeOld();
+
+    console.log("[handleMidnightTimer] Expanding reminder occurrences...");
+    const { expandReminders } = await import("../modules/messaging/helpers/ReminderBootstrap.js");
+    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    const expandResult = await expandReminders(messagingRepos);
+    console.log("[handleMidnightTimer] expandReminders count:", expandResult);
 
     console.log("[handleMidnightTimer] Processing daily email notifications...");
     const result = await NotificationHelper.sendEmailNotifications("daily");

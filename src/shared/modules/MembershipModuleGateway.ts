@@ -29,7 +29,7 @@ export interface MembershipModuleGateway {
   loadGroupLeaderPersonIds(churchId: string, groupId: string): Promise<string[]>;
   // Every person sharing a household with any of personIds (the input people included).
   loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]>;
-  loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string } | null>;
+  loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string; timeZone?: string } | null>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
   // Returns the full person row; the listed fields are the ones event triggers filter on.

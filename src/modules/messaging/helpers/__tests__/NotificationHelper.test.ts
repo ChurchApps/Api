@@ -69,6 +69,8 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
       connection: { loadForNotification: jest.fn(async () => opts.connections ?? []) },
       notification: { loadNewCounts: jest.fn(async () => ({ notificationCount: 1, pmCount: 0 })) },
       notificationPreference: { loadByPersonId: jest.fn(async () => opts.pref ?? { allowPush: true, emailFrequency: "individual" }) },
+      notificationPreferenceOverride: { loadForPerson: jest.fn(async () => []) },
+      notificationEntityMute: { loadForPerson: jest.fn(async () => []) },
       device: {
         loadForPerson: jest.fn(async () => opts.devices ?? []),
         deleteByFcmToken: jest.fn(async () => {})
@@ -206,6 +208,8 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
       connection: { loadForNotification: jest.fn(async () => []) },
       notification: { loadNewCounts: jest.fn(async () => ({ notificationCount: 0, pmCount: 1 })) },
       notificationPreference: { loadByPersonId: jest.fn(async () => ({ allowPush: true, emailFrequency: "individual" })) },
+      notificationPreferenceOverride: { loadForPerson: jest.fn(async () => []) },
+      notificationEntityMute: { loadForPerson: jest.fn(async () => []) },
       device: {
         loadForPerson: jest.fn(async () => [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]),
         deleteByFcmToken: jest.fn(async () => {})

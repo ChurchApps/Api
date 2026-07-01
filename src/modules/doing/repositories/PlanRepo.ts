@@ -31,8 +31,7 @@ export class PlanRepo {
       showVolunteerNames: model.showVolunteerNames,
       prepared: model.prepared,
       autoReplaceOnDecline: model.autoReplaceOnDecline,
-      lastAutofillRunId: model.lastAutofillRunId,
-      remindersSent: model.remindersSent
+      lastAutofillRunId: model.lastAutofillRunId
     }).execute();
     return model;
   }
@@ -79,7 +78,6 @@ export class PlanRepo {
         "pl.name",
         "pl.serviceDate",
         "pl.notes",
-        "pl.remindersSent",
         "pt.reminderOffsets",
         "pt.reminderMessage",
         sql<number>`DATEDIFF(pl.serviceDate, CURDATE())`.as("daysOut")
@@ -88,10 +86,6 @@ export class PlanRepo {
       .where("pl.serviceDate", "<=", sql`DATE_ADD(CURDATE(), INTERVAL ${maxDays} DAY)` as any)
       .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
       .execute();
-  }
-
-  public async markReminderSent(churchId: string, planId: string, remindersSent: string) {
-    await getDb().updateTable("plans").set({ remindersSent }).where("id", "=", planId).where("churchId", "=", churchId).execute();
   }
 
   public async load(churchId: string, id: string) {

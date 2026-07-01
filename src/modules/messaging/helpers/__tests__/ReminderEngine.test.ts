@@ -1,0 +1,145 @@
+// Isolate the engine from the heavy delivery + cross-module deps.
+const createNotificationsMock = jest.fn() as jest.MockedFunction<any>;
+jest.mock("../NotificationHelper.js", () => ({ NotificationHelper: { createNotifications: createNotificationsMock } }));
+jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch: async () => ({ timeZone: "UTC" }) }) }));
+
+import { ReminderEngine } from "../ReminderEngine.js";
+import { ReminderAdapterRegistry, ReminderAdapter } from "../ReminderAdapter.js";
+
+const adapter: ReminderAdapter = {
+  entityType: "ev",
+  category: "event_reminders",
+  contentType: "event",
+  loadEntity: jest.fn(async () => ({ id: "E1", title: "Party" })),
+  getOccurrences: jest.fn(async () => [{ startLocalDate: "2026-12-25", startLocalISO: "2026-12-25T10:00:00" }]),
+  loadRecipients: jest.fn(async () => [{ personId: "P1" }, { personId: "P2" }]),
+  link: () => "/x",
+  renderMessage: () => "msg"
+};
+
+beforeAll(() => ReminderAdapterRegistry.register(adapter));
+beforeEach(() => createNotificationsMock.mockReset().mockResolvedValue([]));
+
+describe("ReminderEngine.parseOffsets", () => {
+  it("parses, dedups, sorts, clamps, and defaults", () => {
+    expect(ReminderEngine.parseOffsets("1440,60,60")).toEqual([60, 1440]);
+    expect(ReminderEngine.parseOffsets("")).toEqual([1440]);
+    expect(ReminderEngine.parseOffsets(null)).toEqual([1440]);
+    expect(ReminderEngine.parseOffsets("99999999,-5,0")).toEqual([0]); // out-of-range dropped
+  });
+});
+
+describe("ReminderEngine.expandDefinition", () => {
+  const def = {
+    id: "D1",
+    churchId: "CH1",
+    entityType: "ev",
+    entityId: "E1",
+    category: "event_reminders",
+    offsets: "1440,60",
+    sendLocalTime: "09:00:00",
+    timeZone: "UTC",
+    channels: "push,email",
+    enabled: true
+  };
+
+  it("upserts one row per offset with the right key and fireAt, skipping past ones", async () => {
+    const upsert = jest.fn();
+    ReminderEngine.init({ reminderOccurrence: { upsert } } as any);
+    const written = await ReminderEngine.expandDefinition(def as any, new Date("2026-12-01T00:00:00Z"));
+    expect(written).toBe(2);
+    const keys = upsert.mock.calls.map((c) => c[0].occurrenceKey);
+    expect(keys).toContain("D1:2026-12-25T10:00:00:1440");
+    expect(keys).toContain("D1:2026-12-25T10:00:00:60");
+    const byKey = Object.fromEntries(upsert.mock.calls.map((c) => [c[0].occurrenceKey, c[0].fireAt.toISOString()]));
+    expect(byKey["D1:2026-12-25T10:00:00:60"]).toBe("2026-12-25T08:00:00.000Z"); // 9am minus 60
+    expect(byKey["D1:2026-12-25T10:00:00:1440"]).toBe("2026-12-24T09:00:00.000Z"); // day before 9am
+  });
+
+  it("skips occurrences whose fireAt is already in the past", async () => {
+    const upsert = jest.fn();
+    ReminderEngine.init({ reminderOccurrence: { upsert } } as any);
+    const written = await ReminderEngine.expandDefinition(def as any, new Date("2027-01-01T00:00:00Z"));
+    expect(written).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("does nothing for a disabled definition", async () => {
+    const upsert = jest.fn();
+    ReminderEngine.init({ reminderOccurrence: { upsert } } as any);
+    expect(await ReminderEngine.expandDefinition({ ...def, enabled: false } as any, new Date("2026-12-01T00:00:00Z"))).toBe(0);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe("ReminderEngine.scan (dispatcher)", () => {
+  const occ = {
+    id: "O1",
+    churchId: "CH1",
+    definitionId: "D1",
+    entityType: "ev",
+    entityId: "E1",
+    category: "event_reminders",
+    channels: "push,email",
+    message: null,
+    occLocalISO: "2026-12-25T10:00:00"
+  };
+
+  function buildRepos(opts: { claim?: boolean; alreadySent?: string[] }) {
+    return {
+      reminderOccurrence: {
+        loadDue: jest.fn(async () => [occ]),
+        claim: jest.fn(async () => opts.claim ?? true),
+        markSent: jest.fn(async () => {}),
+        markCancelled: jest.fn(async () => {}),
+        markFailed: jest.fn(async () => {})
+      },
+      reminderDefinition: { load: jest.fn(async () => ({ id: "D1", enabled: true, recipientMode: "auto" })) },
+      reminderSentLog: {
+        loadPersonIdsForOccurrence: jest.fn(async () => opts.alreadySent ?? []),
+        insertIgnore: jest.fn(async () => {})
+      }
+    } as any;
+  }
+
+  it("notifies fresh recipients, fences the ledger, and marks the occurrence sent", async () => {
+    const repos = buildRepos({});
+    ReminderEngine.init(repos);
+    const result = await ReminderEngine.scan();
+
+    expect(result).toEqual({ processed: 1, sent: 2 });
+    expect(createNotificationsMock).toHaveBeenCalledTimes(1);
+    const args = createNotificationsMock.mock.calls[0];
+    expect(args[0]).toEqual(["P1", "P2"]); // peopleIds
+    expect(args[2]).toBe("event"); // adapter.contentType
+    expect(args[3]).toBe("E1"); // entityId
+    expect(args[7]).toMatchObject({ category: "event_reminders", deliveryStartLevel: 1 });
+    expect(repos.reminderSentLog.insertIgnore).toHaveBeenCalledTimes(2);
+    expect(repos.reminderOccurrence.markSent).toHaveBeenCalledWith("O1", 2);
+  });
+
+  it("skips recipients already in the sent ledger (idempotent on retry)", async () => {
+    const repos = buildRepos({ alreadySent: ["P1"] });
+    ReminderEngine.init(repos);
+    await ReminderEngine.scan();
+    expect(createNotificationsMock.mock.calls[0][0]).toEqual(["P2"]);
+    expect(repos.reminderSentLog.insertIgnore).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not process an occurrence it fails to claim", async () => {
+    const repos = buildRepos({ claim: false });
+    ReminderEngine.init(repos);
+    const result = await ReminderEngine.scan();
+    expect(result).toEqual({ processed: 0, sent: 0 });
+    expect(createNotificationsMock).not.toHaveBeenCalled();
+  });
+
+  it("cancels an occurrence whose definition is gone/disabled", async () => {
+    const repos = buildRepos({});
+    repos.reminderDefinition.load = jest.fn(async () => null);
+    ReminderEngine.init(repos);
+    await ReminderEngine.scan();
+    expect(repos.reminderOccurrence.markCancelled).toHaveBeenCalledWith("O1");
+    expect(createNotificationsMock).not.toHaveBeenCalled();
+  });
+});

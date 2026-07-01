@@ -8,6 +8,7 @@ export { DeviceContentController } from "./DeviceContentController.js";
 export { MessageController } from "./MessageController.js";
 export { NotificationController } from "./NotificationController.js";
 export { NotificationPreferenceController } from "./NotificationPreferenceController.js";
+export { ReminderController } from "./ReminderController.js";
 export { PrivateMessageController } from "./PrivateMessageController.js";
 export { TextingController } from "./TextingController.js";
 export { EmailTemplateController } from "./EmailTemplateController.js";
