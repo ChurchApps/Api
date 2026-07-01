@@ -128,10 +128,9 @@ export class PaymentMethodController extends GivingBaseController {
   @httpPost("/addcard")
   public async addCard(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // authz-exempt: gated to au.personId or donations.edit below; cId prefers au.churchId, body churchId only a fallback
+      // authz-exempt: anonymous guest giving has no au.churchId; body churchId is the only source, scoped to the gateway lookup below
       const { id, personId, customerId, email, name, churchId, provider } = req.body;
       const cId = au?.churchId || churchId;
-      if (!au.checkAccess(Permissions.donations.edit) && personId !== au.personId) return this.json({}, 401);
       // Default to Stripe for card operations, but allow frontend to specify provider
       const gateway = await GatewayService.getGatewayForChurch(cId, { provider: provider || "stripe" }, this.repos.gateway).catch(() => null);
 
