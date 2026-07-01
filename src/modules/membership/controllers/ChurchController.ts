@@ -191,7 +191,6 @@ export class ChurchController extends MembershipBaseController {
         }
 
         UserHelper.replaceDomainAdminPermissions([result]);
-        UserHelper.syncCrossModulePermissions([result]);
         UserHelper.addAllReportingPermissions([result]);
 
         const churchWithAuth = await AuthenticatedUser.login([result], user);
@@ -371,7 +370,6 @@ export class ChurchController extends MembershipBaseController {
       }
       if (!churchId) return this.json({ message: "No church specified" }, 400);
       const userChurch = await this.fetchChurchPermissions(au, churchId);
-      UserHelper.syncCrossModulePermissions([userChurch]);
       const user = await this.repos.user.load(au.id);
 
       const data = await AuthenticatedUser.login([userChurch], user);

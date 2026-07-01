@@ -15,7 +15,7 @@ export class ReminderController extends MessagingBaseController {
   @httpGet("/event/:eventId")
   public async listForEvent(@requestParam("eventId") eventId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.content.edit))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       return this.repos.reminderDefinition.loadForEntity(au.churchId, "event", eventId);
     });
   }
@@ -23,7 +23,7 @@ export class ReminderController extends MessagingBaseController {
   @httpPost("/event/:eventId")
   public async saveForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.content.edit))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
       const body = req.body || {};
       const existing = (await this.repos.reminderDefinition.loadForEntity(au.churchId, "event", eventId)) as ReminderDefinition[];
@@ -50,7 +50,7 @@ export class ReminderController extends MessagingBaseController {
   @httpDelete("/:defId")
   public async remove(@requestParam("defId") defId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.content.edit))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.reminderOccurrence.cancelPendingForDefinition(defId);
       await this.repos.reminderDefinition.delete(au.churchId, defId);
       return this.json({});
@@ -60,7 +60,7 @@ export class ReminderController extends MessagingBaseController {
   @httpGet("/event/:eventId/preview")
   public async preview(@requestParam("eventId") eventId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.content.edit))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
       const adapter = ReminderAdapterRegistry.get("event")!;
       const entity = await adapter.loadEntity(au.churchId, eventId);
@@ -96,7 +96,7 @@ export class ReminderController extends MessagingBaseController {
   @httpGet("/log")
   public async log(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.messaging.admin)) && !(await this.canAccessCrossApi(au, Permissions.content.edit))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.messaging.admin) && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       return this.repos.reminderOccurrence.loadRecent(au.churchId, 50);
     });
   }

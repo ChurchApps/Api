@@ -119,7 +119,6 @@ export class UserController extends MembershipBaseController {
     const roleUserChurches = await this.repos.rolePermission.loadForUser(id, true); // Set to true so churches[0] is always a real church.  Not sre why it was false before.  If we need to change this make it a param on the login request
 
     UserHelper.replaceDomainAdminPermissions(roleUserChurches);
-    UserHelper.syncCrossModulePermissions(roleUserChurches);
     UserHelper.addAllReportingPermissions(roleUserChurches);
 
     // Load churches via userChurches relationships

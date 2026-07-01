@@ -100,8 +100,8 @@ export const permissionsList: IPermission[] = [
   { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
 
   // Doing API permissions (Tasks, Workflows & Automations)
-  // Plans lives here because PlanAuth enforces it in the doing module; the
-  // MembershipApi JWT only sees it via UserHelper.syncCrossModulePermissions.
+  // Plans lives here because PlanAuth enforces it in the doing module; every JWT now
+  // carries the full cross-module permission set, so it's honored in membership too.
   { apiName: "DoingApi", section: "Plans", action: "Edit", displaySection: "Forms and Plans", displayAction: "Edit Plans" },
   { apiName: "DoingApi", section: "Tasks", action: "View", displaySection: "Tasks", displayAction: "View Workflows & Cards" },
   { apiName: "DoingApi", section: "Tasks", action: "Edit", displaySection: "Tasks", displayAction: "Edit All Cards & Tasks" },

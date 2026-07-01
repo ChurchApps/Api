@@ -27,7 +27,7 @@ export class NotificationController extends MessagingBaseController {
   @httpGet("/groupPreview/:groupId")
   public async previewGroupPush(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.groupMembers.edit))) return this.json({ error: "Unauthorized" }, 401);
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
 
       const preview = await this.getGroupPushPreview(au.churchId, groupId, au.personId);
       const { eligiblePersonIds: _eligiblePersonIds, ...result } = preview;
@@ -107,13 +107,11 @@ export class NotificationController extends MessagingBaseController {
   }
 
   // Called from other modules (e.g. Doing: task assignment, plan publish/notify) after the
-  // triggering action already passed its own permission check — the caller's MessagingApi JWT
-  // won't carry a Messaging permission for that, so fall back to their cross-API grant like
-  // previewGroupPush/sendGroupPush do below.
+  // triggering action already passed its own permission check.
   @httpPost("/create")
   public async create(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.messaging.admin))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       return await NotificationHelper.createNotifications(req.body.peopleIds, au.churchId, req.body.contentType, req.body.contentId, req.body.message, req.body?.link, au.personId);
     }) as any;
   }
@@ -121,7 +119,7 @@ export class NotificationController extends MessagingBaseController {
   @httpPost("/group/send")
   public async sendGroupPush(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.canAccessCrossApi(au, Permissions.groupMembers.edit))) return this.json({ error: "Unauthorized" }, 401);
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
 
       const groupId = (req.body?.groupId || "").trim();
       const title = (req.body?.title || "").trim();

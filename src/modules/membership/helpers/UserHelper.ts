@@ -28,29 +28,6 @@ export class UserHelper {
   }
 
 
-  public static syncCrossModulePermissions(lucs: LoginUserChurch[]) {
-    lucs.forEach((luc) => {
-      const has = (keyName: string) => {
-        const api = ArrayHelper.getOne(luc.apis, "keyName", keyName);
-        if (api === null) return false;
-        return ArrayHelper.getOne(ArrayHelper.getAll(api.permissions, "contentType", "Plans"), "action", "Edit") !== null;
-      };
-      const add = (keyName: string) => {
-        let api = ArrayHelper.getOne(luc.apis, "keyName", keyName);
-        if (api === null) {
-          api = { keyName, permissions: [] };
-          luc.apis.push(api);
-        }
-        const permission: RolePermission = { action: "Edit", contentType: "Plans", contentId: "" };
-        api.permissions.push(permission);
-      };
-      const inDoing = has("DoingApi");
-      const inMembership = has("MembershipApi");
-      if (inDoing && !inMembership) add("MembershipApi");
-      if (inMembership && !inDoing) add("DoingApi");
-    });
-  }
-
   private static addReportingPermissions(luc: LoginUserChurch) {
     const reportingApi = ArrayHelper.getOne(luc.apis, "keyName", "ReportingApi");
     if (reportingApi !== null) {
@@ -86,7 +63,6 @@ export class UserHelper {
   static async loadExpandedPermissions(userId: string, churchId: string, repos: Repos): Promise<Api[]> {
     const luc = (await repos.rolePermission.loadUserPermissionInChurch(userId, churchId)) ?? ({ apis: [] } as unknown as LoginUserChurch);
     await UserHelper.replaceDomainAdminPermissions([luc]);
-    UserHelper.syncCrossModulePermissions([luc]);
     UserHelper.addAllReportingPermissions([luc]);
     return luc.apis;
   }
