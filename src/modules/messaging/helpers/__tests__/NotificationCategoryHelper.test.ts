@@ -11,7 +11,6 @@ describe("NotificationCategoryHelper.categoryFor", () => {
   });
 
   it("maps generic notifications via innerType", () => {
-    expect(NotificationCategoryHelper.categoryFor("notification", "prayer")).toBe("prayer_requests");
     expect(NotificationCategoryHelper.categoryFor("notification", "group")).toBe("group_messages");
     expect(NotificationCategoryHelper.categoryFor("notification", "event")).toBe("event_reminders");
   });
@@ -26,17 +25,14 @@ describe("NotificationCategoryHelper.categoryFor", () => {
 });
 
 describe("NotificationCategoryHelper tiers / transactional", () => {
-  it("classifies locked (tier 0) categories", () => {
-    expect(NotificationCategoryHelper.isLocked("account_security")).toBe(true);
-    expect(NotificationCategoryHelper.isLocked("giving_receipts")).toBe(true);
-    expect(NotificationCategoryHelper.isLocked("checkin_safety")).toBe(true);
-    expect(NotificationCategoryHelper.isLocked("event_reminders")).toBe(false);
+  it("no category is currently locked (tier 0)", () => {
+    NotificationCategoryHelper.all().forEach((c) => expect(NotificationCategoryHelper.isLocked(c.categoryKey)).toBe(false));
   });
 
   it("classifies transactional categories (quiet-hours / cap bypass)", () => {
-    ["event_reminders", "serving_schedule", "tasks", "direct_messages", "checkin_safety"].forEach((c) =>
+    ["event_reminders", "serving_schedule", "tasks", "direct_messages"].forEach((c) =>
       expect(NotificationCategoryHelper.isTransactional(c)).toBe(true));
-    ["announcements", "group_messages", "prayer_requests", "giving_campaigns", "ministry_promotions"].forEach((c) =>
+    ["announcements", "group_messages", "group_activity"].forEach((c) =>
       expect(NotificationCategoryHelper.isTransactional(c)).toBe(false));
   });
 
@@ -46,11 +42,6 @@ describe("NotificationCategoryHelper tiers / transactional", () => {
 });
 
 describe("NotificationCategoryHelper.effectiveOptIn (absence-means-default)", () => {
-  it("locked categories are always on regardless of overrides", () => {
-    const overrides = [{ categoryKey: "account_security", channel: "push", optedIn: false }];
-    expect(NotificationCategoryHelper.effectiveOptIn("account_security", "push", overrides)).toBe(true);
-  });
-
   it("tier-1 defaults to its default channel set when no override exists", () => {
     expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "push", [])).toBe(true);
     expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "email", [])).toBe(true);
@@ -59,13 +50,8 @@ describe("NotificationCategoryHelper.effectiveOptIn (absence-means-default)", ()
     expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "sms", [])).toBe(false);
   });
 
-  it("tier-2 is off by default (opt-in)", () => {
-    expect(NotificationCategoryHelper.effectiveOptIn("giving_campaigns", "push", [])).toBe(false);
-    expect(NotificationCategoryHelper.effectiveOptIn("giving_campaigns", "email", [])).toBe(true); // email is its default
-  });
-
   it("an override wins over the default", () => {
     expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "push", [{ categoryKey: "event_reminders", channel: "push", optedIn: false }])).toBe(false);
-    expect(NotificationCategoryHelper.effectiveOptIn("giving_campaigns", "push", [{ categoryKey: "giving_campaigns", channel: "push", optedIn: true }])).toBe(true);
+    expect(NotificationCategoryHelper.effectiveOptIn("group_activity", "push", [{ categoryKey: "group_activity", channel: "push", optedIn: true }])).toBe(true);
   });
 });

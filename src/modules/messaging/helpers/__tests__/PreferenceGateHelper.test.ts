@@ -9,11 +9,6 @@ const NOON = new Date("2026-06-30T12:00:00Z");
 const QUIET = { quietHoursStart: "22:00:00", quietHoursEnd: "07:00:00", timeZone: "UTC" };
 
 describe("PreferenceGateHelper.evaluate", () => {
-  it("Layer 1: locked categories bypass everything (even master mute + allowPush off)", () => {
-    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "account_security", "push", { pref: { masterMute: true, allowPush: false } });
-    expect(r.allow).toBe(true);
-  });
-
   it("Layer 2: master mute suppresses non-locked", () => {
     const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", { pref: { masterMute: true, allowPush: true } });
     expect(r.allow).toBe(false);
@@ -74,10 +69,6 @@ describe("PreferenceGateHelper.evaluate", () => {
       overrides: [{ categoryKey: "event_reminders", channel: "push", optedIn: false }]
     });
     expect(r.reason).toBe("category_opt_out");
-  });
-
-  it("Layer 5: tier-2 categories are suppressed without an explicit opt-in", () => {
-    expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "giving_campaigns", "push", { pref: { allowPush: true } }).reason).toBe("category_opt_out");
   });
 
   it("default-on tier-1 with no overrides is allowed", () => {
