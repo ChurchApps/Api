@@ -12,27 +12,32 @@ import { ReminderDefinition, NotificationEntityMute } from "../models/index.js";
 
 @controller("/messaging/reminders")
 export class ReminderController extends MessagingBaseController {
-  @httpGet("/event/:eventId")
-  public async listForEvent(@requestParam("eventId") eventId: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      return this.repos.reminderDefinition.loadForEntity(au.churchId, "event", eventId);
-    });
-  }
-
-  @httpPost("/event/:eventId")
-  public async saveForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  // Generic over entityType (event|plan|task). The /event/:id/preview route below is 3 segments, so it never collides with these 2-segment routes.
+  @httpGet("/:entityType/:entityId")
+  public async listForEntity(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
+      if (!ReminderAdapterRegistry.has(entityType)) return this.json({}, 400);
+      return this.repos.reminderDefinition.loadForEntity(au.churchId, entityType, entityId);
+    });
+  }
+
+  @httpPost("/:entityType/:entityId")
+  public async saveForEntity(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      ensureRemindersReady(this.repos);
+      const adapter = ReminderAdapterRegistry.get(entityType);
+      if (!adapter) return this.json({}, 400);
       const body = req.body || {};
-      const existing = (await this.repos.reminderDefinition.loadForEntity(au.churchId, "event", eventId)) as ReminderDefinition[];
+      const existing = (await this.repos.reminderDefinition.loadForEntity(au.churchId, entityType, entityId)) as ReminderDefinition[];
       const def: ReminderDefinition = {
         id: existing[0]?.id,
         churchId: au.churchId,
-        entityType: "event",
-        entityId: eventId,
-        category: "event_reminders",
+        entityType,
+        entityId,
+        category: adapter.category,
         offsets: Array.isArray(body.offsets) ? body.offsets.join(",") : body.offsets,
         sendLocalTime: body.sendLocalTime ? this.normalizeTime(body.sendLocalTime) : undefined,
         timeZone: body.timeZone,
@@ -42,7 +47,7 @@ export class ReminderController extends MessagingBaseController {
         enabled: body.enabled !== false
       };
       const saved = await this.repos.reminderDefinition.save(def);
-      await ReminderEngine.reExpandForEntity(au.churchId, "event", eventId); // synchronous expand — §5.8
+      await ReminderEngine.reExpandForEntity(au.churchId, entityType, entityId); // synchronous expand — §5.8
       return saved;
     });
   }
