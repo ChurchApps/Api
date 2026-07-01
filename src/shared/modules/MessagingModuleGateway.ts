@@ -20,6 +20,9 @@ export interface MessagingModuleGateway {
   // Render a saved EmailTemplate (merge fields resolved against recipient + church) and send it.
   // Returns false when the template is missing or the recipient has no email.
   sendTemplatedEmail(churchId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
+  // Unified cross-source reminder ledger (reminderSentLog): which keys already fired, and record new sends.
+  loadSentReminderKeys(idempotencyKeys: string[]): Promise<string[]>;
+  logReminderSends(rows: { churchId?: string; personId?: string; category?: string; entityType?: string; entityId?: string; idempotencyKey?: string }[]): Promise<void>;
 }
 
 class MessagingModuleGatewayDb implements MessagingModuleGateway {
@@ -46,6 +49,15 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
   public async createNotifications(notifications: any[]) {
     const repos = await this.repos();
     return Promise.all(notifications.map((n) => repos.notification.save(n)));
+  }
+
+  public async loadSentReminderKeys(idempotencyKeys: string[]): Promise<string[]> {
+    return (await this.repos()).reminderSentLog.loadSentKeys(idempotencyKeys);
+  }
+
+  public async logReminderSends(rows: { churchId?: string; personId?: string; category?: string; entityType?: string; entityId?: string; idempotencyKey?: string }[]): Promise<void> {
+    const repos = await this.repos();
+    await Promise.all(rows.map((r) => repos.reminderSentLog.insertIgnore({ ...r, channel: "all", status: "sent" })));
   }
 
   public async sendTemplatedEmail(churchId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean> {

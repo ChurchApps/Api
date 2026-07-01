@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { EmailHelper } from "@churchapps/apihelper";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
@@ -23,41 +24,67 @@ export class ServingReminderHelper {
     return [...new Set(offsets)];
   }
 
-  private static parseSent(csv: string | null | undefined): number[] {
-    if (!csv) return [];
-    return csv.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => Number.isInteger(n));
+  // Per-(plan, offset, person) dedup fence, shared with the reminder engine via reminderSentLog.
+  private static reminderKey(planId: string, daysOut: number, personId: string): string {
+    return crypto.createHash("sha256").update(`plan:${planId}:${daysOut}:${personId}`).digest("hex");
   }
 
   public static async sendReminders(): Promise<{ notifications: number; emails: number }> {
     const repos = await RepoManager.getRepos<any>("doing");
     const plans = (await repos.plan.loadUpcomingForReminders(MAX_OFFSET)) as any[];
+    const gateway = getMessagingModuleGateway();
 
-    const notifications: any[] = [];
-    let emails = 0;
-
+    // Gather offset-matching plans + each assignee's dedup key.
+    const pending: { plan: any; assignments: any[]; keyByPerson: Map<string, string> }[] = [];
     for (const plan of plans) {
       try {
         const offsets = this.parseOffsets(plan.reminderOffsets);
         const daysOut = Number(plan.daysOut);
         if (offsets.length === 0 || !offsets.includes(daysOut)) continue;
 
-        const sent = this.parseSent(plan.remindersSent);
-        if (sent.includes(daysOut)) continue;
-
         const assignments = (await repos.assignment.loadForReminder(plan.churchId, plan.id)) as any[];
-        if (assignments.length > 0) {
-          const built = await this.buildForPlan(plan, assignments);
-          notifications.push(...built.notifications);
-          emails += built.emails;
-        }
+        if (assignments.length === 0) continue;
 
-        await repos.plan.markReminderSent(plan.churchId, plan.id, [...sent, daysOut].join(","));
+        const keyByPerson = new Map<string, string>();
+        for (const a of assignments) {
+          if (a.personId && !keyByPerson.has(a.personId)) keyByPerson.set(a.personId, this.reminderKey(plan.id, daysOut, a.personId));
+        }
+        pending.push({ plan, assignments, keyByPerson });
       } catch (e) {
         console.error(`[ServingReminder] failed for plan ${plan.id}:`, e);
       }
     }
 
-    if (notifications.length > 0) await getMessagingModuleGateway().createNotifications(notifications);
+    // One ledger read: which per-person reminders already fired (idempotent, unified with event reminders).
+    const allKeys = pending.flatMap((p) => [...p.keyByPerson.values()]);
+    const sentKeys = new Set(await gateway.loadSentReminderKeys(allKeys));
+
+    const notifications: any[] = [];
+    let emails = 0;
+    const ledgerRows: any[] = [];
+    for (const { plan, assignments, keyByPerson } of pending) {
+      const freshPersonIds = new Set<string>();
+      keyByPerson.forEach((k, pid) => { if (!sentKeys.has(k)) freshPersonIds.add(pid); });
+      if (freshPersonIds.size === 0) continue;
+      try {
+        const built = await this.buildForPlan(plan, assignments.filter((a) => freshPersonIds.has(a.personId)));
+        notifications.push(...built.notifications);
+        emails += built.emails;
+        freshPersonIds.forEach((pid) => ledgerRows.push({
+          churchId: plan.churchId,
+          personId: pid,
+          category: "serving_schedule",
+          entityType: "plan",
+          entityId: plan.id,
+          idempotencyKey: keyByPerson.get(pid)
+        }));
+      } catch (e) {
+        console.error(`[ServingReminder] failed for plan ${plan.id}:`, e);
+      }
+    }
+
+    if (notifications.length > 0) await gateway.createNotifications(notifications);
+    if (ledgerRows.length > 0) await gateway.logReminderSends(ledgerRows);
     console.log(`[ServingReminder] ${notifications.length} notifications, ${emails} emails`);
     return { notifications: notifications.length, emails };
   }

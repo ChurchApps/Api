@@ -138,11 +138,15 @@ export class ReminderEngine {
           await Promise.all(fresh.map((r) => this.repos.reminderSentLog.insertIgnore({
             churchId: occ.churchId,
             occurrenceId: occ.id,
+            entityType: occ.entityType,
+            entityId: occ.entityId,
             personId: r.personId,
             channel: "all",
             category: occ.category,
             status: "sent",
-            idempotencyKey: crypto.createHash("sha256").update(`${occ.id}:${r.personId}`).digest("hex")
+            // Key is source-namespaced by entityType (matches the serving writer's "plan:..." keys)
+            // so the shared ledger's dedup fence can't collide across sources.
+            idempotencyKey: crypto.createHash("sha256").update(`${occ.entityType}:${occ.id}:${r.personId}`).digest("hex")
           })));
           sent += fresh.length;
         }

@@ -14,6 +14,8 @@ export class ReminderSentLogRepo {
         id: UniqueIdHelper.shortId(),
         churchId: model.churchId,
         occurrenceId: model.occurrenceId,
+        entityType: model.entityType,
+        entityId: model.entityId,
         personId: model.personId,
         channel: model.channel,
         category: model.category,
@@ -27,9 +29,18 @@ export class ReminderSentLogRepo {
     }
   }
 
+  // Occurrence-sourced rows only (event reminders). Non-occurrence sources (serving) dedup via loadSentKeys.
   public async loadPersonIdsForOccurrence(occurrenceId: string): Promise<string[]> {
     const rows = await getDb().selectFrom("reminderSentLog").select(["personId"])
       .where("occurrenceId", "=", occurrenceId).where("status", "=", "sent").execute();
     return rows.map((r: any) => r.personId);
+  }
+
+  // Which of these idempotencyKeys have already been sent — the cross-source dedup fence.
+  public async loadSentKeys(idempotencyKeys: string[]): Promise<string[]> {
+    if (!idempotencyKeys || idempotencyKeys.length === 0) return [];
+    const rows = await getDb().selectFrom("reminderSentLog").select(["idempotencyKey"])
+      .where("idempotencyKey", "in", idempotencyKeys).where("status", "=", "sent").execute();
+    return rows.map((r: any) => r.idempotencyKey);
   }
 }

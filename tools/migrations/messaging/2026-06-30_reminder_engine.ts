@@ -58,7 +58,9 @@ export async function up(db: Kysely<any>): Promise<void> {
     .ifNotExists()
     .addColumn("id", sql`char(11)`, (col) => col.notNull().primaryKey())
     .addColumn("churchId", sql`char(11)`, (col) => col.notNull())
-    .addColumn("occurrenceId", sql`char(11)`, (col) => col.notNull())
+    .addColumn("occurrenceId", sql`char(11)`) // null for non-occurrence sources (e.g. serving reminders)
+    .addColumn("entityType", sql`varchar(24)`) // source discriminator for the unified cross-source ledger
+    .addColumn("entityId", sql`char(11)`)
     .addColumn("personId", sql`char(11)`, (col) => col.notNull())
     .addColumn("channel", sql`varchar(16)`, (col) => col.notNull())
     .addColumn("category", sql`varchar(40)`, (col) => col.notNull())
