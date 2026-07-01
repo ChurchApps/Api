@@ -17,7 +17,10 @@ import { NotificationHelper } from "./helpers/NotificationHelper.js";
 import { DeliveryHelper } from "./helpers/DeliveryHelper.js";
 import { SocketHelper } from "./helpers/SocketHelper.js";
 import { WebPushHelper } from "./helpers/WebPushHelper.js";
+import { ReminderEngine } from "./helpers/ReminderEngine.js";
+import { ensureRemindersReady } from "./helpers/ReminderBootstrap.js";
 import { NotificationService } from "../../shared/helpers/NotificationService.js";
+import { InternalEventBus } from "../../shared/events/InternalEventBus.js";
 
 export function initializeMessagingModule(repos: Repos) {
   // Initialize helpers with repositories
@@ -26,4 +29,7 @@ export function initializeMessagingModule(repos: Repos) {
   SocketHelper.init(repos);
   WebPushHelper.init();
   NotificationService.register(NotificationHelper.createNotifications);
+  // Reminder engine: register adapters + react to event.* mutations from content.
+  ensureRemindersReady(repos);
+  InternalEventBus.subscribe(ReminderEngine.handleBusEvent.bind(ReminderEngine));
 }

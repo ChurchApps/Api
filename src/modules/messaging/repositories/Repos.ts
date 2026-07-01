@@ -1,4 +1,4 @@
-import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, EmailTemplateRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, NotificationPreferenceOverrideRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
+import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, EmailTemplateRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, NotificationPreferenceOverrideRepo, NotificationEntityMuteRepo, ReminderDefinitionRepo, ReminderOccurrenceRepo, ReminderSentLogRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
 
 export class Repos {
   public blockedIp: BlockedIpRepo;
@@ -12,6 +12,10 @@ export class Repos {
   public notification: NotificationRepo;
   public notificationPreference: NotificationPreferenceRepo;
   public notificationPreferenceOverride: NotificationPreferenceOverrideRepo;
+  public notificationEntityMute: NotificationEntityMuteRepo;
+  public reminderDefinition: ReminderDefinitionRepo;
+  public reminderOccurrence: ReminderOccurrenceRepo;
+  public reminderSentLog: ReminderSentLogRepo;
   public privateMessage: PrivateMessageRepo;
   public textingProvider: TextingProviderRepo;
   public sentText: SentTextRepo;
@@ -30,6 +34,10 @@ export class Repos {
     this.notification = new NotificationRepo();
     this.notificationPreference = new NotificationPreferenceRepo();
     this.notificationPreferenceOverride = new NotificationPreferenceOverrideRepo();
+    this.notificationEntityMute = new NotificationEntityMuteRepo();
+    this.reminderDefinition = new ReminderDefinitionRepo();
+    this.reminderOccurrence = new ReminderOccurrenceRepo();
+    this.reminderSentLog = new ReminderSentLogRepo();
     this.privateMessage = new PrivateMessageRepo();
     this.textingProvider = new TextingProviderRepo();
     this.sentText = new SentTextRepo();

@@ -39,6 +39,13 @@ export class NotificationPreferenceOverrideRepo {
       .execute();
   }
 
+  public async loadByPersonIds(personIds: string[]) {
+    if (!personIds || personIds.length === 0) return [];
+    return getDb().selectFrom("notificationPreferenceOverrides").selectAll()
+      .where("personId", "in", personIds)
+      .execute();
+  }
+
   public async delete(churchId: string, id: string) {
     await getDb().deleteFrom("notificationPreferenceOverrides")
       .where("id", "=", id).where("churchId", "=", churchId).execute();

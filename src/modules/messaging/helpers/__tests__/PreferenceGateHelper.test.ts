@@ -87,4 +87,36 @@ describe("PreferenceGateHelper.evaluate", () => {
   it("a missing preference row behaves as defaults (allowed)", () => {
     expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", { pref: null }).allow).toBe(true);
   });
+
+  it("Layer 6: a fully muted entity suppresses", () => {
+    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", {
+      pref: { allowPush: true },
+      entityType: "event",
+      entityId: "E1",
+      entityMutes: [{ entityType: "event", entityId: "E1", level: "muted" }]
+    });
+    expect(r.reason).toBe("entity_muted");
+  });
+
+  it("Layer 6: 'mentions' level suppresses non-mentions but allows direct mentions", () => {
+    const muteCtx = (isDirectMention: boolean) => ({
+      pref: { allowPush: true },
+      entityType: "group",
+      entityId: "G1",
+      isDirectMention,
+      entityMutes: [{ entityType: "group", entityId: "G1", level: "mentions" }]
+    });
+    expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "group_messages", "push", muteCtx(false)).reason).toBe("entity_muted");
+    expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "group_messages", "push", muteCtx(true)).allow).toBe(true);
+  });
+
+  it("Layer 6: a mute on a different entity does not suppress", () => {
+    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", {
+      pref: { allowPush: true },
+      entityType: "event",
+      entityId: "E1",
+      entityMutes: [{ entityType: "event", entityId: "OTHER", level: "muted" }]
+    });
+    expect(r.allow).toBe(true);
+  });
 });

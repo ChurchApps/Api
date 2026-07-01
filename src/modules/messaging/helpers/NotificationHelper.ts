@@ -217,7 +217,20 @@ export class NotificationHelper {
     if (!pref) {
       pref = await this.createNotificationPref(churchId, personId);
     }
-    const overrides: NotificationPreferenceOverride[] = (await NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId)) as any[] || [];
+    // Entity mutes can only match when there's an entity to mute (navData.innerId);
+    // skip the query otherwise to keep the delivery hot path at one pref read.
+    const needMutes = !!navData?.innerId;
+    const [overrides, entityMutes] = (await Promise.all([
+      NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId),
+      needMutes ? NotificationHelper.repos.notificationEntityMute.loadForPerson(churchId, personId) : Promise.resolve([])
+    ])) as [NotificationPreferenceOverride[], any[]];
+    const gateCtx = {
+      pref,
+      overrides: overrides || [],
+      entityMutes: entityMutes || [],
+      entityType: navData?.innerType as string | undefined,
+      entityId: navData?.innerId as string | undefined
+    };
     this.addDebugStep(debugTrace, "delivery-load-prefs", "ok", {
       allowPush: pref.allowPush,
       emailFrequency: pref.emailFrequency,
@@ -226,7 +239,7 @@ export class NotificationHelper {
 
     // Level 1: Try Push (gated by the preference precedence rules)
     if (startLevel <= 1) {
-      const pushGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "push", { pref, overrides });
+      const pushGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "push", gateCtx);
       if (!pushGate.allow) {
         this.addDebugStep(debugTrace, "delivery-push-gated", "warn", { reason: pushGate.reason, decision: pushGate.decision });
       }
@@ -388,7 +401,7 @@ export class NotificationHelper {
 
     // Level 2: Email (gated). Covers emailFrequency="never" (channel_off) and
     // per-category email opt-out; otherwise it's queued for the digest path.
-    const emailGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "email", { pref, overrides });
+    const emailGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "email", gateCtx);
     if (!emailGate.allow) {
       this.addDebugStep(debugTrace, "delivery-return-complete", "warn", { reason: emailGate.reason || "email suppressed" });
       return "complete"; // End of line, no email wanted
@@ -1040,6 +1053,9 @@ export class NotificationHelper {
         console.log("[NotificationHelper.sendEmailNotifications] No trigger personIds found, skipping reply-to lookup");
       }
 
+      // Batch-load every recipient's overrides once (mirrors the batched pref load above).
+      const allOverrides = (await NotificationHelper.repos.notificationPreferenceOverride.loadByPersonIds(ArrayHelper.getIds(todoPrefs, "personId"))) as any[] || [];
+
       for (const pref of todoPrefs) {
         const allPersonNotifs: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
         const allPersonPms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
@@ -1047,7 +1063,7 @@ export class NotificationHelper {
 
         // Re-check the preference gate per category for the email channel; items
         // the member opted out of are marked complete (not emailed, not re-queued).
-        const overrides = (await NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(pref.churchId, pref.personId)) as any[] || [];
+        const overrides = ArrayHelper.getAll(allOverrides, "personId", pref.personId);
         const emailOk = (category: string) => PreferenceGateHelper.evaluate(pref.churchId, pref.personId, category, "email", { pref, overrides }).allow;
         const notifications = allPersonNotifs.filter((n) => emailOk(n.category || NotificationCategoryHelper.categoryFor(n.contentType)));
         const pms = allPersonPms.filter(() => emailOk("direct_messages"));

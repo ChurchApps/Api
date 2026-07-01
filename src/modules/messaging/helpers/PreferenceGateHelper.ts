@@ -1,4 +1,4 @@
-import { NotificationPreference, NotificationPreferenceOverride } from "../models/index.js";
+import { NotificationPreference, NotificationPreferenceOverride, NotificationEntityMute } from "../models/index.js";
 import { NotificationCategoryHelper } from "./NotificationCategoryHelper.js";
 
 export type GateDecision = "allow" | "suppress" | "defer";
@@ -17,6 +17,10 @@ export interface GateContext {
   timeZone?: string; // explicit tz; else pref.timeZone, else churchTimeZone
   churchTimeZone?: string; // fallback when the member has no tz set
   sentInWindow?: number; // frequency-cap source; wired in Phase 1/2 (architecture §11)
+  entityMutes?: NotificationEntityMute[]; // Phase 2 per-entity mute
+  entityType?: string;
+  entityId?: string;
+  isDirectMention?: boolean;
 }
 
 const ALLOW: GateResult = { decision: "allow", allow: true };
@@ -66,6 +70,12 @@ export class PreferenceGateHelper {
 
     // LAYER 5 — per-category preference (absence-means-default).
     if (!NotificationCategoryHelper.effectiveOptIn(category, channel, ctx.overrides)) return suppress("category_opt_out");
+
+    // LAYER 6 — per-entity mute (Phase 2). Mute restricts further than the category.
+    if (ctx.entityMutes && ctx.entityType && ctx.entityId) {
+      const mute = ctx.entityMutes.find((m) => m.entityType === ctx.entityType && m.entityId === ctx.entityId);
+      if (mute && (mute.level === "muted" || (mute.level === "mentions" && !ctx.isDirectMention))) return suppress("entity_muted");
+    }
 
     return ALLOW;
   }

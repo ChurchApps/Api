@@ -12,6 +12,7 @@ export class Church {
   public archivedDate?: Date;
   public latitude?: number;
   public longitude?: number;
+  public timeZone?: string;
 
   public settings?: any;
 }
