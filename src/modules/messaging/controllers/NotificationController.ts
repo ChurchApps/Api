@@ -106,10 +106,14 @@ export class NotificationController extends MessagingBaseController {
     }) as any;
   }
 
+  // Called from other modules (e.g. Doing: task assignment, plan publish/notify) after the
+  // triggering action already passed its own permission check — the caller's MessagingApi JWT
+  // won't carry a Messaging permission for that, so fall back to their cross-API grant like
+  // previewGroupPush/sendGroupPush do below.
   @httpPost("/create")
   public async create(req: express.Request<{}, {}, any>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
+      if (!(await this.canAccessCrossApi(au, Permissions.messaging.admin))) return this.json({}, 401);
       return await NotificationHelper.createNotifications(req.body.peopleIds, au.churchId, req.body.contentType, req.body.contentId, req.body.message, req.body?.link, au.personId);
     }) as any;
   }
