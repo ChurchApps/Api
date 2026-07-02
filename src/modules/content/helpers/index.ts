@@ -19,6 +19,7 @@ export { HolidayHelper } from "./HolidayHelper.js";
 export { ConflictHelper } from "./ConflictHelper.js";
 export { IcsHelper } from "./IcsHelper.js";
 export { ApprovalHelper } from "./ApprovalHelper.js";
+export { canViewPage, PUBLIC_VISIBILITY } from "./PageVisibilityHelper.js";
 
 // Re-export from shared helpers for convenience
 export { Environment } from "../../../shared/helpers/Environment.js";

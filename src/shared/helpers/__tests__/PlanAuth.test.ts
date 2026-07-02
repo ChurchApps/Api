@@ -1,5 +1,5 @@
 /**
- * Delegated authorization for the "doing" (Planning Center parity) module: a person
+ * Delegated authorization for the "doing" module: a person
  * without the global Plans:Edit permission can still edit a ministry's plans/plan
  * types/positions if they're a member of that ministry's group. These tests guard
  * against privilege-escalation bugs in that fallback path.

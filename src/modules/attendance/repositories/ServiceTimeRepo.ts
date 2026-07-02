@@ -59,6 +59,34 @@ export class ServiceTimeRepo {
     return rows.rows;
   }
 
+  // Flat service+time rows for the public service-times element. Campus names are
+  // resolved separately from the membership master (attendance.campuses is frozen).
+  public async loadPublicTree(churchId: string) {
+    const rows = await sql<any>`SELECT s.id as serviceId, s.name as serviceName, s.campusId, st.id as timeId, st.name as timeName
+      FROM services s INNER JOIN serviceTimes st ON st.serviceId=s.id AND st.removed=0
+      WHERE s.churchId=${churchId} AND s.removed=0
+      ORDER BY s.name, st.name`.execute(getDb());
+    return rows.rows;
+  }
+
+  // Groups flat rows into [{ serviceId, serviceName, campusName?, times:[{id,name}] }].
+  public buildPublicTree(rows: any[], campusNames: { [id: string]: string } = {}) {
+    const byService = new Map<string, any>();
+    const result: any[] = [];
+    (Array.isArray(rows) ? rows : []).forEach((r) => {
+      let service = byService.get(r.serviceId);
+      if (!service) {
+        service = { serviceId: r.serviceId, serviceName: r.serviceName, times: [] };
+        const campusName = r.campusId ? campusNames[r.campusId] : undefined;
+        if (campusName) service.campusName = campusName;
+        byService.set(r.serviceId, service);
+        result.push(service);
+      }
+      if (r.timeId) service.times.push({ id: r.timeId, name: r.timeName });
+    });
+    return result;
+  }
+
   public convertToModel(_churchId: string, data: any) {
     return data ? this.rowToModel(data) : data;
   }

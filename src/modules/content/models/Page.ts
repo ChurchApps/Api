@@ -8,6 +8,9 @@ export class Page {
   public layout?: string;
   public publishedJSON?: string;
   public publishedAt?: Date;
+  public visibility?: string;
+  public groupIds?: string;
+  public metaDescription?: string;
 
   public sections?: Section[];
 }

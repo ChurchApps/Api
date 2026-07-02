@@ -1,6 +1,8 @@
 export { Block } from "./Block.js";
 export { Element } from "./Element.js";
 export { Page } from "./Page.js";
+export { Post } from "./Post.js";
+export { Redirect } from "./Redirect.js";
 export { PageHistory } from "./PageHistory.js";
 export { Section } from "./Section.js";
 export { Link } from "./Link.js";

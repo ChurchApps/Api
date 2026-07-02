@@ -84,7 +84,7 @@ export class AutomationExecutionRepo {
       .execute();
   }
 
-  // Retention sweep — history must cover at least 32 days (PC parity); we keep 90.
+  // Retention sweep — history must cover at least 32 days; we keep 90.
   public async purgeOld(days = 90) {
     await getDb().deleteFrom("automationExecutions")
       .where("status", "in", ["success", "failed"])

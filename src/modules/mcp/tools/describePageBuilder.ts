@@ -20,7 +20,14 @@ Block         (blockType: sectionBlock | footerBlock | elementBlock)
       └─ Element ...
 \`\`\`
 
-A Section can point at a Block via \`targetBlockId\` to inline a reusable block. An Element with \`elementType:"block"\` references a block via \`answers.blockId\`.
+A Section can point at a Block via \`targetBlockId\` to inline a reusable block. An Element with \`elementType:"block"\` references a block via \`answers.targetBlockId\`.
+
+## Section answers (backgrounds & shaped dividers)
+
+A Section record carries its own \`answersJSON\` (parsed to \`answers\` on read). Beyond \`background\`/\`textColor\`, it supports:
+
+- \`backgroundOpacity\` — 0-1 overlay opacity drawn over an image background.
+- \`dividerTop\` / \`dividerBottom\` — a shaped SVG edge between sections: \`{ "shape":"wave|waves|slant|curve|triangle|peaks", "color":"#ffffff", "height":60, "flip":false }\`. \`color\` should match the ADJACENT section's background so the shape reads as a transition. \`height\` is px (default 60); \`flip\` mirrors horizontally.
 
 \`churchId\` is **auto-set from the auth token** on every POST — do not pass it. All POST endpoints accept an **array** of records (omit \`id\` to create, include \`id\` to update).
 
@@ -53,23 +60,32 @@ You'll need the user's \`churchId\` for the tree endpoint. Get it from \`GET /me
 - \`text\` — Rich text. \`{ text:"<p>hello</p>", textAlignment:"left"|"center"|"right" }\`. \`text\` is HTML (use \`<h1>\`, \`<p>\`, \`<a>\`, etc.).
 - \`textWithPhoto\` — \`{ photo, photoAlt, photoPosition:"left"|"right"|"top"|"bottom", text, textAlignment }\`.
 - \`card\` — \`{ photo, photoAlt, url, title, titleAlignment, text, textAlignment }\`.
-- \`faq\` — Expandable Q&A.
-- \`table\` — \`{ columns:"Name,Email", ... }\`.
+- \`faq\` — Expandable Q&A. \`{ title, description:"<p>answer html</p>", headingType:"h6"|"link", iconColor }\`.
+- \`iconFeature\` — A Material Icon above a short heading + blurb. \`{ icon:"volunteer_activism", title, description:"<p>...</p>", iconColor:"#03a9f4", iconSize:"small"|"medium"|"large", textAlignment:"center" }\`. \`icon\` is a Material Icons ligature name. Ideal in a \`row\` of 3-4 for "what to expect" / values / feature grids.
+- \`testimonial\` — Member quotes. \`{ quotes:[{ text, author, role?, photoUrl? }], displayMode:"single"|"rotate" }\`. \`quotes\` is a native array (not stringified inside answersJSON). Use for member/visitor quotes.
+- \`stats\` — Big-number highlights. \`{ items:[{ value:500, prefix?, suffix?:"+", label:"Members" }], columns:2|3|4 }\`. \`items\` is a native array; \`value\` is a number. Use for attendance/impact numbers.
+- \`socialIcons\` — Row of social links. \`{ facebook, instagram, youtube, x, tiktok, vimeo, iconStyle:"filled"|"outlined", size:"small"|"medium"|"large", alignment:"left"|"center"|"right", color:"#444444" }\`. Only the URLs you set render.
+- \`countdown\` — Countdown timer. \`{ mode:"weekly"|"date", dayOfWeek:0, time:"10:00", targetDate?, title, completedText:"Starting now!", showDays:"true", showHours:"true" }\`. \`weekly\` counts to the next dayOfWeek/time (Sunday=0); \`date\` counts to \`targetDate\` (ISO).
+- \`table\` — \`{ contents:[["a","b"],["c","d"]], head:false, markdown:false, size:"medium"|"small" }\`. \`contents\` is a native 2D string array; set \`head:true\` to make the first row a header.
 
 ### Media
 - \`image\` — \`{ photo:"https://...", photoAlt:"description" }\`.
+- \`gallery\` — Photo grid. \`{ photos:[{ url, alt?, caption? }], layout:"grid"|"masonry"|"square"|"wide", columns:2|3|4, spacing:"small"|"medium"|"large" }\`. \`photos\` is a native array.
 - \`video\` — \`{ videoType:"youtube"|"vimeo", videoId:"dQw4w9WgXcQ" }\` (just the id, not the full URL).
 - \`map\` — \`{ mapAddress:"123 Main St", mapLabel:"Our Church", mapZoom:15 }\`.
 
 ### Church-specific
 - \`logo\` — \`{ url:"https://..." }\` (link the logo points at).
-- \`sermons\` — Sermon list (no required answers).
+- \`sermons\` — Sermon list. \`{ layout:"browse"|"grid"|"list"|"featuredLatest", playlistId?, itemCount:6, showTitles:"true", showDates:"true" }\`. \`browse\` (default) is the interactive playlist browser; \`grid\`/\`list\` render a flat set (respect \`itemCount\`/\`playlistId\`); \`featuredLatest\` is a single hero for the newest sermon.
 - \`stream\` — \`{ mode:"video"|"interaction", offlineContent:"countdown"|"hide"|"block", targetBlockId? }\`.
 - \`donation\` — Donation form.
 - \`donateLink\` — Simple donate button.
 - \`form\` — Embedded custom form. \`{ formId }\`.
 - \`calendar\` — Calendar view.
 - \`groupList\` — \`{ label:"Our Groups" }\`.
+- \`campaignProgress\` — Live giving-goal thermometer. \`{ fundId, goalAmount:50000, title, startDate?, endDate?, showAmounts:"true", donateUrl? }\`. \`fundId\` must be a real GivingApi fund id — look it up; never invent one.
+- \`staffGrid\` — Live staff/team photo cards from a group's roster. \`{ groupId, columns:2|3|4, showRoles:"true" }\`. \`groupId\` must be a real group with its "Show roster on website" (publicRoster) setting enabled, else nothing renders.
+- \`serviceTimes\` — Live service schedule (also emits schema.org Event JSON-LD when day/time parse). \`{ title:"Service Times", showCampus:"true" }\`. Data comes from the church's attendance service times; no ids needed.
 
 ### Advanced
 - \`rawHTML\` — **This is the "HTML block".** \`{ rawHTML:"<your html>", javascript:"/* optional, no <script> tag */" }\`. Use this whenever the user asks for an HTML block, custom embed, or hand-written markup.

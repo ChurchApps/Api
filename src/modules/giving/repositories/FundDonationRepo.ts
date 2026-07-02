@@ -133,6 +133,21 @@ export class FundDonationRepo {
     return result.rows;
   }
 
+  public async getTotalByFundId(churchId: string, fundId: string, startDate?: Date, endDate?: Date) {
+    let query = getDb().selectFrom("fundDonations as fd")
+      .innerJoin("donations as d", "d.id", "fd.donationId")
+      .where("fd.churchId", "=", churchId)
+      .where("fd.fundId", "=", fundId)
+      .select((eb) => [
+        eb.fn.sum("fd.amount").as("totalAmount"),
+        eb.fn.count("fd.donationId").distinct().as("donationCount")
+      ]) as any;
+    if (startDate) query = query.where("d.donationDate", ">=", startDate);
+    if (endDate) query = query.where("d.donationDate", "<=", endDate);
+    const row: any = await query.executeTakeFirst();
+    return { totalAmount: Number(row?.totalAmount) || 0, donationCount: Number(row?.donationCount) || 0 };
+  }
+
   private rowToModel(data: any): FundDonation {
     const result: any = { id: data.id, donationId: data.donationId, fundId: data.fundId, amount: data.amount, currency: data?.currency };
     if (data.batchId !== undefined) {

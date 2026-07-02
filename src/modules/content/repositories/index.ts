@@ -2,6 +2,8 @@ export { BlockRepo } from "./BlockRepo.js";
 export { ElementRepo } from "./ElementRepo.js";
 export { PageRepo } from "./PageRepo.js";
 export { PageHistoryRepo } from "./PageHistoryRepo.js";
+export { PostRepo } from "./PostRepo.js";
+export { RedirectRepo } from "./RedirectRepo.js";
 export { SectionRepo } from "./SectionRepo.js";
 export { LinkRepo } from "./LinkRepo.js";
 export { FileRepo } from "./FileRepo.js";

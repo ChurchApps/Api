@@ -16,6 +16,7 @@ BEGIN
     TRUNCATE TABLE playlists;
     TRUNCATE TABLE elements;
     TRUNCATE TABLE sections;
+    TRUNCATE TABLE posts;
     TRUNCATE TABLE pages;
     TRUNCATE TABLE blocks;
     TRUNCATE TABLE curatedEvents;

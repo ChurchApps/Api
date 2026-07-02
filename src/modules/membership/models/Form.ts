@@ -14,4 +14,8 @@ export class Form {
   public archived?: boolean;
   public action?: string;
   public thankYouMessage?: string;
+  public displayMode?: string;
+  public autoCreatePerson?: boolean;
+  public followUpSubject?: string;
+  public followUpBody?: string;
 }

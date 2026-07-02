@@ -24,6 +24,10 @@ export class FormRepo {
       accessEndTime: accessEndTime as any,
       restricted: form.restricted,
       thankYouMessage: form.thankYouMessage,
+      displayMode: form.displayMode ?? "standard",
+      autoCreatePerson: form.autoCreatePerson ?? false,
+      followUpSubject: form.followUpSubject,
+      followUpBody: form.followUpBody,
       createdTime: sql`NOW()` as any,
       modifiedTime: sql`NOW()` as any,
       archived: false as any,
@@ -43,6 +47,10 @@ export class FormRepo {
       accessEndTime: accessEndTime as any,
       archived: form.archived,
       thankYouMessage: form.thankYouMessage,
+      displayMode: form.displayMode ?? "standard",
+      autoCreatePerson: form.autoCreatePerson ?? false,
+      followUpSubject: form.followUpSubject,
+      followUpBody: form.followUpBody,
       modifiedTime: sql`NOW()` as any
     }).where("id", "=", form.id).where("churchId", "=", form.churchId).execute();
     return form;
@@ -131,7 +139,7 @@ export class FormRepo {
 
   public async access(id: string) {
     return (await getDb().selectFrom("forms")
-      .select(["id", "name", "restricted", "churchId"])
+      .select(["id", "name", "restricted", "churchId", "autoCreatePerson", "followUpSubject", "followUpBody"])
       .where("id", "=", id)
       .where("removed", "=", 0 as any)
       .where("archived", "=", 0 as any)
@@ -161,7 +169,11 @@ export class FormRepo {
       restricted: row.restricted,
       archived: row.archived,
       action: row.action,
-      thankYouMessage: row.thankYouMessage
+      thankYouMessage: row.thankYouMessage,
+      displayMode: row.displayMode,
+      autoCreatePerson: row.autoCreatePerson,
+      followUpSubject: row.followUpSubject,
+      followUpBody: row.followUpBody
     };
   }
 

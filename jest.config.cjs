@@ -7,7 +7,7 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\\.ts$': ['ts-jest', {
+    '^.+\\.[tj]s$': ['ts-jest', {
       // The Api's main tsconfig uses module=NodeNext which Jest can't load directly.
       // Compile tests with a Jest-friendly module setting; isolatedModules keeps it fast.
       isolatedModules: true,
@@ -37,6 +37,9 @@ module.exports = {
   moduleNameMapper: {
     '^@shared/(.*)$': '<rootDir>/src/shared/$1',
     '^@modules/(.*)$': '<rootDir>/src/modules/$1',
+    // Test-only alias to the current (workspace-built) element catalog so AI-generation
+    // validation is checked against the live schemas, not the possibly-stale installed pkg.
+    '^@current-element-catalog$': '<rootDir>/../Packages/helpers/dist/ElementTypes.js',
     // Strip the `.js` suffix that NodeNext-style imports use, so Jest+ts-jest
     // can resolve sibling `.ts` files.
     '^(\\.{1,2}/.*)\\.js$': '$1',

@@ -3,7 +3,7 @@ import type {
   BibleTranslation, BibleVerse, BibleVerseText, Block, CalendarBlockout,
   CuratedCalendar, CuratedEvent, Element, Event, EventBooking,
   EventException, EventTemplate, File, GlobalStyle, Link,
-  Page, PageHistory, Playlist, Registration, RegistrationMember, Resource,
+  Page, PageHistory, Post, Playlist, Redirect, Registration, RegistrationMember, Resource,
   Room, Section, Sermon, Setting, Song, SongDetail, SongDetailLink,
   StreamingService
 } from "../models/index.js";
@@ -33,7 +33,9 @@ export interface ContentDatabase {
   links: Link;
   pages: Omit<Page, "sections">;
   pageHistory: PageHistory;
+  posts: Post;
   playlists: Playlist;
+  redirects: Redirect;
   registrations: Omit<Registration, "members">;
   registrationMembers: RegistrationMember;
   sections: Omit<Section, "answers" | "styles" | "animations" | "elements" | "sections">;

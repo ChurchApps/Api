@@ -297,6 +297,9 @@ INSERT INTO `groups` (id, churchId, categoryName, name, trackAttendance, parentP
 -- Special Events
 ('GRP00000030', 'CHU00000001', 'Events', 'Vacation Bible School', 1, 1, 1, 'Annual summer program for children.', 'Summer', 'Various', 'standard', 'events', 'vacation-bible-school', 0);
 
+-- Opt one team group into public roster exposure (staff/team grid demo data)
+UPDATE `groups` SET publicRoster = b'1' WHERE id = 'GRP0000000b' AND churchId = 'CHU00000001';
+
 -- Group Memberships
 INSERT INTO groupMembers (id, churchId, groupId, personId, joinDate, leader) VALUES
 -- Worship Services (Everyone attends main service)

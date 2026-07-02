@@ -15,6 +15,21 @@ export class FundController extends GivingBaseController {
     });
   }
 
+  @httpGet("/public/:churchId/:fundId/total")
+  public async getPublicTotal(@requestParam("churchId") churchId: string, @requestParam("fundId") fundId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const fund = await this.repos.fund.load(churchId, fundId);
+      if (!fund) return { fundId, totalAmount: 0, donationCount: 0 };
+      const parseDate = (v: any) => {
+        if (!v) return undefined;
+        const d = new Date(v.toString());
+        return isNaN(d.getTime()) ? undefined : d;
+      };
+      const totals = await this.repos.fundDonation.getTotalByFundId(churchId, fundId, parseDate(req.query.startDate), parseDate(req.query.endDate));
+      return { fundId, ...totals };
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

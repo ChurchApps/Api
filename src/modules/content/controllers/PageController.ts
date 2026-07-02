@@ -1,6 +1,6 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
-import { Permissions } from "../helpers/index.js";
+import { Permissions, canViewPage, PUBLIC_VISIBILITY } from "../helpers/index.js";
 import { TreeHelper } from "../helpers/TreeHelper.js";
 import { Element, Page, Section } from "../models/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
@@ -19,6 +19,10 @@ export class PageController2 extends ContentBaseController {
 
       let result: Page = {};
       if (page?.id !== undefined) {
+        // Only url-based (public render) requests are gated; the editor's id-based requests are unchanged.
+        if (url && !canViewPage(page, this.authUser())) {
+          return { restricted: true, visibility: page.visibility || PUBLIC_VISIBILITY };
+        }
         result = page;
         // Public (url-based) requests serve the published snapshot when one exists; the
         // editor's id-based requests always see the working tree.
@@ -103,7 +107,9 @@ export class PageController2 extends ContentBaseController {
   public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const pages: Page[] = await this.repos.page.loadAll(churchId);
-      return pages.map((p) => ({ url: p.url, title: p.title }));
+      return pages
+        .filter((p) => (p.visibility || PUBLIC_VISIBILITY) === PUBLIC_VISIBILITY)
+        .map((p) => ({ url: p.url, title: p.title, metaDescription: p.metaDescription }));
     });
   }
 
@@ -203,6 +209,7 @@ export class PageController2 extends ContentBaseController {
   private removeTreeFields(page: Page) {
     delete page.id;
     delete page.churchId;
+    delete page.groupIds;
     page.sections.forEach((s) => {
       delete s.id;
       delete s.churchId;

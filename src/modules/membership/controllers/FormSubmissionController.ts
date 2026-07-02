@@ -2,7 +2,8 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { FormSubmission, Answer, Form, Church } from "../models/index.js";
-import { Permissions, Environment } from "../helpers/index.js";
+import { Permissions, Environment, ConversationalFormHelper } from "../helpers/index.js";
+import type { FormContact } from "../helpers/index.js";
 import { MemberPermission, Person } from "../models/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
@@ -77,6 +78,25 @@ export class FormSubmissionController extends MembershipBaseController {
               results.push({ error: `You're not allowed to submit ${form.name}` });
             } else {
               formSubmission.churchId = churchId;
+
+              const wantsPerson = form.autoCreatePerson === true;
+              const wantsFollowUp = !!(form.followUpSubject && form.followUpBody);
+              let contact: FormContact = null;
+              let followUpFirstName: string = null;
+              if (wantsPerson || wantsFollowUp) {
+                const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
+                contact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
+                followUpFirstName = contact?.firstName;
+                if (wantsPerson && contact?.email && !formSubmission.contentId) {
+                  const person = await ConversationalFormHelper.findOrCreatePerson(this.repos, churchId, contact);
+                  if (person) {
+                    formSubmission.contentType = "person";
+                    formSubmission.contentId = person.id;
+                    followUpFirstName = person.name?.first || contact.firstName;
+                  }
+                }
+              }
+
               const savedSubmissions = await this.repos.formSubmission.save(formSubmission);
 
               const answerPromises: Promise<Answer>[] = [];
@@ -98,6 +118,14 @@ export class FormSubmissionController extends MembershipBaseController {
                 await this.sendEmails(formSubmission, form, churchId);
               } catch (err) {
                 console.error("Form submission notifications failed (non-fatal):", err);
+              }
+
+              if (wantsFollowUp && contact?.email) {
+                try {
+                  await this.sendFollowUp(churchId, contact.email, followUpFirstName, form.followUpSubject, form.followUpBody);
+                } catch (err) {
+                  console.error("Form follow-up email failed (non-fatal):", err);
+                }
               }
             }
           }
@@ -138,6 +166,14 @@ export class FormSubmissionController extends MembershipBaseController {
         }
       }
     }
+  }
+
+  private async sendFollowUp(churchId: string, email: string, firstName: string, subject: string, body: string) {
+    const church: Church = await this.repos.church.loadById(churchId);
+    const tokens = { firstName, churchName: church?.name };
+    const resolvedSubject = ConversationalFormHelper.applyTokens(subject, tokens);
+    const resolvedBody = ConversationalFormHelper.applyTokens(body, tokens);
+    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
   }
 
   private async sendNotifications(churchId: string, form: Form, peopleIds: string[]) {

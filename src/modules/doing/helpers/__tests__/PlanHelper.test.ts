@@ -1,5 +1,5 @@
 /**
- * Unit tests for the parity-grade auto-scheduling algorithm (roadmap 2.14/2.15):
+ * Unit tests for the auto-scheduling algorithm (roadmap 2.14/2.15):
  * last-served rotation, blockout/cross-plan exclusions, max-per-month and
  * preferred-time preferences, household together/apart scheduling, undo-able
  * runs, and auto-replacement when a volunteer declines.

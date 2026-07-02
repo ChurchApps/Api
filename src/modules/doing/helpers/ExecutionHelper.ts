@@ -12,7 +12,7 @@ interface Subject {
 }
 
 // Execution lifecycle for the rule engine: every trigger firing becomes an
-// automationExecutions row (PC-parity history). The first attempt runs inline;
+// automationExecutions row (execution history). The first attempt runs inline;
 // failures are retried with backoff by processDue (scheduled-tasks timer). A row is
 // created pending with a short lease so a crash mid-attempt is picked up by the worker.
 export class ExecutionHelper {

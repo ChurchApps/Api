@@ -78,6 +78,27 @@ export class GroupMemberRepo {
       .execute();
   }
 
+  // Privacy-safe roster for public website elements (staff/team grid).
+  // Roster exposure is an explicit per-group opt-in (publicRoster=1) on top of
+  // the group being publicly visible (non-archived, non-removed); a group that
+  // hasn't opted in, is hidden, or is missing yields no rows. Only display name
+  // + photo + leader flag are selected — never contact/demographic fields.
+  public async loadPublicForGroup(churchId: string, groupId: string) {
+    return getDb().selectFrom("groupMembers as gm")
+      .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .select(["gm.id", "gm.personId", "gm.leader", "p.displayName", "p.photoUpdated"])
+      .where("gm.churchId", "=", churchId)
+      .where("gm.groupId", "=", groupId)
+      .where("g.removed", "=", false as any)
+      .where("g.publicRoster", "=", true as any)
+      .where((eb) => eb.or([eb("g.archived", "is", null), eb("g.archived", "=", false as any)]))
+      .orderBy("gm.leader", "desc")
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
+      .execute();
+  }
+
   public async loadForGroups(churchId: string, groupIds: string[]) {
     if (!groupIds.length) return [];
     return getDb().selectFrom("groupMembers as gm")
@@ -232,6 +253,20 @@ export class GroupMemberRepo {
   public convertAllToModel(_churchId: string, data: any[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => this.rowToModel(d));
+  }
+
+  // Flattened, privacy-safe projection for the public staff/team grid.
+  public convertAllToPublicModel(churchId: string, data: any[]) {
+    if (!Array.isArray(data)) return [];
+    return data.map((d) => {
+      const result: any = {
+        id: d.personId,
+        name: { display: d.displayName },
+        photo: PersonHelper.getPhotoPath(churchId, { id: d.personId, photoUpdated: d.photoUpdated })
+      };
+      if (d.leader) result.role = "Leader";
+      return result;
+    });
   }
 
   public convertAllToBasicModel(churchId: string, data: any[]) {

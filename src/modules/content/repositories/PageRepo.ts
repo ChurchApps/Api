@@ -16,7 +16,10 @@ export class PageRepo {
       churchId: model.churchId,
       url: model.url,
       title: model.title,
-      layout: model.layout
+      layout: model.layout,
+      visibility: model.visibility,
+      groupIds: model.groupIds,
+      metaDescription: model.metaDescription
     } as any).execute();
     return model;
   }
@@ -25,8 +28,11 @@ export class PageRepo {
     await getDb().updateTable("pages").set({
       url: model.url,
       title: model.title,
-      layout: model.layout
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+      layout: model.layout,
+      visibility: model.visibility,
+      groupIds: model.groupIds,
+      metaDescription: model.metaDescription
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -35,7 +41,9 @@ export class PageRepo {
   }
 
   // publishedJSON (a full page snapshot) is intentionally excluded from loads; use loadPublished.
-  private static readonly summaryColumns = ["id", "churchId", "url", "title", "layout", "publishedAt"] as const;
+  private static readonly summaryColumns = [
+    "id", "churchId", "url", "title", "layout", "publishedAt", "visibility", "groupIds", "metaDescription"
+  ] as const;
 
   public async load(churchId: string, id: string): Promise<Page | undefined> {
     return (await getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
@@ -69,7 +77,10 @@ export class PageRepo {
       url: row.url,
       title: row.title,
       layout: row.layout,
-      publishedAt: row.publishedAt
+      publishedAt: row.publishedAt,
+      visibility: row.visibility,
+      groupIds: row.groupIds,
+      metaDescription: row.metaDescription
     };
   }
 }

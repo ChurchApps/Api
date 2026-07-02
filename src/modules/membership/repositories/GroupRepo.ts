@@ -32,6 +32,7 @@ export class GroupRepo {
       campusId: group.campusId,
       joinPolicy: group.joinPolicy ?? "open",
       archived: group.archived ?? false,
+      publicRoster: group.publicRoster ?? false,
       removed: false as any
     }).execute();
     return group;
@@ -55,7 +56,8 @@ export class GroupRepo {
       slug: group.slug,
       campusId: group.campusId,
       joinPolicy: group.joinPolicy ?? "open",
-      archived: group.archived ?? false
+      archived: group.archived ?? false,
+      publicRoster: group.publicRoster ?? false
     }).where("id", "=", group.id).where("churchId", "=", group.churchId).execute();
     return group;
   }
@@ -218,7 +220,8 @@ export class GroupRepo {
       slug: row.slug,
       campusId: row.campusId,
       joinPolicy: (row.joinPolicy as Group["joinPolicy"]) ?? "open",
-      archived: row.archived
+      archived: row.archived,
+      publicRoster: row.publicRoster
     };
     row.labels?.split(",").forEach((label: string) => result.labelArray.push(label.trim()));
     return result;

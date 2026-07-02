@@ -3,9 +3,29 @@ import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { ServiceTime, GroupServiceTime } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
+import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 
 @controller("/attendance/servicetimes")
 export class ServiceTimeController extends AttendanceBaseController {
+  @httpGet("/public/:churchId")
+  public async getPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const rows = (await this.repos.serviceTime.loadPublicTree(churchId)) as any[];
+      const campusIds = [...new Set(rows.map((r) => r.campusId).filter(Boolean))];
+      const campusNames: { [id: string]: string } = {};
+      if (campusIds.length > 0) {
+        const campuses = await KyselyPool.getDb<any>("membership").selectFrom("campuses")
+          .select(["id", "name"])
+          .where("churchId", "=", churchId)
+          .where("id", "in", campusIds)
+          .where((eb: any) => eb.or([eb("removed", "is", null), eb("removed", "=", false)]))
+          .execute();
+        (campuses as any[]).forEach((c) => (campusNames[c.id] = c.name));
+      }
+      return this.repos.serviceTime.buildPublicTree(rows, campusNames);
+    });
+  }
+
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {

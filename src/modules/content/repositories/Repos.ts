@@ -3,6 +3,8 @@ import {
   ElementRepo,
   PageRepo,
   PageHistoryRepo,
+  PostRepo,
+  RedirectRepo,
   SectionRepo,
   LinkRepo,
   FileRepo,
@@ -40,6 +42,8 @@ export class Repos {
   public element: ElementRepo;
   public page: PageRepo;
   public pageHistory: PageHistoryRepo;
+  public post: PostRepo;
+  public redirect: RedirectRepo;
   public section: SectionRepo;
   public link: LinkRepo;
   public file: FileRepo;
@@ -78,6 +82,8 @@ export class Repos {
     this.element = new ElementRepo();
     this.page = new PageRepo();
     this.pageHistory = new PageHistoryRepo();
+    this.post = new PostRepo();
+    this.redirect = new RedirectRepo();
     this.section = new SectionRepo();
     this.link = new LinkRepo();
     this.file = new FileRepo();
