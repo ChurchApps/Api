@@ -16,6 +16,7 @@ export class Group {
   public labelArray?: string[];
   public slug?: string;
   public campusId?: string;
+  public archived?: boolean;
 
   public joinPolicy?: "open" | "request" | "closed";
 

@@ -73,50 +73,18 @@ export class SubscriptionController extends GivingBaseController {
     });
   }
 
+  // authz-exempt: gated by resolveSubscriptionForAction(au, id, provider) — donations.edit or subscription owner (au.personId)
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string; reason?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const subscription = await this.repos.subscription.load(au.churchId, id) as any;
-      let permission = au.checkAccess(Permissions.donations.edit) || subscription?.personId === au.personId;
-
-      // Resolve gateway via provider query/body param or by looking up the customer's provider
       const provider = req.query?.provider?.toString() || req.body?.provider;
-      let gateway = provider
-        ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
-        : null;
-
-      // KingdomFunding subscriptions are not persisted in the local `subscription`
-      // table, so the personId-on-subscription check above can never grant access.
-      // Fall back to verifying that the schedule's customer_id matches the
-      // requester's KF customer record for this church.
-      if (!permission && !subscription && provider?.toLowerCase() === "kingdomfunding" && gateway) {
-        const schedule = await GatewayService.getSubscription(gateway, id).catch(() => null);
-        const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
-        if (remoteCustomerId) {
-          const ownerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, provider).catch(() => null) as any;
-          if (ownerCustomer && String(ownerCustomer.id) === remoteCustomerId) {
-            permission = true;
-          }
-        }
-      }
-
-      if (!permission) return this.json(null, 401);
-
-      if (!gateway && subscription?.customerId) {
-        const customer = await this.repos.customer.load(au.churchId, subscription.customerId) as any;
-        const custProvider = customer?.provider || "stripe";
-        gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: custProvider }, this.repos.gateway).catch(() => null);
-      }
-
-      if (!gateway) {
-        gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
-      }
-
-      if (!gateway) return this.json({ error: "No gateway configured" }, 400);
+      const resolved = await this.resolveSubscriptionForAction(au, id, provider);
+      if (!resolved.permission) return this.json(null, 401);
+      if (!resolved.gateway) return this.json({ error: "No gateway configured" }, 400);
 
       try {
         // Cancel subscription with the gateway
-        await GatewayService.cancelSubscription(gateway, id, req.body?.reason);
+        await GatewayService.cancelSubscription(resolved.gateway, id, req.body?.reason);
         // Delete from database
         await this.repos.subscription.delete(au.churchId, id);
         return this.json({ success: true });
@@ -125,6 +93,81 @@ export class SubscriptionController extends GivingBaseController {
         return this.json({ error: "Subscription cancellation failed" }, 500);
       }
     });
+  }
+
+  // authz-exempt: gated by resolveSubscriptionForAction(au, id, provider) — donations.edit or subscription owner (au.personId)
+  @httpPost("/:id/pause")
+  public async pause(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const provider = req.query?.provider?.toString() || req.body?.provider;
+      const resolved = await this.resolveSubscriptionForAction(au, id, provider);
+      if (!resolved.permission) return this.json(null, 401);
+      if (!resolved.gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      try {
+        await GatewayService.pauseSubscription(resolved.gateway, id);
+        return this.json({ success: true });
+      } catch (error) {
+        console.error("Subscription pause failed:", error);
+        return this.json({ error: "Subscription pause failed" }, 500);
+      }
+    });
+  }
+
+  // authz-exempt: gated by resolveSubscriptionForAction(au, id, provider) — donations.edit or subscription owner (au.personId)
+  @httpPost("/:id/resume")
+  public async resume(@requestParam("id") id: string, req: express.Request<{}, {}, { provider?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const provider = req.query?.provider?.toString() || req.body?.provider;
+      const resolved = await this.resolveSubscriptionForAction(au, id, provider);
+      if (!resolved.permission) return this.json(null, 401);
+      if (!resolved.gateway) return this.json({ error: "No gateway configured" }, 400);
+
+      try {
+        await GatewayService.resumeSubscription(resolved.gateway, id);
+        return this.json({ success: true });
+      } catch (error) {
+        console.error("Subscription resume failed:", error);
+        return this.json({ error: "Subscription resume failed" }, 500);
+      }
+    });
+  }
+
+  // Shared by delete/pause/resume: resolves the gateway and verifies the caller either
+  // owns the subscription or holds donations.edit. KingdomFunding schedules aren't always
+  // persisted locally, so ownership falls back to matching the remote schedule's customer_id.
+  private async resolveSubscriptionForAction(au: any, id: string, provider?: string): Promise<{ subscription: any; gateway: any; permission: boolean }> {
+    const subscription = await this.repos.subscription.load(au.churchId, id) as any;
+    let permission = au.checkAccess(Permissions.donations.edit) || subscription?.personId === au.personId;
+
+    let gateway = provider
+      ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
+      : null;
+
+    if (!permission && !subscription && provider?.toLowerCase() === "kingdomfunding" && gateway) {
+      const schedule = await GatewayService.getSubscription(gateway, id).catch(() => null);
+      const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
+      if (remoteCustomerId) {
+        const ownerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, provider).catch(() => null) as any;
+        if (ownerCustomer && String(ownerCustomer.id) === remoteCustomerId) {
+          permission = true;
+        }
+      }
+    }
+
+    if (!permission) return { subscription, gateway: null, permission: false };
+
+    if (!gateway && subscription?.customerId) {
+      const customer = await this.repos.customer.load(au.churchId, subscription.customerId) as any;
+      const custProvider = customer?.provider || "stripe";
+      gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: custProvider }, this.repos.gateway).catch(() => null);
+    }
+
+    if (!gateway) {
+      gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
+    }
+
+    return { subscription, gateway, permission: true };
   }
 
   private loadPrivateKey = async (churchId: string) => {

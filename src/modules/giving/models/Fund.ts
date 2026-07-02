@@ -5,4 +5,5 @@ export class Fund {
   public taxDeductible?: boolean;
   public productId?: string;
   public amount?: number;
+  public visible?: boolean;
 }

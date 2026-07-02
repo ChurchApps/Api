@@ -158,7 +158,7 @@ export class GroupMemberController extends MembershipBaseController {
       if (!groupId) return this.json({ error: "groupId required" }, 400);
 
       const group: any = await this.repos.group.load(au.churchId, groupId);
-      if (!group) return this.json({ error: "Group not found" }, 404);
+      if (!group || group.archived) return this.json({ error: "Group not found" }, 404);
 
       const policy = group.joinPolicy ?? "open";
       if (policy === "closed") return this.json({ error: "Group is closed to new members" }, 403);

@@ -205,16 +205,15 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       return { personId: existing[0].id, householdId: existing[0].householdId, email: existing[0].email };
     }
     const household = await repos.household.save({ churchId, name: guestInfo.lastName });
+    // PersonRepo.save maps only the nested name/contactInfo shapes to columns.
     const person = await repos.person.save({
       churchId,
-      firstName: guestInfo.firstName,
-      lastName: guestInfo.lastName,
-      email: guestInfo.email,
-      mobilePhone: guestInfo.phone || null,
+      name: { first: guestInfo.firstName, last: guestInfo.lastName },
+      contactInfo: { email: guestInfo.email, mobilePhone: guestInfo.phone || null },
       householdId: household.id,
       householdRole: "Head",
       membershipStatus: "Guest"
-    });
+    } as any);
     return { personId: person.id, householdId: household.id, email: guestInfo.email };
   }
 

@@ -84,6 +84,16 @@ export class StripeHelper {
     return await stripe.subscriptions.cancel(subscriptionId);
   };
 
+  static pauseSubscription = async (secretKey: string, subscriptionId: string) => {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.subscriptions.update(subscriptionId, { pause_collection: { behavior: "void" } });
+  };
+
+  static resumeSubscription = async (secretKey: string, subscriptionId: string) => {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.subscriptions.update(subscriptionId, { pause_collection: null });
+  };
+
   static getCustomerSubscriptions = async (secretKey: string, customerId: string) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.subscriptions.list({ customer: customerId });

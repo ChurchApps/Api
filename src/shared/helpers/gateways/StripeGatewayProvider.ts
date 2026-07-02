@@ -153,6 +153,14 @@ export class StripeGatewayProvider implements IGatewayProvider {
     await StripeHelper.deleteSubscription(config.privateKey, subscriptionId);
   }
 
+  async pauseSubscription(config: GatewayConfig, subscriptionId: string): Promise<void> {
+    await StripeHelper.pauseSubscription(config.privateKey, subscriptionId);
+  }
+
+  async resumeSubscription(config: GatewayConfig, subscriptionId: string): Promise<void> {
+    await StripeHelper.resumeSubscription(config.privateKey, subscriptionId);
+  }
+
   async calculateFees(amount: number, churchId: string, currency: string = "USD", paymentType?: "card" | "bank"): Promise<number> {
     let customFixedFee: number | null = null;
     let customPercentFee: number | null = null;

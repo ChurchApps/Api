@@ -112,6 +112,14 @@ export class EPayMintsGatewayProvider implements IGatewayProvider {
     throw new Error("ePayMints does not support subscription cancellation");
   }
 
+  async pauseSubscription(_config: GatewayConfig, _subscriptionId: string): Promise<void> {
+    throw new Error("ePayMints does not support subscription pausing");
+  }
+
+  async resumeSubscription(_config: GatewayConfig, _subscriptionId: string): Promise<void> {
+    throw new Error("ePayMints does not support subscription resuming");
+  }
+
   async calculateFees(amount: number, churchId: string): Promise<number> {
     let customFixedFee: number | null = null;
     let customPercentFee: number | null = null;

@@ -42,7 +42,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       if (!groupId) return this.json({ error: "groupId required" }, 400);
 
       const group: any = await this.repos.group.load(au.churchId, groupId);
-      if (!group) return this.json({ error: "Group not found" }, 404);
+      if (!group || group.archived) return this.json({ error: "Group not found" }, 404);
       if (group.joinPolicy !== "request") return this.json({ error: "Group does not accept join requests" }, 400);
 
       const existingMembers = await this.repos.groupMember.loadForPerson(au.churchId, au.personId) as any[];

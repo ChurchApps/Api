@@ -67,6 +67,14 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     await PayPalHelper.cancelSubscription(config.publicKey, config.privateKey, subscriptionId, reason);
   }
 
+  async pauseSubscription(_config: GatewayConfig, _subscriptionId: string): Promise<void> {
+    throw new Error("PayPal does not support subscription pausing");
+  }
+
+  async resumeSubscription(_config: GatewayConfig, _subscriptionId: string): Promise<void> {
+    throw new Error("PayPal does not support subscription resuming");
+  }
+
   async calculateFees(amount: number, churchId: string): Promise<number> {
     let customFixedFee: number | null = null;
     let customPercentFee: number | null = null;

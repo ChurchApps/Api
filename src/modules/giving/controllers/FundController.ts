@@ -10,7 +10,7 @@ export class FundController extends GivingBaseController {
   @httpGet("/churchId/:churchId")
   public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const data = await this.repos.fund.loadAll(churchId);
+      const data = await this.repos.fund.loadVisible(churchId);
       return this.repos.fund.convertAllToModel(churchId, data);
     });
   }
@@ -26,7 +26,8 @@ export class FundController extends GivingBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const data = await this.repos.fund.loadAll(au.churchId);
+      const canViewAll = au.checkAccess(Permissions.donations.view) || au.checkAccess(Permissions.donations.edit);
+      const data = canViewAll ? await this.repos.fund.loadAll(au.churchId) : await this.repos.fund.loadVisible(au.churchId);
       return this.repos.fund.convertAllToModel(au.churchId, data);
     });
   }

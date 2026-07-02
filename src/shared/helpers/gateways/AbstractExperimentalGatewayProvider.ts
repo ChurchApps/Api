@@ -44,6 +44,14 @@ export abstract class AbstractExperimentalGatewayProvider implements IGatewayPro
     this.notImplemented("cancelSubscription");
   }
 
+  async pauseSubscription(_config: GatewayConfig, _subscriptionId: string): Promise<void> {
+    this.notImplemented("pauseSubscription");
+  }
+
+  async resumeSubscription(_config: GatewayConfig, _subscriptionId: string): Promise<void> {
+    this.notImplemented("resumeSubscription");
+  }
+
   async calculateFees(_amount: number, _churchId: string): Promise<number> {
     this.notImplemented("calculateFees");
   }

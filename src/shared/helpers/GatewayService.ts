@@ -115,6 +115,18 @@ export class GatewayService {
     await provider.cancelSubscription(config, subscriptionId, reason);
   }
 
+  static async pauseSubscription(gateway: any, subscriptionId: string): Promise<void> {
+    const provider = this.getProviderFromGateway(gateway);
+    const config = this.getGatewayConfig(gateway);
+    await provider.pauseSubscription(config, subscriptionId);
+  }
+
+  static async resumeSubscription(gateway: any, subscriptionId: string): Promise<void> {
+    const provider = this.getProviderFromGateway(gateway);
+    const config = this.getGatewayConfig(gateway);
+    await provider.resumeSubscription(config, subscriptionId);
+  }
+
   static async calculateFees(gateway: any, amount: number, churchId: string, currency?: string, paymentType?: "card" | "bank"): Promise<number> {
     const provider = this.getProviderFromGateway(gateway);
     const currencyToUse = currency || gateway.currency || "USD";

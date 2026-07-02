@@ -12,6 +12,7 @@ interface RegisterRequest {
   personId?: string;
   guestInfo?: { firstName: string; lastName: string; email: string; phone?: string };
   members?: { personId?: string; firstName: string; lastName: string }[];
+  formSubmissionId?: string;
 }
 
 @controller("/content/registrations")
@@ -70,7 +71,8 @@ export class RegistrationController extends ContentBaseController {
         personId,
         householdId,
         status: "confirmed",
-        registeredDate: new Date()
+        registeredDate: new Date(),
+        formSubmissionId: data.formSubmissionId
       };
 
       const inserted = await this.repos.registration.atomicInsertWithCapacityCheck(registration, event.capacity);

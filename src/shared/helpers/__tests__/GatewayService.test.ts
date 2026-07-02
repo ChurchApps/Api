@@ -108,6 +108,42 @@ describe("GatewayService", () => {
     });
   });
 
+  describe("pauseSubscription / resumeSubscription", () => {
+    it("should call provider pauseSubscription with the resolved config and subscriptionId", async () => {
+      const mockProvider = { pauseSubscription: jest.fn().mockResolvedValue(undefined) };
+      (GatewayFactory.getProvider as jest.Mock).mockReturnValue(mockProvider);
+      const mockGateway = { provider: "stripe", publicKey: "public_key", privateKey: "encrypted_private_key", webhookKey: "encrypted_webhook_key", productId: "product_id" };
+
+      await GatewayService.pauseSubscription(mockGateway, "sub_123");
+
+      expect(mockProvider.pauseSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({ publicKey: "public_key", privateKey: "decrypted_encrypted_private_key" }),
+        "sub_123"
+      );
+    });
+
+    it("should call provider resumeSubscription with the resolved config and subscriptionId", async () => {
+      const mockProvider = { resumeSubscription: jest.fn().mockResolvedValue(undefined) };
+      (GatewayFactory.getProvider as jest.Mock).mockReturnValue(mockProvider);
+      const mockGateway = { provider: "stripe", publicKey: "public_key", privateKey: "encrypted_private_key", webhookKey: "encrypted_webhook_key", productId: "product_id" };
+
+      await GatewayService.resumeSubscription(mockGateway, "sub_123");
+
+      expect(mockProvider.resumeSubscription).toHaveBeenCalledWith(
+        expect.objectContaining({ publicKey: "public_key", privateKey: "decrypted_encrypted_private_key" }),
+        "sub_123"
+      );
+    });
+
+    it("should propagate a provider's not-supported error", async () => {
+      const mockProvider = { pauseSubscription: jest.fn().mockRejectedValue(new Error("PayPal does not support subscription pausing")) };
+      (GatewayFactory.getProvider as jest.Mock).mockReturnValue(mockProvider);
+      const mockGateway = { provider: "paypal", publicKey: "public_key", privateKey: "encrypted_private_key" };
+
+      await expect(GatewayService.pauseSubscription(mockGateway, "sub_123")).rejects.toThrow("PayPal does not support subscription pausing");
+    });
+  });
+
   describe("getGatewayForChurch", () => {
     const createRepo = (gateways: any[]) => ({ loadAll: jest.fn().mockResolvedValue(gateways) });
 

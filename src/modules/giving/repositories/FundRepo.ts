@@ -19,6 +19,7 @@ export class FundRepo {
       name: fund.name,
       taxDeductible: fund.taxDeductible,
       productId: fund.productId,
+      visible: fund.visible ?? true,
       removed: false
     } as any).execute();
     return fund;
@@ -28,7 +29,8 @@ export class FundRepo {
     await getDb().updateTable("funds").set({
       name: fund.name,
       taxDeductible: fund.taxDeductible,
-      productId: fund.productId
+      productId: fund.productId,
+      visible: fund.visible ?? true
     } as any).where("id", "=", fund.id).where("churchId", "=", fund.churchId).execute();
     return fund;
   }
@@ -46,6 +48,16 @@ export class FundRepo {
     const rows = await (getDb().selectFrom("funds").selectAll()
       .where("churchId", "=", churchId) as any)
       .where(sql.ref("removed"), "=", false)
+      .orderBy("name")
+      .execute();
+    return rows.map((r: any) => this.rowToModel(r));
+  }
+
+  public async loadVisible(churchId: string) {
+    const rows = await (getDb().selectFrom("funds").selectAll()
+      .where("churchId", "=", churchId) as any)
+      .where(sql.ref("removed"), "=", false)
+      .where((eb: any) => eb.or([eb("visible", "=", true as any), eb("visible", "is", null)]))
       .orderBy("name")
       .execute();
     return rows.map((r: any) => this.rowToModel(r));
@@ -72,7 +84,8 @@ export class FundRepo {
       name: data.name,
       churchId: data.churchId,
       productId: data.productId,
-      taxDeductible: data.taxDeductible
+      taxDeductible: data.taxDeductible,
+      visible: data.visible
     };
   }
 
