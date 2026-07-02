@@ -8,7 +8,7 @@ import { createApp } from "./dist/app.js";
 
 // Import socket and timer handlers
 import { handleSocket } from "./dist/lambda/socket-handler.js";
-import { handle15MinTimer, handleMidnightTimer, handleScheduledTasks, handleWebhookTimer } from "./dist/lambda/timer-handler.js";
+import { handle30MinTimer, handleMidnightTimer, handleScheduledTasks, handleWebhookTimer } from "./dist/lambda/timer-handler.js";
 
 // Initialize environment and database pools
 const initializeEnvironment = async () => {
@@ -145,14 +145,16 @@ export const socket = async function (event, context) {
   }
 };
 
-// Timer handlers
+// Timer handlers. Export name "timer15Min" is legacy — kept as-is so it matches
+// the serverless.yml function key/handler string (renaming would recreate the
+// EventBridge rule); it actually runs every 30 minutes.
 export const timer15Min = async function (event, context) {
   try {
     await initializeEnvironment();
-    await handle15MinTimer(event, context);
+    await handle30MinTimer(event, context);
     return { statusCode: 200, body: "Timer executed successfully" };
   } catch (error) {
-    console.error("Error in 15-minute timer:", error);
+    console.error("Error in 30-minute timer:", error);
     throw error;
   }
 };

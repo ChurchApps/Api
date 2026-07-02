@@ -157,7 +157,7 @@ functions:
       - websocket:
           route: $default
 
-  timer15Min:
+  timer15Min: # legacy name, runs every 30 min (renaming would recreate the EventBridge rule)
     handler: lambda.timer15Min
     layers:
       - { Ref: DependenciesLambdaLayer }

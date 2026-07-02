@@ -3,6 +3,4 @@ export class PlanType {
   public churchId?: string;
   public ministryId?: string;
   public name?: string;
-  public reminderOffsets?: string;
-  public reminderMessage?: string;
 }

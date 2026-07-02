@@ -26,6 +26,10 @@ export interface ReminderAdapter {
   loadRecipients(churchId: string, entity: any, occLocalISO: string, recipientMode: string): Promise<ReminderRecipient[]>;
   link(entity: any, occLocalISO: string): string;
   renderMessage?(entity: any, occLocalISO: string, custom?: string): string;
+  buildEmails?(entity: any, occLocalISO: string, recipients: ReminderRecipient[], custom?: string): Promise<Record<string, { subject: string; html: string }> | null>;
+  // Scope inheritance (entityId null, scopeId set): the concrete entities a scoped
+  // definition fans out to in the window — e.g. every plan of a planType.
+  loadScopeEntities?(churchId: string, scopeId: string, from: Date, to: Date): Promise<any[]>;
 }
 
 export class ReminderAdapterRegistry {

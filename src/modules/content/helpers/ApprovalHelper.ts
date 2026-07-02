@@ -1,8 +1,8 @@
-import { EmailHelper } from "@churchapps/apihelper";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 
 interface PendingBookingRow {
   id?: string;
@@ -62,7 +62,7 @@ export class ApprovalHelper {
         for (const personId of approverIds) {
           const person = await getMembershipModuleGateway().loadPerson(digest.churchId, personId);
           if (!person?.email) continue;
-          await EmailHelper.sendTemplatedEmail(Environment.supportEmail, person.email, "B1.church", Environment.b1AdminRoot ?? "", this.getDigestSubject(digest), this.getDigestBody(digest), "ChurchEmailTemplate.html");
+          await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, "B1.church", Environment.b1AdminRoot ?? "", this.getDigestSubject(digest), this.getDigestBody(digest), "ChurchEmailTemplate.html");
           emails++;
         }
         await repos.eventBooking.markNotified(digest.bookingIds);

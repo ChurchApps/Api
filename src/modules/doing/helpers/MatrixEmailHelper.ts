@@ -1,10 +1,9 @@
-import { EmailHelper } from "@churchapps/apihelper";
-import { Environment } from "../../../shared/helpers/Environment.js";
+import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 // Consolidated, cross-plan serving summary email: one message per person covering
 // every plan they're assigned to in a date range (the matrix "Email all" action).
-// Distinct from ServingReminderHelper, which is per-plan and cron-driven.
+// Distinct from the reminder engine's per-plan serving reminders (planType-scoped).
 
 const RECIPIENT_CAP = 200;
 
@@ -63,8 +62,10 @@ function buildHtml(firstName: string, items: PersonSchedule["items"], scheduleUr
 }
 
 export class MatrixEmailHelper {
-  // Sends one consolidated email per assigned person across the given overview rows.
-  public static async sendConsolidated(churchId: string, rows: OverviewEmailRow[]): Promise<{ sent: number; failed: number; capped: boolean }> {
+  // Sends one consolidated, preference-gated notification+email per assigned person
+  // across the given overview rows; emailImmediate bypasses the unread-dedup guard,
+  // so each explicit "Email all" click sends (staff intent), gated per recipient.
+  public static async sendConsolidated(churchId: string, rows: OverviewEmailRow[], ministryId: string): Promise<{ sent: number; failed: number; capped: boolean }> {
     const schedules = groupOverviewByPerson(rows);
     const capped = schedules.length > RECIPIENT_CAP;
     const recipients = capped ? schedules.slice(0, RECIPIENT_CAP) : schedules;
@@ -73,27 +74,26 @@ export class MatrixEmailHelper {
     const membership = getMembershipModuleGateway();
     const church = await membership.loadChurch(churchId);
     const subDomain = church?.subDomain || "app";
-    const churchName = church?.name || "B1";
     const scheduleUrl = `https://${subDomain}.b1.church/my/plans`;
 
     const names = new Map<string, string>();
     for (const p of (await membership.loadPeople(churchId, recipients.map((r) => r.personId))) as any[]) names.set(p.id, p.displayName);
 
-    let sent = 0;
-    let failed = 0;
+    const emailByPerson: Record<string, { subject: string; html: string }> = {};
     for (const sched of recipients) {
-      const person = await membership.loadPerson(churchId, sched.personId);
-      if (!person?.email) continue;
       const firstName = (names.get(sched.personId) || "").split(" ")[0] || "there";
-      const html = buildHtml(firstName, sched.items, scheduleUrl);
-      try {
-        await EmailHelper.sendTemplatedEmail(Environment.supportEmail, person.email, churchName, scheduleUrl, "Your Serving Schedule", html, "ChurchEmailTemplate.html");
-        sent++;
-      } catch (e) {
-        failed++;
-        console.error(`[MatrixEmail] email failed for ${sched.personId}:`, e);
-      }
+      emailByPerson[sched.personId] = { subject: "Your Serving Schedule", html: buildHtml(firstName, sched.items, scheduleUrl) };
     }
-    return { sent, failed, capped };
+
+    const personIds = recipients.map((r) => r.personId);
+    const result = await NotificationService.createNotifications(personIds, churchId, "plan", ministryId, "Your serving schedule", scheduleUrl, undefined, {
+      category: "serving_schedule",
+      deliveryStartLevel: 2,
+      emailImmediate: true,
+      emailByPerson
+    });
+
+    const sent = Array.isArray(result) ? result.length : personIds.length;
+    return { sent, failed: 0, capped };
   }
 }

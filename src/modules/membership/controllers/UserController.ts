@@ -6,10 +6,11 @@ import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { EmailHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, MauticHelper } from "../helpers/index.js";
+import { UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, MauticHelper } from "../helpers/index.js";
 import { v4 } from "uuid";
 import { ChurchHelper } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 
 const emailPasswordValidation = [
   body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"),
@@ -265,7 +266,7 @@ export class UserController extends MembershipBaseController {
 
             if (Environment.emailOnRegistration) {
               const emailBody = "Name: " + register.firstName + " " + register.lastName + "<br/>Email: " + register.email + "<br/>App: " + register.appName;
-              emailPromises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody));
+              emailPromises.push(TransactionalEmailHelper.sendTransactional(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody));
             }
             await Promise.all(emailPromises);
             console.log("Register: emails", Date.now() - emailStart, "ms");

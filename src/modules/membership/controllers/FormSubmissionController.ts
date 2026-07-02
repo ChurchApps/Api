@@ -2,9 +2,10 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { FormSubmission, Answer, Form, Church } from "../models/index.js";
-import { Permissions, EmailHelper, Environment } from "../helpers/index.js";
+import { Permissions, Environment } from "../helpers/index.js";
 import { MemberPermission, Person } from "../models/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import axios from "axios";
 
 @controller("/membership/formsubmissions")
@@ -130,7 +131,7 @@ export class FormSubmissionController extends MembershipBaseController {
           const contents = "<table role=\"presentation\" style=\"text-align: left;\" cellspacing=\"8\" width=\"80%\"><tablebody>" + contentRows.join(" ") + "</tablebody></table>";
           const promises: Promise<any>[] = [];
           (people as any[]).forEach((p: Person) => {
-            if (p.email) promises.push(EmailHelper.sendTemplatedEmail(Environment.supportEmail, p.email, church.name, Environment.b1AdminRoot, "New Submissions for " + form.name, contents));
+            if (p.email) promises.push(TransactionalEmailHelper.sendTransactional(Environment.supportEmail, p.email, church.name, Environment.b1AdminRoot, "New Submissions for " + form.name, contents));
           });
           promises.push(this.sendNotifications(churchId, form, ids));
           await Promise.all(promises);

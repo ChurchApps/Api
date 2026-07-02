@@ -1,7 +1,6 @@
-import { EmailHelper } from "@churchapps/apihelper";
 import { RepoManager } from "../infrastructure/RepoManager.js";
-import { Environment } from "../helpers/Environment.js";
 import { MergeFieldHelper } from "../../modules/messaging/helpers/MergeFieldHelper.js";
+import { NotificationHelper } from "../../modules/messaging/helpers/NotificationHelper.js";
 
 interface EmailRecipient {
   firstName?: string;
@@ -17,12 +16,10 @@ export interface MessagingModuleGateway {
   loadNotificationPreferencesByPerson(churchId: string, personId: string): Promise<any[]>;
   loadPrivateMessagesByPerson(churchId: string, personId: string): Promise<any[]>;
   createNotifications(notifications: any[]): Promise<any[]>;
-  // Render a saved EmailTemplate (merge fields resolved against recipient + church) and send it.
-  // Returns false when the template is missing or the recipient has no email.
-  sendTemplatedEmail(churchId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
-  // Unified cross-source reminder ledger (reminderSentLog): which keys already fired, and record new sends.
-  loadSentReminderKeys(idempotencyKeys: string[]): Promise<string[]>;
-  logReminderSends(rows: { churchId?: string; personId?: string; category?: string; entityType?: string; entityId?: string; idempotencyKey?: string }[]): Promise<void>;
+  // Render a saved EmailTemplate (merge fields resolved against recipient + church) and send it
+  // through the notification funnel (preference-gated). Returns false when the template is
+  // missing or the recipient has no email.
+  sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
 }
 
 class MessagingModuleGatewayDb implements MessagingModuleGateway {
@@ -51,16 +48,7 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     return Promise.all(notifications.map((n) => repos.notification.save(n)));
   }
 
-  public async loadSentReminderKeys(idempotencyKeys: string[]): Promise<string[]> {
-    return (await this.repos()).reminderSentLog.loadSentKeys(idempotencyKeys);
-  }
-
-  public async logReminderSends(rows: { churchId?: string; personId?: string; category?: string; entityType?: string; entityId?: string; idempotencyKey?: string }[]): Promise<void> {
-    const repos = await this.repos();
-    await Promise.all(rows.map((r) => repos.reminderSentLog.insertIgnore({ ...r, channel: "all", status: "sent" })));
-  }
-
-  public async sendTemplatedEmail(churchId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean> {
+  public async sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean> {
     if (!recipient?.email) return false;
     const repos = await this.repos();
     const template = await repos.emailTemplate.loadById(churchId, templateId);
@@ -68,7 +56,12 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     const church = { name: churchName };
     const subject = MergeFieldHelper.resolve(subjectOverride || template.subject || "", recipient, church);
     const body = MergeFieldHelper.resolve(template.htmlContent || "", recipient, church);
-    await EmailHelper.sendTemplatedEmail(Environment.supportEmail, recipient.email, churchName || "B1", "", subject, body, "ChurchEmailTemplate.html");
+    await NotificationHelper.createNotifications([personId], churchId, "task", templateId, subject, undefined, undefined, {
+      category: "announcements",
+      deliveryStartLevel: 2,
+      emailImmediate: true,
+      emailByPerson: { [personId]: { subject, html: body } }
+    });
     return true;
   }
 }

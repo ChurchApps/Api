@@ -52,17 +52,6 @@ describe("PreferenceGateHelper.evaluate", () => {
     expect(r.allow).toBe(true);
   });
 
-  it("Layer 4: frequency cap suppresses non-transactional when over cap", () => {
-    const base = { pref: { allowPush: true, maxPushPerDay: 5 } };
-    expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "announcements", "push", { ...base, sentInWindow: 5 }).reason).toBe("frequency_cap");
-    expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "announcements", "push", { ...base, sentInWindow: 4 }).allow).toBe(true);
-  });
-
-  it("Layer 4: transactional categories ignore the frequency cap", () => {
-    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", { pref: { allowPush: true, maxPushPerDay: 5 }, sentInWindow: 99 });
-    expect(r.allow).toBe(true);
-  });
-
   it("Layer 5: an opt-out override suppresses", () => {
     const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", {
       pref: { allowPush: true },
@@ -109,5 +98,23 @@ describe("PreferenceGateHelper.evaluate", () => {
       entityMutes: [{ entityType: "event", entityId: "OTHER", level: "muted" }]
     });
     expect(r.allow).toBe(true);
+  });
+});
+
+describe("PreferenceGateHelper.evaluate quiet-hours deferUntil across DST", () => {
+  const CHI_QUIET = { quietHoursStart: "22:00:00", quietHoursEnd: "07:00:00", timeZone: "America/Chicago" };
+
+  it("spring-forward: defers to the correct UTC instant across the 2026-03-08 CST->CDT jump", () => {
+    const now = new Date("2026-03-08T05:30:00Z"); // 23:30 CST on 2026-03-07
+    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "announcements", "push", { pref: { allowPush: true, ...CHI_QUIET }, now });
+    expect(r.decision).toBe("defer");
+    expect(r.deferUntil?.toISOString()).toBe("2026-03-08T12:00:00.000Z");
+  });
+
+  it("fall-back: defers to the correct UTC instant across the 2026-11-01 CDT->CST repeat", () => {
+    const now = new Date("2026-11-01T04:30:00Z"); // 23:30 CDT on 2026-10-31
+    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "announcements", "push", { pref: { allowPush: true, ...CHI_QUIET }, now });
+    expect(r.decision).toBe("defer");
+    expect(r.deferUntil?.toISOString()).toBe("2026-11-01T13:00:00.000Z");
   });
 });

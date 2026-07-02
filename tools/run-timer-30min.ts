@@ -26,6 +26,11 @@ async function run() {
     const approvalResult = await ApprovalHelper.sendApprovalDigests();
     console.log("sendApprovalDigests result:", JSON.stringify(approvalResult));
 
+    console.log("Scanning due reminder occurrences...");
+    const { scanReminders } = await import("../src/modules/messaging/helpers/ReminderBootstrap");
+    const reminderResult = await scanReminders(repos);
+    console.log("scanReminders result:", JSON.stringify(reminderResult));
+
     console.log("30-minute timer completed successfully.");
     await KyselyPool.destroyAll();
     process.exit(0);

@@ -1,5 +1,5 @@
-import { EmailHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { Registration, RegistrationMember, Event } from "../models/index.js";
 
 export class RegistrationHelper {
@@ -31,7 +31,7 @@ export class RegistrationHelper {
       <p>If you need to cancel your registration, please visit the church website or contact the church office.</p>
     `;
 
-    await EmailHelper.sendTemplatedEmail(Environment.supportEmail, email, churchName, Environment.b1AdminRoot, "Registration Confirmed: " + event.title, contents);
+    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, churchName, Environment.b1AdminRoot, "Registration Confirmed: " + event.title, contents);
   }
 
   static async sendCancellationEmail(email: string, churchName: string, event: Event) {
@@ -43,6 +43,6 @@ export class RegistrationHelper {
       <p>If this was a mistake, please register again on the church website or contact the church office.</p>
     `;
 
-    await EmailHelper.sendTemplatedEmail(Environment.supportEmail, email, churchName, Environment.b1AdminRoot, "Registration Cancelled: " + event.title, contents);
+    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, churchName, Environment.b1AdminRoot, "Registration Cancelled: " + event.title, contents);
   }
 }

@@ -6,7 +6,8 @@ import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Utils, Permissions, ChurchHelper, RoleHelper, Environment, HubspotHelper, MauticHelper, GeoHelper, PersonHelper, UserHelper } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
-import { ArrayHelper, EmailHelper } from "@churchapps/apihelper";
+import { ArrayHelper } from "@churchapps/apihelper";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 
 const churchRegisterValidation = [
   body("name").notEmpty().withMessage("Select a church name"),
@@ -325,7 +326,7 @@ export class ChurchController extends MembershipBaseController {
 
         const postInitPromises: Promise<any>[] = [];
         if (Environment.emailOnRegistration) {
-          postInitPromises.push(EmailHelper.sendTemplatedEmail(
+          postInitPromises.push(TransactionalEmailHelper.sendTransactional(
             Environment.supportEmail,
             Environment.supportEmail,
             appName,

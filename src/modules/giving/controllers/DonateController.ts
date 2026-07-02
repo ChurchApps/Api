@@ -4,9 +4,10 @@ import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { StripeHelper } from "../../../shared/helpers/StripeHelper.js";
-import { EncryptionHelper, EmailHelper, CurrencyHelper } from "@churchapps/apihelper";
+import { EncryptionHelper, CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import Axios from "axios";
 import dayjs from "dayjs";
 
@@ -853,7 +854,7 @@ export class DonateController extends GivingBaseController {
 
     const contents = donationType === "recurring" ? recurringDonationContent : oneTimeDonationContent;
 
-    await EmailHelper.sendTemplatedEmail(Environment.supportEmail, to, title, church.churchURL as string, "Thank You For Donating", contents, "ChurchEmailTemplate.html");
+    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, to, title, church.churchURL as string, "Thank You For Donating", contents, "ChurchEmailTemplate.html");
   };
 
   private logDonation = async (donationData: Donation, fundData: FundDonation[]) => {

@@ -25,8 +25,18 @@ describe("NotificationService", () => {
       "personA"
     );
 
-    expect(impl).toHaveBeenCalledWith(["p1", "p2"], "church1", "groupJoinRequest", "req1", "hello", "/groups/g1", "personA");
+    expect(impl).toHaveBeenCalledWith(["p1", "p2"], "church1", "groupJoinRequest", "req1", "hello", "/groups/g1", "personA", undefined);
     expect(result).toBe("ok");
+  });
+
+  it("forwards the optional 8th options argument through to the registered impl", async () => {
+    const impl = jest.fn().mockResolvedValue("ok");
+    NotificationService.register(impl);
+    const options = { category: "serving_schedule", deliveryStartLevel: 2, emailImmediate: true, emailByPerson: { p1: { subject: "s", html: "h" } } };
+
+    await NotificationService.createNotifications(["p1"], "church1", "plan", "min1", "hello", undefined, undefined, options);
+
+    expect(impl).toHaveBeenCalledWith(["p1"], "church1", "plan", "min1", "hello", undefined, undefined, options);
   });
 
   it("propagates rejections from the registered impl", async () => {

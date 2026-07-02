@@ -151,6 +151,7 @@ export class StepActionHelper {
     const church = await membership.loadChurch(task.churchId || "");
     const sent = await getMessagingModuleGateway().sendTemplatedEmail(
       task.churchId || "",
+      task.associatedWithId,
       config.templateId,
       { email: person.email, displayName: task.associatedWithLabel },
       church?.name || "B1",

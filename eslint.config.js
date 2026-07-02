@@ -6,6 +6,7 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 const authzPlugin = require("./tools/eslint-rules/authz.cjs");
+const emailDoorPlugin = require("./tools/eslint-rules/email-door.cjs");
 
 export default [
   {
@@ -23,11 +24,13 @@ export default [
     plugins: {
       "@typescript-eslint": tsPlugin,
       import: importPlugin,
-      "unused-imports": unusedImportsPlugin
+      "unused-imports": unusedImportsPlugin,
+      "email-door": emailDoorPlugin
     },
     rules: {
       // --- Code quality ---
       "prefer-const": "error",
+      "email-door/no-direct-email-helper": "error",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": ["warn", {
         args: "all",

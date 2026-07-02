@@ -1,9 +1,9 @@
-import { EmailHelper } from "@churchapps/apihelper";
 import { List } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { getDoingModuleGateway, getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { Environment } from "./index.js";
 import { ListRuleHelper } from "./ListRuleHelper.js";
 
@@ -72,7 +72,7 @@ export class ListRefreshHelper {
     const subject = `List "${list.name}" membership changed`;
     const contents = `<h2>${list.name}</h2><p>The nightly refresh updated this list: ${addedCount} added, ${removedCount} removed.</p>`;
     try {
-      await EmailHelper.sendTemplatedEmail(Environment.supportEmail, creator.email, "B1.church", Environment.b1AdminRoot ?? "", subject, contents, "ChurchEmailTemplate.html");
+      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, creator.email, "B1.church", Environment.b1AdminRoot ?? "", subject, contents, "ChurchEmailTemplate.html");
     } catch (e) {
       console.error(`[ListRefreshHelper] Notification email failed for list ${list.id}:`, e);
     }

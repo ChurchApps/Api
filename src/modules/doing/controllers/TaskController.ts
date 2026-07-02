@@ -5,6 +5,7 @@ import { DoingBaseController } from "./DoingBaseController.js";
 import { Task } from "../models/index.js";
 import { Environment, WorkflowHelper } from "../helpers/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
+import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 
 @controller("/doing/tasks")
 export class TaskController extends DoingBaseController {
@@ -85,7 +86,9 @@ export class TaskController extends DoingBaseController {
       for (const task of req.body) {
         task.churchId = au.churchId;
         if (req.query?.type === "directoryUpdate") await this.handleDirectoryUpdate(au.churchId, task);
-        result.push(await this.repos.task.save(task));
+        const saved = await this.repos.task.save(task);
+        await InternalEventBus.publish(au.churchId, "task.updated", saved); // sync any per-task reminder occurrences
+        result.push(saved);
       }
       return result;
     });

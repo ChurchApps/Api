@@ -68,23 +68,13 @@ export class PlanRepo {
     await getDb().updateTable("plans").set({ lastAutofillRunId: runId }).where("id", "=", planId).where("churchId", "=", churchId).execute();
   }
 
-  // Global (all churches): published plans within maxDays of service, with plan-type reminder config.
-  public async loadUpcomingForReminders(maxDays: number) {
-    return getDb().selectFrom("plans as pl")
-      .leftJoin("planTypes as pt", "pt.id", "pl.planTypeId")
-      .select([
-        "pl.id",
-        "pl.churchId",
-        "pl.name",
-        "pl.serviceDate",
-        "pl.notes",
-        "pt.reminderOffsets",
-        "pt.reminderMessage",
-        sql<number>`DATEDIFF(pl.serviceDate, CURDATE())`.as("daysOut")
-      ])
-      .where("pl.serviceDate", ">=", sql`CURDATE()` as any)
-      .where("pl.serviceDate", "<=", sql`DATE_ADD(CURDATE(), INTERVAL ${maxDays} DAY)` as any)
-      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
+  // Scope expansion source: plans of a planType with serviceDate inside the reminder horizon.
+  public async loadByPlanTypeIdInRange(churchId: string, planTypeId: string, from: Date, to: Date) {
+    return getDb().selectFrom("plans").selectAll()
+      .where("churchId", "=", churchId)
+      .where("planTypeId", "=", planTypeId)
+      .where("serviceDate", ">=", (from.toISOString().split("T")[0]) as any)
+      .where("serviceDate", "<=", (to.toISOString().split("T")[0]) as any)
       .execute();
   }
 

@@ -20,6 +20,9 @@ BEGIN
     TRUNCATE TABLE devices;
     TRUNCATE TABLE emailTemplates;
     TRUNCATE TABLE textingProviders;
+    TRUNCATE TABLE reminderDefinitions;
+    TRUNCATE TABLE reminderOccurrences;
+    TRUNCATE TABLE reminderSentLog;
     SET FOREIGN_KEY_CHECKS = 1;
 
     -- ========================================
@@ -84,12 +87,20 @@ BEGIN
     -- Notification Preferences
     -- ========================================
     INSERT INTO notificationPreferences (id, churchId, personId, allowPush, emailFrequency) VALUES
-    ('NPR00000001', 'CHU00000001', 'PER00000082', b'1', 'realtime'),
+    ('NPR00000001', 'CHU00000001', 'PER00000082', b'1', 'individual'),
     ('NPR00000002', 'CHU00000001', 'PER00000001', b'1', 'daily'),
-    ('NPR00000003', 'CHU00000001', 'PER00000027', b'1', 'realtime'),
+    ('NPR00000003', 'CHU00000001', 'PER00000027', b'1', 'individual'),
     ('NPR00000004', 'CHU00000001', 'PER00000036', b'1', 'weekly'),
     ('NPR00000005', 'CHU00000001', 'PER00000073', b'0', 'daily'),
-    ('NPR00000006', 'CHU00000001', 'PER00000060', b'1', 'none');
+    ('NPR00000006', 'CHU00000001', 'PER00000060', b'1', 'never');
+
+    -- ========================================
+    -- Reminder Definitions
+    -- ========================================
+    -- Scoped serving reminder: every plan of "Sunday Service" (PLT00000001) reminds
+    -- its assignments 2 days out via push + rich email (Accept/Decline for unconfirmed).
+    INSERT INTO reminderDefinitions (id, churchId, entityType, entityId, scopeId, category, offsets, sendLocalTime, timeZone, message, channels, recipientMode, enabled) VALUES
+    ('RMD00000001', 'CHU00000001', 'plan', NULL, 'PLT00000001', 'serving_schedule', '2880', '09:00:00', NULL, 'See you Sunday! Please arrive 15 minutes early.', 'push,email', 'assignments', 1);
 
     -- ========================================
     -- Devices
@@ -145,10 +156,10 @@ BEGIN
     -- ========================================
     -- Private Messages
     -- ========================================
-    INSERT INTO privateMessages (id, churchId, fromPersonId, toPersonId, conversationId, notifyPersonId, deliveryMethod) VALUES
-    ('PRM00000001', 'CHU00000001', 'PER00000001', 'PER00000082', 'CVS00000003', 'PER00000082', 'push'),
-    ('PRM00000002', 'CHU00000001', 'PER00000027', 'PER00000082', 'CVS00000004', 'PER00000082', 'email'),
-    ('PRM00000003', 'CHU00000001', 'PER00000082', 'PER00000001', 'CVS00000003', 'PER00000001', 'push');
+    INSERT INTO privateMessages (id, churchId, fromPersonId, toPersonId, conversationId, notifyPersonId) VALUES
+    ('PRM00000001', 'CHU00000001', 'PER00000001', 'PER00000082', 'CVS00000003', 'PER00000082'),
+    ('PRM00000002', 'CHU00000001', 'PER00000027', 'PER00000082', 'CVS00000004', 'PER00000082'),
+    ('PRM00000003', 'CHU00000001', 'PER00000082', 'PER00000001', 'CVS00000003', 'PER00000001');
 
     -- ========================================
     -- Device Contents

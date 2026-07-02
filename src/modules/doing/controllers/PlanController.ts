@@ -7,6 +7,7 @@ import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../mod
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 
 @controller("/doing/plans")
 export class PlanController extends DoingBaseController {
@@ -244,7 +245,7 @@ export class PlanController extends DoingBaseController {
       if (!ministryId) return this.json({ error: "ministryId is required" }, 400);
       if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
       const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
-      return await MatrixEmailHelper.sendConsolidated(au.churchId, rows);
+      return await MatrixEmailHelper.sendConsolidated(au.churchId, rows, ministryId);
     });
   }
 
@@ -303,7 +304,11 @@ export class PlanController extends DoingBaseController {
         if (plan.serviceDate) {
           plan.serviceDate = new Date(plan.serviceDate);
         }
-        promises.push(this.repos.plan.save(plan));
+        // Sync reminder occurrences (planType-scoped serving reminders) without waiting for midnight.
+        promises.push(this.repos.plan.save(plan).then(async (saved) => {
+          await InternalEventBus.publish(au.churchId, "plan.updated", saved);
+          return saved;
+        }));
       });
       const result = await Promise.all(promises);
 
@@ -322,6 +327,7 @@ export class PlanController extends DoingBaseController {
       await this.repos.position.deleteByPlanId(au.churchId, id);
       await this.repos.planItem.deleteByPlanId(au.churchId, id);
       await this.repos.plan.delete(au.churchId, id);
+      await InternalEventBus.publish(au.churchId, "plan.destroyed", { id });
       return {};
     });
   }

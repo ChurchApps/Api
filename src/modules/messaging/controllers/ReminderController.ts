@@ -52,6 +52,48 @@ export class ReminderController extends MessagingBaseController {
     });
   }
 
+  // Scope (inheritance) definitions: entityId null, scopeId set (e.g. serving reminders per planType).
+  // 3-segment paths never collide with the 2-segment entity routes above.
+  @httpGet("/scope/:entityType/:scopeId")
+  public async listForScope(@requestParam("entityType") entityType: string, @requestParam("scopeId") scopeId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      ensureRemindersReady(this.repos);
+      if (!ReminderAdapterRegistry.has(entityType)) return this.json({}, 400);
+      return this.repos.reminderDefinition.loadForScope(au.churchId, entityType, scopeId);
+    });
+  }
+
+  @httpPost("/scope/:entityType/:scopeId")
+  public async saveForScope(@requestParam("entityType") entityType: string, @requestParam("scopeId") scopeId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      ensureRemindersReady(this.repos);
+      const adapter = ReminderAdapterRegistry.get(entityType);
+      if (!adapter) return this.json({}, 400);
+      const body = req.body || {};
+      const existing = (await this.repos.reminderDefinition.loadForScope(au.churchId, entityType, scopeId)) as ReminderDefinition[];
+      const def: ReminderDefinition = {
+        id: existing[0]?.id,
+        churchId: au.churchId,
+        entityType,
+        entityId: undefined, // scope definition — inherited by every entity in the scope
+        scopeId,
+        category: adapter.category,
+        offsets: Array.isArray(body.offsets) ? body.offsets.join(",") : body.offsets,
+        sendLocalTime: body.sendLocalTime ? this.normalizeTime(body.sendLocalTime) : undefined,
+        timeZone: body.timeZone,
+        message: body.message,
+        channels: Array.isArray(body.channels) ? body.channels.join(",") : body.channels,
+        recipientMode: body.recipientMode,
+        enabled: body.enabled !== false
+      };
+      const saved = await this.repos.reminderDefinition.save(def);
+      await ReminderEngine.reExpandForScope(au.churchId, entityType, scopeId); // synchronous expand — §5.8
+      return saved;
+    });
+  }
+
   @httpDelete("/:defId")
   public async remove(@requestParam("defId") defId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

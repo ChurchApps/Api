@@ -33,10 +33,8 @@ const runThirtyMinute = async (): Promise<void> => {
 
 const runMidnight = async (): Promise<void> => {
   const { NotificationHelper } = await import("../../modules/messaging/helpers/NotificationHelper.js");
-  const { AutomationHelper } = await import("../../modules/bridge/helpers/AutomationHelper.js");
   const messagingRepos = await RepoManager.getRepos<any>("messaging");
   NotificationHelper.init(messagingRepos);
-  await AutomationHelper.remindServiceRequests();
   const contentRepos = await RepoManager.getRepos<any>("content");
   await contentRepos.streamingService.advanceRecurringServices();
   const { expandReminders } = await import("../../modules/messaging/helpers/ReminderBootstrap.js");

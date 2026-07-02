@@ -1,11 +1,13 @@
 import { RepoManager } from "../../../../shared/infrastructure/RepoManager.js";
+import { getDoingModuleGateway } from "../../../../shared/modules/DoingModuleGateway.js";
 import { singleDateOccurrence } from "../../../../shared/helpers/CivilDate.js";
 import { ReminderAdapter, ReminderOccurrenceInfo, ReminderRecipient } from "../ReminderAdapter.js";
 
 // Plan adapter (architecture §6.3). Wraps the proven AssignmentRepo.loadForReminder
-// recipient logic. NOTE: the existing midnight ServingReminderHelper is left
-// running and is NOT migrated here — this adapter only fires for explicit
-// reminderDefinitions(entityType='plan'), so there is no double-send.
+// recipient logic. Serving reminders are configured as planType-scoped definitions
+// (entityType='plan', entityId null, scopeId=planTypeId); the engine fans each out
+// over the plans loaded by loadScopeEntities. buildEmails reproduces the legacy
+// serving email (with Accept/Decline token buttons) via the doing gateway.
 export const PlanReminderAdapter: ReminderAdapter = {
   entityType: "plan",
   category: "serving_schedule",
@@ -14,6 +16,11 @@ export const PlanReminderAdapter: ReminderAdapter = {
   async loadEntity(churchId: string, entityId: string) {
     const doing = await RepoManager.getRepos<any>("doing");
     return (await doing.plan.load(churchId, entityId)) ?? null;
+  },
+
+  async loadScopeEntities(churchId: string, scopeId: string, from: Date, to: Date) {
+    const doing = await RepoManager.getRepos<any>("doing");
+    return (await doing.plan.loadByPlanTypeIdInRange(churchId, scopeId, from, to)) || [];
   },
 
   async getOccurrences(entity: any, from: Date, to: Date): Promise<ReminderOccurrenceInfo[]> {
@@ -31,6 +38,12 @@ export const PlanReminderAdapter: ReminderAdapter = {
       out.push({ personId: a.personId });
     }
     return out;
+  },
+
+  async buildEmails(entity: any, _occLocalISO: string, recipients: ReminderRecipient[], custom?: string) {
+    const personIds = recipients.map((r) => r.personId).filter(Boolean);
+    if (!entity?.id || personIds.length === 0) return null;
+    return getDoingModuleGateway().buildPlanReminderEmails(entity.churchId, entity.id, personIds, custom);
   },
 
   link(entity: any) {

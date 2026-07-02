@@ -1,5 +1,6 @@
 import { NotificationPreference, NotificationPreferenceOverride, NotificationEntityMute } from "../models/index.js";
 import { NotificationCategoryHelper } from "./NotificationCategoryHelper.js";
+import { TimezoneHelper } from "./TimezoneHelper.js";
 
 export type GateDecision = "allow" | "suppress" | "defer";
 
@@ -16,7 +17,6 @@ export interface GateContext {
   now?: Date;
   timeZone?: string; // explicit tz; else pref.timeZone, else churchTimeZone
   churchTimeZone?: string; // fallback when the member has no tz set
-  sentInWindow?: number; // frequency-cap source; wired in Phase 1/2 (architecture §11)
   entityMutes?: NotificationEntityMute[]; // Phase 2 per-entity mute
   entityType?: string;
   entityId?: string;
@@ -61,12 +61,8 @@ export class PreferenceGateHelper {
       }
     }
 
-    // LAYER 4 — frequency cap (non-transactional only). No counting source is
-    // wired in Phase 0; only enforced when a caller supplies ctx.sentInWindow.
-    if (!NotificationCategoryHelper.isTransactional(category) && ctx.sentInWindow != null) {
-      const cap = channel === "push" ? pref?.maxPushPerDay : undefined;
-      if (cap != null && ctx.sentInWindow >= cap) return suppress("frequency_cap");
-    }
+    // LAYER 4 — frequency cap enforcement removed as dead code; reintroduce with
+    // a real counter if abuse shows up.
 
     // LAYER 5 — per-category preference (absence-means-default).
     if (!NotificationCategoryHelper.effectiveOptIn(category, channel, ctx.overrides)) return suppress("category_opt_out");
@@ -100,12 +96,23 @@ export class PreferenceGateHelper {
     return s < e ? cur >= s && cur < e : cur >= s || cur < e; // wrap past midnight
   }
 
-  // ponytail: naive minute-add, DST-blind across the boundary; the only Phase-0
-  // consumer (direct push) ignores deferUntil. Phase-1 reminder dispatcher recomputes.
+  // Next occurrence of the wall-clock `end` time in tz, on-or-after `now`, resolved
+  // to a UTC instant via TimezoneHelper.wallClockToUtc so DST transitions land correctly.
   private static quietHoursEndInstant(now: Date, tz: string, end: string): Date {
-    const cur = this.localMinutes(now, tz);
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const map: Record<string, string> = {};
+    for (const p of parts) map[p.type] = p.value;
+    const y = Number(map.year);
+    const mo = Number(map.month);
+    const d = Number(map.day);
     const e = this.toMinutes(end);
-    const minutesUntil = e > cur ? e - cur : 24 * 60 - cur + e;
-    return new Date(now.getTime() + minutesUntil * 60000);
+    const eh = Math.floor(e / 60);
+    const em = e % 60;
+    let candidate = TimezoneHelper.wallClockToUtc(y, mo, d, eh, em, tz);
+    if (candidate.getTime() <= now.getTime()) {
+      const next = new Date(Date.UTC(y, mo - 1, d + 1));
+      candidate = TimezoneHelper.wallClockToUtc(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), eh, em, tz);
+    }
+    return candidate;
   }
 }

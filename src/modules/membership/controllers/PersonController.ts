@@ -8,7 +8,8 @@ import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requ
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
 import { Environment, Permissions, PersonConditionHelper, PersonHelper, UserChurchHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
-import { AuthenticatedUser, EmailHelper } from "@churchapps/apihelper";
+import { AuthenticatedUser } from "@churchapps/apihelper";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 
 @controller("/membership/people")
 export class PersonController extends MembershipBaseController {
@@ -59,7 +60,7 @@ export class PersonController extends MembershipBaseController {
       const person: Person = await this.repos.person.load(churchId, personId);
       if (!person?.email) return this.denyAccess(["No email address"]);
 
-      await EmailHelper.sendTemplatedEmail(Environment.supportEmail, person.email, appName, null, subject, body);
+      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, appName, null, subject, body);
       return { success: true };
     });
   }

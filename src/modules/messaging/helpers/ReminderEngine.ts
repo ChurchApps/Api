@@ -3,7 +3,7 @@ import { Repos } from "../repositories/index.js";
 import { ReminderDefinition, ReminderOccurrence } from "../models/index.js";
 import { ReminderAdapterRegistry } from "./ReminderAdapter.js";
 import { TimezoneHelper } from "./TimezoneHelper.js";
-import { NotificationHelper } from "./NotificationHelper.js";
+import { NotificationHelper, CreateNotificationOptions } from "./NotificationHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/MembershipModuleGateway.js";
 
 const HORIZON_DAYS = 14;
@@ -47,21 +47,43 @@ export class ReminderEngine {
 
   // Materialize fire rows for one definition over the rolling horizon. Idempotent
   // (occurrenceKey unique); safe to re-run. Called by the cron and synchronously
-  // on definition save (so last-minute events still fire — §5.8).
+  // on definition save (so last-minute events still fire — §5.8). A definition is
+  // entity-level (entityId set) or scope-level (scopeId set, entityId null): the
+  // latter fans out over every concrete entity the adapter reports for the scope.
   static async expandDefinition(def: ReminderDefinition, now: Date = new Date(), tzCache?: Map<string, string>): Promise<number> {
     this.ensureInit();
-    if (!def.enabled || !def.entityId) return 0; // scope-based (entityId null) expansion deferred
+    if (!def.enabled) return 0;
+    if (!def.entityId && !def.scopeId) return 0;
     const adapter = ReminderAdapterRegistry.get(def.entityType || "");
     if (!adapter) return 0;
-    const entity = await adapter.loadEntity(def.churchId!, def.entityId);
-    if (!entity) return 0;
 
     const tz = def.timeZone || (await this.churchTimeZone(def.churchId!, tzCache));
     const horizon = new Date(now.getTime() + HORIZON_DAYS * 24 * 60 * 60000);
+
+    if (def.entityId) {
+      const entity = await adapter.loadEntity(def.churchId!, def.entityId);
+      if (!entity) return 0;
+      return this.materialize(def, adapter, entity, def.entityId, now, horizon, tz, false);
+    }
+
+    // Scope path: one occurrence set per concrete entity, keyed by entity id.
+    if (!adapter.loadScopeEntities) return 0;
+    const entities = await adapter.loadScopeEntities(def.churchId!, def.scopeId!, now, horizon);
+    let written = 0;
+    for (const entity of entities) {
+      if (!entity?.id) continue;
+      written += await this.materialize(def, adapter, entity, entity.id, now, horizon, tz, true);
+    }
+    return written;
+  }
+
+  // Shared occurrence writer for both paths. Entity-level keys stay stable
+  // (`${defId}:${occISO}:${offset}`); scope rows namespace by entity id so a
+  // scoped definition's per-entity occurrences never collide.
+  private static async materialize(def: ReminderDefinition, adapter: any, entity: any, entityId: string, now: Date, horizon: Date, tz: string, scoped: boolean): Promise<number> {
     const occurrences = await adapter.getOccurrences(entity, now, horizon);
     const offsets = this.parseOffsets(def.offsets);
     const sendLocalTime = def.sendLocalTime || "09:00:00";
-
     let written = 0;
     for (const occ of occurrences) {
       for (const offsetMin of offsets) {
@@ -71,10 +93,10 @@ export class ReminderEngine {
           churchId: def.churchId,
           definitionId: def.id,
           entityType: def.entityType,
-          entityId: def.entityId,
+          entityId,
           category: def.category,
           message: def.message,
-          occurrenceKey: `${def.id}:${occ.startLocalISO}:${offsetMin}`,
+          occurrenceKey: scoped ? `${def.id}:${entityId}:${occ.startLocalISO}:${offsetMin}` : `${def.id}:${occ.startLocalISO}:${offsetMin}`,
           occLocalISO: occ.startLocalISO,
           fireAt
         });
@@ -125,6 +147,12 @@ export class ReminderEngine {
         if (fresh.length > 0) {
           const message = adapter.renderMessage ? adapter.renderMessage(entity, occ.occLocalISO!, occ.message || undefined) : (occ.message || "You have a reminder");
           const link = adapter.link(entity, occ.occLocalISO!) || undefined;
+          const options: CreateNotificationOptions = { category: occ.category, deliveryStartLevel: 1 };
+          if ((def as any).channels?.split(",").map((c: string) => c.trim()).includes("email")) {
+            options.emailImmediate = true;
+            const emailByPerson = adapter.buildEmails ? await adapter.buildEmails(entity, occ.occLocalISO!, fresh, occ.message || undefined) : null;
+            if (emailByPerson) options.emailByPerson = emailByPerson;
+          }
           await NotificationHelper.createNotifications(
             fresh.map((r) => r.personId),
             occ.churchId!,
@@ -133,7 +161,7 @@ export class ReminderEngine {
             message,
             link,
             undefined,
-            { category: occ.category, deliveryStartLevel: 1 }
+            options
           );
           await Promise.all(fresh.map((r) => this.repos.reminderSentLog.insertIgnore({
             churchId: occ.churchId,
@@ -172,14 +200,32 @@ export class ReminderEngine {
     }
   }
 
-  // InternalEventBus subscriber — content publishes event.created/updated/destroyed
-  // via WebhookDispatcher; we keep occurrences in sync without waiting for midnight.
+  // Scope-level analogue: re-materialize every scoped definition for (entityType, scopeId)
+  // via the ux_reminder_scope index — e.g. all plans of a planType after a plan changes.
+  static async reExpandForScope(churchId: string, entityType: string, scopeId: string): Promise<void> {
+    this.ensureInit();
+    const defs = (await this.repos.reminderDefinition.loadForScope(churchId, entityType, scopeId)) as ReminderDefinition[];
+    for (const def of defs) {
+      await this.repos.reminderOccurrence.cancelPendingForDefinition(def.id!);
+      await this.expandDefinition(def);
+    }
+  }
+
+  // InternalEventBus subscriber — content/doing publish entity mutations; we keep
+  // occurrences in sync without waiting for midnight. event.* and plan.*/task.*
+  // arrive via WebhookDispatcher.emit / InternalEventBus.publish respectively.
   // Bound at the subscription site (index.ts) so `this` resolves to the class.
   static async handleBusEvent(churchId: string, event: string, payload: any): Promise<void> {
-    if (!this.repos || !event.startsWith("event.")) return;
-    const eventId = payload?.id;
-    if (!eventId) return;
-    if (event === "event.destroyed") await this.cancelEntity(churchId, "event", eventId);
-    else if (event === "event.created" || event === "event.updated") await this.reExpandForEntity(churchId, "event", eventId);
+    if (!this.repos) return;
+    const id = payload?.id;
+    if (!id) return;
+    if (event === "event.destroyed") await this.cancelEntity(churchId, "event", id);
+    else if (event === "event.created" || event === "event.updated") await this.reExpandForEntity(churchId, "event", id);
+    else if (event === "plan.destroyed") await this.cancelEntity(churchId, "plan", id);
+    else if (event === "plan.updated") {
+      await this.reExpandForEntity(churchId, "plan", id); // per-plan definitions
+      if (payload?.planTypeId) await this.reExpandForScope(churchId, "plan", payload.planTypeId); // planType-scoped serving reminders
+    } else if (event === "task.destroyed") await this.cancelEntity(churchId, "task", id);
+    else if (event === "task.updated") await this.reExpandForEntity(churchId, "task", id);
   }
 }

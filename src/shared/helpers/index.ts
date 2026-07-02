@@ -11,4 +11,5 @@ export { DateHelper } from "./DateHelper.js";
 export { ValidationHelper } from "./ValidationHelper.js";
 export { StripeHelper } from "./StripeHelper.js";
 export { CollectionHelper } from "./CollectionHelper.js";
-export { NotificationService, type CreateNotificationsFn } from "./NotificationService.js";
+export { NotificationService, type CreateNotificationsFn, type NotificationServiceOptions } from "./NotificationService.js";
+export { TransactionalEmailHelper } from "./TransactionalEmailHelper.js";

@@ -18,8 +18,7 @@ export class PrivateMessageRepo {
       fromPersonId: model.fromPersonId,
       toPersonId: model.toPersonId,
       conversationId: model.conversationId,
-      notifyPersonId: model.notifyPersonId,
-      deliveryMethod: model.deliveryMethod
+      notifyPersonId: model.notifyPersonId
     }).execute();
     return model;
   }
@@ -29,8 +28,7 @@ export class PrivateMessageRepo {
       fromPersonId: model.fromPersonId,
       toPersonId: model.toPersonId,
       conversationId: model.conversationId,
-      notifyPersonId: model.notifyPersonId,
-      deliveryMethod: model.deliveryMethod
+      notifyPersonId: model.notifyPersonId
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -42,7 +40,7 @@ export class PrivateMessageRepo {
 
   public async loadByPersonId(churchId: string, personId: string) {
     const result = await sql<any>`
-      SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, pm.deliveryMethod, m.timeSent as lastMessageTime
+      SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, m.timeSent as lastMessageTime
       FROM privateMessages pm
       INNER JOIN conversations c on c.id=pm.conversationId
       LEFT JOIN messages m on m.id=c.lastPostId
@@ -69,33 +67,8 @@ export class PrivateMessageRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public async loadUndelivered() {
-    const result = await getDb().selectFrom("privateMessages").selectAll()
-      .where("notifyPersonId", "is not", null)
-      .where((eb) =>
-        eb.or([
-          eb("deliveryMethod", "is", null),
-          eb("deliveryMethod", "=", ""),
-          eb("deliveryMethod", "=", "push"),
-          eb("deliveryMethod", "=", "socket"),
-          eb("deliveryMethod", "=", "email")
-        ]))
-      .execute();
-    return result.map((d: any) => this.rowToModel(d));
-  }
-
   public async markAllRead(churchId: string, personId: string) {
-    await getDb().updateTable("privateMessages").set({
-      notifyPersonId: null,
-      deliveryMethod: "complete"
-    }).where("churchId", "=", churchId).where("notifyPersonId", "=", personId).execute();
-  }
-
-  public async loadPendingEscalation() {
-    return getDb().selectFrom("privateMessages").selectAll()
-      .where("notifyPersonId", "is not", null)
-      .where("deliveryMethod", "in", ["socket", "push"])
-      .execute();
+    await getDb().updateTable("privateMessages").set({ notifyPersonId: null }).where("churchId", "=", churchId).where("notifyPersonId", "=", personId).execute();
   }
 
   protected rowToModel(data: any): PrivateMessage {
@@ -106,7 +79,6 @@ export class PrivateMessageRepo {
       toPersonId: data.toPersonId,
       conversationId: data.pmId ? data.id : data.conversationId,
       notifyPersonId: data.notifyPersonId,
-      deliveryMethod: data.deliveryMethod,
 
       conversation: {
         id: data.id,

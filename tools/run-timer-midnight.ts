@@ -3,7 +3,6 @@ import { Environment } from "../src/shared/helpers/Environment";
 import { KyselyPool } from "../src/shared/infrastructure/KyselyPool";
 import { NotificationHelper } from "../src/modules/messaging/helpers/NotificationHelper";
 import { RepoManager } from "../src/shared/infrastructure/RepoManager";
-import { AutomationHelper } from "../src/modules/bridge/helpers/AutomationHelper";
 
 async function run() {
   try {
@@ -14,8 +13,9 @@ async function run() {
     const repos = await RepoManager.getRepos<any>("messaging");
     NotificationHelper.init(repos);
 
-    console.log("Reminding service requests...");
-    await AutomationHelper.remindServiceRequests();
+    console.log("Expanding reminder occurrences...");
+    const { expandReminders } = await import("../src/modules/messaging/helpers/ReminderBootstrap");
+    await expandReminders(repos);
 
     console.log("Advancing recurring streaming services...");
     const contentRepos = await RepoManager.getRepos<any>("content");

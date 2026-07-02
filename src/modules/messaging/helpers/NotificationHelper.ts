@@ -24,6 +24,8 @@ export interface CreateNotificationOptions {
   deliveryTitle?: string;
   navData?: Record<string, unknown>;
   category?: string; // preference opt-out axis (architecture §2.6); derived if omitted
+  emailByPerson?: Record<string, { subject: string; html: string }>; // pre-rendered per-recipient email; only used when emailImmediate is set
+  emailImmediate?: boolean; // send the rich email at creation time instead of the escalation/batch digest
 }
 
 export class NotificationHelper {
@@ -156,17 +158,46 @@ export class NotificationHelper {
   ): Promise<string> => {
     this.ensureInitialized();
     const effectiveCategory = category ?? NotificationCategoryHelper.categoryFor(contentType, navData?.innerType as string | undefined);
-    // const isPrivateMessage = contentType === "privateMessage";
-    // const senderPersonId = isPrivateMessage ? String(navData?.personId || "") : "";
-    // const conversationId = isPrivateMessage ? String(navData?.conversationId || "") : "";
 
-    // Level 0: Try Socket. Load connections and unread counts in parallel so the
-    // socket payload can carry the fresh counts and the client avoids a round-trip.
-    // For private messages, do not stop at socket delivery. Installed PWAs can
-    // keep an alerts socket alive in the background, which would otherwise
-    // suppress the OS-level push notification entirely.
+    // Load prefs once up-front: the in_app gate needs them before socket delivery,
+    // and the push/email levels reuse the same context (one pref read on the hot path).
+    let pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
+    if (!pref) {
+      pref = await this.createNotificationPref(churchId, personId);
+    }
+    // Entity mutes can only match when there's an entity to mute (navData.innerId);
+    // skip the query otherwise to keep the delivery hot path lean.
+    const needMutes = !!navData?.innerId;
+    const [overrides, entityMutes] = (await Promise.all([
+      NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId),
+      needMutes ? NotificationHelper.repos.notificationEntityMute.loadForPerson(churchId, personId) : Promise.resolve([])
+    ])) as [NotificationPreferenceOverride[], any[]];
+    const gateCtx = {
+      pref,
+      overrides: overrides || [],
+      entityMutes: entityMutes || [],
+      entityType: navData?.innerType as string | undefined,
+      entityId: navData?.innerId as string | undefined
+    };
+    this.addDebugStep(debugTrace, "delivery-load-prefs", "ok", {
+      allowPush: pref.allowPush,
+      emailFrequency: pref.emailFrequency,
+      category: effectiveCategory
+    });
+
+    // Level 0: in-app / socket. Gate on the in_app channel first. A suppressed
+    // (muted) item is parked — it stays visible in the inbox but gets no socket
+    // ping, no badge, and (because escalation is driven by unreadness) no push/
+    // email escalation. For private messages, do not stop at socket delivery:
+    // installed PWAs can keep an alerts socket alive in the background, which
+    // would otherwise suppress the OS-level push notification entirely.
     let socketDelivered = false;
     if (startLevel <= 0) {
+      const inAppGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "in_app", gateCtx);
+      if (!inAppGate.allow) {
+        this.addDebugStep(debugTrace, "delivery-in-app-muted", "warn", { reason: inAppGate.reason, decision: inAppGate.decision });
+        return "muted";
+      }
       this.addDebugStep(debugTrace, "delivery-load-socket-connections", "start", { churchId, personId, contentType, contentId });
       const [connections, countsRaw] = await Promise.all([
         NotificationHelper.repos.connection.loadForNotification(churchId, personId),
@@ -207,35 +238,10 @@ export class NotificationHelper {
         });
         if (contentType !== "privateMessage" && deliveryCount > 0) {
           this.addDebugStep(debugTrace, "delivery-stop-at-socket", "ok", { reason: "non-private-message socket delivery succeeded" });
-          return "socket"; // Stop here, let 15-min timer escalate if unread
+          return "socket"; // Stop here, let 30-min timer escalate if unread
         }
       }
     }
-
-    // Only load prefs when we may need them (push/email fallback).
-    let pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
-    if (!pref) {
-      pref = await this.createNotificationPref(churchId, personId);
-    }
-    // Entity mutes can only match when there's an entity to mute (navData.innerId);
-    // skip the query otherwise to keep the delivery hot path at one pref read.
-    const needMutes = !!navData?.innerId;
-    const [overrides, entityMutes] = (await Promise.all([
-      NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId),
-      needMutes ? NotificationHelper.repos.notificationEntityMute.loadForPerson(churchId, personId) : Promise.resolve([])
-    ])) as [NotificationPreferenceOverride[], any[]];
-    const gateCtx = {
-      pref,
-      overrides: overrides || [],
-      entityMutes: entityMutes || [],
-      entityType: navData?.innerType as string | undefined,
-      entityId: navData?.innerId as string | undefined
-    };
-    this.addDebugStep(debugTrace, "delivery-load-prefs", "ok", {
-      allowPush: pref.allowPush,
-      emailFrequency: pref.emailFrequency,
-      category: effectiveCategory
-    });
 
     // Level 1: Try Push (gated by the preference precedence rules)
     if (startLevel <= 1) {
@@ -389,7 +395,7 @@ export class NotificationHelper {
 
         if (anyPushSent) {
           this.addDebugStep(debugTrace, "delivery-return-push", "ok", { anyPushSent });
-          return "push"; // Stop here, let 15-min timer escalate if unread
+          return "push"; // Stop here, let 30-min timer escalate if unread
         }
       }
     }
@@ -414,70 +420,55 @@ export class NotificationHelper {
     this.ensureInitialized();
     console.log("[NotificationHelper.escalateDelivery] Starting escalation check...");
 
-    // Load notifications pending escalation
+    // Load notifications pending escalation. Direct-message rows (contentType
+    // "privateMessage") now escalate here too, as ordinary notification rows.
     const pendingNotifications: Notification[] = (await NotificationHelper.repos.notification.loadPendingEscalation()) as any[];
     console.log("[NotificationHelper.escalateDelivery] Found " + pendingNotifications.length + " notifications pending escalation");
 
-    // Load private messages pending escalation
-    const pendingPMs: PrivateMessage[] = (await NotificationHelper.repos.privateMessage.loadPendingEscalation()) as any[];
-    console.log("[NotificationHelper.escalateDelivery] Found " + pendingPMs.length + " PMs pending escalation");
-
-    // Escalate notifications
     for (const notification of pendingNotifications) {
       const currentLevel = notification.deliveryMethod === "socket" ? 0 : 1;
       const nextLevel = currentLevel + 1;
+      const isPm = notification.contentType === "privateMessage";
 
       let title = "New Notification";
       if (notification.message.includes("Volunteer Requests:")) {
         title = "New Plan Assignment";
-      } else if (notification.message.startsWith("New message:")) {
-        title = notification.message;
       } else {
         title = notification.message;
       }
 
-      const newMethod = await this.attemptDeliveryWithEscalation(
-        notification.churchId,
-        notification.personId,
-        nextLevel,
-        title,
-        notification.message,
-        "notification",
-        notification.id,
-        { innerType: notification.contentType, innerId: notification.contentId }
-      );
+      // Keep the delivery keyed on contentType so the push carries the DM type and
+      // the service worker deep-links to the conversation via the sender's personId.
+      const newMethod = isPm
+        ? await this.attemptDeliveryWithEscalation(
+          notification.churchId,
+          notification.personId,
+          nextLevel,
+          notification.message,
+          notification.message,
+          "privateMessage",
+          notification.contentId,
+          { personId: notification.triggeredByPersonId },
+          notification.category
+        )
+        : await this.attemptDeliveryWithEscalation(
+          notification.churchId,
+          notification.personId,
+          nextLevel,
+          title,
+          notification.message,
+          "notification",
+          notification.id,
+          { innerType: notification.contentType, innerId: notification.contentId }
+        );
 
       notification.deliveryMethod = newMethod;
       await NotificationHelper.repos.notification.save(notification);
       console.log("[NotificationHelper.escalateDelivery] Notification " + notification.id + " escalated from " + (currentLevel === 0 ? "socket" : "push") + " to " + newMethod);
     }
 
-    // Escalate private messages
-    for (const pm of pendingPMs) {
-      const currentLevel = pm.deliveryMethod === "socket" ? 0 : 1;
-      const nextLevel = currentLevel + 1;
-
-      // Other party = whichever of fromPersonId/toPersonId is NOT the notify recipient.
-      const otherPersonId = pm.fromPersonId === pm.notifyPersonId ? pm.toPersonId : pm.fromPersonId;
-
-      const newMethod = await this.attemptDeliveryWithEscalation(
-        pm.churchId,
-        pm.notifyPersonId,
-        nextLevel,
-        "New Private Message",
-        "You have a new private message",
-        "privateMessage",
-        pm.id,
-        { personId: otherPersonId, conversationId: pm.conversationId }
-      );
-
-      pm.deliveryMethod = newMethod;
-      await NotificationHelper.repos.privateMessage.save(pm);
-      console.log("[NotificationHelper.escalateDelivery] PM " + pm.id + " escalated from " + (currentLevel === 0 ? "socket" : "push") + " to " + newMethod);
-    }
-
     console.log("[NotificationHelper.escalateDelivery] Escalation complete");
-    return { notificationsEscalated: pendingNotifications.length, pmsEscalated: pendingPMs.length };
+    return { notificationsEscalated: pendingNotifications.length };
   };
 
   static checkShouldNotify = async (conversation: Conversation, message: Message, senderPersonId: string, _title?: string, debugTrace?: NotificationDebugTrace) => {
@@ -529,7 +520,6 @@ export class NotificationHelper {
             messageId: message.id
           });
           pm.notifyPersonId = null;
-          pm.deliveryMethod = "complete";
           await NotificationHelper.repos.privateMessage.save(pm);
           break;
         }
@@ -565,7 +555,6 @@ export class NotificationHelper {
             toPersonId: pm.toPersonId,
             messageId: message.id
           });
-          pm.deliveryMethod = "complete";
           await NotificationHelper.repos.privateMessage.save(pm);
           break;
         }
@@ -582,6 +571,26 @@ export class NotificationHelper {
           privateMessageId: pm.id,
           notifyPersonId: pm.notifyPersonId
         });
+
+        // A notifications row (contentType "privateMessage") now owns all delivery
+        // state and escalation. Reuse the conversation's existing unread row so
+        // consecutive messages share one escalation unit (as the single pm row did);
+        // every message still pings the socket below via attemptDeliveryWithEscalation.
+        const existingDmRows = (await NotificationHelper.repos.notification.loadExistingUnread(conversation.churchId, "privateMessage", pm.id)) as any[] || [];
+        let dmNotification: Notification = (existingDmRows || []).find((n: any) => n.personId === pm.notifyPersonId);
+        if (!dmNotification) {
+          dmNotification = await NotificationHelper.repos.notification.save({
+            churchId: conversation.churchId,
+            personId: pm.notifyPersonId,
+            contentType: "privateMessage",
+            contentId: pm.id,
+            timeSent: new Date(),
+            isNew: true,
+            message: `New Message from ${message.displayName}`,
+            triggeredByPersonId: senderPersonId,
+            category: "direct_messages"
+          });
+        }
 
         // Use escalation logic - start at level 0 (socket)
         // navData.personId = the OTHER party in the chat (the sender), so the
@@ -600,10 +609,17 @@ export class NotificationHelper {
           debugTrace
         );
 
-        pm.deliveryMethod = deliveryMethod;
-        await NotificationHelper.repos.privateMessage.save(pm);
+        dmNotification.deliveryMethod = deliveryMethod;
+        if (deliveryMethod === "muted") {
+          // Mute-park: drop the unread badge (notifyPersonId) and stop escalation.
+          dmNotification.isNew = false;
+          pm.notifyPersonId = null;
+          await NotificationHelper.repos.privateMessage.save(pm);
+        }
+        await NotificationHelper.repos.notification.save(dmNotification);
         this.addDebugStep(debugTrace, "notify-save-private-message-delivery-method", "ok", {
           privateMessageId: pm.id,
+          notificationId: dmNotification.id,
           deliveryMethod
         });
         break;
@@ -676,24 +692,34 @@ export class NotificationHelper {
     // Return early if no notifications to create
     if (notifications.length === 0) return [];
 
-    // don't notify people a second time about the same type of event.
-    const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[] || [];
-    const suppressedPersonIds: string[] = [];
-    for (let i = notifications.length - 1; i >= 0; i--) {
-      if (existing.length > 0 && ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) {
-        suppressedPersonIds.push(notifications[i].personId);
-        notifications.splice(i, 1);
+    // Don't notify people a second time about the same type of event — except explicit
+    // emailImmediate sends (reminder offsets, staff "email all", workflow steps), whose
+    // producers own their dedup (ledger/intent); an unread earlier row must not swallow them.
+    if (!options?.emailImmediate) {
+      const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[] || [];
+      const suppressedPersonIds: string[] = [];
+      for (let i = notifications.length - 1; i >= 0; i--) {
+        if (existing.length > 0 && ArrayHelper.getAll(existing, "personId", notifications[i].personId).length > 0) {
+          suppressedPersonIds.push(notifications[i].personId);
+          notifications.splice(i, 1);
+        }
+      }
+      if (suppressedPersonIds.length > 0) {
+        console.info("[chat-push] notification suppressed by unread existing", {
+          churchId,
+          contentType,
+          contentId,
+          suppressedPersonIds
+        });
       }
     }
-    if (suppressedPersonIds.length > 0) {
-      console.info("[chat-push] notification suppressed by unread existing", {
-        churchId,
-        contentType,
-        contentId,
-        suppressedPersonIds
-      });
-    }
     if (notifications.length > 0) {
+      const emailAddresses = new Map<string, string>();
+      if (options?.emailImmediate) {
+        const emailData = (await this.getEmailData(notifications.map((n) => ({ personId: n.personId }) as NotificationPreference))) || [];
+        emailData.forEach((e: any) => { if (e?.id && e?.email) emailAddresses.set(e.id, e.email); });
+      }
+
       const promises: Promise<Notification>[] = [];
       notifications.forEach((n) => {
         const promise = NotificationHelper.repos.notification.save(n).then(async (notification) => {
@@ -721,9 +747,15 @@ export class NotificationHelper {
             n.category
           );
 
-          // Save the delivery method
+          // Save the delivery method. A muted (in_app-gated) row is parked:
+          // isNew=false keeps it out of badge counts and stops escalation.
           notification.deliveryMethod = deliveryMethod;
+          if (deliveryMethod === "muted") notification.isNew = false;
           await NotificationHelper.repos.notification.save(notification);
+
+          if (options?.emailImmediate) {
+            await NotificationHelper.applyImmediateEmail(notification, emailAddresses.get(n.personId), options);
+          }
 
           return notification;
         });
@@ -732,6 +764,34 @@ export class NotificationHelper {
       const result = await Promise.all(promises);
       return result;
     } else return [];
+  };
+
+  // Post-escalation: gated rich email now instead of the batch digest; no address on file leaves the row as escalation left it.
+  private static applyImmediateEmail = async (notification: Notification, email: string | undefined, options: CreateNotificationOptions) => {
+    if (!email) return;
+
+    const pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(notification.churchId, notification.personId);
+    const overrides = (await NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(notification.churchId, notification.personId)) as any[] || [];
+    const gate = PreferenceGateHelper.evaluate(notification.churchId, notification.personId, notification.category || "", "email", { pref, overrides });
+
+    if (!gate.allow) {
+      notification.deliveryMethod = "complete";
+      await NotificationHelper.repos.notification.save(notification);
+      return;
+    }
+
+    const custom = options.emailByPerson?.[notification.personId];
+    const subject = custom?.subject || options.deliveryTitle || notification.message;
+    const html = custom?.html || (notification.message + (notification.link ? ` <a href="${notification.link}">View Details</a>` : ""));
+
+    try {
+      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
+      await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", true, email);
+      notification.deliveryMethod = "complete";
+      await NotificationHelper.repos.notification.save(notification);
+    } catch (e) {
+      await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", false, email, String(e));
+    }
   };
 
   // Legacy push paths historically fired without checking preferences (architecture §4.5).
@@ -803,163 +863,6 @@ export class NotificationHelper {
     return method;
   };
 
-  static notifyUserForPrivateMessage = async (churchId: string, personId: string, senderName: string, messageContent: string, conversationId: string, privateMessageId?: string) => {
-    this.ensureInitialized();
-    let method = "";
-    const contentType = "privateMessage";
-    const contentId = privateMessageId || conversationId;
-
-    // Handle web socket notifications
-    const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
-    if (connections.length > 0) {
-      const deliveryCount = await DeliveryHelper.sendMessages(connections, {
-        churchId,
-        conversationId: "alert",
-        action: "privateMessage",
-        data: {}
-      });
-      for (const [index, conn] of connections.entries()) {
-        await this.logDelivery(churchId, personId, contentType, contentId, "socket", index < deliveryCount, conn.socketId, index < deliveryCount ? undefined : "Socket delivery failed");
-      }
-      if (deliveryCount > 0) method = "socket";
-    }
-
-    // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
-
-    const allowPush = await this.pushAllowed(churchId, personId, "direct_messages");
-    if (devices.length > 0 && allowPush) {
-      const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
-      const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
-      const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
-      const title = `New Message from ${senderName}`;
-      if (staleWebPushTokens.length > 0) {
-        await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
-      }
-
-      if (expoPushTokens.length > 0) {
-        try {
-          const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, messageContent, "privateMessage", conversationId);
-          method = "push";
-          for (let i = 0; i < expoPushTokens.length; i++) {
-            const ticket = tickets?.[i];
-            const success = ticket?.status === "ok";
-            const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
-            await this.logDelivery(churchId, personId, contentType, contentId, "push", success, expoPushTokens[i], errorMsg);
-            if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
-          }
-        } catch (error) {
-          console.error("Push notification failed for private message:", error);
-          for (const token of expoPushTokens) {
-            await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
-          }
-        }
-      }
-
-      if (webPushTokens.length > 0) {
-        try {
-          const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, messageContent, "privateMessage", conversationId);
-          for (const r of results) {
-            const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
-            await this.logDelivery(churchId, personId, contentType, contentId, "push", r.success, r.token, details || undefined);
-            if (r.gone) await this.deleteInvalidToken(r.token);
-          }
-          if (results.some((r) => r.success)) method = "push";
-          else if (results.some((r) => r.retryable)) method = "push";
-        } catch (error) {
-          console.error("Web push notification failed for private message:", error);
-          for (const token of webPushTokens) {
-            await this.logDelivery(churchId, personId, contentType, contentId, "push", false, token, String(error));
-          }
-        }
-      }
-    }
-
-    return method;
-  };
-
-  static notifyUserForGeneralNotification = async (churchId: string, personId: string, notificationMessage: string, notificationId: string) => {
-    this.ensureInitialized();
-    let method = "";
-    const contentType = "notification";
-
-    // Handle web socket notifications
-    const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
-    if (connections.length > 0) {
-      const deliveryCount = await DeliveryHelper.sendMessages(connections, {
-        churchId,
-        conversationId: "alert",
-        action: "notification",
-        data: {}
-      });
-      for (const [index, conn] of connections.entries()) {
-        await this.logDelivery(churchId, personId, contentType, notificationId, "socket", index < deliveryCount, conn.socketId, index < deliveryCount ? undefined : "Socket delivery failed");
-      }
-      if (deliveryCount > 0) method = "socket";
-    }
-
-    // Handle push notifications
-    const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
-
-    const allowPush = await this.pushAllowed(churchId, personId, NotificationCategoryHelper.categoryFor("notification"));
-    if (devices.length > 0 && allowPush) {
-      const allTokens = devices.map((device) => device.fcmToken).filter((token) => !!token) as string[];
-      const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
-      const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens } = this.prepareWebPushDevices(devices);
-      if (staleWebPushTokens.length > 0) {
-        await Promise.all(staleWebPushTokens.map((token) => this.deleteInvalidToken(token)));
-      }
-
-      let title = "New Notification";
-      if (notificationMessage.includes("Volunteer Requests:")) {
-        title = "New Plan Assignment";
-      } else if (notificationMessage.startsWith("New message:")) {
-        title = notificationMessage;
-      } else {
-        title = notificationMessage;
-      }
-
-      if (expoPushTokens.length > 0) {
-        try {
-          const tickets = await ExpoPushHelper.sendBulkTypedMessages(expoPushTokens, title, notificationMessage, "notification", notificationId);
-          method = "push";
-          for (let i = 0; i < expoPushTokens.length; i++) {
-            const ticket = tickets?.[i];
-            const success = ticket?.status === "ok";
-            const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
-            await this.logDelivery(churchId, personId, contentType, notificationId, "push", success, expoPushTokens[i], errorMsg);
-            if (!success && ticket?.status === "error") await this.deleteInvalidToken(expoPushTokens[i]);
-          }
-        } catch (error) {
-          console.error("Push notification failed for general notification:", error);
-          for (const token of expoPushTokens) {
-            await this.logDelivery(churchId, personId, contentType, notificationId, "push", false, token, String(error));
-          }
-        }
-      }
-
-      if (webPushTokens.length > 0) {
-        try {
-          const results = await WebPushHelper.sendBulkTypedMessages(webPushTokens, title, notificationMessage, "notification", notificationId);
-          for (const r of results) {
-            const details = [r.diagnosticCode, r.statusCode, r.endpointHost, r.errorMessage].filter((value) => value !== undefined && value !== "").join(" | ");
-            await this.logDelivery(churchId, personId, contentType, notificationId, "push", r.success, r.token, details || undefined);
-            if (r.gone) await this.deleteInvalidToken(r.token);
-          }
-          if (results.some((r) => r.success)) method = "push";
-          else if (results.some((r) => r.retryable)) method = "push";
-        } catch (error) {
-          console.error("Web push notification failed for general notification:", error);
-          for (const token of webPushTokens) {
-            await this.logDelivery(churchId, personId, contentType, notificationId, "push", false, token, String(error));
-          }
-        }
-      }
-    }
-
-    return method;
-  };
-
   static sendEmailNotifications = async (frequency: string) => {
     const startTime = Date.now();
     console.log("[NotificationHelper.sendEmailNotifications] ========== START ==========");
@@ -970,60 +873,33 @@ export class NotificationHelper {
 
     let promises: Promise<any>[] = [];
 
-    console.log("[NotificationHelper.sendEmailNotifications] Loading undelivered notifications...");
+    // Direct messages now flow through here as notification rows (contentType
+    // "privateMessage"); there is no separate private-message escalation queue.
     const rawNotifications = await NotificationHelper.repos.notification.loadUndelivered();
-    console.log("[NotificationHelper.sendEmailNotifications] Raw notifications type: " + typeof rawNotifications);
-    console.log("[NotificationHelper.sendEmailNotifications] Raw notifications isArray: " + Array.isArray(rawNotifications));
-    console.log("[NotificationHelper.sendEmailNotifications] Raw notifications sample: " + JSON.stringify(rawNotifications?.slice?.(0, 2) || rawNotifications));
     const allNotifications: Notification[] = (rawNotifications || []) as any[];
-    console.log("[NotificationHelper.sendEmailNotifications] Loaded notifications (" + (Date.now() - startTime) + "ms)");
+    console.log("[NotificationHelper.sendEmailNotifications] Found " + allNotifications.length + " undelivered notifications");
 
-    console.log("[NotificationHelper.sendEmailNotifications] Loading undelivered PMs...");
-    const rawPMs = await NotificationHelper.repos.privateMessage.loadUndelivered();
-    console.log("[NotificationHelper.sendEmailNotifications] Raw PMs type: " + typeof rawPMs);
-    console.log("[NotificationHelper.sendEmailNotifications] Raw PMs sample: " + JSON.stringify(rawPMs?.slice?.(0, 2) || rawPMs));
-    const allPMs: PrivateMessage[] = (rawPMs || []) as any[];
-    console.log("[NotificationHelper.sendEmailNotifications] Loaded PMs (" + (Date.now() - startTime) + "ms)");
-
-    console.log("[NotificationHelper.sendEmailNotifications] Found " + allNotifications.length + " undelivered notifications, " + allPMs.length + " undelivered PMs");
-    if (allNotifications.length > 0) {
-      console.log("[NotificationHelper.sendEmailNotifications] First notification keys: " + Object.keys(allNotifications[0] || {}).join(", "));
-      console.log("[NotificationHelper.sendEmailNotifications] First notification personId: " + (allNotifications[0] as any)?.personId);
-    }
-
-    if (allNotifications.length === 0 && allPMs.length === 0) {
+    if (allNotifications.length === 0) {
       console.log("[NotificationHelper.sendEmailNotifications] No undelivered items found, returning early");
       return;
     }
 
-    const notifPersonIds = ArrayHelper.getIds(allNotifications, "personId");
-    const pmPersonIds = ArrayHelper.getIds(allPMs, "notifyPersonId");
-    console.log("[NotificationHelper.sendEmailNotifications] notifPersonIds from ArrayHelper: " + JSON.stringify(notifPersonIds));
-    console.log("[NotificationHelper.sendEmailNotifications] pmPersonIds from ArrayHelper: " + JSON.stringify(pmPersonIds));
-    const peopleIds = notifPersonIds.concat(pmPersonIds);
+    const peopleIds = ArrayHelper.getIds(allNotifications, "personId");
     console.log("[NotificationHelper.sendEmailNotifications] Processing " + peopleIds.length + " unique people");
 
     const notificationPrefs = (await NotificationHelper.repos.notificationPreference.loadByPersonIds(peopleIds)) as any[];
-    console.log("[NotificationHelper.sendEmailNotifications] Found " + notificationPrefs.length + " existing notification preferences");
 
     const todoPrefs: NotificationPreference[] = [];
     for (const personId of peopleIds) {
       const notifications: Notification[] = ArrayHelper.getAll(allNotifications, "personId", personId);
-      const pms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", personId);
       let pref = ArrayHelper.getOne(notificationPrefs, "personId", personId);
       if (!pref) {
-        console.log("[NotificationHelper.sendEmailNotifications] Creating default pref for person " + personId);
-        pref = await this.createNotificationPref(notifications[0]?.churchId || pms[0]?.churchId, personId);
+        pref = await this.createNotificationPref(notifications[0]?.churchId, personId);
       }
-      console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + ": emailFrequency=" + pref.emailFrequency + ", notifications=" + notifications.length + ", pms=" + pms.length);
       if (pref.emailFrequency === "never") {
-        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " has email disabled, marking as 'complete'");
-        promises = promises.concat(this.markMethod(notifications, pms, "complete"));
+        promises = promises.concat(this.markMethod(notifications, "complete"));
       } else if (pref.emailFrequency === frequency) {
-        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " matches frequency '" + frequency + "', adding to todo");
         todoPrefs.push(pref);
-      } else {
-        console.log("[NotificationHelper.sendEmailNotifications] Person " + personId + " has frequency '" + pref.emailFrequency + "', skipping for '" + frequency + "' run");
       }
       // else: leave for the other timer (don't mark as "none")
     }
@@ -1031,26 +907,15 @@ export class NotificationHelper {
     console.log("[NotificationHelper.sendEmailNotifications] " + todoPrefs.length + " people to process for '" + frequency + "' frequency");
 
     if (todoPrefs.length > 0) {
-      console.log("[NotificationHelper.sendEmailNotifications] Fetching email addresses from membership API...");
       const allEmailData = await this.getEmailData(todoPrefs);
-      console.log("[NotificationHelper.sendEmailNotifications] Got " + (allEmailData?.length || 0) + " email addresses");
 
-      // Collect sender personIds from PMs and triggeredByPersonIds from notifications for reply-to
-      console.log("[NotificationHelper.sendEmailNotifications] allPMs sample for sender lookup: " + JSON.stringify(allPMs.slice(0, 2).map(pm => ({ id: pm.id, fromPersonId: pm.fromPersonId, notifyPersonId: pm.notifyPersonId }))));
-      const pmSenderIds = allPMs.map(pm => pm.fromPersonId).filter(id => id);
-      const notifTriggerIds = allNotifications.map(n => n.triggeredByPersonId).filter(id => id);
-      const allTriggerPersonIds = [...new Set([...pmSenderIds, ...notifTriggerIds])];
-      console.log("[NotificationHelper.sendEmailNotifications] allTriggerPersonIds (PM senders + notification triggers): " + JSON.stringify(allTriggerPersonIds));
-
+      // Reply-to: the person who triggered each notification (DM sender, task
+      // assigner, etc.) is carried on triggeredByPersonId.
+      const triggerIds = [...new Set(allNotifications.map((n) => n.triggeredByPersonId).filter((id): id is string => !!id))];
       let triggerEmailData: any[] = [];
-      if (allTriggerPersonIds.length > 0) {
-        console.log("[NotificationHelper.sendEmailNotifications] Fetching trigger/sender emails for reply-to...");
-        const triggerPrefs = allTriggerPersonIds.map(personId => ({ personId } as NotificationPreference));
+      if (triggerIds.length > 0) {
+        const triggerPrefs = triggerIds.map((personId) => ({ personId } as NotificationPreference));
         triggerEmailData = await this.getEmailData(triggerPrefs);
-        console.log("[NotificationHelper.sendEmailNotifications] Got " + (triggerEmailData?.length || 0) + " trigger email addresses");
-        console.log("[NotificationHelper.sendEmailNotifications] triggerEmailData: " + JSON.stringify(triggerEmailData));
-      } else {
-        console.log("[NotificationHelper.sendEmailNotifications] No trigger personIds found, skipping reply-to lookup");
       }
 
       // Batch-load every recipient's overrides once (mirrors the batched pref load above).
@@ -1058,7 +923,6 @@ export class NotificationHelper {
 
       for (const pref of todoPrefs) {
         const allPersonNotifs: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
-        const allPersonPms: PrivateMessage[] = ArrayHelper.getAll(allPMs, "notifyPersonId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
 
         // Re-check the preference gate per category for the email channel; items
@@ -1066,49 +930,35 @@ export class NotificationHelper {
         const overrides = ArrayHelper.getAll(allOverrides, "personId", pref.personId);
         const emailOk = (category: string) => PreferenceGateHelper.evaluate(pref.churchId, pref.personId, category, "email", { pref, overrides }).allow;
         const notifications = allPersonNotifs.filter((n) => emailOk(n.category || NotificationCategoryHelper.categoryFor(n.contentType)));
-        const pms = allPersonPms.filter(() => emailOk("direct_messages"));
         const suppressedNotifs = allPersonNotifs.filter((n) => !notifications.includes(n));
-        const suppressedPms = allPersonPms.filter((pm) => !pms.includes(pm));
-        if (suppressedNotifs.length > 0 || suppressedPms.length > 0) {
-          promises.push(...this.markMethod(suppressedNotifs, suppressedPms, "complete"));
+        if (suppressedNotifs.length > 0) {
+          promises.push(...this.markMethod(suppressedNotifs, "complete"));
         }
 
-        // Get sender/trigger email for reply-to
-        // Priority: PM sender > notification triggeredBy
+        // Reply-to = the trigger/sender of the first item.
         let senderEmail: string | undefined;
-        if (pms.length > 0 && pms[0].fromPersonId) {
-          const senderData = ArrayHelper.getOne(triggerEmailData, "id", pms[0].fromPersonId);
-          senderEmail = senderData?.email;
-        } else if (notifications.length > 0 && notifications[0].triggeredByPersonId) {
+        if (notifications.length > 0 && notifications[0].triggeredByPersonId) {
           const triggerData = ArrayHelper.getOne(triggerEmailData, "id", notifications[0].triggeredByPersonId);
           senderEmail = triggerData?.email;
         }
 
-        console.log("[NotificationHelper.sendEmailNotifications] Person " + pref.personId + ": email=" + (emailData?.email || "NOT FOUND") + ", notifications=" + notifications.length + ", pms=" + pms.length + ", replyTo=" + (senderEmail || "none"));
-        if (emailData?.email && (notifications.length > 0 || pms.length > 0)) {
-          console.log("[NotificationHelper.sendEmailNotifications] Queuing email to " + emailData.email);
-          promises.push(this.sendEmailNotification(emailData.email, notifications, pms, senderEmail));
-        } else {
-          console.log("[NotificationHelper.sendEmailNotifications] Skipping person " + pref.personId + " - no email or no items");
+        console.log("[NotificationHelper.sendEmailNotifications] Person " + pref.personId + ": email=" + (emailData?.email || "NOT FOUND") + ", notifications=" + notifications.length + ", replyTo=" + (senderEmail || "none"));
+        if (emailData?.email && notifications.length > 0) {
+          promises.push(this.sendEmailNotification(emailData.email, notifications, senderEmail));
         }
       }
     }
-    console.log("[NotificationHelper.sendEmailNotifications] Waiting for " + promises.length + " promises to complete...");
     await Promise.all(promises);
     console.log("[NotificationHelper.sendEmailNotifications] ========== COMPLETE ==========");
     console.log("[NotificationHelper.sendEmailNotifications] Total execution time: " + (Date.now() - startTime) + "ms");
-    return { frequency, notificationsProcessed: allNotifications.length, pmsProcessed: allPMs.length, emailsSent: promises.length };
+    return { frequency, notificationsProcessed: allNotifications.length, emailsSent: promises.length };
   };
 
-  static markMethod = (notifications: Notification[], privateMessages: PrivateMessage[], method: string) => {
+  static markMethod = (notifications: Notification[], method: string) => {
     const promises: Promise<any>[] = [];
     notifications.forEach((notification) => {
       notification.deliveryMethod = method;
       promises.push(NotificationHelper.repos.notification.save(notification));
-    });
-    privateMessages.forEach((pm) => {
-      pm.deliveryMethod = method;
-      promises.push(NotificationHelper.repos.privateMessage.save(pm));
     });
     return promises;
   };
@@ -1143,33 +993,26 @@ export class NotificationHelper {
     }
   };
 
-  static sendEmailNotification = async (email: string, notifications: Notification[], privateMessages: PrivateMessage[], senderEmail?: string) => {
-    console.log("[NotificationHelper.sendEmailNotification] Starting email send to: " + email + (senderEmail ? " (reply-to: " + senderEmail + ")" : ""));
-
+  static sendEmailNotification = async (email: string, notifications: Notification[], senderEmail?: string) => {
     if (!email || typeof email !== "string" || !email.includes("@")) {
       console.error("[NotificationHelper.sendEmailNotification] Invalid email address: " + email + ", skipping send");
       return;
     }
 
+    const notifCount = notifications?.length || 0;
+    if (notifCount === 0) return;
+
+    const firstNotification = notifications[0];
+    const allDms = notifications.every((n) => n.contentType === "privateMessage");
     let title = "";
     let content = "";
 
-    const notifCount = notifications?.length || 0;
-    const pmCount = privateMessages?.length || 0;
-    const totalCount = notifCount + pmCount;
-
-    console.log("[NotificationHelper.sendEmailNotification] Items: " + notifCount + " notifications, " + pmCount + " private messages");
-
-    // Early return if nothing to send
-    if (totalCount === 0) {
-      console.log("[NotificationHelper.sendEmailNotification] No items to send, returning early");
-      return;
-    }
-
-    const firstNotification = notifications?.[0];
-
-    if (notifCount === 1 && pmCount === 0 && firstNotification) {
-      if (firstNotification.message.includes("Volunteer Requests:")) {
+    if (notifCount === 1) {
+      if (firstNotification.contentType === "privateMessage") {
+        // DM digest — the row message already reads "New Message from {name}".
+        title = firstNotification.message;
+        content = firstNotification.message;
+      } else if (firstNotification.message.includes("Volunteer Requests:")) {
         const match = firstNotification.message.match(/Volunteer Requests:(.*).Please log in and confirm/);
         title = "New Notification: Volunteer Request";
         content = "<h3>New Notification</h3><h4>Volunteer Request</h4><h4>" + (match ? match[1] : firstNotification.message) + "</h4>" +
@@ -1181,15 +1024,11 @@ export class NotificationHelper {
         title = "New Notification: " + firstNotification.message;
         content = "New Notification: " + firstNotification.message;
       }
-    } else if (notifCount === 0 && pmCount === 1) title = "New Private Message";
-    else if (notifCount > 0 && pmCount > 0) title = totalCount + " New Notifications and Messages";
-    else if (notifCount > 0) title = notifCount + " New Notification" + (notifCount > 1 ? "s" : "");
-    else if (pmCount > 0) title = pmCount + " New Private Message" + (pmCount > 1 ? "s" : "");
+    } else {
+      title = notifCount + (allDms ? " New Message" : " New Notification") + "s";
+    }
 
-    console.log("[NotificationHelper.sendEmailNotification] Email title: " + title);
-    console.log("[NotificationHelper.sendEmailNotification] Calling EmailHelper.sendTemplatedEmail...");
-
-    // Use reply-to for PM/notification emails (so recipient can reply directly to sender/trigger)
+    // Use reply-to so the recipient can reply directly to the sender/trigger.
     const replyTo = senderEmail || undefined;
 
     let emailSuccess = true;
@@ -1203,21 +1042,13 @@ export class NotificationHelper {
       console.error("[NotificationHelper.sendEmailNotification] Email FAILED to " + email + ":", error);
     }
 
-    // Log email delivery for each notification
     for (const notification of notifications) {
-      await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", emailSuccess, email, emailError);
-    }
-
-    // Log email delivery for each private message
-    for (const pm of privateMessages) {
-      await this.logDelivery(pm.churchId, pm.notifyPersonId, "privateMessage", pm.id, "email", emailSuccess, email, emailError);
+      const logType = notification.contentType === "privateMessage" ? "privateMessage" : "notification";
+      await this.logDelivery(notification.churchId, notification.personId, logType, notification.id, "email", emailSuccess, email, emailError);
     }
 
     if (emailSuccess) {
-      console.log("[NotificationHelper.sendEmailNotification] Marking " + notifications.length + " notifications and " + privateMessages.length + " PMs as complete");
-      const promises: Promise<any>[] = this.markMethod(notifications, privateMessages, "complete");
-      await Promise.all(promises);
-      console.log("[NotificationHelper.sendEmailNotification] Delivery method updated to complete");
+      await Promise.all(this.markMethod(notifications, "complete"));
     } else {
       console.log("[NotificationHelper.sendEmailNotification] Email failed, NOT marking items as delivered");
     }

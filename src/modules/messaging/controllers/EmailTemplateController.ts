@@ -3,8 +3,8 @@ import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { EmailTemplate, DeliveryLog } from "../models/index.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
-import { EmailHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
@@ -118,7 +118,7 @@ export class EmailTemplateController extends MessagingBaseController {
         const resolvedBody = MergeFieldHelper.resolve(htmlContent, person, church);
 
         try {
-          await EmailHelper.sendTemplatedEmail(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
+          await TransactionalEmailHelper.sendTransactional(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
           successCount++;
 
           const log: DeliveryLog = {

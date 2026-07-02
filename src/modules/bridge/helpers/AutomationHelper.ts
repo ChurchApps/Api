@@ -81,10 +81,4 @@ export class AutomationHelper {
     console.log(`Sent ${notifications.length} group attendance reminder notifications`);
     return notifications.length;
   }
-
-  public static async remindServiceRequests(): Promise<void> {
-    // Dynamic import keeps the doing helper's email deps out of this module's load graph.
-    const { ServingReminderHelper } = await import("../../doing/helpers/ServingReminderHelper.js");
-    await ServingReminderHelper.sendReminders();
-  }
 }

@@ -58,6 +58,13 @@ export class ReminderDefinitionRepo {
       .execute();
   }
 
+  // Scoped definitions (entityId null) for an inheritance scope — the ux_reminder_scope index.
+  public async loadForScope(churchId: string, entityType: string, scopeId: string) {
+    return getDb().selectFrom("reminderDefinitions").selectAll()
+      .where("churchId", "=", churchId).where("entityType", "=", entityType).where("scopeId", "=", scopeId)
+      .execute();
+  }
+
   // Global across churches — the expander cron iterates every enabled definition.
   public async loadAllEnabled() {
     return getDb().selectFrom("reminderDefinitions").selectAll().where("enabled", "=", true as any).execute();

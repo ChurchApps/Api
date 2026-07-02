@@ -1,3 +1,14 @@
+// Mirrors messaging's CreateNotificationOptions (src/modules/messaging/helpers/NotificationHelper.ts)
+// structurally, so shared/ doesn't import module-internal types across the module boundary.
+export interface NotificationServiceOptions {
+  deliveryStartLevel?: number;
+  deliveryTitle?: string;
+  navData?: Record<string, unknown>;
+  category?: string;
+  emailByPerson?: Record<string, { subject: string; html: string }>;
+  emailImmediate?: boolean;
+}
+
 export type CreateNotificationsFn = (
   peopleIds: string[],
   churchId: string,
@@ -5,7 +16,8 @@ export type CreateNotificationsFn = (
   contentId: string,
   message: string,
   link?: string,
-  triggeredByPersonId?: string
+  triggeredByPersonId?: string,
+  options?: NotificationServiceOptions
 ) => Promise<unknown>;
 
 export class NotificationService {
@@ -22,11 +34,12 @@ export class NotificationService {
     contentId: string,
     message: string,
     link?: string,
-    triggeredByPersonId?: string
+    triggeredByPersonId?: string,
+    options?: NotificationServiceOptions
   ): Promise<unknown> {
     if (!NotificationService.createNotificationsImpl) {
       throw new Error("NotificationService not initialized. Ensure the messaging module has booted before sending notifications.");
     }
-    return NotificationService.createNotificationsImpl(peopleIds, churchId, contentType, contentId, message, link, triggeredByPersonId);
+    return NotificationService.createNotificationsImpl(peopleIds, churchId, contentType, contentId, message, link, triggeredByPersonId, options);
   }
 }

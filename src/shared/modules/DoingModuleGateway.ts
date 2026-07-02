@@ -11,6 +11,9 @@ export interface DoingModuleGateway {
   // List-condition provider: people scheduled to serve in the window (any plan).
   loadServingPersonIds(churchId: string, startDate?: Date, endDate?: Date): Promise<string[]>;
   addPersonToWorkflow(churchId: string, workflowId: string, personId: string, personLabel?: string): Promise<void>;
+  // Rich serving-reminder email bodies per person (positions, notes, Accept/Decline
+  // token buttons) for the messaging reminder engine's immediate-email path.
+  buildPlanReminderEmails(churchId: string, planId: string, personIds: string[], customMessage?: string): Promise<Record<string, { subject: string; html: string }>>;
 }
 
 class DoingModuleGatewayDb implements DoingModuleGateway {
@@ -49,6 +52,12 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
   public async addPersonToWorkflow(churchId: string, workflowId: string, personId: string, personLabel?: string) {
     const { WorkflowHelper } = await import("../../modules/doing/helpers/WorkflowHelper.js");
     await WorkflowHelper.addToWorkflow(churchId, workflowId, { type: "person", id: personId, label: personLabel }, { type: "system", label: "List" }, undefined, await this.repos());
+  }
+
+  public async buildPlanReminderEmails(churchId: string, planId: string, personIds: string[], customMessage?: string) {
+    // Dynamic import keeps the doing email/token deps out of this module's load graph.
+    const { PlanReminderEmailHelper } = await import("../../modules/doing/helpers/PlanReminderEmailHelper.js");
+    return PlanReminderEmailHelper.build(churchId, planId, personIds, customMessage);
   }
 }
 
