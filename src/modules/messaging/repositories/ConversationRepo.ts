@@ -131,7 +131,13 @@ export class ConversationRepo {
       contentType: data.contentType,
       contentId: data.contentId,
       title: data.title,
-      dateCreated: data.dateCreated
+      dateCreated: data.dateCreated,
+      groupId: data.groupId,
+      visibility: data.visibility,
+      firstPostId: data.firstPostId,
+      lastPostId: data.lastPostId,
+      postCount: data.postCount,
+      allowAnonymousPosts: !!data.allowAnonymousPosts
     };
   }
 

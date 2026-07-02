@@ -98,6 +98,7 @@ export const permissionsList: IPermission[] = [
 
   // Messaging API permissions
   { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
+  { apiName: "MessagingApi", section: "Messaging", action: "Admin", displaySection: "Messaging", displayAction: "Admin" },
 
   // Doing API permissions (Tasks, Workflows & Automations)
   // Plans lives here because PlanAuth enforces it in the doing module; every JWT now

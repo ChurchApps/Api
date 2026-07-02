@@ -29,10 +29,10 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
   }
 
   public static getApiJwt(api: Api, user: User, userChurch: LoginUserChurch) {
-    // Monolith: every token carries the full cross-module permission set (minus the
-    // apiName-prefixed ReportingApi duplicates) so a permission from any module is
+    // Monolith: every token carries the full cross-module permission set, including
+    // the apiName-prefixed ReportingApi bucket, so a permission from any module is
     // honored on any module's endpoints — no request-time cross-API fallback needed.
-    const permList = buildPermStrings(userChurch.apis?.filter((a) => a.keyName !== "ReportingApi"));
+    const permList = buildPermStrings(userChurch.apis);
 
     const groupIds: string[] = [];
     userChurch.groups?.forEach((g) => groupIds.push(g.id));
@@ -126,9 +126,11 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     allUserChurches.forEach((uc) => {
       uc.apis?.forEach((api) => {
         api.jwt = AuthenticatedUser.getApiJwt(api, user, uc);
-        if (api.keyName === "ReportingApi") api.permissions = []; // We just need the jwt, not the list
       });
       uc.jwt = AuthenticatedUser.getChurchJwt(user, uc);
+      uc.apis?.forEach((api) => {
+        if (api.keyName === "ReportingApi") api.permissions = []; // We just need the jwt, not the list
+      });
     });
   }
 
