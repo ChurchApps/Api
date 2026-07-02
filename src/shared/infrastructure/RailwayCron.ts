@@ -39,6 +39,8 @@ const runMidnight = async (): Promise<void> => {
   await contentRepos.streamingService.advanceRecurringServices();
   const { expandReminders } = await import("../../modules/messaging/helpers/ReminderBootstrap.js");
   await expandReminders(messagingRepos); // reminder expander — Pattern A
+  const { GradePromotionHelper } = await import("../../modules/membership/helpers/GradePromotionHelper.js");
+  await GradePromotionHelper.checkPromotions();
   await NotificationHelper.sendEmailNotifications("daily");
 };
 

@@ -26,6 +26,8 @@ export interface PeopleTable {
   maritalStatus?: string;
   anniversary?: Date;
   membershipStatus?: string;
+  grade?: string;
+  school?: string;
   homePhone?: string;
   mobilePhone?: string;
   workPhone?: string;

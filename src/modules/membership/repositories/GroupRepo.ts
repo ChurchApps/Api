@@ -33,6 +33,10 @@ export class GroupRepo {
       joinPolicy: group.joinPolicy ?? "open",
       archived: group.archived ?? false,
       publicRoster: group.publicRoster ?? false,
+      minAgeMonths: group.minAgeMonths,
+      maxAgeMonths: group.maxAgeMonths,
+      minGrade: group.minGrade,
+      maxGrade: group.maxGrade,
       removed: false as any
     }).execute();
     return group;
@@ -57,7 +61,11 @@ export class GroupRepo {
       campusId: group.campusId,
       joinPolicy: group.joinPolicy ?? "open",
       archived: group.archived ?? false,
-      publicRoster: group.publicRoster ?? false
+      publicRoster: group.publicRoster ?? false,
+      minAgeMonths: group.minAgeMonths,
+      maxAgeMonths: group.maxAgeMonths,
+      minGrade: group.minGrade,
+      maxGrade: group.maxGrade
     }).where("id", "=", group.id).where("churchId", "=", group.churchId).execute();
     return group;
   }
@@ -221,7 +229,11 @@ export class GroupRepo {
       campusId: row.campusId,
       joinPolicy: (row.joinPolicy as Group["joinPolicy"]) ?? "open",
       archived: row.archived,
-      publicRoster: row.publicRoster
+      publicRoster: row.publicRoster,
+      minAgeMonths: row.minAgeMonths,
+      maxAgeMonths: row.maxAgeMonths,
+      minGrade: row.minGrade,
+      maxGrade: row.maxGrade
     };
     row.labels?.split(",").forEach((label: string) => result.labelArray.push(label.trim()));
     return result;

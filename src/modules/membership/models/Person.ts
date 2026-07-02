@@ -12,6 +12,8 @@ export class Person {
   public maritalStatus?: string;
   public anniversary?: Date;
   public membershipStatus?: string;
+  public grade?: string;
+  public school?: string;
   public householdId?: string;
   public householdRole?: string;
   public campusId?: string;

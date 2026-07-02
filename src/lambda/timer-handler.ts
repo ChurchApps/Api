@@ -96,6 +96,12 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     const listResult = await ListRefreshHelper.refreshAutoLists();
     console.log("[handleMidnightTimer] refreshAutoLists result:", JSON.stringify(listResult));
 
+    // Annual grade promotion for churches that opted in via the gradePromotionDate setting.
+    console.log("[handleMidnightTimer] Checking grade promotions...");
+    const { GradePromotionHelper } = await import("../modules/membership/helpers/GradePromotionHelper.js");
+    const gradeResult = await GradePromotionHelper.checkPromotions();
+    console.log("[handleMidnightTimer] checkPromotions result:", JSON.stringify(gradeResult));
+
     // Automation execution history retention (>= 32 days required; we keep 90).
     console.log("[handleMidnightTimer] Purging old automation executions...");
     const doingRepos = await RepoManager.getRepos<any>("doing");

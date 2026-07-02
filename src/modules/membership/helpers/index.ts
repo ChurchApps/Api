@@ -19,6 +19,7 @@ export { PersonConditionHelper } from "./PersonConditionHelper.js";
 export { PersonHelper } from "./PersonHelper.js";
 export { ListRuleHelper } from "./ListRuleHelper.js";
 export { ListRefreshHelper } from "./ListRefreshHelper.js";
+export { GradePromotionHelper, GRADES, nextGrade } from "./GradePromotionHelper.js";
 export { RoleHelper } from "./RoleHelper.js";
 export { UserHelper } from "./UserHelper.js";
 export { UserChurchHelper } from "./UserChurchHelper.js";

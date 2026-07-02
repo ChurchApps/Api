@@ -55,6 +55,11 @@ export class SettingRepo {
       .execute();
   }
 
+  // Cross-church: the midnight promotion job sweeps every church's setting in one pass.
+  public async loadAllByKeyName(keyName: string) {
+    return getDb().selectFrom("settings").selectAll().where("keyName", "=", keyName).execute();
+  }
+
   public saveAll(models: Setting[]) {
     const promises: Promise<Setting>[] = [];
     models.forEach((model) => { promises.push(this.save(model)); });
