@@ -20,6 +20,7 @@ export { RoleController } from "./RoleController.js";
 export { RoleMemberController } from "./RoleMemberController.js";
 export { RolePermissionController } from "./RolePermissionController.js";
 export { UserController } from "./UserController.js";
+export { UserSsoController } from "./UserSsoController.js";
 export { UserChurchController } from "./UserChurchController.js";
 export { VisibilityPreferenceController } from "./VisibilityPreferenceController.js";
 

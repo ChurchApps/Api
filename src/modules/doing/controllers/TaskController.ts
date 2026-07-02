@@ -1,9 +1,8 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
-import { FileStorageHelper } from "@churchapps/apihelper";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Task } from "../models/index.js";
-import { Environment, WorkflowHelper } from "../helpers/index.js";
+import { WorkflowHelper, DirectoryUpdateHelper } from "../helpers/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 
@@ -85,7 +84,7 @@ export class TaskController extends DoingBaseController {
       const result: Task[] = [];
       for (const task of req.body) {
         task.churchId = au.churchId;
-        if (req.query?.type === "directoryUpdate") await this.handleDirectoryUpdate(au.churchId, task);
+        if (req.query?.type === "directoryUpdate") await DirectoryUpdateHelper.handleDirectoryUpdate(au.churchId, task);
         const saved = await this.repos.task.save(task);
         await InternalEventBus.publish(au.churchId, "task.updated", saved); // sync any per-task reminder occurrences
         result.push(saved);
@@ -217,34 +216,4 @@ export class TaskController extends DoingBaseController {
     return this.withCard(req, res, id, (task) => WorkflowHelper.snooze(task, req.body.days, this.repos));
   }
 
-  private async savePhoto(churchId: string, base64Str: string, task: Task) {
-    const base64Parts = base64Str.split(",");
-    const base64 = base64Parts.length > 1 ? base64Parts[1] : "";
-    const key = "/" + churchId + "/membership/people/" + task.associatedWithId + ".png";
-    await FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64"));
-    const photoUpdated = new Date();
-    const photo: string = Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();
-    return photo;
-  }
-
-  private async handleDirectoryUpdate(churchId: string, task: Task) {
-    if (task.status === "Open") {
-      const data = task.data
-        ? (() => {
-          try {
-            return JSON.parse(task.data);
-          } catch {
-            return [];
-          }
-        })()
-        : [];
-      for (const d of data) {
-        if (d.field === "photo" && d.value !== undefined) {
-          d.value = await this.savePhoto(churchId, d.value, task);
-        }
-      }
-      task.data = JSON.stringify(data);
-      task.taskType = "directoryUpdate";
-    }
-  }
 }

@@ -4,6 +4,7 @@ import { Household, Person, UserChurch } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
+import { SsoHelper } from "./SsoHelper.js";
 
 export class PersonHelper extends BasePersonHelper {
   private static async repos(): Promise<Repos> {
@@ -92,6 +93,8 @@ export class PersonHelper extends BasePersonHelper {
 
         // return existing;
       }
+      // Apply any SSO photo stashed before this person existed (never overwrites an existing photo).
+      await SsoHelper.applyStashedPhoto(au.id, churchId, person, repos);
       return { person, userChurch: existing || userChurch };
     }
   }

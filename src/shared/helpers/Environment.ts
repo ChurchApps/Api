@@ -73,6 +73,13 @@ export class Environment extends EnvironmentBase {
   // CORS configuration
   static corsOrigin: string;
 
+  // SSO (Google / Microsoft social login) configuration
+  static googleSsoClientId: string;
+  static googleSsoClientSecret: string;
+  static microsoftSsoClientId: string;
+  static microsoftSsoClientSecret: string;
+  static ssoAllowedOrigins: string;
+
   // Legacy support for old API environment variables
   static encryptionKey: string;
   static serverPort: number;
@@ -214,6 +221,13 @@ export class Environment extends EnvironmentBase {
     this.webPushSubject = process.env.WEB_PUSH_SUBJECT || config.webPushSubject || "mailto:support@churchapps.org";
     this.webPushPublicKeySource = process.env.WEB_PUSH_PUBLIC_KEY ? "env" : (config.webPushPublicKey ? `config:${this.currentEnvironment}` : "missing");
     this.webPushPrivateKeySource = process.env.WEB_PUSH_PRIVATE_KEY ? "env" : "missing";
+
+    // SSO secrets are environment-only (never committed to config files)
+    this.googleSsoClientId = process.env.GOOGLE_SSO_CLIENT_ID || "";
+    this.googleSsoClientSecret = process.env.GOOGLE_SSO_CLIENT_SECRET || "";
+    this.microsoftSsoClientId = process.env.MICROSOFT_SSO_CLIENT_ID || "";
+    this.microsoftSsoClientSecret = process.env.MICROSOFT_SSO_CLIENT_SECRET || "";
+    this.ssoAllowedOrigins = process.env.SSO_ALLOWED_ORIGINS || "";
 
     console.log("✅ Configuration parameters loaded from environment variables");
   }
