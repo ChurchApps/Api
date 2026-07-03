@@ -13,9 +13,10 @@ export class LinkController extends ContentBaseController {
   public async loadFiltered(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query.category?.toString();
+      const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       const links = category
-        ? await this.repos.link.loadByCategory(churchId, category)
-        : await this.repos.link.loadAll(churchId);
+        ? await this.repos.link.loadByCategory(churchId, category, siteId)
+        : await this.repos.link.loadAll(churchId, siteId);
 
       // Filter links based on visibility (except "team" which needs client-side check)
       return links.filter((link: Link) => this.isLinkVisible(link, au));
@@ -53,8 +54,9 @@ export class LinkController extends ContentBaseController {
   public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const category = req.query.category.toString();
-      if (category === undefined) return await this.repos.link.loadAll(churchId);
-      else return await this.repos.link.loadByCategory(churchId, category);
+      const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
+      if (category === undefined) return await this.repos.link.loadAll(churchId, siteId);
+      else return await this.repos.link.loadByCategory(churchId, category, siteId);
     });
   }
 
@@ -71,7 +73,8 @@ export class LinkController extends ContentBaseController {
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query?.category?.toString();
-      const data = category ? await this.repos.link.loadByCategory(au.churchId, category) : await this.repos.link.loadAll(au.churchId);
+      const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
+      const data = category ? await this.repos.link.loadByCategory(au.churchId, category, siteId) : await this.repos.link.loadAll(au.churchId, siteId);
       return this.repos.link.convertAllToModel(au.churchId, data);
     });
   }
@@ -81,12 +84,12 @@ export class LinkController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<Link>[] = [];
-      req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.link.save(item)); });
+      req.body.forEach((item) => { item.churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.link.save(item)); });
       const result = await Promise.all(promises);
       // Post-save sort behavior
       if (result.length > 0) {
         try {
-          await this.repos.link.sort(au.churchId, result[0].category, result[0].parentId);
+          await this.repos.link.sort(au.churchId, result[0].category, result[0].parentId, result[0].siteId);
         } catch {
           // ignore sort errors
         }

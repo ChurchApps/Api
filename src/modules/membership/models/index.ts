@@ -20,6 +20,7 @@ export { Church } from "./Church.js";
 export { User } from "./User.js";
 export { Campus } from "./Campus.js";
 export { Domain } from "./Domain.js";
+export { Site } from "./Site.js";
 export { Role } from "./Role.js";
 export { RoleMember } from "./RoleMember.js";
 export { RolePermission } from "./RolePermission.js";

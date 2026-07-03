@@ -26,7 +26,7 @@ import {
   WebhookDeliveryRepo,
   ApiKeyRepo
 } from "./index.js";
-import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo, AuditLogRepo, CampusRepo } from "./index.js";
+import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo, AuditLogRepo, CampusRepo, SiteRepo } from "./index.js";
 
 export class Repos {
   public associatedGroup: AssociatedGroupRepo;
@@ -48,6 +48,7 @@ export class Repos {
   public campus: CampusRepo;
   public church: ChurchRepo;
   public domain: DomainRepo;
+  public site: SiteRepo;
   public role: RoleRepo;
   public roleMember: RoleMemberRepo;
   public rolePermission: RolePermissionRepo;
@@ -92,6 +93,7 @@ export class Repos {
     this.campus = new CampusRepo();
     this.church = new ChurchRepo();
     this.domain = new DomainRepo();
+    this.site = new SiteRepo();
     this.role = new RoleRepo();
     this.roleMember = new RoleMemberRepo();
     this.rolePermission = new RolePermissionRepo();

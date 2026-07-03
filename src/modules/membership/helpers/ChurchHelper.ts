@@ -11,7 +11,7 @@ export class ChurchHelper {
     const churches: Church[] = await repos.church.loadContainingSubDomain(subDomain);
     let result = subDomain;
     let i = 1;
-    while (ArrayHelper.getOne(churches, "subDomain", result)) {
+    while (ArrayHelper.getOne(churches, "subDomain", result) || (await repos.site.loadBySubDomain(result))) {
       result = subDomain + i.toString();
       i++;
     }

@@ -106,10 +106,22 @@ export class ChurchController extends MembershipBaseController {
       try {
         let result = {};
         if (req.query.subDomain !== undefined) {
-          const data = await this.repos.church.loadBySubDomain(req.query.subDomain.toString());
+          const sub = req.query.subDomain.toString();
+          const data = await this.repos.church.loadBySubDomain(sub);
           if (data) {
             const church = this.repos.church.convertToModel(data);
             result = { id: church.id, name: church.name, subDomain: church.subDomain };
+          } else {
+            // Fall back to a site subdomain — resolve to its owning church, echoing the queried slug.
+            const site = await this.repos.site.loadBySubDomain(sub);
+            if (site) {
+              const ownerData = await this.repos.church.loadById(site.churchId);
+              // Archived churches are offline — their sites must not resolve either.
+              if (ownerData && !ownerData.archivedDate) {
+                const church = this.repos.church.convertToModel(ownerData);
+                result = { id: church.id, name: church.name, subDomain: sub, siteId: site.id };
+              }
+            }
           }
         } else if (req.query.id !== undefined) {
           const data = await this.repos.church.loadById(req.query.id.toString());
@@ -231,6 +243,9 @@ export class ChurchController extends MembershipBaseController {
       else {
         const c = await repos.church.loadBySubDomain(church.subDomain);
         if (c !== null && c.id !== church.id) result.push("Subdomain unavailable");
+        // Church and site subdomains share one global namespace — any site hit is a collision.
+        const s = await repos.site.loadBySubDomain(church.subDomain);
+        if (s) result.push("Subdomain unavailable");
       }
     }
 
@@ -294,6 +309,10 @@ export class ChurchController extends MembershipBaseController {
           c.subDomain = c.subDomain + "2";
           // result.push("Subdomain unavailable");
           this.validateRegister(church, au);
+        } else {
+          // Site subdomains share the church namespace; selectSubDomain avoids them, this is the backstop.
+          const s = await this.repos.site.loadBySubDomain(church.subDomain);
+          if (s) result.push("Subdomain unavailable");
         }
       }
     }

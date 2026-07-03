@@ -16,6 +16,7 @@ export class LinkRepo {
     await getDb().insertInto("links").values({
       id: model.id,
       churchId: model.churchId,
+      siteId: model.siteId ?? "",
       category: model.category,
       url: model.url,
       linkType: model.linkType,
@@ -33,6 +34,7 @@ export class LinkRepo {
 
   private async update(model: Link): Promise<Link> {
     await getDb().updateTable("links").set({
+      siteId: model.siteId ?? "",
       category: model.category,
       url: model.url,
       linkType: model.linkType,
@@ -56,19 +58,21 @@ export class LinkRepo {
     return (await getDb().selectFrom("links").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public async loadAll(churchId: string): Promise<Link[]> {
-    return getDb().selectFrom("links").selectAll().where("churchId", "=", churchId).orderBy("sort").execute() as any;
+  public async loadAll(churchId: string, siteId = ""): Promise<Link[]> {
+    return getDb().selectFrom("links").selectAll().where("churchId", "=", churchId).where("siteId", "=", siteId).orderBy("sort").execute() as any;
   }
 
-  public async loadByCategory(churchId: string, category: string): Promise<Link[]> {
+  public async loadByCategory(churchId: string, category: string, siteId = ""): Promise<Link[]> {
     return getDb().selectFrom("links").selectAll()
       .where("churchId", "=", churchId)
       .where("category", "=", category)
+      .where("siteId", "=", siteId)
       .orderBy("sort").execute() as any;
   }
 
-  public async sort(churchId: string, category: string, parentId: string) {
-    const existing = await this.loadByCategory(churchId, category);
+  // siteId must scope the re-sort — otherwise re-ordering one site's nav corrupts another's.
+  public async sort(churchId: string, category: string, parentId: string, siteId = "") {
+    const existing = await this.loadByCategory(churchId, category, siteId);
     const filtered = ArrayHelper.getAll(existing, "parentId", parentId);
     const toSave: Link[] = [];
     filtered.forEach((link, index) => {

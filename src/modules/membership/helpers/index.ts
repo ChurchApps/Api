@@ -9,6 +9,7 @@ export type IPermission = { contentType: string; action: string };
 
 // Module-specific helpers
 export { CaddyHelper } from "./CaddyHelper.js";
+export { VercelHelper } from "./VercelHelper.js";
 export { ChurchHelper } from "./ChurchHelper.js";
 export { ConversationalFormHelper, type FormContact } from "./ConversationalFormHelper.js";
 export { GeoHelper } from "./GeoHelper.js";

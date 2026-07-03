@@ -4,4 +4,5 @@ export class Domain {
   public domainName?: string;
   public lastChecked?: Date;
   public isStale?: boolean;
+  public siteId?: string;
 }

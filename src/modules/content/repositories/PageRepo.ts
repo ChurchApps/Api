@@ -14,6 +14,7 @@ export class PageRepo {
     await getDb().insertInto("pages").values({
       id: model.id,
       churchId: model.churchId,
+      siteId: model.siteId ?? "",
       url: model.url,
       title: model.title,
       layout: model.layout,
@@ -26,6 +27,7 @@ export class PageRepo {
 
   private async update(model: Page): Promise<Page> {
     await getDb().updateTable("pages").set({
+      siteId: model.siteId ?? "",
       url: model.url,
       title: model.title,
       layout: model.layout,
@@ -42,19 +44,19 @@ export class PageRepo {
 
   // publishedJSON (a full page snapshot) is intentionally excluded from loads; use loadPublished.
   private static readonly summaryColumns = [
-    "id", "churchId", "url", "title", "layout", "publishedAt", "visibility", "groupIds", "metaDescription"
+    "id", "churchId", "siteId", "url", "title", "layout", "publishedAt", "visibility", "groupIds", "metaDescription"
   ] as const;
 
   public async load(churchId: string, id: string): Promise<Page | undefined> {
     return (await getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public async loadAll(churchId: string): Promise<Page[]> {
-    return getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("churchId", "=", churchId).execute() as any;
+  public async loadAll(churchId: string, siteId = ""): Promise<Page[]> {
+    return getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("churchId", "=", churchId).where("siteId", "=", siteId).execute() as any;
   }
 
-  public async loadByUrl(churchId: string, url: string) {
-    return (await getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("url", "=", url).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  public async loadByUrl(churchId: string, url: string, siteId = "") {
+    return (await getDb().selectFrom("pages").select(PageRepo.summaryColumns).where("url", "=", url).where("churchId", "=", churchId).where("siteId", "=", siteId).executeTakeFirst()) ?? null;
   }
 
   public async loadPublished(churchId: string, id: string): Promise<Page | undefined> {
@@ -74,6 +76,7 @@ export class PageRepo {
     return {
       id: row.id,
       churchId: row.churchId,
+      siteId: row.siteId,
       url: row.url,
       title: row.title,
       layout: row.layout,

@@ -14,6 +14,7 @@ export class GlobalStyleRepo {
     await getDb().insertInto("globalStyles").values({
       id: model.id,
       churchId: model.churchId,
+      siteId: model.siteId ?? "",
       fonts: model.fonts,
       palette: model.palette,
       typography: model.typography,
@@ -28,6 +29,7 @@ export class GlobalStyleRepo {
 
   private async update(model: GlobalStyle): Promise<GlobalStyle> {
     await getDb().updateTable("globalStyles").set({
+      siteId: model.siteId ?? "",
       fonts: model.fonts,
       palette: model.palette,
       typography: model.typography,
@@ -52,8 +54,15 @@ export class GlobalStyleRepo {
     return getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).execute() as any;
   }
 
-  public async loadForChurch(churchId: string): Promise<GlobalStyle | undefined> {
-    return (await getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).limit(1).executeTakeFirst()) ?? null;
+  public async loadForChurch(churchId: string, siteId = ""): Promise<GlobalStyle | undefined> {
+    const row = await getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).where("siteId", "=", siteId).limit(1).executeTakeFirst();
+    if (row) return row;
+    // A non-primary site with no styles of its own falls back to the primary row as-is
+    // (its id/siteId stay primary — the B1Admin client uses that to copy-on-write).
+    if (siteId !== "") {
+      return (await getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).where("siteId", "=", "").limit(1).executeTakeFirst()) ?? null;
+    }
+    return null;
   }
 
   public convertToModel(_churchId: string, data: any) { return data as GlobalStyle; }
@@ -63,6 +72,7 @@ export class GlobalStyleRepo {
     return {
       id: row.id,
       churchId: row.churchId,
+      siteId: row.siteId,
       fonts: row.fonts,
       palette: row.palette,
       typography: row.typography,

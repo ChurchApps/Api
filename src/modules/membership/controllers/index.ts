@@ -15,6 +15,7 @@ export { AnswerController } from "./AnswerController.js";
 export { MembershipCampusController } from "./CampusController.js";
 export { ChurchController } from "./ChurchController.js";
 export { DomainController } from "./DomainController.js";
+export { SiteController } from "./SiteController.js";
 export { PermissionController } from "./PermissionController.js";
 export { RoleController } from "./RoleController.js";
 export { RoleMemberController } from "./RoleMemberController.js";

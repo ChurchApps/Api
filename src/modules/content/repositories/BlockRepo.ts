@@ -14,6 +14,7 @@ export class BlockRepo {
     await getDb().insertInto("blocks").values({
       id: model.id,
       churchId: model.churchId,
+      siteId: model.siteId ?? "",
       blockType: model.blockType,
       name: model.name
     } as any).execute();
@@ -22,9 +23,10 @@ export class BlockRepo {
 
   private async update(model: Block): Promise<Block> {
     await getDb().updateTable("blocks").set({
+      siteId: model.siteId ?? "",
       blockType: model.blockType,
       name: model.name
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -36,15 +38,19 @@ export class BlockRepo {
     return (await getDb().selectFrom("blocks").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public async loadAll(churchId: string): Promise<Block[]> {
-    return getDb().selectFrom("blocks").selectAll().where("churchId", "=", churchId).orderBy("name").execute() as any;
+  public async loadAll(churchId: string, siteId = ""): Promise<Block[]> {
+    let query = getDb().selectFrom("blocks").selectAll().where("churchId", "=", churchId);
+    // "" = shared only; a specific site sees shared blocks plus its own.
+    query = siteId === "" ? query.where("siteId", "=", "") : query.where("siteId", "in", ["", siteId]);
+    return query.orderBy("name").execute() as any;
   }
 
-  public async loadByBlockType(churchId: string, blockType: string) {
-    return getDb().selectFrom("blocks").selectAll()
+  public async loadByBlockType(churchId: string, blockType: string, siteId = "") {
+    let query = getDb().selectFrom("blocks").selectAll()
       .where("churchId", "=", churchId)
-      .where("blockType", "=", blockType)
-      .orderBy("name").execute() as any;
+      .where("blockType", "=", blockType);
+    query = siteId === "" ? query.where("siteId", "=", "") : query.where("siteId", "in", ["", siteId]);
+    return query.orderBy("name").execute() as any;
   }
 
   public convertToModel(_churchId: string, data: any) { return data as Block; }
@@ -54,6 +60,7 @@ export class BlockRepo {
     return {
       id: row.id,
       churchId: row.churchId,
+      siteId: row.siteId,
       blockType: row.blockType,
       name: row.name
     };

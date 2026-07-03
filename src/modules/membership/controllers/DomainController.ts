@@ -2,7 +2,7 @@ import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Domain } from "../models/index.js";
-import { CaddyHelper, Permissions } from "../helpers/index.js";
+import { CaddyHelper, Permissions, VercelHelper } from "../helpers/index.js";
 import { DomainHealthHelper } from "../helpers/DomainHealthHelper.js";
 
 @controller("/membership/domains")
@@ -61,10 +61,25 @@ export class DomainController extends MembershipBaseController {
         const promises: Promise<Domain>[] = [];
         req.body.forEach((domain) => {
           domain.churchId = au.churchId;
+          domain.domainName = (domain.domainName || "").toLowerCase().trim();
+          domain.siteId = domain.siteId || "";
           promises.push(this.repos.domain.save(domain));
         });
         const result = await Promise.all(promises);
-        await CaddyHelper.updateCaddy();
+        // Both edge configs are best-effort: the domains table is source of truth and a bulk-sync
+        // script reconciles. Post-cutover Caddy is stopped and must never 500 a domain save.
+        try {
+          await CaddyHelper.updateCaddy();
+        } catch (e) {
+          console.error("Edge domain sync failed (non-fatal):", e);
+        }
+        for (const d of result) {
+          try {
+            await VercelHelper.addDomain(d.domainName);
+          } catch (e) {
+            console.error("Edge domain sync failed (non-fatal):", e);
+          }
+        }
         return result;
       }
     });
@@ -74,7 +89,21 @@ export class DomainController extends MembershipBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      const row = await this.repos.domain.load(au.churchId, id);
       await this.repos.domain.delete(au.churchId, id);
+      // Best-effort: also fixes the pre-existing stale-route-on-delete bug for Caddy.
+      try {
+        await CaddyHelper.updateCaddy();
+      } catch (e) {
+        console.error("Edge domain sync failed (non-fatal):", e);
+      }
+      if (row) {
+        try {
+          await VercelHelper.removeDomain(row.domainName);
+        } catch (e) {
+          console.error("Edge domain sync failed (non-fatal):", e);
+        }
+      }
       return {};
     });
   }

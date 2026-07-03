@@ -1,6 +1,7 @@
 export class GlobalStyle {
   id?: string;
   churchId?: string;
+  siteId?: string;
   fonts?: string;
   palette?: string;          // Expand to more colors
   typography?: string;       // NEW: font sizes, weights, line heights

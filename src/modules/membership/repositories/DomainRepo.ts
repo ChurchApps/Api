@@ -17,16 +17,19 @@ export class DomainRepo {
       churchId: model.churchId,
       domainName: model.domainName,
       lastChecked: model.lastChecked,
-      isStale: model.isStale
+      isStale: model.isStale,
+      siteId: model.siteId ?? ""
     }).execute();
     return model;
   }
 
   private async update(model: Domain): Promise<Domain> {
+    // ?? "" is deliberate: Kysely drops undefined keys and B1Admin always resends full rows.
     await getDb().updateTable("domains").set({
       domainName: model.domainName,
       lastChecked: model.lastChecked,
-      isStale: model.isStale
+      isStale: model.isStale,
+      siteId: model.siteId ?? ""
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -44,15 +47,38 @@ export class DomainRepo {
   }
 
   public async loadByName(domainName: string) {
-    return (await getDb().selectFrom("domains").selectAll().where("domainName", "=", domainName).executeTakeFirst()) ?? null;
+    const name = (domainName || "").toLowerCase().trim();
+    const query = (n: string) => getDb().selectFrom("domains as d")
+      .leftJoin("churches as c", "c.id", "d.churchId")
+      .leftJoin("sites as s", "s.id", "d.siteId")
+      .select([
+        "d.id",
+        "d.churchId",
+        "d.domainName",
+        "d.lastChecked",
+        "d.isStale",
+        "d.siteId",
+        sql`COALESCE(NULLIF(s.subDomain,''), c.subDomain)`.as("subDomain")
+      ])
+      .where("d.domainName", "=", n)
+      .executeTakeFirst();
+    let row = await query(name);
+    // Single retry (not recursion) for a bare-domain fallback when a www.* lookup misses.
+    if (!row && name.startsWith("www.")) row = await query(name.substring(4));
+    return row ?? null;
   }
 
   public async loadPairs() {
     return getDb().selectFrom("domains as d")
       .innerJoin("churches as c", "c.id", "d.churchId")
-      .select(["d.domainName as host", sql`CONCAT(c.subDomain, '.b1.church:443')`.as("dial")])
+      .leftJoin("sites as s", "s.id", "d.siteId")
+      .select(["d.domainName as host", sql`CONCAT(COALESCE(NULLIF(s.subDomain,''), c.subDomain), '.b1.church:443')`.as("dial")])
       .where("d.domainName", "not like", "%www.%")
       .execute();
+  }
+
+  public async clearSiteId(churchId: string, siteId: string) {
+    await getDb().updateTable("domains").set({ siteId: "" }).where("churchId", "=", churchId).where("siteId", "=", siteId).execute();
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
@@ -85,7 +111,8 @@ export class DomainRepo {
       churchId: row.churchId,
       domainName: row.domainName,
       lastChecked: row.lastChecked,
-      isStale: row.isStale
+      isStale: row.isStale,
+      siteId: row.siteId
     };
   }
 

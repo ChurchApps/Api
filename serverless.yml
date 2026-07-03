@@ -59,6 +59,9 @@ provider:
     MAUTIC_PASSWORD: ${ssm:/${self:custom.envLower}/mauticPassword, ''}
     CADDY_HOST: ${ssm:/${self:custom.envLower}/caddyHost, ''}
     CADDY_PORT: ${ssm:/${self:custom.envLower}/caddyPort, ''}
+    VERCEL_TOKEN: ${ssm:/${self:custom.envLower}/vercelToken, ''}
+    VERCEL_PROJECT_ID: ${ssm:/${self:custom.envLower}/vercelProjectId, ''}
+    VERCEL_TEAM_ID: ${ssm:/${self:custom.envLower}/vercelTeamId, ''}
     YOUTUBE_API_KEY: ${ssm:/${self:custom.envLower}/youTubeApiKey, ''}
     PEXELS_KEY: ${ssm:/${self:custom.envLower}/pexelsKey, ''}
     VIMEO_TOKEN: ${ssm:/${self:custom.envLower}/vimeoToken, ''}

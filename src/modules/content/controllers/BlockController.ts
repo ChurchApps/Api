@@ -30,26 +30,30 @@ export class BlockController extends ContentBaseController {
   @httpGet("/blockType/:blockType")
   public async loadByType(@requestParam("blockType") blockType: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.block.loadByBlockType(au.churchId, blockType);
+      const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
+      return await this.repos.block.loadByBlockType(au.churchId, blockType, siteId);
     });
   }
 
   @httpGet("/public/footer/:churchId")
   public async loadFooter(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const footerBlocks = await this.repos.block.loadByBlockType(churchId, "footerBlock");
+      const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
+      const footerBlocks = await this.repos.block.loadByBlockType(churchId, "footerBlock", siteId);
       const result: Section[] = [];
-      if (footerBlocks.length > 0) {
+      // Prefer the site's own footer block, else fall back to the shared ('') one.
+      const chosen = (siteId && footerBlocks.find((b: any) => b.siteId === siteId)) || footerBlocks.find((b: any) => !b.siteId || b.siteId === "");
+      if (chosen) {
         const blockIds: string[] = ArrayHelper.getIds(footerBlocks, "id");
         const allBlockSections = await this.repos.section.loadForBlocks(churchId, blockIds);
         const allBlockElements = await this.repos.element.loadForBlocks(churchId, blockIds);
         TreeHelper.populateAnswers(allBlockElements);
         TreeHelper.populateAnswers(allBlockSections);
 
-        const footerBlockSections = ArrayHelper.getAll(allBlockSections, "blockId", footerBlocks[0].id);
+        const footerBlockSections = ArrayHelper.getAll(allBlockSections, "blockId", chosen.id);
         footerBlockSections.forEach((s) => {
           s.zone = "siteFooter";
-          const blockElements = ArrayHelper.getAll(allBlockElements, "blockId", footerBlocks[0].id);
+          const blockElements = ArrayHelper.getAll(allBlockElements, "blockId", chosen.id);
           const tree = TreeHelper.buildTree([s], blockElements);
           result.push(...tree);
         });
@@ -69,7 +73,8 @@ export class BlockController extends ContentBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const data = await this.repos.block.loadAll(au.churchId);
+      const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
+      const data = await this.repos.block.loadAll(au.churchId, siteId);
       return this.repos.block.convertAllToModel(au.churchId, data);
     });
   }
@@ -79,7 +84,7 @@ export class BlockController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<Block>[] = [];
-      req.body.forEach((item) => { (item as any).churchId = au.churchId; promises.push(this.repos.block.save(item)); });
+      req.body.forEach((item) => { (item as any).churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.block.save(item)); });
       const result = await Promise.all(promises);
       return this.repos.block.convertAllToModel(au.churchId, result);
     });

@@ -3,6 +3,7 @@ import { Section } from "./Section.js";
 export class Page {
   public id?: string;
   public churchId?: string;
+  public siteId?: string;
   public url?: string;
   public title?: string;
   public layout?: string;

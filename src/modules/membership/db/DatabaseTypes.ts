@@ -2,7 +2,7 @@ import type {
   AccessLog, Answer, ApiKey, AssociatedGroup, AuditLog, Campus, Church, ClientError, Domain, Form,
   FormSubmission, Group, GroupJoinRequest, GroupMember, GroupMemberHistory, Household, List, ListMember, MemberPermission,
   OAuthClient, OAuthCode, OAuthDeviceCode, OAuthRelaySession, OAuthToken,
-  Question, Role, RoleMember, RolePermission, Setting, User, UserChurch,
+  Question, Role, RoleMember, RolePermission, Setting, Site, User, UserChurch,
   VisibilityPreference, Webhook, WebhookDelivery
 } from "../models/index.js";
 
@@ -88,6 +88,7 @@ export interface MembershipDatabase {
   roleMembers: Omit<RoleMember, "user">;
   rolePermissions: RolePermission;
   settings: Setting;
+  sites: Site;
   users: Omit<User, "jwt"> & { password?: string };
   userChurches: UserChurch;
   visibilityPreferences: VisibilityPreference;

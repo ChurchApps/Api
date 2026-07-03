@@ -19,6 +19,7 @@ export { AuditLogRepo } from "./AuditLogRepo.js";
 export { CampusRepo } from "./CampusRepo.js";
 export { ChurchRepo } from "./ChurchRepo.js";
 export { DomainRepo } from "./DomainRepo.js";
+export { SiteRepo } from "./SiteRepo.js";
 export { RoleRepo } from "./RoleRepo.js";
 export { RoleMemberRepo } from "./RoleMemberRepo.js";
 export { RolePermissionRepo } from "./RolePermissionRepo.js";

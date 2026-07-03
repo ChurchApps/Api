@@ -114,7 +114,8 @@ export class CaddyHelper {
 
     const adminUrl = this.getAdminBaseUrl() + "/config/apps/http/servers/proxy/routes";
     const routes = await this.generateRoutes();
-    await axios.patch(adminUrl, routes);
+    // Bounded like putConfig — an unreachable admin API must not stall callers for the OS connect timeout.
+    await axios.patch(adminUrl, routes, { timeout: 10000 });
   }
 
   // Generates the full routes array from the database

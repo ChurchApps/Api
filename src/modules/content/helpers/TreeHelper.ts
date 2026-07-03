@@ -25,10 +25,10 @@ export class TreeHelper {
     return result;
   }
 
-  static async insertBlocks(sections: Section[], allElements: Element[], churchId: string) {
+  static async insertBlocks(sections: Section[], allElements: Element[], churchId: string, siteId = "") {
     const blockIds: string[] = [];
     const repos = await RepoManager.getRepos<Repos>("content");
-    const footerBlocks: Block[] = await repos.block.loadByBlockType(churchId, "footerBlock");
+    const footerBlocks: Block[] = await repos.block.loadByBlockType(churchId, "footerBlock", siteId);
     footerBlocks.forEach((b) => {
       blockIds.push(b.id);
     });
@@ -62,11 +62,13 @@ export class TreeHelper {
         }
       });
 
-      if (footerBlocks.length > 0) {
-        const footerBlockSections = ArrayHelper.getAll(allBlockSections, "blockId", footerBlocks[0].id);
+      // Prefer the site's own footer block, else fall back to the shared ('') one.
+      const chosen = (siteId && footerBlocks.find((b) => b.siteId === siteId)) || footerBlocks.find((b) => !b.siteId || b.siteId === "");
+      if (chosen) {
+        const footerBlockSections = ArrayHelper.getAll(allBlockSections, "blockId", chosen.id);
         footerBlockSections.forEach((s) => {
           s.zone = "siteFooter";
-          const blockElements = ArrayHelper.getAll(allBlockElements, "blockId", footerBlocks[0].id);
+          const blockElements = ArrayHelper.getAll(allBlockElements, "blockId", chosen.id);
           const tree = this.buildTree([s], blockElements);
           sections.push(...tree);
         });
