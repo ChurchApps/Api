@@ -80,6 +80,7 @@ export class PersonRepo {
       optedOut: person.optedOut,
       nametagNotes: person.nametagNotes,
       donorNumber: person.donorNumber,
+      importKey: person.importKey,
       removed: false
     }).execute();
     return person;
@@ -120,7 +121,8 @@ export class PersonRepo {
       conversationId: person.conversationId,
       optedOut: person.optedOut,
       nametagNotes: person.nametagNotes,
-      donorNumber: person.donorNumber
+      donorNumber: person.donorNumber,
+      importKey: person.importKey
     }).where("id", "=", person.id).where("churchId", "=", person.churchId).execute();
     return person;
   }

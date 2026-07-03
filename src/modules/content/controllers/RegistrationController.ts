@@ -155,6 +155,7 @@ export class RegistrationController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (registration) {
+        if (registration.personId !== au.personId && !au.checkAccess(Permissions.registrations.view)) return this.json({}, 401);
         (registration as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
         (registration as any).event = await this.repos.event.load(au.churchId, registration.eventId);
       }

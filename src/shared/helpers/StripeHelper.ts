@@ -242,7 +242,8 @@ export class StripeHelper {
         "payment_intent.succeeded",
         "payment_intent.payment_failed",
         "charge.succeeded",  // Keep for backward compatibility during migration
-        "charge.failed"      // Keep for backward compatibility during migration
+        "charge.failed",     // Keep for backward compatibility during migration
+        "customer.subscription.deleted"
       ]
     });
   }

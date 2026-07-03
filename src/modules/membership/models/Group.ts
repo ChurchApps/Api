@@ -5,7 +5,7 @@ export class Group {
   public name?: string;
   public trackAttendance?: boolean;
   public attendanceReminders?: boolean;
-  public parentPickup?: false;
+  public parentPickup?: boolean;
   public printNametag?: boolean;
   public about?: string;
   public photoUrl?: string;

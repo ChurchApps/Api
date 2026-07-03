@@ -50,7 +50,7 @@ export class EventController extends ContentBaseController {
       let newEvents: any[] = [];
       if (req.query.groupId) {
         // authz-exempt: public ICS feed; churchId is the published feed identifier
-        const groupEvents = await this.repos.event.loadForGroup(req.query.churchId.toString(), req.query.groupId.toString());
+        const groupEvents = await this.repos.event.loadPublicForGroup(req.query.churchId.toString(), req.query.groupId.toString());
         if (groupEvents && groupEvents.length > 0) {
           await CalendarHelper.addExceptionDates(groupEvents, this.repos);
           newEvents = this.populateEventsForICS(groupEvents);

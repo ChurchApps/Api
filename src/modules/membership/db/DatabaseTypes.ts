@@ -61,7 +61,7 @@ export interface MembershipDatabase {
   domains: Domain;
   forms: Omit<Form, "action" | "questions"> & { removed?: boolean; archived?: boolean };
   formSubmissions: Omit<FormSubmission, "form" | "questions" | "answers">;
-  groups: Omit<Group, "labelArray" | "memberCount" | "importKey"> & { removed?: boolean };
+  groups: Omit<Group, "labelArray" | "memberCount"> & { removed?: boolean };
   groupMembers: Omit<GroupMember, "person" | "group">;
   groupMemberHistory: GroupMemberHistory;
   groupJoinRequests: Omit<GroupJoinRequest, "person" | "group">;

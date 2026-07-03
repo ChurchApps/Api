@@ -37,6 +37,7 @@ export class GroupRepo {
       maxAgeMonths: group.maxAgeMonths,
       minGrade: group.minGrade,
       maxGrade: group.maxGrade,
+      importKey: group.importKey,
       removed: false as any
     }).execute();
     return group;
@@ -65,7 +66,8 @@ export class GroupRepo {
       minAgeMonths: group.minAgeMonths,
       maxAgeMonths: group.maxAgeMonths,
       minGrade: group.minGrade,
-      maxGrade: group.maxGrade
+      maxGrade: group.maxGrade,
+      importKey: group.importKey
     }).where("id", "=", group.id).where("churchId", "=", group.churchId).execute();
     return group;
   }
