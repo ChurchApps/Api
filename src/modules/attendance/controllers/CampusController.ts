@@ -2,12 +2,7 @@ import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 
-// DEPRECATED: read-only/frozen — campuses are mastered in the membership module
-// (/membership/campuses). The attendance `campuses` table is no longer written to
-// (the create/update/delete endpoints were removed); only these GET endpoints
-// remain so legacy readers (e.g. B1Checkin) keep working. This controller, the
-// CampusRepo, the Campus model, and the `campuses` table are slated for deletion
-// once those legacy readers are migrated off the attendance campus joins.
+// DEPRECATED: read-only/frozen; campuses mastered in membership module, slated for deletion.
 @controller("/attendance/campuses")
 export class CampusController extends AttendanceBaseController {
 

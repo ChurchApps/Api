@@ -41,9 +41,7 @@ export class EventLogRepo {
       } as any).execute();
       return model;
     } catch (err) {
-      // A concurrent webhook delivery already inserted this provider event
-      // (UNIQUE(churchId, providerId)). Treat as idempotent success and return
-      // the winning row instead of 500-ing, which would trigger a retry storm.
+      // Concurrent insert already claimed this provider event (UNIQUE constraint); idempotent success.
       if (isDuplicateKeyError(err) && model.churchId && model.providerId) {
         const existing = await this.loadByProviderId(model.churchId as string, model.providerId);
         if (existing) return existing;

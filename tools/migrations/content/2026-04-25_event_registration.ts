@@ -1,11 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// Adds the registration columns the Event model declares but the initial
-// schema omitted. Without these, RegistrationController's
-// `if (!event.registrationEnabled) return ...` guard always trips and the
-// /mobile/register/<id> wizard short-circuits to "Registration unavailable".
-//
-// `tags` is also part of the Event model and is added here for parity.
+// Event model declares these columns; schema omitted them, causing registration guard to always trip.
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .alterTable("events")

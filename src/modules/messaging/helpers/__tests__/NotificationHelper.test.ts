@@ -1,19 +1,5 @@
-/**
- * Server escalation contract test for the consolidated push fallback path.
- *
- * Asserts the chain that the closed-PWA scenario depends on:
- *   1. Recipient has no live socket connections in their "alerts" room.
- *   2. Recipient has a Device row whose `fcmToken` starts with `webpush:`.
- *   3. NotificationHelper.attemptDeliveryWithEscalation falls through socket,
- *      reaches the push level, and calls WebPushHelper.sendBulkTypedMessages
- *      with the right tokens / payload.
- *
- * web-push and the messaging repos are mocked so this test runs without a
- * real DB or push service.
- */
-
-// Mock the WebPushHelper used inside NotificationHelper. We assert it gets called
-// with the encoded subscription string (and the right title/body/type/contentId).
+// Contract test for socket→push escalation when recipient offline with webpush device.
+// Mocks WebPushHelper, ExpoPushHelper, DeliveryHelper, apihelper (ESM), Environment, axios.
 const sendBulkTypedMessagesMock = jest.fn() as jest.MockedFunction<any>;
 sendBulkTypedMessagesMock.mockResolvedValue([{ token: "webpush:fake", success: true, gone: false, retryable: false }]);
 
@@ -31,18 +17,15 @@ jest.mock("../WebPushHelper.js", () => ({
   }
 }));
 
-// ExpoPushHelper might be invoked too; provide a no-op so the test doesn't
-// accidentally exercise expo-server-sdk.
+// ExpoPushHelper: no-op to avoid accidentally exercising expo-server-sdk.
 jest.mock("../ExpoPushHelper.js", () => ({ ExpoPushHelper: { sendBulkTypedMessages: jest.fn().mockResolvedValue([]) } }));
 
-// DeliveryHelper.sendMessages is only called on the socket path; we assert it
-// is NOT called in this test (recipient is offline).
+// DeliveryHelper mock: should NOT be called in this test (recipient is offline).
 const sendMessagesMock = jest.fn() as jest.MockedFunction<any>;
 sendMessagesMock.mockResolvedValue(0);
 jest.mock("../DeliveryHelper.js", () => ({ DeliveryHelper: { sendMessages: sendMessagesMock } }));
 
-// @churchapps/apihelper is ESM-only and breaks Jest's CommonJS loader. Mock it
-// since our paths under test don't use ArrayHelper or EmailHelper.
+// @churchapps/apihelper: ESM-only, breaks CommonJS Jest; mock to avoid loading ArrayHelper/EmailHelper.
 const sendTemplatedEmailMock = jest.fn() as jest.MockedFunction<any>;
 sendTemplatedEmailMock.mockResolvedValue(undefined);
 jest.mock("@churchapps/apihelper", () => ({
@@ -50,10 +33,10 @@ jest.mock("@churchapps/apihelper", () => ({
   EmailHelper: { sendEmail: jest.fn().mockResolvedValue(undefined), sendTemplatedEmail: sendTemplatedEmailMock }
 }));
 
-// Environment uses import.meta.url which CommonJS-transformed Jest can't parse.
+// Environment: import.meta.url can't be parsed by CommonJS Jest.
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { getEnvironmentName: () => "test" } }));
 
-// axios is used elsewhere in NotificationHelper but not on the path under test.
+// axios: unused on the socket/push escalation path under test.
 jest.mock("axios", () => ({ default: { post: jest.fn() }, post: jest.fn() }));
 
 import { NotificationHelper } from "../NotificationHelper.js";

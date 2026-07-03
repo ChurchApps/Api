@@ -2,11 +2,7 @@ import { Kysely, MysqlDialect } from "kysely";
 import { createPool } from "mysql2";
 import { Environment } from "../helpers/Environment.js";
 
-/**
- * Multi-database Kysely instance manager for API.
- * Maintains separate Kysely instances for each module's database,
- * replacing MultiDatabasePool with type-safe Kysely queries.
- */
+/** Multi-database Kysely instance manager for API. */
 export class KyselyPool {
   private static instances: Map<string, Kysely<any>> = new Map();
 

@@ -14,8 +14,6 @@ export interface CivilOccurrence {
   startLocalISO: string;
 }
 
-// A single-dated entity (plan/task/non-recurring event) yields one occurrence
-// when its date falls inside the window.
 export const singleDateOccurrence = (raw: Date | string | null | undefined, from: Date, to: Date): CivilOccurrence[] => {
   if (!raw) return [];
   const d = new Date(raw);

@@ -45,7 +45,6 @@ export class MusicBrainzHelper {
       return { recording, finalScore: score };
     });
 
-    // Sort by final score descending
     scoredRecordings.sort((a, b) => b.finalScore - a.finalScore);
 
     return scoredRecordings[0].recording;

@@ -4,11 +4,6 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { ListRuleHelper, Permissions } from "../helpers/index.js";
 import { List, ListRuleGroup } from "../models/index.js";
 
-// Saved people-search queries ("Lists"). A List stores its query — a provider-scoped
-// rules tree (plus the legacy filter blob for re-seeding the UI) — not the matched
-// people, so it re-runs live each time it is opened. Scope "private" hides a list from
-// everyone but its creator; "org" shares it church-wide. Reads use People.View, writes
-// use People.Edit.
 @controller("/membership/lists")
 export class ListController extends MembershipBaseController {
   private canView(list: List, personId: string) {
@@ -26,7 +21,6 @@ export class ListController extends MembershipBaseController {
     });
   }
 
-  // Evaluates the list's rules tree server-side and returns the matching people.
   @httpGet("/:id/people")
   public async getPeople(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -40,7 +34,6 @@ export class ListController extends MembershipBaseController {
     });
   }
 
-  // Evaluates an unsaved rules tree — lets the UI preview matches before saving.
   @httpPost("/preview")
   public async preview(req: express.Request<{}, {}, { rules: ListRuleGroup; householdInclusion?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

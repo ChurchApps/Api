@@ -1,9 +1,4 @@
-// Connector-specific formatting for outbound webhook deliveries.
-//
-// A `standard` webhook receives the raw {event,churchId,occurredAt,data}
-// envelope. Slack and Discord incoming webhooks instead expect a small
-// message object ({text} / {content}), so for those connector types the
-// delivery worker sends a human-readable summary built from the event + data.
+// Slack and Discord expect different message formats; standard uses raw envelope.
 
 export interface WebhookEnvelope {
   event: string;
@@ -12,7 +7,6 @@ export interface WebhookEnvelope {
   data: any;
 }
 
-// Builds a one-line human-readable summary of an event for chat connectors.
 export function describeEvent(envelope: WebhookEnvelope): string {
   const d = envelope.data ?? {};
   switch (envelope.event) {
@@ -49,11 +43,6 @@ function formatAmount(d: any): string {
   return currency === "USD" ? `$${d.amount.toFixed(2)}` : `${d.amount.toFixed(2)} ${currency}`;
 }
 
-/**
- * Returns the request body string to deliver for a given connector type.
- * `standard` (and any unknown type) returns the raw envelope JSON; `slack`
- * and `discord` return their respective message JSON.
- */
 export function formatForConnector(connectorType: string | undefined, envelope: WebhookEnvelope): string {
   switch (connectorType) {
     case "slack": return JSON.stringify({ text: describeEvent(envelope) });

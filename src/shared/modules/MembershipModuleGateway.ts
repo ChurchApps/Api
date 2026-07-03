@@ -2,9 +2,7 @@ import { sql } from "kysely";
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { KyselyPool } from "../infrastructure/KyselyPool.js";
 
-// Gateway: the only seam through which other modules read/write membership data.
-// Method signatures are the contract; the Db implementation below is swappable for
-// an HTTP one if membership ever becomes a separate service.
+// Gateway contract; Db impl is swappable for HTTP if ever separate service.
 
 interface ConditionInput {
   churchId: string;
@@ -27,29 +25,22 @@ export interface MembershipModuleGateway {
   loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
   loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]>;
   loadGroupLeaderPersonIds(churchId: string, groupId: string): Promise<string[]>;
-  // Every person sharing a household with any of personIds (the input people included).
   loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]>;
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string; timeZone?: string } | null>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
-  // Returns the full person row; the listed fields are the ones event triggers filter on.
   loadPerson(churchId: string, personId: string): Promise<{ id: string; householdId: string; email: string; membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date } | null>;
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
   // Idempotent: adds the person to the group only if not already a member.
   addGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
   // Idempotent: removes the person's membership row(s) for the group.
   removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;
-  // Sets a single allowed person field; throws on a field outside the allow-list.
   setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void>;
-  // Every non-removed person with the fields event-trigger conditions filter on (run-now).
   loadPeopleForAutomation(churchId: string): Promise<{ id: string; displayName: string; membershipStatus?: string; gender?: string; maritalStatus?: string }[]>;
   loadList(churchId: string, listId: string): Promise<{ id: string; name: string } | null>;
   loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]>;
-  // Single per-church setting value (e.g. gradePromotionDate, ratioEnforcement).
   loadSetting(churchId: string, keyName: string): Promise<string | null>;
-  // Capacity/ratio fields for the check-in gates, by group id.
   loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]>;
-  // Household adults (householdRole !== "Child") of the given people, with phone + opt-out.
   loadHouseholdAdults(churchId: string, personIds: string[]): Promise<HouseholdAdult[]>;
 }
 

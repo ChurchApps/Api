@@ -1,6 +1,4 @@
-// A reminder occurrence in civil-local terms only. The engine never trusts the
-// source time-of-day (it composes fireAt from the definition's sendLocalTime/tz),
-// so adapters return civil dates, not instants (architecture §5.3).
+// Reminder occurrence in civil-local terms only (architecture §5.3). Adapters return civil dates, not instants; engine composes fireAt from definition's sendLocalTime/tz.
 export interface ReminderOccurrenceInfo {
   startLocalDate: string; // YYYY-MM-DD
   startLocalISO: string; // civil-local ISO, used in the occurrenceKey
@@ -14,9 +12,7 @@ export interface ReminderRecipient {
   isDirectMention?: boolean;
 }
 
-// Per-entity strategy. The engine is entity-agnostic and never imports
-// content/doing directly — it calls registered adapters which use gateways /
-// dynamic imports for cross-module reads (architecture §6.2).
+// Entity-agnostic engine (§6.2) calls registered adapters for cross-module reads via gateways/dynamic imports; no direct content/doing imports.
 export interface ReminderAdapter {
   entityType: string; // 'event' | 'plan' | 'task'
   category: string; // preference category for this entity
@@ -27,8 +23,7 @@ export interface ReminderAdapter {
   link(entity: any, occLocalISO: string): string;
   renderMessage?(entity: any, occLocalISO: string, custom?: string): string;
   buildEmails?(entity: any, occLocalISO: string, recipients: ReminderRecipient[], custom?: string): Promise<Record<string, { subject: string; html: string }> | null>;
-  // Scope inheritance (entityId null, scopeId set): the concrete entities a scoped
-  // definition fans out to in the window — e.g. every plan of a planType.
+  // Scope inheritance (entityId null, scopeId set): concrete entities a scoped definition fans out to in the window (e.g., every plan of a planType).
   loadScopeEntities?(churchId: string, scopeId: string, from: Date, to: Date): Promise<any[]>;
 }
 

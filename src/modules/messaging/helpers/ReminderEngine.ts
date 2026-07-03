@@ -10,11 +10,7 @@ const HORIZON_DAYS = 14;
 const MAX_OFFSET_MIN = HORIZON_DAYS * 24 * 60;
 const DEFAULT_TZ = "America/New_York";
 
-// Generalized reminder engine (architecture §5). Reuses the automations
-// scan-window/outbox pattern: the expander materializes per-occurrence fire rows;
-// the dispatcher claims due rows and produces Notifications. Both ride existing
-// timers — no new infra. Reminders are Notification *producers*; the preference
-// gate inside NotificationHelper.createNotifications is the single send-time chokepoint.
+// Reminder engine (architecture §5): expander materializes per-occurrence fire rows; dispatcher claims due rows and produces Notifications. Both ride existing timers — no new infra. Preference gate inside NotificationHelper is the single send-time chokepoint.
 export class ReminderEngine {
   private static repos: Repos;
 
@@ -45,11 +41,7 @@ export class ReminderEngine {
     return tz;
   }
 
-  // Materialize fire rows for one definition over the rolling horizon. Idempotent
-  // (occurrenceKey unique); safe to re-run. Called by the cron and synchronously
-  // on definition save (so last-minute events still fire — §5.8). A definition is
-  // entity-level (entityId set) or scope-level (scopeId set, entityId null): the
-  // latter fans out over every concrete entity the adapter reports for the scope.
+  // Idempotent (occurrenceKey unique). Called by cron and on definition save so last-minute events still fire (§5.8). Entity-level (entityId set) or scope-level (scopeId set, entityId null): scope fans out over every concrete entity the adapter reports.
   static async expandDefinition(def: ReminderDefinition, now: Date = new Date(), tzCache?: Map<string, string>): Promise<number> {
     this.ensureInit();
     if (!def.enabled) return 0;
@@ -66,7 +58,6 @@ export class ReminderEngine {
       return this.materialize(def, adapter, entity, def.entityId, now, horizon, tz, false);
     }
 
-    // Scope path: one occurrence set per concrete entity, keyed by entity id.
     if (!adapter.loadScopeEntities) return 0;
     const entities = await adapter.loadScopeEntities(def.churchId!, def.scopeId!, now, horizon);
     let written = 0;
@@ -77,9 +68,7 @@ export class ReminderEngine {
     return written;
   }
 
-  // Shared occurrence writer for both paths. Entity-level keys stay stable
-  // (`${defId}:${occISO}:${offset}`); scope rows namespace by entity id so a
-  // scoped definition's per-entity occurrences never collide.
+  // Entity-level keys stay stable (`${defId}:${occISO}:${offset}`); scope rows namespace by entity id so occurrences never collide.
   private static async materialize(def: ReminderDefinition, adapter: any, entity: any, entityId: string, now: Date, horizon: Date, tz: string, scoped: boolean): Promise<number> {
     const occurrences = await adapter.getOccurrences(entity, now, horizon);
     const offsets = this.parseOffsets(def.offsets);
@@ -106,7 +95,6 @@ export class ReminderEngine {
     return written;
   }
 
-  // Cron expander — rides the existing midnight timer.
   static async expandAll(now: Date = new Date()): Promise<number> {
     this.ensureInit();
     const defs = (await this.repos.reminderDefinition.loadAllEnabled()) as ReminderDefinition[];
@@ -122,8 +110,7 @@ export class ReminderEngine {
     return total;
   }
 
-  // Dispatcher — rides the existing 30-min timer. Claims due rows and produces
-  // Notifications for not-yet-notified recipients (ledger-fenced for idempotency).
+  // Rides existing 30-min timer; claims due rows and produces Notifications (ledger-fenced for idempotency).
   static async scan(): Promise<{ processed: number; sent: number }> {
     this.ensureInit();
     const due = (await this.repos.reminderOccurrence.loadDue(100)) as ReminderOccurrence[];
@@ -200,8 +187,6 @@ export class ReminderEngine {
     }
   }
 
-  // Scope-level analogue: re-materialize every scoped definition for (entityType, scopeId)
-  // via the ux_reminder_scope index — e.g. all plans of a planType after a plan changes.
   static async reExpandForScope(churchId: string, entityType: string, scopeId: string): Promise<void> {
     this.ensureInit();
     const defs = (await this.repos.reminderDefinition.loadForScope(churchId, entityType, scopeId)) as ReminderDefinition[];

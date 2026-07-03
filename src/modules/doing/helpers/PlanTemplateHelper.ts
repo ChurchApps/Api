@@ -1,6 +1,4 @@
-// Capture/apply the reusable part of a plan (order of service, positions, notes)
-// to and from a template's JSON snapshot. Repos are passed in so this stays
-// DB-free and unit-testable.
+// Capture/apply plan snapshots (service order, positions, notes) to templates.
 
 export interface PlanTemplateData {
   notes?: string;
@@ -56,8 +54,7 @@ export class PlanTemplateHelper {
     }
   }
 
-  // Two-pass create with parentId remap; mirrors PlanController.copyServiceOrderItems
-  // but reads items from a list (the stored snapshot) instead of the source plan.
+  // Two-pass: create root items first, then children with remapped parentIds.
   private static async createItems(repos: any, churchId: string, planId: string, items: any[]): Promise<void> {
     const idMap = new Map<string, string>();
     for (const item of items.filter((i) => !i.parentId)) {

@@ -1,11 +1,6 @@
 import { BasePermissions } from "@churchapps/apihelper";
 
-/**
- * Consolidated permissions for all modules in the monolith
- * Combines permission definitions from all original microservices
- */
 export class Permissions extends BasePermissions {
-  // Membership API permissions
   static groups = { edit: { contentType: "Groups", action: "Edit" } };
 
   static groupMembers = { view: { contentType: "Group Members", action: "View" }, edit: { contentType: "Group Members", action: "Edit" } };
@@ -20,17 +15,14 @@ export class Permissions extends BasePermissions {
 
   static server = { admin: { contentType: "Server", action: "Admin" } };
 
-  // Attendance API permissions
   static attendance = { view: { contentType: "Attendance", action: "View" }, viewSummary: { contentType: "Attendance", action: "View Summary" }, edit: { contentType: "Attendance", action: "Edit" }, checkin: { contentType: "Attendance", action: "Checkin" } };
 
   static services = { edit: { contentType: "Services", action: "Edit" } };
 
-  // Giving API permissions
   static donations = { viewSummary: { contentType: "Donations", action: "View Summary" }, edit: { contentType: "Donations", action: "Edit" }, view: { contentType: "Donations", action: "View" } };
 
   static settings = { edit: { contentType: "Settings", action: "Edit" }, view: { contentType: "Settings", action: "View" } };
 
-  // Content API permissions
   static content = { edit: { contentType: "Content", action: "Edit" } };
 
   static streamingServices = { edit: { contentType: "StreamingServices", action: "Edit" } };
@@ -39,40 +31,29 @@ export class Permissions extends BasePermissions {
 
   static registrations = { view: { contentType: "Registrations", action: "View" }, edit: { contentType: "Registrations", action: "Edit" } };
 
-  // Conflict-Resolver role: approve/reject event and room/resource requests without full content-edit rights
   static calendars = { admin: { contentType: "Calendars", action: "Admin" } };
 
-  // Messaging API permissions (to be defined during migration)
   static messaging = { view: { contentType: "Messaging", action: "View" }, edit: { contentType: "Messaging", action: "Edit" }, admin: { contentType: "Messaging", action: "Admin" } };
 
   static texting = { send: { contentType: "Texting", action: "Send" } };
 
-  // DoingApi service permissions — contentType is "Tasks" (covers Tasks, Workflows & Automations)
   static tasks = { view: { contentType: "Tasks", action: "View" }, edit: { contentType: "Tasks", action: "Edit" }, admin: { contentType: "Tasks", action: "Admin" } };
 
-  // General admin permissions
   static admin = { editSettings: { contentType: "Admin", action: "Edit Settings" } };
 }
 
-/**
- * Complete permissions list for all modules
- * This consolidates the permissions from all original microservices
- */
 export const permissionsList: IPermission[] = [
-  // Attendance API permissions
   { apiName: "AttendanceApi", section: "Attendance", action: "Checkin", displaySection: "Attendance", displayAction: "Checkin" },
   { apiName: "AttendanceApi", section: "Attendance", action: "Edit", displaySection: "Attendance", displayAction: "Edit Attendance" },
   { apiName: "AttendanceApi", section: "Services", action: "Edit", displaySection: "Attendance", displayAction: "Edit Services" },
   { apiName: "AttendanceApi", section: "Attendance", action: "View", displaySection: "Attendance", displayAction: "View Attendance" },
   { apiName: "AttendanceApi", section: "Attendance", action: "View Summary", displaySection: "Attendance", displayAction: "View Attendance Summary" },
 
-  // Giving API permissions
   { apiName: "GivingApi", section: "Donations", action: "Edit", displaySection: "Donations", displayAction: "Edit Donations" },
   { apiName: "GivingApi", section: "Settings", action: "Edit", displaySection: "Donations", displayAction: "Edit Settings" },
   { apiName: "GivingApi", section: "Donations", action: "View Summary", displaySection: "Donations", displayAction: "View Donation Summaries" },
   { apiName: "GivingApi", section: "Donations", action: "View", displaySection: "Donations", displayAction: "View Donations" },
 
-  // Membership API permissions
   { apiName: "MembershipApi", section: "Forms", action: "Admin", displaySection: "Forms and Plans", displayAction: "Form Admin" },
   { apiName: "MembershipApi", section: "Forms", action: "Edit", displaySection: "Forms and Plans", displayAction: "Edit Forms" },
   { apiName: "MembershipApi", section: "Group Members", action: "Edit", displaySection: "People and Groups", displayAction: "Edit Group Members" },
@@ -87,7 +68,6 @@ export const permissionsList: IPermission[] = [
   { apiName: "MembershipApi", section: "Roles", action: "View", displaySection: "People and Groups", displayAction: "View Roles and Users" },
   { apiName: "MembershipApi", section: "Settings", action: "Edit", displaySection: "Content", displayAction: "Edit Church Settings" },
 
-  // Content API permissions
   { apiName: "ContentApi", section: "Content", action: "Edit", displaySection: "Content", displayAction: "Edit Content" },
   { apiName: "ContentApi", section: "Settings", action: "Edit", displaySection: "Content", displayAction: "Edit Settings" },
   { apiName: "ContentApi", section: "StreamingServices", action: "Edit", displaySection: "Content", displayAction: "Edit Services" },
@@ -96,19 +76,14 @@ export const permissionsList: IPermission[] = [
   { apiName: "ContentApi", section: "Registrations", action: "Edit", displaySection: "Content", displayAction: "Edit Registrations" },
   { apiName: "ContentApi", section: "Calendars", action: "Admin", displaySection: "Content", displayAction: "Resolve Calendar Conflicts & Approvals" },
 
-  // Messaging API permissions
   { apiName: "MessagingApi", section: "Texting", action: "Send", displaySection: "Messaging", displayAction: "Send Text Messages" },
   { apiName: "MessagingApi", section: "Messaging", action: "Admin", displaySection: "Messaging", displayAction: "Admin" },
 
-  // Doing API permissions (Tasks, Workflows & Automations)
-  // Plans lives here because PlanAuth enforces it in the doing module; every JWT now
-  // carries the full cross-module permission set, so it's honored in membership too.
   { apiName: "DoingApi", section: "Plans", action: "Edit", displaySection: "Forms and Plans", displayAction: "Edit Plans" },
   { apiName: "DoingApi", section: "Tasks", action: "View", displaySection: "Tasks", displayAction: "View Workflows & Cards" },
   { apiName: "DoingApi", section: "Tasks", action: "Edit", displaySection: "Tasks", displayAction: "Edit All Cards & Tasks" },
   { apiName: "DoingApi", section: "Tasks", action: "Admin", displaySection: "Tasks", displayAction: "Manage Workflows & Automations" },
 
-  // Lessons API permissions
   { apiName: "LessonsApi", section: "Schedules", action: "Edit", displaySection: "Lessons", displayAction: "Edit Schedules" },
   { apiName: "LessonsApi", section: "Content", action: "Edit", displaySection: "Lessons", displayAction: "Edit Content" }
 ];

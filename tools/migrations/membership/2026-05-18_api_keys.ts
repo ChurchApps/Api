@@ -1,15 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// Phase 0 of the integration platform: API keys (personal access tokens) and
-// a fix for the too-narrow oAuthTokens.scopes column.
-//
-// apiKeys store only a SHA-256 hash of the secret; `prefix` is the plaintext,
-// indexed lookup segment. `scopes` is TEXT so a full scope list always fits.
-//
-// oAuthTokens.scopes was VARCHAR(45) in the initial schema — too small to hold
-// even a few `resource:action` scopes now that scopes are enforced; widened to
-// VARCHAR(500). (oAuthClients/oAuthCodes/oAuthDeviceCodes.scopes are already
-// VARCHAR(255) and need no change.)
+// oAuthTokens.scopes was VARCHAR(45) — too narrow for enforced resource:action scopes; widened to 500.
 
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema

@@ -9,8 +9,7 @@ export interface ProposedBooking {
   // Per-occurrence padding applied before/after each event occurrence (recurrence-aware).
   setupMinutes?: number;
   teardownMinutes?: number;
-  // Optional absolute reservation window; when set the bookings are reserved for
-  // exactly [startTime, endTime] (may span days) and override the offsets above.
+  // Absolute startTime/endTime overrides setup/teardown offsets.
   startTime?: Date | string;
   endTime?: Date | string;
   roomIds: string[];
@@ -167,9 +166,7 @@ export class ConflictHelper {
     return null;
   }
 
-  // The time window(s) a booking reserves. An absolute startTime/endTime is a fixed
-  // one-off span (overrides everything). Otherwise the event's occurrences, each padded
-  // by setupMinutes before and teardownMinutes after (recurrence-aware).
+  // Time windows: absolute startTime/endTime override setup/teardown padding (recurrence-aware).
   private static windowsFor(src: WindowSource, ctx: ConflictContext): Occurrence[] {
     if (src.startTime && src.endTime) return [{ start: new Date(src.startTime), end: new Date(src.endTime) }];
     const occurrences = RecurrenceHelper.getOccurrences(

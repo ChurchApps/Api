@@ -4,11 +4,7 @@ import { Repos } from "../repositories/index.js";
 
 export class GdprErasureHelper {
 
-  /**
-   * Anonymizes a person across all modules. Replaces PII with generic values
-   * while preserving operational records (donation amounts, attendance dates)
-   * for church reporting. Then deletes the user account.
-   */
+  /** Replaces PII with generic values while preserving operational records for reporting */
   public static async anonymize(churchId: string, personId: string, userId: string | null, membershipRepos: Repos) {
     await Promise.all([
       this.anonymizeMembership(churchId, personId, membershipRepos),
@@ -31,7 +27,6 @@ export class GdprErasureHelper {
   private static async anonymizeMembership(churchId: string, personId: string, _repos: Repos) {
     const db = KyselyPool.getDb<any>("membership");
 
-    // Anonymize the person record — clear PII, keep the row
     await db.updateTable("people").set({
       displayName: "Anonymized",
       firstName: "Anonymized",
@@ -61,7 +56,6 @@ export class GdprErasureHelper {
       optedOut: true as any
     } as any).where("id", "=", personId).where("churchId", "=", churchId).execute();
 
-    // Remove from groups, visibility prefs, member permissions
     await Promise.all([
       db.deleteFrom("groupMembers").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
       db.deleteFrom("visibilityPreferences").where("personId", "=", personId).where("churchId", "=", churchId).execute(),
@@ -76,13 +70,11 @@ export class GdprErasureHelper {
     await db.updateTable("donations").set({ personId: null } as any)
       .where("personId", "=", personId).where("churchId", "=", churchId).execute();
 
-    // Delete customer records (payment gateway tokens)
     const customers = await db.selectFrom("customers").select("id")
       .where("personId", "=", personId).where("churchId", "=", churchId).execute();
     const customerIds = customers.map(c => c.id);
 
     if (customerIds.length > 0) {
-      // Delete subscriptions and their fund allocations
       const subs = await db.selectFrom("subscriptions").select("id")
         .where("churchId", "=", churchId)
         .where("customerId", "in", customerIds).execute();
@@ -95,7 +87,6 @@ export class GdprErasureHelper {
           .where("customerId", "in", customerIds).execute();
       }
 
-      // Delete payment methods and event logs linked to customers
       await Promise.all([
         db.deleteFrom("gatewayPaymentMethods").where("churchId", "=", churchId)
           .where("customerId", "in", customerIds).execute(),

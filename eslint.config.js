@@ -28,7 +28,6 @@ export default [
       "email-door": emailDoorPlugin
     },
     rules: {
-      // --- Code quality ---
       "prefer-const": "error",
       "email-door/no-direct-email-helper": "error",
       "@typescript-eslint/no-explicit-any": "off",
@@ -39,7 +38,6 @@ export default [
       }],
       "unused-imports/no-unused-imports": "error",
 
-      // --- Formatting (ESLint is the sole formatter — no Prettier) ---
       "no-trailing-spaces": "error",
       "eol-last": ["error", "always"],
       "quotes": ["error", "double", { avoidEscape: true, allowTemplateLiterals: true }],
@@ -53,12 +51,10 @@ export default [
       "no-multi-spaces": ["error", { ignoreEOLComments: true }],
       "block-spacing": ["error", "always"],
 
-      // --- Compact / single-line formatting ---
       "brace-style": ["error", "1tbs", { allowSingleLine: true }],
       curly: ["error", "multi-line"],
       "nonblock-statement-body-position": ["error", "beside"],
 
-      // Objects
       "object-curly-spacing": ["error", "always"],
       "object-curly-newline": ["error", {
         ObjectExpression: { multiline: true },
@@ -68,16 +64,13 @@ export default [
       }],
       "object-property-newline": ["error", { allowAllPropertiesOnSameLine: true }],
 
-      // Arrays
       "array-bracket-spacing": ["error", "never"],
       "array-bracket-newline": ["error", { multiline: true, minItems: 8 }],
       "array-element-newline": ["error", { ArrayExpression: "consistent", ArrayPattern: { minItems: 8 } }],
 
-      // Functions
       "function-paren-newline": ["error", "consistent"],
       "function-call-argument-newline": ["error", "consistent"],
 
-      // Line length
       "max-len": ["warn", {
         code: 250,
         ignoreStrings: true,
@@ -87,7 +80,6 @@ export default [
         ignoreRegExpLiterals: true
       }],
 
-      // Module separation rules for monolith
       "import/no-restricted-paths": [
         "error",
         {

@@ -1,10 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// How long a booking reserves its room/resource, in two complementary forms:
-//  - setupMinutes/teardownMinutes: per-occurrence padding before/after each event
-//    occurrence (recurrence-aware, e.g. "every Saturday 8am-5pm").
-//  - startTime/endTime: an absolute one-off span that overrides the above
-//    (e.g. a single Fri-Sun retreat). NULL on all four = follows the event exactly.
+// setupMinutes/teardownMinutes for recurring padding, startTime/endTime for one-off spans; NULL on all four = follows the event.
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .alterTable("eventBookings")

@@ -6,9 +6,6 @@ import { SongHelper } from "../SongHelper.js";
 import { RepoManager } from "../../../../shared/infrastructure/index.js";
 import { PraiseChartsHelper } from "../PraiseChartsHelper.js";
 
-// Exercises the FreeShow import path (POST /content/songs/import -> importSong).
-// Guards the PC-alignment changes: a Song must be created carrying songDetailId,
-// and a CCLI/freeShow match must return an Arrangement (not a SongDetail).
 describe("SongHelper.importSong (FreeShow import)", () => {
   let repos: any;
 

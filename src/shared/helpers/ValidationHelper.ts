@@ -1,29 +1,16 @@
-/**
- * Shared validation utilities for all modules
- * Provides consistent validation patterns across the monolith
- */
 export class ValidationHelper {
-  /**
-   * Validate email format
-   */
   static isValidEmail(email: string): boolean {
     if (!email) return false;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   }
 
-  /**
-   * Validate phone number (basic format)
-   */
   static isValidPhone(phone: string): boolean {
     if (!phone) return false;
     const phoneRegex = /^[\+]?[0-9\-\s\(\)\.]{10,}$/;
     return phoneRegex.test(phone);
   }
 
-  /**
-   * Validate URL format
-   */
   static isValidUrl(url: string): boolean {
     if (!url) return false;
     try {
@@ -34,25 +21,16 @@ export class ValidationHelper {
     }
   }
 
-  /**
-   * Validate church ID format (8-character alphanumeric)
-   */
   static isValidChurchId(churchId: string): boolean {
     if (!churchId) return false;
     return /^[a-zA-Z0-9]{8}$/.test(churchId);
   }
 
-  /**
-   * Validate user ID format
-   */
   static isValidUserId(userId: string): boolean {
     if (!userId) return false;
     return /^[a-zA-Z0-9]{8,}$/.test(userId);
   }
 
-  /**
-   * Sanitize string input (remove potentially harmful characters)
-   */
   static sanitizeString(input: string): string {
     if (!input) return "";
     return input
@@ -61,9 +39,6 @@ export class ValidationHelper {
       .trim();
   }
 
-  /**
-   * Validate required fields in an object
-   */
   static validateRequired(obj: any, requiredFields: string[]): string[] {
     const errors: string[] = [];
     for (const field of requiredFields) {
@@ -74,9 +49,6 @@ export class ValidationHelper {
     return errors;
   }
 
-  /**
-   * Validate string length
-   */
   static validateLength(value: string, fieldName: string, min: number = 0, max: number = 255): string | null {
     if (!value) {
       return min > 0 ? `${fieldName} is required` : null;
@@ -90,9 +62,6 @@ export class ValidationHelper {
     return null;
   }
 
-  /**
-   * Validate numeric range
-   */
   static validateRange(value: number, fieldName: string, min?: number, max?: number): string | null {
     if (isNaN(value)) {
       return `${fieldName} must be a valid number`;
@@ -106,9 +75,6 @@ export class ValidationHelper {
     return null;
   }
 
-  /**
-   * Validate date format and range
-   */
   static validateDate(date: string, fieldName: string, minDate?: Date, maxDate?: Date): string | null {
     const parsedDate = new Date(date);
     if (isNaN(parsedDate.getTime())) {
@@ -123,9 +89,6 @@ export class ValidationHelper {
     return null;
   }
 
-  /**
-   * Check if value is empty or whitespace
-   */
   static isEmpty(value: any): boolean {
     return value === null || value === undefined || (typeof value === "string" && value.trim() === "") || (Array.isArray(value) && value.length === 0);
   }

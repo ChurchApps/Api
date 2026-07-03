@@ -3,14 +3,7 @@ import { RepoManager } from "../infrastructure/RepoManager.js";
 import { formatForConnector } from "./WebhookFormatters.js";
 import { InternalEventBus } from "../events/InternalEventBus.js";
 
-// In-process webhook event emitter. Called from controllers (or repos) right
-// after a mutation. emit() does a cached subscription lookup (so churches with
-// no webhooks — the vast majority — cost zero queries on the write path) and,
-// when there is a match, durably enqueues a delivery row. The actual HTTP
-// delivery is handled separately by WebhookDeliveryWorker. emit() never
-// throws — a webhook failure must never break the originating operation.
-// Webhook storage lives in the membership module, so emit() resolves those
-// repos itself — callers in any module just pass churchId/event/payload.
+// emit() never throws — webhook failures must never break the originating operation.
 export class WebhookDispatcher {
   private static cache = new Map<string, { hooks: Webhook[]; expires: number }>();
   private static TTL_MS = 60000;
@@ -22,8 +15,6 @@ export class WebhookDispatcher {
   public static async emit(churchId: string, event: string, payload: any): Promise<void> {
     try {
       if (!churchId) return;
-      // In-process subscribers (e.g. workflow event triggers) fire even for churches
-      // with no external webhooks; publish never throws.
       await InternalEventBus.publish(churchId, event, payload);
       const repos = await RepoManager.getRepos<any>("membership");
       const hooks = await WebhookDispatcher.getHooks(repos, churchId);
@@ -31,8 +22,6 @@ export class WebhookDispatcher {
       const matching = hooks.filter((h) => Array.isArray(h.events) && h.events.includes(event));
       if (matching.length === 0) return;
 
-      // The delivery body is formatted per hook — a Slack/Discord connector
-      // stores its chat-ready message, a standard hook stores the raw envelope.
       const envelope = { event, churchId, occurredAt: new Date().toISOString(), data: payload };
       for (const hook of matching) {
         await repos.webhookDelivery.create({

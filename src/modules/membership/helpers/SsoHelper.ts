@@ -63,9 +63,6 @@ export class SsoHelper {
     return `${Environment.membershipApi}/users/sso/callback/${provider}`;
   }
 
-  // returnUrl must be an http(s) URL whose host is trusted: localhost, *.b1.church,
-  // or a configured SSO_ALLOWED_ORIGINS entry. The church domains table is deliberately
-  // NOT trusted here — it accepts unverified domains, so it could exfiltrate login JWTs.
   public static async validateReturnUrl(returnUrl: string): Promise<boolean> {
     if (!returnUrl) return false;
     let url: URL;
@@ -138,8 +135,6 @@ export class SsoHelper {
     return { id_token: json.id_token, access_token: json.access_token };
   }
 
-  // Enforces provider-specific email trust so an unverified or spoofable address
-  // never becomes a login identity. Returns the normalized email on success.
   public static checkEmailTrust(provider: string, claims: any): { ok: boolean; email?: string; reason?: string } {
     const rawEmail: string = claims.email || claims.preferred_username || "";
     const email = rawEmail.trim().toLowerCase();
@@ -150,11 +145,8 @@ export class SsoHelper {
       return { ok: false, reason: "Your Google email address is not verified. Please sign in with email and password." };
     }
 
-    // Microsoft: multi-tenant AAD emails are spoofable unless the tenant is the
-    // consumer tenant or the verified-email optional claim (xms_edov) is present.
     if (claims.tid === CONSUMER_TENANT) return { ok: true, email };
     if (claims.xms_edov === true || claims.xms_edov === "true") {
-      // xms_edov only vouches for the `email` claim, not the preferred_username (UPN).
       const verifiedEmail = String(claims.email || "").trim().toLowerCase();
       if (!verifiedEmail) return { ok: false, reason: "Your organization's email could not be verified. Please sign in with email and password." };
       return { ok: true, email: verifiedEmail };
@@ -173,9 +165,6 @@ export class SsoHelper {
     return { firstName, lastName };
   }
 
-  // Finds the user by email or creates one exactly like /register (random bcrypt
-  // password, registrationDate, matching-people userChurch links) — but with no
-  // verification code, since the identity provider already verified the email.
   public static async findOrCreateUser(email: string, firstName: string, lastName: string, repos: Repos): Promise<{ user: User; isNew: boolean }> {
     const normalized = email.trim().toLowerCase();
     let user = await repos.user.loadByEmail(normalized);
@@ -225,10 +214,6 @@ export class SsoHelper {
     return `data:${contentType};base64,${buffer.toString("base64")}`;
   }
 
-  // Requests a staff-approval directoryUpdate photo task for each of the user's people
-  // that have no photo yet, via the internal event bus (the doing module subscribes and
-  // runs the same submission pipeline as member self-service). When the user has no person
-  // at all, stashes the photo so PersonHelper.claim can apply it on church select.
   public static async importPhoto(provider: string, claims: any, accessToken: string | undefined, user: User, repos: Repos): Promise<void> {
     try {
       const dataUrl = await this.fetchProviderPhoto(provider, claims, accessToken);
@@ -252,7 +237,6 @@ export class SsoHelper {
     }
   }
 
-  // Applies a previously stashed SSO photo to a freshly-created/claimed person.
   public static async applyStashedPhoto(userId: string, churchId: string, person: Person, repos: Repos): Promise<void> {
     try {
       if (!person || person.photoUpdated) return;
@@ -309,8 +293,6 @@ export class SsoHelper {
     return returnUrl + separator + key + "=" + encodeURIComponent(value);
   }
 
-  // Delivers the token/error in the URL fragment so it is never sent to a server
-  // or leaked via Referer / access logs.
   public static appendFragment(returnUrl: string, key: string, value: string): string {
     const separator = returnUrl.includes("#") ? "&" : "#";
     return returnUrl + separator + key + "=" + encodeURIComponent(value);

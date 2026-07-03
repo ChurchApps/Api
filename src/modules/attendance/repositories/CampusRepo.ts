@@ -2,10 +2,7 @@ import { injectable } from "inversify";
 import { getDb } from "../db/index.js";
 import { Campus } from "../models/index.js";
 
-// DEPRECATED: read-only/frozen — campuses are mastered in the membership module.
-// The write methods (save/create/update/delete) were removed; only the read
-// methods remain to serve legacy readers. Slated for deletion once those legacy
-// readers are migrated off the attendance campus joins.
+// DEPRECATED: read-only/frozen; campuses mastered in membership module, slated for deletion.
 @injectable()
 export class CampusRepo {
   public async load(churchId: string, id: string) {

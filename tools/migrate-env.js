@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
-/**
- * Migration script to convert old .env format to new connection string format
- */
+// Converts .env to use connection strings instead of separate DB vars
 const fs = require('fs');
 const path = require('path');
 

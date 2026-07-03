@@ -3,9 +3,7 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 
 import { CustomerRepo } from "../CustomerRepo";
 
-// Regression guard for the multi-provider data-loss bug: save() must scope its
-// existing-customer lookup by provider. Keying on personId alone let a second
-// provider's customer save delete the first provider's customer row.
+// Regression: save() must scope customer lookup by provider to prevent data loss.
 describe("CustomerRepo.save (provider-scoped customer keying)", () => {
   const makeRepo = () => {
     const repo = new CustomerRepo();
@@ -28,8 +26,7 @@ describe("CustomerRepo.save (provider-scoped customer keying)", () => {
 
   it("creates a new row for a second provider instead of clobbering the first provider's customer", async () => {
     const repo = makeRepo();
-    // The KingdomFunding customer doesn't exist yet (a Stripe one for the same
-    // person is a different provider and must be left untouched).
+    // KingdomFunding customer doesn't exist (Stripe customer is a different provider).
     jest.spyOn(repo, "loadByPersonAndProvider").mockResolvedValue(null as any);
     await repo.save({ id: "ab_123", churchId: "C1", personId: "P1", provider: "kingdomfunding" } as any);
     expect((repo as any).create).toHaveBeenCalledTimes(1);

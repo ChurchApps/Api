@@ -1,6 +1,3 @@
-// EPayMints integration helper
-// Note: ePayMints may use REST/SOAP APIs depending on their service offering
-
 import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
 
 export class EPayMintsHelper {
@@ -38,7 +35,6 @@ export class EPayMintsHelper {
     }
   }
 
-  // Customer Management
   static async createCustomer(
     apiKey: string,
     environment: string,
@@ -50,14 +46,10 @@ export class EPayMintsHelper {
     }
   ): Promise<string> {
     try {
-      // TODO: Implement actual ePayMints customer creation API
-      // ePayMints may not have traditional customer objects like Stripe/PayPal
-      // Instead, they might use terminal-based or merchant-based identification
-
+      // TODO: ePayMints may use terminal-based or merchant-based identification, not traditional customer objects.
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": customerData.terminalId || "" };
 
-      // Mock implementation - replace with actual API call
       const result = await EPayMintsHelper.makeRequest(
         `${baseUrl}/customers`,
         "POST",
@@ -71,7 +63,6 @@ export class EPayMintsHelper {
     }
   }
 
-  // Payment Processing
   static async createPayment(
     apiKey: string,
     environment: string,
@@ -100,7 +91,7 @@ export class EPayMintsHelper {
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": paymentData.terminalId };
 
       const requestBody: any = {
-        amount: Math.round(paymentData.amount * 100), // Convert to cents
+        amount: Math.round(paymentData.amount * 100),
         currency: paymentData.currency || "USD",
         customer_id: paymentData.customerId,
         description: paymentData.description || "Payment"
@@ -115,7 +106,7 @@ export class EPayMintsHelper {
         };
       }
 
-      // TODO: Replace with actual ePayMints payment creation API
+      // TODO: Real ePayMints payment creation API
       const result = await EPayMintsHelper.makeRequest(
         `${baseUrl}/payments`,
         "POST",
@@ -134,7 +125,6 @@ export class EPayMintsHelper {
     }
   }
 
-  // ACH Processing (ePayMints specialization)
   static async createACHPayment(
     apiKey: string,
     environment: string,
@@ -162,7 +152,6 @@ export class EPayMintsHelper {
     });
   }
 
-  // Transaction Status
   static async getTransactionStatus(
     apiKey: string,
     environment: string,
@@ -173,7 +162,7 @@ export class EPayMintsHelper {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": terminalId };
 
-      // TODO: Replace with actual ePayMints transaction status API
+      // TODO: Real ePayMints transaction status API
       const result = await EPayMintsHelper.makeRequest(
         `${baseUrl}/transactions/${transactionId}`,
         "GET",
@@ -191,7 +180,6 @@ export class EPayMintsHelper {
     }
   }
 
-  // Refunds
   static async createRefund(
     apiKey: string,
     environment: string,
@@ -206,7 +194,7 @@ export class EPayMintsHelper {
       const baseUrl = EPayMintsHelper.getBaseUrl(environment);
       const headers = { Authorization: `Bearer ${apiKey}`, "X-Terminal-ID": refundData.terminalId };
 
-      // TODO: Replace with actual ePayMints refund API
+      // TODO: Real ePayMints refund API
       const result = await EPayMintsHelper.makeRequest(
         `${baseUrl}/refunds`,
         "POST",
@@ -229,7 +217,6 @@ export class EPayMintsHelper {
     }
   }
 
-  // Settlement/Batch Processing
   static async getSettlementInfo(
     apiKey: string,
     environment: string,
@@ -242,7 +229,7 @@ export class EPayMintsHelper {
 
       const queryParams = date ? `?date=${date}` : "";
 
-      // TODO: Replace with actual ePayMints settlement API
+      // TODO: Real ePayMints settlement API
       const result = await EPayMintsHelper.makeRequest(
         `${baseUrl}/settlements${queryParams}`,
         "GET",
@@ -260,7 +247,6 @@ export class EPayMintsHelper {
     }
   }
 
-  // Fee Calculation
   static calculateFees(
     amount: number,
     paymentMethod: "card" | "ach",
@@ -268,37 +254,31 @@ export class EPayMintsHelper {
     customPercentFee?: number
   ): number {
     if (paymentMethod === "ach") {
-      // ePayMints ACH fees are typically lower
       const fixedFee = customFixedFee ?? 0.5;
       const percentFee = customPercentFee ?? 0.008; // 0.8%
-      const maxFee = 5.0; // Cap ACH fees
+      const maxFee = 5.0;
       const fee = Math.round(((amount + fixedFee) / (1 - percentFee) - amount) * 100) / 100;
       return Math.min(fee, maxFee);
     } else {
-      // Card processing fees
       const fixedFee = customFixedFee ?? 0.3;
       const percentFee = customPercentFee ?? 0.029; // 2.9%
       return Math.round(((amount + fixedFee) / (1 - percentFee) - amount) * 100) / 100;
     }
   }
 
-  // Webhook Verification (if supported)
   static validateWebhookSignature(
     _payload: string,
     signature: string,
     webhookSecret: string
   ): boolean {
     try {
-      // TODO: Implement ePayMints-specific webhook signature verification
-      // This would depend on their webhook signing mechanism
-      // For now, return true as placeholder
+      // TODO: ePayMints-specific webhook signature verification (depends on their mechanism).
       return signature.length > 0 && webhookSecret.length > 0;
     } catch {
       return false;
     }
   }
 
-  // Event Logging
   static async logEvent(
     churchId: string,
     ePayMintsEvent: any,

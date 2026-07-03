@@ -32,9 +32,6 @@ export interface GateResult {
   warnings: GateViolation[];
 }
 
-// Pure evaluation of the pre-save check-in gates (capacity + volunteer ratio).
-// `current` is room occupancy already present today (not checked out, excluding the
-// people in this batch); `incoming` is what this batch would add per group.
 export class CheckinGateHelper {
   static evaluate(params: {
     groups: Record<string, GateGroup>;
@@ -52,7 +49,6 @@ export class CheckinGateHelper {
       const cur = current[groupId] ?? { total: 0, volunteers: 0, guests: 0 };
       const inc = incoming[groupId];
 
-      // --- Capacity / closed (always hard) ---
       let capacityViolated = false;
       if (g.checkinClosed) capacityViolated = true;
       else if (g.capacity != null && cur.total + inc.total > g.capacity) capacityViolated = true;
@@ -63,7 +59,6 @@ export class CheckinGateHelper {
         continue; // one violation per group is enough to reject the batch
       }
 
-      // --- Volunteer ratio (only gates incoming non-volunteers) ---
       if (inc.nonVolunteers > 0) {
         const volunteers = cur.volunteers + inc.volunteers;
         const children = cur.total - cur.volunteers + inc.nonVolunteers;

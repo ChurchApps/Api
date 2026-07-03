@@ -13,9 +13,7 @@ interface VisibilityGated {
   groupIds?: string;
 }
 
-// Mirrors the links visibility enum (everyone/visitors/members/staff/team/groups).
-// Unlike links (a nav filter), this is a hard access gate on a public endpoint, so
-// anything other than "everyone" requires the caller to be authenticated into the page's church.
+// Hard access gate (unlike links nav filter): visibility !== "everyone" requires auth into the page's church.
 export function canViewPage(page: VisibilityGated, au?: PageViewer | null): boolean {
   const visibility = page.visibility || PUBLIC_VISIBILITY;
   if (visibility === PUBLIC_VISIBILITY) return true;

@@ -6,21 +6,12 @@ import { buildPermStrings } from "../auth/buildPermStrings.js";
 import { filterPermissionsByScopes, parseScopes } from "../auth/Scopes.js";
 import crypto from "crypto";
 
-/**
- * Shared CustomAuthProvider implementation for the monolith
- * Extends the base provider from @churchapps/apihelper with module-specific logic
- */
+/** CustomAuthProvider for monolith with module-specific logic. */
 export class CustomAuthProvider extends BaseAuthProvider {
-  /**
-   * Constructor for CustomAuthProvider
-   */
   constructor() {
     super();
   }
 
-  /**
-   * Override to use consolidated environment configuration
-   */
   protected getJwtSecret(): string {
     if (!Environment.jwtSecret) {
       console.error("🔴 CRITICAL: Environment.jwtSecret is not set when getJwtSecret() was called");
@@ -30,66 +21,34 @@ export class CustomAuthProvider extends BaseAuthProvider {
     return Environment.jwtSecret;
   }
 
-  /**
-   * Override to use consolidated JWT expiration setting
-   */
   protected getJwtExpiration(): string {
     return Environment.jwtExpiration || "2 days";
   }
 
-  /**
-   * Module-specific authentication validation
-   * This can be extended as modules are migrated to add specific auth rules
-   */
   protected async validateModuleAccess(token: any, _moduleName?: string): Promise<boolean> {
-    // Base validation - use the public validateToken method
     const isValid = await this.validateToken(token);
-    if (!isValid) return false;
-
-    // Add module-specific validation logic here as needed
-    // For now, all authenticated users can access all modules
-    // This can be refined during migration based on specific requirements
-
-    return true;
+    return isValid;
   }
 
-  /**
-   * Get the appropriate membership API URL for auth validation
-   */
   protected getMembershipApiUrl(): string {
     return Environment.membershipApi;
   }
 
-  /**
-   * Public method to validate token
-   */
   async validateToken(token: any): Promise<boolean> {
     try {
-      // Use the base class's validation logic if available
-      // For now, implement basic JWT validation
       if (!token) return false;
-
-      // Basic token structure validation
       if (typeof token === "string") {
         const parts = token.split(".");
-        return parts.length === 3; // Basic JWT structure check
+        return parts.length === 3;
       }
-
-      return !!token; // Assume token object is valid for now
+      return !!token;
     } catch (error) {
       console.error("Token validation error:", error);
       return false;
     }
   }
 
-  /**
-   * Required method for AuthProvider interface.
-   *
-   * `cak_`-prefixed bearer tokens are API keys — resolved here. Everything
-   * else is a JWT (staff login or OAuth access token) and delegates to the
-   * base provider unchanged. Both paths produce a Principal of the same
-   * shape, so all downstream authorization stays a single mechanism.
-   */
+  // cak_ tokens are API keys; everything else delegates to base (JWT).
   async getUser(req: any, res: any, next: any): Promise<any> {
     try {
       const authHeader = req.headers?.authorization;
@@ -104,13 +63,7 @@ export class CustomAuthProvider extends BaseAuthProvider {
     }
   }
 
-  /**
-   * Resolves an API key (`cak_<prefix>.<secret>`) to a Principal. The key's
-   * permissions are its person's CURRENT RBAC permissions, intersected with
-   * the key's granted scopes — resolved fresh each request so the key can
-   * never drift from RBAC and stays revocable. Returns null on any failure
-   * (missing/expired key, bad secret, malformed token).
-   */
+  // Resolves cak_<prefix>.<secret> to Principal; fresh RBAC intersection per request keeps key revocable.
   private async getUserFromApiKey(token: string): Promise<Principal> {
     try {
       const body = token.substring(4);
@@ -124,12 +77,11 @@ export class CustomAuthProvider extends BaseAuthProvider {
       if (!key || !key.hashedKey) return null;
       if (key.expiresAt && new Date(key.expiresAt) < new Date()) return null;
 
-      // Constant-time hash comparison.
+      // Constant-time hash comparison (prevents timing attacks).
       const actual = Buffer.from(crypto.createHash("sha256").update(secret).digest("hex"), "utf8");
       const expected = Buffer.from(key.hashedKey, "utf8");
       if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
 
-      // Permissions, group membership, and person status are independent — resolve in parallel.
       const [apis, groupMembers, people] = await Promise.all([
         UserHelper.loadExpandedPermissions(key.userId, key.churchId, repos),
         repos.groupMember.loadForPeople([key.personId]),

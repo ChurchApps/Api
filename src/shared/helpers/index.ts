@@ -1,8 +1,3 @@
-/**
- * Consolidated exports for all shared helpers
- * Provides a single import point for common utilities
- */
-
 export { Environment } from "./Environment.js";
 export { Permissions, permissionsList, type IPermission, type ApiName, type DisplaySection, type ContentType, type Actions } from "./Permissions.js";
 export { PlanAuth } from "./PlanAuth.js";

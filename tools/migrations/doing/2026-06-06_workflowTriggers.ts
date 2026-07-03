@@ -1,9 +1,5 @@
 import { type Kysely, sql } from "kysely";
 
-// Event-driven workflow triggers: "when <event> happens to a record matching
-// <conditions>, add the subject to <workflow>". Companion to the form/scheduled
-// triggers. triggerId is stamped on the card it creates for dedup.
-
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable("workflowTriggers")

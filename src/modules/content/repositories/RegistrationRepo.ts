@@ -138,7 +138,6 @@ export class RegistrationRepo {
       return true;
     }
 
-    // Race safety comes from the count-subquery and insert being one atomic MySQL statement.
     const result: any = await sql`INSERT INTO registrations (id, churchId, eventId, personId, householdId, status, formSubmissionId, notes, registeredDate, cancelledDate, totalAmount, amountPaid, couponId, waitlistNotifiedDate)
       SELECT ${values.id}, ${values.churchId}, ${values.eventId}, ${values.personId}, ${values.householdId}, ${values.status}, ${values.formSubmissionId}, ${values.notes}, ${values.registeredDate}, ${values.cancelledDate}, ${values.totalAmount}, ${values.amountPaid}, ${values.couponId}, ${values.waitlistNotifiedDate}
       FROM dual
@@ -150,9 +149,6 @@ export class RegistrationRepo {
     return false;
   }
 
-  // Promotes the oldest waitlisted registration to pending if a spot is free.
-  // The status='waitlisted' guard makes concurrent promotions safe: only one
-  // statement can flip a given row, so nobody is promoted twice or over capacity.
   public async promoteFromWaitlist(churchId: string, eventId: string, capacity: number | null): Promise<Registration | null> {
     const candidate = await getDb().selectFrom("registrations").selectAll()
       .where("churchId", "=", churchId)

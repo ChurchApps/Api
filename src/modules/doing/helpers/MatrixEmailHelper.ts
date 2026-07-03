@@ -1,9 +1,7 @@
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
-// Consolidated, cross-plan serving summary email: one message per person covering
-// every plan they're assigned to in a date range (the matrix "Email all" action).
-// Distinct from the reminder engine's per-plan serving reminders (planType-scoped).
+// Cross-plan serving summary email: one message per person across assigned plans in date range (matrix "Email all" action). Distinct from per-plan reminder engine reminders.
 
 const RECIPIENT_CAP = 200;
 
@@ -23,8 +21,7 @@ export interface PersonSchedule {
   items: { planName: string; serviceDate: Date | string | null; positions: string[] }[];
 }
 
-// Pure: group overview rows into one schedule per person, plans sorted by date,
-// roles de-duped. Rows without a personId (unfilled slots) are dropped.
+// Group rows into schedule per person (plans sorted by date, roles de-duped). Drops unfilled slots (no personId).
 export function groupOverviewByPerson(rows: OverviewEmailRow[]): PersonSchedule[] {
   const byPerson = new Map<string, Map<string, { planName: string; serviceDate: Date | string | null; positions: Set<string> }>>();
   for (const r of rows) {
@@ -62,9 +59,7 @@ function buildHtml(firstName: string, items: PersonSchedule["items"], scheduleUr
 }
 
 export class MatrixEmailHelper {
-  // Sends one consolidated, preference-gated notification+email per assigned person
-  // across the given overview rows; emailImmediate bypasses the unread-dedup guard,
-  // so each explicit "Email all" click sends (staff intent), gated per recipient.
+  // Sends one preference-gated notification+email per person across rows. emailImmediate bypasses unread-dedup guard so "Email all" clicks send per staff intent, gated per recipient.
   public static async sendConsolidated(churchId: string, rows: OverviewEmailRow[], ministryId: string): Promise<{ sent: number; failed: number; capped: boolean }> {
     const schedules = groupOverviewByPerson(rows);
     const capped = schedules.length > RECIPIENT_CAP;

@@ -1,8 +1,3 @@
-// Builds a fresh MCP server for one HTTP request. The Streamable HTTP
-// transport is stateless on Lambda — a new transport + Server pair per call
-// avoids any cross-request state and lets us bind the api_call tool to this
-// request's Authorization header.
-
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { listEndpointsSchema, listEndpointsHandler } from "./tools/listEndpoints.js";
 import { describeEndpointSchema, describeEndpointHandler } from "./tools/describeEndpoint.js";

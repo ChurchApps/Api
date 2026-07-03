@@ -10,9 +10,6 @@ interface EvalContext {
   visitedListIds: Set<string>;
 }
 
-// Evaluates a list's rules tree to person ids. Each condition is answered by its
-// owning module (provider) so cross-product rules stay live; groups combine child
-// results with all/any/none set logic.
 export class ListRuleHelper {
   public static async getPeopleIds(churchId: string, list: List, repos: Repos): Promise<string[]> {
     if (!list.rules) return [];
@@ -110,7 +107,6 @@ export class ListRuleHelper {
       ids = await this.evaluateGroup(list.rules, ctx);
       ids = await this.expandHousehold(ids, list.householdInclusion, ctx);
     } else {
-      // Legacy list without rules: fall back to the cached refresh membership.
       ids = new Set(await ctx.repos.listMember.loadPersonIds(ctx.churchId, c.entityId));
     }
     if (c.operator === "notIn") return this.complement(ids, ctx);

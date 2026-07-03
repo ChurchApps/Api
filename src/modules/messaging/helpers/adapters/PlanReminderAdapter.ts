@@ -3,11 +3,7 @@ import { getDoingModuleGateway } from "../../../../shared/modules/DoingModuleGat
 import { singleDateOccurrence } from "../../../../shared/helpers/CivilDate.js";
 import { ReminderAdapter, ReminderOccurrenceInfo, ReminderRecipient } from "../ReminderAdapter.js";
 
-// Plan adapter (architecture §6.3). Wraps the proven AssignmentRepo.loadForReminder
-// recipient logic. Serving reminders are configured as planType-scoped definitions
-// (entityType='plan', entityId null, scopeId=planTypeId); the engine fans each out
-// over the plans loaded by loadScopeEntities. buildEmails reproduces the legacy
-// serving email (with Accept/Decline token buttons) via the doing gateway.
+// Plan-type-scoped serving reminders with legacy Accept/Decline email buttons.
 export const PlanReminderAdapter: ReminderAdapter = {
   entityType: "plan",
   category: "serving_schedule",

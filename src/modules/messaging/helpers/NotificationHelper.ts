@@ -159,14 +159,12 @@ export class NotificationHelper {
     this.ensureInitialized();
     const effectiveCategory = category ?? NotificationCategoryHelper.categoryFor(contentType, navData?.innerType as string | undefined);
 
-    // Load prefs once up-front: the in_app gate needs them before socket delivery,
-    // and the push/email levels reuse the same context (one pref read on the hot path).
+    // Load prefs up-front: one pref read on hot path, reused by all gate levels.
     let pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
     if (!pref) {
       pref = await this.createNotificationPref(churchId, personId);
     }
-    // Entity mutes can only match when there's an entity to mute (navData.innerId);
-    // skip the query otherwise to keep the delivery hot path lean.
+    // Skip mute query if no entity to mute, keeping delivery hot path lean.
     const needMutes = !!navData?.innerId;
     const [overrides, entityMutes] = (await Promise.all([
       NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId),
@@ -185,12 +183,7 @@ export class NotificationHelper {
       category: effectiveCategory
     });
 
-    // Level 0: in-app / socket. Gate on the in_app channel first. A suppressed
-    // (muted) item is parked — it stays visible in the inbox but gets no socket
-    // ping, no badge, and (because escalation is driven by unreadness) no push/
-    // email escalation. For private messages, do not stop at socket delivery:
-    // installed PWAs can keep an alerts socket alive in the background, which
-    // would otherwise suppress the OS-level push notification entirely.
+    // In-app/socket: muted items park (visible in inbox, no ping/badge/escalation). For PMs: don't stop at socket (PWAs keep alerts socket alive in background, suppressing OS push).
     let socketDelivered = false;
     if (startLevel <= 0) {
       const inAppGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "in_app", gateCtx);
@@ -243,7 +236,6 @@ export class NotificationHelper {
       }
     }
 
-    // Level 1: Try Push (gated by the preference precedence rules)
     if (startLevel <= 1) {
       const pushGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "push", gateCtx);
       if (!pushGate.allow) {
@@ -405,8 +397,7 @@ export class NotificationHelper {
       return "socket";
     }
 
-    // Level 2: Email (gated). Covers emailFrequency="never" (channel_off) and
-    // per-category email opt-out; otherwise it's queued for the digest path.
+    // Email (gated): covers emailFrequency="never" and per-category opt-out; otherwise queued for digest path.
     const emailGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "email", gateCtx);
     if (!emailGate.allow) {
       this.addDebugStep(debugTrace, "delivery-return-complete", "warn", { reason: emailGate.reason || "email suppressed" });
@@ -424,7 +415,6 @@ export class NotificationHelper {
     // "privateMessage") now escalate here too, as ordinary notification rows.
     const pendingNotifications: Notification[] = (await NotificationHelper.repos.notification.loadPendingEscalation()) as any[];
     console.log("[NotificationHelper.escalateDelivery] Found " + pendingNotifications.length + " notifications pending escalation");
-
     for (const notification of pendingNotifications) {
       const currentLevel = notification.deliveryMethod === "socket" ? 0 : 1;
       const nextLevel = currentLevel + 1;
@@ -482,7 +472,6 @@ export class NotificationHelper {
     });
     switch (conversation.contentType) {
       case "streamingLive":
-        // don't send notifications for live stream chat room.
         this.addDebugStep(debugTrace, "notify-skip-streaming-live", "warn", { reason: "streaming live chat disabled for notifications" });
         break;
       case "privateMessage": {
@@ -507,18 +496,8 @@ export class NotificationHelper {
 
         const participants = [pm.fromPersonId, pm.toPersonId].filter((value): value is string => !!value);
         if (!senderPersonId || !participants.includes(senderPersonId)) {
-          this.addDebugStep(debugTrace, "notify-validate-private-message-sender", "error", {
-            senderPersonId,
-            participants
-          });
-          console.warn("[chat-push] private message notification skipped: sender is not a conversation participant", {
-            churchId: conversation.churchId,
-            conversationId: conversation.id,
-            senderPersonId,
-            fromPersonId: pm.fromPersonId,
-            toPersonId: pm.toPersonId,
-            messageId: message.id
-          });
+          this.addDebugStep(debugTrace, "notify-validate-private-message-sender", "error", { senderPersonId, participants });
+          console.warn("[chat-push] private message notification skipped: sender is not a conversation participant", { churchId: conversation.churchId, conversationId: conversation.id, senderPersonId, fromPersonId: pm.fromPersonId, toPersonId: pm.toPersonId, messageId: message.id });
           pm.notifyPersonId = null;
           await NotificationHelper.repos.privateMessage.save(pm);
           break;
@@ -564,18 +543,14 @@ export class NotificationHelper {
           recipientDeviceIds: recipientDevices.map((device) => device.id)
         });
 
-        // Persist notifyPersonId first so the unread count query inside
-        // attemptDeliveryWithEscalation includes this new message.
+        // Persist notifyPersonId first so unread count query includes this new message.
         await NotificationHelper.repos.privateMessage.save(pm);
         this.addDebugStep(debugTrace, "notify-save-private-message-target", "ok", {
           privateMessageId: pm.id,
           notifyPersonId: pm.notifyPersonId
         });
 
-        // A notifications row (contentType "privateMessage") now owns all delivery
-        // state and escalation. Reuse the conversation's existing unread row so
-        // consecutive messages share one escalation unit (as the single pm row did);
-        // every message still pings the socket below via attemptDeliveryWithEscalation.
+        // Notifications row owns delivery state/escalation. Reuse existing unread row so consecutive messages share one escalation unit; every message pings socket.
         const existingDmRows = (await NotificationHelper.repos.notification.loadExistingUnread(conversation.churchId, "privateMessage", pm.id)) as any[] || [];
         let dmNotification: Notification = (existingDmRows || []).find((n: any) => n.personId === pm.notifyPersonId);
         if (!dmNotification) {
@@ -592,10 +567,7 @@ export class NotificationHelper {
           });
         }
 
-        // Use escalation logic - start at level 0 (socket)
-        // navData.personId = the OTHER party in the chat (the sender), so the
-        // service worker can deep-link to /mobile/messages/{senderPersonId}
-        // (the route's [id] is the other person's id, not the conversation id).
+        // Start at level 0 (socket). navData.personId = the OTHER party (sender) so SW deep-links to /mobile/messages/{senderPersonId}.
         const deliveryMethod = await this.attemptDeliveryWithEscalation(
           message.churchId,
           pm.notifyPersonId,
@@ -611,7 +583,6 @@ export class NotificationHelper {
 
         dmNotification.deliveryMethod = deliveryMethod;
         if (deliveryMethod === "muted") {
-          // Mute-park: drop the unread badge (notifyPersonId) and stop escalation.
           dmNotification.isNew = false;
           pm.notifyPersonId = null;
           await NotificationHelper.repos.privateMessage.save(pm);
@@ -626,11 +597,7 @@ export class NotificationHelper {
       }
       default: {
         const allMessages: Message[] = await NotificationHelper.repos.message.loadForConversation(conversation.churchId, conversation.id);
-        // Subscription model — latest action per person wins:
-        //   - a "real" comment auto-subscribes the poster
-        //   - a messageType="subscription" marker explicitly toggles their state
-        //     ("off" content → unsubscribed; anything else → subscribed)
-        // Iterate chronologically so the last action determines final state.
+        // Subscription model: latest action per person wins (real comment auto-subscribes; subscription marker toggles state). Iterate chronologically.
         const sorted = [...allMessages].sort((a, b) => {
           const ta = a.timeSent ? new Date(a.timeSent).getTime() : 0;
           const tb = b.timeSent ? new Date(b.timeSent).getTime() : 0;
@@ -689,12 +656,9 @@ export class NotificationHelper {
       notifications.push(notification);
     });
 
-    // Return early if no notifications to create
     if (notifications.length === 0) return [];
 
-    // Don't notify people a second time about the same type of event — except explicit
-    // emailImmediate sends (reminder offsets, staff "email all", workflow steps), whose
-    // producers own their dedup (ledger/intent); an unread earlier row must not swallow them.
+    // Don't re-notify same event, except emailImmediate (reminders, staff "email all", workflow steps) where producers own dedup (ledger/intent).
     if (!options?.emailImmediate) {
       const existing = (await NotificationHelper.repos.notification.loadExistingUnread(notifications[0].churchId, notifications[0].contentType, notifications[0].contentId)) as any[] || [];
       const suppressedPersonIds: string[] = [];
@@ -733,8 +697,7 @@ export class NotificationHelper {
             title = n.message;
           }
 
-          // Forward the wrapped content's type/id so the SW can deep-link to
-          // the actual conversation/group/etc. instead of the notifications list.
+          // Forward content type/id so SW deep-links to actual conversation/group instead of notifications list.
           const deliveryMethod = await NotificationHelper.attemptDeliveryWithEscalation(
             n.churchId,
             n.personId,
@@ -747,9 +710,8 @@ export class NotificationHelper {
             n.category
           );
 
-          // Save the delivery method. A muted (in_app-gated) row is parked:
-          // isNew=false keeps it out of badge counts and stops escalation.
           notification.deliveryMethod = deliveryMethod;
+          // Muted rows parked: isNew=false keeps out of badge counts and stops escalation.
           if (deliveryMethod === "muted") notification.isNew = false;
           await NotificationHelper.repos.notification.save(notification);
 
@@ -766,7 +728,7 @@ export class NotificationHelper {
     } else return [];
   };
 
-  // Post-escalation: gated rich email now instead of the batch digest; no address on file leaves the row as escalation left it.
+  // Post-escalation rich email (gated, immediate instead of digest). No address leaves row as escalation left it.
   private static applyImmediateEmail = async (notification: Notification, email: string | undefined, options: CreateNotificationOptions) => {
     if (!email) return;
 
@@ -794,8 +756,7 @@ export class NotificationHelper {
     }
   };
 
-  // Legacy push paths historically fired without checking preferences (architecture §4.5).
-  // Route them through the gate so opt-outs / master mute / quiet hours are honored.
+  // Legacy push paths (§4.5) route through gate so opt-outs/master-mute/quiet-hours honored.
   private static pushAllowed = async (churchId: string, personId: string, category: string): Promise<boolean> => {
     const pref = await NotificationHelper.repos.notificationPreference.loadByPersonId(churchId, personId);
     const overrides = (await NotificationHelper.repos.notificationPreferenceOverride.loadForPerson(churchId, personId)) as any[] || [];
@@ -804,11 +765,9 @@ export class NotificationHelper {
 
   static notifyUser = async (churchId: string, personId: string, title: string = "New Notification") => {
     this.ensureInitialized();
-    // Removed excessive logging to reduce CloudWatch costs
     let method = "";
     const _deliveryCount = 0;
 
-    // Handle web socket notifications
     const connections = await NotificationHelper.repos.connection.loadForNotification(churchId, personId);
     if (connections.length > 0) {
       const deliveryCount = await DeliveryHelper.sendMessages(connections, {
@@ -820,7 +779,6 @@ export class NotificationHelper {
       if (deliveryCount > 0) method = "socket";
     }
 
-    // Handle push notifications
     const devices: Device[] = (await NotificationHelper.repos.device.loadForPerson(churchId, personId)) as any[];
 
     const allowPush = await this.pushAllowed(churchId, personId, NotificationCategoryHelper.categoryFor("notification"));
@@ -873,8 +831,7 @@ export class NotificationHelper {
 
     let promises: Promise<any>[] = [];
 
-    // Direct messages now flow through here as notification rows (contentType
-    // "privateMessage"); there is no separate private-message escalation queue.
+    // DMs now flow as notification rows (contentType "privateMessage"); no separate PM escalation queue.
     const rawNotifications = await NotificationHelper.repos.notification.loadUndelivered();
     const allNotifications: Notification[] = (rawNotifications || []) as any[];
     console.log("[NotificationHelper.sendEmailNotifications] Found " + allNotifications.length + " undelivered notifications");
@@ -925,8 +882,7 @@ export class NotificationHelper {
         const allPersonNotifs: Notification[] = ArrayHelper.getAll(allNotifications, "personId", pref.personId);
         const emailData = ArrayHelper.getOne(allEmailData, "id", pref.personId);
 
-        // Re-check the preference gate per category for the email channel; items
-        // the member opted out of are marked complete (not emailed, not re-queued).
+        // Re-check preference gate per category; opted-out items marked complete (not emailed/re-queued).
         const overrides = ArrayHelper.getAll(allOverrides, "personId", pref.personId);
         const emailOk = (category: string) => PreferenceGateHelper.evaluate(pref.churchId, pref.personId, category, "email", { pref, overrides }).allow;
         const notifications = allPersonNotifs.filter((n) => emailOk(n.category || NotificationCategoryHelper.categoryFor(n.contentType)));
@@ -935,7 +891,7 @@ export class NotificationHelper {
           promises.push(...this.markMethod(suppressedNotifs, "complete"));
         }
 
-        // Reply-to = the trigger/sender of the first item.
+        // Reply-to = the trigger/sender of first item.
         let senderEmail: string | undefined;
         if (notifications.length > 0 && notifications[0].triggeredByPersonId) {
           const triggerData = ArrayHelper.getOne(triggerEmailData, "id", notifications[0].triggeredByPersonId);
@@ -1028,7 +984,6 @@ export class NotificationHelper {
       title = notifCount + (allDms ? " New Message" : " New Notification") + "s";
     }
 
-    // Use reply-to so the recipient can reply directly to the sender/trigger.
     const replyTo = senderEmail || undefined;
 
     let emailSuccess = true;

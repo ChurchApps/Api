@@ -8,7 +8,7 @@ import { GatewayConfig } from "../IGatewayProvider";
 
 const mockedPost = (Axios as any).post as jest.Mock;
 
-// NMI posts form-urlencoded; the body is a string. Parse it back to inspect fields.
+// Extract NMI form-urlencoded response params for assertion.
 const bodyParams = (call: any[]): URLSearchParams => new URLSearchParams(call[1]);
 
 describe("KingdomFundingGatewayProvider.processCharge (NMI)", () => {
@@ -21,9 +21,7 @@ describe("KingdomFundingGatewayProvider.processCharge (NMI)", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  // Money-unit contract: the client sends whole-dollar amounts and each provider
-  // adapter converts to its API's wire unit. Stripe converts dollars->cents; NMI
-  // takes dollars formatted as a 2-decimal string (e.g. "25.00"), never cents.
+  // Client sends dollars; NMI requires 2-decimal string, never cents.
   it("sends whole-dollar amounts to NMI as a 2-decimal string, not cents", async () => {
     mockedPost.mockResolvedValue({ data: "response=1&transactionid=100200" });
     const result = await provider.processCharge(config, {
@@ -46,10 +44,7 @@ describe("KingdomFundingGatewayProvider.processCharge (NMI)", () => {
     expect(bodyParams(mockedPost.mock.calls[0]).get("amount")).toBe("12.50");
   });
 
-  // Source resolution is the contract that keeps the giving controllers provider-agnostic:
-  // a fresh Collect.js token charges via payment_token; a saved method (paymentMethodId)
-  // charges via customer_vault_id. NMI tokens and vault ids are both GUID-shaped, so this
-  // must be driven by explicit fields, never a shape heuristic.
+  // Disambiguate by explicit fields: token → payment_token, saved → customer_vault_id.
   it("charges a fresh token via payment_token", async () => {
     mockedPost.mockResolvedValue({ data: "response=1&transactionid=1" });
     await provider.processCharge(config, { amount: 10, type: "card", id: "collectjs-token-123" });

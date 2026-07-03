@@ -1,7 +1,4 @@
-// In-process pub/sub for domain events. WebhookDispatcher.emit() publishes here
-// so modules can react to mutations (e.g. the doing module starts workflows)
-// without importing each other. publish() never throws — a subscriber failure
-// must never break the originating write.
+// publish() never throws — subscriber failures must never break the originating write.
 export type InternalEventHandler = (churchId: string, event: string, payload: any) => Promise<void>;
 
 export class InternalEventBus {

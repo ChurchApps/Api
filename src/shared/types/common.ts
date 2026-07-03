@@ -1,9 +1,5 @@
-/**
- * Common types and interfaces shared across all modules
- * Consolidates type definitions from the original microservices
- */
+/** Consolidates types from the original microservices. */
 
-// Base interfaces that all entities should implement
 export interface BaseEntity {
   id?: string;
   churchId: string;
@@ -20,7 +16,6 @@ export interface TimestampedEntity extends BaseEntity {
   dateModified: Date | string;
 }
 
-// Common response patterns
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -40,7 +35,6 @@ export interface SearchResponse<T> extends PaginatedResponse<T> {
   filters?: Record<string, any>;
 }
 
-// Database connection configuration
 export interface DatabaseConfig {
   host: string;
   user: string;
@@ -52,7 +46,6 @@ export interface DatabaseConfig {
   reconnect?: boolean;
 }
 
-// Module configuration
 export interface ModuleConfig {
   name: string;
   database: DatabaseConfig;
@@ -60,7 +53,6 @@ export interface ModuleConfig {
   apiUrl?: string;
 }
 
-// Authentication and authorization
 export interface AuthenticatedUser {
   id: string;
   email: string;
@@ -84,7 +76,6 @@ export interface Role {
   permissions: Permission[];
 }
 
-// Address and contact information (used across multiple modules)
 export interface Address {
   address1?: string;
   address2?: string;
@@ -121,7 +112,6 @@ export interface Person extends BaseEntity {
   notes?: string;
 }
 
-// File and media types
 export interface FileUpload {
   id?: string;
   churchId: string;
@@ -142,7 +132,6 @@ export interface MediaFile extends FileUpload {
   bitrate?: number;
 }
 
-// Search and filtering
 export interface SearchFilter {
   field: string;
   operator: "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "like" | "in" | "notin";
@@ -162,7 +151,6 @@ export interface SearchCriteria {
   currentPage?: number;
 }
 
-// Configuration and settings
 export interface Setting extends BaseEntity {
   keyName: string;
   value: string;
@@ -176,7 +164,6 @@ export interface ChurchSettings {
   settings: Record<string, any>;
 }
 
-// Error handling
 export interface ApiError {
   code: string;
   message: string;
@@ -189,7 +176,6 @@ export interface ValidationError extends ApiError {
   value: any;
 }
 
-// Event and audit logging
 export interface AuditLog extends BaseEntity {
   action: string;
   entityType: string;
@@ -200,7 +186,6 @@ export interface AuditLog extends BaseEntity {
   userAgent?: string;
 }
 
-// Notification types
 export interface Notification extends BaseEntity {
   recipientId: string;
   title: string;
@@ -211,7 +196,6 @@ export interface Notification extends BaseEntity {
   data?: Record<string, any>;
 }
 
-// Export utility types
 export type ModuleName = "attendance" | "content" | "doing" | "giving" | "membership" | "messaging";
 
 export type Environment = "dev" | "demo" | "staging" | "prod";
@@ -220,20 +204,16 @@ export type PermissionAction = "view" | "edit" | "delete" | "admin" | "create";
 
 export type ContentType = "People" | "Groups" | "Households" | "Attendance" | "Donations" | "Content" | "Settings" | "Forms" | "Plans" | "Messaging" | "Tasks";
 
-// Utility type for making properties optional
 export type Partial<T> = {
   [P in keyof T]?: T[P];
 };
 
-// Utility type for making properties required
 export type Required<T> = {
   [P in keyof T]-?: T[P];
 };
 
-// Utility type for picking specific properties
 export type Pick<T, K extends keyof T> = {
   [P in K]: T[P];
 };
 
-// Utility type for omitting specific properties
 export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;

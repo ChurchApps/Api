@@ -9,7 +9,7 @@ import { filterPermissionsByScopes } from "../../../shared/auth/Scopes.js";
 export class AuthenticatedUser extends BaseAuthenticatedUser {
   public static async login(allUserChurches: LoginUserChurch[], user: User) {
     const userChurches = [...allUserChurches];
-    if (userChurches.length > 1 && userChurches[0].church.id === "") userChurches.splice(0, 1); // remove empty church with universal permissions if there are actual church records.
+    if (userChurches.length > 1 && userChurches[0].church.id === "") userChurches.splice(0, 1);
 
     // if (churches.length === 0) return null;
     // else {
@@ -29,9 +29,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
   }
 
   public static getApiJwt(api: Api, user: User, userChurch: LoginUserChurch) {
-    // Monolith: every token carries the full cross-module permission set, including
-    // the apiName-prefixed ReportingApi bucket, so a permission from any module is
-    // honored on any module's endpoints — no request-time cross-API fallback needed.
+    // Monolith: tokens carry full permissions so any module honors them without cross-API fallback.
     const permList = buildPermStrings(userChurch.apis);
 
     const groupIds: string[] = [];
@@ -145,7 +143,6 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
       const userId: string = principal.details.id;
       result = await repos.user.load(userId);
     } catch {
-      // JWT verification failed - user not found
     }
     return result;
   }

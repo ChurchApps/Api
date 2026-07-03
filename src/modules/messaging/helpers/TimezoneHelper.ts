@@ -3,7 +3,6 @@
 // and dodges the supply-chain cooldown). "day before at 9am" never lands in a DST
 // gap, so the simple two-pass offset resolution below is correct for reminders.
 export class TimezoneHelper {
-  // Offset (tz wall-clock minus UTC) in ms at the given instant.
   private static offsetMs(tz: string, instantMs: number): number {
     const dtf = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
@@ -22,7 +21,6 @@ export class TimezoneHelper {
     return localAsUtc - instantMs;
   }
 
-  // Interpret (y, mo[1-12], d, h, mi) as a wall-clock time in tz and return the UTC instant.
   static wallClockToUtc(y: number, mo: number, d: number, h: number, mi: number, tz: string): Date {
     const asIfUtc = Date.UTC(y, mo - 1, d, h, mi, 0);
     const off1 = this.offsetMs(tz, asIfUtc);
@@ -32,8 +30,6 @@ export class TimezoneHelper {
     return new Date(utc);
   }
 
-  // Compute a reminder's UTC fire instant: the occurrence's civil date at sendLocalTime,
-  // shifted back offsetMin minutes (in civil space), converted to UTC in tz.
   static computeFireAt(occLocalDate: string, sendLocalTime: string, offsetMin: number, tz: string): Date {
     const [y, mo, d] = occLocalDate.split("-").map(Number);
     const [sh, sm] = sendLocalTime.split(":").map(Number);

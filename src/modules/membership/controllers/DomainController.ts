@@ -23,7 +23,6 @@ export class DomainController extends MembershipBaseController {
     });
   }
 
-  // Caddy on_demand_tls `ask` endpoint: 2xx authorizes cert issuance for the SNI, anything else denies it.
   @httpGet("/authorize")
   public async authorize(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -35,13 +34,10 @@ export class DomainController extends MembershipBaseController {
     });
   }
 
-  // Static-Caddy host list: one `{domain} {sub}.b1.church` line per routable domain; the box diffs it to decide reloads.
   @httpGet("/hostmap")
   public async hostmap(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const pairs = (await this.repos.domain.loadPairs()) as { host: string; dial: string }[];
-      // First row wins per host: the table has no unique index on domainName, and a duplicate
-      // map key would poison the whole file for Caddy's map directive.
       const seen = new Set<string>();
       const lines: string[] = [];
       pairs.forEach((p) => {
@@ -95,14 +91,10 @@ export class DomainController extends MembershipBaseController {
           domain.churchId = au.churchId;
           domain.domainName = (domain.domainName || "").toLowerCase().trim();
           domain.siteId = domain.siteId || "";
-          // Blank or space-containing rows must never persist — prod accumulated several (empty
-          // add-rows, a church NAME typed into the domain field), each generating a garbage route
-          // that can poison the static host map.
           if (!domain.domainName || /\s/.test(domain.domainName)) return;
           promises.push(this.repos.domain.save(domain));
         });
         const result = await Promise.all(promises);
-        // Best-effort: an unreachable Caddy admin API must not fail the save; the static-config path doesn't need this push at all.
         try {
           await CaddyHelper.updateCaddy();
         } catch (e) {
@@ -118,7 +110,6 @@ export class DomainController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       await this.repos.domain.delete(au.churchId, id);
-      // Best-effort: an unreachable Caddy admin API must not fail the delete; also fixes the pre-existing stale-route-on-delete bug.
       try {
         await CaddyHelper.updateCaddy();
       } catch (e) {

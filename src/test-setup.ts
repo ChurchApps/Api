@@ -1,7 +1,4 @@
-// Global test setup. Lazily import the Environment + DB helpers because they use
-// `import.meta.url` (ESM) and would otherwise crash this CommonJS-transformed
-// test bootstrap. Tests that mock at the unit level don't need them at all;
-// tests that need real DB/env will await these inside their own beforeAll.
+// Lazy-import Environment and DB helpers: import.meta.url (ESM) would crash CommonJS bootstrap.
 beforeAll(async () => {
   try {
     const { Environment } = await import("./shared/helpers/Environment.js");
@@ -16,11 +13,7 @@ afterAll(async () => {
   } catch { /* nothing to clean up */ }
 });
 
-// Mock external services for testing. (firebase-admin removed — not installed
-// and not referenced anywhere in the Api source; the mock just made jest fail
-// to resolve.)
+// firebase-admin removed: wasn't installed, mock broke jest resolve
 jest.mock("stripe");
-
-// Set test environment variables
 process.env.ENVIRONMENT = "test";
 process.env.NODE_ENV = "test";

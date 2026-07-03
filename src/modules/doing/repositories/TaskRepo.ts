@@ -47,9 +47,7 @@ export class TaskRepo {
   }
 
   private async update(task: Task): Promise<Task> {
-    // dateCreated is an immutable creation timestamp; don't overwrite it on
-    // update. The client can send it back as an ISO string, which MySQL
-    // rejects ("Incorrect datetime value") when assigned to a DATETIME column.
+    // dateCreated is immutable; don't overwrite on update (client may send ISO string, MySQL DATETIME rejects it).
     await getDb().updateTable("tasks").set({
       taskType: task.taskType,
       dateClosed: (task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed) as any,
@@ -114,8 +112,6 @@ export class TaskRepo {
     return query.execute();
   }
 
-  // Dedup for scheduled rules: which of these subjects already have a card from this
-  // trigger within the recurs window? Mirrors the old automation dedup, keyed on triggerId.
   public async loadByTriggerIdContent(churchId: string, triggerId: string, recurs: string, associatedWithType: string, associatedWithIds: string[]) {
     if (associatedWithIds.length === 0) return [];
     let query = getDb().selectFrom("tasks").selectAll()
@@ -134,9 +130,6 @@ export class TaskRepo {
     return query.orderBy("taskNumber").execute();
   }
 
-  // Dedup for oncePerSubject event triggers: is this subject already in this workflow
-  // (any status)? Keyed on workflow+subject, not the trigger, so a "create" and a
-  // later "edit-to-Visitor" — two triggers feeding one workflow — add the person once.
   public async loadBySubjectInWorkflow(churchId: string, workflowId: string, associatedWithType: string, associatedWithId: string) {
     return (await getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)
@@ -154,7 +147,6 @@ export class TaskRepo {
     return (result as any)?.taskNumber ?? 1;
   }
 
-  // Plain-task lists exclude cards (workflowId set); cards have the board / my-cards.
   public async loadForPerson(churchId: string, personId: string, status: string) {
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)

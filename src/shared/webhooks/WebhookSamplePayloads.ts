@@ -1,8 +1,5 @@
 import { ALL_WEBHOOK_EVENTS } from "./WebhookEvents.js";
 
-// Representative sample `data` payloads for each webhook event, used by the
-// "Send test event" feature so an integrator can verify connectivity and
-// signature handling before real data flows. Values are obviously fake.
 const SAMPLES: Record<string, (churchId: string) => any> = {
   "person.created": (churchId) => ({ id: "smpl_person", churchId, name: { display: "Sample Person", first: "Sample", last: "Person" }, contactInfo: { email: "sample@example.com" } }),
   "person.updated": (churchId) => ({ id: "smpl_person", churchId, name: { display: "Sample Person", first: "Sample", last: "Person" }, contactInfo: { email: "sample@example.com" } }),
@@ -38,13 +35,10 @@ const SAMPLES: Record<string, (churchId: string) => any> = {
   "event.destroyed": (churchId) => ({ id: "smpl_event", churchId })
 };
 
-// Builds a sample `data` object for an event. Falls back to a minimal shape so a
-// newly added event without an explicit sample still produces a usable test.
 export const samplePayloadFor = (event: string, churchId: string): any => {
   return (SAMPLES[event] ?? ((cid: string) => ({ id: "smpl_sample", churchId: cid })))(churchId);
 };
 
-// Every catalog event must have an explicit sample — asserted by a unit test.
 export const hasSamplePayload = (event: string): boolean => event in SAMPLES;
 
 export const SAMPLE_PAYLOAD_EVENTS: string[] = ALL_WEBHOOK_EVENTS.filter((e) => e in SAMPLES);

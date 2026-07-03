@@ -7,10 +7,7 @@ export interface OAuthConnection {
   expiresAt: Date;
 }
 
-// Shapes raw oAuthToken+client rows (from OAuthTokenRepo.loadForUser) into the
-// Connected Apps list. Tokens whose refresh window has already lapsed are
-// dropped — `OAuthTokenRepo.deleteExpired` only runs on a timer, so expired
-// rows can linger and should never show as live connections.
+// Expired rows can linger in the DB; filter them out as `deleteExpired` only runs on timer.
 export function toConnections(rows: any[], now: Date = new Date()): OAuthConnection[] {
   return (rows || [])
     .filter((r) => !r.expiresAt || new Date(r.expiresAt) > now)

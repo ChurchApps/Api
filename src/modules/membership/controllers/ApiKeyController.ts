@@ -8,7 +8,6 @@ import { listAllScopes, parseScopes, unknownScopes } from "../../../shared/auth/
 
 @controller("/membership/apiKeys")
 export class ApiKeyController extends MembershipBaseController {
-  // Catalog of grantable scopes — used by the key-creation UI.
   @httpGet("/scopes")
   public async getScopes(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

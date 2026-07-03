@@ -25,17 +25,12 @@ async function main() {
     );
   }
 
-  // Find every connection-string env var that is set, regardless of name.
-  // This catches core module strings, cross-module strings like
-  // DOING_MEMBERSHIP_CONNECTION_STRING, REPORTING_CONNECTION_STRING, and any
-  // future ones added to .env.
   const allConnStrings = Object.keys(process.env)
     .filter((k) => k.endsWith("_CONNECTION_STRING"))
     .sort();
 
   const offenders: string[] = [];
 
-  // Must have the six required module strings present.
   for (const moduleName of REQUIRED_MODULES) {
     const envVar = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
     if (!process.env[envVar]) {
@@ -43,7 +38,6 @@ async function main() {
     }
   }
 
-  // Every connection string that IS set must point at a demo or localhost host.
   for (const envVar of allConnStrings) {
     const connString = process.env[envVar]!;
     try {

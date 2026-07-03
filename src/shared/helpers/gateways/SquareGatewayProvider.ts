@@ -8,15 +8,12 @@ export class SquareGatewayProvider implements IGatewayProvider {
   readonly name = "square";
 
   async createWebhookEndpoint(_config: GatewayConfig, _webhookUrl: string): Promise<{ id: string }> {
-    // TODO: Implement Square webhook creation when SDK is available
-    // Square webhooks are configured through the Square Developer Dashboard
-    // or via the Webhooks API
+    // TODO: implement when Square SDK available
     return { id: `sq_webhook_${Date.now()}` };
   }
 
   async deleteWebhooksByChurchId(_config: GatewayConfig, _churchId: string): Promise<void> {
-    // TODO: Implement Square webhook deletion when SDK is available
-    // Square webhooks would need to be identified and deleted via API
+    // TODO: implement when Square SDK available
   }
 
   async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any): Promise<WebhookResult> {
@@ -120,8 +117,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
   }
 
   async updateSubscription(_config: GatewayConfig, _subscriptionData: any): Promise<SubscriptionResult> {
-    // Square subscriptions are typically updated by canceling and creating new ones
-    // TODO: Implement proper update logic when Square SDK is available
+    // TODO: implement (Square typically: cancel + create new)
     throw new Error("Square subscription updates not yet implemented");
   }
 
@@ -170,8 +166,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
   }
 
   async createProduct(_config: GatewayConfig, churchId: string): Promise<string> {
-    // Square uses catalog items/plans instead of products
-    // TODO: Implement catalog item creation when Square SDK is available
+    // TODO: implement (Square uses catalog items/plans, not products)
     return `square-catalog-${churchId}`;
   }
 
@@ -187,7 +182,6 @@ export class SquareGatewayProvider implements IGatewayProvider {
     );
   }
 
-  // Customer management
   async createCustomer(config: GatewayConfig, customerData: any): Promise<string> {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
@@ -199,8 +193,7 @@ export class SquareGatewayProvider implements IGatewayProvider {
   }
 
   async getCustomerSubscriptions(_config: GatewayConfig, _customerId: string): Promise<any> {
-    // TODO: Implement when Square SDK is available
-    // Square doesn't have a direct API to list subscriptions by customer
+    // TODO: implement (Square has no direct API to list subscriptions by customer)
     return [];
   }
 
@@ -214,7 +207,6 @@ export class SquareGatewayProvider implements IGatewayProvider {
     );
   }
 
-  // Payment method management
   async attachPaymentMethod(config: GatewayConfig, paymentData: any): Promise<any> {
     const settings = this.parseSettings(config);
     const environment = this.resolveEnvironment(config, settings);
@@ -256,7 +248,6 @@ export class SquareGatewayProvider implements IGatewayProvider {
     throw new Error("Square bank account deletion not implemented in this API");
   }
 
-  // Square-specific functionality
   async generateClientToken(config: GatewayConfig): Promise<string> {
     // Square uses application ID for client-side initialization
     return config.publicKey; // Application ID
@@ -266,10 +257,8 @@ export class SquareGatewayProvider implements IGatewayProvider {
     throw new Error("Square uses direct payment creation, not order-based flow");
   }
 
-  // Subscription plan management
   async createSubscriptionPlan(_config: GatewayConfig, _planData: any): Promise<string> {
-    // TODO: Implement Square catalog plan creation when SDK is available
-    // Square subscriptions use catalog objects (items/variations) as plans
+    // TODO: implement (Square uses catalog objects as plans)
     return `sq_plan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 

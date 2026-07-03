@@ -14,7 +14,6 @@ export class PaymentMethodController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.view) && id !== au.personId) return this.json({}, 401);
 
-      // Load ALL gateways for this church
       const allGateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       if (!allGateways?.length) return [];
 
@@ -138,18 +137,15 @@ export class PaymentMethodController extends GivingBaseController {
         return this.json({ error: "Payment gateway not configured" }, 400);
       }
 
-      // Check if provider supports vault/stored payment methods
       const capabilities = GatewayService.getProviderCapabilities(gateway);
       if (!capabilities?.supportsVault) {
         return this.json({ error: `${gateway.provider} does not support stored payment methods` }, 400);
       }
 
-      // Validate payment method ID format for Stripe
       if (gateway.provider === "stripe" && (!id || !id.startsWith("pm_"))) {
         return this.json({ error: "Invalid payment method ID format" }, 400);
       }
 
-      // For non-Stripe providers, look up the provider-specific customer instead of using the passed-in (Stripe) customer ID
       let customer = customerId;
       if (gateway.provider?.toLowerCase() !== "stripe" && personId) {
         const providerCustomer = await this.repos.customer.loadByPersonAndProvider(cId, personId, gateway.provider) as any;
@@ -171,7 +167,6 @@ export class PaymentMethodController extends GivingBaseController {
           const opts: any = { customer: custId };
           if (gateway.provider?.toLowerCase() === "kingdomfunding") {
             opts.customerId = custId; // Accept Blue reads customerId; Stripe 400s on the extra key
-            // Detect ACH vs card based on which fields the frontend sent
             if (req.body.routing_number && req.body.account_number) {
               opts.routing_number = req.body.routing_number;
               opts.account_number = req.body.account_number;
@@ -192,7 +187,6 @@ export class PaymentMethodController extends GivingBaseController {
         try {
           pm = await GatewayService.attachPaymentMethod(gateway, id, buildAttachOptions(customer));
         } catch (attachErr: any) {
-          // If customer doesn't exist on the provider (404/Not Found), recreate and retry
           const status = attachErr.response?.status || attachErr.statusCode;
           if (status === 404 && gateway.provider?.toLowerCase() !== "stripe") {
             console.log(`Customer ${customer} not found on ${gateway.provider}, recreating...`);
@@ -209,7 +203,6 @@ export class PaymentMethodController extends GivingBaseController {
           }
         }
 
-        // Save to gatewayPaymentMethods for non-Stripe providers
         if ((gateway.provider?.toLowerCase() === "paypal" || gateway.provider?.toLowerCase() === "kingdomfunding") && customer) {
           const tokenId = pm?.id ? String(pm.id) : id;
           if (tokenId) {
@@ -225,7 +218,6 @@ export class PaymentMethodController extends GivingBaseController {
                 ? `${(card.brand || "Card").toUpperCase()} •••• ${card.last4 ?? ""}`.trim()
                 : paypalSource?.email_address || `PayPal token ${tokenId.substring(0, 6)}...`;
             } else {
-              // KingdomFunding — detect card vs bank/check
               const isBank = pm?.type === "check"
                 || pm?.account_type
                 || !!pm?.routing_number
@@ -325,14 +317,12 @@ export class PaymentMethodController extends GivingBaseController {
     });
   }
 
-  // New endpoint for ACH bank account setup using Financial Connections
   @httpPost("/ach-setup-intent")
   public async createACHSetupIntent(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       // authz-exempt: gated to au.personId or donations.edit below; cId prefers au.churchId, body churchId only a fallback
       const { personId, customerId, email, name, churchId } = req.body;
       const cId = au?.churchId || churchId;
-      // ACH SetupIntent is Stripe-only
       const gateway = await GatewayService.getGatewayForChurch(cId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
 
       if (!gateway) {
@@ -342,27 +332,23 @@ export class PaymentMethodController extends GivingBaseController {
       const permission = au.checkAccess(Permissions.donations.edit) || personId === au.personId;
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
-      // Check if provider supports ACH/bank accounts
       const capabilities = GatewayService.getProviderCapabilities(gateway);
       if (!capabilities?.supportsACH) {
         return this.json({ error: `${gateway.provider} does not support bank account payments` }, 400);
       }
 
-      // Only Stripe supports this flow
       if (gateway.provider?.toLowerCase() !== "stripe") {
         return this.json({ error: "ACH SetupIntent only supported for Stripe" }, 400);
       }
 
       let customer = customerId;
       if (!customer) {
-        // First, check if a customer already exists in the database for this person
         const existingCustomer = await this.repos.customer.loadByPersonAndProvider(cId, personId, gateway.provider)
           || await this.repos.customer.loadByPersonId(cId, personId);
 
         if (existingCustomer?.id) {
           customer = existingCustomer.id;
         } else {
-          // No existing customer, create a new one
           try {
             customer = await GatewayService.createCustomer(gateway, email, name);
             if (customer) {
@@ -392,7 +378,6 @@ export class PaymentMethodController extends GivingBaseController {
     });
   }
 
-  // Anonymous endpoint for ACH bank account setup (for guest donations)
   @httpPost("/ach-setup-intent-anon")
   public async createACHSetupIntentAnon(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -413,22 +398,18 @@ export class PaymentMethodController extends GivingBaseController {
         return this.json({ error: "Payment gateway not configured" }, 400);
       }
 
-      // Check if provider supports ACH/bank accounts
       const capabilities = GatewayService.getProviderCapabilities(gateway);
       if (!capabilities?.supportsACH) {
         return this.json({ error: `${gateway.provider} does not support bank account payments` }, 400);
       }
 
-      // Only Stripe supports this flow
       if (gateway.provider?.toLowerCase() !== "stripe") {
         return this.json({ error: "ACH SetupIntent only supported for Stripe" }, 400);
       }
 
       try {
-        // Create a temporary Stripe customer (not saved to DB for guest one-time donation)
         const stripeCustomerId = await GatewayService.createCustomer(gateway, email, name);
 
-        // Create ACH SetupIntent
         const setupIntent = await GatewayService.createACHSetupIntent(gateway, stripeCustomerId);
         return {
           clientSecret: setupIntent.client_secret,
@@ -445,17 +426,14 @@ export class PaymentMethodController extends GivingBaseController {
     });
   }
 
-  // Legacy endpoint for adding bank accounts via token (deprecated - use ach-setup-intent instead)
   @httpPost("/addbankaccount")
   public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name } = req.body;
-      // Bank accounts are Stripe-only
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
-      // Check if provider supports ACH/bank accounts
       const capabilities = GatewayService.getProviderCapabilities(gateway);
       if (!capabilities?.supportsACH) {
         return this.json({ error: `${gateway.provider} does not support bank account payments` }, 400);
@@ -495,7 +473,6 @@ export class PaymentMethodController extends GivingBaseController {
   public async updateBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, personId, bankData, customerId } = req.body;
-      // Bank operations are Stripe-only
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({}, 401);
@@ -511,7 +488,6 @@ export class PaymentMethodController extends GivingBaseController {
   public async verifyBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, customerId, amountData } = req.body;
-      // Bank verification is Stripe-only
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
       const permission =
         gateway &&
@@ -527,11 +503,6 @@ export class PaymentMethodController extends GivingBaseController {
     });
   }
 
-  /**
-   * Confirm a payment method belongs to the given customer before a non-admin can delete it.
-   * Non-Stripe PMs are tracked in gatewayPaymentMethods (the source of truth); Stripe PMs are
-   * verified against the customer's live payment methods at the gateway.
-   */
   private async verifyPaymentMethodOwnership(churchId: string, gateway: any, paymentMethodId: string, customerId: string): Promise<boolean> {
     const prov = gateway.provider?.toLowerCase();
     if (prov === "paypal" || prov === "kingdomfunding") {
@@ -560,12 +531,10 @@ export class PaymentMethodController extends GivingBaseController {
   @httpDelete("/:id/:customerid")
   public async deletePaymentMethod(@requestParam("id") id: string, @requestParam("customerid") customerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // Determine provider: pm_ and ba_ are Stripe, otherwise check query param or look up in gatewayPaymentMethods
       const providerParam = (req.query as any).provider?.toLowerCase();
       const isStripe = id.startsWith("pm_") || id.startsWith("ba_");
       let resolvedProvider = providerParam || (isStripe ? "stripe" : null);
 
-      // If provider not determined, look up in gatewayPaymentMethods table
       if (!resolvedProvider) {
         const localRecord = await this.repos.gatewayPaymentMethod.loadByExternalIdAcrossGateways(au.churchId, id);
         if (localRecord) {
@@ -614,7 +583,6 @@ export class PaymentMethodController extends GivingBaseController {
         } catch (detachErr: any) {
           const msg = detachErr?.message || "";
           if (resolvedProvider === "kingdomfunding" && msg.includes("active recurring")) {
-            // Try to cancel linked subscriptions, then retry
             try {
               const provider = GatewayFactory.getProvider(gateway.provider);
               const config = GatewayService.getGatewayConfig(gateway);
@@ -638,7 +606,6 @@ export class PaymentMethodController extends GivingBaseController {
           }
         }
 
-        // Always clean up local records for non-Stripe providers
         const prov = gateway.provider?.toLowerCase();
         if (prov === "paypal" || prov === "kingdomfunding") {
           await this.repos.gatewayPaymentMethod.deleteByExternalId(au.churchId, gateway.id, id);

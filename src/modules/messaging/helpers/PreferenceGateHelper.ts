@@ -26,48 +26,30 @@ export interface GateContext {
 const ALLOW: GateResult = { decision: "allow", allow: true };
 const suppress = (reason: string): GateResult => ({ decision: "suppress", allow: false, reason });
 
-// Send-time precedence gate (architecture §4.4). The single chokepoint every
-// notification passes through; first layer that decides wins. Pure: all state is
-// passed in via ctx so it is trivially testable and adds no DB call on the hot path.
-//
-// Phase-0 scope: Layer 0 (bounce/suspend) and Layer 6/7 (entity mute / dedup)
-// have no data source yet and are documented no-ops; dedup is still enforced by
-// the existing NotificationHelper.loadExistingUnread path. priority is never a
-// parameter — time-sensitivity is derived from the category.
+// Send-time precedence gate (architecture §4.4): single chokepoint where first-layer decision wins. Pure: state passed via ctx (no DB calls on hot path). Phase-0: Layer 0 (bounce/suspend) and Layer 6/7 (entity mute/dedup) documented no-ops; dedup enforced by NotificationHelper.loadExistingUnread.
 export class PreferenceGateHelper {
-  // churchId/personId are part of the contract (and future logging / frequency
-  // lookups) but unused by Phase-0's pure logic — hence the underscore prefix.
   static evaluate(_churchId: string, _personId: string, category: string, channel: string, ctx: GateContext = {}): GateResult {
     const pref = ctx.pref;
     const now = ctx.now ?? new Date();
 
-    // LAYER 1 — compliance / locked: bypass everything below.
     if (NotificationCategoryHelper.isLocked(category)) return ALLOW;
 
-    // LAYER 2 — master mute / global channel kill (reuses the existing flags).
     if (pref?.masterMute) return suppress("master_mute");
     if (channel === "push" && pref && !pref.allowPush) return suppress("channel_off");
     if (channel === "sms" && !pref?.allowSms) return suppress("channel_off");
     if (channel === "email" && pref?.emailFrequency === "never") return suppress("channel_off");
 
-    // LAYER 3 — quiet hours (push/sms only; email is non-intrusive).
     if ((channel === "push" || channel === "sms") && pref?.quietHoursStart && pref?.quietHoursEnd) {
       const tz = ctx.timeZone ?? pref.timeZone ?? ctx.churchTimeZone;
       if (tz && this.nowInQuietHours(now, tz, pref.quietHoursStart, pref.quietHoursEnd)) {
-        if (NotificationCategoryHelper.isTransactional(category)) return ALLOW; // time-sensitive bypass
-        // Non-transactional: the reminder dispatcher reschedules to deferUntil;
-        // the direct-push path treats DEFER as suppress (architecture §4.4.1).
+        if (NotificationCategoryHelper.isTransactional(category)) return ALLOW;
+        // Reminder dispatcher reschedules to deferUntil; direct-push path treats DEFER as suppress (§4.4.1).
         return { decision: "defer", allow: false, reason: "quiet_hours", deferUntil: this.quietHoursEndInstant(now, tz, pref.quietHoursEnd) };
       }
     }
 
-    // LAYER 4 — frequency cap enforcement removed as dead code; reintroduce with
-    // a real counter if abuse shows up.
-
-    // LAYER 5 — per-category preference (absence-means-default).
     if (!NotificationCategoryHelper.effectiveOptIn(category, channel, ctx.overrides)) return suppress("category_opt_out");
 
-    // LAYER 6 — per-entity mute (Phase 2). Mute restricts further than the category.
     if (ctx.entityMutes && ctx.entityType && ctx.entityId) {
       const mute = ctx.entityMutes.find((m) => m.entityType === ctx.entityType && m.entityId === ctx.entityId);
       if (mute && (mute.level === "muted" || (mute.level === "mentions" && !ctx.isDirectMention))) return suppress("entity_muted");
@@ -96,8 +78,7 @@ export class PreferenceGateHelper {
     return s < e ? cur >= s && cur < e : cur >= s || cur < e; // wrap past midnight
   }
 
-  // Next occurrence of the wall-clock `end` time in tz, on-or-after `now`, resolved
-  // to a UTC instant via TimezoneHelper.wallClockToUtc so DST transitions land correctly.
+  // Wall-clock end time in tz (on-or-after now), resolved to UTC via wallClockToUtc so DST transitions land correctly.
   private static quietHoursEndInstant(now: Date, tz: string, end: string): Date {
     const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
     const map: Record<string, string> = {};

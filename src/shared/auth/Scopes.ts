@@ -1,13 +1,7 @@
-// OAuth / API-key scopes. A scope is a FILTER over the RBAC permission set: it
-// can only narrow a credential's permissions, never grant. Applied when an
-// OAuth JWT is minted and when an API key is resolved — checkAccess is unchanged.
-//
-// A scope maps to {contentType, action} pairs. Matching against a permission
-// string ignores its apiName prefix and contentId segment.
+// OAuth/API-key scopes filter RBAC permissions (narrow only, never grant); applied to JWT and API key resolution.
+// Matches {contentType, action} pairs against permission strings (ignoring apiName prefix and contentId).
 
 interface PermPair { contentType: string; action: string; }
-
-// --- read pair groups (View-style actions) -------------------------------
 
 const peopleRead: PermPair[] = [
   { contentType: "People", action: "View" },
@@ -35,10 +29,7 @@ const rolesRead: PermPair[] = [{ contentType: "Roles", action: "View" }];
 
 const settingsRead: PermPair[] = [{ contentType: "Settings", action: "View" }];
 
-// --- the catalog ----------------------------------------------------------
-// `write` scopes include their matching `read` pairs — a connector that
-// writes a resource almost always needs to read it back.
-
+// `write` scopes include matching `read` pairs — connectors need both.
 export const SCOPE_CATALOG: Record<string, PermPair[]> = {
   "people:read": peopleRead,
   "people:write": [
@@ -67,8 +58,7 @@ export const SCOPE_CATALOG: Record<string, PermPair[]> = {
     { contentType: "Services", action: "Edit" }
   ],
 
-  // Forms have no View permission — read access is gated by Edit in the RBAC
-  // catalog, so only a write scope is exposed.
+  // Forms have no View; read access gated by Edit, so only write scope exposed.
   "forms:write": [
     { contentType: "Forms", action: "Edit" },
     { contentType: "Forms", action: "Admin" },
@@ -110,8 +100,7 @@ export const SCOPE_CATALOG: Record<string, PermPair[]> = {
   "settings:write": [...settingsRead, { contentType: "Settings", action: "Edit" }]
 };
 
-// Server/Domain admin permissions are intentionally absent — a scoped
-// credential can never scope *up* to site administration.
+// Server/Domain admin permissions intentionally absent — credentials cannot escalate to site admin.
 
 /** All recognised scope names — for a consent screen or key-creation UI. */
 export function listAllScopes(): string[] {

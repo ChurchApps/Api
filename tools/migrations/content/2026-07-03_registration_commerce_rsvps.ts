@@ -1,11 +1,5 @@
 import { type Kysely, sql } from "kysely";
 
-// Phase 2 paid registrations: attendee types (R-1), selections (R-2), payments (R-4),
-// waitlists (R-3), and discount codes (R-6). Capacity/inventory/coupon-use counts are
-// always derived from registration status at query time — no decrementing counters.
-// Plus GR-1: per-occurrence yes/no/maybe RSVPs for group events, with a per-event
-// opt-out flag. Occurrence identity is the occurrence start datetime exactly as
-// RecurrenceHelper emits it (event.start for non-recurring events).
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable("registrationTypes")

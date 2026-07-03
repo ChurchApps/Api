@@ -10,7 +10,6 @@ export class CustomerController extends GivingBaseController {
   @httpGet("/:id/subscriptions")
   public async getSubscriptions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // Check permissions
       let permission = au.checkAccess(Permissions.donations.viewSummary);
       if (!permission) {
         const customerData = await this.repos.customer.load(au.churchId, id);
@@ -21,11 +20,9 @@ export class CustomerController extends GivingBaseController {
       }
       if (!permission) return this.json({}, 401);
 
-      // Look up the person associated with the requested customer
       const customerRecord = await this.repos.customer.load(au.churchId, id) as any;
       const personId = customerRecord?.personId || au.personId;
 
-      // Load all gateways and fetch subscriptions from each that supports them
       const allGateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
       const allSubscriptions: any[] = [];
 
@@ -133,7 +130,7 @@ export class CustomerController extends GivingBaseController {
     });
   }
 
-  /** Map Kingdom Funding (NMI) frequency names to a Stripe-compatible interval + count. */
+  /** Map KF frequency to Stripe intervals. */
   private mapKFFrequency(frequency: string): { interval: string; interval_count: number } {
     switch (frequency?.toLowerCase()) {
       case "daily": return { interval: "day", interval_count: 1 };

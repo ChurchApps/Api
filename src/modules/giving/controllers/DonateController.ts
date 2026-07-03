@@ -26,7 +26,6 @@ export class DonateController extends GivingBaseController {
 
       const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
 
-      // Return gateway info without sensitive data
       const publicGateways = gateways.map(gateway => {
         const base: any = {
           id: gateway.id,
@@ -105,14 +104,13 @@ export class DonateController extends GivingBaseController {
         const gateway = await this.getGateway(churchId, req.body.provider, req.body.gatewayId);
         if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
-        // Check if provider supports orders (required for PayPal-style checkout)
         const capabilities = GatewayService.getProviderCapabilities(gateway);
         if (!capabilities?.supportsOrders) {
           return this.json({ error: `${gateway.provider} does not support order-based checkout` }, 400);
         }
 
         const funds = Array.isArray(req.body.funds) ? req.body.funds : [];
-        // Warning: PayPal custom_id is limited (~127 chars). Keep it compact.
+        // PayPal custom_id limited (~127 chars); keep compact.
         let customId = "";
         try {
           const minimalFunds = funds.map((f: any) => ({ id: f.id, amount: f.amount }));
@@ -458,17 +456,13 @@ export class DonateController extends GivingBaseController {
       donationData.currency = normalizedCurrency;
 
       try {
-        // KingdomFunding + saveCard: create customer & payment method BEFORE charging,
-        // then charge with the saved pm-{id} instead of the single-use nonce.
-        // Flow: Create customer → Add payment method (nonce) → Charge with pm-{id}
-        // Uses GatewayService (not direct Axios) so credentials are decrypted and URLs are correct.
+        // KF + saveCard: create customer → add payment method (nonce) → charge with pm-{id}. Uses GatewayService for credential handling.
         if (donationData.saveCard && gateway.provider?.toLowerCase() === "kingdomfunding") {
           try {
             const personEmail = donationData.person?.email || "";
             const personName = donationData.person?.name || donationData.name || "";
             const personId = donationData.person?.id;
 
-            // Step 1: Find or create customer via GatewayService
             let customerId: string | undefined;
             if (personId) {
               const existingCustomer = await this.repos.customer.loadByPersonAndProvider(churchId, personId, "kingdomfunding") as any;
@@ -482,7 +476,6 @@ export class DonateController extends GivingBaseController {
             }
 
             if (customerId) {
-              // Step 2: Attach payment method using nonce via GatewayService
               const nonceToken = donationData.token || donationData.id || "";
               const nonceSource = nonceToken.startsWith("nonce-") ? nonceToken : `nonce-${nonceToken}`;
 
@@ -502,7 +495,7 @@ export class DonateController extends GivingBaseController {
               try {
                 pm = await GatewayService.attachPaymentMethod(gateway, nonceSource, attachOptions);
               } catch (attachErr: any) {
-                // Customer doesn't exist on provider (stale local record) — recreate and retry
+                // Stale local customer record: recreate and retry.
                 const status = attachErr.response?.status || attachErr.statusCode;
                 if (status === 404) {
                   console.log(`Customer ${customerId} not found on Accept Blue, recreating...`);
@@ -523,7 +516,6 @@ export class DonateController extends GivingBaseController {
 
               const savedPmId = pm?.id;
               if (savedPmId) {
-                // Save payment method locally
                 const cardType = pm.card_type || donationData.cardBrand || "Card";
                 const last4 = pm.last_4 || donationData.cardLast4 || "";
                 await this.repos.gatewayPaymentMethod.save({
@@ -536,7 +528,6 @@ export class DonateController extends GivingBaseController {
                   metadata: { card_type: cardType, last_4: last4 }
                 } as any);
 
-                // Step 3: Charge using the saved payment method instead of the nonce
                 donationData.paymentMethodId = String(savedPmId);
                 donationData.customerId = customerId;
                 delete donationData.id;     // Remove nonce so processCharge uses pm-{id}
@@ -544,16 +535,13 @@ export class DonateController extends GivingBaseController {
               }
             }
           } catch (saveCardErr: any) {
-            // Log only the gateway's error message/status — never the raw response body, which
-            // can contain donor PII (billing name, last_4, AVS zip).
+            // Never log raw response body; can contain donor PII (billing name, last_4, AVS zip).
             console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.status || "", saveCardErr.response?.data?.error_message || saveCardErr.message);
             // Fall through — charge will proceed with original nonce
           }
         }
 
-        // KF saved payment method: the frontend sends id="54879" (a numeric PM ID from Accept Blue).
-        // The KF provider treats id as a nonce (nonce-54879) which is wrong.
-        // Detect numeric IDs and move them to paymentMethodId so the provider uses pm-{id} instead.
+        // KF saved payment method: frontend sends numeric ID (PM ID from Accept Blue). Detect and move to paymentMethodId so provider uses pm-{id} instead of nonce.
         if (gateway.provider?.toLowerCase() === "kingdomfunding" && donationData.id && !donationData.paymentMethodId) {
           const id = String(donationData.id);
           if (/^\d+$/.test(id)) {
@@ -568,7 +556,7 @@ export class DonateController extends GivingBaseController {
           return this.json({ error: chargeResult.data?.error || chargeResult.error || "Charge processing failed" }, 400);
         }
 
-        // For PayPal and KingdomFunding, log the donation immediately (no webhook flow)
+        // PayPal and KF: log donation immediately (no webhook flow).
         if (gateway.provider === "paypal" || gateway.provider?.toLowerCase() === "kingdomfunding") {
           try {
             await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repos);
@@ -608,10 +596,8 @@ export class DonateController extends GivingBaseController {
         churchId: CHURCH_ID, provider, gatewayId, currency, expiry_month, expiry_year, routing_number,
         account_number, account_type, sec_code, name: bankName
       } = req.body;
-      // authz-exempt: public donate flow; prefers au.churchId, body churchId only a fallback
       const churchId = au.churchId || CHURCH_ID;
 
-      // Validate required parameters
       if (!provider && !gatewayId) {
         return this.json({ error: "Either provider or gatewayId is required" }, 400);
       }
@@ -619,7 +605,6 @@ export class DonateController extends GivingBaseController {
       const gateway = await this.getGateway(churchId, provider, gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
-      // Check if provider supports subscriptions
       const capabilities = GatewayService.getProviderCapabilities(gateway);
       if (!capabilities?.supportsSubscriptions) {
         return this.json({ error: `${gateway.provider} does not support recurring subscriptions` }, 400);
@@ -663,7 +648,7 @@ export class DonateController extends GivingBaseController {
           return this.json({ error: "Subscription creation failed" }, 400);
         }
 
-        // Save the KF customer ID locally (created during subscription on Accept Blue)
+        // KF customer ID created during subscription on Accept Blue.
         const abCustomerId = subscriptionResult.data?.customerId ? String(subscriptionResult.data.customerId) : customerId;
         if (gateway.provider?.toLowerCase() === "kingdomfunding" && abCustomerId && person?.id) {
           try {
@@ -713,7 +698,7 @@ export class DonateController extends GivingBaseController {
   public async calculateFee(req: express.Request<{}, {}, { type?: string; provider?: string; gatewayId?: string; amount: number; currency?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const { type, provider, gatewayId, amount, currency } = req.body;
-      // authz-exempt: public donate widget; fee calc keyed by the public churchId
+      // authz-exempt: public donate widget; fee calc keyed by public churchId.
       const churchId = req.query.churchId?.toString();
 
       if (!churchId) {
@@ -726,7 +711,6 @@ export class DonateController extends GivingBaseController {
         const currencyToUse = (currency || "USD").toUpperCase();
 
         if (provider || gatewayId) {
-          // Use gateway-specific fee calculation
           const gateway = await this.getGateway(churchId, provider, gatewayId);
 
           if (!gateway) {
@@ -736,7 +720,7 @@ export class DonateController extends GivingBaseController {
           calculatedFee = await GatewayService.calculateFees(gateway, amount, churchId, currencyToUse);
           gatewayProvider = gateway.provider;
         } else {
-          // Legacy type-based calculation for backward compatibility
+          // Legacy type-based calculation for backward compatibility.
           if (type === "creditCard") {
             calculatedFee = await this.getCreditCardFees(amount, churchId, currencyToUse);
           } else if (type === "ach") {
@@ -762,7 +746,6 @@ export class DonateController extends GivingBaseController {
     donationType: "recurring" | "one-time" = "recurring",
     currency: string = "USD"
   ) => {
-    // Skip email if no recipient address
     if (!to) return;
 
     const contentRows: any[] = [];
@@ -883,7 +866,6 @@ export class DonateController extends GivingBaseController {
       return await GatewayService.calculateFees(stripeGateway, amount, churchId, currency);
     }
 
-    // Fallback to hardcoded calculation if no Stripe gateway found
     let customFixedFee: number | null = null;
     let customPercentFee: number | null = null;
     if (churchId) {
@@ -893,20 +875,18 @@ export class DonateController extends GivingBaseController {
       if (data?.transFeeCC && data.transFeeCC !== null && data.transFeeCC !== undefined && data.transFeeCC !== "") customPercentFee = +data.transFeeCC / 100;
     }
     const fixedFee = customFixedFee ?? 0.3;
-    // Clamp to [0, 0.99] so a misconfigured fee can't divide by zero or go negative.
+    // Clamp [0, 0.99] to avoid divide by zero or negative fees.
     const fixedPercent = Math.min(Math.max(customPercentFee ?? 0.029, 0), 0.99);
     return Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
   };
 
   private getACHFees = async (amount: number, churchId: string) => {
-    // ACH is typically handled by Stripe, so find Stripe gateway
     const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
     const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
     if (stripeGateway) {
       return await GatewayService.calculateFees(stripeGateway, amount, churchId);
     }
 
-    // Fallback to hardcoded calculation if no Stripe gateway found
     let customPercentFee: number | null = null;
     let customMaxFee: number | null = null;
     if (churchId) {
@@ -915,7 +895,7 @@ export class DonateController extends GivingBaseController {
       if (data?.flatRateACH && data.flatRateACH !== null && data.flatRateACH !== undefined && data.flatRateACH !== "") customPercentFee = +data.flatRateACH / 100;
       if (data?.hardLimitACH && data.hardLimitACH !== null && data.hardLimitACH !== undefined && data.hardLimitACH !== "") customMaxFee = +data.hardLimitACH;
     }
-    // Clamp to [0, 0.99] so a misconfigured fee can't divide by zero or go negative.
+    // Clamp [0, 0.99] to avoid divide by zero or negative fees.
     const fixedPercent = Math.min(Math.max(customPercentFee ?? 0.008, 0), 0.99);
     const fixedMaxFee = customMaxFee ?? 5.0;
     const fee = Math.round((amount / (1 - fixedPercent) - amount) * 100) / 100;
@@ -926,7 +906,6 @@ export class DonateController extends GivingBaseController {
   public async captchaVerify(req: express.Request<{}, {}, { token: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
-        // detecting if its a bot or a human
         const { token } = req.body;
         const response = await Axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${Environment.googleRecaptchaSecretKey}&response=${token}`);
         const data = response.data;
@@ -971,7 +950,6 @@ export class DonateController extends GivingBaseController {
         gatewayId
       }, this.repos.gateway);
     } catch {
-      // Return null for backward compatibility when gateway not found
       return null;
     }
   }

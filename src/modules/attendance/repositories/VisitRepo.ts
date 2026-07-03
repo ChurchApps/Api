@@ -113,7 +113,6 @@ export class VisitRepo {
     return getDb().selectFrom("visits").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).execute();
   }
 
-  // People who have visited before but not since the cutoff (their most recent visit predates it).
   public async loadPersonIdsAbsentSince(churchId: string, since: Date): Promise<string[]> {
     const cutoff = DateHelper.toMysqlDateOnly(since);
     const rows = await sql<{ personId: string }>`SELECT personId FROM visits WHERE churchId=${churchId} GROUP BY personId HAVING MAX(visitDate) < ${cutoff}`.execute(getDb());
@@ -196,10 +195,6 @@ export class VisitRepo {
     };
   }
 
-  // Room occupancy for capacity/ratio gates: today's not-checked-out visits per
-  // target group, split by checkinType. Counted via visitSessions→sessions so the
-  // group is the room the visit was checked into, not the visit's serviceId group.
-  // excludePersonIds drops people in the current batch (they're being re-checked in).
   public async countActiveByGroupToday(churchId: string, groupIds: string[], excludePersonIds: string[] = []): Promise<{ groupId: string; total: number; volunteers: number; guests: number }[]> {
     if (groupIds.length === 0) return [];
     const today = DateHelper.toMysqlDateOnly(new Date());
@@ -219,7 +214,6 @@ export class VisitRepo {
     return rows.rows.map((r: any) => ({ groupId: r.groupId, total: Number(r.total ?? 0), volunteers: Number(r.volunteers ?? 0), guests: Number(r.guests ?? 0) }));
   }
 
-  // Today's not-checked-out visits for a service (broadcast recipient resolution).
   public async loadActiveByServiceToday(churchId: string, serviceId: string) {
     const today = DateHelper.toMysqlDateOnly(new Date());
     const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND serviceId=${serviceId} AND visitDate=${today} AND checkoutTime IS NULL`.execute(getDb());

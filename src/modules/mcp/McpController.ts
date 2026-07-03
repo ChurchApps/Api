@@ -1,8 +1,4 @@
-// Exposes the MCP server over Streamable HTTP at POST /mcp. The Express
-// auth pipeline (CustomAuthProvider) has already resolved the bearer token
-// to a Principal on httpContext.user before this controller runs — we just
-// reject unauthenticated calls and let the api_call tool re-present the
-// same Authorization header on each nested call.
+// MCP server pre-authenticated by Express auth pipeline; api_call tool re-presents same header.
 
 import { BaseHttpController, controller, httpPost } from "inversify-express-utils";
 import express from "express";
@@ -19,11 +15,7 @@ export class McpController extends BaseHttpController {
       return;
     }
 
-    // Stateless mode: no session id, a fresh server+transport per request.
-    // Fits Lambda's request model and keeps the path safe when running
-    // behind a load balancer with no sticky sessions. enableJsonResponse
-    // forces single request/response (no SSE) — API Gateway REST buffers
-    // responses and can't stream, so the SSE default 504s at 30s.
+    // Stateless per-request server; API Gateway REST can't stream, so disable SSE.
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true

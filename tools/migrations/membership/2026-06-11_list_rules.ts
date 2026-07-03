@@ -1,9 +1,5 @@
 import { type Kysely, sql } from "kysely";
 
-// 1.15/2.1: lists store a rules tree (cross-product conditions) plus sharing scope,
-// nightly auto-refresh, household inclusion and attached actions. listMembers caches
-// refresh results so membership diffs (join/leave) can drive notifications/automations.
-// Group health: attendanceReminders flag and groupMemberHistory audit log.
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema.alterTable("lists")
     .addColumn("rules", sql`mediumtext`)

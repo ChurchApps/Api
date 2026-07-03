@@ -10,7 +10,6 @@ export interface EndpointExample {
   notes?: string;
 }
 
-// Keyed by "METHOD path" (path matches the inventory path verbatim).
 export const EXAMPLES: Record<string, EndpointExample> = {
   "GET /membership/people": {
     summary: "List people in the current church. Supports ?firstName=, ?lastName=, ?email= filters.",

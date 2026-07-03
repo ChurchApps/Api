@@ -37,8 +37,7 @@ export class RoleHelper {
 
     const promises: Promise<RolePermission>[] = [];
     permissions.forEach((p) => {
-      // roleId will override if permission object has `roleId` property. It is specifically for everyone role
-      // where `roleId` is supposed to be kept null.
+      // roleId in p overrides, used by everyone-role (keep null).
       const rp = new RolePermission({ churchId: this.churchId, roleId: role.id, ...p });
       promises.push(repos.rolePermission.save(rp));
     });

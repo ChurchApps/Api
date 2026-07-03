@@ -1,12 +1,4 @@
-/**
- * Unit tests for the auto-scheduling algorithm (roadmap 2.14/2.15):
- * last-served rotation, blockout/cross-plan exclusions, max-per-month and
- * preferred-time preferences, household together/apart scheduling, undo-able
- * runs, and auto-replacement when a volunteer declines.
- *
- * Gateways, apihelper (ESM) and notifications are mocked so the tests run
- * without a DB; repos are passed in explicitly.
- */
+/** Tests auto-scheduling algorithm: rotation, blockouts, max-per-month, household preferences, auto-replacement. */
 
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "id" + Math.random().toString(36).slice(2, 8) } }));
 

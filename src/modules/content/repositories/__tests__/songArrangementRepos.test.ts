@@ -7,9 +7,7 @@ import { SongRepo } from "../SongRepo.js";
 import { ArrangementRepo } from "../ArrangementRepo.js";
 import { SongDetailRepo } from "../SongDetailRepo.js";
 
-// Minimal recording stand-in for the Kysely fluent builder: every chained call is
-// captured so a test can assert on the column list / join targets, and the
-// terminal execute()/executeTakeFirst() resolve to canned results.
+// Records Kysely builder calls for assertion without DB execution.
 function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
   const calls: { method: string; args: any[] }[] = [];
   const proxy: any = new Proxy(

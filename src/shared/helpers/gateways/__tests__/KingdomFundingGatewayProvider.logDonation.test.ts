@@ -4,9 +4,7 @@ jest.mock("../../Environment", () => ({ Environment: { membershipApi: "http://te
 import { KingdomFundingGatewayProvider } from "../KingdomFundingGatewayProvider";
 import { GatewayConfig } from "../IGatewayProvider";
 
-// A webhook-created donation (recurring auto-charge / ACH settlement) arrives with no fund
-// data, so logDonation must recover the allocation — otherwise the money is recorded but
-// left unallocated and fund reports undercount.
+// Webhooks arrive without fund data; recovery prevents unallocated money.
 describe("KingdomFundingGatewayProvider.logDonation fund recovery", () => {
   const provider = new KingdomFundingGatewayProvider();
 

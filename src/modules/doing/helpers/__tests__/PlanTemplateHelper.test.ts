@@ -1,8 +1,4 @@
-/**
- * Unit tests for capturing a plan into a template snapshot and applying it back.
- * The helper takes repos explicitly, so in-memory fakes stand in for the DB and
- * the test runs without any external service.
- */
+/** Tests plan template capture/apply using in-memory repo fakes. */
 
 import { PlanTemplateHelper } from "../PlanTemplateHelper.js";
 

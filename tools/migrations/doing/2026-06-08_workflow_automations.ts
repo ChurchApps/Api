@@ -1,25 +1,15 @@
 import { type Kysely, sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
-// Consolidates the workflow automation model. Must sort AFTER 2026-06-07_unify_form_triggers.
-//  1. Adds schedule-rule columns (triggerKind, recurs) to workflowTriggers.
-//  2. Folds the standalone automations/actions engine into workflowTriggers as schedule rules
-//     (reusing each automation's id as the trigger id so conjunctions/conditions repoint with a
-//     simple rename). addToWorkflow -> a schedule rule on the same workflow; task -> a single-step
-//     workflow + a schedule rule on it. Then automationId is replaced by triggerId and the
-//     automations/actions tables are dropped.
-//  3. Adds workflowStepActions (a step's ordered on-enter automated actions).
+// Must sort AFTER 2026-06-07_unify_form_triggers.
 
 export async function up(db: Kysely<any>): Promise<void> {
-  // 1. Schedule-rule columns.
   await db.schema.alterTable("workflowTriggers").addColumn("triggerKind", sql`varchar(20)`, (col) => col.notNull().defaultTo("event")).execute();
   await db.schema.alterTable("workflowTriggers").addColumn("recurs", sql`varchar(45)`).execute();
 
-  // 2. Conjunctions gain a triggerId owner (alongside the existing stepRouteId).
   await db.schema.alterTable("conjunctions").addColumn("triggerId", sql`char(11)`).execute();
   await db.schema.createIndex("idx_conjunctions_triggerId").on("conjunctions").columns(["triggerId"]).execute();
 
-  // addToWorkflow automations -> schedule rules (reuse the automation id as the trigger id).
   await sql`
     INSERT INTO workflowTriggers (id, churchId, name, triggerKind, eventType, recurs, workflowId, stepId, conditions, oncePerSubject, active)
     SELECT a.id, a.churchId, a.title, 'schedule', NULL, a.recurs,
@@ -29,7 +19,6 @@ export async function up(db: Kysely<any>): Promise<void> {
       AND JSON_UNQUOTE(JSON_EXTRACT(act.actionData, '$.workflowId')) IS NOT NULL
   `.execute(db);
 
-  // task automations -> single-step workflow + schedule rule (reuse automation id as trigger id).
   const taskAutos = await sql<{ id: string; churchId: string; title: string; recurs: string; active: number; actionData: string }>`
     SELECT a.id, a.churchId, a.title, a.recurs, (a.active + 0) AS active, act.actionData
     FROM automations a JOIN actions act ON act.automationId = a.id
@@ -51,16 +40,13 @@ export async function up(db: Kysely<any>): Promise<void> {
       VALUES (${row.id}, ${row.churchId}, ${row.title}, 'schedule', NULL, ${row.recurs}, ${workflowId}, ${stepId}, NULL, b'0', ${activeBit})`.execute(db);
   }
 
-  // Repoint the condition tree from automationId to the (same-id) triggerId, carry dedup history.
   await sql`UPDATE conjunctions SET triggerId = automationId WHERE automationId IS NOT NULL`.execute(db);
   await sql`UPDATE tasks SET triggerId = automationId WHERE triggerId IS NULL AND automationId IS NOT NULL`.execute(db);
 
-  // Retire the legacy owner column and tables.
   await db.schema.alterTable("conjunctions").dropColumn("automationId").execute();
   await db.schema.dropTable("actions").ifExists().execute();
   await db.schema.dropTable("automations").ifExists().execute();
 
-  // 3. On-enter step actions.
   await db.schema
     .createTable("workflowStepActions")
     .ifNotExists()
@@ -79,7 +65,6 @@ export async function down(db: Kysely<any>): Promise<void> {
   await db.schema.dropIndex("idx_workflowStepActions_churchId_stepId").on("workflowStepActions").ifExists().execute();
   await db.schema.dropTable("workflowStepActions").ifExists().execute();
 
-  // Recreate the automations/actions shells (row data is not reconstructed).
   await db.schema
     .createTable("automations")
     .ifNotExists()

@@ -13,7 +13,6 @@ export class RolePermissionController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
       else {
         let permissions: RolePermission[] = [];
-        // when "id" is null, return roles associated with every member of church
         if (id === "null") {
           const everyonePermission = await this.repos.rolePermission.loadForEveryone(au.churchId);
           permissions = (everyonePermission as any[]).map((e: any) => {

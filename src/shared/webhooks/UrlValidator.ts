@@ -7,7 +7,6 @@ import net from "net";
 // check; resolvesToPrivate() must additionally run before every delivery to
 // defend against DNS rebinding.
 export class UrlValidator {
-  // Returns an error message if the URL is unacceptable, or null if it passes.
   public static async validate(rawUrl: string): Promise<string | null> {
     let parsed: URL;
     try {
@@ -28,7 +27,6 @@ export class UrlValidator {
     return false;
   }
 
-  // Resolves the hostname and reports whether any resolved address is private.
   // Fails closed (returns true) if resolution fails.
   public static async resolvesToPrivate(hostname: string): Promise<boolean> {
     const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");

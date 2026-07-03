@@ -7,11 +7,7 @@ import type {
   VisibilityPreference, Webhook, WebhookDelivery
 } from "../models/index.js";
 
-/**
- * The people table stores flattened name/contact columns rather than
- * the composite Name/ContactInfo objects used in the Person model.
- * rowToModel() in PersonRepo maps these back to the Person model shape.
- */
+/** people table flattens name/contact into columns; rowToModel() restores Person shape. */
 export interface PeopleTable {
   id?: string;
   churchId?: string;

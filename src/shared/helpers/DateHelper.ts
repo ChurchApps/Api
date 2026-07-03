@@ -5,106 +5,62 @@ import timezone from "dayjs/plugin/timezone.js";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-/**
- * Shared date/time utilities for all modules
- * Provides consistent date handling across the monolith
- */
 export class DateHelper {
-  /**
-   * Get current timestamp in MySQL format
-   */
   static now(): string {
     return dayjs().format("YYYY-MM-DD HH:mm:ss");
   }
 
-  /**
-   * Convert date to MySQL format
-   */
   static toMySqlFormat(date: Date | string | null | undefined): string | null {
     if (date === null || date === undefined) return null;
     return dayjs(date).format("YYYY-MM-DD HH:mm:ss");
   }
 
-  /**
-   * Get current date in MySQL date format (no time)
-   */
   static today(): string {
     return dayjs().format("YYYY-MM-DD");
   }
 
-  /**
-   * Convert to church's timezone
-   * Can be extended to use church-specific timezone settings
-   */
   static toChurchTime(date: Date | string, timezone?: string): string {
-    const tz = timezone || "America/New_York"; // Default timezone
+    const tz = timezone || "America/New_York";
     return dayjs(date).tz(tz).format("YYYY-MM-DD HH:mm:ss");
   }
 
-  /**
-   * Add days to a date
-   */
   static addDays(date: Date | string, days: number): string {
     return dayjs(date).add(days, "day").format("YYYY-MM-DD HH:mm:ss");
   }
 
-  /**
-   * Subtract days from a date
-   */
   static subtractDays(date: Date | string, days: number): string {
     return dayjs(date).subtract(days, "day").format("YYYY-MM-DD HH:mm:ss");
   }
 
-  /**
-   * Get start of day
-   */
   static startOfDay(date?: Date | string): string {
     return dayjs(date).startOf("day").format("YYYY-MM-DD HH:mm:ss");
   }
 
-  /**
-   * Get end of day
-   */
   static endOfDay(date?: Date | string): string {
     return dayjs(date).endOf("day").format("YYYY-MM-DD HH:mm:ss");
   }
 
-  /**
-   * Check if date is valid
-   */
   static isValid(date: any): boolean {
     return dayjs(date).isValid();
   }
 
-  /**
-   * Format for display (human readable)
-   */
   static formatForDisplay(date: Date | string, format: string = "MMM DD, YYYY"): string {
     return dayjs(date).format(format);
   }
 
-  /**
-   * Get age from birthdate
-   */
   static getAge(birthDate: Date | string): number {
     return dayjs().diff(dayjs(birthDate), "year");
   }
 
-  /**
-   * Legacy alias for toMySqlFormat (backward compatibility)
-   */
+  /** Backward compatibility */
   static toMysqlDate(date: Date | string | null | undefined): string | null {
     return this.toMySqlFormat(date);
   }
 
-  /**
-   * For DATE-only fields - preserves calendar date without timezone conversion
-   * Use this for fields like birthDate, donationDate, batchDate that should NOT shift with timezone
-   */
+  /** DATE-only fields: preserves calendar date without timezone conversion (e.g. birthDate, donationDate) */
   static toMysqlDateOnly(date: Date | string | null | undefined): string | null {
     if (date === null || date === undefined) return null;
 
-    // If already a date string, extract just the date portion
     if (typeof date === "string") {
       const match = date.match(/^(\d{4}-\d{2}-\d{2})/);
       return match ? match[1] : null;

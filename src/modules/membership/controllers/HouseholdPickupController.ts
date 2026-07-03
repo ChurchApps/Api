@@ -6,9 +6,6 @@ import { HouseholdPickupPerson } from "../models/index.js";
 
 @controller("/membership/householdpickup")
 export class HouseholdPickupController extends MembershipBaseController {
-  // Read matches GET /people/household/:householdId — any authenticated church user
-  // (the kiosk runs on attendance.checkin and carries no membership edit perm).
-  // churchId scoping is enforced in the repo.
   @httpGet("/:householdId")
   public async getForHousehold(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

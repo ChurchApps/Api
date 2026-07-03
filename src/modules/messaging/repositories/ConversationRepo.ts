@@ -10,9 +10,7 @@ export class ConversationRepo {
     try {
       await this.cleanup();
     } catch {
-      // cleanup() relies on a `cleanup` stored procedure that is not present
-      // in every environment's messaging schema. Treat its absence as
-      // non-fatal so that conversation saves aren't blocked.
+      // Stored procedure may not exist in every environment.
     }
     return conversation.id ? this.update(conversation) : this.create(conversation);
   }
@@ -114,9 +112,7 @@ export class ConversationRepo {
     try {
       await sql`CALL updateConversationStats(${conversationId})`.execute(getDb());
     } catch {
-      // Denormalized stats (firstPostId/lastPostId/postCount) are recomputed
-      // by this stored procedure, which isn't present in every environment.
-      // A missing procedure should not cause message saves to 500.
+      // Stored procedure may not exist in every environment.
     }
   }
 

@@ -72,7 +72,6 @@ export class OpenAiHelper {
 
   private static parsePosts(rawResponse: string) {
     try {
-      // try parsing json
       const jsonStart = rawResponse.indexOf("[");
       const jsonEnd = rawResponse.lastIndexOf("]") + 1;
       const jsonString = rawResponse.slice(jsonStart, jsonEnd);

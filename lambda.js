@@ -1,16 +1,9 @@
 import serverlessExpress from "@codegenie/serverless-express";
-
-// Import Environment from the shared helpers
 import { Environment } from "./dist/shared/helpers/Environment.js";
-
-// Import the app creator
 import { createApp } from "./dist/app.js";
-
-// Import socket and timer handlers
 import { handleSocket } from "./dist/lambda/socket-handler.js";
 import { handle30MinTimer, handleMidnightTimer, handleScheduledTasks, handleWebhookTimer } from "./dist/lambda/timer-handler.js";
 
-// Initialize environment and database pools
 const initializeEnvironment = async () => {
   if (!Environment.currentEnvironment) {
     const stage = process.env.STAGE || process.env.ENVIRONMENT || "dev";
@@ -27,17 +20,14 @@ const initializeEnvironment = async () => {
   }
 };
 
-// Cache the handler
 let cachedHandler;
 
-// Web handler for HTTP requests
 export const web = async function (event, context) {
   try {
     console.log("Web handler invoked");
     console.log("Event httpMethod:", event.httpMethod);
     console.log("Event path:", event.path);
 
-    // Quick test endpoint
     if (event.path === "/test") {
       return {
         statusCode: 200,
@@ -55,7 +45,6 @@ export const web = async function (event, context) {
       };
     }
 
-    // Test POST request handling
     if (event.path === "/test-post" && event.httpMethod === "POST") {
       return {
         statusCode: 200,
@@ -73,7 +62,6 @@ export const web = async function (event, context) {
       };
     }
 
-    // Test Express app routing without database
     if (event.path === "/api/test") {
       return {
         statusCode: 200,
@@ -91,10 +79,8 @@ export const web = async function (event, context) {
       };
     }
 
-    // Ensure environment is initialized before creating the app
     await initializeEnvironment();
 
-    // Initialize the handler only once
     if (!cachedHandler) {
       console.log("Creating Express app with fully initialized environment...");
       const app = await createApp();
@@ -131,7 +117,6 @@ export const web = async function (event, context) {
   }
 };
 
-// WebSocket handler
 export const socket = async function (event, context) {
   try {
     await initializeEnvironment();

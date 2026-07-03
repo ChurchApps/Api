@@ -95,7 +95,6 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
-  // Stitch aggregated reactions onto each loaded message in one extra query.
   private async appendReactions(conversations: Conversation[], churchId: string, personId: string) {
     const messageIds: string[] = [];
     conversations.forEach((c) => (c.messages || []).forEach((m: any) => { if (m?.id) messageIds.push(m.id); }));
@@ -148,9 +147,7 @@ export class ConversationController extends MessagingBaseController {
         promises.push(this.repos.conversation.save(conversation));
       }) as any;
       const result = await Promise.all(promises);
-      // Notify any client subscribed to this content's room (e.g. a second tab on the
-      // same person profile) that a conversation now exists for it. Without this, the
-      // second tab would still show conversationId=null until a manual reload.
+      // Notify subscribed clients so other tabs see the new conversation.
       const activityPromises: Promise<unknown>[] = [];
       result.forEach((c) => {
         const room = contentRoom(c.contentType, c.contentId);

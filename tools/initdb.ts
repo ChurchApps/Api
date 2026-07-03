@@ -13,7 +13,6 @@ const __dirname = path.dirname(__filename);
 
 const MODULES = ["membership", "attendance", "content", "giving", "messaging", "doing"] as const;
 
-// Demo data files per module (the only dbScripts still used)
 const moduleDemoFiles: Record<string, string[]> = {
   membership: ["demo.sql", "populateData.sql"],
   attendance: ["demo.sql"],
@@ -60,12 +59,10 @@ export async function initializeDatabases(options: InitOptions = {}) {
       }
 
       if (!options.demoOnly) {
-        // Run Kysely migrations for schema
         await runMigrations(moduleName);
       }
 
       if (!options.schemaOnly) {
-        // Load demo data from SQL scripts
         await loadDemoData(moduleName);
       }
     }
@@ -88,9 +85,7 @@ async function runMigrations(moduleName: string) {
   }
 
   const db = createKysely(moduleName);
-  // Custom provider instead of Kysely's FileMigrationProvider: the built-in
-  // version calls `import()` with a raw OS path, which fails on Windows ESM
-  // (`ERR_UNSUPPORTED_ESM_URL_SCHEME` for `d:\...`). We convert to a file:// URL.
+  // Kysely's built-in provider fails on Windows with raw OS paths; we convert to file:// URLs.
   const provider: MigrationProvider = {
     async getMigrations() {
       const migrations: Record<string, any> = {};
@@ -287,7 +282,6 @@ function parseArguments(): InitOptions {
   return options;
 }
 
-// Main execution
 const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMainModule) {
   const options = parseArguments();

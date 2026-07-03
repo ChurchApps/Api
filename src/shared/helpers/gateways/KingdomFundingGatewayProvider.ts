@@ -32,8 +32,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     return "";
   }
 
-  // ─── Helpers ──────────────────────────────────────────────
-
   private getApiUrl(): string {
     return process.env.NMI_API_URL || "https://secure.nmi.com/api/transact.php";
   }
@@ -78,7 +76,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     return resp.responsetext || resp.response_code || "Transaction was not approved";
   }
 
-  /** Split a "First Last" display name into NMI first_name / last_name fields. */
   private splitName(name: string): { first_name?: string; last_name?: string } {
     const parts = (name || "").trim().split(/\s+/).filter(Boolean);
     if (parts.length === 0) return {};
@@ -105,8 +102,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     const n = Number(amount);
     return (isNaN(n) ? 0 : n).toFixed(2);
   }
-
-  // ─── Webhook Management ───────────────────────────────────
 
   /**
    * NMI webhook endpoints + signing keys are configured in the Merchant Portal
@@ -235,8 +230,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     };
   }
 
-  // ─── Payment Processing ───────────────────────────────────
-
   /**
    * Process a one-time charge via NMI.
    *
@@ -339,8 +332,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       return { success: false, transactionId: "", data: { error: "ACH charge failed. Please try again." } };
     }
   }
-
-  // ─── Recurring Subscriptions ──────────────────────────────
 
   /**
    * Normalize an interval into a count + unit. The frontend sends an object
@@ -575,8 +566,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     }
   }
 
-  // ─── Refunds ──────────────────────────────────────────────
-
   /**
    * Refund (settled) or void (unsettled) a transaction. Pass type:"void" to force a
    * void; omit amount for a full refund.
@@ -603,8 +592,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     }
   }
 
-  // ─── Fee Calculation ──────────────────────────────────────
-
   /**
    * Calculate transaction fees using KF-specific settings (flatRateKF / transFeeKF).
    * Fee logic is our own, not gateway-dependent.
@@ -629,8 +616,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     const percentFee = Math.min(Math.max(customPercentFee ?? 0.029, 0), 0.99);
     return Math.round(((amount + fixedFee) / (1 - percentFee) - amount) * 100) / 100;
   }
-
-  // ─── Customer & Payment Method Management ─────────────────
 
   /**
    * Create a bare Customer Vault record (contact info only). A payment method is
@@ -735,12 +720,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     return resp;
   }
 
-  // ─── Read APIs (NMI Query API — returns XML) ──────────────
-  // These power the "view recurring donations" and "manage saved methods" screens.
-  // The Query API (query.php) returns XML; a light tag extractor avoids adding an XML
-  // parser dependency. Field names are best-effort — confirm against a live sandbox
-  // list during recurring/vault testing before relying on these screens.
-
+  // NMI Query API returns XML; use light tag extraction to avoid an XML parser dependency.
   async getSubscription(config: GatewayConfig, subscriptionId: string): Promise<any> {
     try {
       const resp = await Axios.get(this.getQueryUrl(), {
@@ -785,8 +765,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       return [];
     }
   }
-
-  // ─── Event & Donation Logging ─────────────────────────────
 
   async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
     try {
@@ -957,10 +935,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 }
 
-// ─── Module-level NMI Query API (XML) helpers ───────────────
-// Minimal extractors for the few fields the recurring/saved-method screens need.
-// Field names are best-effort and should be confirmed against live sandbox XML.
-
+// Light XML extractors for NMI Query API responses.
 function extractAll(xml: string, blockTag: string): string[] {
   const re = new RegExp(`<${blockTag}[\\s>][\\s\\S]*?</${blockTag}>`, "g");
   return xml.match(re) || [];

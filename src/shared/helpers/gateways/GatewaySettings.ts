@@ -2,7 +2,6 @@
  * Type-safe gateway settings with provider-specific configurations
  */
 
-// Base settings shared across all providers
 interface BaseGatewaySettings {
   webhookEnabled?: boolean;
   testMode?: boolean;
@@ -10,7 +9,6 @@ interface BaseGatewaySettings {
   autoCapture?: boolean;
 }
 
-// Stripe-specific settings
 export namespace StripeSettings {
   export interface Settings extends BaseGatewaySettings {
     statementDescriptor?: string;
@@ -22,7 +20,6 @@ export namespace StripeSettings {
   }
 }
 
-// PayPal-specific settings
 export namespace PayPalSettings {
   export interface Settings extends BaseGatewaySettings {
     brandName?: string;
@@ -35,7 +32,6 @@ export namespace PayPalSettings {
   }
 }
 
-// Square-specific settings (future implementation)
 export namespace SquareSettings {
   export interface Settings extends BaseGatewaySettings {
     locationId?: string;
@@ -47,7 +43,6 @@ export namespace SquareSettings {
   }
 }
 
-// ePayMints-specific settings (future implementation)
 export namespace ePayMintsSettings {
   export interface Settings extends BaseGatewaySettings {
     merchantId?: string;
@@ -59,7 +54,6 @@ export namespace ePayMintsSettings {
   }
 }
 
-// KingdomFunding-specific settings
 export namespace KingdomFundingSettings {
   export interface Settings extends BaseGatewaySettings {
     merchantId?: string;
@@ -67,7 +61,6 @@ export namespace KingdomFundingSettings {
   }
 }
 
-// Union type for all gateway settings
 export type GatewaySettings =
   | { provider: "stripe"; settings: StripeSettings.Settings }
   | { provider: "paypal"; settings: PayPalSettings.Settings }
@@ -75,7 +68,6 @@ export type GatewaySettings =
   | { provider: "epaymints"; settings: ePayMintsSettings.Settings }
   | { provider: "kingdomfunding"; settings: KingdomFundingSettings.Settings };
 
-// Type guard functions
 export function isStripeSettings(settings: any): settings is StripeSettings.Settings {
   return settings && typeof settings === "object";
 }
@@ -96,7 +88,6 @@ export function isKingdomFundingSettings(settings: any): settings is KingdomFund
   return settings && typeof settings === "object";
 }
 
-// Helper to validate and cast settings based on provider
 export function validateGatewaySettings(provider: string, settings: Record<string, unknown> | null): BaseGatewaySettings | null {
   if (!settings) return null;
 

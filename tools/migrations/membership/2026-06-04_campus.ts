@@ -1,17 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// Planning-Center-style church-wide Campus support.
-//
-// Promotes the membership `campuses` table from an unused { id, name } stub to
-// the canonical church-scoped campus entity (churchId + address + timezone +
-// website), and lets People and Groups belong to a campus via campusId.
-// NULL campusId = "unassigned".
-//
-// NOTE: seeding these campuses from the existing attendance campuses and the
-// smart-hybrid backfill of people.campusId / groups.campusId are performed by
-// the hand-run cross-database script tools/manual/campus-reconcile.sql — a
-// per-module migration runs against the membership database only and cannot
-// read the separate attendance database.
+// Per-module migration cannot read separate attendance database; seeding via tools/manual/campus-reconcile.sql.
 
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema

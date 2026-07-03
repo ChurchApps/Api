@@ -1,8 +1,5 @@
 import { type Kysely, sql } from "kysely";
 
-// Roadmap 2.7/2.8: rooms and resources as first-class entities, event bookings
-// (which double as the approval records), facility blockouts, event templates,
-// and an approval status on events for the non-staff event-request flow.
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable("rooms")

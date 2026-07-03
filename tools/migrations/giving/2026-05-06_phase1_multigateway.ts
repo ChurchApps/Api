@@ -1,8 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// Mirrors tools/dbScripts/giving/migrations/phase1-multigateway.ts.
-// Idempotent: skips columns/tables that already exist (the initial schema
-// declares them on fresh installs; pre-migrator prod databases do not).
+// Idempotent: initial schema declares these on fresh installs; pre-migrator dbs do not.
 
 async function columnExists(db: Kysely<any>, table: string, column: string): Promise<boolean> {
   const result = await sql<{ count: number }>`
@@ -57,7 +55,6 @@ export async function up(db: Kysely<any>): Promise<void> {
     await db.schema.createIndex("idx_gateway_payment_methods_customer").on("gatewayPaymentMethods").column("customerId").execute();
   }
 
-  // Backfill customers.provider from each church's gateway. Idempotent via the WHERE clause.
   await sql`
     UPDATE customers c
     LEFT JOIN gateways g ON g.churchId = c.churchId
@@ -65,7 +62,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     WHERE c.provider IS NULL OR c.provider = ''
   `.execute(db);
 
-  // Validate: phase1 assumes one gateway row per church.
+  // phase1 assumes one gateway row per church.
   const dupes = await sql<{ churchId: string; gatewayCount: number }>`
     SELECT churchId, COUNT(*) AS gatewayCount FROM gateways GROUP BY churchId HAVING COUNT(*) > 1
   `.execute(db);

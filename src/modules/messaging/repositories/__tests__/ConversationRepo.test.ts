@@ -5,10 +5,7 @@ jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { 
 
 import { ConversationRepo } from "../ConversationRepo";
 
-// Regression guard: rowToModel dropped allowAnonymousPosts (and other persisted fields),
-// so MessageController.send's `conv.allowAnonymousPosts !== true` check always saw
-// `undefined` and rejected every anonymous post (e.g. the public stream chat) with 401,
-// even when the conversation row had allowAnonymousPosts=true.
+// Regression: rowToModel dropped allowAnonymousPosts, so undefined check always rejected anon posts despite db=true.
 describe("ConversationRepo.convertToModel", () => {
   const repo = new ConversationRepo();
 

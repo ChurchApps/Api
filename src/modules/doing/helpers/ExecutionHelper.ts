@@ -11,10 +11,7 @@ interface Subject {
   label?: string;
 }
 
-// Execution lifecycle for the rule engine: every trigger firing becomes an
-// automationExecutions row (execution history). The first attempt runs inline;
-// failures are retried with backoff by processDue (scheduled-tasks timer). A row is
-// created pending with a short lease so a crash mid-attempt is picked up by the worker.
+// First attempt inline, failures retry with backoff; pending rows with lease detect crashes.
 export class ExecutionHelper {
   private static readonly LEASE_MINUTES = 10;
   private static readonly MAX_ATTEMPTS = 6;
@@ -76,8 +73,6 @@ export class ExecutionHelper {
     }
   }
 
-  // Scheduled (pull) rules: evaluate the relational condition tree over the people set
-  // and fire an execution per match. Also reused by run-now on schedule rules.
   public static async runScheduledRule(rule: WorkflowTrigger, repos: Repos, eventType = "schedule"): Promise<{ created: number; skipped: number }> {
     if (!rule.workflowId || !rule.id || !rule.churchId) return { created: 0, skipped: 0 };
     const matched = await ConjunctionHelper.getPeopleIdsForTrigger(rule.churchId, rule.id, repos);
@@ -85,7 +80,6 @@ export class ExecutionHelper {
     let peopleIds = matched.filter((id) => id && id !== "*");
     if (peopleIds.length === 0) return { created: 0, skipped: 0 };
 
-    // Dedup: drop anyone who already has a card from this rule within the recurs window.
     let skipped = 0;
     const existing = (await repos.task.loadByTriggerIdContent(rule.churchId, rule.id, rule.recurs || "", "person", peopleIds)) as Task[];
     if (existing.length > 0) {
@@ -103,9 +97,7 @@ export class ExecutionHelper {
     return { created: people.length, skipped };
   }
 
-  // Bulk-apply-on-create: run an automation against everything that currently matches.
-  // Supported where a "current set" exists; event types tied to a transient moment
-  // (donation, form submission, check-in, member-left) have none.
+  // Supported where a "current set" exists; event types tied to a transient moment (donation, form submission, check-in, member-left) have none.
   public static async runNow(trigger: WorkflowTrigger, repos: Repos): Promise<{ created: number; skipped: number }> {
     if (!trigger.id || !trigger.churchId || !trigger.workflowId) throw new Error("Trigger is incomplete");
     if (trigger.triggerKind === "schedule") return this.runScheduledRule(trigger, repos, "runNow");
@@ -167,8 +159,6 @@ export class ExecutionHelper {
     return { created, skipped };
   }
 
-  // Timer worker: re-attempt due pending rows. Rows whose trigger was deleted fail;
-  // rows whose trigger is inactive park as paused (resume-all re-queues them).
   public static async processDue(repos: Repos): Promise<number> {
     const due = (await repos.automationExecution.loadDuePending()) as AutomationExecution[];
     const triggers = new Map<string, WorkflowTrigger | null>();
@@ -191,7 +181,6 @@ export class ExecutionHelper {
           await this.attempt(execution, trigger, repos);
         }
       } catch {
-        // Skip a failing row, keep processing the rest.
       }
     }
     return due.length;

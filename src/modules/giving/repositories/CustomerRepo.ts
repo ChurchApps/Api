@@ -6,9 +6,7 @@ import { Customer } from "../models/index.js";
 export class CustomerRepo {
 
   public async save(model: Customer): Promise<Customer> {
-    // Scope the lookup by provider: a person can have one customer record per
-    // provider (Stripe + KingdomFunding + ...). Keying on personId alone let a
-    // second provider's save clobber the first provider's customer row.
+    // A person can have one customer record per provider; keying on personId alone lets a second provider clobber the first.
     const provider = model.provider ?? "stripe";
     const existing = await this.loadByPersonAndProvider(model.churchId!, model.personId!, provider);
 
@@ -17,16 +15,13 @@ export class CustomerRepo {
       const newId = model.id || existing.id;
 
       if (newId !== oldId) {
-        // External customer id changed for this same provider — replace the row
         await this.delete(model.churchId!, oldId!);
         return await this.create(model);
       } else {
-        // Same ID, just update other fields
         model.id = existing.id;
         return await this.update(model);
       }
     } else {
-      // No customer for this person+provider yet, create it
       return await this.create(model);
     }
   }

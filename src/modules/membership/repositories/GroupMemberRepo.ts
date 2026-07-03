@@ -78,11 +78,7 @@ export class GroupMemberRepo {
       .execute();
   }
 
-  // Privacy-safe roster for public website elements (staff/team grid).
-  // Roster exposure is an explicit per-group opt-in (publicRoster=1) on top of
-  // the group being publicly visible (non-archived, non-removed); a group that
-  // hasn't opted in, is hidden, or is missing yields no rows. Only display name
-  // + photo + leader flag are selected — never contact/demographic fields.
+  // Privacy-safe: explicit opt-in (publicRoster=1) + visible group; selects only display name/photo/leader, never contact/demographic.
   public async loadPublicForGroup(churchId: string, groupId: string) {
     return getDb().selectFrom("groupMembers as gm")
       .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
@@ -135,7 +131,6 @@ export class GroupMemberRepo {
       .execute();
   }
 
-  // Per-group member aggregates for the health comparison view.
   public async loadHealthSummary(churchId: string) {
     const rows = await sql<any>`SELECT gm.groupId,
         COUNT(*) AS memberCount,
@@ -150,7 +145,6 @@ export class GroupMemberRepo {
     return rows.rows;
   }
 
-  // Same buckets as PersonRepo.loadDemographics, scoped to one group's members.
   public async loadDemographicsForGroup(churchId: string, groupId: string) {
     const db = getDb();
     const genderRows = await sql<any>`SELECT COALESCE(NULLIF(TRIM(p.gender), ''), 'Unassigned') AS name, COUNT(*) AS count
@@ -255,7 +249,6 @@ export class GroupMemberRepo {
     return data.map((d) => this.rowToModel(d));
   }
 
-  // Flattened, privacy-safe projection for the public staff/team grid.
   public convertAllToPublicModel(churchId: string, data: any[]) {
     if (!Array.isArray(data)) return [];
     return data.map((d) => {

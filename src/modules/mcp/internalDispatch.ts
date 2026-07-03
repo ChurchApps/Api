@@ -81,9 +81,7 @@ function makeRequest(method: string, url: string, body: any, authorization: stri
   };
   if (authorization) req.headers.authorization = authorization;
 
-  // The Lambda body-parsing shim in app.ts:60-111 sets _body=true to short-
-  // circuit body-parser; the dev server uses bodyParser.json. Either way, we
-  // hand the body in already parsed and mark it as such.
+  // Mark body as parsed to skip body-parser (Lambda shim or dev server behavior).
   req.body = body ?? {};
   if (isLambda) req._body = true;
 
@@ -94,7 +92,6 @@ function makeRequest(method: string, url: string, body: any, authorization: stri
   req.readable = false;
   req.aborted = false;
 
-  // Express introspects these for IP / proxy handling; provide safe defaults.
   req.ip = "127.0.0.1";
   req.ips = [];
   req.protocol = "http";

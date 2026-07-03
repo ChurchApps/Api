@@ -16,13 +16,9 @@ export interface MessagingModuleGateway {
   loadNotificationPreferencesByPerson(churchId: string, personId: string): Promise<any[]>;
   loadPrivateMessagesByPerson(churchId: string, personId: string): Promise<any[]>;
   createNotifications(notifications: any[]): Promise<any[]>;
-  // Render a saved EmailTemplate (merge fields resolved against recipient + church) and send it
-  // through the notification funnel (preference-gated). Returns false when the template is
-  // missing or the recipient has no email.
+  // Render a saved EmailTemplate and send through notification funnel; returns false if template missing or no email.
   sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
-  // Ad-hoc bulk SMS (check-in paging/broadcast). Recipients are pre-filtered by the
-  // caller (opt-out/no-phone already removed). Returns { ok:false, reason:"no_provider" }
-  // when the church has no active texting provider. Caps at 500 recipients.
+  // Ad-hoc bulk SMS (pre-filtered recipients, capped at 500); returns { ok: false, reason: "no_provider" } if no provider.
   sendBulkText(churchId: string, recipients: BulkTextRecipient[], message: string, context?: string): Promise<BulkTextResult>;
 }
 

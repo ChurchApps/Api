@@ -3,12 +3,6 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { ReminderTokenHelper } from "./ReminderTokenHelper.js";
 
-// Doing-side renderer for the serving-reminder email. Reproduces the retired
-// per-plan serving email (plan name, date, positions, custom message, notes,
-// Accept/Decline token buttons for unconfirmed assignments). Invoked through
-// DoingModuleGateway.buildPlanReminderEmails by the messaging reminder engine, which
-// supplies the recipients and the scoped definition's custom message.
-
 const esc = (s: unknown): string =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c] as string));
 

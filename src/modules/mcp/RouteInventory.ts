@@ -1,15 +1,6 @@
-// Builds a static inventory of every HTTP route registered by an
-// inversify-express-utils @controller / @httpVerb decorator. Run once at
-// startup AFTER all controller modules have been imported (the decorators
-// register themselves on import). The result is consumed by the MCP tools so
-// the LLM can discover what endpoints are callable via api_call.
-
 import "reflect-metadata";
 
-// String literals copied from inversify-express-utils/lib/cjs/constants.js —
-// importing the constants module pulls in the library's CommonJS entry which
-// fights NodeNext resolution. Pin the strings; they are part of the package's
-// public-ish surface and have not changed across major versions.
+// Pin strings to avoid CommonJS import that fights NodeNext resolution.
 const CONTROLLER_METADATA_KEY = "inversify-express-utils:controller";
 const CONTROLLER_METHOD_METADATA_KEY = "inversify-express-utils:controller-method";
 
@@ -72,9 +63,7 @@ function joinPath(prefix: string, suffix: string): string {
   return p + s;
 }
 
-// Path → likely scope mapping. Heuristic only — the real authorization check
-// happens inside each controller via au.checkAccess(Permissions.x). This is a
-// hint for the LLM so it picks the right API key to use.
+// Heuristic scope guess; real check is per-controller via au.checkAccess.
 function scopesForPath(path: string): string[] {
   const lc = path.toLowerCase();
   if (lc.startsWith("/membership/people")) return ["people:read", "people:write"];

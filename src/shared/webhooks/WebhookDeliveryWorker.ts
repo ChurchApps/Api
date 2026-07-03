@@ -6,9 +6,6 @@ import { UrlValidator } from "./UrlValidator.js";
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_RESPONSE_BODY = 4000;
 
-// Drains the durable webhook delivery outbox. Invoked on a short-interval
-// timer. Each due delivery is POSTed once per run; failures are rescheduled
-// per WebhookRetryPolicy until they succeed or exhaust their retries.
 export class WebhookDeliveryWorker {
   public static async process(repos: any): Promise<{ attempted: number; succeeded: number; failed: number }> {
     const due: WebhookDelivery[] = await repos.webhookDelivery.loadDuePending(100);
@@ -32,8 +29,7 @@ export class WebhookDeliveryWorker {
     return { attempted: due.length, succeeded, failed };
   }
 
-  // Public so the "Send test event" route can run a single delivery synchronously
-  // through the real signed-delivery path and return the result immediately.
+  // Public so test-event route can run a single delivery synchronously.
   public static async attempt(repos: any, webhook: Webhook, delivery: WebhookDelivery): Promise<boolean> {
     delivery.attemptCount = (delivery.attemptCount ?? 0) + 1;
     let status = 0;

@@ -41,7 +41,6 @@ export class OAuthController extends MembershipBaseController {
 
       const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
 
-      // Create authorization code
       const authCode: OAuthCode = {
         userChurchId: userChurch.id,
         clientId: client.clientId,
@@ -52,7 +51,6 @@ export class OAuthController extends MembershipBaseController {
       };
       await this.repos.oAuthCode.save(authCode);
 
-      // Return authorization code
       return this.json({
         code: authCode.code,
         state: state || null
@@ -85,8 +83,7 @@ export class OAuthController extends MembershipBaseController {
         return this.handleDeviceCodeGrant(device_code, client_id, res);
       }
 
-      // Validate client. Only public (secret-less) clients may omit client_secret on
-      // the refresh_token grant; if the client has a secret on file it must still match.
+      // Only public (secret-less) clients may omit client_secret on refresh_token grant; if client has a secret, it must match.
       let client;
       if (grant_type === "refresh_token" && !client_secret) {
         client = (await this.repos.oAuthClient.loadByClientId(client_id)) as any;
@@ -124,7 +121,7 @@ export class OAuthController extends MembershipBaseController {
 
         loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
-        // Create access token (refresh token expires in 90 days)
+        // Refresh token expires in 90 days
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: authCode.userChurchId,
@@ -135,7 +132,6 @@ export class OAuthController extends MembershipBaseController {
         };
         await this.repos.oAuthToken.save(token);
 
-        // Delete used authorization code
         await this.repos.oAuthCode.delete(authCode.id);
 
         return this.json({
@@ -170,7 +166,7 @@ export class OAuthController extends MembershipBaseController {
 
         loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
-        // Create new access token (refresh token expires in 90 days)
+        // Refresh token expires in 90 days
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: oldToken.userChurchId,
@@ -195,16 +191,12 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /**
-   * RFC 8628 Section 3.1: Device Authorization Request
-   * POST /oauth/device/authorize
-   */
+  /** Device Authorization Request per RFC 8628 Section 3.1. */
   @httpPost("/device/authorize")
   public async deviceAuthorize(req: express.Request<{}, {}, { client_id: string; scope?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const { client_id, scope } = req.body;
 
-      // Validate client_id
       if (!client_id) {
         return this.json({ error: "invalid_request", error_description: "client_id required" }, 400);
       }
@@ -214,15 +206,13 @@ export class OAuthController extends MembershipBaseController {
         return this.json({ error: "invalid_client" }, 400);
       }
 
-      // Generate codes
       const deviceCode = OAuthDeviceCodeRepo.generateDeviceCode();
       const userCode = OAuthDeviceCodeRepo.generateUserCode();
 
-      // Set expiration (15 minutes per RFC recommendation)
+      // 15 minutes per RFC recommendation
       const expiresIn = 900; // seconds
       const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
-      // Store device code
       const dc: OAuthDeviceCode = {
         deviceCode,
         userCode,
@@ -246,9 +236,7 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /**
-   * Handle device_code grant type (called from /token endpoint)
-   */
+  /** Handle device_code grant type (called from /token endpoint). */
   private async handleDeviceCodeGrant(deviceCode: string, clientId: string, _res: express.Response): Promise<any> {
     if (!deviceCode) {
       return this.json({ error: "invalid_request", error_description: "device_code required" }, 400);
@@ -260,14 +248,12 @@ export class OAuthController extends MembershipBaseController {
       return this.json({ error: "invalid_grant" }, 400);
     }
 
-    // Check expiration
     if (new Date() > dc.expiresAt) {
       dc.status = "expired";
       await this.repos.oAuthDeviceCode.save(dc);
       return this.json({ error: "expired_token" }, 400);
     }
 
-    // Check status
     switch (dc.status) {
       case "pending": return this.json({ error: "authorization_pending" }, 400);
       case "denied":
@@ -301,11 +287,10 @@ export class OAuthController extends MembershipBaseController {
 
         loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
-        // Create access token
         const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(dc.scopes));
         const refreshToken = UniqueIdHelper.shortId();
 
-        // Store the refresh token (expires in 90 days)
+        // Refresh token expires in 90 days
         const token: OAuthToken = {
           clientId: dc.clientId,
           userChurchId: dc.userChurchId,
@@ -316,7 +301,6 @@ export class OAuthController extends MembershipBaseController {
         };
         await this.repos.oAuthToken.save(token);
 
-        // Clean up device code
         await this.repos.oAuthDeviceCode.delete(dc.id);
 
         return this.json({
@@ -332,10 +316,7 @@ export class OAuthController extends MembershipBaseController {
     }
   }
 
-  /**
-   * Get pending device code info (for admin approval UI)
-   * GET /oauth/device/pending/:userCode
-   */
+  /** Get pending device code info for admin approval UI. */
   @httpGet("/device/pending/:userCode")
   public async getPendingDevice(@requestParam("userCode") userCode: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
@@ -355,10 +336,7 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /**
-   * Approve device authorization (called from admin UI)
-   * POST /oauth/device/approve
-   */
+  /** Approve device authorization (called from admin UI). */
   @httpPost("/device/approve")
   public async approveDevice(req: express.Request<{}, {}, { user_code: string; church_id: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -387,10 +365,7 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /**
-   * Deny device authorization
-   * POST /oauth/device/deny
-   */
+  /** Deny device authorization. */
   // authz-exempt: open to any authenticated user — only marks a pending device code "denied" (blocks pairing); no data access or escalation, holder of the on-screen user_code may decline
   @httpPost("/device/deny")
   public async denyDevice(req: express.Request<{}, {}, { user_code: string }>, res: express.Response): Promise<any> {
@@ -410,13 +385,7 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /**
-   * Create a relay session for external OAuth providers (e.g., Dropbox).
-   * The TV app calls this to get a sessionCode and redirectUri, then builds
-   * the provider's auth URL with that redirectUri. After the user authorizes,
-   * the provider redirects to /relay/callback which stores the auth code.
-   * The TV polls /relay/sessions/:sessionCode to retrieve it.
-   */
+  /** Create relay session for external OAuth providers; TV app receives sessionCode to poll for auth code. */
   @httpPost("/relay/sessions")
   public async createRelaySession(req: express.Request<{}, {}, { provider: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -448,10 +417,7 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /**
-   * Poll a relay session for the auth code.
-   * Returns status "pending" while waiting, or "completed" with the authCode.
-   */
+  /** Poll relay session for auth code; returns "pending" or "completed" with authCode. */
   @httpGet("/relay/sessions/:sessionCode")
   public async getRelaySession(@requestParam("sessionCode") sessionCode: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -474,11 +440,7 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /**
-   * OAuth redirect callback. The external provider (e.g., Dropbox) redirects
-   * here with ?code=xxx&state=sessionCode. We store the code and show a
-   * simple HTML page telling the user to return to their TV.
-   */
+  /** OAuth callback from external provider; stores code and shows HTML confirmation. */
   @httpGet("/relay/callback")
   public async relayCallback(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -521,8 +483,7 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
 </head><body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`;
   }
 
-  // Lists the OAuth apps the current user has authorized, for the
-  // Connected Apps screen in B1Admin Settings.
+  // Connected Apps screen in B1Admin Settings
   @httpGet("/connections")
   public async getConnections(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -533,8 +494,7 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
     });
   }
 
-  // Revokes one of the current user's OAuth connections. A token can only be
-  // revoked by the user it belongs to.
+  // Token can only be revoked by the user it belongs to
   @httpDelete("/connections/:id")
   public async deleteConnection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -7,9 +7,7 @@ import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/workflowTriggers")
 export class WorkflowTriggerController extends DoingBaseController {
-  // Internal cron hook (no user context) for the scheduled (pull) rules. Gated by the
-  // INTERNAL_API_KEY shared secret; fails closed if the header or env var is missing.
-  // The real driver is the lambda timer; this is a manual/external fallback.
+  // Gated by INTERNAL_API_KEY (fails closed if missing); manual fallback for lambda timer.
   @httpGet("/check")
   public async check(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -20,7 +18,6 @@ export class WorkflowTriggerController extends DoingBaseController {
     });
   }
 
-  // Static catalog of triggerable events + their condition fields for the B1Admin builder.
   @httpGet("/fields")
   public async getFields(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -53,7 +50,6 @@ export class WorkflowTriggerController extends DoingBaseController {
     });
   }
 
-  // Re-attempts a failed/paused execution immediately (counts as a fresh attempt window).
   @httpPost("/executions/:id/retry")
   public async retryExecution(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -95,7 +91,6 @@ export class WorkflowTriggerController extends DoingBaseController {
     });
   }
 
-  // Pause-all: deactivates the trigger (no new firings) and parks its queued retries.
   @httpPost("/:id/pauseAll")
   public async pauseAll(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -124,7 +119,6 @@ export class WorkflowTriggerController extends DoingBaseController {
     });
   }
 
-  // Bulk-apply-on-create: run the automation against everything that currently matches.
   @httpPost("/:id/runNow")
   public async runNow(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -155,9 +149,8 @@ export class WorkflowTriggerController extends DoingBaseController {
       for (const trigger of req.body) {
         trigger.churchId = au.churchId;
         const saved = (await this.repos.workflowTrigger.save(trigger)) as WorkflowTrigger;
-        // Schedule rules carry a relational condition tree (like personMatch routes),
-        // so they need a root conjunction to hang conditions off of.
         if (saved.triggerKind === "schedule") {
+          // Schedule rules need a root conjunction to hang conditions on.
           const existing = (await this.repos.conjunction.loadForTrigger(au.churchId, saved.id || "")) as Conjunction[];
           if (!existing || existing.length === 0) {
             await this.repos.conjunction.save({ churchId: au.churchId, triggerId: saved.id, parentId: null, groupType: "and" } as Conjunction);
@@ -174,7 +167,6 @@ export class WorkflowTriggerController extends DoingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
-      // Tear down any condition tree (schedule rules) before the trigger itself.
       const conditions = (await this.repos.condition.loadForTrigger(au.churchId, id)) as Condition[];
       for (const c of conditions) if (c.id) await this.repos.condition.delete(au.churchId, c.id);
       const conjunctions = (await this.repos.conjunction.loadForTrigger(au.churchId, id)) as Conjunction[];

@@ -1,10 +1,5 @@
 import { type Kysely, sql } from "kysely";
 
-// Phase 1 — reminder engine (architecture §5.2) + Phase 2 per-entity mute (§4.1).
-// Scan-window outbox over MySQL: definitions describe "remind people about this
-// entity at these offsets/clock time"; the expander materializes per-occurrence
-// fire rows; the dispatcher claims due rows and produces Notifications.
-
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema.createTable("reminderDefinitions")
     .ifNotExists()
@@ -73,7 +68,6 @@ export async function up(db: Kysely<any>): Promise<void> {
   await db.schema.createIndex("ux_idem").on("reminderSentLog").columns(["idempotencyKey"]).unique().execute();
   await db.schema.createIndex("ix_cap").on("reminderSentLog").columns(["churchId", "personId", "channel", "category", "sentAt"]).execute();
 
-  // Phase 2 — per-entity mute (Slack/PC parity, architecture §4.1).
   await db.schema.createTable("notificationEntityMutes")
     .ifNotExists()
     .addColumn("id", sql`char(11)`, (col) => col.notNull().primaryKey())

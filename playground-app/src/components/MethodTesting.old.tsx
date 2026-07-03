@@ -15,7 +15,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
   const [autoPopulatedFields, setAutoPopulatedFields] = useState<Set<string>>(new Set());
   const [supportedMethods, setSupportedMethods] = useState<string[]>([]);
 
-  // Form states for different methods
   const [feeAmount, setFeeAmount] = useState('100.00');
   const [chargeAmount, setChargeAmount] = useState('25.00');
   const [chargeCurrency, setChargeCurrency] = useState('USD');
@@ -34,7 +33,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
   const [cancelSubId, setCancelSubId] = useState('sub_test123');
   const [cancelReason, setCancelReason] = useState('User requested cancellation');
 
-  // Payment method states
   const [listPaymentsCustomer, setListPaymentsCustomer] = useState('cus_test123');
   const [attachPaymentMethodId, setAttachPaymentMethodId] = useState('pm_test_4242424242424242');
   const [attachCustomerId, setAttachCustomerId] = useState('cus_test123');
@@ -42,7 +40,7 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
   const [bankCustomerId, setBankCustomerId] = useState('cus_test123');
   const [bankAccountNumber, setBankAccountNumber] = useState('000123456789');
   const [bankRoutingNumber, setBankRoutingNumber] = useState('110000000');
-  // Card update states
+
   const [cardPaymentMethodId, setCardPaymentMethodId] = useState('pm_test_4242424242424242');
   const [cardNumber, setCardNumber] = useState('4111111111111111');
   const [cardExpMonth, setCardExpMonth] = useState('12');
@@ -50,7 +48,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
   const [cardCvc, setCardCvc] = useState('123');
   const [cardZip, setCardZip] = useState('90210');
 
-  // Add card states
   const [addCardCustomerId, setAddCardCustomerId] = useState('cus_test123');
   const [addCardNumber, setAddCardNumber] = useState('4111111111111111');
   const [addCardExpMonth, setAddCardExpMonth] = useState('12');
@@ -58,10 +55,8 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
   const [addCardCvc, setAddCardCvc] = useState('123');
   const [addCardZip, setAddCardZip] = useState('90210');
 
-  // Get charge states
   const [getChargeId, setGetChargeId] = useState('ch_test_1234567890');
 
-  // Fetch supported methods for the current provider
   useEffect(() => {
     const fetchProviderInfo = async () => {
       try {
@@ -82,12 +77,10 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
     }
   }, [provider]);
 
-  // Helper function to check if a method is supported by the current provider
   const isMethodSupported = (methodName: string): boolean => {
     return supportedMethods.includes(methodName);
   };
 
-  // Helper function to get field class with auto-population highlighting
   const getFieldClass = (fieldName: string) => {
     return autoPopulatedFields.has(fieldName) ? 'border-success bg-light' : '';
   };
@@ -112,12 +105,10 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
       [method]: { data, error, loading: false }
     }));
 
-    // Auto-populate related fields based on successful responses
     if (!error && data?.success && data?.result) {
       const result = data.result;
       const newAutoPopulated = new Set<string>();
 
-      // Auto-populate Customer ID from create customer response
       if (method === 'customer' && result.customerId) {
         setChargeCustomerId(result.customerId);
         setSubCustomerId(result.customerId);
@@ -131,7 +122,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
         newAutoPopulated.add('bankCustomerId');
       }
 
-      // Auto-populate Subscription ID from create subscription response
       if (method === 'subscription' && result.subscriptionId) {
         setUpdateSubId(result.subscriptionId);
         setCancelSubId(result.subscriptionId);
@@ -139,9 +129,7 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
         newAutoPopulated.add('cancelSubId');
       }
 
-      // Auto-populate Product ID from create product response
       if (method === 'product' && result.productId) {
-        // Update the config with the product ID
         onConfigChange({
           ...config,
           productId: result.productId
@@ -149,7 +137,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
         newAutoPopulated.add('productId');
       }
 
-      // Auto-populate payment method token from charge response (if available)
       if (method === 'charge' && result.data?.paymentMethodId) {
         setChargePaymentMethod(result.data.paymentMethodId);
         setSubResourceId(result.data.paymentMethodId);
@@ -157,7 +144,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
         newAutoPopulated.add('subResourceId');
       }
 
-      // Update auto-populated fields and clear after 3 seconds
       if (newAutoPopulated.size > 0) {
         setAutoPopulatedFields(newAutoPopulated);
         setTimeout(() => {
@@ -456,7 +442,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
           </Alert>
         )}
         <Accordion>
-          {/* ===== SETUP & CONFIGURATION ===== */}
           <Accordion.Item eventKey="0">
             <Accordion.Header>
               <strong>🔧 Setup:</strong> Generate Client Token
@@ -536,7 +521,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* ===== CUSTOMER MANAGEMENT ===== */}
           <Accordion.Item eventKey="3">
             <Accordion.Header>
               <strong>👤 Customer:</strong> Create Customer
@@ -588,7 +572,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* ===== PAYMENT METHODS ===== */}
           <Accordion.Item eventKey="4">
             <Accordion.Header><strong>💳 Payment Methods:</strong> Get Customer Payment Methods</Accordion.Header>
             <Accordion.Body>
@@ -895,7 +878,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* ===== FEES & CHARGES ===== */}
           <Accordion.Item eventKey="0">
             <Accordion.Header><strong>🔍 Transactions:</strong> Get Charge Details</Accordion.Header>
             <Accordion.Body>
@@ -1029,7 +1011,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* ===== SUBSCRIPTIONS ===== */}
           <Accordion.Item eventKey="10">
             <Accordion.Header><strong>🔄 Subscriptions:</strong> Create Subscription</Accordion.Header>
             <Accordion.Body>

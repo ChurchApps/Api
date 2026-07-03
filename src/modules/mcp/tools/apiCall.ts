@@ -1,9 +1,7 @@
 import { z } from "zod";
 import { dispatch } from "../internalDispatch.js";
 
-// Paths that must not be reachable via MCP: provider webhooks expect raw
-// signed bodies, the jwtSecret-gated endpoint is operator-only, and OAuth
-// admin endpoints manage client credentials we don't want LLMs touching.
+// Blocked: provider webhooks need raw signed bodies, jwtSecret is operator-only, OAuth manages client credentials.
 const BLOCKLIST: RegExp[] = [
   /^\/giving\/donate\/webhook\//i,
   /^\/membership\/people\/apiemails$/i,

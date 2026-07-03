@@ -62,12 +62,7 @@ export class DeliveryHelper {
         sc.socket.send(JSON.stringify(payload));
         return true;
       } else {
-        // The DB row points at a socketId we don't have in our in-memory map.
-        // Most common cause: the client's WebSocket is connected to a *different*
-        // Api instance (e.g. wss://socket.staging.churchapps.org instead of
-        // ws://localhost:8087). The /connections POST hit this Api but the WS
-        // session lives elsewhere, so we can't deliver. Log loudly so this isn't
-        // mistaken for a "stale connection".
+        // Connection mismatch: client's WS is on a different Api instance.
         const reason = !sc ? "not in local in-memory connections (likely client connected to a different WS endpoint)" : `readyState=${sc.socket.readyState}`;
         console.warn(`[DeliveryHelper.sendLocal] dropping ${payload.action} for socketId=${connection.socketId} room=${connection.conversationId} — ${reason}`);
         SocketHelper.deleteConnection(connection.socketId);
@@ -79,23 +74,19 @@ export class DeliveryHelper {
   };
 
   private static getApiGatewayEndpoint(): string | null {
-    // Return cached endpoint if available
     if (DeliveryHelper.awsEndpoint !== null) {
       return DeliveryHelper.awsEndpoint;
     }
-
-    // Construct endpoint from auto-detected/configured values
     const apiGatewayId = process.env.WEBSOCKET_API_ID;
     const region = process.env.AWS_REGION || "us-east-2";
     const stage = process.env.STAGE || process.env.ENVIRONMENT || "dev";
 
     if (!apiGatewayId) {
       console.error("DeliveryHelper: WEBSOCKET_API_ID not available. WebSocket delivery disabled.");
-      DeliveryHelper.awsEndpoint = ""; // Cache empty string to avoid repeated lookups
+      DeliveryHelper.awsEndpoint = "";
       return null;
     }
 
-    // Use stage name as-is (lowercase) to match WebSocket API Gateway stage
     DeliveryHelper.awsEndpoint = `https://${apiGatewayId}.execute-api.${region}.amazonaws.com/${stage}`;
 
     console.log(`DeliveryHelper: Using WebSocket endpoint: ${DeliveryHelper.awsEndpoint}`);
@@ -118,10 +109,7 @@ export class DeliveryHelper {
   static sendAws = async (connection: Connection, payload: PayloadInterface) => {
     try {
       const client = DeliveryHelper.getAwsClient();
-      if (!client) {
-        // No WebSocket endpoint configured - skip delivery silently
-        return false;
-      }
+      if (!client) return false;
 
       const command = new PostToConnectionCommand({
         ConnectionId: connection.socketId,
@@ -136,11 +124,10 @@ export class DeliveryHelper {
       await Promise.race([client.send(command), timeoutPromise]);
       return true;
     } catch (e: any) {
-      // GoneException means connection is stale - this is expected, don't log as error
+      // GoneException (410): connection stale, expected.
       if (e.name === "GoneException" || e.$metadata?.httpStatusCode === 410) {
         return false;
       }
-      // Log detailed error info for debugging
       console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, {
         name: e.name,
         message: e.message,

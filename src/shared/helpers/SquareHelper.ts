@@ -20,7 +20,6 @@ export class SquareHelper {
       : "https://connect.squareupsandbox.com";
   }
 
-  // Customer Management
   static async createCustomer(_accessToken: string, _environment: string, _customerData: {
     email?: string;
     name?: { givenName?: string; familyName?: string };
@@ -41,7 +40,6 @@ export class SquareHelper {
       // const response = await customersApi.createCustomer(request);
       // return response.result.customer?.id || '';
 
-      // Mock implementation for now
       return `sq_customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     } catch (error) {
       throw new Error(`Failed to create Square customer: ${error}`);
@@ -62,7 +60,6 @@ export class SquareHelper {
     }
   }
 
-  // Payment Methods (Cards)
   static async createCard(_accessToken: string, _environment: string, cardData: {
     customerId: string;
     cardNonce: string;
@@ -124,7 +121,6 @@ export class SquareHelper {
     }
   }
 
-  // Payments
   static async createPayment(_accessToken: string, _environment: string, paymentData: {
     amount: number;
     currency?: string;
@@ -172,7 +168,6 @@ export class SquareHelper {
     }
   }
 
-  // Subscriptions
   static async createSubscription(_accessToken: string, _environment: string, subscriptionData: {
     customerId: string;
     locationId: string;
@@ -219,7 +214,6 @@ export class SquareHelper {
     }
   }
 
-  // Webhooks
   static async validateWebhookSignature(
     _body: string,
     _signature: string,
@@ -235,7 +229,6 @@ export class SquareHelper {
     }
   }
 
-  // Fee Calculation
   static calculateFees(amount: number, customFixedFee?: number, customPercentFee?: number): number {
     // Square standard fees: 2.6% + $0.10 for card-present, 2.9% + $0.30 for card-not-present
     const fixedFee = customFixedFee ?? 0.3;
@@ -243,7 +236,6 @@ export class SquareHelper {
     return Math.round(((amount + fixedFee) / (1 - percentFee) - amount) * 100) / 100;
   }
 
-  // Event Logging
   static async logEvent(churchId: string, squareEvent: any, eventData: any, givingRepos: any): Promise<any> {
     const eventLog: EventLog = {
       id: "", // Let the repository create() method generate the ID

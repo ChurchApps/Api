@@ -19,7 +19,6 @@ interface GroupMemberEmailDetail {
 @controller("/messaging/emailTemplates")
 export class EmailTemplateController extends MessagingBaseController {
 
-  // List all templates for the authenticated church
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -28,7 +27,6 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  // Get single template by ID
   @httpGet("/mergeFields")
   public async getMergeFields(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
@@ -36,7 +34,6 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  // Preview email recipient count for a group
   @httpGet("/preview/:groupId")
   public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -52,7 +49,6 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  // Get single template
   @httpGet("/:id")
   public async getOne(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -62,7 +58,6 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  // Create or update template(s)
   @httpPost("/")
   public async save(req: express.Request<{}, {}, EmailTemplate[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -77,7 +72,6 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  // Send email to a group or specific people
   @httpPost("/send")
   public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -86,7 +80,6 @@ export class EmailTemplateController extends MessagingBaseController {
       if (!subject || !htmlContent) return this.json({ error: "subject and htmlContent are required" }, 400);
       if (!groupId && (!personIds || personIds.length === 0)) return this.json({ error: "groupId or personIds is required" }, 400);
 
-      // Load church name for merge fields
       let churchName = "";
       try {
         const membershipRepos = await RepoManager.getRepos<any>("membership");
@@ -95,7 +88,6 @@ export class EmailTemplateController extends MessagingBaseController {
       } catch { /* church name is optional */ }
       const church = { name: churchName };
 
-      // Load recipients
       let members: GroupMemberEmailDetail[];
       if (groupId) {
         members = await this.getGroupMemberEmailDetails(au.churchId, groupId);
@@ -106,7 +98,6 @@ export class EmailTemplateController extends MessagingBaseController {
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
       if (eligible.length === 0) return this.json({ error: "No eligible recipients with email addresses" }, 400);
 
-      // Send emails
       let successCount = 0;
       let failCount = 0;
       const from = Environment.supportEmail;
@@ -156,7 +147,6 @@ export class EmailTemplateController extends MessagingBaseController {
     });
   }
 
-  // Delete template
   @httpDelete("/:churchId/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

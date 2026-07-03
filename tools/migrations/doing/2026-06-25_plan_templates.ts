@@ -1,8 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// A reusable named snapshot of a plan's order of service, positions and notes.
-// `data` holds the serialized { notes, items, positions }; templates are read and
-// written whole, so no child tables are needed.
+// Read/written whole; no child tables needed.
 
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema

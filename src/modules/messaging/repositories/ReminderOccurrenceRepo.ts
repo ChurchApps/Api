@@ -9,9 +9,7 @@ const LEASE_MINUTES = 30; // a 'processing' row older than this is re-surfaced (
 
 @injectable()
 export class ReminderOccurrenceRepo {
-  // Idempotent on occurrenceKey: insert new, refresh a still-pending row, resurrect a
-  // cancelled one (re-expansion cancels-then-expands, so unchanged keys must revive —
-  // an upsert only happens when the expander wants the row live). Never touch sent/failed/processing.
+  // Idempotent on occurrenceKey: upsert only if pending/cancelled, resurrect cancelled on re-expansion.
   public async upsert(model: ReminderOccurrence): Promise<void> {
     const existing = await getDb().selectFrom("reminderOccurrences").select(["id", "status"])
       .where("occurrenceKey", "=", model.occurrenceKey).executeTakeFirst();

@@ -86,7 +86,7 @@ export class TaskController extends DoingBaseController {
         task.churchId = au.churchId;
         if (req.query?.type === "directoryUpdate") await DirectoryUpdateHelper.handleDirectoryUpdate(au.churchId, task);
         const saved = await this.repos.task.save(task);
-        await InternalEventBus.publish(au.churchId, "task.updated", saved); // sync any per-task reminder occurrences
+        await InternalEventBus.publish(au.churchId, "task.updated", saved);
         result.push(saved);
       }
       return result;

@@ -73,7 +73,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
         )}
 
         <Accordion defaultActiveKey="0">
-          {/* Get Gateways */}
           <Accordion.Item eventKey="0">
             <Accordion.Header>
               <strong>⚙️ Configuration:</strong> Get Payment Gateways
@@ -89,7 +88,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* Transaction Lookup */}
           <Accordion.Item eventKey="1">
             <Accordion.Header>
               <strong>🔍 Transactions:</strong> Get Charge Details
@@ -105,7 +103,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* Calculate Fees */}
           <Accordion.Item eventKey="2">
             <Accordion.Header>
               <strong>💰 Charges:</strong> Calculate Fees
@@ -121,7 +118,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* Process Charge */}
           <Accordion.Item eventKey="3">
             <Accordion.Header>
               <strong>💳 Charges:</strong> Process Charge
@@ -138,7 +134,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* Create Customer */}
           <Accordion.Item eventKey="4">
             <Accordion.Header>
               <strong>👤 Customer:</strong> Create Customer
@@ -155,7 +150,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* Add Card */}
           <Accordion.Item eventKey="5">
             <Accordion.Header>
               <strong>💳 Payment Methods:</strong> Add New Card
@@ -171,7 +165,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* Create Subscription */}
           <Accordion.Item eventKey="6">
             <Accordion.Header>
               <strong>🔄 Subscriptions:</strong> Create Subscription
@@ -187,7 +180,6 @@ const MethodTesting: React.FC<MethodTestingProps> = ({ config, provider, onConfi
             </Accordion.Body>
           </Accordion.Item>
 
-          {/* You can add more method components here as needed */}
         </Accordion>
       </Card.Body>
     </Card>

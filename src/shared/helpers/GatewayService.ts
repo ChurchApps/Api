@@ -160,7 +160,6 @@ export class GatewayService {
     }
   }
 
-  // Customer management
   static async createCustomer(gateway: any, email: string, name: string): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createCustomer) {
@@ -197,7 +196,6 @@ export class GatewayService {
     return [];
   }
 
-  // Payment method management
   static async attachPaymentMethod(gateway: any, paymentMethodId: string, options: any): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.attachPaymentMethod) {
@@ -261,7 +259,6 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support bank account deletion`);
   }
 
-  // ACH SetupIntent for Financial Connections (Stripe only)
   static async createACHSetupIntent(gateway: any, customerId: string): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createACHSetupIntent) {
@@ -271,7 +268,6 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support ACH SetupIntent`);
   }
 
-  // Provider-specific functionality
   static async generateClientToken(gateway: any): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.generateClientToken) {
@@ -290,7 +286,6 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support order creation`);
   }
 
-  // Subscription plan management
   static async createSubscriptionPlan(gateway: any, planData: any): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createSubscriptionPlan) {
@@ -309,10 +304,7 @@ export class GatewayService {
     throw new Error(`${gateway.provider} does not support plan-based subscription creation`);
   }
 
-  /**
-   * Load and resolve the most appropriate gateway for the provided church.
-   * Throws descriptive errors when the gateway cannot be resolved.
-   */
+  /** Resolve the most appropriate gateway for a church, throwing descriptive errors if ambiguous. */
   static async getGatewayForChurch(
     churchId: string,
     options: GetGatewayOptions = {},
@@ -422,11 +414,7 @@ export class GatewayService {
     return ambiguous ? null : selected;
   }
 
-  /**
-   * Get the capabilities of a specific payment provider
-   * @param gatewayOrProvider Provider name (stripe, paypal, square, epaymints) or gateway object
-   * @returns Provider capabilities or null if provider not found
-   */
+  /** Get the capabilities of a specific payment provider. */
   static getProviderCapabilities(gatewayOrProvider: string | { provider?: string }): ProviderCapabilities | null {
     const provider = typeof gatewayOrProvider === "string" ? gatewayOrProvider : gatewayOrProvider?.provider;
     if (!provider) return null;
@@ -546,11 +534,7 @@ export class GatewayService {
     return capabilities[provider.toLowerCase()] || null;
   }
 
-  /**
-   * Validate gateway settings based on provider type
-   * @param gateway Gateway object with provider and settings
-   * @returns Validated settings or null if invalid
-   */
+  /** Validate gateway settings based on provider type. */
   static validateSettings(gateway: any): any {
     if (!gateway.settings) return null;
     return validateGatewaySettings(gateway.provider, gateway.settings);

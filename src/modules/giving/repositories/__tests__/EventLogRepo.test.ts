@@ -20,9 +20,7 @@ describe("isDuplicateKeyError", () => {
   });
 });
 
-// With UNIQUE(churchId, providerId) on eventLogs, a concurrent webhook delivery
-// loses the insert race. create() must treat that as idempotent success (return
-// the winning row) rather than throwing — a 500 would make the provider retry.
+// Concurrent webhooks must be idempotent; 500 would trigger retry storm.
 describe("EventLogRepo.create idempotency under the unique constraint", () => {
   const buildDb = (opts: { insertError?: any; existingRow?: any }) => ({
     insertInto: () => ({ values: () => ({ execute: () => (opts.insertError ? Promise.reject(opts.insertError) : Promise.resolve()) }) }),

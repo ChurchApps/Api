@@ -7,11 +7,7 @@ import { ensureEnvironment, createKysely, ensureDatabaseExists, getModules } fro
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Drop-in replacement for kysely's FileMigrationProvider that imports each
-// migration via a file:// URL. Plain Windows absolute paths (e.g. `D:\foo`)
-// fail Node's ESM loader with ERR_UNSUPPORTED_ESM_URL_SCHEME because they
-// aren't valid URL schemes. The standard provider hits this on Windows; this
-// wrapper sidesteps it by converting paths before `await import()`.
+// Kysely's built-in provider fails on Windows with raw OS paths; we convert to file:// URLs.
 class FileURLMigrationProvider implements MigrationProvider {
   constructor(private readonly migrationFolder: string) {}
 

@@ -1,9 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// Fold the old per-workflow form triggers into the unified workflowTriggers engine:
-// each formWorkflowTrigger becomes a form.submission.created event trigger whose
-// condition matches its formId. Then retire the formWorkflowTriggers table.
-// Must sort AFTER 2026-06-06_workflowTriggers (which creates workflowTriggers).
+// Must run AFTER 2026-06-06_workflowTriggers (which creates the table).
 
 export async function up(db: Kysely<any>): Promise<void> {
   await sql`
@@ -18,7 +15,7 @@ export async function up(db: Kysely<any>): Promise<void> {
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
-  // Recreate the table shell (row data is not reconstructed from the conditions JSON).
+  // Row data not reconstructed from conditions JSON.
   await db.schema
     .createTable("formWorkflowTriggers")
     .ifNotExists()

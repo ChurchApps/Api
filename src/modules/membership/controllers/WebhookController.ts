@@ -9,7 +9,6 @@ const CONNECTOR_TYPES = ["standard", "slack", "discord"];
 
 @controller("/membership/webhooks")
 export class WebhookController extends MembershipBaseController {
-  // Public catalog of subscribable events — used by the admin UI event picker.
   @httpGet("/events")
   public async getEvents(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -27,7 +26,6 @@ export class WebhookController extends MembershipBaseController {
     });
   }
 
-  // Queues a fresh delivery attempt that reuses the original payload.
   @httpPost("/deliveries/:deliveryId/redeliver")
   public async redeliver(@requestParam("deliveryId") deliveryId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -45,9 +43,6 @@ export class WebhookController extends MembershipBaseController {
     });
   }
 
-  // Fires a synthetic sample payload at the webhook so an integrator can verify
-  // connectivity and signature handling before real data flows. The delivery is
-  // attempted synchronously and the result is returned for immediate feedback.
   @httpPost("/:id/test")
   public async test(@requestParam("id") id: string, req: express.Request<{}, {}, { event?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -92,8 +87,7 @@ export class WebhookController extends MembershipBaseController {
     });
   }
 
-  // Creates or updates a webhook. The signing secret is generated on create and
-  // returned exactly once in the create response; it is never returned again.
+  // Secret is returned only on create — the church must store it.
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Webhook>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -129,12 +123,10 @@ export class WebhookController extends MembershipBaseController {
 
       const saved = await this.repos.webhook.save(webhook);
       WebhookDispatcher.invalidate(au.churchId);
-      // Reveal the secret only on create — the church must store it now.
       return isNew ? saved : this.maskSecret(saved);
     });
   }
 
-  // Rotates the signing secret and returns the new value once.
   @httpPost("/:id/regenerate-secret")
   public async regenerateSecret(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

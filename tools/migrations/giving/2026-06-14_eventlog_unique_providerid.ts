@@ -1,15 +1,11 @@
 import { type Kysely, sql } from "kysely";
 
-// Webhook idempotency: enforce one eventLog per (churchId, providerId) at the
-// data layer. Previously only application code guarded against duplicate
-// provider events (a read-then-write TOCTOU race), so concurrent webhook
-// deliveries — Stripe retries aggressively — could insert duplicate rows.
+// Concurrent webhook deliveries (Stripe retries aggressively) caused duplicates; enforce at data layer.
 export async function up(db: Kysely<any>): Promise<void> {
   // Manual/non-provider events have no provider event id; normalize "" -> NULL
   // so they are exempt from the unique index (MySQL allows repeated NULLs).
   await sql`UPDATE eventLogs SET providerId = NULL WHERE providerId = ''`.execute(db);
 
-  // Collapse any pre-existing duplicates, keeping the earliest row per key.
   await sql`
     DELETE e1 FROM eventLogs e1
     JOIN eventLogs e2

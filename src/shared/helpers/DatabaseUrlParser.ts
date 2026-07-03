@@ -1,6 +1,3 @@
-/**
- * Utility for parsing MySQL connection strings into configuration objects
- */
 export interface DatabaseConfig {
   host: string;
   user: string;
@@ -11,23 +8,14 @@ export interface DatabaseConfig {
 }
 
 export class DatabaseUrlParser {
-  /**
-   * Parses a MySQL connection string into a database configuration object
-   * Format: mysql://user:password@host:port/database
-   *
-   * @param url MySQL connection string
-   * @returns DatabaseConfig object
-   */
+  /** Format: mysql://user:password@host:port/database */
   static parseConnectionString(url: string): DatabaseConfig {
     if (!url) {
       throw new Error("Database URL is required");
     }
 
-    // Remove mysql:// prefix if present
     const cleanUrl = url.replace(/^mysql:\/\//, "");
 
-    // Parse the URL components
-    // Pattern: [user[:password]@]host[:port]/database[?params]
     const urlPattern = /^(?:([^:@]+)(?::([^@]*))?@)?([^:\/]+)(?::(\d+))?\/([^?]+)(?:\?(.*))?$/;
     const match = cleanUrl.match(urlPattern);
 
@@ -57,12 +45,6 @@ export class DatabaseUrlParser {
     };
   }
 
-  /**
-   * Validates a database configuration object
-   *
-   * @param config DatabaseConfig object to validate
-   * @returns true if valid, throws error if invalid
-   */
   static validateConfig(config: DatabaseConfig): boolean {
     if (!config.host) {
       throw new Error("Database host is required");
@@ -83,12 +65,6 @@ export class DatabaseUrlParser {
     return true;
   }
 
-  /**
-   * Converts a database configuration object back to a connection string
-   *
-   * @param config DatabaseConfig object
-   * @returns MySQL connection string
-   */
   static configToConnectionString(config: DatabaseConfig): string {
     const userPass = config.password ? `${config.user}:${config.password}` : config.user;
 

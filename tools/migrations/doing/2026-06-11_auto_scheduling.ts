@@ -1,12 +1,5 @@
 import { type Kysely, sql } from "kysely";
 
-// Auto-scheduling parity (roadmap 2.14/2.15): per-volunteer scheduling
-// preferences, undo-able autofill runs, and plan-level prepared (penciled-in)
-// and auto-replace-on-decline flags.
-// schedulingPreferences.personId references membership.people.id (no cross-DB FK).
-// Execution history for the rule engine: one row per trigger firing (event, schedule
-// or run-now). pending rows are retried with backoff by the scheduled-tasks timer.
-
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable("schedulingPreferences")

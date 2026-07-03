@@ -219,7 +219,6 @@ export class BibleController extends ContentBaseController {
     await this.repos.bibleLookup.save(lookup);
   }
 
-  // Resolve book key from either ID or keyName
   // Book keys are 3 chars: LLL (e.g. GEN) or NLL (e.g. 1CO, 2TI)
   private async resolveBookKey(bookKeyOrId: string): Promise<string> {
     const isBookKey = /^([A-Z]{3}|[0-9][A-Z]{2})$/.test(bookKeyOrId);

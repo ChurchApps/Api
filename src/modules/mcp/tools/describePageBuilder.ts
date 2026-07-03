@@ -1,7 +1,4 @@
-// Static, hand-written guide that teaches an LLM how to build B1App pages via
-// the /content/* endpoints. The element-type catalog and answersJSON shapes
-// mirror B1Admin/src/site/admin/elements/elementTypeMeta.ts and ElementEdit.tsx
-// — keep them in sync when adding/removing element types or fields.
+// Keep element-type catalog and answersJSON shapes in sync with B1Admin elementTypeMeta.ts and ElementEdit.tsx.
 
 const GUIDE = `# B1App Page Builder Guide
 

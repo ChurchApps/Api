@@ -1,8 +1,6 @@
 import { type Kysely, sql } from "kysely";
 
-// Mirrors tools/dbScripts/giving/migrations/phase3-subscription-currency.ts.
-// Idempotent: skips the column if it already exists (initial schema declares
-// it on fresh installs; pre-migrator prod databases do not).
+// Idempotent: initial schema declares it on fresh installs; pre-migrator dbs do not.
 
 async function columnExists(db: Kysely<any>, table: string, column: string): Promise<boolean> {
   const result = await sql<{ count: number }>`
@@ -18,7 +16,6 @@ export async function up(db: Kysely<any>): Promise<void> {
     await sql.raw("ALTER TABLE subscriptions ADD COLUMN currency varchar(10) DEFAULT NULL AFTER customerId").execute(db);
   }
 
-  // Backfill subscription currencies from each church's gateway. Idempotent via the WHERE clause.
   await sql`
     UPDATE subscriptions s
     LEFT JOIN gateways g ON g.churchId = s.churchId

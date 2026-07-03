@@ -11,7 +11,6 @@ interface ProxyRequestBody {
   resolution?: number;
 }
 
-// Provider interface for type safety (matches IProvider from content-provider-helper)
 interface Provider {
   readonly requiresAuth: boolean | (() => boolean);
   browse(path?: string | null, auth?: ContentProviderAuthData | null): Promise<unknown[]>;

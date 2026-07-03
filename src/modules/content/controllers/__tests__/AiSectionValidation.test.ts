@@ -1,7 +1,4 @@
-// Validated against the current workspace-built element catalog (see jest moduleNameMapper),
-// which is the same contract ElementController.validateAnswers enforces on POST /content/elements.
-// Guards that AI-generated sections using the newer element catalog (iconFeature, gallery,
-// testimonial, socialIcons, countdown, stats and the sermons layouts) persist without a 400.
+// Guards AI-generated sections with new element types (iconFeature, gallery, testimonial, etc.) against catalog contract violations.
 import { validateElementAnswers, ElementTypes } from "@current-element-catalog";
 
 interface GenElement {
@@ -34,7 +31,6 @@ const validateSection = (elements: GenElement[]): string[] => {
   return errors;
 };
 
-// A representative "What to Expect" section as the section generator now emits it.
 const whatToExpectSection: GenElement[] = [
   { elementType: "text", sort: 0, answersJSON: JSON.stringify({ text: "<h2>What to Expect on Sunday</h2><p>Here is everything you need to feel at home.</p>", textAlignment: "center" }) },
   {

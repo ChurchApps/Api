@@ -1,13 +1,4 @@
-/**
- * Unit tests for on-enter step actions: when a card enters a step, the step's automated
- * actions run, then the card rests for a human unless an auto-route advances it. A "delay"
- * action parks the card (snooze) and saves a cursor; processSnoozed resumes the remaining
- * actions on wake (drip support).
- *
- * Gateways, apihelper (ESM), the SSRF validator and notifications are mocked so
- * the test runs without a DB or any external service. Repos are passed in
- * explicitly (WorkflowHelper accepts a repos argument), so no RepoManager.
- */
+/** Tests on-enter actions + drip (delay+resume); mocks avoid external deps; repos passed explicitly. */
 
 jest.mock("@churchapps/apihelper", () => ({
   DateHelper: { addDays: (d: Date, n: number) => new Date(d.getTime() + n * 86400000) },
