@@ -98,10 +98,7 @@ export class ServerHealthController extends MembershipBaseController {
             { key: "googleRecaptchaSecretKey", label: "Google reCAPTCHA Secret", configured: has(Environment.googleRecaptchaSecretKey) },
             { key: "hubspotKey", label: "HubSpot Key", configured: has(Environment.hubspotKey) },
             { key: "caddyHost", label: "Caddy Host", configured: has(Environment.caddyHost) },
-            { key: "caddyPort", label: "Caddy Port", configured: has(Environment.caddyPort) },
-            { key: "vercelToken", label: "Vercel Token", configured: has(Environment.vercelToken) },
-            { key: "vercelProjectId", label: "Vercel Project Id", configured: has(Environment.vercelProjectId) },
-            { key: "vercelTeamId", label: "Vercel Team Id", configured: has(Environment.vercelTeamId) }
+            { key: "caddyPort", label: "Caddy Port", configured: has(Environment.caddyPort) }
           ]
         },
         {

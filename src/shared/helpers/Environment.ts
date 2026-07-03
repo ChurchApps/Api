@@ -30,9 +30,6 @@ export class Environment extends EnvironmentBase {
   static mauticPassword: string;
   static caddyHost: string;
   static caddyPort: string;
-  static vercelToken: string;
-  static vercelProjectId: string;
-  static vercelTeamId: string;
   static mailSystem: string;
   static appName: string;
   static appEnv: string;
@@ -209,10 +206,6 @@ export class Environment extends EnvironmentBase {
     this.mauticPassword = process.env.MAUTIC_PASSWORD || "";
     this.caddyHost = process.env.CADDY_HOST || config.caddyHost || "";
     this.caddyPort = process.env.CADDY_PORT || config.caddyPort || "";
-    // Vercel domain management (secrets — environment-only, no config-file fallback)
-    this.vercelToken = process.env.VERCEL_TOKEN || "";
-    this.vercelProjectId = process.env.VERCEL_PROJECT_ID || "";
-    this.vercelTeamId = process.env.VERCEL_TEAM_ID || "";
     this.youTubeApiKey = process.env.YOUTUBE_API_KEY || "";
     this.pexelsKey = process.env.PEXELS_KEY || "";
     this.vimeoToken = process.env.VIMEO_TOKEN || "";
