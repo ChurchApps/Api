@@ -95,9 +95,10 @@ export class DomainController extends MembershipBaseController {
           domain.churchId = au.churchId;
           domain.domainName = (domain.domainName || "").toLowerCase().trim();
           domain.siteId = domain.siteId || "";
-          // Blank rows (an empty add-row saved from B1Admin) must never persist — prod accumulated
-          // several, each of which generated a garbage Caddy route.
-          if (!domain.domainName) return;
+          // Blank or space-containing rows must never persist — prod accumulated several (empty
+          // add-rows, a church NAME typed into the domain field), each generating a garbage route
+          // that can poison the static host map.
+          if (!domain.domainName || /\s/.test(domain.domainName)) return;
           promises.push(this.repos.domain.save(domain));
         });
         const result = await Promise.all(promises);

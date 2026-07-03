@@ -75,6 +75,7 @@ export class DomainRepo {
       .select(["d.domainName as host", sql`CONCAT(COALESCE(NULLIF(s.subDomain,''), c.subDomain), '.b1.church:443')`.as("dial")])
       .where("d.domainName", "not like", "%www.%")
       .where("d.domainName", "<>", "")
+      .where("d.domainName", "not like", "% %")
       .execute();
   }
 
