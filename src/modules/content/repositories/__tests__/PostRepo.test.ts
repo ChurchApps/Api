@@ -30,14 +30,14 @@ const whereCalls = (calls: { method: string; args: any[] }[]) => calls.filter((c
 describe("PostRepo persistence", () => {
   afterEach(() => jest.restoreAllMocks());
 
-  const post = { churchId: "c1", pageId: "p1", title: "Hello", slug: "hello", excerpt: "hi", category: "News", tags: "a,b", publishDate: new Date() };
+  const post = { churchId: "c1", title: "Hello", slug: "hello", excerpt: "hi", content: "Hello **world**", category: "News", tags: "a,b", publishDate: new Date() };
 
   it("inserts into posts with a generated id on create", async () => {
     const { proxy, calls } = recordingDb();
     (getDb as jest.Mock).mockReturnValue(proxy);
     await new PostRepo().save({ ...post });
     expect(firstArg(calls, "insertInto")).toBe("posts");
-    expect(firstArg(calls, "values")).toMatchObject({ id: "gen_id", pageId: "p1", slug: "hello", category: "News", tags: "a,b" });
+    expect(firstArg(calls, "values")).toMatchObject({ id: "gen_id", content: "Hello **world**", slug: "hello", category: "News", tags: "a,b" });
   });
 
   it("updates posts scoped by id + churchId, without changing churchId", async () => {

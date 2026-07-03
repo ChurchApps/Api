@@ -14,10 +14,10 @@ export class PostRepo {
     await getDb().insertInto("posts").values({
       id: model.id,
       churchId: model.churchId,
-      pageId: model.pageId,
       title: model.title,
       slug: model.slug,
       excerpt: model.excerpt,
+      content: model.content,
       authorId: model.authorId,
       photoUrl: model.photoUrl,
       publishDate: model.publishDate,
@@ -29,10 +29,10 @@ export class PostRepo {
 
   private async update(model: Post): Promise<Post> {
     await getDb().updateTable("posts").set({
-      pageId: model.pageId,
       title: model.title,
       slug: model.slug,
       excerpt: model.excerpt,
+      content: model.content,
       authorId: model.authorId,
       photoUrl: model.photoUrl,
       publishDate: model.publishDate,
