@@ -75,6 +75,13 @@ provider:
     WEB_PUSH_PRIVATE_KEY: ${ssm:/${self:custom.envLower}/webPushPrivateKey, ''}
     WEB_PUSH_SUBJECT: ${ssm:/${self:custom.envLower}/webPushSubject, 'mailto:support@churchapps.org'}
 
+    # SSO (Google / Microsoft social login)
+    GOOGLE_SSO_CLIENT_ID: ${ssm:/${self:custom.envLower}/googleSsoClientId, ''}
+    GOOGLE_SSO_CLIENT_SECRET: ${ssm:/${self:custom.envLower}/googleSsoClientSecret, ''}
+    MICROSOFT_SSO_CLIENT_ID: ${ssm:/${self:custom.envLower}/microsoftSsoClientId, ''}
+    MICROSOFT_SSO_CLIENT_SECRET: ${ssm:/${self:custom.envLower}/microsoftSsoClientSecret, ''}
+    SSO_ALLOWED_ORIGINS: ${ssm:/${self:custom.envLower}/ssoAllowedOrigins, ''}
+
     # Sentry error tracking
     NODE_OPTIONS: "--import @sentry/aws-serverless/awslambda-auto"
     SENTRY_DSN: "https://15d37b1878f2bb1f6a94e8e47495625f@o4510432524107776.ingest.us.sentry.io/4510433937915904"
