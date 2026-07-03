@@ -30,7 +30,8 @@ export class DomainController extends MembershipBaseController {
       const domain = typeof req.query.domain === "string" ? req.query.domain.toLowerCase().trim() : "";
       if (!domain) return this.json({}, 404);
       const row = await this.repos.domain.loadByName(domain);
-      return row ? this.json({}, 200) : this.json({}, 404);
+      // Caddy only reads the status; the body is for humans debugging with curl/browser.
+      return row ? this.json({ authorized: true }, 200) : this.json({}, 404);
     });
   }
 
@@ -39,7 +40,16 @@ export class DomainController extends MembershipBaseController {
   public async hostmap(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const pairs = (await this.repos.domain.loadPairs()) as { host: string; dial: string }[];
-      const lines = pairs.map((p) => p.host + " " + p.dial.replace(/:443$/, "")).sort();
+      // First row wins per host: the table has no unique index on domainName, and a duplicate
+      // map key would poison the whole file for Caddy's map directive.
+      const seen = new Set<string>();
+      const lines: string[] = [];
+      pairs.forEach((p) => {
+        if (!p.host || seen.has(p.host)) return;
+        seen.add(p.host);
+        lines.push(p.host + " " + p.dial.replace(/:443$/, ""));
+      });
+      lines.sort();
       res.set("Content-Type", "text/plain");
       res.send(lines.join("\n"));
     });
@@ -85,6 +95,9 @@ export class DomainController extends MembershipBaseController {
           domain.churchId = au.churchId;
           domain.domainName = (domain.domainName || "").toLowerCase().trim();
           domain.siteId = domain.siteId || "";
+          // Blank rows (an empty add-row saved from B1Admin) must never persist — prod accumulated
+          // several, each of which generated a garbage Caddy route.
+          if (!domain.domainName) return;
           promises.push(this.repos.domain.save(domain));
         });
         const result = await Promise.all(promises);

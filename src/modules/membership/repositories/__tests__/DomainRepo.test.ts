@@ -65,6 +65,15 @@ describe("DomainRepo.loadPairs", () => {
       .join(" ");
     expect(serialized).toContain("COALESCE");
   });
+
+  it("excludes www.* and empty domainName rows", async () => {
+    const { proxy, calls } = recordingDb({ execute: [] });
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new DomainRepo().loadPairs();
+    const wheres = calls.filter((c) => c.method === "where");
+    expect(wheres.some((c) => c.args[0] === "d.domainName" && c.args[1] === "not like" && c.args[2] === "%www.%")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "d.domainName" && c.args[1] === "<>" && c.args[2] === "")).toBe(true);
+  });
 });
 
 describe("DomainRepo.loadByName", () => {
