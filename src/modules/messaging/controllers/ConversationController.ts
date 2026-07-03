@@ -89,8 +89,31 @@ export class ConversationController extends MessagingBaseController {
         }
       }
 
+      await this.appendReactions(conversations, churchId, au.personId);
+
       return conversations;
     }) as any;
+  }
+
+  // Stitch aggregated reactions onto each loaded message in one extra query.
+  private async appendReactions(conversations: Conversation[], churchId: string, personId: string) {
+    const messageIds: string[] = [];
+    conversations.forEach((c) => (c.messages || []).forEach((m: any) => { if (m?.id) messageIds.push(m.id); }));
+    if (messageIds.length === 0) return;
+    const rows = await this.repos.messageReaction.loadForMessages(churchId, messageIds);
+    const byMessage = new Map<string, Map<string, { emoji: string; count: number; mine: boolean }>>();
+    for (const r of rows as any[]) {
+      let emojiMap = byMessage.get(r.messageId);
+      if (!emojiMap) { emojiMap = new Map(); byMessage.set(r.messageId, emojiMap); }
+      let entry = emojiMap.get(r.emoji);
+      if (!entry) { entry = { emoji: r.emoji, count: 0, mine: false }; emojiMap.set(r.emoji, entry); }
+      entry.count++;
+      if (r.personId === personId) entry.mine = true;
+    }
+    conversations.forEach((c) => (c.messages || []).forEach((m: any) => {
+      const emojiMap = byMessage.get(m.id);
+      m.reactions = emojiMap ? Array.from(emojiMap.values()) : [];
+    }));
   }
 
   @httpGet("/:churchId/:contentType/:contentId")

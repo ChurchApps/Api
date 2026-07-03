@@ -45,6 +45,29 @@ export interface MembershipModuleGateway {
   loadPeopleForAutomation(churchId: string): Promise<{ id: string; displayName: string; membershipStatus?: string; gender?: string; maritalStatus?: string }[]>;
   loadList(churchId: string, listId: string): Promise<{ id: string; name: string } | null>;
   loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]>;
+  // Single per-church setting value (e.g. gradePromotionDate, ratioEnforcement).
+  loadSetting(churchId: string, keyName: string): Promise<string | null>;
+  // Capacity/ratio fields for the check-in gates, by group id.
+  loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]>;
+  // Household adults (householdRole !== "Child") of the given people, with phone + opt-out.
+  loadHouseholdAdults(churchId: string, personIds: string[]): Promise<HouseholdAdult[]>;
+}
+
+export interface CheckinGroup {
+  id: string;
+  name: string;
+  capacity?: number;
+  guestCapacity?: number;
+  checkinClosed: boolean;
+  volunteerRatio?: number;
+  minVolunteers?: number;
+}
+
+export interface HouseholdAdult {
+  personId: string;
+  name: string;
+  mobilePhone: string;
+  optedOut: boolean;
 }
 
 class MembershipModuleGatewayDb implements MembershipModuleGateway {
@@ -259,6 +282,58 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .where("listId", "=", listId)
       .execute()) as { personId: string }[];
     return rows.map((r) => r.personId).filter((id) => !!id);
+  }
+
+  public async loadSetting(churchId: string, keyName: string): Promise<string | null> {
+    const row = await this.getDb().selectFrom("settings")
+      .select("value")
+      .where("churchId", "=", churchId)
+      .where("keyName", "=", keyName)
+      .executeTakeFirst();
+    return (row?.value as string) ?? null;
+  }
+
+  public async loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]> {
+    if (groupIds.length === 0) return [];
+    const rows = (await this.getDb().selectFrom("groups")
+      .select(["id", "name", "capacity", "guestCapacity", "checkinClosed", "volunteerRatio", "minVolunteers"])
+      .where("churchId", "=", churchId)
+      .where("id", "in", groupIds)
+      .execute()) as any[];
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      capacity: r.capacity ?? undefined,
+      guestCapacity: r.guestCapacity ?? undefined,
+      checkinClosed: r.checkinClosed === 1 || r.checkinClosed === true,
+      volunteerRatio: r.volunteerRatio ?? undefined,
+      minVolunteers: r.minVolunteers ?? undefined
+    }));
+  }
+
+  public async loadHouseholdAdults(churchId: string, personIds: string[]): Promise<HouseholdAdult[]> {
+    if (personIds.length === 0) return [];
+    const seeds = (await this.getDb().selectFrom("people")
+      .select("householdId")
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("id", "in", personIds)
+      .execute()) as { householdId: string }[];
+    const householdIds = [...new Set(seeds.map((p) => p.householdId).filter((id) => !!id))];
+    if (householdIds.length === 0) return [];
+    const rows = (await this.getDb().selectFrom("people")
+      .select(["id", "displayName", "mobilePhone", "optedOut"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("householdId", "in", householdIds)
+      .where((eb: any) => eb.or([eb("householdRole", "is", null), eb("householdRole", "!=", "Child")]))
+      .execute()) as any[];
+    return rows.map((r) => ({
+      personId: r.id,
+      name: r.displayName || "",
+      mobilePhone: r.mobilePhone || "",
+      optedOut: r.optedOut === true || r.optedOut === 1
+    }));
   }
 
   public async setPersonField(churchId: string, personId: string, field: string, value: string): Promise<void> {

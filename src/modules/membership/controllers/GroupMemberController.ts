@@ -18,6 +18,8 @@ export class GroupMemberController extends MembershipBaseController {
   @httpGet("/public/leaders/:churchId/:groupId")
   public async getPublicLeaders(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      const group: any = await this.repos.group.load(churchId, groupId);
+      if (group?.confidential) return [];
       const result = (await this.repos.groupMember.loadLeadersForGroup(churchId, groupId)) as any[];
       return this.repos.groupMember.convertAllToModel(churchId, result);
     });
@@ -26,6 +28,8 @@ export class GroupMemberController extends MembershipBaseController {
   @httpGet("/public/:churchId/:groupId")
   public async getPublicMembers(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      const group: any = await this.repos.group.load(churchId, groupId);
+      if (group?.confidential) return [];
       const rows = (await this.repos.groupMember.loadPublicForGroup(churchId, groupId)) as any[];
       return this.repos.groupMember.convertAllToPublicModel(churchId, rows);
     });
@@ -34,6 +38,9 @@ export class GroupMemberController extends MembershipBaseController {
   @httpGet("/basic/:groupId")
   public async getbasic(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      // Confidential-group rosters are members-or-staff only.
+      const group: any = await this.repos.group.load(au.churchId, groupId);
+      if (group?.confidential && !au.groupIds?.includes(groupId) && !au.checkAccess(Permissions.groupMembers.view)) return this.json({}, 401);
       const result = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
       return this.repos.groupMember.convertAllToBasicModel(au.churchId, this.filterMinors(result, au, groupId));
     });

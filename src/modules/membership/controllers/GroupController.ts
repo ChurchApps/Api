@@ -54,7 +54,8 @@ export class GroupController extends MembershipBaseController {
   @httpGet("/public/:churchId/list")
   public async getPublicList(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadAll(churchId)) as any[]);
+      const groups = this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadAll(churchId)) as any[]);
+      return groups.filter((g) => !g.confidential);
     });
   }
 
@@ -62,7 +63,7 @@ export class GroupController extends MembershipBaseController {
   public async getPublic(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const group = await this.repos.group.load(churchId, id);
-      return group && !(group as any).archived ? this.repos.group.convertToModel(churchId, group) : this.json({ error: "Group not found" }, 404);
+      return group && !(group as any).archived && !(group as any).confidential ? this.repos.group.convertToModel(churchId, group) : this.json({ error: "Group not found" }, 404);
     });
   }
 
@@ -76,7 +77,8 @@ export class GroupController extends MembershipBaseController {
   @httpGet("/public/:churchId/tag/:tag")
   public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadByTag(churchId, tag)) as any[]);
+      const groups = this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadByTag(churchId, tag)) as any[]);
+      return groups.filter((g) => !g.confidential);
     });
   }
 

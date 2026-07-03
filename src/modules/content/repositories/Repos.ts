@@ -13,6 +13,7 @@ import {
   SermonRepo,
   StreamingServiceRepo,
   EventRepo,
+  EventRsvpRepo,
   EventExceptionRepo,
   CuratedCalendarRepo,
   CuratedEventRepo,
@@ -23,6 +24,11 @@ import {
   EventTemplateRepo,
   RegistrationRepo,
   RegistrationMemberRepo,
+  RegistrationTypeRepo,
+  RegistrationSelectionRepo,
+  RegistrationSelectionChoiceRepo,
+  RegistrationPaymentRepo,
+  RegistrationCouponRepo,
   SettingRepo,
   BibleTranslationRepo,
   BibleBookRepo,
@@ -52,6 +58,7 @@ export class Repos {
   public sermon: SermonRepo;
   public streamingService: StreamingServiceRepo;
   public event: EventRepo;
+  public eventRsvp: EventRsvpRepo;
   public eventException: EventExceptionRepo;
   public curatedCalendar: CuratedCalendarRepo;
   public curatedEvent: CuratedEventRepo;
@@ -62,6 +69,11 @@ export class Repos {
   public eventTemplate: EventTemplateRepo;
   public registration: RegistrationRepo;
   public registrationMember: RegistrationMemberRepo;
+  public registrationType: RegistrationTypeRepo;
+  public registrationSelection: RegistrationSelectionRepo;
+  public registrationSelectionChoice: RegistrationSelectionChoiceRepo;
+  public registrationPayment: RegistrationPaymentRepo;
+  public registrationCoupon: RegistrationCouponRepo;
   public setting: SettingRepo;
   public bibleTranslation: BibleTranslationRepo;
   public bibleBook: BibleBookRepo;
@@ -92,6 +104,7 @@ export class Repos {
     this.sermon = new SermonRepo();
     this.streamingService = new StreamingServiceRepo();
     this.event = new EventRepo();
+    this.eventRsvp = new EventRsvpRepo();
     this.eventException = new EventExceptionRepo();
     this.curatedCalendar = new CuratedCalendarRepo();
     this.curatedEvent = new CuratedEventRepo();
@@ -102,6 +115,11 @@ export class Repos {
     this.eventTemplate = new EventTemplateRepo();
     this.registration = new RegistrationRepo();
     this.registrationMember = new RegistrationMemberRepo();
+    this.registrationType = new RegistrationTypeRepo();
+    this.registrationSelection = new RegistrationSelectionRepo();
+    this.registrationSelectionChoice = new RegistrationSelectionChoiceRepo();
+    this.registrationPayment = new RegistrationPaymentRepo();
+    this.registrationCoupon = new RegistrationCouponRepo();
     this.setting = new SettingRepo();
     this.bibleTranslation = new BibleTranslationRepo();
     this.bibleBook = new BibleBookRepo();

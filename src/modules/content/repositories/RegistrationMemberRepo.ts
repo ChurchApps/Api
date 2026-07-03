@@ -1,4 +1,5 @@
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { RegistrationMember } from "../models/index.js";
 import { injectable } from "inversify";
@@ -17,7 +18,8 @@ export class RegistrationMemberRepo {
       registrationId: model.registrationId,
       personId: model.personId,
       firstName: model.firstName,
-      lastName: model.lastName
+      lastName: model.lastName,
+      registrationTypeId: model.registrationTypeId || null
     } as any).execute();
     return model;
   }
@@ -27,9 +29,40 @@ export class RegistrationMemberRepo {
       registrationId: model.registrationId,
       personId: model.personId,
       firstName: model.firstName,
-      lastName: model.lastName
-    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+      lastName: model.lastName,
+      registrationTypeId: model.registrationTypeId || null
+    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
+  }
+
+  // Per-type capacity counted over registrationMembers joined to active registrations,
+  // guarded atomically in a single INSERT...SELECT so concurrent inserts can't oversell.
+  public async atomicInsertWithTypeCapacity(model: RegistrationMember, capacity: number | null): Promise<boolean> {
+    if (!model.id) model.id = UniqueIdHelper.shortId();
+    const typeId = model.registrationTypeId || null;
+
+    if (capacity === null || capacity === undefined || !typeId) {
+      await this.create(model);
+      return true;
+    }
+
+    const result: any = await sql`INSERT INTO registrationMembers (id, churchId, registrationId, personId, firstName, lastName, registrationTypeId)
+      SELECT ${model.id}, ${model.churchId}, ${model.registrationId}, ${model.personId || null}, ${model.firstName || null}, ${model.lastName || null}, ${typeId}
+      FROM dual
+      WHERE (SELECT COUNT(*) FROM registrationMembers m JOIN registrations r ON r.id=m.registrationId
+             WHERE m.registrationTypeId=${typeId} AND r.status IN ('pending','confirmed')) < ${capacity}`.execute(getDb());
+    return result?.numAffectedRows > 0n || result?.affectedRows > 0;
+  }
+
+  public async countActiveForType(churchId: string, typeId: string): Promise<number> {
+    const result = await getDb().selectFrom("registrationMembers as m")
+      .innerJoin("registrations as r", "r.id", "m.registrationId")
+      .select(sql<number>`COUNT(*)`.as("cnt"))
+      .where("m.churchId", "=", churchId)
+      .where("m.registrationTypeId", "=", typeId)
+      .where("r.status", "in", ["pending", "confirmed"])
+      .executeTakeFirst();
+    return (result as any)?.cnt || 0;
   }
 
   public async delete(churchId: string, id: string) {

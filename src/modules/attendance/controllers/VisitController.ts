@@ -4,7 +4,9 @@ import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Visit, VisitSession, Session } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
-import { SecurityCodeHelper } from "../helpers/index.js";
+import { SecurityCodeHelper, CheckinGateHelper } from "../helpers/index.js";
+import type { GateGroup, GateCount, GateIncoming } from "../helpers/CheckinGateHelper.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 interface IdCache {
   [name: string]: string;
@@ -123,17 +125,18 @@ export class VisitController extends AttendanceBaseController {
         }
 
         const submittedVisits = [...req.body];
-        submittedVisits.forEach((sv) => {
+        for (const sv of submittedVisits) {
           sv.churchId = au.churchId;
           sv.visitDate = currentDate;
           sv.checkinTime = new Date();
           sv.addedBy = au.id;
           if (!sv.securityCode) sv.securityCode = securityCode;
-          sv.visitSessions.forEach(async (vs) => {
+          // for..of, not forEach(async): unawaited assignments raced the save and wrote NULL sessionIds on first-session creation
+          for (const vs of sv.visitSessions) {
             vs.sessionId = await this.getSessionId(au.churchId, vs.session.serviceTimeId, vs.session.groupId, currentDate);
             vs.churchId = au.churchId;
-          });
-        });
+          }
+        }
 
         const existingVisitIds: string[] = [];
         if (existingVisits.length > 0) {
@@ -141,6 +144,10 @@ export class VisitController extends AttendanceBaseController {
           const visitSessions: VisitSession[] = this.repos.visitSession.convertAllToModel(au.churchId, (await this.repos.visitSession.loadByVisitIds(au.churchId, existingVisitIds)) as any);
           this.populateDeleteIds(existingVisits, submittedVisits, visitSessions, deleteVisitIds, deleteVisitSessionIds);
         }
+
+        // Capacity + volunteer-ratio gates run BEFORE any save (postCheckin is not transactional).
+        const gateResponse = await this.evaluateGates(au.churchId, submittedVisits, peopleIds, req.query.acknowledgeWarnings === "true");
+        if (gateResponse) return this.json(gateResponse.body, gateResponse.status);
 
         const promises: Promise<any>[] = [];
         await this.getSavePromises(submittedVisits, promises);
@@ -183,6 +190,17 @@ export class VisitController extends AttendanceBaseController {
         for (const visit of visits) await WebhookDispatcher.emit(au.churchId, "attendance.checkout", visit);
         return visits;
       }
+    });
+  }
+
+  @httpGet("/:id/guardians")
+  public async getGuardians(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.checkin) && !au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
+      const visit = this.repos.visit.convertToModel(au.churchId, await this.repos.visit.load(au.churchId, id));
+      if (!visit?.personId) return [];
+      const adults = await getMembershipModuleGateway().loadHouseholdAdults(au.churchId, [visit.personId]);
+      return adults.map((a) => ({ personId: a.personId, name: a.name, mobilePhone: a.mobilePhone }));
     });
   }
 
@@ -251,6 +269,51 @@ export class VisitController extends AttendanceBaseController {
       v.visitSessions = visitSessions.filter((vs) => vs.visitId === v.id);
       v.visitSessions.forEach((vs) => (vs.session = sessions.find((s) => s.id === vs.sessionId)));
     });
+  }
+
+  // Returns a {body,status} 409 payload when the batch must be rejected, else null.
+  private async evaluateGates(churchId: string, submittedVisits: Visit[], batchPersonIds: string[], acknowledgeWarnings: boolean): Promise<{ body: any; status: number } | null> {
+    const incoming: Record<string, GateIncoming> = {};
+    const targetGroupIds = new Set<string>();
+    submittedVisits.forEach((sv) => {
+      const isVolunteer = sv.checkinType === "volunteer";
+      const isGuest = sv.checkinType === "guest";
+      (sv.visitSessions || []).forEach((vs) => {
+        const gid = vs.session?.groupId;
+        if (!gid) return;
+        targetGroupIds.add(gid);
+        const e = incoming[gid] ?? (incoming[gid] = { total: 0, volunteers: 0, guests: 0, nonVolunteers: 0 });
+        e.total++;
+        if (isVolunteer) e.volunteers++;
+        else e.nonVolunteers++;
+        if (isGuest) e.guests++;
+      });
+    });
+    if (targetGroupIds.size === 0) return null;
+
+    const groupIds = [...targetGroupIds];
+    const gateway = getMembershipModuleGateway();
+    const [groupList, countRows, ratioSetting] = await Promise.all([
+      gateway.loadGroupsForCheckin(churchId, groupIds),
+      this.repos.visit.countActiveByGroupToday(churchId, groupIds, batchPersonIds),
+      gateway.loadSetting(churchId, "ratioEnforcement")
+    ]);
+
+    const groups: Record<string, GateGroup> = {};
+    groupList.forEach((g) => (groups[g.id] = g));
+    const current: Record<string, GateCount> = {};
+    countRows.forEach((r) => (current[r.groupId] = { total: r.total, volunteers: r.volunteers, guests: r.guests }));
+    const ratioEnforcement = ratioSetting === "block" ? "block" : "warn";
+
+    const { hard, warnings } = CheckinGateHelper.evaluate({ groups, current, incoming, ratioEnforcement });
+    if (hard.length > 0) {
+      const primary = hard.some((v) => v.reason === "capacity") ? "capacity" : "ratio";
+      return { body: { error: primary, groups: hard }, status: 409 };
+    }
+    if (warnings.length > 0 && !acknowledgeWarnings) {
+      return { body: { warning: true, error: "ratio", groups: warnings }, status: 409 };
+    }
+    return null;
   }
 
   private populateDeleteIds(existingVisits: Visit[], _submittedVisits: Visit[], visitSessions: VisitSession[], deleteVisitIds: string[], deleteVisitSessionIds: string[]) {

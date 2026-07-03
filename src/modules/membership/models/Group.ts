@@ -18,10 +18,16 @@ export class Group {
   public campusId?: string;
   public archived?: boolean;
   public publicRoster?: boolean;
+  public confidential?: boolean;
   public minAgeMonths?: number;
   public maxAgeMonths?: number;
   public minGrade?: string;
   public maxGrade?: string;
+  public capacity?: number;
+  public guestCapacity?: number;
+  public checkinClosed?: boolean;
+  public volunteerRatio?: number;
+  public minVolunteers?: number;
 
   public joinPolicy?: "open" | "request" | "closed";
 

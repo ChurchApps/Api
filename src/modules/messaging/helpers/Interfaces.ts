@@ -11,6 +11,7 @@ export type PayloadAction =
   | "videoChatInvite"
   | "notification"
   | "blockedIp"
+  | "reaction"
   | "conversationActivity";
 
 export interface PayloadInterface {

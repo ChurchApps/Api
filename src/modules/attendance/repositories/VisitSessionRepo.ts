@@ -73,7 +73,7 @@ export class VisitSessionRepo {
   }
 
   public async loadForSession(churchId: string, sessionId: string) {
-    const rows = await sql<any>`SELECT vs.*, v.personId FROM visitSessions vs INNER JOIN visits v on v.id = vs.visitId WHERE vs.churchId=${churchId} AND vs.sessionId = ${sessionId}`.execute(getDb());
+    const rows = await sql<any>`SELECT vs.*, v.personId, v.checkinType FROM visitSessions vs INNER JOIN visits v on v.id = vs.visitId WHERE vs.churchId=${churchId} AND vs.sessionId = ${sessionId}`.execute(getDb());
     return rows.rows.map((row: any) => this.rowToModel(row));
   }
 
@@ -88,7 +88,7 @@ export class VisitSessionRepo {
   protected rowToModel(row: any): VisitSession {
     const result: VisitSession = { id: row.id, visitId: row.visitId, sessionId: row.sessionId };
     if (row.personId !== undefined) {
-      result.visit = { id: result.visitId, personId: row.personId };
+      result.visit = { id: result.visitId, personId: row.personId, checkinType: row.checkinType };
     }
     return result;
   }

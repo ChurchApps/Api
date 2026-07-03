@@ -36,6 +36,20 @@ export class EventController extends ContentBaseController {
     });
   }
 
+  // CA-1: the caller's own event/room requests joined with their bookings + statuses.
+  @httpGet("/requests/mine")
+  public async getMyRequests(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const events = await this.repos.event.loadRequestsForPerson(au.churchId, au.personId);
+      const result = [];
+      for (const event of events) {
+        const bookings = await this.repos.eventBooking.loadForEvent(au.churchId, event.id);
+        result.push({ ...event, bookings });
+      }
+      return result;
+    });
+  }
+
   @httpGet("/pending")
   public async getPendingApproval(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -265,7 +279,10 @@ export class EventController extends ContentBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const existing = await this.repos.event.load(au.churchId, id);
+      // CA-1: a requester may withdraw their own still-pending request.
+      const isSelfCancel = !!existing && existing.requestedBy === au.personId && existing.approvalStatus === "pending";
+      if (!au.checkAccess(Permissions.content.edit) && !isSelfCancel) return this.json({}, 401);
       else {
         await this.repos.event.delete(au.churchId, id);
         await this.repos.eventBooking.deleteForEvent(au.churchId, id);

@@ -4,6 +4,7 @@ export { Device } from "./Device.js";
 export { DeviceContent } from "./DeviceContent.js";
 export { FcmMessage } from "./FcmMessage.js";
 export { Message } from "./Message.js";
+export { MessageReaction } from "./MessageReaction.js";
 export { Notification } from "./Notification.js";
 export { NotificationPreference } from "./NotificationPreference.js";
 export { NotificationPreferenceOverride } from "./NotificationPreferenceOverride.js";

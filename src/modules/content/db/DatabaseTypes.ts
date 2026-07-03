@@ -2,8 +2,9 @@ import type {
   Arrangement, ArrangementKey, BibleBook, BibleChapter, BibleLookup,
   BibleTranslation, BibleVerse, BibleVerseText, Block, CalendarBlockout,
   CuratedCalendar, CuratedEvent, Element, Event, EventBooking,
-  EventException, EventTemplate, File, GlobalStyle, Link,
-  Page, PageHistory, Post, Playlist, Redirect, Registration, RegistrationMember, Resource,
+  EventException, EventRsvp, EventTemplate, File, GlobalStyle, Link,
+  Page, PageHistory, Post, Playlist, Redirect, Registration, RegistrationMember,
+  RegistrationType, RegistrationSelection, RegistrationSelectionChoice, RegistrationPayment, RegistrationCoupon, Resource,
   Room, Section, Sermon, Setting, Song, SongDetail, SongDetailLink,
   StreamingService
 } from "../models/index.js";
@@ -22,6 +23,7 @@ export interface ContentDatabase {
   curatedEvents: CuratedEvent;
   elements: Omit<Element, "answers" | "styles" | "animations" | "elements">;
   events: Omit<Event, "exceptionDates">;
+  eventRsvps: EventRsvp;
   eventExceptions: EventException;
   eventBookings: EventBooking;
   eventTemplates: EventTemplate;
@@ -38,6 +40,11 @@ export interface ContentDatabase {
   redirects: Redirect;
   registrations: Omit<Registration, "members">;
   registrationMembers: RegistrationMember;
+  registrationTypes: RegistrationType;
+  registrationSelections: RegistrationSelection;
+  registrationSelectionChoices: RegistrationSelectionChoice;
+  registrationPayments: RegistrationPayment;
+  registrationCoupons: RegistrationCoupon;
   sections: Omit<Section, "answers" | "styles" | "animations" | "elements" | "sections">;
   sermons: Sermon;
   settings: Setting;

@@ -33,10 +33,16 @@ export class GroupRepo {
       joinPolicy: group.joinPolicy ?? "open",
       archived: group.archived ?? false,
       publicRoster: group.publicRoster ?? false,
+      confidential: group.confidential ?? false,
       minAgeMonths: group.minAgeMonths,
       maxAgeMonths: group.maxAgeMonths,
       minGrade: group.minGrade,
       maxGrade: group.maxGrade,
+      capacity: group.capacity,
+      guestCapacity: group.guestCapacity,
+      checkinClosed: (group.checkinClosed ?? false) as any,
+      volunteerRatio: group.volunteerRatio,
+      minVolunteers: group.minVolunteers,
       importKey: group.importKey,
       removed: false as any
     }).execute();
@@ -63,10 +69,18 @@ export class GroupRepo {
       joinPolicy: group.joinPolicy ?? "open",
       archived: group.archived ?? false,
       publicRoster: group.publicRoster ?? false,
+      // Explicit false so un-setting confidential persists (Kysely drops undefined).
+      confidential: group.confidential ?? false,
       minAgeMonths: group.minAgeMonths,
       maxAgeMonths: group.maxAgeMonths,
       minGrade: group.minGrade,
       maxGrade: group.maxGrade,
+      // Explicit null so clearing a capacity/ratio persists (undefined is dropped from the UPDATE).
+      capacity: group.capacity ?? null,
+      guestCapacity: group.guestCapacity ?? null,
+      checkinClosed: (group.checkinClosed ?? false) as any,
+      volunteerRatio: group.volunteerRatio ?? null,
+      minVolunteers: group.minVolunteers ?? null,
       importKey: group.importKey
     }).where("id", "=", group.id).where("churchId", "=", group.churchId).execute();
     return group;
@@ -90,6 +104,7 @@ export class GroupRepo {
   public async loadPublicSlug(churchId: string, slug: string) {
     return (await getDb().selectFrom("groups").selectAll().where("churchId", "=", churchId).where("slug", "=", slug).where("removed", "=", false as any)
       .where((eb) => eb.or([eb("archived", "is", null), eb("archived", "=", false as any)]))
+      .where((eb) => eb.or([eb("confidential", "is", null), eb("confidential", "=", false as any)]))
       .executeTakeFirst()) ?? null;
   }
 
@@ -176,6 +191,7 @@ export class GroupRepo {
       .where("labels", "like", "%" + label + "%")
       .where("removed", "=", false as any)
       .where((eb) => eb.or([eb("archived", "is", null), eb("archived", "=", false as any)]))
+      .where((eb) => eb.or([eb("confidential", "is", null), eb("confidential", "=", false as any)]))
       .orderBy("name")
       .execute();
   }
@@ -232,10 +248,16 @@ export class GroupRepo {
       joinPolicy: (row.joinPolicy as Group["joinPolicy"]) ?? "open",
       archived: row.archived,
       publicRoster: row.publicRoster,
+      confidential: row.confidential,
       minAgeMonths: row.minAgeMonths,
       maxAgeMonths: row.maxAgeMonths,
       minGrade: row.minGrade,
-      maxGrade: row.maxGrade
+      maxGrade: row.maxGrade,
+      capacity: row.capacity,
+      guestCapacity: row.guestCapacity,
+      checkinClosed: row.checkinClosed === 1 || row.checkinClosed === true,
+      volunteerRatio: row.volunteerRatio,
+      minVolunteers: row.minVolunteers
     };
     row.labels?.split(",").forEach((label: string) => result.labelArray.push(label.trim()));
     return result;

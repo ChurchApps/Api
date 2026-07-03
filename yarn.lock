@@ -1350,9 +1350,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/helpers@npm:^1.9.0":
-  version: 1.9.0
-  resolution: "@churchapps/helpers@npm:1.9.0"
+"@churchapps/helpers@npm:^1.10.0":
+  version: 1.10.0
+  resolution: "@churchapps/helpers@npm:1.10.0"
   dependencies:
     dayjs: "npm:^1.11.20"
   peerDependencies:
@@ -1360,7 +1360,7 @@ __metadata:
   peerDependenciesMeta:
     rrule:
       optional: true
-  checksum: 10c0/c41bdefba1b5ce7668a0648e95e4e4b14684dd02c63fe147b1587d2dc1691966034afe59b29e1f4a4a6759c3fc69583173c037c8b606bb22e94c197c30454324
+  checksum: 10c0/daaa38246bd5b5acf5f643c71403fbe2bd087dcb77451d30d5142290a70c86077454d558bf3c1f4b6ddf36c6c8533fb7d4a422c72feba0961953da4c9a8f3120
   languageName: node
   linkType: hard
 
@@ -3848,7 +3848,7 @@ __metadata:
     "@aws-sdk/lib-storage": "npm:^3.862.0"
     "@churchapps/apihelper": "npm:^0.7.0"
     "@churchapps/content-providers": "npm:^0.3.1"
-    "@churchapps/helpers": "npm:^1.9.0"
+    "@churchapps/helpers": "npm:^1.10.0"
     "@churchapps/texting": "npm:^0.2.1"
     "@codegenie/serverless-express": "npm:^4.15.0"
     "@hubspot/api-client": "npm:^13.1.0"

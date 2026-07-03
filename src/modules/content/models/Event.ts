@@ -12,10 +12,12 @@ export class Event {
   exceptionDates?: Date[];
   registrationEnabled?: boolean;
   capacity?: number;
+  waitlistEnabled?: boolean;
   registrationOpenDate?: Date;
   registrationCloseDate?: Date;
   tags?: string;
   formId?: string;
   approvalStatus?: string;
   requestedBy?: string;
+  rsvpDisabled?: boolean;
 }

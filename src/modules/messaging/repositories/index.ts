@@ -5,6 +5,7 @@ export { ConversationRepo } from "./ConversationRepo.js";
 export { DeviceRepo } from "./DeviceRepo.js";
 export { DeviceContentRepo } from "./DeviceContentRepo.js";
 export { MessageRepo } from "./MessageRepo.js";
+export { MessageReactionRepo } from "./MessageReactionRepo.js";
 export { NotificationRepo } from "./NotificationRepo.js";
 export { NotificationPreferenceRepo } from "./NotificationPreferenceRepo.js";
 export { NotificationPreferenceOverrideRepo } from "./NotificationPreferenceOverrideRepo.js";

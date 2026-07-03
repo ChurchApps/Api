@@ -173,6 +173,55 @@ export class MessageController extends MessagingBaseController {
     }) as any;
   }
 
+  // Toggle an emoji reaction on a message (delete the caller's existing one, else add).
+  @httpPost("/:messageId/reactions")
+  public async toggleReaction(@requestParam("messageId") messageId: string, req: express.Request<{}, {}, { emoji: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const emoji = (req.body?.emoji || "").toString();
+      if (!emoji) return this.json({ error: "emoji is required" }, 400);
+      const message = await this.repos.message.loadById(au.churchId, messageId);
+      if (!message || Object.keys(message).length === 0) return this.json({ error: "Message not found" }, 404);
+      const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
+      if (!conv?.id) return this.json({ error: "Conversation not found" }, 404);
+
+      const allowed = await this.canParticipate(au, conv);
+      if (!allowed) return this.json({}, 401);
+
+      const existing = await this.repos.messageReaction.loadOne(au.churchId, messageId, au.personId, emoji);
+      let added: boolean;
+      if (existing) {
+        await this.repos.messageReaction.delete(au.churchId, existing.id);
+        added = false;
+      } else {
+        await this.repos.messageReaction.create({ churchId: au.churchId, messageId, conversationId: message.conversationId, personId: au.personId, emoji });
+        added = true;
+      }
+
+      await DeliveryHelper.sendConversationMessages({
+        churchId: au.churchId,
+        conversationId: message.conversationId,
+        action: "reaction",
+        data: { messageId, conversationId: message.conversationId, personId: au.personId, emoji, added }
+      });
+
+      return { messageId, emoji, added };
+    }) as any;
+  }
+
+  // Group / announcement conversations gate on group membership; DMs on being a
+  // participant; staff with content.edit may always act (moderation).
+  private async canParticipate(au: any, conv: any): Promise<boolean> {
+    if (au.checkAccess(Permissions.content.edit)) return true;
+    if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
+      return !!conv.contentId && au.groupIds?.includes(conv.contentId);
+    }
+    if (conv.contentType === "privateMessage") {
+      const pm = (await this.repos.privateMessage.loadById(au.churchId, conv.contentId)) as any;
+      return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);
+    }
+    return false;
+  }
+
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {

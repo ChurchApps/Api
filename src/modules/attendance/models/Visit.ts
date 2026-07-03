@@ -14,6 +14,8 @@ export class Visit {
   public checkoutTime?: Date;
   public checkedOutBy?: string;
   public checkedOutById?: string;
+  public checkinType?: string;
+  public checkedInById?: string;
 
   // public person?: Person;
   public visitSessions?: VisitSession[];

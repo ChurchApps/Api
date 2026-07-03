@@ -22,7 +22,9 @@ export class VisitRepo {
       visitDate: visitDate as any,
       checkinTime: checkinTime as any,
       addedBy: model.addedBy,
-      securityCode: model.securityCode
+      securityCode: model.securityCode,
+      checkinType: model.checkinType,
+      checkedInById: model.checkedInById
     }).execute();
     return model;
   }
@@ -37,7 +39,9 @@ export class VisitRepo {
       visitDate: visitDate as any,
       checkinTime: checkinTime as any,
       addedBy: model.addedBy,
-      securityCode: model.securityCode
+      securityCode: model.securityCode,
+      checkinType: model.checkinType ?? null,
+      checkedInById: model.checkedInById ?? null
     }).where("id", "=", model.id)
       .where("churchId", "=", model.churchId)
       .execute();
@@ -186,7 +190,39 @@ export class VisitRepo {
       securityCode: row.securityCode,
       checkoutTime: row.checkoutTime,
       checkedOutBy: row.checkedOutBy,
-      checkedOutById: row.checkedOutById
+      checkedOutById: row.checkedOutById,
+      checkinType: row.checkinType,
+      checkedInById: row.checkedInById
     };
+  }
+
+  // Room occupancy for capacity/ratio gates: today's not-checked-out visits per
+  // target group, split by checkinType. Counted via visitSessions→sessions so the
+  // group is the room the visit was checked into, not the visit's serviceId group.
+  // excludePersonIds drops people in the current batch (they're being re-checked in).
+  public async countActiveByGroupToday(churchId: string, groupIds: string[], excludePersonIds: string[] = []): Promise<{ groupId: string; total: number; volunteers: number; guests: number }[]> {
+    if (groupIds.length === 0) return [];
+    const today = DateHelper.toMysqlDateOnly(new Date());
+    const excludeClause = excludePersonIds.length > 0 ? sql`AND v.personId NOT IN (${sql.join(excludePersonIds)})` : sql``;
+    const rows = await sql<any>`
+      SELECT s.groupId AS groupId,
+        COUNT(*) AS total,
+        SUM(CASE WHEN v.checkinType = 'volunteer' THEN 1 ELSE 0 END) AS volunteers,
+        SUM(CASE WHEN v.checkinType = 'guest' THEN 1 ELSE 0 END) AS guests
+      FROM sessions s
+      INNER JOIN visitSessions vs ON vs.sessionId = s.id
+      INNER JOIN visits v ON v.id = vs.visitId
+      WHERE s.churchId = ${churchId} AND s.groupId IN (${sql.join(groupIds)})
+        AND DATE(s.sessionDate) = ${today} AND v.checkoutTime IS NULL ${excludeClause}
+      GROUP BY s.groupId
+    `.execute(getDb());
+    return rows.rows.map((r: any) => ({ groupId: r.groupId, total: Number(r.total ?? 0), volunteers: Number(r.volunteers ?? 0), guests: Number(r.guests ?? 0) }));
+  }
+
+  // Today's not-checked-out visits for a service (broadcast recipient resolution).
+  public async loadActiveByServiceToday(churchId: string, serviceId: string) {
+    const today = DateHelper.toMysqlDateOnly(new Date());
+    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND serviceId=${serviceId} AND visitDate=${today} AND checkoutTime IS NULL`.execute(getDb());
+    return rows.rows;
   }
 }

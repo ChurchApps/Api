@@ -14,6 +14,7 @@ export { SermonRepo } from "./SermonRepo.js";
 export { StreamingServiceRepo } from "./StreamingServiceRepo.js";
 
 export { EventRepo } from "./EventRepo.js";
+export { EventRsvpRepo } from "./EventRsvpRepo.js";
 export { EventExceptionRepo } from "./EventExceptionRepo.js";
 export { CuratedCalendarRepo } from "./CuratedCalendarRepo.js";
 export { CuratedEventRepo } from "./CuratedEventRepo.js";
@@ -25,6 +26,11 @@ export { EventTemplateRepo } from "./EventTemplateRepo.js";
 
 export { RegistrationRepo } from "./RegistrationRepo.js";
 export { RegistrationMemberRepo } from "./RegistrationMemberRepo.js";
+export { RegistrationTypeRepo } from "./RegistrationTypeRepo.js";
+export { RegistrationSelectionRepo } from "./RegistrationSelectionRepo.js";
+export { RegistrationSelectionChoiceRepo } from "./RegistrationSelectionChoiceRepo.js";
+export { RegistrationPaymentRepo } from "./RegistrationPaymentRepo.js";
+export { RegistrationCouponRepo } from "./RegistrationCouponRepo.js";
 
 export { SettingRepo } from "./SettingRepo.js";
 

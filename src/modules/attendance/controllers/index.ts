@@ -1,5 +1,6 @@
 export { AttendanceBaseController } from "./AttendanceBaseController.js";
 export { AttendanceRecordController } from "./AttendanceRecordController.js";
+export { CheckinController } from "./CheckinController.js";
 export { CampusController } from "./CampusController.js";
 export { GroupServiceTimeController } from "./GroupServiceTimeController.js";
 export { LabelTemplateController } from "./LabelTemplateController.js";

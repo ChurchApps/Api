@@ -30,12 +30,14 @@ export class EventRepo {
       recurrenceRule: m.recurrenceRule,
       registrationEnabled: m.registrationEnabled,
       capacity: m.capacity,
+      waitlistEnabled: m.waitlistEnabled,
       registrationOpenDate: m.registrationOpenDate,
       registrationCloseDate: m.registrationCloseDate,
       tags: m.tags,
       formId: m.formId,
       approvalStatus: m.approvalStatus,
-      requestedBy: m.requestedBy
+      requestedBy: m.requestedBy,
+      rsvpDisabled: m.rsvpDisabled ?? false
     } as any).execute();
     return model;
   }
@@ -57,12 +59,15 @@ export class EventRepo {
       recurrenceRule: m.recurrenceRule,
       registrationEnabled: m.registrationEnabled,
       capacity: m.capacity,
+      waitlistEnabled: m.waitlistEnabled,
       registrationOpenDate: m.registrationOpenDate,
       registrationCloseDate: m.registrationCloseDate,
       tags: m.tags,
       formId: m.formId,
       approvalStatus: m.approvalStatus,
-      requestedBy: m.requestedBy
+      requestedBy: m.requestedBy,
+      // explicit false so un-disabling RSVP persists (Kysely drops undefined)
+      rsvpDisabled: m.rsvpDisabled ?? false
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -99,6 +104,14 @@ export class EventRepo {
       .where("churchId", "=", churchId)
       .where("tags", "like", "%" + tag + "%")
       .orderBy("start").execute() as any;
+  }
+
+  // CA-1: the caller's own event requests, newest first, for the "My requests" screen.
+  public async loadRequestsForPerson(churchId: string, personId: string): Promise<Event[]> {
+    return getDb().selectFrom("events").selectAll()
+      .where("churchId", "=", churchId)
+      .where("requestedBy", "=", personId)
+      .orderBy("start", "desc").execute() as any;
   }
 
   public async loadPendingApproval(churchId: string): Promise<Event[]> {
@@ -175,12 +188,14 @@ export class EventRepo {
       recurrenceRule: row.recurrenceRule,
       registrationEnabled: row.registrationEnabled,
       capacity: row.capacity,
+      waitlistEnabled: row.waitlistEnabled,
       registrationOpenDate: row.registrationOpenDate,
       registrationCloseDate: row.registrationCloseDate,
       tags: row.tags,
       formId: row.formId,
       approvalStatus: row.approvalStatus,
-      requestedBy: row.requestedBy
+      requestedBy: row.requestedBy,
+      rsvpDisabled: row.rsvpDisabled
     };
   }
 }

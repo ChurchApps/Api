@@ -14,6 +14,7 @@ export { SubDomainHelper } from "./SubDomainHelper.js";
 export { PollyHelper } from "./PollyHelper.js";
 export { CalendarHelper } from "./CalendarHelper.js";
 export { RegistrationHelper } from "./RegistrationHelper.js";
+export { RegistrationPricingHelper } from "./RegistrationPricingHelper.js";
 export { RecurrenceHelper } from "./RecurrenceHelper.js";
 export { HolidayHelper } from "./HolidayHelper.js";
 export { ConflictHelper } from "./ConflictHelper.js";

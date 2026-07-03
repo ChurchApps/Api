@@ -1,4 +1,4 @@
-import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, EmailTemplateRepo, MessageRepo, NotificationRepo, NotificationPreferenceRepo, NotificationPreferenceOverrideRepo, NotificationEntityMuteRepo, ReminderDefinitionRepo, ReminderOccurrenceRepo, ReminderSentLogRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
+import { BlockedIpRepo, ConnectionRepo, ConversationRepo, DeliveryLogRepo, DeviceRepo, DeviceContentRepo, EmailTemplateRepo, MessageRepo, MessageReactionRepo, NotificationRepo, NotificationPreferenceRepo, NotificationPreferenceOverrideRepo, NotificationEntityMuteRepo, ReminderDefinitionRepo, ReminderOccurrenceRepo, ReminderSentLogRepo, PrivateMessageRepo, TextingProviderRepo, SentTextRepo } from "./index.js";
 
 export class Repos {
   public blockedIp: BlockedIpRepo;
@@ -9,6 +9,7 @@ export class Repos {
   public deviceContent: DeviceContentRepo;
   public emailTemplate: EmailTemplateRepo;
   public message: MessageRepo;
+  public messageReaction: MessageReactionRepo;
   public notification: NotificationRepo;
   public notificationPreference: NotificationPreferenceRepo;
   public notificationPreferenceOverride: NotificationPreferenceOverrideRepo;
@@ -31,6 +32,7 @@ export class Repos {
     this.deviceContent = new DeviceContentRepo();
     this.emailTemplate = new EmailTemplateRepo();
     this.message = new MessageRepo();
+    this.messageReaction = new MessageReactionRepo();
     this.notification = new NotificationRepo();
     this.notificationPreference = new NotificationPreferenceRepo();
     this.notificationPreferenceOverride = new NotificationPreferenceOverrideRepo();

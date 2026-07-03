@@ -6,6 +6,11 @@ CREATE PROCEDURE resetDemoData()
 BEGIN
     -- Truncate all tables (in order to respect foreign key constraints)
     SET FOREIGN_KEY_CHECKS = 0;
+    TRUNCATE TABLE registrationSelectionChoices;
+    TRUNCATE TABLE registrationPayments;
+    TRUNCATE TABLE registrationCoupons;
+    TRUNCATE TABLE registrationSelections;
+    TRUNCATE TABLE registrationTypes;
     TRUNCATE TABLE registrationMembers;
     TRUNCATE TABLE registrations;
     TRUNCATE TABLE links;
@@ -218,6 +223,14 @@ BEGIN
         DATE_ADD(DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY), INTERVAL '09:00:00' HOUR_SECOND) + INTERVAL ((5 + 7 - DAYOFWEEK(DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY))) % 7 + 14) DAY,
         DATE_ADD(DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY), INTERVAL '12:00:00' HOUR_SECOND) + INTERVAL ((5 + 7 - DAYOFWEEK(DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY))) % 7 + 14) DAY, 
         0, 'FREQ=MONTHLY;BYDAY=3SA', 'public');
+
+    -- GR-1 RSVP target: an upcoming recurring weekly event for the demo group (GRP00000004),
+    -- whose members include demo@b1.church (PER00000082) and tester@b1.church (PER00000083).
+    INSERT INTO events (id, churchId, groupId, title, description, start, end, allDay, recurrenceRule, visibility) VALUES
+    ('EVT00000018', 'CHU00000001', 'GRP00000004', 'Midweek Small Group', 'Weekly small-group gathering for the Adult Bible Class.',
+        DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (2 - WEEKDAY(CURDATE()) + 7) % 7 DAY), INTERVAL '19:00:00' HOUR_SECOND),
+        DATE_ADD(DATE_ADD(CURDATE(), INTERVAL (2 - WEEKDAY(CURDATE()) + 7) % 7 DAY), INTERVAL '20:30:00' HOUR_SECOND),
+        0, 'FREQ=WEEKLY;BYDAY=WE', 'public');
 
     -- Enable registration on the seeded special events so /mobile/register/<id>
     -- and the public guest registration form have something live to render.
@@ -650,6 +663,24 @@ BEGIN
     -- Gonzalez Missions Conference (REG00000006)
     ('RGM00000011', 'CHU00000001', 'REG00000006', 'PER00000044', 'Roberto', 'Gonzalez'),
     ('RGM00000012', 'CHU00000001', 'REG00000006', 'PER00000045', 'Carmen', 'Gonzalez');
+
+    -- ========================================
+    -- Paid Registration Demo (VBS = EVT00000015)
+    -- Two priced attendee types (one small-capacity), one priced selection with
+    -- capacity, an active percent coupon, and waitlist enabled — powers the
+    -- Phase 2 paid-registration Playwright suites.
+    -- ========================================
+    UPDATE events SET waitlistEnabled = b'1' WHERE id = 'EVT00000015';
+
+    INSERT INTO registrationTypes (id, churchId, eventId, name, description, price, capacity, minAgeYears, maxAgeYears, formId, sort, active) VALUES
+    ('RGT00000001', 'CHU00000001', 'EVT00000015', 'Camper', 'Child attendee for the full week', 45.00, 6, 5, 12, NULL, 1, b'1'),
+    ('RGT00000002', 'CHU00000001', 'EVT00000015', 'Chaperone', 'Adult volunteer helper', 15.00, NULL, 18, NULL, NULL, 2, b'1');
+
+    INSERT INTO registrationSelections (id, churchId, eventId, name, description, price, capacity, maxQuantity, sort, active) VALUES
+    ('RGS00000001', 'CHU00000001', 'EVT00000015', 'Commemorative T-Shirt', 'Optional event t-shirt', 12.00, 50, 5, 1, b'1');
+
+    INSERT INTO registrationCoupons (id, churchId, eventId, code, discountType, value, startDate, endDate, minMembers, maxUses, active) VALUES
+    ('RGC00000001', 'CHU00000001', 'EVT00000015', 'EARLYBIRD', 'percent', 10.00, NULL, NULL, NULL, 100, b'1');
 
     -- ========================================
     -- Navigation Links

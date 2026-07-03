@@ -4,6 +4,7 @@ export { GroupMemberHistoryRepo } from "./GroupMemberHistoryRepo.js";
 export { GroupJoinRequestRepo } from "./GroupJoinRequestRepo.js";
 export { GroupRepo } from "./GroupRepo.js";
 export { HouseholdRepo } from "./HouseholdRepo.js";
+export { HouseholdPickupPersonRepo } from "./HouseholdPickupPersonRepo.js";
 export { ListRepo } from "./ListRepo.js";
 export { ListMemberRepo } from "./ListMemberRepo.js";
 export { PersonRepo } from "./PersonRepo.js";

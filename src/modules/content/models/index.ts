@@ -14,6 +14,7 @@ export { StreamingService } from "./StreamingService.js";
 export { File } from "./File.js";
 
 export { Event } from "./Event.js";
+export { EventRsvp } from "./EventRsvp.js";
 export { EventException } from "./EventException.js";
 export { CuratedCalendar } from "./CuratedCalendar.js";
 export { CuratedEvent } from "./CuratedEvent.js";
@@ -23,7 +24,7 @@ export { EventBooking } from "./EventBooking.js";
 export { CalendarBlockout } from "./CalendarBlockout.js";
 export { EventTemplate } from "./EventTemplate.js";
 
-export { Registration, RegistrationMember } from "./Registration.js";
+export { Registration, RegistrationMember, RegistrationType, RegistrationSelection, RegistrationSelectionChoice, RegistrationPayment, RegistrationCoupon } from "./Registration.js";
 
 export { Setting } from "./Setting.js";
 
