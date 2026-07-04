@@ -20,6 +20,12 @@ export class DonationBatchController extends GivingBaseController {
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json([], 401);
+      //to display batch total considering different currencies
+      if (req.query?.withCurrency) {
+        const data = await this.repos.donationBatch.loadAllWithCurrency(au.churchId);
+        return data;
+      }
+
       const data = await this.repos.donationBatch.loadAll(au.churchId);
       return this.repos.donationBatch.convertAllToModel(au.churchId, data);
     });
