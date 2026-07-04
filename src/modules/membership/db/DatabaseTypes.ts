@@ -3,6 +3,7 @@ import type {
   FormSubmission, Group, GroupJoinRequest, GroupMember, GroupMemberHistory, Household, List, ListMember, MemberPermission,
   HouseholdPickupPerson,
   OAuthClient, OAuthCode, OAuthDeviceCode, OAuthRelaySession, OAuthToken,
+  PersonField, PersonFieldValue,
   Question, Role, RoleMember, RolePermission, Setting, Site, User, UserChurch,
   VisibilityPreference, Webhook, WebhookDelivery
 } from "../models/index.js";
@@ -81,6 +82,8 @@ export interface MembershipDatabase {
   oAuthRelaySessions: OAuthRelaySession;
   oAuthTokens: OAuthToken;
   people: PeopleTable;
+  personFields: PersonField;
+  personFieldValues: PersonFieldValue;
   questions: Question & { removed?: boolean };
   roles: Role;
   roleMembers: Omit<RoleMember, "user">;

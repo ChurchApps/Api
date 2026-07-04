@@ -12,6 +12,8 @@ export { MemberPermission } from "./MemberPermission.js";
 export { ContactInfo } from "./ContactInfo.js";
 export { Name } from "./Name.js";
 export { Person } from "./Person.js";
+export { PersonField } from "./PersonField.js";
+export { PersonFieldValue } from "./PersonFieldValue.js";
 export { SearchCondition } from "./SearchCondition.js";
 
 export { AccessLog } from "./AccessLog.js";

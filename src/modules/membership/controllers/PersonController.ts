@@ -6,7 +6,7 @@ import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { Environment, Permissions, PersonConditionHelper, PersonHelper, UserChurchHelper } from "../helpers/index.js";
+import { Environment, Permissions, PersonConditionHelper, PersonHelper, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
@@ -369,7 +369,11 @@ export class PersonController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
       else {
         let data: any[] = (await this.repos.person.loadAll(au.churchId)) as any[];
-        data = PersonConditionHelper.apply(data, req.body);
+        const conditions = req.body ?? [];
+        const fieldConditions = conditions.filter((c) => typeof c.field === "string" && c.field.startsWith("personField_"));
+        const standardConditions = conditions.filter((c) => !(typeof c.field === "string" && c.field.startsWith("personField_")));
+        if (fieldConditions.length) data = await ListRuleHelper.filterByFieldConditions(au.churchId, data, fieldConditions, this.repos);
+        data = PersonConditionHelper.apply(data, standardConditions);
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
         return await this.filterPeople(result, au);
       }

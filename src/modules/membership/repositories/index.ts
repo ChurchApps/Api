@@ -8,6 +8,8 @@ export { HouseholdPickupPersonRepo } from "./HouseholdPickupPersonRepo.js";
 export { ListRepo } from "./ListRepo.js";
 export { ListMemberRepo } from "./ListMemberRepo.js";
 export { PersonRepo } from "./PersonRepo.js";
+export { PersonFieldRepo } from "./PersonFieldRepo.js";
+export { PersonFieldValueRepo } from "./PersonFieldValueRepo.js";
 export { AnswerRepo } from "./AnswerRepo.js";
 export { FormRepo } from "./FormRepo.js";
 export { FormSubmissionRepo } from "./FormSubmissionRepo.js";

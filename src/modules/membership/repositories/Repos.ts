@@ -9,6 +9,8 @@ import {
   ListRepo,
   ListMemberRepo,
   PersonRepo,
+  PersonFieldRepo,
+  PersonFieldValueRepo,
   AnswerRepo,
   FormRepo,
   FormSubmissionRepo,
@@ -40,6 +42,8 @@ export class Repos {
   public list: ListRepo;
   public listMember: ListMemberRepo;
   public person: PersonRepo;
+  public personField: PersonFieldRepo;
+  public personFieldValue: PersonFieldValueRepo;
   public answer: AnswerRepo;
   public form: FormRepo;
   public formSubmission: FormSubmissionRepo;
@@ -86,6 +90,8 @@ export class Repos {
     this.list = new ListRepo();
     this.listMember = new ListMemberRepo();
     this.person = new PersonRepo();
+    this.personField = new PersonFieldRepo();
+    this.personFieldValue = new PersonFieldValueRepo();
     this.answer = new AnswerRepo();
     this.form = new FormRepo();
     this.formSubmission = new FormSubmissionRepo();

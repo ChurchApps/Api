@@ -1,5 +1,5 @@
 export interface ListRuleCondition {
-  provider: "person" | "group" | "form" | "giving" | "attendance" | "serving" | "list";
+  provider: "person" | "group" | "form" | "field" | "giving" | "attendance" | "serving" | "list";
   field?: string;
   operator?: string;
   value?: string;
