@@ -10,10 +10,11 @@ export class AuditLogController extends MembershipBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
 
       const filter: AuditLogFilter = {
         category: req.query.category?.toString() || undefined,
+        module: req.query.module?.toString() || undefined,
         userId: req.query.userId?.toString() || undefined,
         entityType: req.query.entityType?.toString() || undefined,
         entityId: req.query.entityId?.toString() || undefined,
@@ -35,7 +36,7 @@ export class AuditLogController extends MembershipBaseController {
   @httpGet("/person/:personId")
   public async getForPerson(req: express.Request<{ personId: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
 
       const personId = req.params.personId;
       const limit = req.query.limit ? parseInt(req.query.limit.toString(), 10) : 100;

@@ -436,7 +436,10 @@ export class PersonController extends MembershipBaseController {
       const missingIds = personIds.filter((id) => existingIds.indexOf(id) === -1);
       if (missingIds.length > 0) return this.json({ error: "Some people were not found", missingIds }, 404);
 
-      return this.deletePeople(au.churchId, existingIds);
+      const batch = await this.repos.batch.create({ churchId: au.churchId, userId: au.id, source: "bulk-delete", label: `Bulk delete ${existingIds.length} people`, status: "open" });
+      const resp = await this.deletePeople(au.churchId, existingIds, batch.id);
+      await this.repos.batch.complete(au.churchId, batch.id, existingIds.length);
+      return resp;
     });
   }
 
@@ -463,17 +466,20 @@ export class PersonController extends MembershipBaseController {
       const missingIds = personIds.filter((id) => existingIds.indexOf(id) === -1);
       if (missingIds.length > 0) return this.json({ error: "Some people were not found", missingIds }, 404);
 
+      const batch = await this.repos.batch.create({ churchId: au.churchId, userId: au.id, source: "bulk-update", label: `Bulk update ${existingIds.length} people`, status: "open" });
+
       await this.repos.person.updateFieldsByIds(au.churchId, existingIds, updates);
 
       for (const person of existingPeople) {
         await WebhookDispatcher.emit(au.churchId, "person.updated", { ...person, ...updates, churchId: au.churchId });
       }
 
-      return this.json({ success: true, updatedIds: existingIds, count: existingIds.length });
+      await this.repos.batch.complete(au.churchId, batch.id, existingIds.length);
+      return this.json({ success: true, updatedIds: existingIds, count: existingIds.length, batchId: batch.id });
     });
   }
 
-  private async deletePeople(churchId: string, personIds: string[]) {
+  private async deletePeople(churchId: string, personIds: string[], batchId?: string) {
     if (personIds.length === 1) {
       await this.repos.person.delete(churchId, personIds[0]);
     } else {
@@ -483,7 +489,7 @@ export class PersonController extends MembershipBaseController {
     for (const id of personIds) await WebhookDispatcher.emit(churchId, "person.destroyed", { id, churchId });
 
     await this.repos.household.deleteUnused(churchId);
-    return this.json({ success: true, deletedIds: personIds, count: personIds.length });
+    return this.json({ success: true, deletedIds: personIds, count: personIds.length, batchId });
   }
 
   private async savePhoto(churchId: string, person: Person) {

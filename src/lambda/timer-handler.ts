@@ -113,6 +113,11 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     const expandResult = await expandReminders(messagingRepos);
     console.log("[handleMidnightTimer] expandReminders count:", expandResult);
 
+    // Audit log retention (365 days) — must stay above any future undo window.
+    console.log("[handleMidnightTimer] Purging old audit logs...");
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    await membershipRepos.auditLog.deleteOld(365);
+
     console.log("[handleMidnightTimer] Processing daily email notifications...");
     const result = await NotificationHelper.sendEmailNotifications("daily");
     console.log("[handleMidnightTimer] sendEmailNotifications result:", JSON.stringify(result));

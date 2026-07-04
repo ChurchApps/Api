@@ -29,7 +29,7 @@ import {
   WebhookDeliveryRepo,
   ApiKeyRepo
 } from "./index.js";
-import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo, AuditLogRepo, CampusRepo, SiteRepo } from "./index.js";
+import { UserRepo, ChurchRepo, RoleRepo, RoleMemberRepo, RolePermissionRepo, UserChurchRepo, AccessLogRepo, AuditLogRepo, BatchRepo, CampusRepo, SiteRepo } from "./index.js";
 
 export class Repos {
   public associatedGroup: AssociatedGroupRepo;
@@ -70,6 +70,7 @@ export class Repos {
   public oAuthRelaySession: OAuthRelaySessionRepo;
 
   public auditLog: AuditLogRepo;
+  public batch: BatchRepo;
   public clientError: ClientErrorRepo;
 
   public webhook: WebhookRepo;
@@ -118,6 +119,7 @@ export class Repos {
     this.oAuthRelaySession = new OAuthRelaySessionRepo();
 
     this.auditLog = new AuditLogRepo();
+    this.batch = new BatchRepo();
     this.clientError = new ClientErrorRepo();
 
     this.webhook = new WebhookRepo();

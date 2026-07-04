@@ -130,6 +130,8 @@ export class GroupMemberController extends MembershipBaseController {
       const existingPersonIds = new Set(existing.map((gm) => gm.personId));
       const newPersonIds = personIds.filter((id) => !existingPersonIds.has(id));
 
+      const batch = await this.repos.batch.create({ churchId: au.churchId, userId: au.id, source: "bulk-add", label: `Add ${newPersonIds.length} group members`, status: "open" });
+
       const added: GroupMember[] = [];
       for (const personId of newPersonIds) {
         const saved = await this.repos.groupMember.save({ churchId: au.churchId, groupId, personId, leader: false });
@@ -139,7 +141,8 @@ export class GroupMemberController extends MembershipBaseController {
         added.push(saved);
       }
 
-      return this.json({ success: true, addedIds: added.map((gm) => gm.personId), count: added.length });
+      await this.repos.batch.complete(au.churchId, batch.id, added.length);
+      return this.json({ success: true, addedIds: added.map((gm) => gm.personId), count: added.length, batchId: batch.id });
     });
   }
 
@@ -156,13 +159,16 @@ export class GroupMemberController extends MembershipBaseController {
       const existing = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
       const toRemove = existing.filter((gm) => personIds.indexOf(gm.personId) !== -1);
 
+      const batch = await this.repos.batch.create({ churchId: au.churchId, userId: au.id, source: "bulk-remove", label: `Remove ${toRemove.length} group members`, status: "open" });
+
       await this.repos.groupMember.deleteForGroupAndPeople(au.churchId, groupId, toRemove.map((gm) => gm.personId));
       for (const gm of toRemove) {
         await this.repos.groupMemberHistory.log(au.churchId, groupId, gm.personId, "left");
         await WebhookDispatcher.emit(au.churchId, "group.member.removed", gm);
       }
 
-      return this.json({ success: true, removedIds: toRemove.map((gm) => gm.personId), count: toRemove.length });
+      await this.repos.batch.complete(au.churchId, batch.id, toRemove.length);
+      return this.json({ success: true, removedIds: toRemove.map((gm) => gm.personId), count: toRemove.length, batchId: batch.id });
     });
   }
 

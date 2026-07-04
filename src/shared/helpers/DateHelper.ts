@@ -56,6 +56,11 @@ export class DateHelper {
   static toMysqlDate(date: Date | string | null | undefined): string | null {
     return this.toMySqlFormat(date);
   }
+  // Millisecond precision — required where sub-second ordering matters (e.g. audit-log conflict guard).
+  static toMysqlDateMs(date: Date | string | null | undefined): string | null {
+    if (date === null || date === undefined) return null;
+    return dayjs(date).format("YYYY-MM-DD HH:mm:ss.SSS");
+  }
 
   /** DATE-only fields: preserves calendar date without timezone conversion (e.g. birthDate, donationDate) */
   static toMysqlDateOnly(date: Date | string | null | undefined): string | null {

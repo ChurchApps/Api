@@ -1,5 +1,5 @@
 import type {
-  AccessLog, Answer, ApiKey, AssociatedGroup, AuditLog, Campus, Church, ClientError, Domain, Form,
+  AccessLog, Answer, ApiKey, AssociatedGroup, AuditLog, Batch, Campus, Church, ClientError, Domain, Form,
   FormSubmission, Group, GroupJoinRequest, GroupMember, GroupMemberHistory, Household, List, ListMember, MemberPermission,
   HouseholdPickupPerson,
   OAuthClient, OAuthCode, OAuthDeviceCode, OAuthRelaySession, OAuthToken,
@@ -53,6 +53,7 @@ export interface MembershipDatabase {
   apiKeys: ApiKey;
   associatedGroups: AssociatedGroup;
   auditLogs: AuditLog;
+  batches: Batch;
   campuses: Campus;
   churches: Omit<Church, "settings">;
   clientErrors: ClientError;

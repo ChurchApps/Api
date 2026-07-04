@@ -8,5 +8,7 @@ export class AuditLog {
   public entityId?: string;
   public details?: string;
   public ipAddress?: string;
+  public module?: string;
+  public batchId?: string;
   public created?: Date;
 }

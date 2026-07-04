@@ -18,6 +18,7 @@ export { SearchCondition } from "./SearchCondition.js";
 
 export { AccessLog } from "./AccessLog.js";
 export { AuditLog } from "./AuditLog.js";
+export { Batch } from "./Batch.js";
 export { Api } from "./Api.js";
 export { Church } from "./Church.js";
 export { User } from "./User.js";
