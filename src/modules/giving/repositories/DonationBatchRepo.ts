@@ -72,6 +72,43 @@ export class DonationBatchRepo {
     return this.convertAllToModel(churchId, result.rows);
   }
 
+  public async loadAllWithCurrency(churchId: string) {
+    const batches = await sql<any>`
+      SELECT db.*,
+        IFNULL(d.donationCount, 0) AS donationCount
+      FROM donationBatches db
+      LEFT JOIN (
+        SELECT batchId, COUNT(*) AS donationCount
+        FROM donations
+        WHERE churchId = ${churchId}
+        GROUP BY batchId
+      ) d ON db.id = d.batchId
+      WHERE db.churchId = ${churchId}
+      ORDER BY db.batchDate DESC`.execute(getDb());
+
+    const amounts = await sql<any>`
+      SELECT batchId,
+        LOWER(IFNULL(currency, 'usd')) AS currency,
+        SUM(amount) AS amount
+      FROM donations
+      WHERE churchId = ${churchId}
+      GROUP BY batchId, currency`.execute(getDb());
+
+    // group amounts rows by batchId
+    const amountsByBatch = new Map<string, { currency: string; amount: number }[]>();
+    for (const row of amounts.rows) {
+      const list = amountsByBatch.get(row.batchId) ?? [];
+      list.push({ currency: row.currency, amount: Number(row.amount) });
+      amountsByBatch.set(row.batchId, list);
+    }
+    const result = batches.rows.map((row) => ({
+      ...row,
+      amountsByCurrency: amountsByBatch.get(row.id) ?? [],
+    }));
+
+    return result;
+  }
+
   private rowToModel(data: any): DonationBatch {
     return {
       id: data.id,
