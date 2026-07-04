@@ -103,7 +103,7 @@ export class DonationBatchRepo {
     }
     const result = batches.rows.map((row) => ({
       ...row,
-      amountsByCurrency: amountsByBatch.get(row.id) ?? [],
+      amountsByCurrency: amountsByBatch.get(row.id) ?? []
     }));
 
     return result;
