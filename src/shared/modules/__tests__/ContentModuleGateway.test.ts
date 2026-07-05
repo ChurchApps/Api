@@ -32,9 +32,7 @@ describe("ContentModuleGateway.deleteSiteContent", () => {
     await getContentModuleGateway().deleteSiteContent("c1", "s1");
 
     const deletes = calls.filter((c) => c.method === "deleteFrom").map((c) => c.args[0]);
-    [
-      "elements", "sections", "pageHistory", "posts", "pages", "blocks", "links", "globalStyles"
-    ].forEach((t) => {
+    ["elements", "sections", "pageHistory", "pages", "blocks", "links", "globalStyles"].forEach((t) => {
       expect(deletes).toContain(t);
     });
     // Every query is church-scoped.

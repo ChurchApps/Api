@@ -46,7 +46,6 @@ class ContentModuleGatewayDb implements ContentModuleGateway {
           await db.deleteFrom("sections").where("churchId", "=", churchId).where("id", "in", sectionIds).execute();
         }
         await db.deleteFrom("pageHistory").where("churchId", "=", churchId).where("pageId", "in", pageIds).execute();
-        await db.deleteFrom("posts").where("churchId", "=", churchId).where("pageId", "in", pageIds).execute();
         await db.deleteFrom("pages").where("churchId", "=", churchId).where("id", "in", pageIds).execute();
       }
 
