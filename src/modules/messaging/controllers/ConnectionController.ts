@@ -9,19 +9,12 @@ export class ConnectionController extends MessagingBaseController {
   private async updateAnonName(connection: Connection) {
     if (connection.displayName === "Anonymous ") {
       const connections: Connection[] = await this.repos.connection.loadForConversation(connection.churchId, connection.conversationId);
-      const anonConnections = connections.filter((c) => c.displayName.includes("Anonymous"));
-      if (anonConnections.length > 0) {
-        const displayNames = anonConnections.map((c) => c.displayName);
-        const numbers: number[] = [];
-        displayNames.forEach((name) => {
-          const splitName = name.split("_");
-          numbers.push(Number(splitName[1]));
-        });
-        const maxNumber = Math.max(...numbers);
-        connection.displayName = `Anonymous_${maxNumber + 1}`;
-      } else {
-        connection.displayName = "Anonymous_1";
-      }
+      const numbers = connections
+        .filter((c) => c.displayName.includes("Anonymous"))
+        .map((c) => Number(c.displayName.split("_")[1]))
+        .filter((n) => !Number.isNaN(n));
+      const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+      connection.displayName = `Anonymous_${maxNumber + 1}`;
     }
   }
 

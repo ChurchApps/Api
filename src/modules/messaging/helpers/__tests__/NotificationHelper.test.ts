@@ -96,12 +96,36 @@ describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
     expect(result).toBe("push");
   });
 
-  it("delivers via socket when the recipient is online (push not invoked)", async () => {
+  it("also attempts push when the recipient is online (socket success no longer suppresses push)", async () => {
     sendMessagesMock.mockResolvedValueOnce(1);
 
     const repos = buildRepos({
       connections: [{ socketId: "abc", churchId: "CHU00000001" }],
       devices: [{ fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://e/x", keys: { p256dh: "p", auth: "a" } }) }]
+    });
+    NotificationHelper.init(repos);
+
+    const result = await NotificationHelper.attemptDeliveryWithEscalation(
+      "CHU00000001",
+      "PER00000001",
+      0,
+      "Title",
+      "Body",
+      "notification",
+      "NID0001"
+    );
+
+    expect(sendMessagesMock).toHaveBeenCalledTimes(1);
+    expect(sendBulkTypedMessagesMock).toHaveBeenCalledTimes(1);
+    expect(result).toBe("push");
+  });
+
+  it("returns socket when online but the recipient has no push devices", async () => {
+    sendMessagesMock.mockResolvedValueOnce(1);
+
+    const repos = buildRepos({
+      connections: [{ socketId: "abc", churchId: "CHU00000001" }],
+      devices: []
     });
     NotificationHelper.init(repos);
 

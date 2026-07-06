@@ -69,7 +69,8 @@ export class DeliveryHelper {
         return false;
       }
     } catch (e) {
-      throw new Error(`[${connection.churchId}] DeliveryHelper.sendLocal: ${e}`);
+      console.error(`[${connection.churchId}] DeliveryHelper.sendLocal error:`, e);
+      return false;
     }
   };
 

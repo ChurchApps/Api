@@ -32,4 +32,5 @@ export interface ViewerInterface {
 export interface SocketConnectionInterface {
   id: string;
   socket: WebSocket;
+  isAlive?: boolean;
 }

@@ -11,6 +11,8 @@ export class SocketHelper {
   private static wss: WebSocketServer = null;
   private static connections: SocketConnectionInterface[] = [];
   private static repos: Repos;
+  private static heartbeatInterval: NodeJS.Timeout = null;
+  private static readonly HEARTBEAT_MS = 30000;
 
   static init = (repos: Repos) => {
     SocketHelper.repos = repos;
@@ -56,9 +58,13 @@ export class SocketHelper {
   };
 
   private static bindConnectionHandlers = () => {
+    SocketHelper.startHeartbeat();
     SocketHelper.wss.on("connection", (socket) => {
-      const sc: SocketConnectionInterface = { id: UniqueIdHelper.shortId(), socket };
+      const sc: SocketConnectionInterface = { id: UniqueIdHelper.shortId(), socket, isAlive: true };
       SocketHelper.connections.push(sc);
+
+      // Browsers auto-reply to protocol-level pings; pong marks the socket live for the next sweep.
+      sc.socket.on("pong", () => { sc.isAlive = true; });
 
       // Handle incoming messages - send socketId for ANY message
       sc.socket.on("message", (message) => {
@@ -68,9 +74,38 @@ export class SocketHelper {
       });
 
       sc.socket.on("close", async () => {
+        SocketHelper.deleteConnection(sc.id);
         await SocketHelper.handleDisconnect(sc.id);
       });
     });
+  };
+
+  private static startHeartbeat = () => {
+    if (SocketHelper.heartbeatInterval) return;
+    SocketHelper.heartbeatInterval = setInterval(() => {
+      SocketHelper.connections.slice().forEach((sc) => {
+        if (sc.isAlive === false) {
+          try { sc.socket.terminate(); } catch { /* already gone */ }
+          SocketHelper.deleteConnection(sc.id);
+          void SocketHelper.handleDisconnect(sc.id);
+          return;
+        }
+        sc.isAlive = false;
+        try { sc.socket.ping(); } catch { /* already gone */ }
+      });
+    }, SocketHelper.HEARTBEAT_MS);
+  };
+
+  static getLiveSocketIds = (): string[] => SocketHelper.connections.map((sc) => sc.id);
+
+  static reapStaleConnections = async (repos: Repos) => {
+    if (Environment.deliveryProvider === "local") {
+      // Single-replica only: valid because the local WS path already assumes one process holds every live socket.
+      await repos.connection.deleteStaleLocal(SocketHelper.getLiveSocketIds());
+    } else {
+      // API Gateway caps connections at ~2h, so a 24h TTL only reaps rows whose $disconnect was missed.
+      await repos.connection.deleteStaleAws(24);
+    }
   };
 
   static handleDisconnect = async (socketId: string) => {
@@ -102,6 +137,10 @@ export class SocketHelper {
     }
   };
   static shutdown = () => {
+    if (SocketHelper.heartbeatInterval) {
+      clearInterval(SocketHelper.heartbeatInterval);
+      SocketHelper.heartbeatInterval = null;
+    }
     if (SocketHelper.wss) {
       console.log("Shutting down WebSocket server...");
       SocketHelper.wss.close(() => {

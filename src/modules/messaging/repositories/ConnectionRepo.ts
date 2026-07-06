@@ -53,7 +53,7 @@ export class ConnectionRepo {
   public async loadById(churchId: string, id: string) {
     const result = (await getDb().selectFrom("connections").selectAll()
       .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
-    return result || {};
+    return result;
   }
 
   public async loadForConversation(churchId: string, conversationId: string) {
@@ -90,6 +90,18 @@ export class ConnectionRepo {
       .where("churchId", "=", churchId)
       .where("conversationId", "=", conversationId)
       .where("socketId", "=", socketId)
+      .execute();
+  }
+
+  public async deleteStaleLocal(liveSocketIds: string[]) {
+    let query = getDb().deleteFrom("connections");
+    if (liveSocketIds.length > 0) query = query.where("socketId", "not in", liveSocketIds);
+    await query.execute();
+  }
+
+  public async deleteStaleAws(olderThanHours: number) {
+    await getDb().deleteFrom("connections")
+      .where("timeJoined", "<", sql`DATE_SUB(NOW(), INTERVAL ${olderThanHours} HOUR)` as any)
       .execute();
   }
 

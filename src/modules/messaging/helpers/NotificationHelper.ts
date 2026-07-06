@@ -183,7 +183,7 @@ export class NotificationHelper {
       category: effectiveCategory
     });
 
-    // In-app/socket: muted items park (visible in inbox, no ping/badge/escalation). For PMs: don't stop at socket (PWAs keep alerts socket alive in background, suppressing OS push).
+    // In-app/socket: muted items park (visible in inbox, no ping/badge/escalation). Socket success never stops here: always also evaluate push in the same pass (client SW suppresses the OS notification when the app is focused on that conversation).
     let socketDelivered = false;
     if (startLevel <= 0) {
       const inAppGate = PreferenceGateHelper.evaluate(churchId, personId, effectiveCategory, "in_app", gateCtx);
@@ -229,10 +229,6 @@ export class NotificationHelper {
           attemptedConnectionCount: connections.length,
           deliveredCount: deliveryCount
         });
-        if (contentType !== "privateMessage" && deliveryCount > 0) {
-          this.addDebugStep(debugTrace, "delivery-stop-at-socket", "ok", { reason: "non-private-message socket delivery succeeded" });
-          return "socket"; // Stop here, let 30-min timer escalate if unread
-        }
       }
     }
 

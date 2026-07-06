@@ -60,6 +60,10 @@ export const handle30MinTimer = async (_event: ScheduledEvent, _context: Context
     const reminderResult = await scanReminders(messagingRepos);
     console.log("[handle30MinTimer] scanReminders result:", JSON.stringify(reminderResult));
 
+    console.log("[handle30MinTimer] Reaping stale connection rows...");
+    const { SocketHelper } = await import("../modules/messaging/helpers/SocketHelper.js");
+    await SocketHelper.reapStaleConnections(messagingRepos);
+
     console.log("[handle30MinTimer] ========== TIMER COMPLETE ==========");
     console.log("[handle30MinTimer] Total execution time:", Date.now() - startTime, "ms");
   } catch (error) {
