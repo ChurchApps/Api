@@ -2,10 +2,32 @@ import express from "express";
 import Axios from "axios";
 import { SquareHelper } from "../SquareHelper.js";
 import { Environment } from "../Environment.js";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider.js";
+import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities } from "./IGatewayProvider.js";
 
 export class SquareGatewayProvider implements IGatewayProvider {
   readonly name = "square";
+
+  readonly capabilities: ProviderCapabilities = {
+    supportsOneTimePayments: true,
+    supportsSubscriptions: true,
+    supportsVault: true,
+    supportsACH: true,
+    supportsRefunds: false,
+    supportsPartialRefunds: false,
+    supportsWebhooks: true,
+    supportsOrders: false,
+    supportedPaymentMethods: ["card", "apple_pay", "google_pay", "ach_debit", "gift_card"],
+    supportedCurrencies: ["usd", "cad", "gbp", "aud", "jpy", "eur"],
+    requiresPlansForSubscriptions: false,
+    requiresCustomerForSubscription: true,
+    supportsInstantCapture: true,
+    supportsManualCapture: true,
+    supportsSCA: true,
+    maxRefundWindow: 120,
+    minTransactionAmount: 100, // $1.00
+    maxTransactionAmount: 5000000, // $50,000.00
+    notes: ["ACH support requires Square bank on file", "Subscriptions available with catalog plans"]
+  };
 
   async createWebhookEndpoint(_config: GatewayConfig, _webhookUrl: string): Promise<{ id: string }> {
     // TODO: implement when Square SDK available

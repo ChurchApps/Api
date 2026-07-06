@@ -1,35 +1,18 @@
 import { GatewayFactory, IGatewayProvider, GatewayConfig } from "./gateways/index.js";
+import type { ProviderCapabilities, WebhookEventClassification, ReplayEvent, SubscriptionResult } from "./gateways/index.js";
 import { validateGatewaySettings } from "./gateways/GatewaySettings.js";
 import { GatewayRepo } from "../../modules/giving/repositories/GatewayRepo.js";
 import { Gateway } from "../../modules/giving/models/index.js";
 import { EncryptionHelper } from "@churchapps/apihelper";
 
-export interface ProviderCapabilities {
-  supportsOneTimePayments: boolean;
-  supportsSubscriptions: boolean;
-  supportsVault: boolean;
-  supportsACH: boolean;
-  supportsRefunds: boolean;
-  supportsPartialRefunds: boolean;
-  supportsWebhooks: boolean;
-  supportsOrders: boolean;
-  supportsInstantCapture: boolean;
-  supportsManualCapture: boolean;
-  supportsSCA: boolean;
-  requiresPlansForSubscriptions: boolean;
-  requiresCustomerForSubscription: boolean;
-  supportedPaymentMethods: string[];
-  supportedCurrencies: string[];
-  maxRefundWindow?: number; // in days
-  minTransactionAmount?: number; // in cents
-  maxTransactionAmount?: number; // in cents
-  notes?: string[];
-}
+export type { ProviderCapabilities } from "./gateways/index.js";
 
 export interface GetGatewayOptions {
   provider?: string;
   gatewayId?: string;
   environmentPreference?: string[];
+  // Restrict resolution to gateways whose provider has this capability.
+  requiredCapability?: keyof ProviderCapabilities;
 }
 
 type GatewayResolutionReason = "not-found" | "ambiguous" | null;
@@ -91,10 +74,44 @@ export class GatewayService {
     return await provider.verifyWebhookSignature(config, headers, body);
   }
 
+  static classifyWebhookEvent(gateway: any, eventType: string): WebhookEventClassification {
+    const provider = this.getProviderFromGateway(gateway);
+    return provider.classifyWebhookEvent?.(eventType) || { action: "ignore" };
+  }
+
+  static logsDonationsImmediately(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).logsDonationsImmediately;
+  }
+
+  static async prepareCharge(gateway: any, donationData: any, repos: any): Promise<void> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.prepareCharge) {
+      const config = this.getGatewayConfig(gateway);
+      await provider.prepareCharge(config, donationData, repos);
+    }
+  }
+
   static async processCharge(gateway: any, donationData: any) {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.processCharge(config, donationData);
+  }
+
+  static async prepareSubscription(gateway: any, subscriptionData: any, person: any, repos: any): Promise<void> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.prepareSubscription) {
+      const config = this.getGatewayConfig(gateway);
+      await provider.prepareSubscription(config, subscriptionData, person, repos);
+    }
+  }
+
+  static async finalizeSubscription(gateway: any, result: SubscriptionResult, subscriptionData: any, person: any, repos: any): Promise<string | undefined> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.finalizeSubscription) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.finalizeSubscription(config, result, subscriptionData, person, repos);
+    }
+    return undefined;
   }
 
   static async createSubscription(gateway: any, subscriptionData: any) {
@@ -160,11 +177,11 @@ export class GatewayService {
     }
   }
 
-  static async createCustomer(gateway: any, email: string, name: string): Promise<string | undefined> {
+  static async createCustomer(gateway: any, email: string, name: string, options?: { personId?: string }): Promise<string | undefined> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createCustomer) {
       const config = this.getGatewayConfig(gateway);
-      return await provider.createCustomer(config, email, name);
+      return await provider.createCustomer(config, email, name, options);
     }
     return undefined;
   }
@@ -194,6 +211,122 @@ export class GatewayService {
       return await provider.getCustomerPaymentMethods(config, customer);
     }
     return [];
+  }
+
+  static async listNormalizedPaymentMethods(gateway: any, customer: any, repos: any): Promise<any[]> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.listNormalizedPaymentMethods) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.listNormalizedPaymentMethods(config, customer, repos);
+    }
+    return [];
+  }
+
+  static async listNormalizedSubscriptions(gateway: any, customerId: string): Promise<any[]> {
+    const provider = this.getProviderFromGateway(gateway);
+    const config = this.getGatewayConfig(gateway);
+    if (provider.listNormalizedSubscriptions) {
+      return await provider.listNormalizedSubscriptions(config, customerId);
+    }
+    // Providers whose raw subscriptions already match the UI shape (or return { data: [...] }).
+    const raw = provider.getCustomerSubscriptions ? await provider.getCustomerSubscriptions(config, customerId) : [];
+    return Array.isArray(raw) ? raw : raw?.data || [];
+  }
+
+  static validateAttachToken(gateway: any, id: string): string | null {
+    const provider = this.getProviderFromGateway(gateway);
+    return provider.validateAttachToken ? provider.validateAttachToken(id) : null;
+  }
+
+  static async resolveCustomerForAttach(gateway: any, personId: string | undefined, requestCustomerId: string | undefined, repos: any): Promise<string | undefined> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.resolveCustomerForAttach) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.resolveCustomerForAttach(config, personId, requestCustomerId, repos);
+    }
+    return requestCustomerId;
+  }
+
+  static recreatesMissingCustomers(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).recreatesMissingCustomers;
+  }
+
+  static buildAttachOptions(gateway: any, customerId: string, tokenId: string, body: any): any {
+    const provider = this.getProviderFromGateway(gateway);
+    return provider.buildAttachOptions ? provider.buildAttachOptions(customerId, tokenId, body) : { customer: customerId };
+  }
+
+  static buildLocalMethodRecord(gateway: any, pm: any, body: any, tokenId: string): { methodType: string; displayName: string; metadata: any } | null {
+    const provider = this.getProviderFromGateway(gateway);
+    return provider.buildLocalMethodRecord ? provider.buildLocalMethodRecord(pm, body, tokenId) : null;
+  }
+
+  // Infers the owning provider from an opaque payment-method id via registered providers.
+  static inferProviderFromMethodId(id: string): string | null {
+    for (const name of GatewayFactory.getSupportedProviders()) {
+      const provider = GatewayFactory.getProvider(name);
+      if (provider.ownsPaymentMethodId?.(id)) return name;
+    }
+    return null;
+  }
+
+  static async verifyMethodOwnership(gateway: any, paymentMethodId: string, customerId: string, repos: any): Promise<boolean> {
+    const provider = this.getProviderFromGateway(gateway);
+    const config = this.getGatewayConfig(gateway);
+    if (provider.verifyMethodOwnership) {
+      return await provider.verifyMethodOwnership(config, paymentMethodId, customerId, repos);
+    }
+    // Default: the method's local record must belong to the customer.
+    const record = await repos.gatewayPaymentMethod.loadByExternalId(gateway.churchId, gateway.id, paymentMethodId)
+      || await repos.gatewayPaymentMethod.loadByExternalIdAcrossGateways(gateway.churchId, paymentMethodId);
+    return !!record && String(record.customerId) === String(customerId);
+  }
+
+  static async deletePaymentMethod(gateway: any, paymentMethodId: string, customerId: string, repos: any): Promise<void> {
+    const provider = this.getProviderFromGateway(gateway);
+    const config = this.getGatewayConfig(gateway);
+    if (provider.deletePaymentMethod) {
+      await provider.deletePaymentMethod(config, paymentMethodId, customerId, repos);
+    } else {
+      await this.detachPaymentMethod(gateway, paymentMethodId);
+    }
+    // Clean up the local display record; a no-op for providers that keep none.
+    await repos.gatewayPaymentMethod.deleteByExternalId(gateway.churchId, gateway.id, paymentMethodId);
+  }
+
+  static async verifySubscriptionOwnership(gateway: any, subscriptionId: string, personId: string, repos: any): Promise<boolean> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (provider.verifySubscriptionOwnership) {
+      const config = this.getGatewayConfig(gateway);
+      return await provider.verifySubscriptionOwnership(config, subscriptionId, personId, repos);
+    }
+    return false;
+  }
+
+  static mapGatewayError(gateway: any, e: any): { status: number; body: any } | null {
+    try {
+      return this.getProviderFromGateway(gateway).mapError?.(e) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  static supportsReplayEvents(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).listReplayEvents;
+  }
+
+  static async listReplayEvents(gateway: any, startDate: number, endDate: number): Promise<ReplayEvent[]> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.listReplayEvents) throw new Error(`${gateway.provider} does not support event replay`);
+    const config = this.getGatewayConfig(gateway);
+    return await provider.listReplayEvents(config, startDate, endDate);
+  }
+
+  static async importReplayEvent(gateway: any, churchId: string, event: ReplayEvent, repos: any): Promise<void> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.importReplayEvent) throw new Error(`${gateway.provider} does not support event replay`);
+    const config = this.getGatewayConfig(gateway);
+    await provider.importReplayEvent(config, churchId, event, repos);
   }
 
   static async attachPaymentMethod(gateway: any, paymentMethodId: string, options: any): Promise<any> {
@@ -257,6 +390,10 @@ export class GatewayService {
       return await provider.deleteBankAccount(config, customerId, bankAccountId);
     }
     throw new Error(`${gateway.provider} does not support bank account deletion`);
+  }
+
+  static supportsACHSetupIntent(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).createACHSetupIntent;
   }
 
   static async createACHSetupIntent(gateway: any, customerId: string): Promise<any> {
@@ -356,6 +493,11 @@ export class GatewayService {
     const normalizedProvider = options.provider?.toLowerCase();
     const environmentOrder = options.environmentPreference || ["production", "live", "sandbox", "test"]; // fallback order
 
+    if (options.requiredCapability) {
+      gateways = gateways.filter((gateway) => !!this.getProviderCapabilities(gateway)?.[options.requiredCapability!]);
+      if (gateways.length === 1) return { gateway: gateways[0], reason: null };
+    }
+
     const matches = gateways.filter((gateway) => {
       if (options.gatewayId && gateway.id === options.gatewayId) return true;
       if (normalizedProvider) {
@@ -414,124 +556,15 @@ export class GatewayService {
     return ambiguous ? null : selected;
   }
 
-  /** Get the capabilities of a specific payment provider. */
+  /** Get the capabilities of a specific payment provider (declared on each provider class). */
   static getProviderCapabilities(gatewayOrProvider: string | { provider?: string }): ProviderCapabilities | null {
     const provider = typeof gatewayOrProvider === "string" ? gatewayOrProvider : gatewayOrProvider?.provider;
     if (!provider) return null;
-
-    const capabilities: Record<string, ProviderCapabilities> = {
-      stripe: {
-        supportsOneTimePayments: true,
-        supportsSubscriptions: true,
-        supportsVault: true,
-        supportsACH: true,
-        supportsRefunds: false,
-        supportsPartialRefunds: false,
-        supportsWebhooks: true,
-        supportsOrders: false,
-        supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
-        supportedCurrencies: [
-          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd", "inr"
-        ],
-        requiresPlansForSubscriptions: false,
-        requiresCustomerForSubscription: true,
-        supportsInstantCapture: true,
-        supportsManualCapture: true,
-        supportsSCA: true,
-        maxRefundWindow: 180,
-        minTransactionAmount: 50, // 50 cents
-        maxTransactionAmount: 99999999, // $999,999.99
-        notes: ["Supports ACH via Plaid or micro-deposits", "Ideal for card + bank payments"]
-      },
-      paypal: {
-        supportsOneTimePayments: true,
-        supportsSubscriptions: true,
-        supportsVault: true,
-        supportsACH: false,
-        supportsRefunds: false,
-        supportsPartialRefunds: false,
-        supportsWebhooks: true,
-        supportsOrders: true,
-        supportedPaymentMethods: ["paypal", "card", "venmo", "pay_later"],
-        supportedCurrencies: [
-          "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
-        ],
-        requiresPlansForSubscriptions: true,
-        requiresCustomerForSubscription: false,
-        supportsInstantCapture: true,
-        supportsManualCapture: true,
-        supportsSCA: true,
-        maxRefundWindow: 180,
-        minTransactionAmount: 100, // $1.00
-        maxTransactionAmount: 1000000, // $10,000.00
-        notes: ["Subscriptions require Billing Plans", "Order APIs power PayPal smart buttons"]
-      },
-      square: {
-        supportsOneTimePayments: true,
-        supportsSubscriptions: true,
-        supportsVault: true,
-        supportsACH: true,
-        supportsRefunds: false,
-        supportsPartialRefunds: false,
-        supportsWebhooks: true,
-        supportsOrders: false,
-        supportedPaymentMethods: ["card", "apple_pay", "google_pay", "ach_debit", "gift_card"],
-        supportedCurrencies: ["usd", "cad", "gbp", "aud", "jpy", "eur"],
-        requiresPlansForSubscriptions: false,
-        requiresCustomerForSubscription: true,
-        supportsInstantCapture: true,
-        supportsManualCapture: true,
-        supportsSCA: true,
-        maxRefundWindow: 120,
-        minTransactionAmount: 100, // $1.00
-        maxTransactionAmount: 5000000, // $50,000.00
-        notes: ["ACH support requires Square bank on file", "Subscriptions available with catalog plans"]
-      },
-      epaymints: {
-        supportsOneTimePayments: true,
-        supportsSubscriptions: false,
-        supportsVault: false,
-        supportsACH: true,
-        supportsRefunds: false,
-        supportsPartialRefunds: false,
-        supportsWebhooks: false,
-        supportsOrders: false,
-        supportedPaymentMethods: ["card", "ach"],
-        supportedCurrencies: ["usd"],
-        requiresPlansForSubscriptions: false,
-        requiresCustomerForSubscription: false,
-        supportsInstantCapture: true,
-        supportsManualCapture: false,
-        supportsSCA: false,
-        maxRefundWindow: 90,
-        minTransactionAmount: 100, // $1.00
-        maxTransactionAmount: 10000000, // $100,000.00
-        notes: ["Webhooks limited; polling recommended", "ACH available via tokenised transactions"]
-      },
-      kingdomfunding: {
-        supportsOneTimePayments: true,
-        supportsSubscriptions: true,
-        supportsVault: true,
-        supportsACH: true,
-        supportsRefunds: false,
-        supportsPartialRefunds: false,
-        supportsWebhooks: true,
-        supportsOrders: false,
-        supportedPaymentMethods: ["card", "ach"],
-        supportedCurrencies: ["usd"],
-        requiresPlansForSubscriptions: false,
-        requiresCustomerForSubscription: true,
-        supportsInstantCapture: true,
-        supportsManualCapture: false,
-        supportsSCA: false,
-        maxRefundWindow: 180,
-        minTransactionAmount: 1,
-        maxTransactionAmount: 2000000000,
-        notes: ["Powered by KingdomFunding", "Reusable saved payment methods", "Single-step recurring schedules"]
-      }
-    };
-
-    return capabilities[provider.toLowerCase()] || null;
+    try {
+      return GatewayFactory.getProvider(provider).capabilities;
+    } catch {
+      return null;
+    }
   }
 
   /** Validate gateway settings based on provider type. */

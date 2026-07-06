@@ -2,10 +2,65 @@ import express from "express";
 import Axios from "axios";
 import { PayPalHelper } from "../PayPalHelper.js";
 import { Environment } from "../Environment.js";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider.js";
+import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, WebhookEventClassification } from "./IGatewayProvider.js";
 
 export class PayPalGatewayProvider implements IGatewayProvider {
   readonly name = "paypal";
+  // Captures are money-in-hand at charge time; there is no later settlement webhook flow.
+  readonly logsDonationsImmediately = true;
+  readonly recreatesMissingCustomers = true;
+
+  readonly capabilities: ProviderCapabilities = {
+    supportsOneTimePayments: true,
+    supportsSubscriptions: true,
+    supportsVault: true,
+    supportsACH: false,
+    supportsRefunds: false,
+    supportsPartialRefunds: false,
+    supportsWebhooks: true,
+    supportsOrders: true,
+    supportedPaymentMethods: ["paypal", "card", "venmo", "pay_later"],
+    supportedCurrencies: [
+      "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd"
+    ],
+    requiresPlansForSubscriptions: true,
+    requiresCustomerForSubscription: false,
+    supportsInstantCapture: true,
+    supportsManualCapture: true,
+    supportsSCA: true,
+    maxRefundWindow: 180,
+    minTransactionAmount: 100, // $1.00
+    maxTransactionAmount: 1000000, // $10,000.00
+    notes: ["Subscriptions require Billing Plans", "Order APIs power PayPal smart buttons"]
+  };
+
+  classifyWebhookEvent(eventType: string): WebhookEventClassification {
+    if (eventType === "PAYMENT.CAPTURE.COMPLETED") return { action: "donation", status: "complete" };
+    if (eventType === "BILLING.SUBSCRIPTION.CANCELLED") return { action: "cancel-subscription" };
+    return { action: "ignore" };
+  }
+
+  // The attach flow keys saved methods to the provider-scoped customer, not the request-supplied id.
+  async resolveCustomerForAttach(config: GatewayConfig, personId: string | undefined, _requestCustomerId: string | undefined, repos: any): Promise<string | undefined> {
+    if (!personId) return undefined;
+    const providerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name);
+    return providerCustomer?.id || undefined;
+  }
+
+  buildLocalMethodRecord(pm: any, body: any, tokenId: string): { methodType: string; displayName: string; metadata: any } | null {
+    const paymentSource = pm?.payment_source || {};
+    const card = paymentSource.card as { last4?: string; brand?: string } | undefined;
+    const paypalSource = paymentSource.paypal as { email_address?: string } | undefined;
+    const methodType = card ? "card" : paypalSource ? "paypal" : typeof pm?.type === "string" ? pm.type : "token";
+    const displayName = card
+      ? `${(card.brand || "Card").toUpperCase()} •••• ${card.last4 ?? ""}`.trim()
+      : paypalSource?.email_address || `PayPal token ${tokenId.substring(0, 6)}...`;
+    return {
+      methodType,
+      displayName,
+      metadata: { status: pm?.status, brand: pm?.card_type || body?.cardBrand, last4: pm?.last_4 || body?.cardLast4 || "" }
+    };
+  }
 
   async createWebhookEndpoint(config: GatewayConfig, webhookUrl: string): Promise<{ id: string }> {
     const webhook = await PayPalHelper.createWebhookEndpoint(config.publicKey, config.privateKey, webhookUrl);
@@ -140,6 +195,26 @@ export class PayPalGatewayProvider implements IGatewayProvider {
       throw new Error("PayPal customer id is required to list payment methods");
     }
     return await PayPalHelper.listVaultPaymentMethods(config.publicKey, config.privateKey, customerId);
+  }
+
+  async listNormalizedPaymentMethods(config: GatewayConfig, customer: any, repos: any): Promise<any[]> {
+    const raw = await this.getCustomerPaymentMethods(config, customer);
+    if (!Array.isArray(raw)) return [];
+    const customerId = typeof customer === "string" ? customer : customer?.id;
+    const stored = await repos.gatewayPaymentMethod.loadByCustomer(config.churchId, config.gatewayId, customerId);
+    const lookup = new Map(stored.map((record: any) => [record.externalId, record]));
+    return raw.map((method: any) => {
+      const record: any = lookup.get(method?.id);
+      return {
+        id: method.id,
+        type: "paypal",
+        provider: this.name,
+        name: record?.displayName || "PayPal",
+        email: method.email,
+        customerId: record?.customerId || customerId,
+        gatewayId: config.gatewayId
+      };
+    });
   }
 
   async attachPaymentMethod(config: GatewayConfig, paymentMethodId: string, options: any): Promise<any> {

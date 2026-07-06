@@ -15,7 +15,7 @@ jest.mock("../../../../shared/modules/index", () => ({
 }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../../../shared/infrastructure/RepoManager", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ gateway: {} })) } }));
-jest.mock("../../../../shared/helpers/GatewayService", () => ({ GatewayService: { getGatewayForChurch: jest.fn(async () => ({ provider: "stripe", currency: "USD" })), processCharge: jest.fn() } }));
+jest.mock("../../../../shared/helpers/GatewayService", () => ({ GatewayService: { getGatewayForChurch: jest.fn(async () => ({ provider: "stripe", currency: "USD" })), prepareCharge: jest.fn(), processCharge: jest.fn() } }));
 jest.mock("../../../../shared/helpers/Environment", () => ({ Environment: { b1AdminRoot: "https://app.test", supportEmail: "s@test" } }));
 
 import { RegistrationController } from "../RegistrationController.js";

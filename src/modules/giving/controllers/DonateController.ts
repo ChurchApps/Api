@@ -3,8 +3,7 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
-import { StripeHelper } from "../../../shared/helpers/StripeHelper.js";
-import { EncryptionHelper, CurrencyHelper } from "@churchapps/apihelper";
+import { CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
@@ -182,10 +181,10 @@ export class DonateController extends GivingBaseController {
         if (!existingEvent) {
           await GatewayService.logEvent(gateway, churchId, req.body, webhookResult.eventData, this.repos);
 
-          if (this.shouldProcessDonation(provider, webhookResult.eventType!)) {
-            const isPending = this.isPendingPayment(provider, webhookResult.eventType!);
-            const isCompleted = this.isCompletedPayment(provider, webhookResult.eventType!);
-            // KingdomFunding puts the transaction ID at reference_number or transaction.id, not at
+          const classification = GatewayService.classifyWebhookEvent(gateway, webhookResult.eventType!);
+          if (classification.action === "donation") {
+            const isPending = classification.status === "pending";
+            // Some providers put the transaction ID at reference_number or transaction.id, not at
             // the top-level id. Check every candidate so the idempotency match is reliable even if
             // the webhook surfaces the id under a different field than the /charge response stored.
             const candidateIds = [
@@ -209,31 +208,22 @@ export class DonateController extends GivingBaseController {
             }
             const transactionId = matchedId;
 
-            if (isCompleted && transactionId) {
-              if (existingDonation) {
-                // Update existing pending/in-flight donation to complete
-                await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
-              } else {
-                // No prior donation found, create a new complete donation
-                await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
-              }
-            } else if (isPending) {
+            if (isPending) {
               if (existingDonation) {
                 // Pending webhook for a transaction we already know about — no-op
-                console.log(`KingdomFunding webhook: skipping duplicate pending event for txnId=${transactionId}`);
+                console.log(`Webhook: skipping duplicate pending event for txnId=${transactionId}`);
               } else {
                 // Create a new pending donation for ACH payments awaiting settlement
                 await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "pending");
               }
+            } else if (existingDonation && transactionId) {
+              // Update existing pending/in-flight donation to complete
+              await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
             } else {
-              // Regular completed donation (card payments, etc.)
-              if (existingDonation && transactionId) {
-                await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
-              } else {
-                await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
-              }
+              // No prior donation found, create a new complete donation
+              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
             }
-          } else if (this.shouldCancelSubscription(provider, webhookResult.eventType!)) {
+          } else if (classification.action === "cancel-subscription") {
             await this.repos.subscription.delete(churchId, webhookResult.eventData.id);
           }
         }
@@ -244,41 +234,6 @@ export class DonateController extends GivingBaseController {
 
       return this.json({}, 200);
     });
-  }
-
-  private shouldProcessDonation(provider: string, eventType: string): boolean {
-    const donationEvents: Record<string, string[]> = {
-      // payment_intent.processing is for ACH payments that are pending
-      // payment_intent.succeeded is the new standard for ACH payments via Payment Intents API
-      // charge.succeeded is kept for backward compatibility during migration
-      stripe: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded", "payment_intent.processing"],
-      paypal: ["PAYMENT.CAPTURE.COMPLETED"],
-      // KingdomFunding webhook events: "succeeded.charge" for card/ACH, "status.settled" for ACH settlement
-      kingdomfunding: ["succeeded.charge", "status.settled"]
-    };
-    return donationEvents[provider]?.includes(eventType) || false;
-  }
-
-  private isPendingPayment(provider: string, eventType: string): boolean {
-    // ACH payments start in "processing" state and later transition to "succeeded"/"settled"
-    if (provider === "stripe") return eventType === "payment_intent.processing";
-    // KingdomFunding ACH: initial charge succeeds but needs settlement confirmation
-    if (provider === "kingdomfunding") return eventType === "status.originated" || eventType === "status.pending";
-    return false;
-  }
-
-  private isCompletedPayment(provider: string, eventType: string): boolean {
-    if (provider === "stripe") return eventType === "payment_intent.succeeded";
-    if (provider === "kingdomfunding") return eventType === "status.settled" || eventType === "succeeded.charge";
-    return false;
-  }
-
-  private shouldCancelSubscription(provider: string, eventType: string): boolean {
-    const cancellationEvents: Record<string, string[]> = {
-      stripe: ["customer.subscription.deleted"],
-      paypal: ["BILLING.SUBSCRIPTION.CANCELLED"]
-    };
-    return cancellationEvents[provider]?.includes(eventType) || false;
   }
 
   @httpPost("/replay-stripe-events")
@@ -301,22 +256,14 @@ export class DonateController extends GivingBaseController {
         return this.json({ error: "Invalid date format" }, 400);
       }
 
-      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
-      const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
-
-      if (!stripeGateway) {
+      // The import page is a Stripe-history tool; the provider name is the feature's target, not a branch.
+      const gateway = await this.getGateway(au.churchId, "stripe", undefined);
+      if (!gateway) {
         return this.json({ error: "No Stripe gateway configured" }, 404);
       }
 
-      const secretKey = EncryptionHelper.decrypt(stripeGateway.privateKey);
-
       try {
-        const events = await StripeHelper.listEvents(secretKey, {
-          startDate: startTimestamp,
-          endDate: endTimestamp,
-          // Include payment_intent.succeeded for new ACH payments using Payment Intents API
-          types: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded"]
-        });
+        const events = await GatewayService.listReplayEvents(gateway, startTimestamp, endTimestamp);
 
         const results: {
           eventId: string;
@@ -329,92 +276,38 @@ export class DonateController extends GivingBaseController {
         }[] = [];
 
         for (const event of events) {
-          const eventData = event.data.object as any;
+          const base = { eventId: event.id, type: event.type, amount: event.amount, created: event.created, customer: event.customerId };
 
           // Skip subscription events (they're handled separately)
-          const isSubscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
-          if (event.type === "charge.succeeded" && isSubscriptionEvent) {
-            results.push({
-              eventId: event.id,
-              type: event.type,
-              amount: (eventData.amount || eventData.amount_paid || 0) / 100,
-              created: new Date(event.created * 1000),
-              customer: eventData.customer || "",
-              status: "skipped",
-              error: "Subscription event - handled by invoice.paid"
-            });
+          if (event.skipReason) {
+            results.push({ ...base, status: "skipped", error: event.skipReason });
             continue;
           }
 
           // Check if already processed via event log
           const existingEvent = await this.repos.eventLog.loadByProviderId(au.churchId, event.id);
-
           if (existingEvent) {
-            results.push({
-              eventId: event.id,
-              type: event.type,
-              amount: (eventData.amount || eventData.amount_paid || 0) / 100,
-              created: new Date(event.created * 1000),
-              customer: eventData.customer || "",
-              status: "already_imported"
-            });
+            results.push({ ...base, status: "already_imported" });
             continue;
           }
 
           // Secondary check: look for matching donation by amount, date, and person
-          const amount = (eventData.amount || eventData.amount_paid || 0) / 100;
-          const donationDate = new Date(eventData.created * 1000);
-          const customerData = eventData.customer ? await this.repos.customer.load(au.churchId, eventData.customer) as any : null;
+          const customerData = event.customerId ? await this.repos.customer.load(au.churchId, event.customerId) as any : null;
           const personId = customerData?.personId || null;
-
-          const existingDonation = await this.repos.donation.findMatchingDonation(au.churchId, amount, donationDate, personId);
-
+          const existingDonation = await this.repos.donation.findMatchingDonation(au.churchId, event.amount, event.created, personId);
           if (existingDonation) {
-            results.push({
-              eventId: event.id,
-              type: event.type,
-              amount,
-              created: donationDate,
-              customer: eventData.customer || "",
-              status: "already_imported",
-              error: "Matched existing donation by amount/date/person"
-            });
+            results.push({ ...base, status: "already_imported", error: "Matched existing donation by amount/date/person" });
             continue;
           }
 
           if (dryRun) {
-            results.push({
-              eventId: event.id,
-              type: event.type,
-              amount,
-              created: donationDate,
-              customer: eventData.customer || "",
-              status: "new"
-            });
+            results.push({ ...base, status: "new" });
           } else {
-            // Actually import the event
             try {
-              await StripeHelper.logEvent(au.churchId, event, eventData, this.repos);
-              await StripeHelper.logDonation(secretKey, au.churchId, eventData, this.repos);
-
-              results.push({
-                eventId: event.id,
-                type: event.type,
-                amount,
-                created: donationDate,
-                customer: eventData.customer || "",
-                status: "imported"
-              });
+              await GatewayService.importReplayEvent(gateway, au.churchId, event, this.repos);
+              results.push({ ...base, status: "imported" });
             } catch (err: any) {
-              results.push({
-                eventId: event.id,
-                type: event.type,
-                amount,
-                created: donationDate,
-                customer: eventData.customer || "",
-                status: "error",
-                error: err.message || "Unknown error"
-              });
+              results.push({ ...base, status: "error", error: err.message || "Unknown error" });
             }
           }
         }
@@ -456,99 +349,8 @@ export class DonateController extends GivingBaseController {
       donationData.currency = normalizedCurrency;
 
       try {
-        // KF + saveCard: create customer → add payment method (nonce) → charge with pm-{id}. Uses GatewayService for credential handling.
-        if (donationData.saveCard && gateway.provider?.toLowerCase() === "kingdomfunding") {
-          try {
-            const personEmail = donationData.person?.email || "";
-            const personName = donationData.person?.name || donationData.name || "";
-            const personId = donationData.person?.id;
-
-            let customerId: string | undefined;
-            if (personId) {
-              const existingCustomer = await this.repos.customer.loadByPersonAndProvider(churchId, personId, "kingdomfunding") as any;
-              if (existingCustomer) customerId = existingCustomer.id;
-            }
-            if (!customerId) {
-              customerId = await GatewayService.createCustomer(gateway, personEmail, personName);
-              if (customerId && personId) {
-                await this.repos.customer.save({ id: customerId, churchId, personId, provider: "kingdomfunding" });
-              }
-            }
-
-            if (customerId) {
-              const nonceToken = donationData.token || donationData.id || "";
-              const nonceSource = nonceToken.startsWith("nonce-") ? nonceToken : `nonce-${nonceToken}`;
-
-              const attachOptions: any = {
-                customerId,
-                source: nonceSource,
-                name: personName
-              };
-              if (donationData.expiry_month) attachOptions.expiry_month = Number(donationData.expiry_month);
-              if (donationData.expiry_year) {
-                let ey = Number(donationData.expiry_year);
-                if (ey > 0 && ey < 100) ey += 2000;
-                attachOptions.expiry_year = ey;
-              }
-
-              let pm: any;
-              try {
-                pm = await GatewayService.attachPaymentMethod(gateway, nonceSource, attachOptions);
-              } catch (attachErr: any) {
-                // Stale local customer record: recreate and retry.
-                const status = attachErr.response?.status || attachErr.statusCode;
-                if (status === 404) {
-                  console.log(`Customer ${customerId} not found on Accept Blue, recreating...`);
-                  customerId = await GatewayService.createCustomer(gateway, personEmail, personName);
-                  if (customerId && personId) {
-                    await this.repos.customer.save({ id: customerId, churchId, personId, provider: "kingdomfunding" });
-                  }
-                  if (customerId) {
-                    attachOptions.customerId = customerId;
-                    pm = await GatewayService.attachPaymentMethod(gateway, nonceSource, attachOptions);
-                  } else {
-                    throw attachErr;
-                  }
-                } else {
-                  throw attachErr;
-                }
-              }
-
-              const savedPmId = pm?.id;
-              if (savedPmId) {
-                const cardType = pm.card_type || donationData.cardBrand || "Card";
-                const last4 = pm.last_4 || donationData.cardLast4 || "";
-                await this.repos.gatewayPaymentMethod.save({
-                  churchId,
-                  gatewayId: gateway.id,
-                  customerId,
-                  externalId: String(savedPmId),
-                  methodType: donationData.type === "check" ? "bank" : "card",
-                  displayName: `${cardType} ****${last4}`,
-                  metadata: { card_type: cardType, last_4: last4 }
-                } as any);
-
-                donationData.paymentMethodId = String(savedPmId);
-                donationData.customerId = customerId;
-                delete donationData.id;     // Remove nonce so processCharge uses pm-{id}
-                delete donationData.token;
-              }
-            }
-          } catch (saveCardErr: any) {
-            // Never log raw response body; can contain donor PII (billing name, last_4, AVS zip).
-            console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.status || "", saveCardErr.response?.data?.error_message || saveCardErr.message);
-            // Fall through — charge will proceed with original nonce
-          }
-        }
-
-        // KF saved payment method: frontend sends numeric ID (PM ID from Accept Blue). Detect and move to paymentMethodId so provider uses pm-{id} instead of nonce.
-        if (gateway.provider?.toLowerCase() === "kingdomfunding" && donationData.id && !donationData.paymentMethodId) {
-          const id = String(donationData.id);
-          if (/^\d+$/.test(id)) {
-            donationData.paymentMethodId = id;
-            delete donationData.id;
-          }
-        }
+        // Provider-specific request prep (e.g. charge-time vaulting, saved-method id shaping).
+        await GatewayService.prepareCharge(gateway, donationData, this.repos);
 
         const chargeResult = await GatewayService.processCharge(gateway, donationData);
 
@@ -556,8 +358,8 @@ export class DonateController extends GivingBaseController {
           return this.json({ error: chargeResult.data?.error || chargeResult.error || "Charge processing failed" }, 400);
         }
 
-        // PayPal and KF: log donation immediately (no webhook flow).
-        if (gateway.provider === "paypal" || gateway.provider?.toLowerCase() === "kingdomfunding") {
+        // Providers without a webhook confirmation flow log the donation immediately.
+        if (GatewayService.logsDonationsImmediately(gateway)) {
           try {
             await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repos);
             const logData = {
@@ -636,11 +438,8 @@ export class DonateController extends GivingBaseController {
           sec_code
         };
 
-        // For KF: pass existing local customer ID so provider can reuse it
-        if (gateway.provider?.toLowerCase() === "kingdomfunding" && person?.id && !subscriptionData.customerId) {
-          const existingKFCustomer = await this.repos.customer.loadByPersonAndProvider(churchId, person.id, "kingdomfunding") as any;
-          if (existingKFCustomer?.id) subscriptionData.customerId = existingKFCustomer.id;
-        }
+        // Provider-specific prep (e.g. reuse the person's existing vault customer).
+        await GatewayService.prepareSubscription(gateway, subscriptionData, person, this.repos);
 
         const subscriptionResult = await GatewayService.createSubscription(gateway, subscriptionData);
 
@@ -648,19 +447,14 @@ export class DonateController extends GivingBaseController {
           return this.json({ error: "Subscription creation failed" }, 400);
         }
 
-        // KF customer ID created during subscription on Accept Blue.
-        const abCustomerId = subscriptionResult.data?.customerId ? String(subscriptionResult.data.customerId) : customerId;
-        if (gateway.provider?.toLowerCase() === "kingdomfunding" && abCustomerId && person?.id) {
-          try {
-            await this.repos.customer.save({ id: abCustomerId, churchId, personId: person.id, provider: "kingdomfunding" });
-          } catch { /* customer may already exist, ignore */ }
-        }
+        // Provider-specific persistence (e.g. store the gateway-created customer).
+        const providerCustomerId = await GatewayService.finalizeSubscription(gateway, subscriptionResult, subscriptionData, person, this.repos);
 
         const subscription: Subscription = {
           id: subscriptionResult.subscriptionId,
           churchId,
           personId: person.id,
-          customerId: abCustomerId || customerId
+          customerId: providerCustomerId || customerId
         };
 
         await this.repos.subscription.save(subscription);
@@ -860,10 +654,9 @@ export class DonateController extends GivingBaseController {
 
   // Legacy fee calculation methods for backward compatibility
   private getCreditCardFees = async (amount: number, churchId: string, currency: string = "USD") => {
-    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-    const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
-    if (stripeGateway) {
-      return await GatewayService.calculateFees(stripeGateway, amount, churchId, currency);
+    const gateway = await GatewayService.getGatewayForChurch(churchId, { requiredCapability: "supportsOneTimePayments" }, this.repos.gateway).catch(() => null);
+    if (gateway) {
+      return await GatewayService.calculateFees(gateway, amount, churchId, currency);
     }
 
     let customFixedFee: number | null = null;
@@ -881,10 +674,9 @@ export class DonateController extends GivingBaseController {
   };
 
   private getACHFees = async (amount: number, churchId: string) => {
-    const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-    const stripeGateway = gateways.find((g) => g.provider.toLowerCase() === "stripe");
-    if (stripeGateway) {
-      return await GatewayService.calculateFees(stripeGateway, amount, churchId);
+    const gateway = await GatewayService.getGatewayForChurch(churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch(() => null);
+    if (gateway) {
+      return await GatewayService.calculateFees(gateway, amount, churchId);
     }
 
     let customPercentFee: number | null = null;

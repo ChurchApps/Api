@@ -92,7 +92,8 @@ export class CustomerRepo {
       id: row.id,
       churchId: row.churchId,
       personId: row.personId,
-      provider: row.provider,
+      // Legacy rows predate the provider column and were all Stripe customers.
+      provider: row.provider || "stripe",
       metadata: this.parseJson(row.metadata)
     };
   }

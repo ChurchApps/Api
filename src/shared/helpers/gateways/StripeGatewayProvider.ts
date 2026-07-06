@@ -2,10 +2,45 @@ import express from "express";
 import Axios from "axios";
 import { StripeHelper } from "../StripeHelper.js";
 import { Environment } from "../Environment.js";
-import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig } from "./IGatewayProvider.js";
+import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, WebhookEventClassification, ReplayEvent } from "./IGatewayProvider.js";
+
+const DONATION_EVENTS = ["charge.succeeded", "invoice.paid", "payment_intent.succeeded", "payment_intent.processing"];
 
 export class StripeGatewayProvider implements IGatewayProvider {
   readonly name = "stripe";
+
+  readonly capabilities: ProviderCapabilities = {
+    supportsOneTimePayments: true,
+    supportsSubscriptions: true,
+    supportsVault: true,
+    supportsACH: true,
+    supportsRefunds: false,
+    supportsPartialRefunds: false,
+    supportsWebhooks: true,
+    supportsOrders: false,
+    supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
+    supportedCurrencies: [
+      "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd", "inr"
+    ],
+    requiresPlansForSubscriptions: false,
+    requiresCustomerForSubscription: true,
+    supportsInstantCapture: true,
+    supportsManualCapture: true,
+    supportsSCA: true,
+    maxRefundWindow: 180,
+    minTransactionAmount: 50, // 50 cents
+    maxTransactionAmount: 99999999, // $999,999.99
+    notes: ["Supports ACH via Plaid or micro-deposits", "Ideal for card + bank payments"]
+  };
+
+  classifyWebhookEvent(eventType: string): WebhookEventClassification {
+    // payment_intent.processing = ACH awaiting settlement; the rest are money-in-hand.
+    if (DONATION_EVENTS.includes(eventType)) {
+      return { action: "donation", status: eventType === "payment_intent.processing" ? "pending" : "complete" };
+    }
+    if (eventType === "customer.subscription.deleted") return { action: "cancel-subscription" };
+    return { action: "ignore" };
+  }
 
   async createWebhookEndpoint(config: GatewayConfig, webhookUrl: string): Promise<{ id: string; secret?: string }> {
     const webhook = await StripeHelper.createWebhookEndpoint(config.privateKey, webhookUrl);
@@ -243,6 +278,123 @@ export class StripeGatewayProvider implements IGatewayProvider {
 
   async getCustomerPaymentMethods(config: GatewayConfig, customer: any): Promise<any> {
     return await StripeHelper.getCustomerPaymentMethods(config.privateKey, customer);
+  }
+
+  async listNormalizedPaymentMethods(config: GatewayConfig, customer: any, _repos: any): Promise<any[]> {
+    const raw = await this.getCustomerPaymentMethods(config, customer);
+    const normalized: any[] = [];
+    if (!Array.isArray(raw)) return normalized;
+    for (const customerData of raw) {
+      for (const pm of customerData.cards?.data || []) {
+        normalized.push({
+          id: pm.id,
+          type: "card",
+          provider: this.name,
+          name: pm.card?.brand || "Card",
+          last4: pm.card?.last4,
+          customerId: pm.customer || customerData.customer?.id,
+          gatewayId: config.gatewayId,
+          status: "active"
+        });
+      }
+      for (const bank of customerData.banks?.data || []) {
+        normalized.push({
+          id: bank.id,
+          type: "bank",
+          provider: this.name,
+          name: bank.us_bank_account?.bank_name || "Bank Account",
+          last4: bank.us_bank_account?.last4,
+          customerId: bank.customer || customerData.customer?.id,
+          gatewayId: config.gatewayId,
+          status: "active"
+        });
+      }
+      for (const bank of customerData.legacyBanks?.data || []) {
+        normalized.push({
+          id: bank.id,
+          type: "bank",
+          provider: this.name,
+          name: "Bank Account",
+          last4: bank.last4,
+          customerId: bank.customer || customerData.customer?.id,
+          gatewayId: config.gatewayId,
+          status: bank.status || "new",
+          isLegacy: true
+        });
+      }
+    }
+    return normalized;
+  }
+
+  validateAttachToken(id: string): string | null {
+    return (!id || !id.startsWith("pm_")) ? "Invalid payment method ID format" : null;
+  }
+
+  ownsPaymentMethodId(id: string): boolean {
+    return id.startsWith("pm_") || id.startsWith("ba_");
+  }
+
+  async verifyMethodOwnership(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: any): Promise<boolean> {
+    try {
+      const customerData = await repos.customer.load(config.churchId, customerId);
+      const customer = customerData ? repos.customer.convertToModel(config.churchId, customerData) : null;
+      if (!customer) return false;
+      const pmList = await this.getCustomerPaymentMethods(config, customer);
+      const ids = new Set<string>();
+      for (const cd of (Array.isArray(pmList) ? pmList : [])) {
+        for (const coll of [cd?.cards?.data, cd?.banks?.data, cd?.legacyBanks?.data]) {
+          for (const pm of (coll || [])) ids.add(String(pm.id));
+        }
+      }
+      return ids.has(String(paymentMethodId));
+    } catch (e) {
+      console.error("[PM Delete] Stripe ownership verification failed:", e);
+      return false;
+    }
+  }
+
+  async deletePaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId: string, _repos: any): Promise<void> {
+    if (paymentMethodId.startsWith("ba_")) await this.deleteBankAccount(config, customerId, paymentMethodId);
+    else await this.detachPaymentMethod(config, paymentMethodId);
+  }
+
+  mapError(e: any): { status: number; body: any } | null {
+    if (e?.type !== "StripeInvalidRequestError") return null;
+    if (e.code === "resource_missing") {
+      return { status: 404, body: { error: "Payment method not found. Please create a new payment method.", code: "payment_method_not_found" } };
+    }
+    if (e.code === "parameter_invalid_empty") {
+      return { status: 400, body: { error: "Invalid payment method parameters", code: "invalid_parameters" } };
+    }
+    return null;
+  }
+
+  async listReplayEvents(config: GatewayConfig, startDate: number, endDate: number): Promise<ReplayEvent[]> {
+    const events = await StripeHelper.listEvents(config.privateKey, {
+      startDate,
+      endDate,
+      // Include payment_intent.succeeded for new ACH payments using Payment Intents API
+      types: ["charge.succeeded", "invoice.paid", "payment_intent.succeeded"]
+    });
+    return events.map((event: any) => {
+      const eventData = event.data.object as any;
+      const isSubscriptionEvent = eventData.subscription || eventData.description?.toLowerCase().includes("subscription");
+      return {
+        id: event.id,
+        type: event.type,
+        created: new Date(event.created * 1000),
+        amount: (eventData.amount || eventData.amount_paid || 0) / 100,
+        customerId: eventData.customer || "",
+        raw: event,
+        skipReason: event.type === "charge.succeeded" && isSubscriptionEvent ? "Subscription event - handled by invoice.paid" : undefined
+      };
+    });
+  }
+
+  async importReplayEvent(config: GatewayConfig, churchId: string, event: ReplayEvent, repos: any): Promise<void> {
+    const eventData = event.raw.data.object;
+    await StripeHelper.logEvent(churchId, event.raw, eventData, repos);
+    await StripeHelper.logDonation(config.privateKey, churchId, eventData, repos);
   }
 
   // Payment method management

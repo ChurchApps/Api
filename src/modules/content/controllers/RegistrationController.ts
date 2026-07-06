@@ -532,8 +532,8 @@ export class RegistrationController extends ContentBaseController {
   ): Promise<{ ok: boolean; error?: string; requiresAction?: boolean; data?: any; transactionId?: string }> {
     if (!body.provider && !body.gatewayId) return { ok: false, error: "Either provider or gatewayId is required" };
     let gateway: any;
+    const givingRepos = await RepoManager.getRepos<any>("giving");
     try {
-      const givingRepos = await RepoManager.getRepos<any>("giving");
       gateway = await GatewayService.getGatewayForChurch(churchId, { provider: body.provider, gatewayId: body.gatewayId }, givingRepos.gateway);
     } catch (e: any) {
       return { ok: false, error: e?.message || "Gateway not found" };
@@ -551,14 +551,10 @@ export class RegistrationController extends ContentBaseController {
       person: { email: person.email, name: person.name },
       church: { churchURL: Environment.b1AdminRoot }
     };
-    // Mirror DonateController: KF numeric saved-method ids belong in paymentMethodId (pm-{id}), not the nonce.
-    if (gateway.provider?.toLowerCase() === "kingdomfunding" && chargeData.id && !chargeData.paymentMethodId && /^\d+$/.test(String(chargeData.id))) {
-      chargeData.paymentMethodId = String(chargeData.id);
-      delete chargeData.id;
-    }
-
     let chargeResult: any;
     try {
+      // Provider-specific request prep (e.g. saved-method id shaping).
+      await GatewayService.prepareCharge(gateway, chargeData, givingRepos);
       chargeResult = await GatewayService.processCharge(gateway, chargeData);
     } catch (e: any) {
       return { ok: false, error: e?.message || "Payment processing failed" };

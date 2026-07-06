@@ -38,24 +38,20 @@ export class SubscriptionController extends GivingBaseController {
 
         if (!gateway && existingSub?.customerId) {
           const customer = await this.repos.customer.load(au.churchId, existingSub.customerId) as any;
-          const custProvider = customer?.provider || "stripe";
-          gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: custProvider }, this.repos.gateway).catch(() => null);
+          if (customer?.provider) {
+            gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch(() => null);
+          }
         }
 
         if (!gateway) {
-          gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
+          gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsSubscriptions" }, this.repos.gateway).catch(() => null);
         }
 
         let permission = au.checkAccess(Permissions.donations.edit) || existingSub?.personId === au.personId;
 
-        // KF schedules may be gateway-created (no local row); verify ownership via remote customer_id.
-        if (!permission && !existingSub && provider?.toLowerCase() === "kingdomfunding" && gateway) {
-          const schedule = await GatewayService.getSubscription(gateway, subscription.id).catch(() => null);
-          const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
-          if (remoteCustomerId) {
-            const ownerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, provider).catch(() => null) as any;
-            if (ownerCustomer && String(ownerCustomer.id) === remoteCustomerId) permission = true;
-          }
+        // Gateway-created schedules may have no local row; ask the provider to verify ownership.
+        if (!permission && !existingSub && gateway) {
+          permission = await GatewayService.verifySubscriptionOwnership(gateway, subscription.id, au.personId, this.repos);
         }
         if (!permission) continue;
 
@@ -127,7 +123,7 @@ export class SubscriptionController extends GivingBaseController {
     });
   }
 
-  // Shared by delete/pause/resume; verifies donations.edit or ownership (KF: via remote customer_id).
+  // Shared by delete/pause/resume; verifies donations.edit or ownership (gateway-created schedules via provider).
   private async resolveSubscriptionForAction(au: any, id: string, provider?: string): Promise<{ subscription: any; gateway: any; permission: boolean }> {
     const subscription = await this.repos.subscription.load(au.churchId, id) as any;
     let permission = au.checkAccess(Permissions.donations.edit) || subscription?.personId === au.personId;
@@ -136,27 +132,21 @@ export class SubscriptionController extends GivingBaseController {
       ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
       : null;
 
-    if (!permission && !subscription && provider?.toLowerCase() === "kingdomfunding" && gateway) {
-      const schedule = await GatewayService.getSubscription(gateway, id).catch(() => null);
-      const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
-      if (remoteCustomerId) {
-        const ownerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, provider).catch(() => null) as any;
-        if (ownerCustomer && String(ownerCustomer.id) === remoteCustomerId) {
-          permission = true;
-        }
-      }
+    if (!permission && !subscription && gateway) {
+      permission = await GatewayService.verifySubscriptionOwnership(gateway, id, au.personId, this.repos);
     }
 
     if (!permission) return { subscription, gateway: null, permission: false };
 
     if (!gateway && subscription?.customerId) {
       const customer = await this.repos.customer.load(au.churchId, subscription.customerId) as any;
-      const custProvider = customer?.provider || "stripe";
-      gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: custProvider }, this.repos.gateway).catch(() => null);
+      if (customer?.provider) {
+        gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch(() => null);
+      }
     }
 
     if (!gateway) {
-      gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: "stripe" }, this.repos.gateway).catch(() => null);
+      gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsSubscriptions" }, this.repos.gateway).catch(() => null);
     }
 
     return { subscription, gateway, permission: true };

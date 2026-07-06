@@ -4,10 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { GivingBaseController } from "../../modules/giving/controllers/GivingBaseController.js";
 import { IGatewayProvider } from "../../shared/helpers/gateways/IGatewayProvider.js";
-import { StripeGatewayProvider } from "../../shared/helpers/gateways/StripeGatewayProvider.js";
-import { PayPalGatewayProvider } from "../../shared/helpers/gateways/PayPalGatewayProvider.js";
-import { SquareGatewayProvider } from "../../shared/helpers/gateways/SquareGatewayProvider.js";
-import { EPayMintsGatewayProvider } from "../../shared/helpers/gateways/EPayMintsGatewayProvider.js";
+import { GatewayFactory } from "../../shared/helpers/gateways/GatewayFactory.js";
 import { Environment } from "../../shared/helpers/Environment.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -712,12 +709,6 @@ export class PlaygroundController extends GivingBaseController {
   }
 
   private getGatewayProvider(provider: string): IGatewayProvider {
-    switch (provider.toLowerCase()) {
-      case "stripe": return new StripeGatewayProvider();
-      case "paypal": return new PayPalGatewayProvider();
-      case "square": return new SquareGatewayProvider();
-      case "epaymints": return new EPayMintsGatewayProvider();
-      default: throw new Error(`Unsupported gateway provider: ${provider}`);
-    }
+    return GatewayFactory.getProvider(provider);
   }
 }

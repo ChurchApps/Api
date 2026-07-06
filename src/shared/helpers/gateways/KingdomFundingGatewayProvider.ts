@@ -1,7 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { AbstractExperimentalGatewayProvider } from "./AbstractExperimentalGatewayProvider.js";
-import { GatewayConfig, WebhookResult, ChargeResult, SubscriptionResult } from "./IGatewayProvider.js";
+import { GatewayConfig, WebhookResult, ChargeResult, SubscriptionResult, ProviderCapabilities, WebhookEventClassification } from "./IGatewayProvider.js";
 import Axios from "axios";
 import { Environment } from "../Environment.js";
 import { Donation, DonationBatch, EventLog, FundDonation } from "../../../modules/giving/models/index.js";
@@ -27,9 +27,317 @@ import { Donation, DonationBatch, EventLog, FundDonation } from "../../../module
  */
 export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayProvider {
   readonly name = "kingdomfunding";
+  // Card charges are money-in-hand at charge time; webhooks only confirm ACH settlement.
+  readonly logsDonationsImmediately = true;
+  readonly recreatesMissingCustomers = true;
+
+  readonly capabilities: ProviderCapabilities = {
+    supportsOneTimePayments: true,
+    supportsSubscriptions: true,
+    supportsVault: true,
+    supportsACH: true,
+    supportsRefunds: false,
+    supportsPartialRefunds: false,
+    supportsWebhooks: true,
+    supportsOrders: false,
+    supportedPaymentMethods: ["card", "ach"],
+    supportedCurrencies: ["usd"],
+    requiresPlansForSubscriptions: false,
+    requiresCustomerForSubscription: true,
+    supportsInstantCapture: true,
+    supportsManualCapture: false,
+    supportsSCA: false,
+    maxRefundWindow: 180,
+    minTransactionAmount: 1,
+    maxTransactionAmount: 2000000000,
+    notes: ["Powered by KingdomFunding", "Reusable saved payment methods", "Single-step recurring schedules"]
+  };
+
+  classifyWebhookEvent(eventType: string): WebhookEventClassification {
+    // "succeeded.charge" covers card + initial ACH; "status.settled" confirms ACH settlement.
+    if (eventType === "succeeded.charge" || eventType === "status.settled") return { action: "donation", status: "complete" };
+    return { action: "ignore" };
+  }
 
   async createProduct(_config: GatewayConfig, _churchId: string): Promise<string> {
     return "";
+  }
+
+  // Charge-time vaulting: saveCard vaults the nonce (creating the vault customer in the same
+  // call — a bare add_customer without payment data is rejected by NMI), then charges the
+  // saved method; saved-method requests arrive as bare numeric PM ids.
+  async prepareCharge(config: GatewayConfig, donationData: any, repos: any): Promise<void> {
+    if (donationData.saveCard) {
+      try {
+        const personName = donationData.person?.name || donationData.name || "";
+        const personId = donationData.person?.id;
+
+        let customerId: string | undefined;
+        if (personId) {
+          const existingCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name) as any;
+          if (existingCustomer) customerId = existingCustomer.id;
+        }
+
+        const nonceToken = donationData.token || donationData.id || "";
+        const nonceSource = nonceToken.startsWith("nonce-") ? nonceToken : `nonce-${nonceToken}`;
+
+        const attachOptions: any = {
+          source: nonceSource,
+          name: personName,
+          personId
+        };
+        if (customerId) attachOptions.customerId = customerId;
+        if (donationData.expiry_month) attachOptions.expiry_month = Number(donationData.expiry_month);
+        if (donationData.expiry_year) {
+          let ey = Number(donationData.expiry_year);
+          if (ey > 0 && ey < 100) ey += 2000;
+          attachOptions.expiry_year = ey;
+        }
+
+        let pm: any;
+        try {
+          pm = await this.attachPaymentMethod(config, nonceSource, attachOptions);
+        } catch (attachErr: any) {
+          // Stale local customer record: retry without it so a fresh vault is created from the token.
+          const status = attachErr.response?.status || attachErr.statusCode;
+          if (status === 404 && customerId) {
+            console.log(`Customer ${customerId} not found on the gateway, vaulting a fresh one...`);
+            delete attachOptions.customerId;
+            customerId = undefined;
+            pm = await this.attachPaymentMethod(config, nonceSource, attachOptions);
+          } else {
+            throw attachErr;
+          }
+        }
+
+        const savedPmId = pm?.id;
+        if (savedPmId) {
+          customerId = String(pm.customer_vault_id || customerId || savedPmId);
+          if (personId) {
+            await repos.customer.save({ id: customerId, churchId: config.churchId, personId, provider: this.name });
+          }
+          const cardType = pm.card_type || donationData.cardBrand || "Card";
+          const last4 = pm.last_4 || donationData.cardLast4 || "";
+          await repos.gatewayPaymentMethod.save({
+            churchId: config.churchId,
+            gatewayId: config.gatewayId,
+            customerId,
+            externalId: String(savedPmId),
+            methodType: donationData.type === "check" ? "bank" : "card",
+            displayName: `${cardType} ****${last4}`,
+            metadata: { card_type: cardType, last_4: last4 }
+          } as any);
+
+          donationData.paymentMethodId = String(savedPmId);
+          donationData.customerId = customerId;
+          delete donationData.id; // Remove nonce so processCharge uses pm-{id}
+          delete donationData.token;
+        }
+      } catch (saveCardErr: any) {
+        // Never log raw response body; can contain donor PII (billing name, last_4, AVS zip).
+        console.warn("Charge: Failed to save card before charge (non-fatal, charging with nonce):", saveCardErr.response?.status || "", saveCardErr.response?.data?.error_message || saveCardErr.message);
+        // Fall through — charge will proceed with original nonce
+      }
+    }
+
+    // Saved payment method: frontend sends a numeric PM id. Move it to paymentMethodId so
+    // processCharge uses pm-{id} instead of treating it as a nonce.
+    if (donationData.id && !donationData.paymentMethodId && /^\d+$/.test(String(donationData.id))) {
+      donationData.paymentMethodId = String(donationData.id);
+      delete donationData.id;
+    }
+  }
+
+  // Reuse the person's existing vault customer so schedules attach to it.
+  async prepareSubscription(config: GatewayConfig, subscriptionData: any, person: any, repos: any): Promise<void> {
+    if (person?.id && !subscriptionData.customerId) {
+      const existing = await repos.customer.loadByPersonAndProvider(config.churchId, person.id, this.name) as any;
+      if (existing?.id) subscriptionData.customerId = existing.id;
+    }
+  }
+
+  // Persist the vault customer created during subscription; the returned id is stored on the local row.
+  async finalizeSubscription(config: GatewayConfig, result: SubscriptionResult, subscriptionData: any, person: any, repos: any): Promise<string | undefined> {
+    const customerId = result.data?.customerId ? String(result.data.customerId) : subscriptionData.customerId;
+    if (customerId && person?.id) {
+      try {
+        await repos.customer.save({ id: customerId, churchId: config.churchId, personId: person.id, provider: this.name });
+      } catch { /* customer may already exist, ignore */ }
+    }
+    return customerId;
+  }
+
+  async verifySubscriptionOwnership(config: GatewayConfig, subscriptionId: string, personId: string, repos: any): Promise<boolean> {
+    const schedule = await this.getSubscription(config, subscriptionId).catch(() => null);
+    const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
+    if (!remoteCustomerId) return false;
+    const ownerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name).catch(() => null) as any;
+    return !!ownerCustomer && String(ownerCustomer.id) === remoteCustomerId;
+  }
+
+  // The attach flow keys saved methods to the provider-scoped customer, not the request-supplied id.
+  async resolveCustomerForAttach(config: GatewayConfig, personId: string | undefined, _requestCustomerId: string | undefined, repos: any): Promise<string | undefined> {
+    if (!personId) return undefined;
+    const providerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name) as any;
+    return providerCustomer?.id || undefined;
+  }
+
+  buildAttachOptions(customerId: string, tokenId: string, body: any): any {
+    const opts: any = { customer: customerId, customerId, personId: body.personId };
+    if (body.routing_number && body.account_number) {
+      opts.routing_number = body.routing_number;
+      opts.account_number = body.account_number;
+      opts.account_type = body.account_type || "checking";
+      opts.name = body.name;
+    } else {
+      opts.source = tokenId;
+      if (body.expiry_month) opts.expiry_month = body.expiry_month;
+      if (body.expiry_year) opts.expiry_year = body.expiry_year;
+      if (body.cardBrand) opts.cardBrand = body.cardBrand;
+      if (body.cardLast4) opts.cardLast4 = body.cardLast4;
+    }
+    return opts;
+  }
+
+  buildLocalMethodRecord(pm: any, body: any, _tokenId: string): { methodType: string; displayName: string; metadata: any } | null {
+    const isBank = pm?.type === "check"
+      || pm?.account_type
+      || !!pm?.routing_number
+      || !!body?.routing_number
+      || body?.type === "bank"; // Collect.js ACH token carries no raw bank fields, only the type flag
+
+    if (isBank) {
+      const acctType = pm?.account_type || body?.account_type || "checking";
+      const last4 = pm?.last4
+        || (pm?.account_number ? String(pm.account_number).slice(-4) : "")
+        || (body?.account_number ? String(body.account_number).slice(-4) : "")
+        || body?.cardLast4 || ""; // Collect.js ACH token sends the account last4 as cardLast4
+      const acctLabel = acctType.charAt(0).toUpperCase() + acctType.slice(1);
+      return {
+        methodType: "bank",
+        displayName: `Bank ${acctLabel} •••• ${last4}`.trim(),
+        metadata: { status: pm?.status, brand: acctType || "Bank", last4 }
+      };
+    }
+
+    const cardType = pm?.card_type || body?.cardBrand || "Card";
+    const last4 = pm?.last_4 || body?.cardLast4 || "";
+    return {
+      methodType: "card",
+      displayName: `${cardType} •••• ${last4}`.trim(),
+      metadata: { status: pm?.status, brand: pm?.card_type || body?.cardBrand, last4 }
+    };
+  }
+
+  ownsPaymentMethodId(id: string): boolean {
+    // Numeric ids are vault payment-method ids on this gateway.
+    return /^\d+$/.test(id);
+  }
+
+  // Detach, cascading active recurring schedules tied to the method when the gateway refuses.
+  async deletePaymentMethod(config: GatewayConfig, paymentMethodId: string, customerId: string, repos: any): Promise<void> {
+    try {
+      await this.detachPaymentMethod(config, paymentMethodId);
+    } catch (detachErr: any) {
+      const msg = detachErr?.message || "";
+      if (!msg.includes("active recurring")) throw detachErr;
+      try {
+        const schedules = await this.getCustomerSubscriptions(config, customerId);
+        const activeSchedules = (schedules || []).filter((s: any) => s.payment_method_id?.toString() === paymentMethodId && s.active !== false);
+        for (const schedule of activeSchedules) {
+          try {
+            await this.cancelSubscription(config, schedule.id.toString());
+            await repos.subscription.delete(config.churchId, schedule.id.toString()).catch(() => { });
+          } catch (cancelErr: any) {
+            console.error("[PM Delete] Failed to cancel schedule", schedule.id, cancelErr.message);
+          }
+        }
+        await this.detachPaymentMethod(config, paymentMethodId);
+      } catch (retryErr: any) {
+        // Could not delete from the gateway — proceed to clean up locally only
+        console.warn("[PM Delete] Could not delete PM from provider, cleaning up local records only:", retryErr?.message || retryErr);
+      }
+    }
+
+    // The vault is gone; drop the person→vault mapping too, or the next vaulting/subscribe
+    // attempt reuses the dead vault id and fails.
+    try {
+      const customerRecord = await repos.customer.load(config.churchId, customerId) as any;
+      if (customerRecord && (customerRecord.provider || "").toLowerCase() === this.name) {
+        await repos.customer.delete(config.churchId, customerId);
+      }
+    } catch (cleanupErr: any) {
+      console.warn("[PM Delete] Failed to remove local customer mapping:", cleanupErr?.message || cleanupErr);
+    }
+  }
+
+  // Soft-delete model: a payment method only appears if it has a local gatewayPaymentMethods
+  // record. Users can "delete" without revoking the card at the gateway (which would break
+  // any other system using it).
+  async listNormalizedPaymentMethods(config: GatewayConfig, customer: any, repos: any): Promise<any[]> {
+    const raw = await this.getCustomerPaymentMethods(config, customer);
+    if (!Array.isArray(raw)) return [];
+    const customerId = typeof customer === "string" ? customer : customer?.id;
+    const localRecords = await repos.gatewayPaymentMethod.loadByCustomer(config.churchId, config.gatewayId, customerId);
+    const localExternalIds = new Set(localRecords.map((r: any) => String(r.externalId)));
+    const normalized: any[] = [];
+    for (const pm of raw) {
+      const pmId = String(pm.id);
+      if (!localExternalIds.has(pmId)) continue; // soft-deleted by user
+      normalized.push({
+        id: pmId,
+        type: pm.type === "check" ? "bank" : "card",
+        provider: this.name,
+        name: pm.card_type || pm.type || "Card",
+        last4: pm.last_4 || pm.last4 || "",
+        customerId,
+        gatewayId: config.gatewayId,
+        status: "active"
+      });
+    }
+    return normalized;
+  }
+
+  // Normalize NMI recurring schedules to the Stripe-like shape the UI expects.
+  async listNormalizedSubscriptions(config: GatewayConfig, customerId: string): Promise<any[]> {
+    const subs = await this.getCustomerSubscriptions(config, customerId);
+    const normalized: any[] = [];
+    for (const sub of (Array.isArray(subs) ? subs : [])) {
+      // The gateway marks cancelled/expired schedules active:false — skip those.
+      if (!sub.active) continue;
+      const amountCents = Math.round((sub.amount || 0) * 100);
+      // Use next_run_date so the "Start Date" column shows the next charge date.
+      const anchorSrc = sub.next_run_date || sub.created_at;
+      const freq = this.mapFrequency(sub.frequency);
+      normalized.push({
+        id: String(sub.id),
+        status: "active",
+        billing_cycle_anchor: anchorSrc
+          ? Math.floor(new Date(anchorSrc).getTime() / 1000)
+          : Math.floor(Date.now() / 1000),
+        default_payment_method: sub.payment_method_id ? String(sub.payment_method_id) : undefined,
+        plan: {
+          amount: amountCents,
+          interval: freq.interval,
+          interval_count: freq.interval_count
+        }
+      });
+    }
+    return normalized;
+  }
+
+  private mapFrequency(frequency: string): { interval: string; interval_count: number } {
+    switch (frequency?.toLowerCase()) {
+      case "daily": return { interval: "day", interval_count: 1 };
+      case "weekly": return { interval: "week", interval_count: 1 };
+      case "biweekly": return { interval: "week", interval_count: 2 };
+      case "monthly": return { interval: "month", interval_count: 1 };
+      case "bimonthly": return { interval: "month", interval_count: 2 };
+      case "quarterly": return { interval: "month", interval_count: 3 };
+      case "biannually": return { interval: "month", interval_count: 6 };
+      case "annually": return { interval: "year", interval_count: 1 };
+      default: return { interval: "month", interval_count: 1 };
+    }
   }
 
   private getApiUrl(): string {
@@ -288,6 +596,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         };
       }
 
+      console.error("KingdomFunding(NMI) processCharge declined:", this.errorText(resp));
       return { success: false, transactionId: "", data: { error: this.errorText(resp), ...resp } };
     } catch (error: any) {
       const msg = error.response?.data || error.message || "Charge failed";
@@ -326,6 +635,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
           data: { ...resp, status: "active", reference_number: resp.transactionid, auth_amount: params.amount, paymentType: "bank" }
         };
       }
+      console.error("KingdomFunding(NMI) processBankCharge declined:", this.errorText(resp));
       return { success: false, transactionId: "", data: { error: this.errorText(resp), ...resp } };
     } catch (error: any) {
       console.error("KingdomFunding(NMI) processBankCharge error:", error.message);
@@ -424,7 +734,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       customer_vault: "add_customer",
       customer_vault_id: vaultId,
       ...this.splitName(opts.name || ""),
-      email: opts.subscriptionData?.email || opts.subscriptionData?.person?.email || undefined
+      email: opts.subscriptionData?.email || opts.subscriptionData?.person?.email || undefined,
+      ...await this.lookupBillingAddress(config.churchId, opts.subscriptionData?.person?.id)
     };
 
     if (opts.token) {
@@ -483,6 +794,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         ? await this.vaultPaymentMethod(config, { token, isBank, name, subscriptionData })
         : subscriptionData.paymentMethodId || subscriptionData.customerId;
       if (!customerVaultId) {
+        console.error("KingdomFunding(NMI) createSubscription: no vaulted payment method available");
         return { success: false, subscriptionId: "", data: { error: "Failed to save payment method for recurring donation" } };
       }
 
@@ -496,6 +808,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
           ...this.billingFields(subscriptionData)
         });
         if (!this.isApproved(chargeResp)) {
+          console.error("KingdomFunding(NMI) createSubscription initial charge declined:", this.errorText(chargeResp));
           return { success: false, subscriptionId: "", data: { error: this.errorText(chargeResp) } };
         }
         initialTxnId = chargeResp.transactionid;
@@ -515,6 +828,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       });
 
       if (!this.isApproved(subResp) || !subResp.subscription_id) {
+        console.error("KingdomFunding(NMI) createSubscription schedule declined:", this.errorText(subResp));
         return { success: false, subscriptionId: "", data: { error: this.errorText(subResp) || "Recurring schedule creation failed" } };
       }
 
@@ -549,6 +863,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       const resp = await this.nmiPost(config, params);
       if (!this.isApproved(resp)) {
+        console.error("KingdomFunding(NMI) updateSubscription declined:", this.errorText(resp));
         return { success: false, subscriptionId: String(subscriptionId), data: { error: this.errorText(resp) } };
       }
       return { success: true, subscriptionId: String(subscriptionId), data: resp };
@@ -618,16 +933,47 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   /**
+   * The donor's billing address from their person record; some NMI merchant accounts
+   * reject vault writes without one. Best-effort — returns {} when unavailable.
+   */
+  private async lookupBillingAddress(churchId: string, personId?: string): Promise<Record<string, any>> {
+    if (!personId) return {};
+    try {
+      // Lazy import avoids a static cycle between the gateway layer and module repos.
+      const { RepoManager } = await import("../../infrastructure/RepoManager.js");
+      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const person = await membershipRepos.person.load(churchId, personId);
+      const contact = person?.contactInfo || {};
+      const fields: Record<string, any> = {
+        address1: contact.address1 || undefined,
+        address2: contact.address2 || undefined,
+        city: contact.city || undefined,
+        state: contact.state || undefined,
+        zip: contact.zip || undefined
+      };
+      Object.keys(fields).forEach((k) => fields[k] === undefined && delete fields[k]);
+      return fields;
+    } catch (err: any) {
+      console.warn("KingdomFunding(NMI): billing address lookup failed (continuing without):", err?.message || err);
+      return {};
+    }
+  }
+
+  /**
    * Create a bare Customer Vault record (contact info only). A payment method is
    * attached separately via attachPaymentMethod. Returns the customer_vault_id.
+   * Pass options.personId so the donor's billing address is included — some NMI
+   * accounts reject vault records that carry neither payment data nor an address.
    */
-  async createCustomer(config: GatewayConfig, email: string, name: string): Promise<string> {
+  async createCustomer(config: GatewayConfig, email: string, name: string, options?: { personId?: string }): Promise<string> {
     const vaultId = crypto.randomUUID();
+    const billing = await this.lookupBillingAddress(config.churchId, options?.personId);
     const resp = await this.nmiPost(config, {
       customer_vault: "add_customer",
       customer_vault_id: vaultId,
       email: email || undefined,
-      ...this.splitName(name)
+      ...this.splitName(name),
+      ...billing
     });
     if (!this.isApproved(resp)) {
       throw new Error(this.errorText(resp) || "Failed to create customer");
@@ -664,6 +1010,15 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       throw new Error("attachPaymentMethod requires a payment_token or bank details");
     }
     Object.assign(methodParams, this.splitName(options.name || ""));
+    // Billing address (explicit or looked up from the person record) — some NMI
+    // accounts reject vault writes without it.
+    if (options.address1) {
+      for (const k of ["address1", "address2", "city", "state", "zip"]) {
+        if (options[k]) methodParams[k] = options[k];
+      }
+    } else {
+      Object.assign(methodParams, await this.lookupBillingAddress(config.churchId, options.personId));
+    }
 
     let resp: Record<string, string>;
     let vaultId: string;

@@ -32,24 +32,29 @@ export class CustomerController extends GivingBaseController {
         return [];
       }
 
+      // The passed-in customer id belongs to one provider; other gateways resolve theirs by person.
+      const passedCustomer = customerRecord;
+
       for (const gw of allGateways) {
         const capabilities = GatewayService.getProviderCapabilities(gw);
         if (!capabilities?.supportsSubscriptions) continue;
 
         try {
           // Find the correct customer ID for this specific gateway/provider
-          let gatewayCustomerId = id; // default to the passed-in ID (works for Stripe)
-          if (gw.provider?.toLowerCase() !== "stripe") {
+          let gatewayCustomerId: string | null = null;
+          if (passedCustomer && passedCustomer.provider?.toLowerCase() === gw.provider?.toLowerCase()) {
+            gatewayCustomerId = id;
+          } else {
             const providerCustomer = await this.repos.customer.loadByPersonAndProvider(au.churchId, personId, gw.provider) as any;
-            if (!providerCustomer) continue; // no customer on this provider, skip
-            gatewayCustomerId = providerCustomer.id;
+            if (providerCustomer) gatewayCustomerId = providerCustomer.id;
           }
+          if (!gatewayCustomerId) continue; // no customer on this provider, skip
 
           const gateway = await GatewayService.getGatewayForChurch(au.churchId, { gatewayId: gw.id }, this.repos.gateway);
 
-          let result: any;
+          let subs: any[];
           try {
-            result = await GatewayService.getCustomerSubscriptions(gateway, gatewayCustomerId);
+            subs = await GatewayService.listNormalizedSubscriptions(gateway, gatewayCustomerId);
           } catch (subErr: any) {
             // Customer doesn't exist on the provider — skip this gateway
             if (subErr.response?.status === 404) {
@@ -59,39 +64,8 @@ export class CustomerController extends GivingBaseController {
             throw subErr;
           }
 
-          // Handle Stripe format ({ data: [...] }) and KF format (array)
-          const subs = Array.isArray(result) ? result : (result?.data || []);
-
           for (const sub of subs) {
-            const providerName = gw.provider?.toLowerCase();
-
-            if (providerName === "kingdomfunding") {
-              // The provider marks cancelled/expired schedules active:false — skip those.
-              if (!sub.active) continue;
-
-              // Normalize the NMI recurring schedule to the Stripe-like shape the UI expects.
-              // Use next_run_date so the "Start Date" column shows the next charge date.
-              const amountCents = Math.round((sub.amount || 0) * 100);
-              const anchorSrc = sub.next_run_date || sub.created_at;
-              const freq = this.mapKFFrequency(sub.frequency);
-              allSubscriptions.push({
-                id: String(sub.id),
-                status: "active",
-                billing_cycle_anchor: anchorSrc
-                  ? Math.floor(new Date(anchorSrc).getTime() / 1000)
-                  : Math.floor(Date.now() / 1000),
-                default_payment_method: sub.payment_method_id ? String(sub.payment_method_id) : undefined,
-                plan: {
-                  amount: amountCents,
-                  interval: freq.interval,
-                  interval_count: freq.interval_count
-                },
-                provider: providerName,
-                gatewayId: gw.id
-              });
-            } else {
-              allSubscriptions.push({ ...sub, provider: providerName, gatewayId: gw.id });
-            }
+            allSubscriptions.push({ ...sub, provider: gw.provider?.toLowerCase(), gatewayId: gw.id });
           }
         } catch (e) {
           console.warn(`Failed to load subscriptions from ${gw.provider}:`, e);
@@ -130,18 +104,4 @@ export class CustomerController extends GivingBaseController {
     });
   }
 
-  /** Map KF frequency to Stripe intervals. */
-  private mapKFFrequency(frequency: string): { interval: string; interval_count: number } {
-    switch (frequency?.toLowerCase()) {
-      case "daily": return { interval: "day", interval_count: 1 };
-      case "weekly": return { interval: "week", interval_count: 1 };
-      case "biweekly": return { interval: "week", interval_count: 2 };
-      case "monthly": return { interval: "month", interval_count: 1 };
-      case "bimonthly": return { interval: "month", interval_count: 2 };
-      case "quarterly": return { interval: "month", interval_count: 3 };
-      case "biannually": return { interval: "month", interval_count: 6 };
-      case "annually": return { interval: "year", interval_count: 1 };
-      default: return { interval: "month", interval_count: 1 };
-    }
-  }
 }
