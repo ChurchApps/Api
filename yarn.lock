@@ -1343,10 +1343,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/content-providers@npm:^0.5.1":
-  version: 0.5.1
-  resolution: "@churchapps/content-providers@npm:0.5.1"
-  checksum: 10c0/00e97adeb25d2fffae5ad18e5dc52a50a8f30c988ef336edb53fec48f21d7a80a0861b3ec0956e58e148a85cef9e7c5854fb59245c194e19b946f1e31a69023f
+"@churchapps/content-providers@npm:^0.6.1":
+  version: 0.6.1
+  resolution: "@churchapps/content-providers@npm:0.6.1"
+  checksum: 10c0/2fafcf39a38ccdcacaab711e38bbf05c5649d3cfa108bfd908a0003f670095b4335f8d507382a34eeccdeadae7e86201e8b6c0e70c37c84dc619a6973463d89b
   languageName: node
   linkType: hard
 
@@ -3847,7 +3847,7 @@ __metadata:
     "@aws-sdk/client-ssm": "npm:^3.862.0"
     "@aws-sdk/lib-storage": "npm:^3.862.0"
     "@churchapps/apihelper": "npm:^0.7.1"
-    "@churchapps/content-providers": "npm:^0.5.1"
+    "@churchapps/content-providers": "npm:^0.6.1"
     "@churchapps/helpers": "npm:^1.10.1"
     "@churchapps/texting": "npm:^0.2.2"
     "@codegenie/serverless-express": "npm:^4.15.0"
