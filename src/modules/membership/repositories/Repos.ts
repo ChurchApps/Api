@@ -19,6 +19,7 @@ import {
   DomainRepo,
   SettingRepo,
   ClientErrorRepo,
+  JobRunRepo,
   VisibilityPreferenceRepo,
   OAuthTokenRepo,
   OAuthCodeRepo,
@@ -72,6 +73,7 @@ export class Repos {
   public auditLog: AuditLogRepo;
   public batch: BatchRepo;
   public clientError: ClientErrorRepo;
+  public jobRun: JobRunRepo;
 
   public webhook: WebhookRepo;
   public webhookDelivery: WebhookDeliveryRepo;
@@ -121,6 +123,7 @@ export class Repos {
     this.auditLog = new AuditLogRepo();
     this.batch = new BatchRepo();
     this.clientError = new ClientErrorRepo();
+    this.jobRun = new JobRunRepo();
 
     this.webhook = new WebhookRepo();
     this.webhookDelivery = new WebhookDeliveryRepo();

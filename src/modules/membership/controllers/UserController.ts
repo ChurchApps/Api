@@ -548,6 +548,40 @@ export class UserController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/:id/details")
+  public async details(req: express.Request<{ id: string }, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+
+      const user = await this.repos.user.load(req.params.id);
+      if (!user) return this.json({}, 404);
+
+      const churches: { id: string; name: string; subDomain: string; viaMembership: boolean; viaRoles: boolean }[] = [];
+      const upsert = (church: { id?: string; name?: string; subDomain?: string }, key: "viaMembership" | "viaRoles") => {
+        if (!church?.id) return;
+        let entry = ArrayHelper.getOne(churches, "id", church.id);
+        if (!entry) {
+          entry = { id: church.id, name: church.name, subDomain: church.subDomain, viaMembership: false, viaRoles: false };
+          churches.push(entry);
+        }
+        entry[key] = true;
+      };
+
+      (await this.repos.userChurch.loadForUser(user.id)).forEach((uc: any) => upsert(uc.church, "viaMembership"));
+      (await this.repos.rolePermission.loadForUser(user.id, true)).forEach((uc: any) => upsert(uc.church, "viaRoles"));
+
+      return this.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        registrationDate: user.registrationDate,
+        lastLogin: user.lastLogin,
+        churches
+      }, 200);
+    });
+  }
+
   @httpGet("/:id/impersonate")
   public async impersonate(req: express.Request<{ id: string }, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

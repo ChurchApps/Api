@@ -94,7 +94,7 @@ export class UserRepo {
   public async search(term: string): Promise<User[]> {
     const searchTerm = `%${term}%`;
     return getDb().selectFrom("users")
-      .select(["id", "email", "firstName", "lastName"])
+      .select(["id", "email", "firstName", "lastName", "registrationDate", "lastLogin"])
       .where((eb) => eb.or([
         eb("email", "like", searchTerm),
         eb("firstName", "like", searchTerm),

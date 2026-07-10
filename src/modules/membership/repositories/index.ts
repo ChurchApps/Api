@@ -33,6 +33,7 @@ export { VisibilityPreferenceRepo } from "./VisibilityPreferenceRepo.js";
 
 export { SettingRepo } from "./SettingRepo.js";
 export { ClientErrorRepo } from "./ClientErrorRepo.js";
+export { JobRunRepo } from "./JobRunRepo.js";
 
 export { OAuthTokenRepo } from "./OAuthTokenRepo.js";
 export { OAuthCodeRepo } from "./OAuthCodeRepo.js";

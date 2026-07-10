@@ -20,6 +20,16 @@ interface ConfigGroup {
 @controller("/membership/serverHealth")
 export class ServerHealthController extends MembershipBaseController {
 
+  @httpGet("/jobs")
+  public async getJobs(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const latest = await this.repos.jobRun.loadLatest();
+      const recentFailures = await this.repos.jobRun.loadRecentFailures(25);
+      return { latest, recentFailures };
+    });
+  }
+
   @httpGet("/")
   public async getStatus(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

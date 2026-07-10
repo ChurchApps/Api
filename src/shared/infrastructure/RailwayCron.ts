@@ -1,4 +1,5 @@
 import { RepoManager } from "./RepoManager.js";
+import { JobRunHelper } from "../helpers/JobRunHelper.js";
 
 const ONE_MINUTE_MS = 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
@@ -27,10 +28,10 @@ const runThirtyMinute = async (): Promise<void> => {
   const { SocketHelper } = await import("../../modules/messaging/helpers/SocketHelper.js");
   const repos = await RepoManager.getRepos<any>("messaging");
   NotificationHelper.init(repos);
-  await NotificationHelper.escalateDelivery();
-  await NotificationHelper.sendEmailNotifications("individual");
-  await scanReminders(repos); // reminder dispatcher — Pattern A, no new timer
-  await SocketHelper.reapStaleConnections(repos);
+  await JobRunHelper.run("escalateDelivery", () => NotificationHelper.escalateDelivery());
+  await JobRunHelper.run("individualEmails", () => NotificationHelper.sendEmailNotifications("individual"));
+  await JobRunHelper.run("scanReminders", () => scanReminders(repos)); // reminder dispatcher — Pattern A, no new timer
+  await JobRunHelper.run("reapStaleConnections", () => SocketHelper.reapStaleConnections(repos));
 };
 
 const runMidnight = async (): Promise<void> => {
@@ -38,18 +39,22 @@ const runMidnight = async (): Promise<void> => {
   const messagingRepos = await RepoManager.getRepos<any>("messaging");
   NotificationHelper.init(messagingRepos);
   const contentRepos = await RepoManager.getRepos<any>("content");
-  await contentRepos.streamingService.advanceRecurringServices();
+  await JobRunHelper.run("advanceRecurringServices", () => contentRepos.streamingService.advanceRecurringServices());
   const { expandReminders } = await import("../../modules/messaging/helpers/ReminderBootstrap.js");
-  await expandReminders(messagingRepos); // reminder expander — Pattern A
+  await JobRunHelper.run("expandReminders", () => expandReminders(messagingRepos)); // reminder expander — Pattern A
   const { GradePromotionHelper } = await import("../../modules/membership/helpers/GradePromotionHelper.js");
-  await GradePromotionHelper.checkPromotions();
-  await NotificationHelper.sendEmailNotifications("daily");
+  await JobRunHelper.run("gradePromotions", () => GradePromotionHelper.checkPromotions());
+  await JobRunHelper.run("purgeJobRuns", async () => {
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    return membershipRepos.jobRun.deleteOld(30);
+  });
+  await JobRunHelper.run("dailyEmails", () => NotificationHelper.sendEmailNotifications("daily"));
 };
 
 const runWebhookDeliveries = async (): Promise<void> => {
   const { WebhookDeliveryWorker } = await import("../webhooks/index.js");
   const repos = await RepoManager.getRepos<any>("membership");
-  await WebhookDeliveryWorker.process(repos);
+  await JobRunHelper.run("webhookDeliveries", () => WebhookDeliveryWorker.process(repos));
 };
 
 export const startRailwayCron = (): void => {

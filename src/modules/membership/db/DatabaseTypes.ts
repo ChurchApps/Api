@@ -1,6 +1,6 @@
 import type {
   AccessLog, Answer, ApiKey, AssociatedGroup, AuditLog, Batch, Campus, Church, ClientError, Domain, Form,
-  FormSubmission, Group, GroupJoinRequest, GroupMember, GroupMemberHistory, Household, List, ListMember, MemberPermission,
+  FormSubmission, Group, GroupJoinRequest, GroupMember, GroupMemberHistory, Household, JobRun, List, ListMember, MemberPermission,
   HouseholdPickupPerson,
   OAuthClient, OAuthCode, OAuthDeviceCode, OAuthRelaySession, OAuthToken,
   PersonField, PersonFieldValue,
@@ -65,6 +65,7 @@ export interface MembershipDatabase {
   groupMemberHistory: GroupMemberHistory;
   groupJoinRequests: Omit<GroupJoinRequest, "person" | "group">;
   households: Household;
+  jobRuns: JobRun;
   householdPickupPeople: HouseholdPickupPerson;
   lists: Omit<List, "conditions" | "createdByPersonName" | "rules" | "actions" | "autoRefresh" | "notifyOnChange"> & {
     conditions: string;

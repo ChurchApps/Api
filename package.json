@@ -19,7 +19,7 @@
     "build": "yarn clean && yarn exec tsc --noEmitOnError false && yarn copy-assets && yarn build:playground",
     "build:playground": "cd src/playground && yarn exec tsc && copyfiles index.html dist/",
     "build:prod": "yarn clean && (yarn exec tsc -p tsconfig.prod.json --noEmitOnError false || true) && yarn copy-assets",
-    "build-layer": "rm -rf layer && mkdir -p layer/nodejs && cp tools/layer-package.json layer/nodejs/package.json && cd layer/nodejs && touch yarn.lock && yarn install",
+    "build-layer": "rm -rf layer && mkdir -p layer/nodejs && node tools/build-layer-package.mjs && cd layer/nodejs && touch yarn.lock && yarn install",
     "rebuild-layer": "yarn clean-layer && yarn build-layer",
     "clean-layer": "rm -rf layer",
     "serverless-local": "serverless offline --stage dev --httpPort 8084",
