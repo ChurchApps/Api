@@ -453,7 +453,7 @@ export class PersonController extends MembershipBaseController {
 
       const allowedFields = ["membershipStatus", "maritalStatus", "gender", "optedOut", "campusId", "grade", "school"];
       const updates: Record<string, any> = {};
-      const rawUpdates = req.body?.updates || {};
+      const rawUpdates: Record<string, any> = req.body?.updates || {};
       allowedFields.forEach((field) => {
         if (rawUpdates[field] !== undefined) updates[field] = rawUpdates[field];
       });

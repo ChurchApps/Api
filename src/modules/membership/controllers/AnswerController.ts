@@ -11,7 +11,7 @@ export class AnswerController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
-        let data = null;
+        let data: any = null;
         if (req.query.formSubmissionId !== undefined) data = this.repos.answer.loadForFormSubmission(au.churchId, req.query.formSubmissionId.toString());
         else data = await this.repos.answer.loadAll(au.churchId);
         return this.repos.answer.convertAllToModel(au.churchId, data);

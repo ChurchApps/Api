@@ -34,7 +34,7 @@ export class UserHelper {
     if (reportingApi !== null) {
       luc.apis.forEach((api) => {
         if (api.keyName !== "ReportingApi") {
-          api.permissions.forEach((perm) => {
+          api.permissions.forEach((perm: RolePermission) => {
             const reportingPermission = { ...perm, apiName: api.keyName };
             reportingApi.permissions.push(reportingPermission);
           });

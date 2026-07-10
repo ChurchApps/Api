@@ -269,7 +269,7 @@ export class YouVersionHelper {
         offset: 0,
         total: 0,
         verseCount: 0,
-        verses: []
+        verses: [] as any[]
       }
     };
     // YouVersion has not implemented yet

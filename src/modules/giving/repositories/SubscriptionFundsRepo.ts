@@ -69,7 +69,7 @@ export class SubscriptionFundsRepo {
 
   // If the fund gets deleted for a recurring donation, the donations will go to '(General Fund)'
   public async loadForSubscriptionLog(churchId: string, subscriptionId: string) {
-    let result;
+    let result: any[];
     const queryResult = await sql<any>`
       SELECT subscriptionFunds.*, funds.name, funds.removed
       FROM subscriptionFunds

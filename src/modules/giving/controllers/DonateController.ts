@@ -654,7 +654,7 @@ export class DonateController extends GivingBaseController {
 
   // Legacy fee calculation methods for backward compatibility
   private getCreditCardFees = async (amount: number, churchId: string, currency: string = "USD") => {
-    const gateway = await GatewayService.getGatewayForChurch(churchId, { requiredCapability: "supportsOneTimePayments" }, this.repos.gateway).catch(() => null);
+    const gateway = await GatewayService.getGatewayForChurch(churchId, { requiredCapability: "supportsOneTimePayments" }, this.repos.gateway).catch((): null => null);
     if (gateway) {
       return await GatewayService.calculateFees(gateway, amount, churchId, currency);
     }
@@ -674,7 +674,7 @@ export class DonateController extends GivingBaseController {
   };
 
   private getACHFees = async (amount: number, churchId: string) => {
-    const gateway = await GatewayService.getGatewayForChurch(churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch(() => null);
+    const gateway = await GatewayService.getGatewayForChurch(churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
     if (gateway) {
       return await GatewayService.calculateFees(gateway, amount, churchId);
     }

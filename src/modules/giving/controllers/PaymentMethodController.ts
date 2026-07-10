@@ -49,7 +49,7 @@ export class PaymentMethodController extends GivingBaseController {
         cId,
         provider ? { provider } : { requiredCapability: "supportsVault" },
         this.repos.gateway
-      ).catch(() => null);
+      ).catch((): null => null);
 
       if (!gateway) {
         return this.json({ error: "Payment gateway not configured" }, 400);
@@ -134,7 +134,7 @@ export class PaymentMethodController extends GivingBaseController {
         au.churchId,
         provider ? { provider } : { requiredCapability: "supportsVault" },
         this.repos.gateway
-      ).catch(() => null);
+      ).catch((): null => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
       try {
@@ -157,7 +157,7 @@ export class PaymentMethodController extends GivingBaseController {
       // authz-exempt: gated to au.personId or donations.edit below; cId prefers au.churchId, body churchId only a fallback
       const { personId, customerId, email, name, churchId } = req.body;
       const cId = au?.churchId || churchId;
-      const gateway = await GatewayService.getGatewayForChurch(cId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch(() => null);
+      const gateway = await GatewayService.getGatewayForChurch(cId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
 
       if (!gateway) {
         return this.json({ error: "Payment gateway not configured" }, 400);
@@ -221,7 +221,7 @@ export class PaymentMethodController extends GivingBaseController {
         return this.json({ error: "Email and name are required" }, 400);
       }
 
-      const gateway = await GatewayService.getGatewayForChurch(churchId, { gatewayId }, this.repos.gateway).catch(() => null);
+      const gateway = await GatewayService.getGatewayForChurch(churchId, { gatewayId }, this.repos.gateway).catch((): null => null);
 
       if (!gateway) {
         return this.json({ error: "Payment gateway not configured" }, 400);
@@ -254,7 +254,7 @@ export class PaymentMethodController extends GivingBaseController {
   public async addBankAccount(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name } = req.body;
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch(() => null);
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
@@ -297,7 +297,7 @@ export class PaymentMethodController extends GivingBaseController {
   public async updateBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, personId, bankData, customerId } = req.body;
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch(() => null);
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
       const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
       if (!permission) return this.json({}, 401);
       try {
@@ -312,7 +312,7 @@ export class PaymentMethodController extends GivingBaseController {
   public async verifyBank(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, customerId, amountData } = req.body;
-      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch(() => null);
+      const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
       const permission =
         gateway &&
         (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
@@ -345,7 +345,7 @@ export class PaymentMethodController extends GivingBaseController {
         au.churchId,
         resolvedProvider ? { provider: resolvedProvider } : { requiredCapability: "supportsVault" },
         this.repos.gateway
-      ).catch(() => null);
+      ).catch((): null => null);
 
       let permission = false;
       if (gateway) {

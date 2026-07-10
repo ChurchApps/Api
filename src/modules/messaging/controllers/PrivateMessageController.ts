@@ -66,7 +66,7 @@ export class PrivateMessageController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (_au) => {
       // TODO: Implement loadExisting functionality to find existing conversation between two people
       // const existing = await this.repos.privateMessage.loadExisting(au.churchId, au.personId, personId);
-      const existing = null; // Temporary placeholder
+      const existing: any = null; // Temporary placeholder
       return existing || {};
     });
   }

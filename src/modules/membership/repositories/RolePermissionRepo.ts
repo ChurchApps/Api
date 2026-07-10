@@ -140,7 +140,7 @@ export class RolePermissionRepo {
         if (univeralChurch !== null) {
           univeralChurch.apis.forEach((universalApi) => {
             if (universalApi.keyName === currentApi.keyName) {
-              universalApi.permissions.forEach((perm) => {
+              universalApi.permissions.forEach((perm: RolePermission) => {
                 currentApi.permissions.push(perm);
               });
             }
@@ -207,7 +207,7 @@ export class RolePermissionRepo {
         const api = ArrayHelper.getOne(currentUserChurch.apis, "keyName", universalApi.keyName);
         if (api === null) currentUserChurch.apis.push({ ...universalApi });
         else {
-          universalApi.permissions.forEach((perm) => {
+          universalApi.permissions.forEach((perm: RolePermission) => {
             api.permissions.push(perm);
           });
         }

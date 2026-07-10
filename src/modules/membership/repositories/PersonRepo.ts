@@ -9,7 +9,7 @@ import { CollectionHelper } from "../../../shared/helpers/index.js";
 @injectable()
 export class PersonRepo {
   public async save(person: Person) {
-    person.name.display = PersonHelper.getDisplayNameFromPerson(person);
+    person.name!.display = PersonHelper.getDisplayNameFromPerson(person);
     return person.id ? this.update(person) : this.create(person);
   }
 
@@ -427,7 +427,7 @@ export class PersonRepo {
 
   public convertToPreferenceModel(churchId: string, data: Person) {
     const result: Person = {
-      name: { display: data.name.display },
+      name: { display: data.name!.display },
       contactInfo: data.contactInfo,
       photo: data.photo,
       photoUpdated: data.photoUpdated,

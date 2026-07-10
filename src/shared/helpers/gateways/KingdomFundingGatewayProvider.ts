@@ -168,10 +168,10 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   async verifySubscriptionOwnership(config: GatewayConfig, subscriptionId: string, personId: string, repos: any): Promise<boolean> {
-    const schedule = await this.getSubscription(config, subscriptionId).catch(() => null);
+    const schedule = await this.getSubscription(config, subscriptionId).catch((): null => null);
     const remoteCustomerId = schedule?.customer_id ? String(schedule.customer_id) : null;
     if (!remoteCustomerId) return false;
-    const ownerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name).catch(() => null) as any;
+    const ownerCustomer = await repos.customer.loadByPersonAndProvider(config.churchId, personId, this.name).catch((): null => null) as any;
     return !!ownerCustomer && String(ownerCustomer.id) === remoteCustomerId;
   }
 
@@ -1163,7 +1163,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
             .filter((f: any) => f.fundId)
             .map((f: any) => ({ fundId: String(f.fundId), amount: Number(f.amount) || 0 }));
           if (!funds.length) continue;
-          const total = funds.reduce((s, f) => s + f.amount, 0);
+          const total = funds.reduce((s: number, f: { fundId: string; amount: number }) => s + f.amount, 0);
           // The charged amount may exceed the designated total when the donor covers fees;
           // pick the subscription whose fund total best fits within the charge.
           const gap = amount - total;

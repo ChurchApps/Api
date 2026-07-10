@@ -33,18 +33,18 @@ export class SubscriptionController extends GivingBaseController {
 
         const provider = subscription.provider;
         let gateway = provider
-          ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
+          ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch((): null => null)
           : null;
 
         if (!gateway && existingSub?.customerId) {
           const customer = await this.repos.customer.load(au.churchId, existingSub.customerId) as any;
           if (customer?.provider) {
-            gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch(() => null);
+            gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch((): null => null);
           }
         }
 
         if (!gateway) {
-          gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsSubscriptions" }, this.repos.gateway).catch(() => null);
+          gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsSubscriptions" }, this.repos.gateway).catch((): null => null);
         }
 
         let permission = au.checkAccess(Permissions.donations.edit) || existingSub?.personId === au.personId;
@@ -129,7 +129,7 @@ export class SubscriptionController extends GivingBaseController {
     let permission = au.checkAccess(Permissions.donations.edit) || subscription?.personId === au.personId;
 
     let gateway = provider
-      ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch(() => null)
+      ? await GatewayService.getGatewayForChurch(au.churchId, { provider }, this.repos.gateway).catch((): null => null)
       : null;
 
     if (!permission && !subscription && gateway) {
@@ -141,19 +141,19 @@ export class SubscriptionController extends GivingBaseController {
     if (!gateway && subscription?.customerId) {
       const customer = await this.repos.customer.load(au.churchId, subscription.customerId) as any;
       if (customer?.provider) {
-        gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch(() => null);
+        gateway = await GatewayService.getGatewayForChurch(au.churchId, { provider: customer.provider }, this.repos.gateway).catch((): null => null);
       }
     }
 
     if (!gateway) {
-      gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsSubscriptions" }, this.repos.gateway).catch(() => null);
+      gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsSubscriptions" }, this.repos.gateway).catch((): null => null);
     }
 
     return { subscription, gateway, permission: true };
   }
 
   private loadPrivateKey = async (churchId: string) => {
-    const gateway = await GatewayService.getGatewayForChurch(churchId, {}, this.repos.gateway).catch(() => null);
+    const gateway = await GatewayService.getGatewayForChurch(churchId, {}, this.repos.gateway).catch((): null => null);
     if (!gateway || !gateway.privateKey) return "";
 
     try {
