@@ -12,5 +12,7 @@
   "b1AdminRoot": "https://admin.b1.church",
   "messagingApi": "https://api.churchapps.org/messaging",
   "aiProvider": "openai",
-  "storeApi": "https://api.mutualministry.com"
+  "storeApi": "https://api.mutualministry.com",
+  "ministryStuffApi": "https://api.ministrystuff.org",
+  "ministryStuffContentRoot": "https://content.ministrystuff.org/"
 }

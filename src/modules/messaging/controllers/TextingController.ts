@@ -7,6 +7,7 @@ import { EncryptionHelper } from "@churchapps/apihelper";
 import { getProvider, type TextingProviderConfig } from "@churchapps/texting";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { TextingConfigHelper } from "../helpers/TextingConfigHelper.js";
 
 interface GroupMemberDetail {
   personId: string;
@@ -79,6 +80,22 @@ export class TextingController extends MessagingBaseController {
     });
   }
 
+  @httpGet("/credits")
+  public async getCredits(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const config = await this.getProviderConfig(au.churchId);
+      if (!config) return { configured: false, supported: false };
+      if (config.providerName.toLowerCase() !== "ministrystuff") return { configured: true, supported: false };
+      try {
+        const url = Environment.ministryStuffApi + "/check/credits?churchId=" + encodeURIComponent(au.churchId) + "&creditType=texting";
+        const resp = await axios.get(url, { headers: { "X-Service-Key": Environment.ministryStuffServiceKey } });
+        return { configured: true, supported: true, ...resp.data };
+      } catch {
+        return { configured: true, supported: true, hasCredits: false, error: "unavailable" };
+      }
+    });
+  }
+
   @httpGet("/preview/:groupId")
   public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -131,6 +148,9 @@ export class TextingController extends MessagingBaseController {
 
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
+      if (successCount === 0 && results.length > 0 && results.every(r => r.error?.includes("insufficient_credits"))) {
+        return this.json({ error: "insufficient_credits" }, 400);
+      }
 
       const sentText: SentText = {
         churchId: au.churchId,
@@ -199,6 +219,9 @@ export class TextingController extends MessagingBaseController {
 
       const provider = getProvider(config.providerName);
       const result = await provider.sendMessage(config, phoneNumber, message);
+      if (!result.success && result.error?.includes("insufficient_credits")) {
+        return this.json({ error: "insufficient_credits" }, 400);
+      }
 
       const sentText: SentText = {
         churchId: au.churchId,
@@ -236,20 +259,7 @@ export class TextingController extends MessagingBaseController {
   }
 
   private async getProviderConfig(churchId: string): Promise<(TextingProviderConfig & { providerName: string }) | null> {
-    const providers = await this.repos.textingProvider.loadByChurchId(churchId);
-    const providerList = this.repos.textingProvider.convertAllToModel(providers as any[]);
-    if (providerList.length === 0) return null;
-
-    const p = providerList[0];
-    if (!p.enabled) return null;
-
-    return {
-      providerName: p.provider,
-      churchId,
-      apiKey: p.apiKey ? EncryptionHelper.decrypt(p.apiKey) : "",
-      apiSecret: p.apiSecret ? EncryptionHelper.decrypt(p.apiSecret) : "",
-      fromNumber: p.fromNumber
-    };
+    return TextingConfigHelper.load(this.repos.textingProvider, churchId);
   }
 
   private async getGroupMemberDetails(_churchId: string, groupId: string, jwt: string): Promise<GroupMemberDetail[]> {

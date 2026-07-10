@@ -1320,9 +1320,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/apihelper@npm:^0.7.1":
-  version: 0.7.1
-  resolution: "@churchapps/apihelper@npm:0.7.1"
+"@churchapps/apihelper@portal:/D:/code/churchapps/Packages/apihelper::locator=api%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@churchapps/apihelper@portal:/D:/code/churchapps/Packages/apihelper::locator=api%40workspace%3A."
   dependencies:
     "@aws-sdk/client-s3": "npm:^3.862.0"
     "@aws-sdk/client-ses": "npm:^3.862.0"
@@ -1339,16 +1339,14 @@ __metadata:
     winston-cloudwatch: "npm:^6.3.0"
   peerDependencies:
     "@churchapps/helpers": ^1.5.5
-  checksum: 10c0/835e66cf33e03e9e88b42f553d6a5c172e633ec427b979152a03c4c0c65aa9bba20827e95ca7a009e8c076f08eed97eb835229058644ccd2a28a921ee9ed3ad4
   languageName: node
-  linkType: hard
+  linkType: soft
 
-"@churchapps/content-providers@npm:^0.6.1":
-  version: 0.6.1
-  resolution: "@churchapps/content-providers@npm:0.6.1"
-  checksum: 10c0/2fafcf39a38ccdcacaab711e38bbf05c5649d3cfa108bfd908a0003f670095b4335f8d507382a34eeccdeadae7e86201e8b6c0e70c37c84dc619a6973463d89b
+"@churchapps/content-providers@portal:/D:/code/churchapps/Packages/content-providers::locator=api%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@churchapps/content-providers@portal:/D:/code/churchapps/Packages/content-providers::locator=api%40workspace%3A."
   languageName: node
-  linkType: hard
+  linkType: soft
 
 "@churchapps/helpers@npm:^1.10.1":
   version: 1.10.1
@@ -1364,14 +1362,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/texting@npm:^0.2.2":
-  version: 0.2.2
-  resolution: "@churchapps/texting@npm:0.2.2"
+"@churchapps/texting@portal:/D:/code/churchapps/Packages/texting::locator=api%40workspace%3A.":
+  version: 0.0.0-use.local
+  resolution: "@churchapps/texting@portal:/D:/code/churchapps/Packages/texting::locator=api%40workspace%3A."
   dependencies:
     axios: "npm:^1.11.0"
-  checksum: 10c0/f40f8f0716f28401730cc9a8de3ebbc9deba992d73143cc7c357d61bf52fbed41df56b1040f92daf34a2869b5550b7f72a16ade8778eda00e28ab10d555c728b
   languageName: node
-  linkType: hard
+  linkType: soft
 
 "@codegenie/serverless-express@npm:^4.15.0":
   version: 4.17.1

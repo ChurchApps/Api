@@ -122,19 +122,8 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
   }
 
   private async getTextingConfig(repos: any, churchId: string): Promise<any | null> {
-    const { EncryptionHelper } = await import("@churchapps/apihelper");
-    const providers = await repos.textingProvider.loadByChurchId(churchId);
-    const list = repos.textingProvider.convertAllToModel(providers as any[]);
-    if (!list.length) return null;
-    const p = list[0];
-    if (!p.enabled) return null;
-    return {
-      providerName: p.provider,
-      churchId,
-      apiKey: p.apiKey ? EncryptionHelper.decrypt(p.apiKey) : "",
-      apiSecret: p.apiSecret ? EncryptionHelper.decrypt(p.apiSecret) : "",
-      fromNumber: p.fromNumber
-    };
+    const { TextingConfigHelper } = await import("../../modules/messaging/helpers/TextingConfigHelper.js");
+    return TextingConfigHelper.load(repos.textingProvider, churchId);
   }
 }
 

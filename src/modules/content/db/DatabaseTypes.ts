@@ -6,7 +6,7 @@ import type {
   Page, PageHistory, Post, Playlist, Redirect, Registration, RegistrationMember,
   RegistrationType, RegistrationSelection, RegistrationSelectionChoice, RegistrationPayment, RegistrationCoupon, Resource,
   Room, Section, Sermon, Setting, Song, SongDetail, SongDetailLink,
-  StreamingService
+  StorageProvider, StreamingService
 } from "../models/index.js";
 
 export interface ContentDatabase {
@@ -51,5 +51,6 @@ export interface ContentDatabase {
   songs: Song;
   songDetails: SongDetail;
   songDetailLinks: SongDetailLink;
+  storageProviders: StorageProvider;
   streamingServices: StreamingService;
 }

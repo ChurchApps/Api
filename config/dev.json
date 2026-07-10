@@ -12,5 +12,7 @@
   "b1AdminRoot": "https://admin.staging.b1.church",
   "messagingApi": "https://api.staging.churchapps.org/messaging",
   "aiProvider": "openrouter",
-  "storeApi": "http://localhost:8096"
+  "storeApi": "http://localhost:8096",
+  "ministryStuffApi": "http://localhost:8097",
+  "ministryStuffContentRoot": "http://localhost:8097/content/"
 }

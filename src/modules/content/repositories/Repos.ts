@@ -40,7 +40,8 @@ import {
   SongDetailLinkRepo,
   SongRepo,
   ArrangementRepo,
-  ArrangementKeyRepo
+  ArrangementKeyRepo,
+  StorageProviderRepo
 } from "./index.js";
 
 export class Repos {
@@ -86,6 +87,7 @@ export class Repos {
   public song: SongRepo;
   public arrangement: ArrangementRepo;
   public arrangementKey: ArrangementKeyRepo;
+  public storageProvider: StorageProviderRepo;
 
   public static getCurrent = () => new Repos();
 
@@ -132,5 +134,6 @@ export class Repos {
     this.song = new SongRepo();
     this.arrangement = new ArrangementRepo();
     this.arrangementKey = new ArrangementKeyRepo();
+    this.storageProvider = new StorageProviderRepo();
   }
 }

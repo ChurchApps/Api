@@ -50,3 +50,4 @@ export { PreviewController } from "./PreviewController.js";
 export { StockController } from "./StockController.js";
 export { PraiseChartsController } from "./PraiseChartsController.js";
 export { SupportController } from "./SupportController.js";
+export { StorageSettingController } from "./StorageSettingController.js";

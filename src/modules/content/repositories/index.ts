@@ -46,5 +46,6 @@ export { SongDetailLinkRepo } from "./SongDetailLinkRepo.js";
 export { SongRepo } from "./SongRepo.js";
 export { ArrangementRepo } from "./ArrangementRepo.js";
 export { ArrangementKeyRepo } from "./ArrangementKeyRepo.js";
+export { StorageProviderRepo } from "./StorageProviderRepo.js";
 
 export { Repos } from "./Repos.js";

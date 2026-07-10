@@ -12,5 +12,7 @@
   "b1AdminRoot": "https://demo.b1.church",
   "messagingApi": "https://api.demo.churchapps.org/messaging",
   "aiProvider": "openrouter",
-  "storeApi": "https://api.staging.mutualministry.com"
+  "storeApi": "https://api.staging.mutualministry.com",
+  "ministryStuffApi": "https://api.staging.ministrystuff.org",
+  "ministryStuffContentRoot": "https://content.staging.ministrystuff.org/"
 }
