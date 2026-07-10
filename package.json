@@ -55,10 +55,10 @@
     "@aws-sdk/client-ses": "^3.862.0",
     "@aws-sdk/client-ssm": "^3.862.0",
     "@aws-sdk/lib-storage": "^3.862.0",
-    "@churchapps/apihelper": "^0.7.1",
+    "@churchapps/apihelper": "^0.8.0",
     "@churchapps/content-providers": "^0.7.0",
-    "@churchapps/helpers": "^1.10.1",
-    "@churchapps/texting": "^0.2.2",
+    "@churchapps/helpers": "^1.11.1",
+    "@churchapps/texting": "^0.3.0",
     "@codegenie/serverless-express": "^4.15.0",
     "@hubspot/api-client": "^13.1.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -131,9 +131,6 @@
   "resolutions": {
     "zod": "3.25.76",
     "axios": "1.13.4",
-    "@types/express": "4.17.25",
-    "@churchapps/apihelper": "portal:/D:/code/churchapps/Packages/apihelper",
-    "@churchapps/texting": "portal:/D:/code/churchapps/Packages/texting",
-    "@churchapps/content-providers": "portal:/D:/code/churchapps/Packages/content-providers"
+    "@types/express": "4.17.25"
   }
 }
