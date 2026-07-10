@@ -3844,7 +3844,7 @@ __metadata:
     "@aws-sdk/client-ssm": "npm:^3.862.0"
     "@aws-sdk/lib-storage": "npm:^3.862.0"
     "@churchapps/apihelper": "npm:^0.7.1"
-    "@churchapps/content-providers": "npm:^0.6.1"
+    "@churchapps/content-providers": "npm:^0.7.0"
     "@churchapps/helpers": "npm:^1.10.1"
     "@churchapps/texting": "npm:^0.2.2"
     "@codegenie/serverless-express": "npm:^4.15.0"

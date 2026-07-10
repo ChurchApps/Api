@@ -12,6 +12,7 @@ dist/
 *.js.map
 *.d.ts
 *.d.ts.map
+!src/**/*.d.ts
 .tsbuildinfo
 
 # Environment files
