@@ -302,8 +302,10 @@ export class PaymentMethodController extends GivingBaseController {
       if (!permission) return this.json({}, 401);
       try {
         return await GatewayService.updateBank(gateway, paymentMethodId, bankData, customerId);
-      } catch (e) {
-        return e;
+      } catch (e: any) {
+        console.error("Update bank error", e);
+        // clients read raw.message for the gateway's user-facing error; never echo the full exception
+        return { raw: { message: e?.raw?.message || "Failed to update bank account" } };
       }
     });
   }
@@ -320,8 +322,9 @@ export class PaymentMethodController extends GivingBaseController {
       else {
         try {
           return await GatewayService.verifyBank(gateway, paymentMethodId, amountData, customerId);
-        } catch (e) {
-          return e;
+        } catch (e: any) {
+          console.error("Verify bank error", e);
+          return { raw: { message: e?.raw?.message || "Failed to verify bank account" } };
         }
       }
     });

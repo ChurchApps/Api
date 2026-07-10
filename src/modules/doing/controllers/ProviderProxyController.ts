@@ -1,8 +1,10 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, ContentProviderConfig } from "@churchapps/content-providers";
+import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, ContentProviderConfig, setProviderSecret } from "@churchapps/content-providers";
 import { ContentProviderAuth } from "../models/index.js";
+
+setProviderSecret("gocurriculum", process.env.GOCURRICULUM_CLIENT_SECRET || "");
 
 interface ProxyRequestBody {
   ministryId: string;
