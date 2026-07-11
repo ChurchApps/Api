@@ -33,6 +33,7 @@ describe("ConflictHelper room conflicts", () => {
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe("room");
     expect(result[0].conflictingEventTitle).toBe("Youth Lock-in");
+    expect(result[0].date).toEqual(d("2026-07-10T19:00:00"));
   });
 
   it("does not flag bookings in other rooms or non-overlapping times", () => {

@@ -134,11 +134,31 @@ export class EventBookingController extends ContentBaseController {
 
   // Conflicts surfaced on each pending row so the inbox can flag double-bookings before approval.
   private async computeConflicts(churchId: string, row: any) {
-    const windowStart = new Date();
-    const windowEnd = new Date();
+    const now = new Date();
+    let windowStart = row.eventStart ? new Date(row.eventStart) : now;
+    if (isNaN(windowStart.getTime())) windowStart = now;
+
+    // Cap windowStart to be no earlier than 1 month ago to prevent performance issues with old recurring events.
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    if (windowStart < oneMonthAgo) {
+      windowStart = oneMonthAgo;
+    }
+
+    let windowEnd = new Date(windowStart);
     windowEnd.setFullYear(windowEnd.getFullYear() + 1);
+
+    const futureLimit = new Date(now);
+    futureLimit.setFullYear(futureLimit.getFullYear() + 1);
+    if (windowEnd < futureLimit) {
+      windowEnd = futureLimit;
+    }
+
     const roomIds = row.roomId ? [row.roomId] : [];
     const resources = row.resourceId ? [{ resourceId: row.resourceId, quantity: row.quantity || 1 }] : [];
+    const church = await getMembershipModuleGateway().loadChurch(churchId);
+    const timeZone = church?.timeZone;
+
     return ConflictHelper.findConflicts(
       {
         eventId: row.eventId,
@@ -159,7 +179,8 @@ export class EventBookingController extends ContentBaseController {
         resourceBookings: await this.repos.eventBooking.loadActiveForResources(churchId, resources.map((r) => r.resourceId), row.eventId),
         rooms: row.roomId ? await this.repos.room.loadByIds(churchId, roomIds) : [],
         resources: row.resourceId ? await this.repos.resource.loadByIds(churchId, [row.resourceId]) : [],
-        blockouts: await this.repos.calendarBlockout.loadOverlapping(churchId, windowStart, windowEnd)
+        blockouts: await this.repos.calendarBlockout.loadOverlapping(churchId, windowStart, windowEnd),
+        timeZone
       }
     );
   }

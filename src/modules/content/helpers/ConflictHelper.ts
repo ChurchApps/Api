@@ -53,6 +53,7 @@ export interface ConflictContext {
   rooms: Room[];
   resources: Resource[];
   blockouts: CalendarBlockout[];
+  timeZone?: string;
 }
 
 export interface Conflict {
@@ -77,6 +78,10 @@ export class ConflictHelper {
     return result;
   }
 
+  private static formatDate(d: Date, ctx: ConflictContext): string {
+    return d.toLocaleString("en-US", { timeZone: ctx.timeZone || "America/New_York" });
+  }
+
   private static findRoomConflicts(proposed: ProposedBooking, occurrences: Occurrence[], ctx: ConflictContext): Conflict[] {
     const result: Conflict[] = [];
     for (const roomId of proposed.roomIds || []) {
@@ -87,6 +92,7 @@ export class ConflictHelper {
         if (proposed.eventId && booking.eventId === proposed.eventId) continue;
         if (seenEvents.has(booking.eventId)) continue;
         const overlap = this.firstOverlap(booking, occurrences, ctx);
+
         if (overlap) {
           seenEvents.add(booking.eventId);
           result.push({
@@ -94,8 +100,8 @@ export class ConflictHelper {
             roomId,
             conflictingEventId: booking.eventId,
             conflictingEventTitle: booking.eventTitle,
-            date: overlap,
-            message: `${roomName} is already booked by "${booking.eventTitle}" on ${overlap.toLocaleString()}`
+            date: overlap.start,
+            message: `${roomName} is already booked by "${booking.eventTitle}" from ${this.formatDate(overlap.start, ctx)} to ${this.formatDate(overlap.end, ctx)}`
           });
         }
       }
@@ -122,7 +128,7 @@ export class ConflictHelper {
             type: "resource",
             resourceId: req.resourceId,
             date: occ.start,
-            message: `Only ${Math.max(total - booked, 0)} of ${total} "${resource?.name || "resource"}" available on ${occ.start.toLocaleString()} (${requested} requested)`
+            message: `Only ${Math.max(total - booked, 0)} of ${total} "${resource?.name || "resource"}" available from ${this.formatDate(occ.start, ctx)} to ${this.formatDate(occ.end, ctx)} (${requested} requested)`
           });
           break;
         }
@@ -149,18 +155,18 @@ export class ConflictHelper {
           resourceId: blockout.resourceId,
           blockoutId: blockout.id,
           date: hit.start,
-          message: `${target || "Facility"} blocked out${blockout.reason ? " (" + blockout.reason + ")" : ""} on ${hit.start.toLocaleString()}`
+          message: `${target || "Facility"} blocked out${blockout.reason ? " (" + blockout.reason + ")" : ""} from ${this.formatDate(blockStart, ctx)} to ${this.formatDate(blockEnd, ctx)}`
         });
       }
     }
     return result;
   }
 
-  private static firstOverlap(booking: BookingWithEvent, occurrences: Occurrence[], ctx: ConflictContext): Date | null {
+  private static firstOverlap(booking: BookingWithEvent, occurrences: Occurrence[], ctx: ConflictContext): Occurrence | null {
     const otherOccurrences = this.windowsFor(booking, ctx);
     for (const occ of occurrences) {
       for (const other of otherOccurrences) {
-        if (RecurrenceHelper.overlaps(occ.start, occ.end, other.start, other.end)) return occ.start;
+        if (RecurrenceHelper.overlaps(occ.start, occ.end, other.start, other.end)) return other;
       }
     }
     return null;

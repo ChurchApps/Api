@@ -198,10 +198,30 @@ export class EventController extends ContentBaseController {
         roomIds: req.body.roomIds || [],
         resources: req.body.resources || []
       };
-      const windowStart = new Date();
-      const windowEnd = new Date();
+      const now = new Date();
+      let windowStart = proposed.start ? new Date(proposed.start) : now;
+      if (isNaN(windowStart.getTime())) windowStart = now;
+
+      // Cap windowStart to be no earlier than 1 month ago to prevent performance issues with old recurring events.
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      if (windowStart < oneMonthAgo) {
+        windowStart = oneMonthAgo;
+      }
+
+      let windowEnd = new Date(windowStart);
       windowEnd.setFullYear(windowEnd.getFullYear() + 1);
+
+      const futureLimit = new Date(now);
+      futureLimit.setFullYear(futureLimit.getFullYear() + 1);
+      if (windowEnd < futureLimit) {
+        windowEnd = futureLimit;
+      }
+
       const resourceIds = proposed.resources.map((r) => r.resourceId);
+      const church = await getMembershipModuleGateway().loadChurch(au.churchId);
+      const timeZone = church?.timeZone;
+
       return ConflictHelper.findConflicts(proposed, {
         windowStart,
         windowEnd,
@@ -209,7 +229,8 @@ export class EventController extends ContentBaseController {
         resourceBookings: await this.repos.eventBooking.loadActiveForResources(au.churchId, resourceIds, proposed.eventId),
         rooms: await this.repos.room.loadByIds(au.churchId, proposed.roomIds),
         resources: await this.repos.resource.loadByIds(au.churchId, resourceIds),
-        blockouts: await this.repos.calendarBlockout.loadOverlapping(au.churchId, windowStart, windowEnd)
+        blockouts: await this.repos.calendarBlockout.loadOverlapping(au.churchId, windowStart, windowEnd),
+        timeZone
       });
     });
   }
