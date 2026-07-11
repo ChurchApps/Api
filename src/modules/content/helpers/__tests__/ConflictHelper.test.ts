@@ -147,6 +147,58 @@ describe("ConflictHelper booking windows", () => {
   });
 });
 
+describe("ConflictHelper.computeWindow", () => {
+  it("defaults to now..now+1yr when no anchor is given", () => {
+    const before = Date.now();
+    const { windowStart, windowEnd } = ConflictHelper.computeWindow();
+    const after = Date.now();
+    expect(windowStart.getTime()).toBeGreaterThanOrEqual(before);
+    expect(windowStart.getTime()).toBeLessThanOrEqual(after);
+    expect(windowEnd.getFullYear()).toBe(windowStart.getFullYear() + 1);
+  });
+
+  it("caps an old anchor to one month ago and keeps the window at least a year out", () => {
+    const { windowStart, windowEnd } = ConflictHelper.computeWindow(d("2000-01-01T00:00:00"));
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    expect(Math.abs(windowStart.getTime() - oneMonthAgo.getTime())).toBeLessThan(5000);
+    const futureLimit = new Date();
+    futureLimit.setFullYear(futureLimit.getFullYear() + 1);
+    expect(windowEnd.getTime()).toBeGreaterThanOrEqual(futureLimit.getTime() - 5000);
+  });
+
+  it("anchors the window to a far-future start (>1yr out)", () => {
+    const anchor = d("2030-01-01T00:00:00");
+    const { windowStart, windowEnd } = ConflictHelper.computeWindow(anchor);
+    expect(windowStart.getTime()).toBe(anchor.getTime());
+    expect(windowEnd.getFullYear()).toBe(anchor.getFullYear() + 1);
+  });
+
+  it("treats an invalid anchor as now", () => {
+    const before = Date.now();
+    const { windowStart } = ConflictHelper.computeWindow("not-a-date");
+    const after = Date.now();
+    expect(windowStart.getTime()).toBeGreaterThanOrEqual(before);
+    expect(windowStart.getTime()).toBeLessThanOrEqual(after);
+  });
+});
+
+describe("ConflictHelper timezone formatting", () => {
+  const booking = { id: "b1", eventId: "e2", roomId: "room1", eventTitle: "Youth Lock-in", eventStart: d("2026-07-10T19:00:00"), eventEnd: d("2026-07-10T22:00:00") };
+
+  it("formats conflict times in the church's timezone", () => {
+    const ctx = baseContext({ timeZone: "America/Chicago", roomBookings: [booking] });
+    const result = ConflictHelper.findConflicts(proposed(), ctx);
+    expect(result[0].message).toContain(booking.eventStart.toLocaleString("en-US", { timeZone: "America/Chicago" }));
+  });
+
+  it("falls back to America/New_York when no timezone is set", () => {
+    const ctx = baseContext({ timeZone: undefined, roomBookings: [booking] });
+    const result = ConflictHelper.findConflicts(proposed(), ctx);
+    expect(result[0].message).toContain(booking.eventStart.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  });
+});
+
 describe("ConflictHelper blockout conflicts", () => {
   it("flags a room-specific blockout overlapping the proposal", () => {
     const ctx = baseContext({ blockouts: [{ id: "blk1", churchId: "c1", roomId: "room1", startTime: d("2026-07-10T00:00:00"), endTime: d("2026-07-11T00:00:00"), reason: "Floor refinishing" }] });

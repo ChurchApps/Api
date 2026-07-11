@@ -68,6 +68,27 @@ export interface Conflict {
 }
 
 export class ConflictHelper {
+  // Conflict-lookup window anchored to the booking's own start: capped to no earlier than
+  // a month ago (so old recurring series don't blow up the RRule expansion) and always
+  // extended to at least a year out (so far-future bookings still get checked).
+  public static computeWindow(anchor?: Date | string): { windowStart: Date; windowEnd: Date } {
+    const now = new Date();
+    let windowStart = anchor ? new Date(anchor) : now;
+    if (isNaN(windowStart.getTime())) windowStart = now;
+
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    if (windowStart < oneMonthAgo) windowStart = oneMonthAgo;
+
+    const windowEnd = new Date(windowStart);
+    windowEnd.setFullYear(windowEnd.getFullYear() + 1);
+
+    const futureLimit = new Date(now);
+    futureLimit.setFullYear(futureLimit.getFullYear() + 1);
+    if (windowEnd < futureLimit) return { windowStart, windowEnd: futureLimit };
+    return { windowStart, windowEnd };
+  }
+
   public static findConflicts(proposed: ProposedBooking, ctx: ConflictContext): Conflict[] {
     const occurrences = this.windowsFor(proposed, ctx);
     if (occurrences.length === 0) return [];

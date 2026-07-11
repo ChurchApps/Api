@@ -38,7 +38,8 @@ export class EventBookingController extends ContentBaseController {
         const groupIds = await this.loadRequesterGroupIds(au.churchId, au.personId);
         pending = pending.filter((row: any) => groupIds.includes(row.roomId ? row.roomApprovalGroupId : row.resourceApprovalGroupId));
       }
-      for (const row of pending) row.conflicts = await this.computeConflicts(au.churchId, row);
+      const timeZone = (await getMembershipModuleGateway().loadChurch(au.churchId))?.timeZone;
+      for (const row of pending) row.conflicts = await this.computeConflicts(au.churchId, row, timeZone);
       return pending;
     });
   }
@@ -133,31 +134,11 @@ export class EventBookingController extends ContentBaseController {
   }
 
   // Conflicts surfaced on each pending row so the inbox can flag double-bookings before approval.
-  private async computeConflicts(churchId: string, row: any) {
-    const now = new Date();
-    let windowStart = row.eventStart ? new Date(row.eventStart) : now;
-    if (isNaN(windowStart.getTime())) windowStart = now;
-
-    // Cap windowStart to be no earlier than 1 month ago to prevent performance issues with old recurring events.
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    if (windowStart < oneMonthAgo) {
-      windowStart = oneMonthAgo;
-    }
-
-    let windowEnd = new Date(windowStart);
-    windowEnd.setFullYear(windowEnd.getFullYear() + 1);
-
-    const futureLimit = new Date(now);
-    futureLimit.setFullYear(futureLimit.getFullYear() + 1);
-    if (windowEnd < futureLimit) {
-      windowEnd = futureLimit;
-    }
-
+  // timeZone is loaded once by the caller and threaded in to avoid a per-row church lookup.
+  private async computeConflicts(churchId: string, row: any, timeZone?: string) {
+    const { windowStart, windowEnd } = ConflictHelper.computeWindow(row.eventStart);
     const roomIds = row.roomId ? [row.roomId] : [];
     const resources = row.resourceId ? [{ resourceId: row.resourceId, quantity: row.quantity || 1 }] : [];
-    const church = await getMembershipModuleGateway().loadChurch(churchId);
-    const timeZone = church?.timeZone;
 
     return ConflictHelper.findConflicts(
       {
