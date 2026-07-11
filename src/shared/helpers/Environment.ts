@@ -1,4 +1,4 @@
-import { EnvironmentBase } from "@churchapps/apihelper";
+import { EnvironmentBase, AwsHelper } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser.js";
 
 export class Environment extends EnvironmentBase {
@@ -109,6 +109,13 @@ export class Environment extends EnvironmentBase {
     this.corsOrigin = process.env.CORS_ORIGIN || "*";
     // JWT secret strictly from environment variables
     this.jwtSecret = process.env.JWT_SECRET || "";
+
+    // gocurriculum OAuth client secret: env var first (parity with other integration secrets),
+    // else the SSM param the deploy created. Consumed by setProviderSecret in ProviderProxyController,
+    // whose controller module is imported after this runs.
+    if (!process.env.GOCURRICULUM_CLIENT_SECRET) {
+      process.env.GOCURRICULUM_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/gocurriculumClientSecret`);
+    }
 
     // Initialize module-specific configs
     this.initializeModuleConfigs(data);
