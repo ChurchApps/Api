@@ -92,7 +92,7 @@ export class Environment extends EnvironmentBase {
 
   static async init(environment: string) {
     environment = environment.toLowerCase();
-    const data = await this.initBase(environment, { appName: "API", fileMap: { railway: "railway.json" } });
+    const data = await this.initBase(environment, { appName: "API", fileMap: { railway: "railway.json", docker: "docker.json" } });
 
     // Set current environment and server config
     this.currentEnvironment = environment;

@@ -58,9 +58,9 @@ const runWebhookDeliveries = async (): Promise<void> => {
 };
 
 export const startRailwayCron = (): void => {
-  if (!process.env.RAILWAY_ENVIRONMENT) return;
+  if (!process.env.RAILWAY_ENVIRONMENT && !process.env.SELF_HOSTED) return;
 
-  console.warn("[cron] Railway in-process scheduler starting");
+  console.warn("[cron] in-process scheduler starting");
 
   setInterval(() => void safe("30-min timer", runThirtyMinute), THIRTY_MINUTES_MS);
   setInterval(() => void safe("webhook deliveries", runWebhookDeliveries), ONE_MINUTE_MS);

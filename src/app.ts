@@ -109,6 +109,10 @@ export const createApp = async () => {
       })
     );
 
+    // Disk file store writes to ./content and builds URLs as CONTENT_ROOT + key; serve them back here.
+    // Falls through to the content module's named routes when no file matches.
+    if (Environment.fileStore !== "S3") app.use("/content", express.static("content"));
+
     app.use(moduleRoutingLogger);
 
     configureModuleRoutes(app);

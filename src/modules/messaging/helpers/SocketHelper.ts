@@ -19,10 +19,10 @@ export class SocketHelper {
     const port = Environment.websocketPort;
     console.log(`SocketHelper: Initializing with port ${port}, deliveryProvider: ${Environment.deliveryProvider}`);
 
-    // When running on Railway (or any host that exposes a single port), the WebSocket server
+    // When running on Railway or Docker (any host that exposes a single port), the WebSocket server
     // is attached to the HTTP server in index.ts via attachToServer(). Skip the port-based path.
-    if (process.env.RAILWAY_ENVIRONMENT) {
-      console.log("WebSocket server will attach to HTTP server (Railway mode)");
+    if (process.env.RAILWAY_ENVIRONMENT || process.env.SELF_HOSTED) {
+      console.log("WebSocket server will attach to HTTP server (single-port mode)");
       return;
     }
 

@@ -18,8 +18,8 @@ const startServer = async () => {
       console.warn(`API server started on port ${port} (${Environment.currentEnvironment})`);
     });
 
-    // Railway exposes one port per service: attach WS to the same HTTP listener.
-    if (process.env.RAILWAY_ENVIRONMENT) {
+    // Single-port hosts (Railway, Docker): attach WS to the same HTTP listener and run cron in-process.
+    if (process.env.RAILWAY_ENVIRONMENT || process.env.SELF_HOSTED) {
       const { SocketHelper } = await import("./modules/messaging/helpers/SocketHelper.js");
       SocketHelper.attachToServer(server);
       startRailwayCron();
