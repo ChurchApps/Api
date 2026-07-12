@@ -1,6 +1,11 @@
 # Core APIs - Modular Monolith
 
-This is the consolidated Core APIs modular monolith for the church management system, migrated from 6 separate microservices.
+[![License](https://img.shields.io/github/license/ChurchApps/Api?style=flat-square)](https://github.com/ChurchApps/Api/blob/main/LICENSE)
+[![Stars](https://img.shields.io/github/stars/ChurchApps/Api?style=flat-square&color=yellow)](https://github.com/ChurchApps/Api/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/ChurchApps/Api?style=flat-square)](https://github.com/ChurchApps/Api/commits)
+[![Sponsor](https://img.shields.io/badge/Sponsor-ea4aaa?style=flat-square&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/ChurchApps)
+
+This is the consolidated Core APIs modular monolith for the church management system, migrated from 6 separate microservices. It powers the [B1](https://github.com/ChurchApps/B1Admin) family of free, open-source church software.
 
 ## Overview
 
