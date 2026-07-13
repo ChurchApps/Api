@@ -55,7 +55,7 @@
     "@aws-sdk/client-ses": "^3.862.0",
     "@aws-sdk/client-ssm": "^3.862.0",
     "@aws-sdk/lib-storage": "^3.862.0",
-    "@churchapps/apihelper": "^0.8.0",
+    "@churchapps/apihelper": "^1.0.0",
     "@churchapps/content-providers": "^0.7.2",
     "@churchapps/helpers": "^1.11.1",
     "@churchapps/texting": "^0.3.0",

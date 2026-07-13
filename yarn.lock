@@ -1320,9 +1320,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/apihelper@npm:^0.8.0":
-  version: 0.8.0
-  resolution: "@churchapps/apihelper@npm:0.8.0"
+"@churchapps/apihelper@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "@churchapps/apihelper@npm:1.0.0"
   dependencies:
     "@aws-sdk/client-s3": "npm:^3.862.0"
     "@aws-sdk/client-ses": "npm:^3.862.0"
@@ -1338,8 +1338,8 @@ __metadata:
     winston: "npm:^3.17.0"
     winston-cloudwatch: "npm:^6.3.0"
   peerDependencies:
-    "@churchapps/helpers": ^1.5.5
-  checksum: 10c0/28944e778610f77c59c44fcba194a558c680019370794037a4d622c84b46f7aaa8c4ead89d38f539bebb4504283f57990d6a0f955e8386f9a7b070b9c94e993d
+    "@churchapps/helpers": ^2.0.0
+  checksum: 10c0/d878ef999aec7afc2d5385d875d314ef79a15385a40c633d6a73dad82557d768b889b293f012c6744c0f3f2ea68fa500b976899de8af1abfe54ca9e92e371362
   languageName: node
   linkType: hard
 
@@ -3846,7 +3846,7 @@ __metadata:
     "@aws-sdk/client-ses": "npm:^3.862.0"
     "@aws-sdk/client-ssm": "npm:^3.862.0"
     "@aws-sdk/lib-storage": "npm:^3.862.0"
-    "@churchapps/apihelper": "npm:^0.8.0"
+    "@churchapps/apihelper": "npm:^1.0.0"
     "@churchapps/content-providers": "npm:^0.7.2"
     "@churchapps/helpers": "npm:^1.11.1"
     "@churchapps/texting": "npm:^0.3.0"
