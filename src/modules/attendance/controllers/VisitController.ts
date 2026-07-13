@@ -79,6 +79,7 @@ export class VisitController extends AttendanceBaseController {
           visits?.forEach((v) => {
             if (v.visitDate !== currentDate) {
               v.id = null;
+              v.securityCode = null;
               v.visitSessions?.forEach((vs) => {
                 vs.visitId = null;
                 vs.id = null;
@@ -117,14 +118,17 @@ export class VisitController extends AttendanceBaseController {
         const deleteVisitIds: string[] = [];
         const deleteVisitSessionIds: string[] = [];
 
-        let securityCode = "";
-        for (let attempt = 0; attempt < 5; attempt++) {
-          securityCode = SecurityCodeHelper.generate();
-          const clashes = await this.repos.visit.loadByCodeToday(au.churchId, securityCode);
-          if (clashes.length === 0) break;
+        const submittedVisits = [...req.body];
+        // Re-check-ins keep their existing code; a fresh one would be returned to the client without ever being saved.
+        let securityCode = submittedVisits.find((sv) => sv.securityCode)?.securityCode || "";
+        if (!securityCode) {
+          for (let attempt = 0; attempt < 5; attempt++) {
+            securityCode = SecurityCodeHelper.generate();
+            const clashes = await this.repos.visit.loadByCodeToday(au.churchId, securityCode);
+            if (clashes.length === 0) break;
+          }
         }
 
-        const submittedVisits = [...req.body];
         for (const sv of submittedVisits) {
           sv.churchId = au.churchId;
           sv.visitDate = currentDate;

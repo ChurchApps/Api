@@ -83,6 +83,16 @@ describe("postCheckin passthrough", () => {
     expect(result.securityCode).toBe("ABCD");
   });
 
+  it("returns the visit's existing securityCode on re-check-in instead of an unsaved fresh one", async () => {
+    const { controller, repos } = makeController({ groups: [{ id: "g1", name: "Nursery", capacity: 10, checkinClosed: false }], counts: [] });
+    const body = memberVisit();
+    (body[0] as any).securityCode = "ZZZZ";
+    const result: any = await (controller as any).postCheckin(req(body), {});
+    expect(result.securityCode).toBe("ZZZZ");
+    expect(repos.visit.save.mock.calls[0][0].securityCode).toBe("ZZZZ");
+    expect(repos.visit.loadByCodeToday).not.toHaveBeenCalled();
+  });
+
   it("legacy check-in with no group config saves normally", async () => {
     const { controller, repos } = makeController({ groups: [], counts: [] });
     await (controller as any).postCheckin(req(memberVisit()), {});
