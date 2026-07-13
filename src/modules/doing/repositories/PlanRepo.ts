@@ -109,9 +109,10 @@ export class PlanRepo {
   }
 
   public async loadCurrentByPlanTypeId(planTypeId: string) {
+    // One-day grace so a screen can still pull up yesterday's service (Sunday's lesson on Monday)
     return (await getDb().selectFrom("plans").selectAll()
       .where("planTypeId", "=", planTypeId)
-      .where("serviceDate", ">=", sql`CURDATE()` as any)
+      .where("serviceDate", ">=", sql`CURDATE() - INTERVAL 1 DAY` as any)
       .orderBy("serviceDate")
       .limit(1)
       .executeTakeFirst()) ?? null;

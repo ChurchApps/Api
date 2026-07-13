@@ -302,9 +302,8 @@ export class UserController extends MembershipBaseController {
 
         // Add first user to server admins group
         if (userCount === 0) {
-          this.repos.role.loadAll().then((roles) => {
-            this.repos.roleMember.save({ roleId: roles[0].id, userId: user.id, addedBy: user.id });
-          });
+          const roles = await this.repos.role.loadAll();
+          if (roles.length > 0) await this.repos.roleMember.save({ roleId: roles[0].id, userId: user.id, addedBy: user.id });
         }
         console.log("Register: total", Date.now() - regStart, "ms");
       }
