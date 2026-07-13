@@ -461,7 +461,7 @@ export class OAuthController extends MembershipBaseController {
       const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
       if (!session) {
         res.setHeader("Content-Type", "text/html");
-        return res.send(this.relayCallbackHtml("Session Expired", "This authorization session has expired. Please try again from your TV."));
+        return res.send(this.relayCallbackHtml("Code Out of Date", "This sign-in link came from an older QR code. Scan the QR code currently shown on your TV to try again."));
       }
 
       session.authCode = code;
