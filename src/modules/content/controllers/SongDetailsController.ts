@@ -18,7 +18,21 @@ export class SongDetailsController extends ContentBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.songDetail.loadForChurch(au.churchId);
+      const limit = req.query.limit ? parseInt(req.query.limit.toString(), 10) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset.toString(), 10) : undefined;
+      const search = req.query.search ? req.query.search.toString() : undefined;
+
+      if (limit !== undefined || offset !== undefined || search !== undefined) {
+        const [songDetails, count] = await Promise.all([
+          this.repos.songDetail.loadForChurch(au.churchId, limit, offset, search),
+          this.repos.songDetail.loadCountForChurch(au.churchId, search)
+        ]);
+        console.log(limit, offset, search);
+        console.log({ songDetails, count });
+        return { songDetails, count };
+      } else {
+        return await this.repos.songDetail.loadForChurch(au.churchId);
+      }
     });
   }
 
