@@ -36,6 +36,7 @@ export class OAuthDeviceCodeRepo {
       approvedByUserId: deviceCode.approvedByUserId,
       userChurchId: deviceCode.userChurchId,
       churchId: deviceCode.churchId,
+      planTypeId: deviceCode.planTypeId,
       expiresAt: expiresAt as any
     }).where("id", "=", deviceCode.id).execute();
     return deviceCode;

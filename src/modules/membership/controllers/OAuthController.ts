@@ -308,7 +308,9 @@ export class OAuthController extends MembershipBaseController {
           token_type: "Bearer",
           expires_in: 7 * 24 * 3600, // 7 days (matches JWT expiration)
           refresh_token: refreshToken,
-          scope: dc.scopes
+          scope: dc.scopes,
+          // Extension member (RFC 8628 allows extras): plan type the approver bound this screen to
+          plan_type_id: dc.planTypeId || undefined
         });
 
       default:
@@ -338,9 +340,9 @@ export class OAuthController extends MembershipBaseController {
 
   /** Approve device authorization (called from admin UI). */
   @httpPost("/device/approve")
-  public async approveDevice(req: express.Request<{}, {}, { user_code: string; church_id: string }>, res: express.Response): Promise<any> {
+  public async approveDevice(req: express.Request<{}, {}, { user_code: string; church_id: string; plan_type_id?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { user_code, church_id } = req.body;
+      const { user_code, church_id, plan_type_id } = req.body;
 
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(user_code);
 
@@ -359,6 +361,7 @@ export class OAuthController extends MembershipBaseController {
       dc.approvedByUserId = au.id;
       dc.userChurchId = userChurch.id;
       dc.churchId = church_id;
+      dc.planTypeId = plan_type_id || undefined;
       await this.repos.oAuthDeviceCode.save(dc);
 
       return this.json({ success: true, message: "Device authorized successfully" });

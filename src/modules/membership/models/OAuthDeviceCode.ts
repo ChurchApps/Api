@@ -10,5 +10,6 @@ export class OAuthDeviceCode {
   public approvedByUserId?: string;
   public userChurchId?: string;
   public churchId?: string;
+  public planTypeId?: string;
   public createdAt?: Date;
 }
