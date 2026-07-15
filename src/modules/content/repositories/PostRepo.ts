@@ -6,6 +6,7 @@ import { Post } from "../models/index.js";
 @injectable()
 export class PostRepo {
   public async save(model: Post) {
+    if (model.publishDate && !(model.publishDate instanceof Date)) model.publishDate = new Date(model.publishDate);
     return model.id ? this.update(model) : this.create(model);
   }
 
@@ -78,6 +79,18 @@ export class PostRepo {
     if (options.limit) query = query.limit(options.limit);
     if (options.offset) query = query.offset(options.offset);
     return query.execute() as any;
+  }
+
+  public async loadPublishedCategories(churchId: string): Promise<string[]> {
+    const rows = await getDb().selectFrom("posts").select("category").distinct()
+      .where("churchId", "=", churchId)
+      .where("publishDate", "is not", null)
+      .where("publishDate", "<=", new Date())
+      .where("category", "is not", null)
+      .where("category", "!=", "")
+      .orderBy("category")
+      .execute();
+    return rows.map((r: any) => r.category);
   }
 
   public convertToModel(_churchId: string, data: any) { return data as Post; }
