@@ -84,15 +84,49 @@ export class SongDetailRepo {
     return (await getDb().selectFrom("songDetails").selectAll().where("praiseChartsId", "=", praiseChartsId).executeTakeFirst()) ?? null as any;
   }
 
-  public async loadForChurch(churchId: string) {
-    return getDb().selectFrom("songs as s")
+  public async loadForChurch(churchId: string, limit?: number, offset?: number, search?: string) {
+    let query = getDb().selectFrom("songs as s")
       .innerJoin("songDetails as sd", "sd.id", "s.songDetailId")
       .selectAll("sd")
       .select(["s.id as songId", "s.churchId"])
-      .where("s.churchId", "=", churchId)
-      .orderBy("sd.title")
-      .orderBy("sd.artist")
-      .execute() as any;
+      .where("s.churchId", "=", churchId);
+
+    if (search) {
+      const q = "%" + search.replace(/ /g, "%") + "%";
+      query = query.where((eb) => eb.or([
+        eb(sql`concat(sd.title, ' ', sd.artist)`, "like", q),
+        eb(sql`concat(sd.artist, ' ', sd.title)`, "like", q)
+      ]));
+    }
+
+    query = query.orderBy("sd.title").orderBy("sd.artist");
+
+    if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+    if (offset !== undefined) {
+      query = query.offset(offset);
+    }
+
+    return query.execute() as any;
+  }
+
+  public async loadCountForChurch(churchId: string, search?: string) {
+    let query = getDb().selectFrom("songs as s")
+      .innerJoin("songDetails as sd", "sd.id", "s.songDetailId")
+      .select((eb) => eb.fn.count("sd.id").as("count"))
+      .where("s.churchId", "=", churchId);
+
+    if (search) {
+      const q = "%" + search.replace(/ /g, "%") + "%";
+      query = query.where((eb) => eb.or([
+        eb(sql`concat(sd.title, ' ', sd.artist)`, "like", q),
+        eb(sql`concat(sd.artist, ' ', sd.title)`, "like", q)
+      ]));
+    }
+
+    const result = await query.executeTakeFirst();
+    return (result as any)?.count || 0;
   }
 
   public convertToModel(data: any) { return data as SongDetail; }
