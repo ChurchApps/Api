@@ -37,7 +37,7 @@ export class VisitController extends AttendanceBaseController {
   @httpGet("/checkin")
   public async getCheckin(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin) && !au.personId) return this.json({}, 401);
       else {
         const result: Visit[] = [];
         const serviceId = req.query.serviceId.toString();
@@ -96,7 +96,7 @@ export class VisitController extends AttendanceBaseController {
   @httpPost("/checkin")
   public async postCheckin(req: express.Request<{}, {}, Visit[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin) && !au.personId) return this.json({}, 401);
       else {
         const currentDate = new Date();
         currentDate.setHours(0, 0, 0, 0);
