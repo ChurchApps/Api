@@ -7,7 +7,7 @@ export class YouVersionHelper {
 
   //Import these
   static includedAbbreviations: string[] = [
-    "BDO1573", "BDS", "CARS", "CARSA", "CARST", "CPDV", "CSLAV", "DELUT", "ELB", "ELB71", "FMAR", "GANTP", "GNV", "Hfa", "JA1955", "JCB", "KLB", "LSG", "NBV-P", "NIrV", "NIV", "NIVUK", "NVIs", "OL", "OST", "RVES", "TKW", "WEBUS", "НРП", "PdDpt", "AKNA", "AL", "APB", "ASNA", "BDSC", "BEN", "BIU", "BPH", "CCB", "CCL", "EEEE", "EIV", "FAYH", "GAW", "GKY", "APD", "BMYO"
+    "BDO1573", "BDS", "CARS", "CARSA", "CARST", "CPDV", "CSLAV", "DELUT", "ELB", "ELB71", "FMAR", "GANTP", "GNV", "Hfa", "JA1955", "JCB", "KJV", "KLB", "LSG", "NBV-P", "NIrV", "NIV", "NIVUK", "NVIs", "OL", "OST", "RVES", "TKW", "WEBUS", "НРП", "PdDpt", "AKNA", "AL", "APB", "ASNA", "BDSC", "BEN", "BIU", "BPH", "CCB", "CCL", "EEEE", "EIV", "FAYH", "GAW", "GKY", "APD", "BMYO"
   ];
   // Don't import these (Duplicates)
   static excludedAbbreviations: string[] = [
