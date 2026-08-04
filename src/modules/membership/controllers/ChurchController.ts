@@ -330,6 +330,15 @@ export class ChurchController extends MembershipBaseController {
 
       let church = req.body;
       const appName = church.appName;
+
+      // Idempotency guard: double-submits sail past subdomain validation because selectSubDomain auto-increments (issue #957)
+      const existing = await this.repos.church.loadForUser(au.id);
+      const sameName = (existing || []).find((uc: any) => uc.church?.name === church.name);
+      if (sameName) {
+        const recent = await this.repos.church.loadById(sameName.church.id);
+        if (recent?.registrationDate && Date.now() - new Date(recent.registrationDate).getTime() < 5 * 60 * 1000) return recent;
+      }
+
       church.subDomain = await ChurchHelper.selectSubDomain(church.name);
 
       const errors = await this.validateRegister(church, au);

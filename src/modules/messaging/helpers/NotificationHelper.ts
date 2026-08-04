@@ -625,7 +625,8 @@ export class NotificationHelper {
           contentType: conversation.contentType
         });
         if (subscribers.length > 0) {
-          await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + conversation.title, undefined, senderPersonId);
+          const title = await NotificationHelper.resolveConversationTitle(conversation);
+          await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + title, undefined, senderPersonId);
         }
         break;
       }
@@ -924,6 +925,18 @@ export class NotificationHelper {
     };
     const result = await NotificationHelper.repos.notificationPreference.save(pref);
     return result;
+  };
+
+  // conversations.title is a snapshot from the first message; group renames never sync it, so resolve the live name (issue #973)
+  static resolveConversationTitle = async (conversation: Conversation): Promise<string> => {
+    const groupId = conversation.groupId || ((conversation.contentType === "group" || conversation.contentType === "groupAnnouncement") ? conversation.contentId : null);
+    if (!groupId || (conversation.contentType !== "group" && conversation.contentType !== "groupAnnouncement")) return conversation.title;
+    try {
+      const result = await axios.get(Environment.membershipApi + "/groups/public/" + conversation.churchId + "/" + groupId);
+      return result.data?.name || conversation.title;
+    } catch {
+      return conversation.title;
+    }
   };
 
   static getEmailData = async (notificationPrefs: NotificationPreference[]) => {
