@@ -2,7 +2,8 @@ service: api
 
 frameworkVersion: "3"
 
-disableSchemaValidation: true
+# ponytail: framework 3.40's schema predates nodejs22.x, so validation is permanent false-positive noise
+configValidationMode: "off"
 
 custom:
   env: ${opt:stage, 'dev'}
