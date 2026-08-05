@@ -8,7 +8,7 @@ jest.mock("../../helpers/index", () => ({
   CheckinGateHelper: jest.requireActual("../../helpers/CheckinGateHelper").CheckinGateHelper
 }));
 
-const gateway = { loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn() };
+const gateway = { loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn(), loadHouseholdPeople: jest.fn() };
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => gateway }));
 
 import { VisitController } from "../VisitController.js";
@@ -18,6 +18,7 @@ function makeController(opts: any = {}) {
     visit: {
       convertAllToModel: (_c: string, rows: any[]) => rows,
       convertToModel: (_c: string, row: any) => row,
+      loadLastLoggedDate: jest.fn(async () => null),
       loadByServiceDatePeopleIds: jest.fn(async () => []),
       loadByCodeToday: jest.fn(async () => []),
       countActiveByGroupToday: jest.fn(async () => opts.counts ?? []),
@@ -38,6 +39,7 @@ function makeController(opts: any = {}) {
   };
   gateway.loadGroupsForCheckin.mockResolvedValue(opts.groups ?? []);
   gateway.loadSetting.mockResolvedValue(opts.ratioSetting ?? null);
+  gateway.loadHouseholdPeople.mockResolvedValue(opts.household ?? [{ id: "p1" }]);
 
   const au = { churchId: "c1", id: "u1", checkAccess: () => true };
   const controller = new VisitController();
@@ -57,6 +59,7 @@ beforeEach(() => {
   (VisitController as any).cachedSessionIds = {};
   gateway.loadGroupsForCheckin.mockReset();
   gateway.loadSetting.mockReset();
+  gateway.loadHouseholdPeople.mockReset();
 });
 
 describe("postCheckin capacity gate", () => {
@@ -155,6 +158,44 @@ describe("postCheckin permissions", () => {
     (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", id: "u1", checkAccess: () => false });
     const result: any = await (controller as any).postCheckin(req(memberVisit()), {});
     expect(result.status).toBe(401);
+  });
+});
+
+describe("self check-in household scoping", () => {
+  const memberAu = { churchId: "c1", id: "u1", personId: "p1", checkAccess: () => false };
+  const asMember = (controller: any) => {
+    controller.actionWrapper = (_req: any, _res: any, action: any) => action(memberAu);
+  };
+
+  it("403s postCheckin when a submitted visit targets another household", async () => {
+    const { controller, repos } = makeController({ groups: [], counts: [] });
+    asMember(controller);
+    const body = [{ personId: "p2", checkinType: "member", visitSessions: [] }];
+    const result: any = await (controller as any).postCheckin(req(body), {});
+    expect(result.status).toBe(403);
+    expect(repos.visit.save).not.toHaveBeenCalled();
+  });
+
+  it("allows getCheckin for the member's own household", async () => {
+    const { controller } = makeController();
+    asMember(controller);
+    const result: any = await (controller as any).getCheckin(req(null), {});
+    expect(result).toEqual([]);
+  });
+
+  it("403s getCheckin when querying outside the household", async () => {
+    const { controller } = makeController();
+    asMember(controller);
+    const result: any = await (controller as any).getCheckin({ query: { serviceId: "s1", peopleIds: "p1,p2" } }, {});
+    expect(result.status).toBe(403);
+  });
+
+  it("skips the household check for staff/kiosk callers", async () => {
+    const { controller } = makeController();
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", id: "u1", checkAccess: () => true });
+    const result: any = await (controller as any).getCheckin({ query: { serviceId: "s1", peopleIds: "p2,p3" } }, {});
+    expect(result).toEqual([]);
+    expect(gateway.loadHouseholdPeople).not.toHaveBeenCalled();
   });
 });
 

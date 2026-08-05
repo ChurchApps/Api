@@ -48,6 +48,8 @@ export class VisitController extends AttendanceBaseController {
         const peopleIds: string[] = [];
         peopleIdList?.forEach((id) => peopleIds.push(id));
 
+        if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin) && !(await this.inOwnHousehold(au, peopleIds))) return this.json({}, 403);
+
         const lastDate = await this.repos.visit.loadLastLoggedDate(au.churchId, serviceId, peopleIds);
 
         const visits: Visit[] =
@@ -105,6 +107,9 @@ export class VisitController extends AttendanceBaseController {
         const peopleIdList = req.query.peopleIds.toString().split(",");
         const peopleIds: string[] = [];
         peopleIdList.forEach((id) => peopleIds.push(id));
+
+        const submittedPersonIds = [...peopleIds, ...req.body.map((v) => v.personId).filter(Boolean)];
+        if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin) && !(await this.inOwnHousehold(au, submittedPersonIds))) return this.json({}, 403);
 
         const checkDuplicates = req.query.checkDuplicates === "true";
 
@@ -261,6 +266,15 @@ export class VisitController extends AttendanceBaseController {
         return this.json({});
       }
     });
+  }
+
+  // Self check-in callers (a personId but no staff perms) may only touch their own household —
+  // keeps other families' securityCodes and attendance records unreachable.
+  private async inOwnHousehold(au: { churchId: string; personId?: string }, personIds: string[]) {
+    if (!au.personId || personIds.length === 0) return false;
+    const household = await getMembershipModuleGateway().loadHouseholdPeople(au.churchId, [au.personId]);
+    const allowed = new Set(household.map((p) => p.id));
+    return personIds.every((id) => allowed.has(id));
   }
 
   private async populateSessions(churchId: string, visits: Visit[]) {
