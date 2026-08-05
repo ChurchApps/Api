@@ -5,6 +5,7 @@ import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, C
 import { ContentProviderAuth } from "../models/index.js";
 
 setProviderSecret("gocurriculum", process.env.GOCURRICULUM_CLIENT_SECRET || "");
+setProviderSecret("googledrive", process.env.GOOGLE_DRIVE_CLIENT_SECRET || "");
 
 interface ProxyRequestBody {
   ministryId: string;
