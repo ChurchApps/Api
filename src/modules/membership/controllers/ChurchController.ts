@@ -369,7 +369,8 @@ export class ChurchController extends MembershipBaseController {
         if (Environment.mauticUrl) {
           postInitPromises.push(MauticHelper.register(savedChurch.id, church.name, au.firstName, au.lastName, church.address1, church.city, church.state, church.zip, church.country, au.email, appName).catch(() => {}));
         }
-        await Promise.all(postInitPromises);
+        //fire and forget
+        void Promise.all(postInitPromises).catch((e) => console.error("Post-registration sync failed", e));
         return church;
       }
     });
