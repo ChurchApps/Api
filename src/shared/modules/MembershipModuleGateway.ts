@@ -29,7 +29,7 @@ export interface MembershipModuleGateway {
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string; timeZone?: string } | null>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
-  loadPerson(churchId: string, personId: string): Promise<{ id: string; householdId: string; email: string; membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date } | null>;
+  loadPerson(churchId: string, personId: string): Promise<{ id: string; householdId: string; email: string; membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date; householdRole?: string } | null>;
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;
   // Idempotent: adds the person to the group only if not already a member.
   addGroupMember(churchId: string, groupId: string, personId: string): Promise<void>;

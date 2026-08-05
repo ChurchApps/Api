@@ -4,12 +4,26 @@ import { MessagingBaseController } from "./MessagingBaseController.js";
 import { PrivateMessage } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { NotificationHelper } from "../helpers/NotificationHelper.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/MembershipModuleGateway.js";
+import { MessagingSafetyHelper } from "../../../shared/helpers/index.js";
 
 @controller("/messaging/privatemessages")
 export class PrivateMessageController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, PrivateMessage[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
+      const gateway = getMembershipModuleGateway();
+      const minimumAge = MessagingSafetyHelper.parseMinimumAge(await gateway.loadSetting(au.churchId, "messagingMinimumAge"));
+      if (minimumAge > 0) {
+        const ids = new Set<string>();
+        req.body.forEach((conv) => { if (conv.toPersonId) ids.add(conv.toPersonId); });
+        if (au.personId) ids.add(au.personId);
+        const people = await Promise.all([...ids].map((id) => gateway.loadPerson(au.churchId, id)));
+        // Null loads (unknown/removed ids) are out of scope of this rule — fail open.
+        if (people.some((p) => MessagingSafetyHelper.isRestricted(p, minimumAge))) {
+          return this.json({ errors: ["ageRestricted"] }, 403);
+        }
+      }
       const promises: Promise<PrivateMessage>[] = [];
       req.body.forEach((conv) => {
         conv.churchId = au.churchId;

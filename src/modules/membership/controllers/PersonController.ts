@@ -10,6 +10,7 @@ import { Environment, Permissions, PersonConditionHelper, PersonHelper, UserChur
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { MessagingSafetyHelper, type MessagingSafetyPerson } from "../../../shared/helpers/MessagingSafetyHelper.js";
 
 @controller("/membership/people")
 export class PersonController extends MembershipBaseController {
@@ -130,7 +131,8 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/household/:householdId")
   public async getHouseholdMembers(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repos.person.convertAllToModelWithPermissions(au.churchId, (await this.repos.person.loadByHousehold(au.churchId, householdId)) as any[], au.checkAccess(Permissions.people.edit));
+      const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, (await this.repos.person.loadByHousehold(au.churchId, householdId)) as any[], au.checkAccess(Permissions.people.edit));
+      return await this.appendAllowDirectMessages(result, result, au);
     });
   }
 
@@ -251,6 +253,7 @@ export class PersonController extends MembershipBaseController {
           data = await this.repos.person.search(au.churchId, term, filterOptedOut);
         }
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
+        await this.appendAllowDirectMessages(result, result, au);
         return await this.filterPeople(result, au);
       }
     });
@@ -264,6 +267,7 @@ export class PersonController extends MembershipBaseController {
       idList.forEach((id) => ids.push(id));
       const data = (await this.repos.person.loadByIds(au.churchId, ids)) as any[];
       const result = this.repos.person.convertAllToBasicModel(au.churchId, data);
+      await this.appendAllowDirectMessages(result, data, au);
       return await this.filterPeople(result, au);
     });
   }
@@ -321,6 +325,7 @@ export class PersonController extends MembershipBaseController {
         if (!data) return null;
         const result = this.repos.person.convertToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
         await this.appendFormSubmissions(au.churchId, result, this.repos);
+        await this.appendAllowDirectMessages([result], [result], au);
         return result;
       }
     });
@@ -339,6 +344,7 @@ export class PersonController extends MembershipBaseController {
           data = (await this.repos.person.loadMembersByVisibility(au.churchId, directoryVisibility)) as any[];
         }
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
+        await this.appendAllowDirectMessages(result, result, au);
         return await this.filterPeople(result, au);
       }
     });
@@ -549,6 +555,26 @@ export class PersonController extends MembershipBaseController {
     const publicSettings: any = {};
     churchSettings?.forEach((s: any) => { publicSettings[s.keyName] = s.value; });
     return publicSettings?.directoryVisibility || "Members";
+  }
+
+  private async getMessagingMinimumAge(churchId: string): Promise<number> {
+    const churchSettings = this.repos.setting.convertAllToModel(churchId, (await this.repos.setting.loadPublicSettings(churchId)) as any[]);
+    let value: string | null = null;
+    churchSettings?.forEach((s: any) => { if (s.keyName === "messagingMinimumAge") value = s.value; });
+    return MessagingSafetyHelper.parseMinimumAge(value);
+  }
+
+  // Stamps the derived allowDirectMessages flag so clients never do age math or fetch settings.
+  // sources must carry birthDate/householdRole (raw rows for basic models, the models themselves otherwise).
+  private async appendAllowDirectMessages(models: Person[], sources: (MessagingSafetyPerson & { id?: string })[], au: AuthenticatedUser): Promise<Person[]> {
+    const minimumAge = await this.getMessagingMinimumAge(au.churchId);
+    if (minimumAge <= 0) return models;
+    const viewer = au.personId ? await this.repos.person.load(au.churchId, au.personId) : null;
+    const viewerRestricted = MessagingSafetyHelper.isRestricted(viewer as MessagingSafetyPerson, minimumAge);
+    const byId = new Map<string, MessagingSafetyPerson>();
+    sources.forEach((s) => { if (s?.id) byId.set(s.id, s); });
+    models.forEach((m) => { m.allowDirectMessages = !viewerRestricted && !MessagingSafetyHelper.isRestricted(byId.get(m.id) || null, minimumAge); });
+    return models;
   }
 
   private async isMember(membershipStatus: string): Promise<boolean> {
