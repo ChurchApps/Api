@@ -52,7 +52,13 @@ export class ByosAuth {
     });
     const secret = config.getClientSecret?.();
     if (secret) params.set("client_secret", secret);
-    const resp = await axios.post(config.tokenUrl, params.toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+    let resp;
+    try {
+      resp = await axios.post(config.tokenUrl, params.toString(), { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+    } catch (e: any) {
+      const detail = e?.response?.data;
+      throw new Error("Token exchange failed: " + (detail?.error_description || detail?.error || e?.message || "unknown error"));
+    }
     const data = resp.data;
     if (!data?.access_token) return null;
     return {

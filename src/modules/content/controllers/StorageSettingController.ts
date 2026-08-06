@@ -51,7 +51,12 @@ export class StorageSettingController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const { provider, code, codeVerifier, redirectUri } = req.body;
       if (!ByosAuth.isOAuthProvider(provider)) return this.json({ error: "Unknown provider" }, 400);
-      const tokens = await ByosAuth.exchangeCode(provider, code, codeVerifier, redirectUri);
+      let tokens;
+      try {
+        tokens = await ByosAuth.exchangeCode(provider, code, codeVerifier, redirectUri);
+      } catch (e: any) {
+        return this.json({ error: e?.message || "Token exchange failed" }, 400);
+      }
       if (!tokens) return this.json({ error: "Token exchange failed" }, 400);
       const existingRows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId) as any[]);
       const row: StorageProvider = existingRows.find((r: StorageProvider) => r.provider === provider) || { churchId: au.churchId, provider };

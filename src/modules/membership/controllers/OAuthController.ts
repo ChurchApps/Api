@@ -458,13 +458,13 @@ export class OAuthController extends MembershipBaseController {
 
       if (!code || !sessionCode) {
         res.setHeader("Content-Type", "text/html");
-        return res.send(this.relayCallbackHtml("Error", "Missing authorization code or session. Please try again from your TV."));
+        return res.send(this.relayCallbackHtml("Error", "Missing authorization code or session. Please close this page and start the sign-in again."));
       }
 
       const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
       if (!session) {
         res.setHeader("Content-Type", "text/html");
-        return res.send(this.relayCallbackHtml("Code Out of Date", "This sign-in link came from an older QR code. Scan the QR code currently shown on your TV to try again."));
+        return res.send(this.relayCallbackHtml("Sign-In Link Expired", "This sign-in link has expired. Please start the sign-in again from the app."));
       }
 
       session.authCode = code;
@@ -472,7 +472,7 @@ export class OAuthController extends MembershipBaseController {
       await this.repos.oAuthRelaySession.save(session);
 
       res.setHeader("Content-Type", "text/html");
-      return res.send(this.relayCallbackHtml("Success!", "Authorization complete. You can close this page and return to your TV."));
+      return res.send(this.relayCallbackHtml("Success!", "Authorization complete. You can close this page and return to the app."));
     });
   }
 
