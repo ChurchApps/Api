@@ -135,15 +135,27 @@ functions:
       - http:
           path: /
           method: ANY
-          cors: true
+          # API Gateway answers OPTIONS with a mock integration, so Express CORS never runs - custom headers must be listed here too.
+          cors: &cors
+            origin: "*"
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+              - X-Amzn-Trace-Id
+              - X-Requested-With
+              - X-Batch-Id
       - http:
           path: /{proxy+}
           method: ANY
-          cors: true
+          cors: *cors
       - http:
           path: /api/{proxy+}
           method: ANY
-          cors: true
+          cors: *cors
 
   socket:
     handler: lambda.socket
