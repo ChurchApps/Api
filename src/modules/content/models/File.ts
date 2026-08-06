@@ -8,5 +8,7 @@ export class File {
   public fileType?: string;
   public size?: number;
   public dateModified?: Date;
+  public provider?: string;
+  public externalId?: string;
   public fileContents?: string;
 }

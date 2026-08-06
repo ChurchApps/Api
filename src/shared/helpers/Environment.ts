@@ -119,6 +119,9 @@ export class Environment extends EnvironmentBase {
     if (!process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
       process.env.GOOGLE_DRIVE_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/googleDriveClientSecret`);
     }
+    if (!process.env.ONEDRIVE_CLIENT_SECRET) {
+      process.env.ONEDRIVE_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/onedriveClientSecret`);
+    }
 
     // Initialize module-specific configs
     this.initializeModuleConfigs(data);

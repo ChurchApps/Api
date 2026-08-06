@@ -19,6 +19,8 @@ export class FileRepo {
       contentPath: model.contentPath,
       fileType: model.fileType,
       size: model.size,
+      provider: model.provider,
+      externalId: model.externalId,
       dateModified: sql`NOW()` as any
     } as any).execute();
     return model;
@@ -32,6 +34,8 @@ export class FileRepo {
       contentPath: model.contentPath,
       fileType: model.fileType,
       size: model.size,
+      provider: model.provider,
+      externalId: model.externalId,
       dateModified: model.dateModified
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
@@ -43,6 +47,20 @@ export class FileRepo {
 
   public async load(churchId: string, id: string): Promise<File | undefined> {
     return (await getDb().selectFrom("files").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+  }
+
+  // anonymous download route: ids are globally-unique shortIds, church comes from the row
+  public async loadById(id: string): Promise<File | undefined> {
+    return (await getDb().selectFrom("files").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
+  }
+
+  public async countByProvider(churchId: string, provider: string): Promise<number> {
+    const result = await getDb().selectFrom("files")
+      .select(sql<number>`count(*)`.as("total"))
+      .where("churchId", "=", churchId)
+      .where("provider", "=", provider)
+      .executeTakeFirst();
+    return Number((result as any)?.total || 0);
   }
 
   public async loadAll(churchId: string): Promise<File[]> {

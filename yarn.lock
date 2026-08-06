@@ -834,6 +834,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@aws-sdk/s3-request-presigner@npm:3.1057.0":
+  version: 3.1057.0
+  resolution: "@aws-sdk/s3-request-presigner@npm:3.1057.0"
+  dependencies:
+    "@aws-sdk/core": "npm:^3.974.15"
+    "@aws-sdk/signature-v4-multi-region": "npm:^3.996.30"
+    "@aws-sdk/types": "npm:^3.973.9"
+    "@smithy/core": "npm:^3.24.5"
+    "@smithy/types": "npm:^4.14.2"
+    tslib: "npm:^2.6.2"
+  checksum: 10c0/3f29790a2f8ff945194bbabc0de329db9d93591e19467c86bc2a59677870752c021a3674325d82caa0080d7686da82acd4bc13386d2a35729eb0c93acd67e080
+  languageName: node
+  linkType: hard
+
 "@aws-sdk/signature-v4-multi-region@npm:^3.996.30":
   version: 3.996.30
   resolution: "@aws-sdk/signature-v4-multi-region@npm:3.996.30"
@@ -1320,9 +1334,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/apihelper@npm:^1.0.0":
-  version: 1.0.0
-  resolution: "@churchapps/apihelper@npm:1.0.0"
+"@churchapps/apihelper@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "@churchapps/apihelper@npm:1.1.0"
   dependencies:
     "@aws-sdk/client-s3": "npm:^3.862.0"
     "@aws-sdk/client-ses": "npm:^3.862.0"
@@ -1339,7 +1353,7 @@ __metadata:
     winston-cloudwatch: "npm:^6.3.0"
   peerDependencies:
     "@churchapps/helpers": ^2.0.0
-  checksum: 10c0/d878ef999aec7afc2d5385d875d314ef79a15385a40c633d6a73dad82557d768b889b293f012c6744c0f3f2ea68fa500b976899de8af1abfe54ca9e92e371362
+  checksum: 10c0/cfc3095cf25a4a99182d43f4d0a715d21ac0418824ef0e8c8e70a92fb252936d405d56e61d86f080197d8977b212c1254d13d96f8aa20925bece1a1f2e672995
   languageName: node
   linkType: hard
 
@@ -3846,7 +3860,8 @@ __metadata:
     "@aws-sdk/client-ses": "npm:^3.862.0"
     "@aws-sdk/client-ssm": "npm:^3.862.0"
     "@aws-sdk/lib-storage": "npm:^3.862.0"
-    "@churchapps/apihelper": "npm:^1.0.0"
+    "@aws-sdk/s3-request-presigner": "npm:3.1057.0"
+    "@churchapps/apihelper": "npm:^1.1.0"
     "@churchapps/content-providers": "npm:^0.9.0"
     "@churchapps/helpers": "npm:^1.11.1"
     "@churchapps/texting": "npm:^0.3.0"

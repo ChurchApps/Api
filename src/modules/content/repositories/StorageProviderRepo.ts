@@ -17,7 +17,11 @@ export class StorageProviderRepo {
       provider: model.provider,
       apiKey: model.apiKey,
       apiSecret: model.apiSecret,
-      enabled: model.enabled
+      enabled: model.enabled,
+      accessToken: model.accessToken,
+      refreshToken: model.refreshToken,
+      tokenExpiresAt: model.tokenExpiresAt,
+      settings: model.settings
     }).execute();
     return model;
   }
@@ -27,7 +31,11 @@ export class StorageProviderRepo {
       provider: model.provider,
       apiKey: model.apiKey,
       apiSecret: model.apiSecret,
-      enabled: model.enabled
+      enabled: model.enabled,
+      accessToken: model.accessToken,
+      refreshToken: model.refreshToken,
+      tokenExpiresAt: model.tokenExpiresAt,
+      settings: model.settings
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -49,7 +57,11 @@ export class StorageProviderRepo {
       provider: data.provider,
       apiKey: data.apiKey,
       apiSecret: data.apiSecret,
-      enabled: data.enabled === true || data.enabled === 1 || data.enabled?.[0] === 1
+      enabled: data.enabled === true || data.enabled === 1 || data.enabled?.[0] === 1,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      tokenExpiresAt: data.tokenExpiresAt,
+      settings: data.settings
     };
   }
 
