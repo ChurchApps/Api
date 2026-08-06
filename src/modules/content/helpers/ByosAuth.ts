@@ -17,7 +17,7 @@ interface ByosOAuthConfig {
 const OAUTH_CONFIGS: Record<string, ByosOAuthConfig> = {
   googledrive: {
     tokenUrl: "https://oauth2.googleapis.com/token",
-    clientId: "",
+    clientId: "214868247432-hao323qmsfu96h345udaifs8f1nc7i71.apps.googleusercontent.com",
     getClientSecret: () => process.env.GOOGLE_DRIVE_CLIENT_SECRET || ""
   },
   dropbox: {
