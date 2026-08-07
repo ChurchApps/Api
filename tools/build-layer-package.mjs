@@ -6,8 +6,13 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const rootDeps = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).dependencies || {};
+const rootPkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const rootDeps = rootPkg.dependencies || {};
 const layerPkg = JSON.parse(readFileSync(join(root, "tools/layer-package.json"), "utf8"));
+
+// Without the root's resolutions the layer re-resolves pinned transitives (axios, zod) to
+// whatever is newest, which both drifts from the tested app and trips the 7d supply-chain gate.
+if (rootPkg.resolutions) layerPkg.resolutions = rootPkg.resolutions;
 
 const drifted = [];
 layerPkg.dependencies = Object.fromEntries(
