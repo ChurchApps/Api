@@ -98,6 +98,8 @@ export class FileController extends ContentBaseController {
           return result;
         } catch (e) {
           if (e instanceof QuotaExceededError) return this.json({ error: "storage_quota_exceeded", usedBytes: e.usedBytes, quotaBytes: e.quotaBytes }, 400);
+          const detail = this.providerErrorDetail(e);
+          if (detail && BYOS_PROVIDERS.includes(storage.name)) return this.json({ error: "storage_provider_error: " + detail }, 400);
           throw e;
         }
       }
@@ -120,6 +122,8 @@ export class FileController extends ContentBaseController {
           return result || {};
         } catch (e) {
           if (e instanceof QuotaExceededError) return this.json({ error: "storage_quota_exceeded", usedBytes: e.usedBytes, quotaBytes: e.quotaBytes }, 400);
+          const detail = this.providerErrorDetail(e);
+          if (detail && BYOS_PROVIDERS.includes(storage.name)) return this.json({ error: "storage_provider_error: " + detail }, 400);
           throw e;
         }
       }
@@ -140,6 +144,14 @@ export class FileController extends ContentBaseController {
         return { file: key };
       }
     });
+  }
+
+  // Surfaces the provider's own error text (Dropbox error_summary, Google/Microsoft error payloads) to the admin.
+  private providerErrorDetail(e: any): string | null {
+    const data = e?.response?.data;
+    if (!data) return null;
+    if (typeof data === "string") return data.substring(0, 300);
+    return data.error_summary || data.error?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
   }
 
   private buildKey(churchId: string, contentType: string, contentId: string, fileName: string): string {
