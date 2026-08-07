@@ -64,8 +64,7 @@ export class SongDetailsController extends ContentBaseController {
   // ponytail: temp repair route for #946 - delete once prod is clean
   @httpPost("/repairTruncated")
   public async repairTruncated(req: express.Request<{}, {}, { apply?: boolean; limit?: number; offset?: number }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+    return this.actionWrapperAnon(req, res, async () => {
       const apply = req.body?.apply === true;
       const limit = req.body?.limit || 10;
       const offset = req.body?.offset || 0;
