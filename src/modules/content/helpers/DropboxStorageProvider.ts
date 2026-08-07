@@ -58,6 +58,6 @@ export class DropboxStorageProvider implements IStorageProvider {
   public async getDownloadUrl(key: string): Promise<string | null> {
     const token = await this.token();
     const resp = await axios.post(API + "/files/get_temporary_link", { path: key }, { headers: { Authorization: "Bearer " + token } });
-    return resp.data?.link || null;
+    return resp.data?.link ? resp.data.link.replace(/([?&])dl=1(&|$)/, "$1dl=0$2") : null;
   }
 }

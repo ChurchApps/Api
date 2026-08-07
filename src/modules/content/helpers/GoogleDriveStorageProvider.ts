@@ -89,8 +89,7 @@ export class GoogleDriveStorageProvider implements IStorageProvider {
   }
 
   public async getDownloadUrl(key: string): Promise<string | null> {
-    const token = await this.token();
-    const resp = await axios.get(API + "/files/" + key + "?fields=webContentLink", { headers: this.headers(token) });
-    return resp.data?.webContentLink || "https://drive.google.com/uc?export=download&id=" + key;
+    // webContentLink is export=download (forces a save-as); export=view renders in the browser
+    return "https://drive.google.com/uc?export=view&id=" + key;
   }
 }
