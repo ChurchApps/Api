@@ -78,7 +78,10 @@ export const EventReminderAdapter: ReminderAdapter = {
   },
 
   link(entity: any) {
-    return entity?.id ? `/calendar?eventId=${entity.id}` : "";
+    // /calendar doesn't exist in B1App; deep-link to pages that do (issue #930 follow-up).
+    if (entity?.groupId) return `/mobile/groups/${entity.groupId}?activeTab=events`;
+    if (entity?.id && entity.registrationEnabled) return `/mobile/register/${entity.id}`;
+    return "";
   },
 
   renderMessage(entity: any, _occLocalISO: string, custom?: string) {
