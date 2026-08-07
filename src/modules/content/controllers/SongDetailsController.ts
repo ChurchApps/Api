@@ -1,7 +1,5 @@
 import { controller, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import express from "express";
-import { sql } from "kysely";
-import { getDb } from "../db/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { SongDetail } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
@@ -58,68 +56,6 @@ export class SongDetailsController extends ContentBaseController {
       } catch {
         return await this.repos.songDetail.save(sd);
       }
-    });
-  }
-
-  // ponytail: temp repair route for #946 - delete once prod is clean
-  @httpPost("/repairTruncated")
-  public async repairTruncated(req: express.Request<{}, {}, { apply?: boolean; limit?: number; offset?: number }>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
-      const apply = req.body?.apply === true;
-      const limit = req.body?.limit || 10;
-      const offset = req.body?.offset || 0;
-
-      const remaining = await getDb()
-        .selectFrom("songDetails")
-        .select(({ fn }) => fn.countAll().as("count"))
-        .where(sql<boolean>`char_length(title) = 45 or char_length(artist) = 45 or char_length(album) = 45`)
-        .executeTakeFirst();
-
-      const rows: any[] = await getDb()
-        .selectFrom("songDetails")
-        .select(["id", "praiseChartsId", "title", "artist", "album"])
-        .where(sql<boolean>`char_length(title) = 45 or char_length(artist) = 45 or char_length(album) = 45`)
-        .orderBy("id")
-        .limit(limit)
-        .offset(offset)
-        .execute();
-
-      const results: any[] = [];
-      for (const row of rows) {
-        if (!row.praiseChartsId) {
-          results.push({ id: row.id, title: row.title, status: "unrecoverable" });
-          continue;
-        }
-
-        let fresh: SongDetail;
-        try {
-          fresh = (await PraiseChartsHelper.load(row.praiseChartsId)).songDetails;
-        } catch (e: any) {
-          results.push({ id: row.id, praiseChartsId: row.praiseChartsId, status: "failed", message: e.message });
-          continue;
-        }
-
-        // Only replace a 45-char value when the fresh one extends it exactly, so a bad match can't overwrite good data.
-        const updates: any = {};
-        (["title", "artist", "album"] as const).forEach((field) => {
-          const current = row[field];
-          const value = fresh[field];
-          if (current?.length === 45 && value?.startsWith(current) && value !== current) updates[field] = value;
-        });
-        if (!Object.keys(updates).length) {
-          results.push({ id: row.id, praiseChartsId: row.praiseChartsId, status: "no-match" });
-          continue;
-        }
-
-        if (apply) {
-          await getDb().updateTable("songDetails").set(updates).where("id", "=", row.id).execute();
-          if (updates.title) await getDb().updateTable("songs").set({ name: updates.title }).where("songDetailId", "=", row.id).where("name", "=", row.title).execute();
-        }
-        results.push({ id: row.id, status: apply ? "fixed" : "would-fix", updates });
-      }
-
-      const stuck = results.filter((r) => r.status !== "fixed").length;
-      return { apply, totalTruncated: Number(remaining?.count || 0), scanned: rows.length, nextOffset: offset + stuck, results };
     });
   }
 

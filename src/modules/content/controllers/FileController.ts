@@ -151,7 +151,8 @@ export class FileController extends ContentBaseController {
     const data = e?.response?.data;
     if (!data) return null;
     if (typeof data === "string") return data.substring(0, 300);
-    return data.error_summary || data.error?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
+    const summary = data.error_summary || data.error?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
+    return summary && data.required_scope ? summary + " (required scope: " + data.required_scope + ")" : summary;
   }
 
   private buildKey(churchId: string, contentType: string, contentId: string, fileName: string): string {
