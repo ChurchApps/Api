@@ -22,6 +22,7 @@ export class SectionController extends ContentBaseController {
       else {
         const { convertToBlock } = req.query;
         let section = await this.repos.section.load(au.churchId, id);
+        if (!section) return this.json({}, 404);
         const allElements: Element[] = await this.repos.element.loadForSection(section.churchId, section.id);
         section = TreeHelper.buildTree([section], allElements)[0];
         let result;
@@ -131,6 +132,7 @@ export class SectionController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const section = await this.repos.section.load(au.churchId, id);
+        if (!section) return this.json({}, 404);
         await this.repos.section.delete(au.churchId, id);
         if (section.blockId) {
           await this.repos.section.updateSortForBlock(section.churchId, section.blockId);
