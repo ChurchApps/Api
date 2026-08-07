@@ -63,17 +63,26 @@ export class SongDetailsController extends ContentBaseController {
 
   // ponytail: temp repair route for #946 - delete once prod is clean
   @httpPost("/repairTruncated")
-  public async repairTruncated(req: express.Request<{}, {}, { apply?: boolean; limit?: number }>, res: express.Response): Promise<any> {
+  public async repairTruncated(req: express.Request<{}, {}, { apply?: boolean; limit?: number; offset?: number }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const apply = req.body?.apply === true;
-      const limit = req.body?.limit || 25;
+      const limit = req.body?.limit || 10;
+      const offset = req.body?.offset || 0;
+
+      const remaining = await getDb()
+        .selectFrom("songDetails")
+        .select(({ fn }) => fn.countAll().as("count"))
+        .where(sql<boolean>`char_length(title) = 45 or char_length(artist) = 45 or char_length(album) = 45`)
+        .executeTakeFirst();
 
       const rows: any[] = await getDb()
         .selectFrom("songDetails")
         .select(["id", "praiseChartsId", "title", "artist", "album"])
         .where(sql<boolean>`char_length(title) = 45 or char_length(artist) = 45 or char_length(album) = 45`)
+        .orderBy("id")
         .limit(limit)
+        .offset(offset)
         .execute();
 
       const results: any[] = [];
@@ -110,7 +119,8 @@ export class SongDetailsController extends ContentBaseController {
         results.push({ id: row.id, status: apply ? "fixed" : "would-fix", updates });
       }
 
-      return { apply, scanned: rows.length, results };
+      const stuck = results.filter((r) => r.status !== "fixed").length;
+      return { apply, totalTruncated: Number(remaining?.count || 0), scanned: rows.length, nextOffset: offset + stuck, results };
     });
   }
 
