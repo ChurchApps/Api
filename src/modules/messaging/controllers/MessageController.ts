@@ -14,6 +14,8 @@ export class MessageController extends MessagingBaseController {
   @httpGet("/conversation/:conversationId")
   public async loadByConversation(@requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, conversationId));
+      if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(au, conv.contentType)) return this.json([], 401);
       const messages: Message[] = await this.repos.message.loadForConversation(au.churchId, conversationId);
       return this.repos.message.convertAllToModel(messages);
     });
@@ -22,6 +24,8 @@ export class MessageController extends MessagingBaseController {
   @httpGet("/catchup/:churchId/:conversationId")
   public async catchup(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
+      const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(churchId, conversationId));
+      if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json([], 401);
       const messages: Message[] = await this.repos.message.loadForConversation(churchId, conversationId);
       return this.repos.message.convertAllToModel(messages);
     }) as any;
@@ -33,7 +37,7 @@ export class MessageController extends MessagingBaseController {
       const promises: Promise<Message>[] = [];
       for (const message of req.body) {
         const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(message.churchId, message.conversationId));
-        if (!conv?.id || conv.allowAnonymousPosts !== true) return this.json({ error: "Anonymous posting not allowed" }, 401);
+        if (!conv?.id || conv.allowAnonymousPosts !== true || this.isPersonNote(conv.contentType)) return this.json({ error: "Anonymous posting not allowed" }, 401);
         message.personId = null;
       }
       req.body.forEach((message) => {
@@ -114,13 +118,22 @@ export class MessageController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.message.loadById(churchId, id);
-      return this.repos.message.convertToModel(data);
+      const message = this.repos.message.convertToModel(data);
+      if (message?.conversationId) {
+        const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(churchId, message.conversationId));
+        if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json({}, 401);
+      }
+      return message;
     }) as any;
   }
 
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const message of req.body) {
+        const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
+        if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(au, conv.contentType)) return this.json({}, 401);
+      }
       const promises: Promise<Message>[] = [];
       req.body.forEach((message) => {
         message.churchId = au.churchId;
@@ -211,6 +224,7 @@ export class MessageController extends MessagingBaseController {
   // Group / announcement conversations gate on group membership; DMs on being a
   // participant; staff with content.edit may always act (moderation).
   private async canParticipate(au: any, conv: any): Promise<boolean> {
+    if (this.isPersonNote(conv.contentType)) return this.canViewPersonNotes(au, conv.contentType);
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
       return !!conv.contentId && au.groupIds?.includes(conv.contentId);

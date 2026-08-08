@@ -46,8 +46,9 @@ export class ConversationController extends MessagingBaseController {
   public async getTimelineByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const ids = req.query.ids.toString().split(",");
-      const result = (await this.repos.conversation.loadByIds(au.churchId, ids)) as Conversation[];
+      let result = (await this.repos.conversation.loadByIds(au.churchId, ids)) as Conversation[];
       if (result && Array.isArray(result)) {
+        result = result.filter((c) => !this.isPersonNote(c.contentType) || this.canViewPersonNotes(au, c.contentType));
         await this.appendMessages(result, au.churchId);
       }
       return result || [];
@@ -62,6 +63,7 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (this.isPersonNote(contentType) && !this.canViewPersonNotes(au, contentType)) return this.json([], 401);
       const churchId = au.churchId;
       const pageNumber = parseInt((req.query.page as string) || "1", 10);
       const pageSize = parseInt((req.query.limit as string) || "20", 10);
@@ -124,6 +126,7 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
+      if (this.isPersonNote(contentType) && !this.canViewPersonNotes(this.authUser(), contentType)) return this.json([], 401) as any;
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
       return this.repos.conversation.convertAllToModel(data as any[]);
     }) as any;
@@ -133,7 +136,9 @@ export class ConversationController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.conversation.loadById(churchId, id);
-      return this.repos.conversation.convertToModel(data);
+      const result = this.repos.conversation.convertToModel(data);
+      if (this.isPersonNote(result?.contentType) && !this.canViewPersonNotes(this.authUser(), result.contentType)) return this.json({}, 401);
+      return result;
     }) as any;
   }
 
@@ -141,6 +146,9 @@ export class ConversationController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Conversation[]>, res: express.Response): Promise<Conversation[]> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const conversation of req.body) {
+        if (this.isPersonNote(conversation.contentType) && !this.canViewPersonNotes(au, conversation.contentType)) return this.json({}, 401);
+      }
       const promises: Promise<Conversation>[] = [];
       req.body.forEach((conversation) => {
         conversation.churchId = au.churchId;
@@ -189,6 +197,7 @@ export class ConversationController extends MessagingBaseController {
   @httpPost("/start")
   public async start(req: express.Request<{}, {}, { groupId: string; contentType: string; contentId: string; title: string; comment: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
+      if (this.isPersonNote(req.body.contentType) && !this.canViewPersonNotes(au, req.body.contentType)) return this.json({}, 401);
       const c: Conversation = {
         churchId: au.churchId,
         contentType: req.body.contentType,
@@ -227,6 +236,7 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (this.isPersonNote(contentType) && !this.canViewPersonNotes(this.authUser(), contentType)) return this.json({}, 401);
       return await this.getOrCreate(churchId, contentType, contentId, "public", true);
     }) as any;
   }

@@ -36,6 +36,7 @@ export const SCOPE_CATALOG: Record<string, PermPair[]> = {
     ...peopleRead,
     { contentType: "People", action: "Edit" },
     { contentType: "People", action: "Edit Self" },
+    { contentType: "People", action: "View Confidential Notes" },
     { contentType: "Households", action: "Edit" },
     { contentType: "Group Members", action: "Edit" }
   ],

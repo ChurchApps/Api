@@ -1,8 +1,17 @@
 import "reflect-metadata";
-jest.mock("../MessagingBaseController", () => ({ MessagingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MessagingBaseController", () => ({
+  MessagingBaseController: class {
+    json(obj: any, status: number) { return { obj, status }; }
+    isPersonNote(contentType?: string) { return contentType === "person" || contentType === "personConfidential"; }
+    canViewPersonNotes(au: any, contentType?: string) {
+      if (!au) return false;
+      return au.checkAccess(contentType === "personConfidential" ? "peopleViewConfidentialNotes" : "peopleEdit");
+    }
+  }
+}));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn() } }));
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
-jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" } } }));
+jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
 
 import { MessageController } from "../MessageController.js";
 import { DeliveryHelper } from "../../helpers/DeliveryHelper.js";
@@ -74,6 +83,24 @@ describe("MessageController.toggleReaction", () => {
     const { controller, repos } = makeController({ conversation: { id: "conv1", contentType: "group", contentId: "g1" }, groupIds: ["other"], access: ["contentEdit"] });
     await (controller as any).toggleReaction("m1", req, {});
     expect(repos.messageReaction.create).toHaveBeenCalled();
+  });
+
+  it("allows people.edit on a person-notes conversation", async () => {
+    const { controller, repos } = makeController({ conversation: { id: "conv1", contentType: "person", contentId: "p9" }, access: ["peopleEdit"] });
+    await (controller as any).toggleReaction("m1", req, {});
+    expect(repos.messageReaction.create).toHaveBeenCalled();
+  });
+
+  it("rejects person-notes conversations without people.edit, even with content.edit", async () => {
+    const { controller } = makeController({ conversation: { id: "conv1", contentType: "person", contentId: "p9" }, access: ["contentEdit"] });
+    const result = await (controller as any).toggleReaction("m1", req, {});
+    expect(result.status).toBe(401);
+  });
+
+  it("rejects confidential person notes without the confidential permission", async () => {
+    const { controller } = makeController({ conversation: { id: "conv1", contentType: "personConfidential", contentId: "p9" }, access: ["peopleEdit"] });
+    const result = await (controller as any).toggleReaction("m1", req, {});
+    expect(result.status).toBe(401);
   });
 
   it("404s when the message is missing", async () => {
