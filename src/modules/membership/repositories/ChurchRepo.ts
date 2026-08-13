@@ -26,7 +26,8 @@ export class ChurchRepo {
       archivedDate: church.archivedDate,
       latitude: church.latitude,
       longitude: church.longitude,
-      timeZone: church.timeZone
+      timeZone: church.timeZone,
+      firstDayOfWeek: church.firstDayOfWeek
     }).execute();
     return church;
   }
@@ -44,7 +45,8 @@ export class ChurchRepo {
       archivedDate: church.archivedDate,
       latitude: church.latitude,
       longitude: church.longitude,
-      timeZone: church.timeZone
+      timeZone: church.timeZone,
+      firstDayOfWeek: church.firstDayOfWeek
     }).where("id", "=", church.id).execute();
     return church;
   }
@@ -121,6 +123,7 @@ export class ChurchRepo {
         "c.registrationDate",
         "c.latitude",
         "c.longitude",
+        "c.firstDayOfWeek",
         "p.id as personId",
         "p.membershipStatus"
       ])
@@ -140,7 +143,8 @@ export class ChurchRepo {
           city: row.city,
           state: row.state,
           zip: row.zip,
-          country: row.country
+          country: row.country,
+          firstDayOfWeek: row.firstDayOfWeek
         },
         person: {
           id: row.personId,
@@ -177,7 +181,8 @@ export class ChurchRepo {
       archivedDate: row.archivedDate,
       latitude: row.latitude,
       longitude: row.longitude,
-      timeZone: row.timeZone
+      timeZone: row.timeZone,
+      firstDayOfWeek: row.firstDayOfWeek
     };
   }
 
