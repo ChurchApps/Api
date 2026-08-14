@@ -127,7 +127,7 @@ export default [
       }
     }
   },
-    {
+  {
     files: ["src/modules/**/controllers/**/*.ts"],
     plugins: { authz: authzPlugin },
     rules: {
