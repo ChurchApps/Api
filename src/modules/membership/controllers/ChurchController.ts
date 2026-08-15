@@ -1,5 +1,5 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
-import { RegistrationRequest, Church, RolePermission, Api, RegisterChurchRequest, LoginUserChurch, Group, RoleMember, User } from "../models/index.js";
+import { RegistrationRequest, Church, RegisterChurchRequest, LoginUserChurch, Group, RoleMember, User } from "../models/index.js";
 import express from "express";
 import { body, validationResult } from "express-validator";
 import { AuthenticatedUser } from "../auth/index.js";
@@ -182,34 +182,23 @@ export class ChurchController extends MembershipBaseController {
   @httpGet("/:id/impersonate")
   public async impersonate(@requestParam("id") id: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+
       const churchId = id.toString();
-      const hasAccess = au.checkAccess(Permissions.server.admin) || au.churchId === churchId;
+      const user = await this.repos.user.load(au.id);
 
-      if (!hasAccess) return this.json({}, 401);
-      else {
-        const user = await this.repos.user.load(au.id);
+      let universalChurch = null;
+      const churches = await this.repos.rolePermission.loadForUser(au.id, false);
+      churches.forEach((c) => {
+        if (c.church.id === "0") universalChurch = c;
+      });
+      const result = await this.repos.rolePermission.loadForChurch(churchId, universalChurch);
 
-        let universalChurch = null;
-        const churches = await this.repos.rolePermission.loadForUser(au.id, false);
-        churches.forEach((c) => {
-          if (c.church.id === "0") universalChurch = c;
-        });
-        const result = await this.repos.rolePermission.loadForChurch(churchId, universalChurch);
+      // Expand a real Domain Admin role; do not invent one if the church has none.
+      UserHelper.replaceDomainAdminPermissions([result]);
+      UserHelper.addAllReportingPermissions([result]);
 
-        // Make sure the impersonated church has domain admin permission
-        const membershipApi = ArrayHelper.getOne(result.apis, "keyName", "MembershipApi");
-        const domainAdmin = ArrayHelper.getOne(membershipApi.permissions, "contentType", "Domain");
-        if (domainAdmin === null) {
-          membershipApi.permissions.push({ contentType: "Domain", action: "Admin" });
-        }
-
-        UserHelper.replaceDomainAdminPermissions([result]);
-        UserHelper.addAllReportingPermissions([result]);
-
-        const churchWithAuth = await AuthenticatedUser.login([result], user);
-
-        return churchWithAuth;
-      }
+      return await AuthenticatedUser.login([result], user);
     });
   }
 
@@ -391,7 +380,7 @@ export class ChurchController extends MembershipBaseController {
   @httpPost("/select")
   public async select(req: express.Request<{}, {}, { churchId: string; subDomain: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // authz-exempt: selection target validated against au's own permissions below
+      // authz-exempt: selection target must already be a church the caller belongs to (role via loadUserPermissionInChurch)
       let { churchId } = req.body;
       if (req.body.subDomain && !churchId) {
         const selectedChurch: Church = await this.repos.church.loadBySubDomain(req.body.subDomain);
@@ -400,6 +389,7 @@ export class ChurchController extends MembershipBaseController {
       }
       if (!churchId) return this.json({ message: "No church specified" }, 400);
       const userChurch = await this.fetchChurchPermissions(au, churchId);
+      if (!userChurch) return this.json({ message: "Unauthorized" }, 401);
       const user = await this.repos.user.load(au.id);
 
       const data = await AuthenticatedUser.login([userChurch], user);
@@ -426,54 +416,9 @@ export class ChurchController extends MembershipBaseController {
   }
 
   private async fetchChurchPermissions(au: AuthenticatedUser, churchId: string): Promise<LoginUserChurch> {
-    // church includes user role permission and everyone permission.
     const userChurch = await this.repos.rolePermission.loadUserPermissionInChurch(au.id, churchId);
-
-    if (userChurch) {
-      await this.appendPersonInfo(userChurch, au, churchId);
-      return userChurch;
-    }
-
-    const everyonePermission = await this.repos.rolePermission.loadForEveryone(churchId);
-    let result: LoginUserChurch = null;
-    let currentApi: Api = null;
-    (everyonePermission as any[]).forEach((row: any) => {
-      if (result === null) {
-        result = {
-          church: { id: row.churchId, subDomain: row.subDomain, name: row.churchName },
-          person: {
-            id: "",
-            name: { first: "", last: "" },
-            membershipStatus: "Guest"
-          },
-          apis: []
-        };
-        currentApi = null;
-      }
-
-      if (currentApi === null || row.apiName !== currentApi.keyName) {
-        currentApi = { keyName: row.apiName, permissions: [] };
-        result.apis.push(currentApi);
-      }
-
-      const permission: RolePermission = { action: row.action, contentId: row.contentId, contentType: row.contentType };
-      currentApi.permissions.push(permission);
-    });
-
-    if (result === null) {
-      const church: Church = await this.repos.church.loadById(churchId);
-      result = {
-        church: { id: church.id, subDomain: church.subDomain, name: church.name },
-        person: {
-          id: "",
-          name: { first: "", last: "" },
-          membershipStatus: "Guest"
-        },
-        apis: []
-      };
-    }
-
-    await this.appendPersonInfo(result, au, churchId);
-    return result;
+    if (!userChurch) return null;
+    await this.appendPersonInfo(userChurch, au, churchId);
+    return userChurch;
   }
 }
