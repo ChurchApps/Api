@@ -421,30 +421,8 @@ export class UserController extends MembershipBaseController {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-      const email = req.body.email;
-      const user = await this.repos.user.loadByEmail(email);
-
-      if (user) {
-        return this.json({ exists: true, peopleMatches: [] }, 200);
-      }
-
-      const churches = await this.repos.church.loadAll();
-      const matches: Array<{ firstName: string; lastName: string; churchId: string; churchName: string }> = [];
-
-      for (const church of churches) {
-        const matchingPeople = await this.repos.person.searchEmail(church.id, email);
-        const exactMatches = matchingPeople.filter((p: Person) => p.contactInfo?.email?.toLowerCase() === email.toLowerCase());
-        for (const person of exactMatches) {
-          matches.push({
-            firstName: person.name?.first || "",
-            lastName: person.name?.last || "",
-            churchId: church.id,
-            churchName: church.name
-          });
-        }
-      }
-
-      return this.json({ exists: false, peopleMatches: matches }, 200);
+      const user = await this.repos.user.loadByEmail(req.body.email);
+      return this.json({ exists: !!user, peopleMatches: [] }, 200);
     });
   }
 
