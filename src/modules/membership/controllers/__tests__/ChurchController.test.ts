@@ -12,16 +12,16 @@ jest.mock("../../helpers/index", () => ({
   MauticHelper: {},
   GeoHelper: {}
 }));
-jest.mock("../auth/index", () => ({ AuthenticatedUser: { login: jest.fn(async (churches: any[], user: any) => ({ user, userChurches: churches })) } }));
-jest.mock("../models/index", () => ({}));
-jest.mock("../models/requests", () => ({}));
-jest.mock("../repositories/index", () => ({ Repos: class {} }));
-jest.mock("../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: {} }));
+jest.mock("../../auth/index", () => ({ AuthenticatedUser: { login: jest.fn(async (churches: any[], user: any) => ({ user, userChurches: churches })) } }));
+jest.mock("../../models/index", () => ({}));
+jest.mock("../../models/requests", () => ({}));
+jest.mock("../../repositories/index", () => ({ Repos: class {} }));
+jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: {} }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: () => null, getIds: () => [] } }));
 
 import { ChurchController } from "../ChurchController.js";
 import { UserHelper, PersonHelper } from "../../helpers/index.js";
-import { AuthenticatedUser } from "../auth/index.js";
+import { AuthenticatedUser } from "../../auth/index.js";
 
 function churchController(opts: any = {}) {
   const membershipPerms = opts.membershipPerms ?? [{ contentType: "People", action: "View" }];
