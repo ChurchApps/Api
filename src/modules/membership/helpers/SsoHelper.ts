@@ -2,7 +2,6 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { v4 } from "uuid";
 import jwt from "jsonwebtoken";
 import { FileStorageHelper, AwsHelper } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment.js";
@@ -171,7 +170,6 @@ export class SsoHelper {
     if (user) return { user, isNew: false };
 
     user = { email: normalized, firstName, lastName };
-    user.authGuid = v4();
     user.registrationDate = new Date();
     user.password = bcrypt.hashSync(crypto.randomBytes(16).toString("hex"), 10);
     user = await repos.user.save(user);

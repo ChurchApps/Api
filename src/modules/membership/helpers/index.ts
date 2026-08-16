@@ -28,5 +28,6 @@ export { UserChurchHelper } from "./UserChurchHelper.js";
 export { Utils } from "./Utils.js";
 export { AuditLogHelper } from "./AuditLogHelper.js";
 export { PublicEmailThrottle } from "./PublicEmailThrottle.js";
+export { AuthGuidHelper } from "./AuthGuidHelper.js";
 export { GdprExportHelper } from "./GdprExportHelper.js";
 export { GdprErasureHelper } from "./GdprErasureHelper.js";

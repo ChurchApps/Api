@@ -4,6 +4,7 @@ import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { User } from "../models/index.js";
 import { DateHelper } from "../helpers/index.js";
+import { AuthGuidHelper } from "../helpers/AuthGuidHelper.js";
 
 @injectable()
 export class UserRepo {
@@ -70,7 +71,23 @@ export class UserRepo {
   }
 
   public async loadByAuthGuid(authGuid: string): Promise<User> {
-    return (await getDb().selectFrom("users").selectAll().where("authGuid", "=", authGuid).executeTakeFirst()) ?? null;
+    if (!authGuid) return null;
+    const hashPrefix = AuthGuidHelper.hash(authGuid) + ":";
+    return (await getDb().selectFrom("users").selectAll().where((eb) => eb.or([
+      eb("authGuid", "=", authGuid),
+      eb("authGuid", "like", hashPrefix + "%")
+    ])).executeTakeFirst()) ?? null;
+  }
+
+  // Atomic consume: only the request that swaps the guid off its unused value proceeds.
+  public async consumeAuthGuid(userId: string, expected: string, replacement: string): Promise<boolean> {
+    if (!userId || !expected || expected === replacement) return false;
+    const result = await getDb().updateTable("users")
+      .set({ authGuid: replacement })
+      .where("id", "=", userId)
+      .where("authGuid", "=", expected)
+      .executeTakeFirst();
+    return Number(result?.numUpdatedRows ?? 0) > 0;
   }
 
   public async loadByEmailPassword(email: string, hashedPassword: string): Promise<User> {
