@@ -95,6 +95,13 @@ describe("PersonController.get authorization", () => {
   });
 });
 
+describe("PersonController.apiEmails", () => {
+  it("is not registered", () => {
+    expect(Object.getOwnPropertyNames(PersonController.prototype)).not.toContain("apiEmails");
+    expect((new PersonController() as any).apiEmails).toBeUndefined();
+  });
+});
+
 describe("PersonController.delete / bulkDelete authorization", () => {
   it("delete blocks a caller without people.edit (401, nothing deleted)", async () => {
     const { controller, repos } = personController({ access: [] });

@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { dispatch } from "../internalDispatch.js";
 
-// Blocked: provider webhooks need raw signed bodies, jwtSecret is operator-only, OAuth manages client credentials.
+// Blocked: provider webhooks need raw signed bodies; OAuth manages client credentials.
 const BLOCKLIST: RegExp[] = [
   /^\/giving\/donate\/webhook\//i,
-  /^\/membership\/people\/apiemails$/i,
   /^\/membership\/oauth\/clients/i
 ];
 

@@ -29,23 +29,6 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
-  @httpPost("/apiEmails")
-  public async apiEmails(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
-      const jwtSecret = req.body.jwtSecret;
-      const peopleIds = req.body.peopleIds;
-      if (jwtSecret !== Environment.jwtSecret) return this.denyAccess(["Invalid JWT Secret"]);
-      else {
-        const people: any[] = (await this.repos.person.loadByIdsOnly(peopleIds)) as any[];
-        const result: any[] = [];
-        people.forEach((p) => {
-          result.push({ id: p.id, email: p.email });
-        });
-        return result;
-      }
-    });
-  }
-
   @httpPost("/public/email")
   public async publicEmail(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
