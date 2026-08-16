@@ -23,11 +23,12 @@ import { AuditLogHelper } from "../../helpers/index.js";
 function userController(opts: any = {}) {
   const hashed = bcrypt.hashSync("oldpass", 10);
   const user = opts.user === undefined ? { id: "u1", email: "a@b.c", password: hashed } : opts.user;
+  const saved: any[] = [];
   const repos: any = {
     user: {
       load: jest.fn(async () => (user ? { ...user } : null)),
       loadByAuthGuid: jest.fn(async (g: string) => (opts.guidUser && opts.guidUser.authGuid === g ? { ...opts.guidUser } : null)),
-      save: jest.fn(async (u: any) => u)
+      save: jest.fn(async (u: any) => { saved.push({ ...u }); return u; })
     }
   };
   const au = { id: "u1", churchId: "c1" };
@@ -37,7 +38,7 @@ function userController(opts: any = {}) {
   (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
   (controller as any).json = (obj: any, status: number) => ({ obj, status });
   (controller as any).denyAccess = (errors: string[]) => ({ obj: { errors }, status: 401 });
-  return { controller, repos };
+  return { controller, repos, saved };
 }
 
 describe("UserController.updatePassword", () => {
@@ -56,12 +57,11 @@ describe("UserController.updatePassword", () => {
   });
 
   it("changes the password when currentPassword matches", async () => {
-    const { controller, repos } = userController();
+    const { controller, repos, saved } = userController();
     const result: any = await controller.updatePassword({ body: { newPassword: "newpass", currentPassword: "oldpass" } } as any, {} as any);
     expect(result.status).toBe(200);
     expect(repos.user.save).toHaveBeenCalled();
-    const saved = repos.user.save.mock.calls[0][0];
-    expect(bcrypt.compareSync("newpass", saved.password)).toBe(true);
+    expect(bcrypt.compareSync("newpass", saved[0].password)).toBe(true);
     expect(result.obj.password).toBe(null);
     expect(AuditLogHelper.log).toHaveBeenCalled();
   });
@@ -70,13 +70,12 @@ describe("UserController.updatePassword", () => {
 describe("UserController.setPasswordGuid", () => {
   it("resets the password with authGuid and no current password", async () => {
     const guidUser = { id: "u2", email: "b@c.d", authGuid: "reset-guid", password: bcrypt.hashSync("oldpass", 10) };
-    const { controller, repos } = userController({ guidUser });
+    const { controller, repos, saved } = userController({ guidUser });
     const result: any = await controller.setPasswordGuid({ body: { authGuid: "reset-guid", newPassword: "freshpass" } } as any, {} as any);
     expect(result.success).toBe(true);
     expect(repos.user.save).toHaveBeenCalled();
-    const saved = repos.user.save.mock.calls[0][0];
-    expect(saved.authGuid).toBe("");
-    expect(bcrypt.compareSync("freshpass", saved.password)).toBe(true);
+    expect(saved[0].authGuid).toBe("");
+    expect(bcrypt.compareSync("freshpass", saved[0].password)).toBe(true);
   });
 
   it("fails for an unknown authGuid", async () => {
