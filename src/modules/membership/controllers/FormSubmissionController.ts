@@ -64,68 +64,66 @@ export class FormSubmissionController extends MembershipBaseController {
         const results: any[] = [];
         for (const formSubmission of req.body) {
           const { formId } = formSubmission;
-          let { churchId } = formSubmission;
 
           const formAccess = await this.repos.form.access(formId);
           const form = formAccess && this.repos.form.convertToModel(formAccess.churchId, formAccess);
+          const churchId = form?.churchId;
 
-          if (!form) {
+          if (!form || !churchId) {
             results.push({ error: `Form with id ${formId} not found` });
+          } else if (au?.churchId && au.churchId !== churchId) {
+            results.push({ error: `Form with id ${formId} not found` });
+          } else if (form.restricted && !(await this.formAccess(au, formId))) {
+            results.push({ error: `You're not allowed to submit ${form.name}` });
           } else {
-            if (!churchId) churchId = form.churchId;
-            if (!churchId && au) churchId = au.churchId;
-            if (form.restricted && !(await this.formAccess(au, formId))) {
-              results.push({ error: `You're not allowed to submit ${form.name}` });
-            } else {
-              formSubmission.churchId = churchId;
+            formSubmission.churchId = churchId;
 
-              const wantsPerson = form.autoCreatePerson === true;
-              const wantsFollowUp = !!(form.followUpSubject && form.followUpBody);
-              let contact: FormContact = null;
-              let followUpFirstName: string = null;
-              if (wantsPerson || wantsFollowUp) {
-                const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
-                contact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
-                followUpFirstName = contact?.firstName;
-                if (wantsPerson && contact?.email && !formSubmission.contentId) {
-                  const person = await ConversationalFormHelper.findOrCreatePerson(this.repos, churchId, contact);
-                  if (person) {
-                    formSubmission.contentType = "person";
-                    formSubmission.contentId = person.id;
-                    followUpFirstName = person.name?.first || contact.firstName;
-                  }
+            const wantsPerson = form.autoCreatePerson === true;
+            const wantsFollowUp = !!(form.followUpSubject && form.followUpBody);
+            let contact: FormContact = null;
+            let followUpFirstName: string = null;
+            if (wantsPerson || wantsFollowUp) {
+              const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
+              contact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
+              followUpFirstName = contact?.firstName;
+              if (wantsPerson && contact?.email && !formSubmission.contentId) {
+                const person = await ConversationalFormHelper.findOrCreatePerson(this.repos, churchId, contact);
+                if (person) {
+                  formSubmission.contentType = "person";
+                  formSubmission.contentId = person.id;
+                  followUpFirstName = person.name?.first || contact.firstName;
                 }
               }
+            }
 
-              const savedSubmissions = await this.repos.formSubmission.save(formSubmission);
+            const savedSubmissions = await this.repos.formSubmission.save(formSubmission);
 
-              const answerPromises: Promise<Answer>[] = [];
-              formSubmission?.answers?.forEach((answer) => {
-                if (!answer.churchId) answer.churchId = churchId;
-                answer.formSubmissionId = savedSubmissions.id;
-                answerPromises.push(this.repos.answer.save(answer));
-              });
-              if (answerPromises.length > 0) {
-                await Promise.all(answerPromises);
-              }
+            const answerPromises: Promise<Answer>[] = [];
+            formSubmission?.answers?.forEach((answer) => {
+              answer.churchId = churchId;
+              answer.formSubmissionId = savedSubmissions.id;
+              answerPromises.push(this.repos.answer.save(answer));
+            });
+            if (answerPromises.length > 0) {
+              await Promise.all(answerPromises);
+            }
 
-              results.push(savedSubmissions);
-              // Submitters land in workflows via the unified trigger engine, which
-              // subscribes to this event (form.submission.created) on the internal bus.
-              await WebhookDispatcher.emit(churchId, "form.submission.created", savedSubmissions);
+            results.push(savedSubmissions);
+            // Submitters land in workflows via the unified trigger engine, which
+            // subscribes to this event (form.submission.created) on the internal bus.
+            await WebhookDispatcher.emit(churchId, "form.submission.created", savedSubmissions);
 
+            try {
+              await this.sendEmails(formSubmission, form, churchId);
+            } catch (err) {
+              console.error("Form submission notifications failed (non-fatal):", err);
+            }
+
+            if (wantsFollowUp && contact?.email) {
               try {
-                await this.sendEmails(formSubmission, form, churchId);
+                await this.sendFollowUp(churchId, contact.email, followUpFirstName, form.followUpSubject, form.followUpBody);
               } catch (err) {
-                console.error("Form submission notifications failed (non-fatal):", err);
-              }
-
-              if (wantsFollowUp && contact?.email) {
-                try {
-                  await this.sendFollowUp(churchId, contact.email, followUpFirstName, form.followUpSubject, form.followUpBody);
-                } catch (err) {
-                  console.error("Form follow-up email failed (non-fatal):", err);
-                }
+                console.error("Form follow-up email failed (non-fatal):", err);
               }
             }
           }
