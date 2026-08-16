@@ -1,6 +1,6 @@
 import "reflect-metadata";
 jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../../shared/helpers/index", () => ({ Environment: { contentApi: "https://api.test/content" }, Permissions: { content: { edit: "contentEdit" } } }));
+jest.mock("../../../../shared/helpers/index", () => ({ Environment: { contentApi: "https://api.test/content" }, Permissions: { content: { edit: "contentEdit" } } }));
 jest.mock("../../helpers/StorageResolver", () => ({ StorageResolver: { forFile: jest.fn(), forChurch: jest.fn(), forUrl: jest.fn(), publicUrl: jest.fn() } }));
 jest.mock("../../helpers/ByosAuth", () => ({ BYOS_PROVIDERS: ["googledrive", "dropbox", "onedrive"] }));
 jest.mock("../../helpers/MinistryStuffStorageProvider", () => ({ QuotaExceededError: class QuotaExceededError extends Error {} }));
