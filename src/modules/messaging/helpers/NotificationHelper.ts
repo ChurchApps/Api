@@ -8,6 +8,7 @@ import { NotificationCategoryHelper } from "./NotificationCategoryHelper.js";
 import { PreferenceGateHelper } from "./PreferenceGateHelper.js";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
 export interface NotificationDebugStep {
   step: string;
@@ -941,21 +942,10 @@ export class NotificationHelper {
 
   static getEmailData = async (notificationPrefs: NotificationPreference[]) => {
     const peopleIds = ArrayHelper.getIds(notificationPrefs, "personId");
-    console.log("[NotificationHelper.getEmailData] Fetching emails for " + peopleIds.length + " people");
-    console.log("[NotificationHelper.getEmailData] PeopleIds: " + JSON.stringify(peopleIds));
-    const data = { peopleIds, jwtSecret: Environment.jwtSecret };
-    const url = Environment.membershipApi + "/people/apiEmails";
-    console.log("[NotificationHelper.getEmailData] Calling API: " + url);
-    try {
-      const result = await axios.post(url, data);
-      console.log("[NotificationHelper.getEmailData] API response status: " + result.status);
-      console.log("[NotificationHelper.getEmailData] API response data: " + JSON.stringify(result.data));
-      return result.data;
-    } catch (error: any) {
-      console.error("[NotificationHelper.getEmailData] API call FAILED:", error.message);
-      console.error("[NotificationHelper.getEmailData] Error response:", error.response?.data);
-      throw error;
-    }
+    if (!peopleIds.length) return [];
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    const people: any[] = (await membershipRepos.person.loadByIdsOnly(peopleIds)) as any[];
+    return people.map((p) => ({ id: p.id, email: p.email }));
   };
 
   static sendEmailNotification = async (email: string, notifications: Notification[], senderEmail?: string) => {

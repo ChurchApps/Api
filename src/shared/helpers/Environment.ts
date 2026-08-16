@@ -109,6 +109,7 @@ export class Environment extends EnvironmentBase {
     this.corsOrigin = process.env.CORS_ORIGIN || "*";
     // JWT secret strictly from environment variables
     this.jwtSecret = process.env.JWT_SECRET || "";
+    this.assertRuntimeSecrets();
 
     // gocurriculum OAuth client secret: env var first (parity with other integration secrets),
     // else the SSM param the deploy created. Consumed by setProviderSecret in ProviderProxyController,
@@ -123,7 +124,6 @@ export class Environment extends EnvironmentBase {
       process.env.ONEDRIVE_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/onedriveClientSecret`);
     }
 
-    // Initialize module-specific configs
     this.initializeModuleConfigs(data);
 
     // Initialize database connections
@@ -131,6 +131,18 @@ export class Environment extends EnvironmentBase {
 
     // Initialize app configurations
     await this.initializeAppConfigs(data);
+  }
+
+  private static isDevLikeEnvironment() {
+    return this.currentEnvironment === "dev" || this.currentEnvironment === "docker" || this.currentEnvironment === "local";
+  }
+
+  private static assertRuntimeSecrets() {
+    if (this.isDevLikeEnvironment()) return;
+    const jwt = this.jwtSecret || "";
+    const enc = this.encryptionKey || "";
+    if (!jwt || jwt.length < 32 || jwt === "jwt-secret-dev") throw new Error("JWT_SECRET is empty, shorter than 32 characters, or set to the development sample");
+    if (!enc || enc === "aSecretKeyOfExactly192BitsLength") throw new Error("ENCRYPTION_KEY is empty or set to the development sample");
   }
 
   private static initializeModuleConfigs(config: any) {

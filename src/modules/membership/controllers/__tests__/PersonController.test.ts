@@ -21,7 +21,8 @@ function personController(opts: any = {}) {
       deleteByIds: jest.fn()
     },
     household: { deleteUnused: jest.fn() },
-    formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) }
+    formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) },
+    setting: { convertAllToModel: (_c: string, rows: any[]) => rows, loadPublicSettings: jest.fn(async () => []) }
   };
   const au = { churchId: "c1", id: "u1", personId: opts.personId ?? "p1", membershipStatus: opts.membershipStatus ?? "Guest", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
   const controller = new PersonController();
@@ -92,6 +93,13 @@ describe("PersonController.get authorization", () => {
     const { controller, repos } = personController({ personId: "p1", access: ["peopleView"], person: { id: "p2", name: {} } });
     await (controller as any).get("p2", {}, {});
     expect(repos.person.load).toHaveBeenCalled();
+  });
+});
+
+describe("PersonController.apiEmails", () => {
+  it("is not registered", () => {
+    expect(Object.getOwnPropertyNames(PersonController.prototype)).not.toContain("apiEmails");
+    expect((new PersonController() as any).apiEmails).toBeUndefined();
   });
 });
 
