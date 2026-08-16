@@ -231,6 +231,7 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
+  // authz-exempt: churchId comes from the JWT; only streamingLive rooms are created
   @httpPost("/ensure")
   public async ensure(req: express.Request<{}, {}, { contentType?: string; contentId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -75,7 +75,7 @@ function connectionRepos(opts: any = {}) {
   return {
     ...conversationRepos(opts),
     connection: {
-      loadForConversation: jest.fn(async () => opts.connections ?? [{ id: "cn1" }]),
+      loadForConversation: jest.fn(async () => opts.connections ?? [{ id: "cn1", displayName: "Anonymous_1" }]),
       loadBySocketId: jest.fn(async () => opts.socketConnections ?? []),
       save: jest.fn(async (c: any) => ({ ...c, id: c.id || "cnNew" })),
       deleteForRoom: jest.fn(async () => undefined),
@@ -233,7 +233,7 @@ describe("ConnectionController", () => {
     const repos = connectionRepos({ byId: publicLive, byIdOnly: publicLive });
     const controller = attach(new ConnectionController(), repos);
     const listed = await (controller as any).load("c1", "live1", {}, {});
-    expect(listed).toEqual([{ id: "cn1" }]);
+    expect(listed).toEqual([{ id: "cn1", displayName: "Anonymous_1" }]);
     const saved = await (controller as any).save({ body: [{ churchId: "attacker", conversationId: "live1", displayName: "Anonymous " }] }, {});
     expect(repos.connection.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", conversationId: "live1" }));
     expect(saved[0].churchId).toBe("c1");
