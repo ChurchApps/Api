@@ -7,9 +7,18 @@ import { DomainHealthHelper } from "../helpers/DomainHealthHelper.js";
 
 @controller("/membership/domains")
 export class DomainController extends MembershipBaseController {
+  private requireAdmin(req: express.Request, res: express.Response, action: () => Promise<any>) {
+    const key = process.env.INTERNAL_API_KEY;
+    if (key && req.header("x-internal-key") === key) return this.actionWrapperAnon(req, res, action);
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      return action();
+    });
+  }
+
   @httpGet("/caddy")
   public async caddy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.requireAdmin(req, res, async () => {
       const jsonData = await CaddyHelper.generateJsonData();
       await CaddyHelper.updateCaddy();
       return jsonData;
@@ -18,7 +27,7 @@ export class DomainController extends MembershipBaseController {
 
   @httpGet("/caddy/init")
   public async caddyInit(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.requireAdmin(req, res, async () => {
       return await CaddyHelper.initializeCaddy();
     });
   }
@@ -36,7 +45,7 @@ export class DomainController extends MembershipBaseController {
 
   @httpGet("/hostmap")
   public async hostmap(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.requireAdmin(req, res, async () => {
       const pairs = (await this.repos.domain.loadPairs()) as { host: string; dial: string }[];
       const seen = new Set<string>();
       const lines: string[] = [];
@@ -61,7 +70,8 @@ export class DomainController extends MembershipBaseController {
   @httpGet("/public/lookup/:domainName")
   public async getPublicByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repos.domain.loadByName(domainName);
+      const row = await this.repos.domain.loadByName(domainName) as { subDomain?: string } | null;
+      return row?.subDomain ? { subDomain: row.subDomain } : {};
     });
   }
 
@@ -121,7 +131,7 @@ export class DomainController extends MembershipBaseController {
 
   @httpGet("/health/check")
   public async runHealthCheck(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.requireAdmin(req, res, async () => {
       return await DomainHealthHelper.checkUncheckedDomains();
     });
   }
