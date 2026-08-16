@@ -19,9 +19,7 @@ function formSubmissionController(opts: any = {}) {
       access: jest.fn(async () => opts.formAccess === undefined ? formRow : opts.formAccess),
       convertToModel: (_c: string, data: any) => data
     },
-    formSubmission: {
-      save: jest.fn(async (s: any) => { if (!s.id) s.id = "sub1"; return s; })
-    },
+    formSubmission: { save: jest.fn(async (s: any) => { if (!s.id) s.id = "sub1"; return s; }) },
     answer: { save: jest.fn(async (a: any) => a) },
     question: { loadForForm: jest.fn(async () => []), convertAllToModel: (_c: string, rows: any[]) => rows },
     memberPermission: { loadByEmailNotification: jest.fn(async () => []) },
