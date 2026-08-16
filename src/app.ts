@@ -10,6 +10,7 @@ import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
 import { isPublicDiskFilePath } from "./modules/content/helpers/PublicFileAccess.js";
+import { CorsHelper } from "./shared/helpers/CorsHelper.js";
 
 export const createApp = async () => {
   const environment = process.env.ENVIRONMENT || "dev";
@@ -25,24 +26,11 @@ export const createApp = async () => {
   const server = new InversifyExpressServer(container, null, { rootPath: "" }, null, CustomAuthProvider);
 
   server.setConfig((app) => {
-    app.use(
-      cors({
-        origin: function (origin, callback) {
-          const allowedOrigins = Environment.corsOrigin ? Environment.corsOrigin.split(",").map((o) => o.trim()) : ["*"];
-          if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
-            callback(null, true);
-          } else {
-            callback(new Error("Not allowed by CORS"));
-          }
-        },
-        credentials: true,
-        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin", "X-Batch-Id"]
-      })
-    );
+    app.use(cors(CorsHelper.buildOptions(Environment.corsOrigin)));
 
-    app.options("*", (_req, res) => {
-      res.header("Access-Control-Allow-Origin", "*");
+    app.options("*", async (req, res) => {
+      const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
+      await CorsHelper.applyOriginHeaders(res, origin, Environment.corsOrigin);
       res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
       res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Batch-Id");
       res.sendStatus(200);
