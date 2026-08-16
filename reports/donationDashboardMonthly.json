@@ -15,8 +15,8 @@
         " WHERE d.churchId=:churchId",
         " AND d.donationDate BETWEEN :startDate AND :endDate",
         " AND (:fundId='' OR fd.fundId = :fundId)",
-        " GROUP BY DATE_FORMAT(d.donationDate, '%Y-%m'), f.name",
-        " ORDER BY DATE_FORMAT(d.donationDate, '%Y-%m'), f.name"
+        " GROUP BY DATE_FORMAT(d.donationDate, '%Y-%m-01'), f.name",
+        " ORDER BY DATE_FORMAT(d.donationDate, '%Y-%m-01'), f.name"
       ]
     }
   ],
