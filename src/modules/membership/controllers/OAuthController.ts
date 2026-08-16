@@ -476,14 +476,21 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
+  private escapeHtml(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   private relayCallbackHtml(title: string, message: string): string {
+    const safeTitle = this.escapeHtml(title);
+    const safeMessage = this.escapeHtml(message);
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title}</title>
+<title>${safeTitle}</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#1a0f17;color:#fff}
 .card{text-align:center;padding:40px;border-radius:12px;background:rgba(255,255,255,0.05);max-width:400px}
 h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1.5}</style>
-</head><body><div class="card"><h1>${title}</h1><p>${message}</p></div></body></html>`;
+</head><body><div class="card"><h1>${safeTitle}</h1><p>${safeMessage}</p></div></body></html>`;
   }
 
   // Connected Apps screen in B1Admin Settings
