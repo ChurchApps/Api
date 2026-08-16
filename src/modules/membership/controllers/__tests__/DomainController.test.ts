@@ -8,9 +8,7 @@ jest.mock("../../helpers/index", () => ({
     initializeCaddy: jest.fn(async () => ({ success: true }))
   }
 }));
-jest.mock("../../helpers/DomainHealthHelper.js", () => ({
-  DomainHealthHelper: { checkUncheckedDomains: jest.fn(async () => [{ id: "d1" }]) }
-}));
+jest.mock("../../helpers/DomainHealthHelper.js", () => ({ DomainHealthHelper: { checkUncheckedDomains: jest.fn(async () => [{ id: "d1" }]) } }));
 jest.mock("../../models/index", () => ({}));
 jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("@churchapps/apihelper", () => ({}));
@@ -22,7 +20,7 @@ import { DomainHealthHelper } from "../../helpers/DomainHealthHelper.js";
 function domainController(opts: any = {}) {
   const repos: any = {
     domain: {
-      loadByName: jest.fn(async () => opts.domainRow ?? { id: "d1", churchId: "c1", siteId: "s1", domainName: "x.com", subDomain: "firstchurch" }),
+      loadByName: jest.fn(async () => ("domainRow" in opts ? opts.domainRow : { id: "d1", churchId: "c1", siteId: "s1", domainName: "x.com", subDomain: "firstchurch" })),
       loadPairs: jest.fn(async () => opts.pairs ?? [{ host: "x.com", dial: "firstchurch.b1.church:443" }])
     }
   };
