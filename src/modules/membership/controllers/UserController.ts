@@ -567,7 +567,7 @@ export class UserController extends MembershipBaseController {
       const targetUser = await this.repos.user.load(req.params.id);
       if (!targetUser) return this.json({}, 404);
 
-      return this.json({ jwt: AuthenticatedUser.getUserJwt(targetUser) }, 200);
+      return this.json({ jwt: AuthenticatedUser.getUserJwt(targetUser, "2 hours") }, 200);
     });
   }
 

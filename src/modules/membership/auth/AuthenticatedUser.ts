@@ -116,7 +116,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     );
   }
 
-  public static getUserJwt(user: User, expiresIn: string = "180 days") {
+  public static getUserJwt(user: User, expiresIn: string = Environment.jwtExpiration) {
     return jwt.sign({ id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName }, Environment.jwtSecret, { expiresIn: expiresIn as any });
   }
 
