@@ -8,6 +8,7 @@ import type { IStorageProvider } from "@churchapps/apihelper";
 import { StorageResolver } from "../helpers/StorageResolver.js";
 import { BYOS_PROVIDERS } from "../helpers/ByosAuth.js";
 import { QuotaExceededError } from "../helpers/MinistryStuffStorageProvider.js";
+import { isPublicFile } from "../helpers/PublicFileAccess.js";
 
 // Providers whose public URLs are short-lived; contentPath points at the stable /download route instead.
 const REDIRECT_PROVIDERS = ["googledrive", "dropbox", "onedrive"];
@@ -23,7 +24,11 @@ export class FileController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const file = await this.repos.file.loadById(id);
       if (!file) return this.json({}, 404);
-      res.set("Cache-Control", "public, max-age=300");
+      if (!isPublicFile(file)) {
+        const au = this.authUser();
+        if (!au?.churchId || au.churchId !== file.churchId) return this.json({}, 401);
+      }
+      res.set("Cache-Control", isPublicFile(file) ? "public, max-age=300" : "private, no-store");
       if (!file.provider || !file.externalId) {
         res.redirect(302, file.contentPath);
         return;

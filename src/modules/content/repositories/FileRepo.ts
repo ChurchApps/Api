@@ -49,7 +49,6 @@ export class FileRepo {
     return (await getDb().selectFrom("files").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  // anonymous download route: ids are globally-unique shortIds, church comes from the row
   public async loadById(id: string): Promise<File | undefined> {
     return (await getDb().selectFrom("files").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
