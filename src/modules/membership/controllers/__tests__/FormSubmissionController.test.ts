@@ -55,11 +55,12 @@ describe("FormSubmissionController.save churchId", () => {
     expect(result[0].churchId).toBe("c1");
   });
 
-  it("rejects an authenticated caller whose church does not match the form", async () => {
+  it("lets an authenticated other-church caller submit an unrestricted form under the form church", async () => {
     const { controller, repos } = formSubmissionController({ auChurchId: "otherChurch", auId: "u1" });
     const result: any = await (controller as any).save({ body: [{ formId: "f1", churchId: "otherChurch" }] }, {});
-    expect(repos.formSubmission.save).not.toHaveBeenCalled();
-    expect(result[0].error).toMatch(/not found/);
+    expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
+    expect(repos.formSubmission.save.mock.calls[0][0].churchId).toBe("c1");
+    expect(result[0].churchId).toBe("c1");
   });
 
   it("rejects a missing form", async () => {

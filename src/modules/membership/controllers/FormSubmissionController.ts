@@ -71,8 +71,6 @@ export class FormSubmissionController extends MembershipBaseController {
 
           if (!form || !churchId) {
             results.push({ error: `Form with id ${formId} not found` });
-          } else if (au?.churchId && au.churchId !== churchId) {
-            results.push({ error: `Form with id ${formId} not found` });
           } else if (form.restricted && !(await this.formAccess(au, formId))) {
             results.push({ error: `You're not allowed to submit ${form.name}` });
           } else {
