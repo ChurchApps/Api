@@ -484,8 +484,8 @@ export class UserController extends MembershipBaseController {
   }
 
   // authz-exempt: self-service — only ever loads/updates au.id (the JWT caller's own user); no request-supplied target id
-  @httpPost("/updatePassword", body("newPassword").isLength({ min: 6 }).withMessage("must be at least 6 chars long"))
-  public async updatePassword(req: express.Request<{}, {}, { newPassword: string }>, res: express.Response): Promise<any> {
+  @httpPost("/updatePassword", body("newPassword").isLength({ min: 6 }).withMessage("must be at least 6 chars long"), body("currentPassword").isString().notEmpty().withMessage("current password is required"))
+  public async updatePassword(req: express.Request<{}, {}, { newPassword: string; currentPassword: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -494,6 +494,8 @@ export class UserController extends MembershipBaseController {
 
       let user = await this.repos.user.load(au.id);
       if (user !== null) {
+        const stored = user.password?.toString() || "";
+        if (!req.body.currentPassword || !stored || !bcrypt.compareSync(req.body.currentPassword, stored)) return this.denyAccess(["Incorrect password"]);
         const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
         user.password = hashedPass;
         user = await this.repos.user.save(user);
