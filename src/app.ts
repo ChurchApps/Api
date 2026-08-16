@@ -9,6 +9,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
+import { isPublicDiskFilePath } from "./modules/content/helpers/PublicFileAccess.js";
 
 export const createApp = async () => {
   const environment = process.env.ENVIRONMENT || "dev";
@@ -109,9 +110,13 @@ export const createApp = async () => {
       })
     );
 
-    // Disk file store writes to ./content and builds URLs as CONTENT_ROOT + key; serve them back here.
-    // Falls through to the content module's named routes when no file matches.
-    if (Environment.fileStore !== "S3") app.use("/content", express.static("content"));
+    if (Environment.fileStore !== "S3") {
+      const servePublicContent = express.static("content");
+      app.use("/content", (req, res, next) => {
+        if (!isPublicDiskFilePath(req.path)) return next();
+        return servePublicContent(req, res, next);
+      });
+    }
 
     app.use(moduleRoutingLogger);
 
