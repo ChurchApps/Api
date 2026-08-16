@@ -9,13 +9,13 @@ export class QueryController extends MembershipBaseController {
   @httpPost("/members")
   public async queryMembers(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { text, subDomain, siteUrl } = req.body;
+      if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
+      const { text } = req.body;
 
       if (text && text !== "") {
         OpenAiHelper.initialize();
-        //Proccess the natural language query
         const apiRequestPrompt = await OpenAiHelper.buildPrompt(text);
-        const aiResponse = await OpenAiHelper.getCompletion(apiRequestPrompt, subDomain, siteUrl);
+        const aiResponse = await OpenAiHelper.getCompletion(apiRequestPrompt);
         if (aiResponse && aiResponse.length > 0) {
           let peopleData: any[] = (await this.repos.person.loadAll(au.churchId)) as any[];
           aiResponse.forEach((resp: { field: string; value: string; operator: string }) => {
