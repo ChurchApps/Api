@@ -1,3 +1,10 @@
+jest.mock("@churchapps/apihelper", () => ({
+  EnvironmentBase: class {
+    static async initBase() { return { appName: "API" }; }
+  },
+  AwsHelper: { readParameter: jest.fn().mockResolvedValue("") }
+}));
+
 import { Environment } from "../Environment.js";
 
 const SAMPLE_JWT = "jwt-secret-dev";

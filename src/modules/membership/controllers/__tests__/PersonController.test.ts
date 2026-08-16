@@ -21,7 +21,8 @@ function personController(opts: any = {}) {
       deleteByIds: jest.fn()
     },
     household: { deleteUnused: jest.fn() },
-    formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) }
+    formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) },
+    setting: { convertAllToModel: (_c: string, rows: any[]) => rows, loadPublicSettings: jest.fn(async () => []) }
   };
   const au = { churchId: "c1", id: "u1", personId: opts.personId ?? "p1", membershipStatus: opts.membershipStatus ?? "Guest", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
   const controller = new PersonController();
