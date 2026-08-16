@@ -151,10 +151,11 @@ export class ChurchController extends MembershipBaseController {
 
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, RegistrationRequest>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (au.churchId !== id && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const data = await this.repos.church.loadById(id);
-      const church = this.repos.church.convertToModel(data);
-      return church;
+      if (!data) return this.json({}, 404);
+      return this.repos.church.convertToModel(data);
     });
   }
 
@@ -213,11 +214,11 @@ export class ChurchController extends MembershipBaseController {
   @httpPost("/byIds")
   public async loadByIds(req: express.Request<{}, {}, string[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      let result: Church[] = [];
+      let result: { id?: string; name: string; subDomain?: string }[] = [];
       const ids = req.body;
       if (ids.length > 0) {
         const data = await this.repos.church.loadByIds(ids);
-        result = this.repos.church.convertAllToModel(data);
+        result = this.repos.church.convertAllToModel(data).map((c) => ({ id: c.id, name: c.name, subDomain: c.subDomain }));
       }
       return this.json(result, 200);
     });
