@@ -128,7 +128,9 @@ export class ConversationController extends MessagingBaseController {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
       if (this.isPersonNote(contentType) && !this.canViewPersonNotes(this.authUser(), contentType)) return this.json([], 401) as any;
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
-      return this.repos.conversation.convertAllToModel(data as any[]);
+      const result = this.repos.conversation.convertAllToModel(data as any[]);
+      if (result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
+      return result;
     }) as any;
   }
 
@@ -136,8 +138,10 @@ export class ConversationController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.conversation.loadById(churchId, id);
+      if (!data) return this.json({}, 401);
       const result = this.repos.conversation.convertToModel(data);
       if (this.isPersonNote(result?.contentType) && !this.canViewPersonNotes(this.authUser(), result.contentType)) return this.json({}, 401);
+      if (!this.isAnonPublicConversation(result)) return this.json({}, 401);
       return result;
     }) as any;
   }
@@ -227,6 +231,14 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
+  @httpPost("/ensure")
+  public async ensure(req: express.Request<{}, {}, { contentType?: string; contentId?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (req.body.contentType !== "streamingLive" || !req.body.contentId) return this.json({}, 401);
+      return await this.getOrCreate(au.churchId, "streamingLive", req.body.contentId, "public", true, false);
+    }) as any;
+  }
+
   @httpGet("/current/:churchId/:contentType/:contentId")
   public async current(
     @requestParam("churchId") churchId: string,
@@ -235,9 +247,23 @@ export class ConversationController extends MessagingBaseController {
       req: express.Request<{}, {}, {}>,
       res: express.Response
   ): Promise<any> {
+    if (contentType !== "streamingLive") {
+      return this.actionWrapper(req, res, async (au) => {
+        if (au.churchId !== churchId) return this.json({}, 401);
+        if (this.isPersonNote(contentType) && !this.canViewPersonNotes(au, contentType)) return this.json({}, 401);
+        const conversation = await this.getOrCreate(churchId, contentType, contentId, "public", false, true);
+        if (contentType === "streamingLiveHost" && conversation?.contentId) await this.getOrCreate(churchId, "streamingLive", conversation.contentId, "public", true, false);
+        return conversation;
+      }) as any;
+    }
     return this.actionWrapperAnon(req, res, async () => {
-      if (this.isPersonNote(contentType) && !this.canViewPersonNotes(this.authUser(), contentType)) return this.json({}, 401);
-      return await this.getOrCreate(churchId, contentType, contentId, "public", true);
+      const au = this.authUser();
+      if (au?.churchId === churchId) return await this.getOrCreate(churchId, contentType, contentId, "public", true, false);
+      const result = await this.repos.conversation.loadCurrent(churchId, contentType, contentId);
+      if (!result) return this.json({}, 404);
+      const conv = this.repos.conversation.convertToModel(result);
+      if (!this.isAnonPublicConversation(conv)) return this.json({}, 401);
+      return conv;
     }) as any;
   }
 
@@ -250,8 +276,8 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
-  private async getOrCreate(churchId: string, contentType: string, contentId: string, visibility: string, allowAnonymousPosts: boolean) {
-    const CONTENT_ID = contentId.length > 11 ? EncryptionHelper.decrypt(contentId.toString()) : contentId;
+  private async getOrCreate(churchId: string, contentType: string, contentId: string, visibility: string, allowAnonymousPosts: boolean, decryptContentId: boolean) {
+    const CONTENT_ID = decryptContentId && contentId.length > 11 ? EncryptionHelper.decrypt(contentId.toString()) : contentId;
     let result: Conversation = await this.repos.conversation.loadCurrent(churchId, contentType, CONTENT_ID);
     if (result === null) {
       result = {

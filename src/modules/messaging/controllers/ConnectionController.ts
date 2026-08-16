@@ -21,6 +21,7 @@ export class ConnectionController extends MessagingBaseController {
   @httpGet("/:churchId/:conversationId")
   public async load(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (!(await this.canAccessConnection(churchId, conversationId))) return this.json([], 401);
       const data = await this.repos.connection.loadForConversation(churchId, conversationId);
       const connections = this.repos.connection.convertAllToModel(data);
       return connections;
@@ -30,10 +31,16 @@ export class ConnectionController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Connection[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      const au = this.authUser();
       const promises: Promise<Connection>[] = [];
       for (const connection of req.body) {
+        const convData = connection.conversationId ? await this.repos.conversation.loadByIdOnly(connection.conversationId) : null;
+        const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
+        if (conv && this.isAnonPublicConversation(conv)) connection.churchId = conv.churchId;
+        else if (au && conv && au.churchId === conv.churchId) connection.churchId = conv.churchId;
+        else return this.json({}, 401);
         if (connection.personId === undefined) connection.personId = null;
-        await this.updateAnonName(connection); // update 'Anonymous' names to Anonymous_1, Anonymous_2,..so on.
+        await this.updateAnonName(connection);
         promises.push(
           this.repos.connection
             .save(connection)
@@ -65,6 +72,7 @@ export class ConnectionController extends MessagingBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (!(await this.canAccessConnection(churchId, conversationId))) return this.json({}, 401);
       await this.repos.connection.deleteForRoom(churchId, conversationId, socketId);
       await DeliveryHelper.sendAttendance(churchId, conversationId);
       return { success: true };
@@ -75,8 +83,16 @@ export class ConnectionController extends MessagingBaseController {
   public async setName(req: express.Request<{}, {}, { socketId: string; name: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const connections = await this.repos.connection.loadBySocketId(req.body.socketId);
+      const au = this.authUser();
+      const allowed: Connection[] = [];
+      for (const connection of connections) {
+        const convData = await this.repos.conversation.loadById(connection.churchId, connection.conversationId);
+        const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
+        if (this.isAnonPublicConversation(conv) || (au && conv && au.churchId === conv.churchId)) allowed.push(connection);
+      }
+      if (connections.length > 0 && allowed.length === 0) return this.json({}, 401);
       const promises: Promise<Connection>[] = [];
-      connections.forEach((connection: Connection) => {
+      allowed.forEach((connection: Connection) => {
         connection.displayName = req.body.name;
         promises.push(
           this.repos.connection.save(connection).then(async (c) => {
@@ -87,5 +103,14 @@ export class ConnectionController extends MessagingBaseController {
       });
       return this.repos.connection.convertAllToModel(await Promise.all(promises));
     });
+  }
+
+  private async canAccessConnection(churchId: string, conversationId: string) {
+    const data = await this.repos.conversation.loadById(churchId, conversationId);
+    if (!data) return false;
+    const conv = this.repos.conversation.convertToModel(data);
+    if (this.isAnonPublicConversation(conv)) return true;
+    const au = this.authUser();
+    return !!(au && au.churchId === conv.churchId);
   }
 }
