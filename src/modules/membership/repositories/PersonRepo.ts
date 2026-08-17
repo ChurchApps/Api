@@ -263,6 +263,18 @@ export class PersonRepo {
       .execute() as any;
   }
 
+  // Same as searchEmail but keeps deleted rows, so a returning user can be restored instead of duplicated.
+  // Only for callers that are allowed to undelete (see PersonHelper.getPerson allowRestore); anon callers
+  // must use searchEmail so a deleted person can never be resurrected from the outside.
+  public async searchEmailIncludingRemoved(churchId: string, email: string): Promise<any[]> {
+    return getDb().selectFrom("people").selectAll()
+      .where("churchId", "=", churchId)
+      .where("email", "like", "%" + email + "%")
+      .orderBy("removed", "asc") // prefer a live person over a deleted duplicate
+      .limit(100)
+      .execute() as any;
+  }
+
   public async loadAttendees(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, categoryName: string, groupId: string, startDate: Date, endDate: Date) {
     const conditions: ReturnType<typeof sql>[] = [];
     conditions.push(sql`p.churchId = ${churchId} AND v.visitDate BETWEEN ${startDate as any} AND ${endDate as any}`);

@@ -10,9 +10,13 @@ export class PersonHelper extends BasePersonHelper {
   private static async repos(): Promise<Repos> {
     return await RepoManager.getRepos<Repos>("membership");
   }
-  public static async getPerson(churchId: string, email: string, firstName: string, lastName: string, canEdit: boolean) {
+  public static async getPerson(churchId: string, email: string, firstName: string, lastName: string, canEdit: boolean, allowRestore = true) {
     const repos = await this.repos();
-    const data: Person[] = (await repos.person.searchEmail(churchId, email)) as Person[];
+    // searchEmail hides removed people, so a caller without allowRestore never even loads a deleted
+    // person - it creates a fresh one instead. Only the restoring path looks at removed rows.
+    const data: Person[] = (allowRestore
+      ? await repos.person.searchEmailIncludingRemoved(churchId, email)
+      : await repos.person.searchEmail(churchId, email)) as Person[];
     if (data.length === 0) {
       const household: Household = { churchId, name: lastName };
       await repos.household.save(household);
@@ -27,11 +31,11 @@ export class PersonHelper extends BasePersonHelper {
       newPerson = await repos.person.save(newPerson);
       data.push(await repos.person.load(newPerson.churchId, newPerson.id));
     }
-    const result = (await this.repos()).person.convertAllToModelWithPermissions(churchId, data, canEdit);
+    const result = repos.person.convertAllToModelWithPermissions(churchId, data, canEdit);
     const person = result[0];
-    if (person.removed) {
+    if (allowRestore && person.removed) {
       person.removed = false;
-      await (await this.repos()).person.restore(person.churchId, person.id);
+      await repos.person.restore(person.churchId, person.id);
     }
     return person;
   }
