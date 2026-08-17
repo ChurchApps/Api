@@ -201,7 +201,7 @@ describe("SsoHelper.findOrCreateUser", () => {
     expect(result.user.id).toBe("new1");
     expect(result.user.email).toBe("new@example.com");
     expect(result.user.password).toBeTruthy();
-    expect(result.user.authGuid).toBeTruthy();
+    expect(result.user.authGuid).toBeUndefined();
     expect(createForNewUser).toHaveBeenCalledWith("new1", "new@example.com");
   });
 });

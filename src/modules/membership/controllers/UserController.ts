@@ -6,9 +6,7 @@ import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, MauticHelper } from "../helpers/index.js";
-import { v4 } from "uuid";
-import { ChurchHelper } from "../helpers/index.js";
+import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, MauticHelper, ChurchHelper } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 
@@ -65,10 +63,7 @@ export class UserController extends MembershipBaseController {
           user = await AuthenticatedUser.loadUserByJwt(req.body.jwt, this.repos);
         } else if (req.body.authGuid !== undefined && req.body.authGuid !== "") {
           user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
-          if (user !== null) {
-            // user.authGuid = "";
-            // await this.repos.user.save(user);
-          }
+          if (user !== null) user = await this.consumeLoginGuid(user, req.body.authGuid);
         } else {
           user = await this.repos.user.loadByEmail(req.body.email.trim());
           if (user !== null) {
@@ -96,7 +91,7 @@ export class UserController extends MembershipBaseController {
           if (result === null) return this.denyAccess(["No permissions"]);
           else {
             user.lastLogin = new Date();
-            this.repos.user.save(user);
+            await this.repos.user.save(user);
             MauticHelper.trackLogin(user.email).catch(() => {});
             const ip = AuditLogHelper.getClientIp(req);
             const selectedChurch = userChurches[0];
@@ -113,6 +108,16 @@ export class UserController extends MembershipBaseController {
         return this.error([e.toString()]);
       }
     });
+  }
+
+  // Burns the login guid before anything else awaits, so a concurrent request can never observe it as unused.
+  // The swap is a single conditional UPDATE, so exactly one of N racing requests wins and the rest are denied.
+  private async consumeLoginGuid(user: User, rawGuid: string): Promise<User> {
+    if (!AuthGuidHelper.canLogin(user.authGuid)) return null;
+    const marked = AuthGuidHelper.markLoginUsed(user.authGuid, rawGuid);
+    if (!(await this.repos.user.consumeAuthGuid(user.id, user.authGuid, marked))) return null;
+    user.authGuid = marked;
+    return user;
   }
 
   private async getUserChurches(id: string): Promise<LoginUserChurch[]> {
@@ -219,7 +224,6 @@ export class UserController extends MembershipBaseController {
         user.lastLogin = user.registrationDate;
         const tempPassword = UniqueIdHelper.shortId();
         user.password = bcrypt.hashSync(tempPassword, 10);
-        user.authGuid = v4();
         user = await this.repos.user.save(user);
 
         const code = generateVerificationCode();
@@ -230,6 +234,7 @@ export class UserController extends MembershipBaseController {
         await UserChurchHelper.createForNewUser(user.id, user.email);
       }
       user.password = null;
+      user.authGuid = null;
       (user as any).isNewUser = isNewUser;
       return this.json(user, 200);
     });
@@ -243,13 +248,15 @@ export class UserController extends MembershipBaseController {
 
       const register: RegisterUserRequest = req.body;
       let user: User = await this.repos.user.loadByEmail(register.email);
+      let minted: { raw: string; stored: string } | null = null;
 
       if (user) return res.status(400).json({ errors: ["user already exists"] });
       else {
         const regStart = Date.now();
         const tempPassword = UniqueIdHelper.shortId();
         user = { email: register.email, firstName: register.firstName, lastName: register.lastName };
-        user.authGuid = v4();
+        minted = Environment.isMailConfigured ? null : AuthGuidHelper.mint();
+        if (minted) user.authGuid = minted.stored;
         user.registrationDate = new Date();
         user.password = bcrypt.hashSync(tempPassword, 10);
         console.log("Register: bcrypt", Date.now() - regStart, "ms");
@@ -308,9 +315,10 @@ export class UserController extends MembershipBaseController {
         console.log("Register: total", Date.now() - regStart, "ms");
       }
       user.password = null;
+      user.authGuid = null;
       const mailConfigured = Environment.isMailConfigured;
       const response: any = { ...user, mailConfigured };
-      if (!mailConfigured) response.authGuid = user.authGuid;
+      if (!mailConfigured && minted) response.authGuid = minted.raw;
       return this.json(response, 200);
     });
   }
@@ -320,7 +328,7 @@ export class UserController extends MembershipBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       try {
         const user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
-        if (user !== null) {
+        if (user !== null && AuthGuidHelper.canSetPassword(user.authGuid)) {
           user.authGuid = "";
           const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
           user.password = hashedPass;
@@ -355,9 +363,11 @@ export class UserController extends MembershipBaseController {
         const user = await this.repos.user.loadByEmail(req.body.userEmail);
         if (user === null) return this.json({ emailed: false }, 200);
         else {
+          user.authGuid = "";
           const code = generateVerificationCode();
           const codeHash = bcrypt.hashSync(code, 10);
           const promises = [] as Promise<any>[];
+          promises.push(this.repos.user.save(user));
           promises.push(this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS)));
           promises.push(UserHelper.sendForgotEmail(user.email, code, req.body.appName, req.body.appUrl));
           await Promise.all(promises);
@@ -400,11 +410,12 @@ export class UserController extends MembershipBaseController {
         const match = await bcrypt.compare(req.body.code, user.verificationCode);
         if (!match) return this.json({ errors: ["invalid code"] }, 400);
 
-        user.authGuid = user.authGuid || v4();
+        const minted = AuthGuidHelper.mint();
+        user.authGuid = minted.stored;
         await this.repos.user.save(user);
         await this.repos.user.clearVerification(user.id);
         AuditLogHelper.log(this.repos, "", user.id, "security", "code_verified", "user", user.id, { email: user.email }, ip);
-        return this.json({ authGuid: user.authGuid }, 200);
+        return this.json({ authGuid: minted.raw }, 200);
       } catch (e) {
         if (Environment.currentEnvironment === "dev") {
           throw e;
@@ -498,6 +509,7 @@ export class UserController extends MembershipBaseController {
         if (!req.body.currentPassword || !stored || !bcrypt.compareSync(req.body.currentPassword, stored)) return this.denyAccess(["Incorrect password"]);
         const hashedPass = bcrypt.hashSync(req.body.newPassword, 10);
         user.password = hashedPass;
+        user.authGuid = "";
         user = await this.repos.user.save(user);
         const ip = AuditLogHelper.getClientIp(req);
         AuditLogHelper.log(this.repos, au.churchId, au.id, "security", "password_changed", "user", au.id, { email: user.email, method: "updatePassword" }, ip);
@@ -586,8 +598,9 @@ export class UserController extends MembershipBaseController {
       const user = await this.repos.user.loadByEmail(email);
       if (user) {
         isExistingUser = true;
-        user.authGuid = v4();
-        loginLink = `/login?auth=${user.authGuid}`;
+        const minted = AuthGuidHelper.mint();
+        user.authGuid = minted.stored;
+        loginLink = `/login?auth=${minted.raw}`;
         await Promise.all([
           this.repos.user.save(user),
           UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser, inviterEmail)
