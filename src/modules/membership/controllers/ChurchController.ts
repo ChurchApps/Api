@@ -110,7 +110,7 @@ export class ChurchController extends MembershipBaseController {
           const data = await this.repos.church.loadBySubDomain(sub);
           if (data) {
             const church = this.repos.church.convertToModel(data);
-            result = { id: church.id, name: church.name, subDomain: church.subDomain };
+            result = { id: church.id, name: church.name, subDomain: church.subDomain, firstDayOfWeek: church.firstDayOfWeek };
           } else {
             // Fall back to a site subdomain — resolve to its owning church, echoing the queried slug.
             const site = await this.repos.site.loadBySubDomain(sub);
@@ -119,7 +119,7 @@ export class ChurchController extends MembershipBaseController {
               // Archived churches are offline — their sites must not resolve either.
               if (ownerData && !ownerData.archivedDate) {
                 const church = this.repos.church.convertToModel(ownerData);
-                result = { id: church.id, name: church.name, subDomain: sub, siteId: site.id };
+                result = { id: church.id, name: church.name, subDomain: sub, siteId: site.id, firstDayOfWeek: church.firstDayOfWeek };
               }
             }
           }
@@ -127,7 +127,7 @@ export class ChurchController extends MembershipBaseController {
           const data = await this.repos.church.loadById(req.query.id.toString());
           if (data) {
             const church = this.repos.church.convertToModel(data);
-            result = { id: church.id, name: church.name, subDomain: church.subDomain };
+            result = { id: church.id, name: church.name, subDomain: church.subDomain, firstDayOfWeek: church.firstDayOfWeek };
           }
         }
         return this.json(result, 200);

@@ -13,6 +13,7 @@ export class Church {
   public latitude?: number;
   public longitude?: number;
   public timeZone?: string;
+  public firstDayOfWeek?: number;
 
   public settings?: any;
 }
