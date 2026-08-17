@@ -10,6 +10,13 @@ jest.mock("../../helpers/index", () => {
   const { AuthGuidHelper } = jest.requireActual("../../helpers/AuthGuidHelper");
   return {
     AuthGuidHelper,
+    // These tests exercise authGuid, not throttling, so the limiter is stubbed open.
+    LoginRateLimiter: {
+      getClientIp: () => "1.1.1.1",
+      allow: jest.fn(async () => true),
+      recordFailure: jest.fn(async () => {}),
+      clearFailures: jest.fn(async () => {})
+    },
     UserHelper: { sendWelcomeEmail: jest.fn(), sendForgotEmail: jest.fn(), sendInviteEmail: jest.fn() },
     UserChurchHelper: { createForNewUser: jest.fn() },
     UniqueIdHelper: { shortId: () => "tmpPass" },

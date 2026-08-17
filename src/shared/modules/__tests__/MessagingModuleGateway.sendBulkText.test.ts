@@ -3,7 +3,8 @@ import "reflect-metadata";
 jest.mock("../../infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn() } }));
 jest.mock("../../../modules/messaging/helpers/MergeFieldHelper.js", () => ({ MergeFieldHelper: { resolve: (s: string) => s } }));
 jest.mock("../../../modules/messaging/helpers/NotificationHelper.js", () => ({ NotificationHelper: { createNotifications: jest.fn() } }));
-jest.mock("@churchapps/apihelper", () => ({ EncryptionHelper: { decrypt: (x: string) => x } }));
+// EnvironmentBase is needed because sendBulkText dynamically imports TextingConfigHelper -> Environment.
+jest.mock("@churchapps/apihelper", () => ({ EncryptionHelper: { decrypt: (x: string) => x }, EnvironmentBase: class {} }));
 
 const provider = { sendBulk: jest.fn(), capabilities: {} };
 jest.mock("@churchapps/texting", () => ({ getProvider: () => provider }));
