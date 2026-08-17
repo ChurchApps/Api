@@ -38,6 +38,14 @@ export class ConnectionController extends MessagingBaseController {
       // a 401, so a batch could half-populate the room's presence set.
       const planned: { connection: Connection; before: Connection }[] = [];
       for (const connection of req.body || []) {
+        // "alerts" is a virtual per-person room with no conversation row; only its owner may join it.
+        if (connection.conversationId === "alerts") {
+          if (!this.isAuthenticated(au)) return this.json({}, 401);
+          connection.churchId = au.churchId;
+          connection.personId = au.personId || null;
+          planned.push({ connection, before: await this.loadOwnedConnection(connection) });
+          continue;
+        }
         const convData = connection.conversationId ? await this.repos.conversation.loadByIdOnly(connection.conversationId) : null;
         const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
         if (!conv) return this.json({}, 401);

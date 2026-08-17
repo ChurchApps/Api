@@ -126,10 +126,12 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
-      if (this.isPersonNote(contentType) && !this.canViewPersonNotes(this.authUser(), contentType)) return this.json([], 401) as any;
+      if (this.isPersonNote(contentType)) {
+        if (!this.canViewPersonNotes(this.authUser(), contentType)) return this.json([], 401) as any;
+      }
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
       const result = this.repos.conversation.convertAllToModel(data as any[]);
-      if (result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
+      if (!this.isPersonNote(contentType) && !this.isSameChurch(this.authUser(), churchId) && result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
       return result;
     }) as any;
   }
@@ -140,8 +142,9 @@ export class ConversationController extends MessagingBaseController {
       const data = await this.repos.conversation.loadById(churchId, id);
       if (!data) return this.json({}, 401);
       const result = this.repos.conversation.convertToModel(data);
-      if (this.isPersonNote(result?.contentType) && !this.canViewPersonNotes(this.authUser(), result.contentType)) return this.json({}, 401);
-      if (!this.isAnonPublicConversation(result)) return this.json({}, 401);
+      if (this.isPersonNote(result?.contentType)) {
+        if (!this.canViewPersonNotes(this.authUser(), result.contentType)) return this.json({}, 401);
+      } else if (!this.isAnonPublicConversation(result) && !this.isSameChurch(this.authUser(), result.churchId)) return this.json({}, 401);
       return result;
     }) as any;
   }
@@ -264,11 +267,19 @@ export class ConversationController extends MessagingBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const au = this.authUser();
       if (this.isSameChurch(au, churchId)) return await this.getOrCreate(churchId, contentType, contentId, "public", true, false);
-      const result = await this.repos.conversation.loadCurrent(churchId, contentType, contentId);
-      if (!result) return this.json({}, 404);
-      const conv = this.repos.conversation.convertToModel(result);
-      if (!this.isAnonPublicConversation(conv)) return this.json({}, 401);
-      return conv;
+      const existing = await this.repos.conversation.loadCurrent(churchId, contentType, contentId);
+      if (existing) {
+        const conv = this.repos.conversation.convertToModel(existing);
+        if (!this.isAnonPublicConversation(conv)) return this.json({}, 401);
+        return conv;
+      }
+      // Anonymous viewers may lazily create the public livestream room, but only for a real church
+      // (the /ensure hole this guards against was rooms created under garbage churchIds).
+      // Lazy import: the gateway chain pulls in DB/env modules the unit-test harness doesn't stub.
+      const { getMembershipModuleGateway } = await import("../../../shared/modules/MembershipModuleGateway.js");
+      const church = await getMembershipModuleGateway().loadChurch(churchId);
+      if (!church) return this.json({}, 404);
+      return await this.getOrCreate(churchId, contentType, contentId, "public", true, false);
     }) as any;
   }
 

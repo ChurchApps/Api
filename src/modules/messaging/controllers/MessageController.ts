@@ -27,8 +27,9 @@ export class MessageController extends MessagingBaseController {
       const data = await this.repos.conversation.loadById(churchId, conversationId);
       if (!data) return this.json([], 401);
       const conv = this.repos.conversation.convertToModel(data);
-      if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json([], 401);
-      if (!this.isAnonPublicConversation(conv)) return this.json([], 401);
+      if (this.isPersonNote(conv?.contentType)) {
+        if (!this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json([], 401);
+      } else if (!this.isAnonPublicConversation(conv) && !this.isSameChurch(this.authUser(), conv.churchId)) return this.json([], 401);
       const messages: Message[] = await this.repos.message.loadForConversation(churchId, conversationId);
       return this.repos.message.convertAllToModel(messages);
     }) as any;
@@ -129,8 +130,9 @@ export class MessageController extends MessagingBaseController {
       const convData = await this.repos.conversation.loadById(churchId, message.conversationId);
       if (!convData) return this.json({}, 401);
       const conv = this.repos.conversation.convertToModel(convData);
-      if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json({}, 401);
-      if (!this.isAnonPublicConversation(conv)) return this.json({}, 401);
+      if (this.isPersonNote(conv?.contentType)) {
+        if (!this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json({}, 401);
+      } else if (!this.isAnonPublicConversation(conv) && !this.isSameChurch(this.authUser(), conv.churchId)) return this.json({}, 401);
       return message;
     }) as any;
   }

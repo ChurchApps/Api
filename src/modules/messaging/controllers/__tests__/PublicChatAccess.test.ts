@@ -10,6 +10,8 @@ jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: jest.fn() }, 
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn(), sendAttendance: jest.fn(), sendBlockedIps: jest.fn() } }));
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
 jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
+const loadChurch = jest.fn(async (id: string) => (id === "c1" ? { id } : null));
+jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch }) }));
 
 import { ConversationController } from "../ConversationController.js";
 import { MessageController } from "../MessageController.js";
@@ -101,10 +103,18 @@ describe("ConversationController.current", () => {
     expect(decrypt).not.toHaveBeenCalled();
   });
 
-  it("404s for anon when the streamingLive room is missing", async () => {
+  it("lazily creates the public streamingLive room for anon when the church is real", async () => {
     const repos = conversationRepos({ current: null });
     const controller = attach(new ConversationController(), repos);
     const result = await (controller as any).current("c1", "streamingLive", "svc1", {}, {});
+    expect(repos.conversation.save).toHaveBeenCalled();
+    expect(result).toMatchObject({ contentType: "streamingLive", visibility: "public", allowAnonymousPosts: true });
+  });
+
+  it("404s for anon when the streamingLive room is missing and the church does not exist", async () => {
+    const repos = conversationRepos({ current: null });
+    const controller = attach(new ConversationController(), repos);
+    const result = await (controller as any).current("ghost", "streamingLive", "svc1", {}, {});
     expect(result.status).toBe(404);
     expect(repos.conversation.save).not.toHaveBeenCalled();
   });
