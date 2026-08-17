@@ -1,8 +1,6 @@
 import "reflect-metadata";
 jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../helpers/index", () => ({
-  Permissions: { forms: { admin: "formsAdmin", edit: "formsEdit" } }
-}));
+jest.mock("../../helpers/index", () => ({ Permissions: { forms: { admin: "formsAdmin", edit: "formsEdit" } } }));
 jest.mock("../../models/index", () => ({}));
 
 import { FormController } from "../FormController.js";

@@ -24,8 +24,11 @@ export class MessageController extends MessagingBaseController {
   @httpGet("/catchup/:churchId/:conversationId")
   public async catchup(@requestParam("churchId") churchId: string, @requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message[]> {
     return this.actionWrapperAnon(req, res, async () => {
-      const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(churchId, conversationId));
+      const data = await this.repos.conversation.loadById(churchId, conversationId);
+      if (!data) return this.json([], 401);
+      const conv = this.repos.conversation.convertToModel(data);
       if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json([], 401);
+      if (!this.isAnonPublicConversation(conv)) return this.json([], 401);
       const messages: Message[] = await this.repos.message.loadForConversation(churchId, conversationId);
       return this.repos.message.convertAllToModel(messages);
     }) as any;
@@ -36,9 +39,11 @@ export class MessageController extends MessagingBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const promises: Promise<Message>[] = [];
       for (const message of req.body) {
-        const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(message.churchId, message.conversationId));
-        if (!conv?.id || conv.allowAnonymousPosts !== true || this.isPersonNote(conv.contentType)) return this.json({ error: "Anonymous posting not allowed" }, 401);
+        const convData = await this.repos.conversation.loadById(message.churchId, message.conversationId);
+        const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
+        if (!conv?.id || conv.allowAnonymousPosts !== true || !this.isAnonPublicConversation(conv) || this.isPersonNote(conv.contentType)) return this.json({ error: "Anonymous posting not allowed" }, 401);
         message.personId = null;
+        message.churchId = conv.churchId;
       }
       req.body.forEach((message) => {
         promises.push(
@@ -118,11 +123,14 @@ export class MessageController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Message> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.message.loadById(churchId, id);
+      if (!data) return this.json({}, 401);
       const message = this.repos.message.convertToModel(data);
-      if (message?.conversationId) {
-        const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(churchId, message.conversationId));
-        if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json({}, 401);
-      }
+      if (!message?.conversationId) return this.json({}, 401);
+      const convData = await this.repos.conversation.loadById(churchId, message.conversationId);
+      if (!convData) return this.json({}, 401);
+      const conv = this.repos.conversation.convertToModel(convData);
+      if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json({}, 401);
+      if (!this.isAnonPublicConversation(conv)) return this.json({}, 401);
       return message;
     }) as any;
   }

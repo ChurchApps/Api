@@ -72,6 +72,11 @@ export class ConversationRepo {
       .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
+  public async loadByIdOnly(id: string) {
+    return (await getDb().selectFrom("conversations").selectAll()
+      .where("id", "=", id).executeTakeFirst()) ?? null;
+  }
+
   public async loadForContent(churchId: string, contentType: string, contentId: string) {
     return getDb().selectFrom("conversations").selectAll()
       .where("churchId", "=", churchId)
