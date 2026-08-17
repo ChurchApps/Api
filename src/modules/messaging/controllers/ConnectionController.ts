@@ -32,34 +32,45 @@ export class ConnectionController extends MessagingBaseController {
   public async save(req: express.Request<{}, {}, Connection[]>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const au = this.authUser();
-      const promises: Promise<Connection>[] = [];
-      for (const connection of req.body) {
+
+      // Pass 1 — authorize and resolve every entry before writing any of them. Rejecting from inside
+      // the write loop left the earlier connections saved (and their attendance already broadcast) on
+      // a 401, so a batch could half-populate the room's presence set.
+      const planned: { connection: Connection; before: Connection }[] = [];
+      for (const connection of req.body || []) {
         const convData = connection.conversationId ? await this.repos.conversation.loadByIdOnly(connection.conversationId) : null;
         const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
-        if (conv && this.isAnonPublicConversation(conv)) connection.churchId = conv.churchId;
-        else if (au && conv && au.churchId === conv.churchId) connection.churchId = conv.churchId;
-        else return this.json({}, 401);
+        if (!conv) return this.json({}, 401);
+        if (!this.isAnonPublicConversation(conv) && !this.isSameChurch(au, conv.churchId)) return this.json({}, 401);
+        connection.churchId = conv.churchId;
         if (connection.personId === undefined) connection.personId = null;
-        await this.updateAnonName(connection);
-        promises.push(
-          this.repos.connection
-            .save(connection)
-            .then(async (c) => {
-              await DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
-              await DeliveryHelper.sendBlockedIps(c.churchId, c.conversationId);
-              return c;
-            })
-            .catch((error) => {
-              console.error("❌ Failed to save connection:", error);
-              throw error;
-            })
-        );
+        planned.push({ connection, before: await this.loadOwnedConnection(connection) });
       }
 
-      const savedConnections = await Promise.all(promises);
-      const result = this.repos.connection.convertAllToModel(savedConnections);
+      // Pass 2 — writes only, one at a time so a failure part-way through can be compensated instead
+      // of leaving the room holding a partial set of connections.
+      const applied: { saved: Connection; before: Connection }[] = [];
+      try {
+        for (const { connection, before } of planned) {
+          await this.updateAnonName(connection);
+          applied.push({ saved: await this.repos.connection.save(connection), before });
+        }
+      } catch (error) {
+        console.error("❌ Failed to save connection:", error);
+        await this.undoConnectionWrites(applied);
+        throw error;
+      }
 
-      return result;
+      const savedConnections = applied.map((a) => a.saved);
+      // Broadcast once per room, and only once the whole set is durable.
+      const rooms = new Map<string, Connection>();
+      savedConnections.forEach((c) => rooms.set(c.churchId + "|" + c.conversationId, c));
+      for (const c of rooms.values()) {
+        await DeliveryHelper.sendAttendance(c.churchId, c.conversationId);
+        await DeliveryHelper.sendBlockedIps(c.churchId, c.conversationId);
+      }
+
+      return this.repos.connection.convertAllToModel(savedConnections);
     });
   }
 
@@ -88,7 +99,7 @@ export class ConnectionController extends MessagingBaseController {
       for (const connection of connections) {
         const convData = await this.repos.conversation.loadById(connection.churchId, connection.conversationId);
         const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
-        if (this.isAnonPublicConversation(conv) || (au && conv && au.churchId === conv.churchId)) allowed.push(connection);
+        if (this.isAnonPublicConversation(conv) || this.isSameChurch(au, conv?.churchId)) allowed.push(connection);
       }
       if (connections.length > 0 && allowed.length === 0) return this.json({}, 401);
       const promises: Promise<Connection>[] = [];
@@ -110,7 +121,34 @@ export class ConnectionController extends MessagingBaseController {
     if (!data) return false;
     const conv = this.repos.conversation.convertToModel(data);
     if (this.isAnonPublicConversation(conv)) return true;
-    const au = this.authUser();
-    return !!(au && au.churchId === conv.churchId);
+    return this.isSameChurch(this.authUser(), conv.churchId);
+  }
+
+  // A client-supplied connection id is only honoured when it already names this socket's connection in
+  // this room — otherwise any anonymous caller could rename or claim another viewer's connection by
+  // guessing its id. An unrecognized id is dropped (so a client reconnecting with a stale id still
+  // joins) and doubles as the before-image for undoConnectionWrites.
+  private async loadOwnedConnection(connection: Connection): Promise<Connection> {
+    if (!connection.id) return null;
+    const data = await this.repos.connection.loadById(connection.churchId, connection.id);
+    const existing = data ? this.repos.connection.convertToModel(data) : null;
+    if (existing && existing.conversationId === connection.conversationId && existing.socketId === connection.socketId) return existing;
+    connection.id = undefined;
+    return null;
+  }
+
+  // Presence has no transaction to roll back to, so compensate by hand: drop the rows this request
+  // created and restore the ones it updated. Best-effort — a failed undo is logged, never rethrown, so
+  // the original error is what the caller sees, and the stale row that ConnectionRepo.create evicts for
+  // a reused socket stays evicted (that socket is reconnecting either way).
+  private async undoConnectionWrites(applied: { saved: Connection; before: Connection }[]) {
+    for (const { saved, before } of [...applied].reverse()) {
+      try {
+        if (before) await this.repos.connection.save(before);
+        else await this.repos.connection.delete(saved.churchId, saved.id);
+      } catch (error) {
+        console.error("❌ Failed to roll back connection:", saved?.id, error);
+      }
+    }
   }
 }

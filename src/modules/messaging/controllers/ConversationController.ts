@@ -231,11 +231,15 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
-  // authz-exempt: churchId comes from the JWT; only streamingLive rooms are created
+  // authz-exempt: self-service — any member may ensure their own church's public livestream room, and
+  // the room is created under au.churchId. actionWrapper does NOT reject anonymous callers (it passes
+  // the action an empty AuthenticatedUser), so isAuthenticated is what makes "from the JWT" true here;
+  // without it an anonymous POST created rooms under churchId "".
   @httpPost("/ensure")
   public async ensure(req: express.Request<{}, {}, { contentType?: string; contentId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (req.body.contentType !== "streamingLive" || !req.body.contentId) return this.json({}, 401);
+      if (!this.isAuthenticated(au)) return this.json({}, 401);
+      if (req.body?.contentType !== "streamingLive" || !req.body?.contentId) return this.json({}, 401);
       return await this.getOrCreate(au.churchId, "streamingLive", req.body.contentId, "public", true, false);
     }) as any;
   }
@@ -250,7 +254,7 @@ export class ConversationController extends MessagingBaseController {
   ): Promise<any> {
     if (contentType !== "streamingLive") {
       return this.actionWrapper(req, res, async (au) => {
-        if (au.churchId !== churchId) return this.json({}, 401);
+        if (!this.isSameChurch(au, churchId)) return this.json({}, 401);
         if (this.isPersonNote(contentType) && !this.canViewPersonNotes(au, contentType)) return this.json({}, 401);
         const conversation = await this.getOrCreate(churchId, contentType, contentId, "public", false, true);
         if (contentType === "streamingLiveHost" && conversation?.contentId) await this.getOrCreate(churchId, "streamingLive", conversation.contentId, "public", true, false);
@@ -259,7 +263,7 @@ export class ConversationController extends MessagingBaseController {
     }
     return this.actionWrapperAnon(req, res, async () => {
       const au = this.authUser();
-      if (au?.churchId === churchId) return await this.getOrCreate(churchId, contentType, contentId, "public", true, false);
+      if (this.isSameChurch(au, churchId)) return await this.getOrCreate(churchId, contentType, contentId, "public", true, false);
       const result = await this.repos.conversation.loadCurrent(churchId, contentType, contentId);
       if (!result) return this.json({}, 404);
       const conv = this.repos.conversation.convertToModel(result);

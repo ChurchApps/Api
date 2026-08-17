@@ -2,19 +2,10 @@ import "reflect-metadata";
 
 const decrypt = jest.fn((s: string) => `decrypted:${s}`);
 
-jest.mock("../MessagingBaseController", () => ({
-  MessagingBaseController: class {
-    json(obj: any, status: number) { return { obj, status }; }
-    isPersonNote(contentType?: string) { return contentType === "person" || contentType === "personConfidential"; }
-    canViewPersonNotes(au: any, contentType?: string) {
-      if (!au) return false;
-      return au.checkAccess(contentType === "personConfidential" ? "peopleViewConfidentialNotes" : "peopleEdit");
-    }
-    isAnonPublicConversation(conv: { contentType?: string; allowAnonymousPosts?: boolean; visibility?: string }) {
-      return !!conv && conv.contentType === "streamingLive" && conv.allowAnonymousPosts === true && conv.visibility === "public";
-    }
-  }
-}));
+// Only the infrastructure is stubbed — MessagingBaseController itself is the real one, so these tests
+// exercise the actual isAnonPublicConversation / isAuthenticated / isSameChurch gates.
+jest.mock("../../../../shared/infrastructure/index", () => ({ BaseController: class { constructor(_module?: string) {} } }));
+jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: jest.fn() }, EncryptionHelper: { decrypt } }));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn(), sendAttendance: jest.fn(), sendBlockedIps: jest.fn() } }));
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
@@ -31,12 +22,17 @@ const dmConv = { id: "dm1", churchId: "c1", contentType: "privateMessage", conte
 const hostConv = { id: "host1", churchId: "c1", contentType: "streamingLiveHost", contentId: "svc1", allowAnonymousPosts: true, visibility: "public" };
 const legacyFlag = { id: "leg1", churchId: "c1", contentType: "group", contentId: "g1", allowAnonymousPosts: true, visibility: "public" };
 
+// What CustomBaseController.authUser() hands back with no Authorization header: an AuthenticatedUser
+// built from an empty Principal, i.e. blank strings rather than null.
+const ANON_AU = { id: "", churchId: "", personId: "", checkAccess: () => false };
+const memberAu = (churchId = "c1") => ({ id: "u1", churchId, personId: "p1", checkAccess: () => false });
+
 function attach(controller: any, repos: any, opts: any = {}) {
-  const au = opts.au === undefined ? null : opts.au;
+  const au = opts.au ?? ANON_AU;
   controller.repos = repos;
-  controller.actionWrapper = opts.requireAuthFail
-    ? () => ({ obj: {}, status: 401 })
-    : (_req: any, _res: any, action: any) => action(opts.wrapperAu ?? { churchId: "c1", checkAccess: () => false });
+  // Production actionWrapper does NOT reject anonymous callers — it runs the action with the empty
+  // AuthenticatedUser above. Modelling that is the whole point: handlers must check the JWT themselves.
+  controller.actionWrapper = (_req: any, _res: any, action: any) => action(au);
   controller.actionWrapperAnon = (_req: any, _res: any, action: any) => action();
   controller.authUser = () => au;
   controller.json = (obj: any, status: number) => ({ obj, status });
@@ -72,13 +68,17 @@ function messageRepos(opts: any = {}) {
 }
 
 function connectionRepos(opts: any = {}) {
+  let created = 0;
   return {
     ...conversationRepos(opts),
     connection: {
       loadForConversation: jest.fn(async () => opts.connections ?? [{ id: "cn1", displayName: "Anonymous_1" }]),
       loadBySocketId: jest.fn(async () => opts.socketConnections ?? []),
-      save: jest.fn(async (c: any) => ({ ...c, id: c.id || "cnNew" })),
+      loadById: jest.fn(async () => opts.existingConnection ?? null),
+      save: jest.fn(async (c: any) => ({ ...c, id: c.id || `cnNew${++created}` })),
+      delete: jest.fn(async () => undefined),
       deleteForRoom: jest.fn(async () => undefined),
+      convertToModel: (c: any) => c,
       convertAllToModel: (rows: any[]) => rows
     }
   };
@@ -112,7 +112,7 @@ describe("ConversationController.current", () => {
   it("rejects anon /current for group, person, and privateMessage", async () => {
     for (const contentType of ["group", "person", "privateMessage"]) {
       const repos = conversationRepos();
-      const controller = attach(new ConversationController(), repos, { requireAuthFail: true });
+      const controller = attach(new ConversationController(), repos);
       const result = await (controller as any).current("c1", contentType, "x1", {}, {});
       expect(result.status).toBe(401);
       expect(repos.conversation.save).not.toHaveBeenCalled();
@@ -122,16 +122,24 @@ describe("ConversationController.current", () => {
 
   it("does not decrypt or create streamingLiveHost for anon", async () => {
     const repos = conversationRepos();
-    const controller = attach(new ConversationController(), repos, { requireAuthFail: true });
+    const controller = attach(new ConversationController(), repos);
     const result = await (controller as any).current("c1", "streamingLiveHost", "encrypted-room-id-longer-than-eleven", {}, {});
     expect(result.status).toBe(401);
     expect(decrypt).not.toHaveBeenCalled();
     expect(repos.conversation.save).not.toHaveBeenCalled();
   });
 
+  it("401s an authenticated caller asking for another church's rooms", async () => {
+    const repos = conversationRepos();
+    const controller = attach(new ConversationController(), repos, { au: memberAu("c2") });
+    const result = await (controller as any).current("c1", "group", "g1", {}, {});
+    expect(result.status).toBe(401);
+    expect(repos.conversation.save).not.toHaveBeenCalled();
+  });
+
   it("creates a public livestream room for a same-church authenticated caller", async () => {
     const repos = conversationRepos({ current: null });
-    const controller = attach(new ConversationController(), repos, { au: { churchId: "c1", checkAccess: () => false } });
+    const controller = attach(new ConversationController(), repos, { au: memberAu() });
     const result = await (controller as any).current("c1", "streamingLive", "svc1", {}, {});
     expect(repos.conversation.save).toHaveBeenCalledWith(expect.objectContaining({ contentType: "streamingLive", visibility: "public", allowAnonymousPosts: true, contentId: "svc1" }));
     expect(result.allowAnonymousPosts).toBe(true);
@@ -141,7 +149,7 @@ describe("ConversationController.current", () => {
   it("does not flip flags on an existing livestream row", async () => {
     const existing = { ...publicLive, allowAnonymousPosts: false, visibility: "hidden" };
     const repos = conversationRepos({ current: existing });
-    const controller = attach(new ConversationController(), repos, { au: { churchId: "c1", checkAccess: () => false } });
+    const controller = attach(new ConversationController(), repos, { au: memberAu() });
     const result = await (controller as any).current("c1", "streamingLive", "svc1", {}, {});
     expect(result).toEqual(existing);
     expect(repos.conversation.save).not.toHaveBeenCalled();
@@ -149,8 +157,7 @@ describe("ConversationController.current", () => {
 
   it("ensures a public livestream room when an authenticated host opens host chat", async () => {
     const repos = conversationRepos({ current: null });
-    repos.conversation.loadCurrent = jest.fn(async (_churchId: string, contentType: string) => contentType === "streamingLiveHost" ? null : null);
-    const controller = attach(new ConversationController(), repos, { wrapperAu: { churchId: "c1", checkAccess: () => false } });
+    const controller = attach(new ConversationController(), repos, { au: memberAu() });
     await (controller as any).current("c1", "streamingLiveHost", "encrypted-room-id-longer-than-eleven", {}, {});
     expect(decrypt).toHaveBeenCalledWith("encrypted-room-id-longer-than-eleven");
     expect(repos.conversation.save).toHaveBeenCalledWith(expect.objectContaining({ contentType: "streamingLiveHost", allowAnonymousPosts: false, contentId: "decrypted:encrypted-room-id-longer-than-eleven" }));
@@ -179,16 +186,35 @@ describe("ConversationController.loadByContent / loadById", () => {
 describe("ConversationController.ensure", () => {
   it("creates a public streamingLive room for the JWT church", async () => {
     const repos = conversationRepos({ current: null });
-    const controller = attach(new ConversationController(), repos, { wrapperAu: { churchId: "c1", checkAccess: () => false } });
+    const controller = attach(new ConversationController(), repos, { au: memberAu() });
     await (controller as any).ensure({ body: { contentType: "streamingLive", contentId: "svc1" } }, {});
     expect(repos.conversation.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", contentType: "streamingLive", allowAnonymousPosts: true, visibility: "public" }));
   });
 
-  it("rejects ensure for non-livestream types", async () => {
-    const repos = conversationRepos();
-    const controller = attach(new ConversationController(), repos, { wrapperAu: { churchId: "c1", checkAccess: () => false } });
-    const result = await (controller as any).ensure({ body: { contentType: "group", contentId: "g1" } }, {});
+  // actionWrapper runs the action for anonymous callers too, so without the explicit JWT check this
+  // used to create a streamingLive room under churchId "".
+  it("401s an anonymous caller instead of creating a room", async () => {
+    const repos = conversationRepos({ current: null });
+    const controller = attach(new ConversationController(), repos);
+    const result = await (controller as any).ensure({ body: { contentType: "streamingLive", contentId: "svc1" } }, {});
     expect(result.status).toBe(401);
+    expect(repos.conversation.save).not.toHaveBeenCalled();
+    expect(repos.conversation.loadCurrent).not.toHaveBeenCalled();
+  });
+
+  it("401s a token that carries no church", async () => {
+    const repos = conversationRepos({ current: null });
+    const controller = attach(new ConversationController(), repos, { au: { id: "u1", churchId: "", checkAccess: () => false } });
+    const result = await (controller as any).ensure({ body: { contentType: "streamingLive", contentId: "svc1" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.conversation.save).not.toHaveBeenCalled();
+  });
+
+  it("rejects ensure for non-livestream types and for a missing contentId", async () => {
+    const repos = conversationRepos();
+    const controller = attach(new ConversationController(), repos, { au: memberAu() });
+    expect((await (controller as any).ensure({ body: { contentType: "group", contentId: "g1" } }, {})).status).toBe(401);
+    expect((await (controller as any).ensure({ body: { contentType: "streamingLive" } }, {})).status).toBe(401);
     expect(repos.conversation.save).not.toHaveBeenCalled();
   });
 });
@@ -259,6 +285,74 @@ describe("ConnectionController", () => {
     expect(repos.conversation.loadByIdOnly).toHaveBeenCalledWith("live1");
   });
 
+  // The batch used to be authorized inside the write loop, so entry 1 was already persisted (and its
+  // attendance broadcast) by the time entry 2 was rejected.
+  it("writes nothing when a later entry in the batch is unauthorized", async () => {
+    const repos = connectionRepos();
+    repos.conversation.loadByIdOnly = jest.fn(async (id: string) => (id === "live1" ? publicLive : groupConv));
+    const controller = attach(new ConnectionController(), repos);
+    const result = await (controller as any).save({
+      body: [
+        { conversationId: "live1", socketId: "s1" },
+        { conversationId: "grp1", socketId: "s2" }
+      ]
+    }, {});
+    expect(result.status).toBe(401);
+    expect(repos.connection.save).not.toHaveBeenCalled();
+    expect(DeliveryHelper.sendAttendance).not.toHaveBeenCalled();
+  });
+
+  it("rolls back the rows it created when a later save fails", async () => {
+    const repos = connectionRepos({ byIdOnly: publicLive });
+    let calls = 0;
+    repos.connection.save = jest.fn(async (c: any) => {
+      calls++;
+      if (calls === 2) throw new Error("db down");
+      return { ...c, id: `cn${calls}` };
+    });
+    const controller = attach(new ConnectionController(), repos);
+    await expect((controller as any).save({
+      body: [
+        { conversationId: "live1", socketId: "s1" },
+        { conversationId: "live1", socketId: "s2" }
+      ]
+    }, {})).rejects.toThrow("db down");
+    expect(repos.connection.delete).toHaveBeenCalledTimes(1);
+    expect(repos.connection.delete).toHaveBeenCalledWith("c1", "cn1");
+    expect(DeliveryHelper.sendAttendance).not.toHaveBeenCalled();
+  });
+
+  it("broadcasts attendance once per room, after every row is written", async () => {
+    const repos = connectionRepos({ byIdOnly: publicLive });
+    const controller = attach(new ConnectionController(), repos);
+    await (controller as any).save({
+      body: [
+        { conversationId: "live1", socketId: "s1" },
+        { conversationId: "live1", socketId: "s2" }
+      ]
+    }, {});
+    expect(repos.connection.save).toHaveBeenCalledTimes(2);
+    expect(DeliveryHelper.sendAttendance).toHaveBeenCalledTimes(1);
+    expect(DeliveryHelper.sendAttendance).toHaveBeenCalledWith("c1", "live1");
+    expect(DeliveryHelper.sendBlockedIps).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a connection id that belongs to a different socket instead of updating it", async () => {
+    const repos = connectionRepos({ byIdOnly: publicLive, existingConnection: { id: "victim", churchId: "c1", conversationId: "live1", socketId: "victimSocket", displayName: "Pastor" } });
+    const controller = attach(new ConnectionController(), repos);
+    await (controller as any).save({ body: [{ id: "victim", conversationId: "live1", socketId: "attackerSocket", displayName: "Pastor" }] }, {});
+    expect(repos.connection.save.mock.calls[0][0].id).toBeUndefined();
+    expect(repos.connection.save).toHaveBeenCalledWith(expect.objectContaining({ socketId: "attackerSocket" }));
+  });
+
+  it("keeps a connection id that already belongs to the same socket and room", async () => {
+    const repos = connectionRepos({ byIdOnly: publicLive, existingConnection: { id: "mine", churchId: "c1", conversationId: "live1", socketId: "s1", displayName: "Old" } });
+    const controller = attach(new ConnectionController(), repos);
+    await (controller as any).save({ body: [{ id: "mine", conversationId: "live1", socketId: "s1", displayName: "New" }] }, {});
+    expect(repos.connection.save).toHaveBeenCalledWith(expect.objectContaining({ id: "mine", displayName: "New" }));
+    expect(repos.connection.delete).not.toHaveBeenCalled();
+  });
+
   it("setName only updates connections on public livestream rooms", async () => {
     const repos = connectionRepos({
       socketConnections: [
@@ -284,8 +378,16 @@ describe("ConnectionController", () => {
 
   it("allows an authenticated same-church client to join host chat", async () => {
     const repos = connectionRepos({ byIdOnly: hostConv, byId: hostConv });
-    const controller = attach(new ConnectionController(), repos, { au: { churchId: "c1" } });
+    const controller = attach(new ConnectionController(), repos, { au: memberAu() });
     await (controller as any).save({ body: [{ churchId: "ignored", conversationId: "host1" }] }, {});
     expect(repos.connection.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1" }));
+  });
+
+  it("401s a different church's authenticated client joining host chat", async () => {
+    const repos = connectionRepos({ byIdOnly: hostConv, byId: hostConv });
+    const controller = attach(new ConnectionController(), repos, { au: memberAu("c2") });
+    const result = await (controller as any).save({ body: [{ churchId: "c2", conversationId: "host1" }] }, {});
+    expect(result.status).toBe(401);
+    expect(repos.connection.save).not.toHaveBeenCalled();
   });
 });
