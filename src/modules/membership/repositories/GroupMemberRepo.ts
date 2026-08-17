@@ -78,6 +78,25 @@ export class GroupMemberRepo {
       .execute();
   }
 
+  // Is this person a leader of a publicly visible group? Group visibility matches loadPublicSlug -
+  // the gate on the anonymous group page - so the answer covers exactly the leaders an anonymous
+  // visitor can already see. Pass groupId to require the leadership to be in that one group.
+  public async isPublicGroupLeader(churchId: string, personId: string, groupId?: string) {
+    let query = getDb().selectFrom("groupMembers as gm")
+      .innerJoin("groups as g", "g.id", "gm.groupId")
+      .select("gm.id")
+      .where("gm.churchId", "=", churchId)
+      .where("gm.personId", "=", personId)
+      .where("gm.leader", "=", 1 as any)
+      .where("g.churchId", "=", churchId)
+      .where("g.removed", "=", false as any)
+      .where((eb) => eb.or([eb("g.confidential", "is", null), eb("g.confidential", "=", false as any)]))
+      .where((eb) => eb.or([eb("g.archived", "is", null), eb("g.archived", "=", false as any)]));
+    if (groupId) query = query.where("gm.groupId", "=", groupId);
+    const row = await query.limit(1).executeTakeFirst();
+    return !!row;
+  }
+
   // Privacy-safe: explicit opt-in (publicRoster=1) + visible group; selects only display name/photo/leader, never contact/demographic.
   public async loadPublicForGroup(churchId: string, groupId: string) {
     return getDb().selectFrom("groupMembers as gm")
