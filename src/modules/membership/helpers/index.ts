@@ -17,6 +17,8 @@ export { MauticHelper } from "./MauticHelper.js";
 export { OpenAiHelper } from "./OpenAiHelper.js";
 export { PersonConditionHelper } from "./PersonConditionHelper.js";
 export { PersonHelper } from "./PersonHelper.js";
+export { PublicChurchContext } from "./PublicChurchContext.js";
+export { PublicPersonRateLimiter } from "./PublicPersonRateLimiter.js";
 export { ListRuleHelper } from "./ListRuleHelper.js";
 export { ListRefreshHelper } from "./ListRefreshHelper.js";
 export { GradePromotionHelper, GRADES, nextGrade } from "./GradePromotionHelper.js";

@@ -6,7 +6,7 @@ import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { Environment, Permissions, PersonConditionHelper, PersonHelper, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
+import { AuditLogHelper, Environment, Permissions, PersonConditionHelper, PersonHelper, PublicChurchContext, PublicPersonRateLimiter, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
@@ -15,16 +15,22 @@ import { MessagingSafetyHelper, type MessagingSafetyPerson } from "../../../shar
 @controller("/membership/people")
 export class PersonController extends MembershipBaseController {
   @httpPost("/guest-register")
-  public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: { firstName: string, lastName: string, email?: string, phone?: string }[] }>, res: express.Response): Promise<any> {
+  public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: { firstName: string, lastName: string, email?: string, phone?: string }[], siteToken?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      // authz-exempt: anon endpoint; churchId is the public registration target
-      const { churchId, members } = req.body;
+      // authz-exempt: anon endpoint; a claimed churchId is only honored once it matches the signed site/church token, or the church itself opted in via enableQRGuestRegistration.
+      const claimedChurchId = req.body?.churchId;
+      const bind = PublicChurchContext.bind(req, claimedChurchId);
+      if (bind.mismatch) return this.json({ error: "churchId does not match site context" }, 401);
+      const churchId = bind.churchId || claimedChurchId;
       if (!churchId) return this.json({ error: "churchId is required" }, 400);
+      if (!bind.churchId && !(await this.isGuestRegistrationEnabled(churchId))) return this.json({ error: "Guest registration is not enabled" }, 401);
+      const members = req.body?.members;
       if (!members || !Array.isArray(members) || members.length === 0) return this.json({ error: "At least one member is required" }, 400);
       if (members.length > 10) return this.json({ error: "Maximum 10 members per registration" }, 400);
       for (const m of members) {
         if (!m.firstName || !m.lastName) return this.json({ error: "firstName and lastName are required for each member" }, 400);
       }
+      if (!PublicPersonRateLimiter.allow(AuditLogHelper.getClientIp(req), churchId, "guest-register")) return this.json({ error: "Too many requests" }, 429);
       return PersonHelper.registerGuestHousehold(churchId, members);
     });
   }
@@ -122,10 +128,23 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/loadOrCreate")
   public async loadOrCreate(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      // authz-exempt: anon endpoint; churchId is the public target church
-      const { churchId, email, firstName, lastName } = req.body;
-      const person: Person = await PersonHelper.getPerson(churchId, email, firstName, lastName, false);
-      return { id: person.id, name: person.name, contactInfo: person.contactInfo };
+      const { email, firstName, lastName } = req.body || {};
+      // authz-exempt: anon endpoint; a claimed churchId is checked against the signed site/church token when present, and otherwise against a live, non-archived church plus a rate limit.
+      const claimedChurchId = req.body?.churchId;
+      const bind = PublicChurchContext.bind(req, claimedChurchId);
+      if (bind.mismatch) return this.json({ error: "churchId does not match site context" }, 401);
+      const churchId = bind.churchId || claimedChurchId;
+      if (!churchId) return this.json({ error: "churchId is required" }, 400);
+      if (!email || !firstName || !lastName) return this.json({ error: "email, firstName, and lastName are required" }, 400);
+      if (!bind.churchId) {
+        const church = await this.repos.church.loadById(churchId);
+        if (!church || church.archivedDate) return this.json({ error: "Invalid church" }, 401);
+        if (!PublicPersonRateLimiter.allow(AuditLogHelper.getClientIp(req), churchId, "loadOrCreate")) return this.json({ error: "Too many requests" }, 429);
+      }
+      // allowRestore false: an anon caller must never resurrect a deleted person. Only id/name is
+      // returned - contactInfo would leak the stored email/phone of an existing member.
+      const person: Person = await PersonHelper.getPerson(churchId, email, firstName, lastName, false, false);
+      return { id: person.id, name: person.name };
     });
   }
 
@@ -558,6 +577,15 @@ export class PersonController extends MembershipBaseController {
     sources.forEach((s) => { if (s?.id) byId.set(s.id, s); });
     models.forEach((m) => { m.allowDirectMessages = !viewerRestricted && !MessagingSafetyHelper.isRestricted(byId.get(m.id) || null, minimumAge); });
     return models;
+  }
+
+  private async isGuestRegistrationEnabled(churchId: string): Promise<boolean> {
+    const church = await this.repos.church.loadById(churchId);
+    if (!church || church.archivedDate) return false;
+    const rows = this.repos.setting.convertAllToModel(churchId, (await this.repos.setting.loadPublicSettings(churchId)) as any[]);
+    let enabled = false;
+    rows?.forEach((s: any) => { if (s.keyName === "enableQRGuestRegistration") enabled = s.value === "true"; });
+    return enabled;
   }
 
   private async isMember(membershipStatus: string): Promise<boolean> {

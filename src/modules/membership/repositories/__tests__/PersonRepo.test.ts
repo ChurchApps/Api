@@ -90,6 +90,30 @@ describe("PersonRepo.loadMembersByVisibility statuses mapping", () => {
   });
 });
 
+describe("PersonRepo email lookups and the removed filter", () => {
+  // PersonHelper.getPerson relies on exactly this split: the anon path calls searchEmail, which must
+  // never surface a deleted person, so it can't restore one.
+  it("searchEmail filters out removed people", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new PersonRepo().searchEmail("c1", "a@b.com");
+    const wheres = whereCalls(calls);
+    expect(wheres.some((c) => c.args[0] === "churchId" && c.args[2] === "c1")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "email" && c.args[2] === "%a@b.com%")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "removed" && c.args[1] === "=" && c.args[2] === false)).toBe(true);
+  });
+
+  it("searchEmailIncludingRemoved keeps removed people and orders live ones first", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new PersonRepo().searchEmailIncludingRemoved("c1", "a@b.com");
+    const wheres = whereCalls(calls);
+    expect(wheres.some((c) => c.args[0] === "churchId" && c.args[2] === "c1")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "removed")).toBe(false);
+    expect(calls.some((c) => c.method === "orderBy" && c.args[0] === "removed" && c.args[1] === "asc")).toBe(true);
+  });
+});
+
 describe("PersonRepo model conversion", () => {
   const row = {
     id: "p1",
