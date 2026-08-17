@@ -20,6 +20,7 @@ import {
   SettingRepo,
   ClientErrorRepo,
   JobRunRepo,
+  LoginAttemptRepo,
   VisibilityPreferenceRepo,
   OAuthTokenRepo,
   OAuthCodeRepo,
@@ -74,6 +75,7 @@ export class Repos {
   public batch: BatchRepo;
   public clientError: ClientErrorRepo;
   public jobRun: JobRunRepo;
+  public loginAttempt: LoginAttemptRepo;
 
   public webhook: WebhookRepo;
   public webhookDelivery: WebhookDeliveryRepo;
@@ -124,6 +126,7 @@ export class Repos {
     this.batch = new BatchRepo();
     this.clientError = new ClientErrorRepo();
     this.jobRun = new JobRunRepo();
+    this.loginAttempt = new LoginAttemptRepo();
 
     this.webhook = new WebhookRepo();
     this.webhookDelivery = new WebhookDeliveryRepo();

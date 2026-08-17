@@ -40,6 +40,7 @@ export { Setting } from "./Setting.js";
 
 export { ClientError } from "./ClientError.js";
 export { JobRun } from "./JobRun.js";
+export { LoginAttempt } from "./LoginAttempt.js";
 export { VisibilityPreference } from "./VisibilityPreference.js";
 
 export { OAuthToken } from "./OAuthToken.js";
