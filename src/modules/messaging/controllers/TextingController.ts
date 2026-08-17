@@ -222,6 +222,7 @@ export class TextingController extends MessagingBaseController {
       if (!result.success && result.error?.includes("insufficient_credits")) {
         return this.json({ error: "insufficient_credits" }, 400);
       }
+      if (!result.success) console.error("❌ Text send failed:", config.providerName, result.error);
 
       const sentText: SentText = {
         churchId: au.churchId,
@@ -232,9 +233,22 @@ export class TextingController extends MessagingBaseController {
         successCount: result.success ? 1 : 0,
         failCount: result.success ? 0 : 1
       };
-      await this.repos.sentText.save(sentText);
+      const savedSentText = await this.repos.sentText.save(sentText);
 
-      return { recipientCount: 1, successCount: result.success ? 1 : 0, failCount: result.success ? 0 : 1 };
+      const log: DeliveryLog = {
+        churchId: au.churchId,
+        personId,
+        contentType: "sentText",
+        contentId: savedSentText.id,
+        deliveryMethod: "sms",
+        deliveryAddress: phoneNumber,
+        success: result.success,
+        errorMessage: result.error
+      };
+      await this.repos.deliveryLog.save(log);
+
+      if (!result.success) return { recipientCount: 1, successCount: 0, failCount: 1, error: result.error };
+      return { recipientCount: 1, successCount: 1, failCount: 0 };
     });
   }
 
