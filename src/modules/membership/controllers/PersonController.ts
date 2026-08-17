@@ -6,7 +6,7 @@ import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { AuditLogHelper, Environment, Permissions, PersonConditionHelper, PersonHelper, PublicChurchContext, PublicPersonRateLimiter, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
+import { AuditLogHelper, Environment, Permissions, PersonConditionHelper, PersonHelper, PublicChurchContext, PublicEmailThrottle, PublicPersonRateLimiter, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
@@ -38,9 +38,21 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/public/email")
   public async publicEmail(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      // authz-exempt: anon contact endpoint; churchId is the public target church
+      // authz-exempt: anon group-leader contact; churchId is the public target church
       const churchId = req.body.churchId;
       const personId = req.body.personId;
+      const groupId = req.body.groupId;
+      if (!churchId || !personId) return this.json({ error: "churchId and personId are required" }, 400);
+      const ipAddress = AuditLogHelper.getClientIp(req);
+      if (!PublicPersonRateLimiter.allow(ipAddress, churchId, "public-email")) return this.json({ error: "Too many requests" }, 429);
+      // The target must lead a publicly visible group - the same people the anonymous
+      // /groupmembers/public/leaders roster exposes. When the caller names the group it is
+      // contacting, the leadership has to be in that group, not just anywhere in the church.
+      if (!(await this.repos.groupMember.isPublicGroupLeader(churchId, personId, groupId))) return this.denyAccess(["Unable to send"]);
+      // Durable per-target cap; the in-memory per-IP guard above is per-process and IP-keyed, so it
+      // does not survive Lambda instances or an attacker rotating/spoofing X-Forwarded-For.
+      if (!(await PublicEmailThrottle.allow(this.repos, churchId, personId))) return this.json({ error: "Too many requests" }, 429);
+
       // Escape attacker-supplied subject/body before they're injected raw into the HTML email template (anon endpoint).
       // The body is allowed to keep simple <br> line breaks (the legit contact-group-leader form sends those); everything else is neutralized.
       const subject = this.escapeHtml(req.body.subject);
@@ -48,8 +60,10 @@ export class PersonController extends MembershipBaseController {
       const appName = req.body.appName;
 
       const person: Person = await this.repos.person.load(churchId, personId);
-      if (!person?.email) return this.denyAccess(["No email address"]);
+      if (!person?.email) return this.denyAccess(["Unable to send"]);
 
+      // Recorded before the send so a slow send cannot let concurrent requests past the cap.
+      await PublicEmailThrottle.record(this.repos, churchId, personId, ipAddress);
       await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, appName, null, subject, body);
       return { success: true };
     });

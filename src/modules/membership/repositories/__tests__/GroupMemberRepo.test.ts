@@ -12,6 +12,7 @@ function recordingDb(results: any[] = []) {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => results;
+      if (prop === "executeTakeFirst") return async () => results[0] ?? null;
       return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
@@ -60,5 +61,44 @@ describe("GroupMemberRepo.convertAllToPublicModel privacy", () => {
 
   it("returns [] for non-array input", () => {
     expect(new GroupMemberRepo().convertAllToPublicModel("c1", null as any)).toEqual([]);
+  });
+});
+
+describe("GroupMemberRepo.isPublicGroupLeader", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("requires church, person, leader flag, and a visible non-confidential group", async () => {
+    const { proxy, calls } = recordingDb([{ id: "gm1" }]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const result = await new GroupMemberRepo().isPublicGroupLeader("c1", "p9");
+    expect(result).toBe(true);
+    const wheres = whereCalls(calls);
+    expect(wheres.some((c) => c.args[0] === "gm.churchId" && c.args[2] === "c1")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "gm.personId" && c.args[2] === "p9")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "gm.leader" && c.args[2] === 1)).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "g.churchId" && c.args[2] === "c1")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "g.removed" && c.args[2] === false)).toBe(true);
+    expect(wheres.filter((c) => typeof c.args[0] === "function").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("does not restrict to a group when no groupId is given", async () => {
+    const { proxy, calls } = recordingDb([{ id: "gm1" }]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new GroupMemberRepo().isPublicGroupLeader("c1", "p9");
+    expect(whereCalls(calls).some((c) => c.args[0] === "gm.groupId")).toBe(false);
+  });
+
+  it("restricts to the supplied group", async () => {
+    const { proxy, calls } = recordingDb([{ id: "gm1" }]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const result = await new GroupMemberRepo().isPublicGroupLeader("c1", "p9", "g1");
+    expect(result).toBe(true);
+    expect(whereCalls(calls).some((c) => c.args[0] === "gm.groupId" && c.args[2] === "g1")).toBe(true);
+  });
+
+  it("returns false when no matching leader row exists", async () => {
+    const { proxy } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    expect(await new GroupMemberRepo().isPublicGroupLeader("c1", "p9", "g1")).toBe(false);
   });
 });
