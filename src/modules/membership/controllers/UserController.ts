@@ -6,7 +6,8 @@ import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, MauticHelper, ChurchHelper } from "../helpers/index.js";
+import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, LoginRateLimiter, MauticHelper, ChurchHelper } from "../helpers/index.js";
+import { v4 } from "uuid";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 
@@ -47,6 +48,17 @@ const updateEmailValidation = [body("userId").optional().isString(), body("email
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const VERIFICATION_MAX_ATTEMPTS = 5;
 
+// A throwaway hash at the same cost factor as real passwords. Compared against when the email is
+// unknown so both failure paths burn the same bcrypt time and cannot be told apart by response time.
+const TIMING_EQUALIZER_HASH = "$2a$10$EIDWkbY3nzGaFR.cML8bBuI7fFECgvh7y93pqA6uT.8KrdHHy.Kma";
+
+/** The rate-limit bucket an attempt belongs to: the account being targeted, if we can name one. */
+function loginAccountKey(body: { email?: string; authGuid?: string }): string {
+  const email = (body?.email || "").toString().trim().toLowerCase();
+  if (email) return email;
+  return body?.authGuid ? "guid:" + body.authGuid : "";
+}
+
 function generateVerificationCode(): string {
   return crypto.randomInt(0, 1_000_000).toString().padStart(6, "0");
 }
@@ -58,21 +70,30 @@ export class UserController extends MembershipBaseController {
     // Ensure repositories are hydrated for anonymous access routes
     return this.actionWrapperAnon(req, res, async () => {
       try {
+        const ip = AuditLogHelper.getClientIp(req);
+        // A jwt refresh is already-proven identity, so it is not a credential guess and is not throttled.
+        const isJwtRefresh = req.body.jwt !== undefined && req.body.jwt !== "";
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = loginAccountKey(req.body);
+        if (!isJwtRefresh && !(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) {
+          return this.json({ errors: ["Too many requests"] }, 429);
+        }
+
         let user: User = null;
-        if (req.body.jwt !== undefined && req.body.jwt !== "") {
+        if (isJwtRefresh) {
           user = await AuthenticatedUser.loadUserByJwt(req.body.jwt, this.repos);
         } else if (req.body.authGuid !== undefined && req.body.authGuid !== "") {
           user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
           if (user !== null) user = await this.consumeLoginGuid(user, req.body.authGuid);
         } else {
-          user = await this.repos.user.loadByEmail(req.body.email.trim());
-          if (user !== null) {
-            if (!bcrypt.compareSync(req.body.password, user.password?.toString() || "")) user = null;
-          }
+          const found = await this.repos.user.loadByEmail(req.body.email.trim());
+          // Always run exactly one compare, even when the email is unknown, so the two failures cost the same.
+          const passwordMatched = bcrypt.compareSync(req.body.password || "", found?.password?.toString() || TIMING_EQUALIZER_HASH);
+          user = found !== null && passwordMatched ? found : null;
         }
 
         if (user === null) {
-          const ip = AuditLogHelper.getClientIp(req);
+          if (!isJwtRefresh) await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
           const failEmail = req.body.email || req.body.authGuid || "(jwt)";
           AuditLogHelper.logLogin(this.repos, "", "", false, ip, { email: failEmail, reason: "Invalid Credentials" });
           return this.denyAccess(["Login failed"]);
@@ -92,8 +113,8 @@ export class UserController extends MembershipBaseController {
           else {
             user.lastLogin = new Date();
             await this.repos.user.save(user);
+            if (!isJwtRefresh) await LoginRateLimiter.clearFailures(this.repos, account);
             MauticHelper.trackLogin(user.email).catch(() => {});
-            const ip = AuditLogHelper.getClientIp(req);
             const selectedChurch = userChurches[0];
             if (selectedChurch) {
               AuditLogHelper.logLogin(this.repos, selectedChurch.church.id, user.id, true, ip, { email: user.email });
@@ -162,15 +183,18 @@ export class UserController extends MembershipBaseController {
           return res.status(400).json({ errors: errors.array() });
         }
 
-        const user = await this.repos.user.loadByEmail(req.body.email);
-        if (user === null) {
-          return this.json({}, 200);
-        }
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = loginAccountKey(req.body);
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
 
-        const passwordMatched = bcrypt.compareSync(req.body.password, user.password);
-        if (!passwordMatched) {
-          return this.denyAccess(["Incorrect password"]);
+        const user = await this.repos.user.loadByEmail(req.body.email);
+        // One compare either way: an unknown email must not answer faster than a wrong password.
+        const passwordMatched = bcrypt.compareSync(req.body.password || "", user?.password?.toString() || TIMING_EQUALIZER_HASH);
+        if (user === null || !passwordMatched) {
+          await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
+          return this.denyAccess(["Login failed"]);
         }
+        await LoginRateLimiter.clearFailures(this.repos, account);
         const userChurches = await this.repos.rolePermission.loadForUser(user.id, false);
         const churchNames = userChurches.map((uc) => uc.church.name);
 

@@ -109,6 +109,12 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     return membershipRepos.jobRun.deleteOld(30);
   });
 
+  // Failed-login counters expire after minutes; a day of slack is plenty before reclaiming rows.
+  await JobRunHelper.run("purgeLoginAttempts", async () => {
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    return membershipRepos.loginAttempt.deleteOld(1);
+  });
+
   await JobRunHelper.run("dailyEmails", () => NotificationHelper.sendEmailNotifications("daily"));
 
   console.log("[handleMidnightTimer] ========== TIMER COMPLETE ==========");
