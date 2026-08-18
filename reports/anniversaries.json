@@ -1,0 +1,60 @@
+{
+  "keyName": "anniversaries",
+  "displayName": "Anniversaries by Month",
+  "description": "All people with an anniversary this month.",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "membership",
+      "sqlLines": [
+        "SELECT concat(:month, '/', dayofmonth(p.anniversary)) anniversaryDay, p.displayName",
+        "FROM people p",
+        "LEFT JOIN groupMembers gm on gm.personId=p.id",
+        "WHERE p.churchId=:churchId",
+        "AND (:groupId = '' OR gm.groupId=:groupId)",
+        "AND p.anniversary IS NOT NULL",
+        "AND month(p.anniversary) = :month",
+        "GROUP BY p.anniversary, p.displayName",
+        "ORDER BY dayofmonth(p.anniversary)"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "month",
+      "displayName": "Month",
+      "source": "dropdown",
+      "sourceKey": "month"
+    },
+    {
+      "keyName": "groupId",
+      "displayName": "Group",
+      "source": "dropdown",
+      "sourceKey": "group"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Anniversary",
+          "value": "anniversaryDay",
+          "formatter": "string"
+        },
+        {
+          "header": "Name",
+          "value": "displayName",
+          "formatter": "string"
+        }
+      ]
+    }
+  ],
+  "permissions": []
+}
