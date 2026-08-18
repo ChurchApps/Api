@@ -13,6 +13,11 @@ import { isPublicFile } from "../helpers/PublicFileAccess.js";
 // Providers whose public URLs are short-lived; contentPath points at the stable /download route instead.
 const REDIRECT_PROVIDERS = ["googledrive", "dropbox", "onedrive"];
 
+// Arrangement audio: matches Planning Center's player-supported formats and keeps the free tier
+// from taking WAV-sized files (4-10x an equivalent MP3). Free-tier ceiling; adjust here if needed.
+const ARRANGEMENT_MAX_FILE_BYTES = 26214400;
+const ARRANGEMENT_ALLOWED_MIME_TYPES = ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/aac"];
+
 @controller("/content/files")
 export class FileController extends ContentBaseController {
   // Minted provider links live >=1h; cache them so page loads don't hammer the provider APIs.
@@ -74,13 +79,17 @@ export class FileController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(req.body[0].contentId) === -1) {
         return this.json({}, 401);
       } else {
+        if (req.body[0].contentType === "arrangement") {
+          if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(req.body[0].fileType || "")) return this.json({ error: "unsupported_audio_format" }, 400);
+          if ((req.body[0].size || 0) > ARRANGEMENT_MAX_FILE_BYTES) return this.json({ error: "file_too_large" }, 400);
+        }
         const storage = await StorageResolver.forChurch(this.repos.storageProvider, au.churchId);
         if (storage.name === "churchapps") {
           const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, req.body[0].contentType, req.body[0].contentId);
           if (totalBytes?.size > 100000000) return this.json({}, 401);
         }
         const decoded = req.body[0].fileContents ? Buffer.byteLength(req.body[0].fileContents.split(",").pop() || "", "base64") : 0;
-        if (decoded > 26214400) return this.json({ error: "File too large" }, 400);
+        if (decoded > 26214400) return this.json({ error: "file_too_large" }, 400);
         try {
           const promises: Promise<File>[] = [];
           req.body.forEach((file) => {
@@ -116,6 +125,13 @@ export class FileController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(req.body.contentId) === -1) return this.json({}, 401);
       else {
+        let size = req.body.size || 0;
+        if (req.body.contentType === "arrangement") {
+          if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(req.body.mimeType || "")) return this.json({ error: "unsupported_audio_format" }, 400);
+          if (size > ARRANGEMENT_MAX_FILE_BYTES) return this.json({ error: "file_too_large" }, 400);
+          // an omitted size would otherwise fall through to the provider's generic upload cap
+          size = size > 0 ? size : ARRANGEMENT_MAX_FILE_BYTES;
+        }
         const storage = await StorageResolver.forChurch(this.repos.storageProvider, au.churchId);
         if (storage.name === "churchapps") {
           const totalBytes = await this.repos.file.loadTotalBytes(au.churchId, req.body.contentType, req.body.contentId);
@@ -123,7 +139,7 @@ export class FileController extends ContentBaseController {
         }
         const key = this.buildKey(au.churchId, req.body.contentType, req.body.contentId, req.body.fileName);
         try {
-          const result = await storage.provider.getUploadUrl(key, req.body.mimeType || "application/octet-stream", req.body.size || 0);
+          const result = await storage.provider.getUploadUrl(key, req.body.mimeType || "application/octet-stream", size);
           return result || {};
         } catch (e) {
           if (e instanceof QuotaExceededError) return this.json({ error: "storage_quota_exceeded", usedBytes: e.usedBytes, quotaBytes: e.quotaBytes }, 400);
@@ -142,7 +158,7 @@ export class FileController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(existingFile.contentId) === -1) return this.json({}, 401);
       else {
         const storage = await StorageResolver.forFile(this.repos.storageProvider, existingFile);
-        const key = existingFile.externalId || this.keyFromUrl(existingFile.contentPath);
+        const key = existingFile.externalId || StorageResolver.keyFromUrl(existingFile.contentPath);
         if (storage) await storage.provider.remove(key);
         await this.repos.file.delete(au.churchId, id);
         FileController.mintedUrlCache.delete(id);
@@ -164,17 +180,6 @@ export class FileController extends ContentBaseController {
     const safeName = path.basename(fileName).replace(/\.\.+/g, ".");
     if (contentId) return "/" + churchId + "/files/" + contentType + "/" + contentId + "/" + safeName;
     return "/" + churchId + "/files/" + safeName;
-  }
-
-  // Legacy files (no externalId): the true storage key is whatever the public URL serves.
-  private keyFromUrl(contentPath: string): string {
-    const base = (contentPath || "").split("?")[0];
-    const roots = [Environment.contentRoot, Environment.ministryStuffContentRoot].filter((r) => r);
-    for (const root of roots) {
-      const trimmed = root.replace(/\/$/, "");
-      if (base.startsWith(trimmed)) return base.substring(trimmed.length);
-    }
-    return base;
   }
 
   private async saveFile(churchId: string, file: File, storage: { name: string; provider: IStorageProvider }) {
@@ -199,12 +204,12 @@ export class FileController extends ContentBaseController {
           if (old) await old.provider.remove(existingFile.externalId);
         }
       } else if (existingFile) {
-        const oldKey = this.keyFromUrl(existingFile.contentPath);
+        const oldKey = StorageResolver.keyFromUrl(existingFile.contentPath);
         const newBytes = !!file.fileContents || !!uploadedExternalId;
         if (isByos && newBytes) {
           // church switched to BYOS after this file was uploaded; clean up the legacy bytes
           await StorageResolver.forUrl(existingFile.contentPath).provider.remove(oldKey);
-        } else if (!isByos && oldKey !== this.keyFromUrl(StorageResolver.publicUrl(storage.name, key))) {
+        } else if (!isByos && oldKey !== StorageResolver.keyFromUrl(StorageResolver.publicUrl(storage.name, key))) {
           // delete existing uploadFile; route to the provider that holds the old bytes
           await StorageResolver.forUrl(existingFile.contentPath).provider.remove(oldKey);
         }

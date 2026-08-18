@@ -67,6 +67,17 @@ export class StorageResolver {
     return { name: "churchapps", provider: StorageProviderFactory.getDefault() };
   }
 
+  // Legacy files (no externalId): the true storage key is whatever the public URL serves.
+  static keyFromUrl(contentPath: string | null | undefined): string {
+    const base = (contentPath || "").split("?")[0];
+    const roots = [Environment.contentRoot, Environment.ministryStuffContentRoot].filter((r) => r);
+    for (const root of roots) {
+      const trimmed = root.replace(/\/$/, "");
+      if (base.startsWith(trimmed)) return base.substring(trimmed.length);
+    }
+    return base;
+  }
+
   static publicUrl(name: string, key: string): string {
     if (name === "ministrystuff") return Environment.ministryStuffContentRoot.replace(/\/$/, "") + key;
     return Environment.contentRoot + key;

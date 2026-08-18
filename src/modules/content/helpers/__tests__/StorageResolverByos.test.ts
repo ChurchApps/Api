@@ -55,3 +55,17 @@ describe("StorageResolver BYOS routing", () => {
     expect(ms.name).toBe("ministrystuff");
   });
 });
+
+describe("StorageResolver.keyFromUrl", () => {
+  it("strips the content root and query string", () => {
+    expect(StorageResolver.keyFromUrl("https://content.churchapps.org/c1/files/arrangement/a1/mix.mp3?dt=9")).toBe("/c1/files/arrangement/a1/mix.mp3");
+  });
+
+  it("strips the MinistryStuff root", () => {
+    expect(StorageResolver.keyFromUrl("https://ms.example.com/c1/files/arrangement/a1/mix.mp3")).toBe("/c1/files/arrangement/a1/mix.mp3");
+  });
+
+  it("returns empty string for a missing path", () => {
+    expect(StorageResolver.keyFromUrl(undefined)).toBe("");
+  });
+});

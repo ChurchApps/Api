@@ -3,6 +3,7 @@ import express from "express";
 import { Arrangement } from "../models/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Permissions } from "../helpers/index.js";
+import { StorageResolver } from "../helpers/StorageResolver.js";
 
 @controller("/content/arrangements")
 export class ArrangementController extends ContentBaseController {
@@ -68,6 +69,15 @@ export class ArrangementController extends ContentBaseController {
         if (existing) {
           await this.repos.arrangement.delete(au.churchId, id);
           await this.repos.arrangementKey.deleteForArrangement(au.churchId, id);
+          // audio (and other) files attached directly to the arrangement aren't cascaded by the row
+          // delete above - remove the bytes too, or they orphan in storage and stay billed forever.
+          const files = await this.repos.file.loadForContent(au.churchId, "arrangement", id);
+          for (const file of files) {
+            const storage = await StorageResolver.forFile(this.repos.storageProvider, file);
+            const key = file.externalId || StorageResolver.keyFromUrl(file.contentPath);
+            if (storage) await storage.provider.remove(key);
+          }
+          if (files.length > 0) await this.repos.file.deleteForContent(au.churchId, "arrangement", id);
           const songArrangments = await this.repos.arrangement.loadBySongId(au.churchId, existing.songId);
           if (songArrangments.length === 0) await this.repos.song.delete(au.churchId, existing.songId);
         }
