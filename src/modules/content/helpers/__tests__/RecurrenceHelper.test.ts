@@ -65,6 +65,23 @@ describe("RecurrenceHelper.getOccurrences", () => {
     );
     expect(result).toHaveLength(1);
   });
+  it("omits occurrences whose calendar date is in exceptionDates", () => {
+    const start = d("2026-07-01T18:30:00");
+    const result = RecurrenceHelper.getOccurrences(
+      {
+        start,
+        end: d("2026-07-01T20:00:00"),
+        recurrenceRule: "FREQ=WEEKLY;BYDAY=WE",
+        exceptionDates: [d("2026-07-08T12:00:00")]
+      },
+      d("2026-07-01T00:00:00"),
+      d("2026-07-31T23:59:59")
+    );
+    const days = result.map((o) => o.start.getDate());
+    expect(days).toContain(1);
+    expect(days).not.toContain(8);
+    expect(result).toHaveLength(4);
+  });
 });
 
 describe("RecurrenceHelper.overlaps", () => {
