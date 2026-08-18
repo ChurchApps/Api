@@ -8,6 +8,7 @@ interface OccurrenceSource {
   start: Date | string;
   end: Date | string;
   recurrenceRule?: string;
+  exceptionDates?: Array<Date | string>;
 }
 
 export interface Occurrence {
@@ -34,11 +35,24 @@ export class RecurrenceHelper {
     }
 
     const dates = rule.between(this.toFakeUtc(windowStart), this.toFakeUtc(windowEnd), true).slice(0, max);
-    return dates.map((d) => {
+    const occurrences = dates.map((d) => {
       const local = this.fromFakeUtc(d);
       local.setHours(start.getHours(), start.getMinutes(), start.getSeconds(), 0);
       return { start: local, end: new Date(local.getTime() + duration) };
     });
+    return this.withoutExceptions(occurrences, event.exceptionDates);
+  }
+
+  private static calendarDateKey(d: Date | string) {
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return "";
+    return `${dt.getFullYear()}-${dt.getMonth()}-${dt.getDate()}`;
+  }
+
+  private static withoutExceptions(occurrences: Occurrence[], exceptionDates?: Array<Date | string>) {
+    if (!exceptionDates?.length) return occurrences;
+    const excluded = new Set(exceptionDates.map((d) => this.calendarDateKey(d)));
+    return occurrences.filter((o) => !excluded.has(this.calendarDateKey(o.start)));
   }
 
   private static toFakeUtc(d: Date): Date {
