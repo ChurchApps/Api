@@ -208,16 +208,20 @@ export class TextingController extends MessagingBaseController {
   }
 
   @httpPost("/sendPerson")
-  public async sendToPerson(req: express.Request<{}, {}, { personId: string; phoneNumber: string; message: string }>, res: express.Response): Promise<any> {
+  public async sendToPerson(req: express.Request<{}, {}, { personId: string; phoneNumber: string; message: string; personName?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
-      const { personId, phoneNumber, message } = req.body;
+      const { personId, phoneNumber, message, personName } = req.body;
       if (!personId || !phoneNumber || !message) return this.json({ error: "personId, phoneNumber, and message are required" }, 400);
 
       const config = await this.getProviderConfig(au.churchId);
       if (!config) return this.json({ error: "No texting provider configured" }, 400);
 
       const provider = getProvider(config.providerName);
+      if (provider.capabilities.addSubscriber) {
+        const parts = (personName || "").split(" ");
+        await provider.addSubscriber(config, phoneNumber, { firstName: parts[0] || "", lastName: parts.slice(1).join(" ") || "" });
+      }
       const result = await provider.sendMessage(config, phoneNumber, message);
       if (!result.success && result.error?.includes("insufficient_credits")) {
         return this.json({ error: "insufficient_credits" }, 400);
