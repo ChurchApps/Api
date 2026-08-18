@@ -1,7 +1,7 @@
 import "reflect-metadata";
 jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Environment: { contentApi: "https://api.test/content" }, Permissions: { content: { edit: "contentEdit" } } }));
-jest.mock("../../helpers/StorageResolver", () => ({ StorageResolver: { forFile: jest.fn(), forChurch: jest.fn(), forUrl: jest.fn(), publicUrl: jest.fn() } }));
+jest.mock("../../helpers/StorageResolver", () => ({ StorageResolver: { forFile: jest.fn(), forChurch: jest.fn(), forUrl: jest.fn(), publicUrl: jest.fn(), keyFromUrl: jest.fn((u: string) => (u || "").split("?")[0]) } }));
 jest.mock("../../helpers/ByosAuth", () => ({ BYOS_PROVIDERS: ["googledrive", "dropbox", "onedrive"] }));
 jest.mock("../../helpers/MinistryStuffStorageProvider", () => ({ QuotaExceededError: class QuotaExceededError extends Error {} }));
 
@@ -10,15 +10,21 @@ import { StorageResolver } from "../../helpers/StorageResolver.js";
 
 function makeController(opts: any = {}) {
   const repos = {
-    file: { loadById: jest.fn(async () => opts.file ?? null) },
+    file: {
+      loadById: jest.fn(async () => opts.file ?? null),
+      loadTotalBytes: jest.fn(async () => ({ size: opts.totalBytes ?? 0 })),
+      save: jest.fn(async (f: any) => f)
+    },
     storageProvider: {}
   };
+  const au = opts.au ?? { churchId: "c1", checkAccess: () => opts.checkAccess ?? true, groupIds: [] };
   const controller = new FileController();
   (controller as any).repos = repos;
   (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).authUser = () => opts.au ?? null;
+  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
+  (controller as any).authUser = () => ("au" in opts ? opts.au : null);
   (controller as any).json = (obj: any, status: number) => ({ obj, status });
-  return { controller, repos };
+  return { controller, repos, au };
 }
 
 function resSpy() {
@@ -98,5 +104,70 @@ describe("FileController.download", () => {
     const res = resSpy();
     await (controller as any).download("w1", {}, res);
     expect(res.redirect).toHaveBeenCalledWith(302, "https://drive.example/public");
+  });
+});
+
+function makeWriteController() {
+  const repos = {
+    file: { loadTotalBytes: jest.fn(async () => ({ size: 0 })), save: jest.fn(async (f: any) => f), load: jest.fn(), delete: jest.fn() },
+    storageProvider: {}
+  };
+  const controller = new FileController();
+  (controller as any).repos = repos;
+  const au = { churchId: "c1", checkAccess: () => true, groupIds: [] };
+  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
+  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  return { controller, repos };
+}
+
+describe("FileController arrangement audio guards", () => {
+  beforeEach(() => {
+    (StorageResolver.forChurch as jest.Mock).mockReset();
+  });
+
+  it("rejects WAV on save", async () => {
+    const { controller } = makeWriteController();
+    const result: any = await (controller as any).save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "audio/wav", size: 1000, fileName: "click.wav" }] }, {});
+    expect(result).toEqual({ obj: { error: "unsupported_audio_format" }, status: 400 });
+    expect(StorageResolver.forChurch).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized arrangement file on save", async () => {
+    const { controller } = makeWriteController();
+    const result: any = await (controller as any).save({ body: [{ contentType: "arrangement", contentId: "a1", fileType: "audio/mpeg", size: 26214401, fileName: "mix.mp3" }] }, {});
+    expect(result).toEqual({ obj: { error: "file_too_large" }, status: 400 });
+    expect(StorageResolver.forChurch).not.toHaveBeenCalled();
+  });
+
+  it("rejects WAV on getUploadUrl", async () => {
+    const { controller } = makeWriteController();
+    const result: any = await (controller as any).getUploadUrl({ body: { contentType: "arrangement", contentId: "a1", fileName: "click.wav", mimeType: "audio/wav", size: 1000 } }, {});
+    expect(result).toEqual({ obj: { error: "unsupported_audio_format" }, status: 400 });
+    expect(StorageResolver.forChurch).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized arrangement file on getUploadUrl", async () => {
+    const { controller } = makeWriteController();
+    const result: any = await (controller as any).getUploadUrl({ body: { contentType: "arrangement", contentId: "a1", fileName: "mix.mp3", mimeType: "audio/mpeg", size: 26214401 } }, {});
+    expect(result).toEqual({ obj: { error: "file_too_large" }, status: 400 });
+    expect(StorageResolver.forChurch).not.toHaveBeenCalled();
+  });
+
+  it("caps omitted arrangement size at 25MB when minting a presign", async () => {
+    const getUploadUrl = jest.fn(async () => ({ url: "https://s3.example/post" }));
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { getUploadUrl } });
+    const { controller, repos } = makeWriteController();
+    await (controller as any).getUploadUrl({ body: { contentType: "arrangement", contentId: "a1", fileName: "mix.mp3", mimeType: "audio/mpeg" } }, {});
+    expect(repos.file.loadTotalBytes).toHaveBeenCalledWith("c1", "arrangement", "a1");
+    expect(getUploadUrl).toHaveBeenCalledWith("/c1/files/arrangement/a1/mix.mp3", "audio/mpeg", 26214400);
+  });
+
+  it("does not apply arrangement MIME rules to website files", async () => {
+    const getUploadUrl = jest.fn(async () => ({ url: "https://s3.example/post" }));
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { getUploadUrl } });
+    const { controller } = makeWriteController();
+    const result: any = await (controller as any).getUploadUrl({ body: { contentType: "website", contentId: "", fileName: "chart.pdf", mimeType: "application/pdf", size: 1000 } }, {});
+    expect(result?.status).not.toBe(400);
+    expect(getUploadUrl).toHaveBeenCalled();
   });
 });

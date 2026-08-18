@@ -45,6 +45,14 @@ export class FileRepo {
     await getDb().deleteFrom("files").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
+  public async deleteForContent(churchId: string, contentType: string, contentId: string) {
+    await getDb().deleteFrom("files")
+      .where("churchId", "=", churchId)
+      .where("contentType", "=", contentType)
+      .where("contentId", "=", contentId)
+      .execute();
+  }
+
   public async load(churchId: string, id: string): Promise<File | undefined> {
     return (await getDb().selectFrom("files").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
