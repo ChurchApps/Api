@@ -1378,12 +1378,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@churchapps/texting@npm:^0.3.0":
-  version: 0.3.0
-  resolution: "@churchapps/texting@npm:0.3.0"
+"@churchapps/texting@npm:^0.3.1":
+  version: 0.3.1
+  resolution: "@churchapps/texting@npm:0.3.1"
   dependencies:
     axios: "npm:^1.11.0"
-  checksum: 10c0/407279f87e4d6a984c96a6effbcddb54dc39a47c427a8b66211e4138d760f49b207e145a49c4dc17e9399379bd7bd54700b0a0dcd170c436b945b3134a3bd493
+  checksum: 10c0/200eeaab0a71fff61a49fbae45487ed529f3024beb1585d41bb535be1701c49fac2d31d712bd0e5c37e4588ba2787e340a08904ff34f266dc36ee14d98274434
   languageName: node
   linkType: hard
 
@@ -3864,7 +3864,7 @@ __metadata:
     "@churchapps/apihelper": "npm:^1.1.0"
     "@churchapps/content-providers": "npm:^0.9.1"
     "@churchapps/helpers": "npm:^1.11.1"
-    "@churchapps/texting": "npm:^0.3.0"
+    "@churchapps/texting": "npm:^0.3.1"
     "@codegenie/serverless-express": "npm:^4.15.0"
     "@hubspot/api-client": "npm:^13.1.0"
     "@modelcontextprotocol/sdk": "npm:^1.29.0"
