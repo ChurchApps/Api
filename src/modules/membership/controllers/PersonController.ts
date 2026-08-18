@@ -502,13 +502,20 @@ export class PersonController extends MembershipBaseController {
   }
 
   private async deletePeople(churchId: string, personIds: string[], batchId?: string) {
+    // Emails captured pre-delete so sync connectors (Mailchimp) can locate the subscriber to archive.
+    const emailById = new Map<string, string>();
+    try {
+      const rows: any[] = (await this.repos.person.loadByIds(churchId, personIds)) as any[];
+      for (const row of rows ?? []) if (row?.email) emailById.set(row.id, row.email);
+    } catch { /* delete proceeds; destroy events just go out without emails */ }
+
     if (personIds.length === 1) {
       await this.repos.person.delete(churchId, personIds[0]);
     } else {
       await this.repos.person.deleteByIds(churchId, personIds);
     }
 
-    for (const id of personIds) await WebhookDispatcher.emit(churchId, "person.destroyed", { id, churchId });
+    for (const id of personIds) await WebhookDispatcher.emit(churchId, "person.destroyed", { id, churchId, email: emailById.get(id) });
 
     await this.repos.household.deleteUnused(churchId);
     return this.json({ success: true, deletedIds: personIds, count: personIds.length, batchId });

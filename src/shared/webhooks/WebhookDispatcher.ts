@@ -61,9 +61,12 @@ export class WebhookDispatcher {
     const out = { ...payload };
     try {
       const personId = out.personId || (out.contentType === "person" ? out.contentId : null);
-      if (wants.person && personId && !out.personName) {
+      if (wants.person && personId && (!out.personName || !out.personEmail)) {
         const person = await repos.person.load(churchId, personId);
-        if (person) out.personName = person.displayName || [person.firstName, person.lastName].filter(Boolean).join(" ");
+        if (person) {
+          if (!out.personName) out.personName = person.displayName || [person.firstName, person.lastName].filter(Boolean).join(" ");
+          if (!out.personEmail && person.email) out.personEmail = person.email;
+        }
       }
       if (wants.group && out.groupId && !out.groupName) {
         const group = await repos.group.load(churchId, out.groupId);

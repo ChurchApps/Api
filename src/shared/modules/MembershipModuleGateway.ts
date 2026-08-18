@@ -1,6 +1,7 @@
 import { sql } from "kysely";
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { KyselyPool } from "../infrastructure/KyselyPool.js";
+import { WebhookDispatcher } from "../webhooks/WebhookDispatcher.js";
 
 // Gateway contract; Db impl is swappable for HTTP if ever separate service.
 
@@ -228,6 +229,7 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       householdRole: "Head",
       membershipStatus: "Guest"
     } as any);
+    await WebhookDispatcher.emit(churchId, "person.created", person);
     return { personId: person.id, householdId: household.id, email: guestInfo.email };
   }
 
@@ -237,6 +239,7 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     if (Array.isArray(existing) && existing.some((m: any) => m.groupId === groupId)) return;
     await repos.groupMember.save({ churchId, groupId, personId, leader: false });
     await repos.groupMemberHistory.log(churchId, groupId, personId, "joined");
+    await WebhookDispatcher.emit(churchId, "group.member.added", { churchId, groupId, personId });
   }
 
   public async removeGroupMember(churchId: string, groupId: string, personId: string): Promise<void> {
@@ -246,7 +249,10 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .where("personId", "=", personId)
       .execute();
     const deleted = Number(result?.[0]?.numDeletedRows ?? 0);
-    if (deleted > 0) await (await this.repos()).groupMemberHistory.log(churchId, groupId, personId, "left");
+    if (deleted > 0) {
+      await (await this.repos()).groupMemberHistory.log(churchId, groupId, personId, "left");
+      await WebhookDispatcher.emit(churchId, "group.member.removed", { churchId, groupId, personId });
+    }
   }
 
   public async loadPeopleForAutomation(churchId: string) {

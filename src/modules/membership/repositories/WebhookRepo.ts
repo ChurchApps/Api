@@ -21,6 +21,7 @@ export class WebhookRepo {
       events: JSON.stringify(model.events ?? []),
       active: model.active === false ? 0 : 1,
       connectorType: model.connectorType ?? "standard",
+      connectorConfig: model.connectorConfig ?? null,
       consecutiveFailures: 0,
       createdBy: model.createdBy,
       dateCreated: sql`NOW()` as any
@@ -36,6 +37,7 @@ export class WebhookRepo {
       events: JSON.stringify(model.events ?? []),
       active: model.active === false ? 0 : 1,
       connectorType: model.connectorType ?? "standard",
+      connectorConfig: model.connectorConfig ?? null,
       dateModified: sql`NOW()` as any
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
@@ -85,6 +87,7 @@ export class WebhookRepo {
       events,
       active: row.active === 1 || row.active === true,
       connectorType: row.connectorType ?? "standard",
+      connectorConfig: row.connectorConfig ?? null,
       consecutiveFailures: row.consecutiveFailures,
       createdBy: row.createdBy,
       dateCreated: row.dateCreated,

@@ -1,5 +1,6 @@
 import type { Repos } from "../repositories/index.js";
 import type { Answer, Household, Person, Question } from "../models/index.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
 
 export interface FormContact {
   firstName?: string;
@@ -56,6 +57,7 @@ export class ConversationalFormHelper {
     };
     if (contact.phone) person.contactInfo.mobilePhone = contact.phone;
     person = await repos.person.save(person);
+    await WebhookDispatcher.emit(churchId, "person.created", person);
     return repos.person.convertToModel(churchId, await repos.person.load(person.churchId, person.id));
   }
 }

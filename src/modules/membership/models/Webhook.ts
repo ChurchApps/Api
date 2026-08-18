@@ -7,8 +7,10 @@ export class Webhook {
   public secret?: string;
   public events?: string[];
   public active?: boolean;
-  // How the outbound delivery body is formatted: "standard" | "slack" | "discord".
+  // How the outbound delivery body is formatted: "standard" | "slack" | "discord" | "mailchimp".
   public connectorType?: string;
+  // Encrypted JSON of connector-specific settings (e.g. Mailchimp apiKey/audienceId).
+  public connectorConfig?: string;
   public consecutiveFailures?: number;
   public createdBy?: string;
   public dateCreated?: Date;

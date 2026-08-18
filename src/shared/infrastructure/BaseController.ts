@@ -2,6 +2,7 @@ import { AuthenticatedUser, CustomBaseController } from "@churchapps/apihelper";
 import { RepoManager } from "./RepoManager.js";
 import { KyselyPool } from "./KyselyPool.js";
 import express from "express";
+import { WebhookDispatcher } from "../webhooks/WebhookDispatcher.js";
 
 export interface UndoArgs {
   db: any;
@@ -86,10 +87,12 @@ export class BaseController extends CustomBaseController {
         if (undoKind === "created") {
           await db.deleteFrom("groupMembers").where("churchId", "=", churchId).where("groupId", "=", groupId).where("personId", "=", personId).execute();
           await membershipRepos.groupMemberHistory.log(churchId, groupId, personId, "left");
+          await WebhookDispatcher.emit(churchId, "group.member.removed", { churchId, groupId, personId });
         } else if (undoKind === "deleted") {
           const existing = await db.selectFrom("groupMembers").select("id").where("churchId", "=", churchId).where("groupId", "=", groupId).where("personId", "=", personId).executeTakeFirst();
           if (!existing) await membershipRepos.groupMember.save({ churchId, groupId, personId, leader: !!before?.leader });
           await membershipRepos.groupMemberHistory.log(churchId, groupId, personId, "joined");
+          await WebhookDispatcher.emit(churchId, "group.member.added", { churchId, groupId, personId });
         } else if (before) {
           await db.updateTable("groupMembers").set({ leader: !!before.leader, groupId: before.groupId, personId: before.personId }).where("id", "=", entityId).where("churchId", "=", churchId).execute();
         } else {

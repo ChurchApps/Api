@@ -4,6 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions } from "../helpers/index.js";
 import { GdprExportHelper } from "../helpers/GdprExportHelper.js";
 import { GdprErasureHelper } from "../helpers/GdprErasureHelper.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
 
 @controller("/membership/gdpr")
 export class GdprController extends MembershipBaseController {
@@ -25,7 +26,9 @@ export class GdprController extends MembershipBaseController {
       const userChurch = await this.repos.userChurch.loadByPersonId(personId, au.churchId);
       const userId = userChurch?.userId || null;
 
+      const person: any = await this.repos.person.load(au.churchId, personId);
       await GdprErasureHelper.anonymize(au.churchId, personId, userId, this.repos);
+      await WebhookDispatcher.emit(au.churchId, "person.destroyed", { id: personId, churchId: au.churchId, email: person?.email });
       return {};
     });
   }

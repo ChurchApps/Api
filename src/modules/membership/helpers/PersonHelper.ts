@@ -5,6 +5,7 @@ import { AuthenticatedUser } from "../auth/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 import { SsoHelper } from "./SsoHelper.js";
+import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
 
 export class PersonHelper extends BasePersonHelper {
   private static async repos(): Promise<Repos> {
@@ -29,6 +30,7 @@ export class PersonHelper extends BasePersonHelper {
         contactInfo: { email }
       };
       newPerson = await repos.person.save(newPerson);
+      await WebhookDispatcher.emit(churchId, "person.created", newPerson);
       data.push(await repos.person.load(newPerson.churchId, newPerson.id));
     }
     const result = repos.person.convertAllToModelWithPermissions(churchId, data, canEdit);
@@ -61,6 +63,7 @@ export class PersonHelper extends BasePersonHelper {
       if (m.email) person.contactInfo.email = m.email;
       if (m.phone) person.contactInfo.mobilePhone = m.phone;
       const saved = await repos.person.save(person);
+      await WebhookDispatcher.emit(churchId, "person.created", saved);
       people.push(saved);
     }
 

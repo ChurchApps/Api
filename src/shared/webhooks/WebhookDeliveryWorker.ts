@@ -2,6 +2,7 @@ import { Webhook, WebhookDelivery } from "../../modules/membership/models/index.
 import { WebhookSigner } from "./WebhookSigner.js";
 import { WebhookRetryPolicy } from "./WebhookRetryPolicy.js";
 import { UrlValidator } from "./UrlValidator.js";
+import { MailchimpConnector } from "./MailchimpConnector.js";
 
 const REQUEST_TIMEOUT_MS = 10000;
 const MAX_RESPONSE_BODY = 4000;
@@ -36,7 +37,12 @@ export class WebhookDeliveryWorker {
     let responseBody = "";
 
     try {
-      if (await UrlValidator.resolvesToPrivate(new URL(webhook.url).hostname)) {
+      if (webhook.connectorType === "mailchimp") {
+        // Connector owns the HTTP exchange (fixed Mailchimp host, own auth, possibly multi-step).
+        const result = await MailchimpConnector.deliver(webhook, delivery);
+        status = result.status;
+        responseBody = result.responseBody;
+      } else if (await UrlValidator.resolvesToPrivate(new URL(webhook.url).hostname)) {
         responseBody = "Blocked: webhook URL resolves to a private address";
       } else {
         const signature = WebhookSigner.sign(webhook.secret, delivery.payload);

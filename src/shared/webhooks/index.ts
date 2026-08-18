@@ -6,3 +6,4 @@ export { UrlValidator } from "./UrlValidator.js";
 export { WebhookDispatcher } from "./WebhookDispatcher.js";
 export { WebhookDeliveryWorker } from "./WebhookDeliveryWorker.js";
 export { formatForConnector, describeEvent } from "./WebhookFormatters.js";
+export { MailchimpConnector, MAILCHIMP_EVENTS } from "./MailchimpConnector.js";
