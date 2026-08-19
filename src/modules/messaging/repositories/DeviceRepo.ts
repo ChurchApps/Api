@@ -30,7 +30,7 @@ export class DeviceRepo {
   }
 
   private async update(model: Device): Promise<Device> {
-    await getDb().updateTable("devices").set({
+    let query = getDb().updateTable("devices").set({
       appName: model.appName,
       deviceId: model.deviceId,
       churchId: model.churchId,
@@ -44,7 +44,9 @@ export class DeviceRepo {
       ipAddress: model.ipAddress,
       contentType: model.contentType,
       contentId: model.contentId
-    }).where("id", "=", model.id).execute();
+    }).where("id", "=", model.id);
+    if (model.churchId) query = query.where("churchId", "=", model.churchId);
+    await query.execute();
     return model;
   }
 
@@ -86,7 +88,7 @@ export class DeviceRepo {
   public async loadByFcmTokenContains(churchId: string, substring: string): Promise<Device | undefined> {
     return (await getDb().selectFrom("devices").selectAll()
       .where("churchId", "=", churchId)
-      .where("fcmToken", "like", `%${substring}%`)
+      .where("fcmToken", "like", `%${DeviceRepo.escapeLike(substring)}%`)
       .orderBy("lastActiveDate", "desc")
       .executeTakeFirst()) ?? null;
   }
@@ -109,15 +111,22 @@ export class DeviceRepo {
     await getDb().deleteFrom("devices").where("fcmToken", "=", fcmToken).execute();
   }
 
-  public async deleteByFcmTokenContains(substring: string) {
-    await getDb().deleteFrom("devices").where("fcmToken", "like", `%${substring}%`).execute();
+  public async deleteByWebPushEndpoint(endpoint: string) {
+    const escaped = DeviceRepo.escapeLike(endpoint);
+    await getDb().deleteFrom("devices")
+      .where("fcmToken", "like", `webpush:{"endpoint":"${escaped}"%`)
+      .execute();
+  }
+
+  public static escapeLike(value: string) {
+    return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/"/g, "\\\"");
   }
 
   public async deleteByFcmTokenContainsExceptId(churchId: string, substring: string, keepId: string) {
     await getDb().deleteFrom("devices")
       .where("churchId", "=", churchId)
       .where("id", "!=", keepId)
-      .where("fcmToken", "like", `%${substring}%`)
+      .where("fcmToken", "like", `%${DeviceRepo.escapeLike(substring)}%`)
       .execute();
   }
 

@@ -53,7 +53,10 @@ export class NotificationController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Notification> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.notification.loadById(au.churchId, id);
-      return this.repos.notification.convertToModel(data);
+      if (!data) return this.json({}, 404);
+      const model = this.repos.notification.convertToModel(data);
+      if (model.personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
+      return model;
     }) as any;
   }
 

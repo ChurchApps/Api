@@ -313,6 +313,7 @@ export class ChurchController extends MembershipBaseController {
   @httpPost("/add", ...churchRegisterValidation)
   public async addChurch(req: express.Request<{}, {}, RegisterChurchRequest>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au?.id) return this.json({}, 401);
       const validationErrors = validationResult(req);
       if (!validationErrors.isEmpty()) {
         return res.status(400).json({ errors: validationErrors.array() });

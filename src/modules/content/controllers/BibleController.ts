@@ -53,7 +53,8 @@ export class BibleController extends ContentBaseController {
 
   @httpGet("/:translationKey/updateCopyright")
   public async updateCopyright(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const bible = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
       const copyright = await BibleSourceFactory.getCopyright(bible?.source || "api.bible", translationKey);
       bible.copyright = copyright || "";

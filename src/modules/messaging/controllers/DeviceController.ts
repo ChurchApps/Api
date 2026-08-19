@@ -1,5 +1,6 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import crypto from "crypto";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Device } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
@@ -19,20 +20,24 @@ export class DeviceController extends MessagingBaseController {
       }
 
       if (result) {
-        // Update existing device
+        if (result.churchId && result.churchId !== au.churchId) result = null;
+      }
+      if (result) {
         result.fcmToken = req.body.fcmToken || result.fcmToken;
-        result.personId = req.body.personId || null;
+        result.personId = au.personId || result.personId;
         result.label = req.body.label || result.label;
         result.deviceInfo = req.body.deviceInfo || result.deviceInfo;
-        result.pairingCode = req.body.pairingCode || result.pairingCode;
         result.lastActiveDate = new Date();
         await this.repos.device.save(result);
       } else {
-        // Create new device
         const device: Device = {
-          ...req.body,
           churchId: au.churchId,
           appName: req.body.appName || "B1Mobile",
+          deviceId: req.body.deviceId,
+          personId: au.personId,
+          fcmToken: req.body.fcmToken,
+          label: req.body.label,
+          deviceInfo: req.body.deviceInfo,
           registrationDate: new Date(),
           lastActiveDate: new Date()
         };
@@ -100,12 +105,14 @@ export class DeviceController extends MessagingBaseController {
 
   private generatePairingCode(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    return Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    const bytes = crypto.randomBytes(8);
+    return Array.from(bytes, (b) => chars[b % chars.length]).join("");
   }
 
   @httpGet("/:churchId")
   public async loadByChurch(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const data = await this.repos.device.loadByChurchId(au.churchId);
       return this.repos.device.convertAllToModel(au.churchId, data as any[]);
     }) as any;
@@ -114,6 +121,7 @@ export class DeviceController extends MessagingBaseController {
   @httpGet("/:churchId/person/:personId")
   public async loadByPerson(@requestParam("churchId") _churchId: string, @requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
+      if (personId !== au.personId && !au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       const data = await this.repos.device.loadByPersonId(au.churchId, personId);
       return this.repos.device.convertAllToModel(au.churchId, data as any[]);
     }) as any;
@@ -134,6 +142,7 @@ export class DeviceController extends MessagingBaseController {
       const promises: Promise<Device>[] = [];
       req.body.forEach((device) => {
         device.churchId = au.churchId;
+        device.personId = au.personId;
         device.lastActiveDate = new Date();
         if (!device.registrationDate) device.registrationDate = new Date();
         promises.push(this.repos.device.save(device));

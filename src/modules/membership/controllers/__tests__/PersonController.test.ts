@@ -27,6 +27,7 @@ function personController(opts: any = {}) {
       save: jest.fn(async (p: any) => { if (!p.id) p.id = "genP"; return p; }),
       convertAllToModelWithPermissions: (_c: string, arr: any[]) => arr,
       convertToModelWithPermissions: (_c: string, data: any) => data,
+      convertToPreferenceModel: (_c: string, data: any) => data,
       load: jest.fn(async () => opts.person ?? null),
       delete: jest.fn(),
       deleteByIds: jest.fn()
@@ -35,6 +36,7 @@ function personController(opts: any = {}) {
     auditLog: { loadCount: jest.fn(async () => 0), create: jest.fn() },
     household: { deleteUnused: jest.fn() },
     formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) },
+    visibilityPreference: { loadForPerson: jest.fn(async () => null) },
     church: { loadById: jest.fn(async () => opts.church ?? { id: "c1" }) },
     setting: {
       loadPublicSettings: jest.fn(async () => opts.settings ?? []),
@@ -82,14 +84,11 @@ describe("PersonController.save authorization", () => {
     expect(repos.person.save).not.toHaveBeenCalled();
   });
 
-  it("editSelf gate only checks body[0] — a second, unrelated person in the same array also gets saved", async () => {
-    // note: suspicious — PersonController.ts:387-388 sets isSelfPermissionValid from req.body[0].id only,
-    // then the save loop below (line 393) iterates the WHOLE array; an editSelf-only caller can smuggle edits
-    // to other people's records by putting their own id first. Possible authz bug.
+  it("blocks editSelf when a second, unrelated person is smuggled in the same array", async () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1" });
     const result: any = await (controller as any).save(saveReq([{ id: "p1" }, { id: "someoneElse" }]), {});
-    expect(result.status).toBeUndefined();
-    expect(repos.person.save).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe(401);
+    expect(repos.person.save).not.toHaveBeenCalled();
   });
 });
 
@@ -112,6 +111,13 @@ describe("PersonController.get authorization", () => {
     const { controller, repos } = personController({ personId: "p1", access: ["peopleView"], person: { id: "p2", name: {} } });
     await (controller as any).get("p2", {}, {});
     expect(repos.person.load).toHaveBeenCalled();
+  });
+
+  it("uses directory visibility for a member without people.view and does not attach form submissions", async () => {
+    const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: "Member", person: { id: "p2", name: {}, contactInfo: {} } });
+    repos.visibilityPreference = { loadForPerson: jest.fn(async () => null) };
+    await (controller as any).get("p2", {}, {});
+    expect(repos.formSubmission.loadForContent).not.toHaveBeenCalled();
   });
 });
 

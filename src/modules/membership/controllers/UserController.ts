@@ -6,7 +6,7 @@ import { body, oneOf, validationResult } from "express-validator";
 import { LoginRequest, User, ResetPasswordRequest, LoadCreateUserRequest, RegisterUserRequest, Church, EmailPassword, NewPasswordRequest, LoginUserChurch, Person } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, LoginRateLimiter, MauticHelper, ChurchHelper } from "../helpers/index.js";
+import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, LoginRateLimiter, MauticHelper, ChurchHelper, PublicPersonRateLimiter } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 
@@ -229,16 +229,27 @@ export class UserController extends MembershipBaseController {
   // authz-exempt: open to any authenticated user — onboarding helper; provisions an inert user (random temp password, email-verification required) and returns no credentials (password nulled)
   @httpPost("/loadOrCreate", ...loadOrCreateValidation)
   public async loadOrCreate(req: express.Request<{}, {}, LoadCreateUserRequest>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
+    return this.actionWrapper(req, res, async (au) => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const { userId, userEmail, firstName, lastName } = req.body;
-      let user: User;
-      let isNewUser = false;
+      const isStaff = !!(au?.id && (au.checkAccess(Permissions.people.edit) || au.checkAccess(Permissions.roles.edit) || au.checkAccess(Permissions.server.admin)));
 
-      if (userId) user = await this.repos.user.load(userId);
-      else user = await this.repos.user.loadByEmail(userEmail);
+      if (userId) {
+        if (!isStaff && au?.id !== userId) return this.json({}, 401);
+        const existing = await this.repos.user.load(userId);
+        if (!existing) return this.json({}, 404);
+        return this.json(this.publicUser(existing), 200);
+      }
+
+      const rateLimitIp = LoginRateLimiter.getClientIp(req);
+      const account = (userEmail || "").toString().trim().toLowerCase();
+      if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
+      if (!isStaff && !PublicPersonRateLimiter.allow(rateLimitIp, "users", "loadOrCreate")) return this.json({ errors: ["Too many requests"] }, 429);
+
+      let user = await this.repos.user.loadByEmail(userEmail);
+      let isNewUser = false;
 
       if (!user) {
         isNewUser = true;
@@ -253,14 +264,16 @@ export class UserController extends MembershipBaseController {
         const codeHash = bcrypt.hashSync(code, 10);
         await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
         await UserHelper.sendWelcomeEmail(user.email, code, null, null);
-        // Create userChurch records for matching people in non-archived churches
         await UserChurchHelper.createForNewUser(user.id, user.email);
       }
-      user.password = null;
-      user.authGuid = null;
-      (user as any).isNewUser = isNewUser;
-      return this.json(user, 200);
+
+      if (isStaff) return this.json({ ...this.publicUser(user), isNewUser }, 200);
+      return this.json({ id: user.id, isNewUser }, 200);
     });
+  }
+
+  private publicUser(user: User) {
+    return { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName };
   }
 
   @httpPost("/register", ...registerValidation)
@@ -383,9 +396,12 @@ export class UserController extends MembershipBaseController {
           return res.status(400).json({ errors: ["Email is not configured on this server. Please contact your administrator to reset your password."], mailConfigured: false });
         }
 
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = (req.body.userEmail || "").toString().trim().toLowerCase();
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
+
         const user = await this.repos.user.loadByEmail(req.body.userEmail);
-        if (user === null) return this.json({ emailed: false }, 200);
-        else {
+        if (user !== null) {
           user.authGuid = "";
           const code = generateVerificationCode();
           const codeHash = bcrypt.hashSync(code, 10);
@@ -396,8 +412,8 @@ export class UserController extends MembershipBaseController {
           await Promise.all(promises);
           const ip = AuditLogHelper.getClientIp(req);
           AuditLogHelper.log(this.repos, "", user.id, "security", "password_reset", "user", user.id, { email: user.email }, ip);
-          return this.json({ emailed: true }, 200);
         }
+        return this.json({ emailed: true }, 200);
       } catch (e) {
         if (Environment.currentEnvironment === "dev") {
           throw e;

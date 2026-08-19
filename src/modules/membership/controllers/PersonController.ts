@@ -134,6 +134,11 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/household/:householdId")
   public async getHouseholdMembers(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const canView = au.checkAccess(Permissions.people.view) || au.checkAccess(Permissions.people.edit);
+      if (!canView) {
+        const self = au.personId ? await this.repos.person.load(au.churchId, au.personId) : null;
+        if (!self || self.householdId !== householdId) return this.json({}, 401);
+      }
       const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, (await this.repos.person.loadByHousehold(au.churchId, householdId)) as any[], au.checkAccess(Permissions.people.edit));
       return await this.appendAllowDirectMessages(result, result, au);
     });
@@ -335,15 +340,19 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (au.personId !== id && !au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
-      else {
-        const data = await this.repos.person.load(au.churchId, id);
-        if (!data) return null;
-        const result = this.repos.person.convertToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
-        await this.appendFormSubmissions(au.churchId, result, this.repos);
-        await this.appendAllowDirectMessages([result], [result], au);
-        return result;
+      const isSelf = au.personId === id;
+      const canView = au.checkAccess(Permissions.people.view);
+      if (!isSelf && !canView && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      const data = await this.repos.person.load(au.churchId, id);
+      if (!data) return null;
+      if (!isSelf && !canView) {
+        const limited = this.repos.person.convertToModelWithPermissions(au.churchId, data, false);
+        return this.repos.person.convertToPreferenceModel(au.churchId, await this.checkVisibilityPref(id, au, limited, this.repos));
       }
+      const result = this.repos.person.convertToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
+      await this.appendFormSubmissions(au.churchId, result, this.repos);
+      await this.appendAllowDirectMessages([result], [result], au);
+      return result;
     });
   }
 
@@ -405,11 +414,10 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Person[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      let isSelfPermissionValid = false;
-      if (au.checkAccess(Permissions.people.editSelf)) {
-        isSelfPermissionValid = req.body[0].id === au.personId;
-      }
-      if (!au.checkAccess(Permissions.people.edit) && !isSelfPermissionValid) return this.json({}, 401);
+      const canEdit = au.checkAccess(Permissions.people.edit);
+      const canEditSelf = au.checkAccess(Permissions.people.editSelf);
+      const isSelfOnly = canEditSelf && Array.isArray(req.body) && req.body.length === 1 && req.body[0]?.id === au.personId;
+      if (!canEdit && !isSelfOnly) return this.json({}, 401);
       else {
         const promises: Promise<Person>[] = [];
         req.body.forEach((person) => {

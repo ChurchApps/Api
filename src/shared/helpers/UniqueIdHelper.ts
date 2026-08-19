@@ -1,8 +1,13 @@
+import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 
 export class UniqueIdHelper {
   static shortId(): string {
     return uuidv4().replace(/-/g, "").substring(0, 8);
+  }
+
+  static secret(): string {
+    return crypto.randomBytes(32).toString("hex");
   }
 
   static uuid(): string {

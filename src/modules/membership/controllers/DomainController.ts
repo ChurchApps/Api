@@ -101,7 +101,7 @@ export class DomainController extends MembershipBaseController {
           domain.churchId = au.churchId;
           domain.domainName = (domain.domainName || "").toLowerCase().trim();
           domain.siteId = domain.siteId || "";
-          if (!domain.domainName || /\s/.test(domain.domainName)) return;
+          if (!domain.domainName || /\s/.test(domain.domainName) || !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain.domainName)) return;
           promises.push(this.repos.domain.save(domain));
         });
         const result = await Promise.all(promises);

@@ -8,9 +8,10 @@ export class SupportController extends ContentBaseController {
   // authz-exempt: open to any authenticated user — SSML→MP3 via Polly, no church data touched
   @httpPost("/createAudio")
   public async post(req: express.Request<{}, {}, { ssml: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
-      // const ssmlTest = "<speak>This is a test of the SSML to MP3 conversion.</speak>";
-      const ssml = req.body.ssml;
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au?.id) return this.json({}, 401);
+      const ssml = req.body.ssml || "";
+      if (ssml.length > 3000) return this.json({ error: "ssml too long" }, 400);
       const data = await PollyHelper.SsmlToMp3(ssml);
       return data;
     });

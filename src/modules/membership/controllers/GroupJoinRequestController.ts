@@ -19,7 +19,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
   @httpGet("/group/:groupId")
   public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const isLeader = au.groupIds && au.groupIds.includes(groupId);
+      const isLeader = au.leaderGroupIds && au.leaderGroupIds.includes(groupId);
       if (!au.checkAccess(Permissions.groupMembers.edit) && !isLeader) return this.json({}, 401);
       const data = await this.repos.groupJoinRequest.loadPendingForGroup(au.churchId, groupId);
       return this.repos.groupJoinRequest.convertAllToModel(au.churchId, data);
@@ -91,7 +91,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       if (!request) return this.json({}, 404);
       if (request.status !== "pending") return this.json({ error: "Request not pending" }, 400);
 
-      const isLeader = au.groupIds && au.groupIds.includes(request.groupId);
+      const isLeader = au.leaderGroupIds && au.leaderGroupIds.includes(request.groupId);
       if (!au.checkAccess(Permissions.groupMembers.edit) && !isLeader) return this.json({}, 401);
 
       const member: GroupMember = {
@@ -136,7 +136,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       if (!request) return this.json({}, 404);
       if (request.status !== "pending") return this.json({ error: "Request not pending" }, 400);
 
-      const isLeader = au.groupIds && au.groupIds.includes(request.groupId);
+      const isLeader = au.leaderGroupIds && au.leaderGroupIds.includes(request.groupId);
       if (!au.checkAccess(Permissions.groupMembers.edit) && !isLeader) return this.json({}, 401);
 
       request.status = "declined";

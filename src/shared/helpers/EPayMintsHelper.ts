@@ -271,12 +271,8 @@ export class EPayMintsHelper {
     signature: string,
     webhookSecret: string
   ): boolean {
-    try {
-      // TODO: ePayMints-specific webhook signature verification (depends on their mechanism).
-      return signature.length > 0 && webhookSecret.length > 0;
-    } catch {
-      return false;
-    }
+    if (!signature || !webhookSecret) return false;
+    return false;
   }
 
   static async logEvent(

@@ -68,9 +68,9 @@ export class UserHelper {
     return luc.apis;
   }
 
-  static sendWelcomeEmail(email: string, code: string, appName: string, appUrl: string): Promise<any> {
-    if (!appName) appName = "ChurchApps";
-    if (!appUrl) appUrl = Environment.b1AdminRoot;
+  static sendWelcomeEmail(email: string, code: string, _appName: string, _appUrl: string): Promise<any> {
+    const appName = "ChurchApps";
+    const appUrl = Environment.b1AdminRoot;
 
     const contents =
       "<h2>Welcome to " + appName + "</h2>" +
@@ -93,9 +93,9 @@ export class UserHelper {
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, subject, contents, "EmailTemplate.html", inviterEmail || undefined);
   }
 
-  static sendForgotEmail(email: string, code: string, appName: string, appUrl: string): Promise<any> {
-    if (!appName) appName = "ChurchApps";
-    if (!appUrl) appUrl = Environment.b1AdminRoot;
+  static sendForgotEmail(email: string, code: string, _appName: string, _appUrl: string): Promise<any> {
+    const appName = "ChurchApps";
+    const appUrl = Environment.b1AdminRoot;
 
     const contents =
       "<h2>Reset Password</h2>" +

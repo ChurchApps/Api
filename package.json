@@ -56,7 +56,7 @@
     "@aws-sdk/client-ssm": "^3.862.0",
     "@aws-sdk/lib-storage": "^3.862.0",
     "@aws-sdk/s3-request-presigner": "3.1057.0",
-    "@churchapps/apihelper": "^1.1.0",
+    "@churchapps/apihelper": "^1.1.2",
     "@churchapps/content-providers": "^0.9.1",
     "@churchapps/helpers": "^1.11.1",
     "@churchapps/texting": "^0.4.0",

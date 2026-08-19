@@ -49,7 +49,8 @@ export class RegistrationController extends ContentBaseController {
       if (event.registrationOpenDate && new Date(event.registrationOpenDate) > now) return this.json({ error: "Registration has not opened yet" }, 400);
       if (event.registrationCloseDate && new Date(event.registrationCloseDate) < now) return this.json({ error: "Registration has closed" }, 400);
 
-      let personId = data.personId || null;
+      const au = this.authUser();
+      let personId = (au?.personId && data.personId === au.personId) ? au.personId : null;
       let householdId: string = null;
       let email: string = null;
       let name = "";

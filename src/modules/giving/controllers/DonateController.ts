@@ -164,8 +164,13 @@ export class DonateController extends GivingBaseController {
         return this.json({ error: `No ${provider} gateway configured` }, 404);
       }
 
+      const capabilities = GatewayService.getProviderFromGateway(gateway).capabilities;
+      if (!capabilities.supportsWebhooks) return this.json({ error: "Webhooks not supported" }, 401);
+
       try {
-        const webhookResult = await GatewayService.verifyWebhook(gateway, req.headers, req.body);
+        const proto = (req.get("x-forwarded-proto") || req.protocol || "https").split(",")[0].trim();
+        const notificationUrl = `${proto}://${req.hostname}/giving/donate/webhook/${provider}?churchId=${churchId}`;
+        const webhookResult = await GatewayService.verifyWebhook(gateway, req.headers, req.body, { notificationUrl });
 
         if (!webhookResult.success) {
           console.error(`${provider} webhook verification failed`);

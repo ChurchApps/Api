@@ -97,18 +97,13 @@ export class PlanFeedController extends DoingBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       // First try to get existing plan items
       let result = (await this.repos.planItem.loadForPlan(churchId, planId)) as PlanItem[];
-      console.log("PlanFeed: loaded planItems count:", result.length);
 
-      // Auto-populate from venue feed if no plan items exist
       if (result.length === 0) {
         const plan = await this.repos.plan.load(churchId, planId);
-        console.log("PlanFeed: plan loaded:", plan ? `contentId=${plan.contentId}` : "null");
         if (plan?.contentId) {
           const venueFeed = await fetchVenueFeed(plan.contentId);
-          console.log("PlanFeed: venueFeed:", venueFeed ? `sections=${venueFeed.sections?.length}` : "null");
           if (venueFeed) {
             result = venueFeedToDefaultPlanItems(venueFeed, planId);
-            console.log("PlanFeed: generated items count:", result.length);
           }
         }
       }

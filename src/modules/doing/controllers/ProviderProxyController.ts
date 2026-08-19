@@ -1,6 +1,7 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
+import { Permissions } from "../../../shared/helpers/index.js";
 import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, ContentProviderConfig, setProviderSecret } from "@churchapps/content-providers";
 import { ContentProviderAuth } from "../models/index.js";
 
@@ -112,6 +113,7 @@ export class ProviderProxyController extends DoingBaseController {
   @httpPost("/browse")
   public async browse(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
       if (!ministryId || !providerId) {
@@ -131,6 +133,7 @@ export class ProviderProxyController extends DoingBaseController {
   @httpPost("/getPresentations")
   public async getPresentations(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
       if (!ministryId || !providerId || !path) {
@@ -150,6 +153,7 @@ export class ProviderProxyController extends DoingBaseController {
   @httpPost("/getPlaylist")
   public async getPlaylist(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path, resolution } = req.body;
 
       if (!ministryId || !providerId || !path) {
@@ -175,6 +179,7 @@ export class ProviderProxyController extends DoingBaseController {
   @httpPost("/getInstructions")
   public async getInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
       if (!ministryId || !providerId || !path) {
@@ -198,6 +203,7 @@ export class ProviderProxyController extends DoingBaseController {
   @httpPost("/getExpandedInstructions")
   public async getExpandedInstructions(req: express.Request<{}, {}, ProxyRequestBody>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
       if (!ministryId || !providerId || !path) {

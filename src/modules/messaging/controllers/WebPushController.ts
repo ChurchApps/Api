@@ -104,9 +104,15 @@ export class WebPushController extends MessagingBaseController {
   @httpPost("/unsubscribe")
   public async unsubscribe(req: express.Request<{}, {}, { endpoint?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      const endpoint = req.body?.endpoint;
-      if (!endpoint) return { success: false };
-      await this.repos.device.deleteByFcmTokenContains(endpoint);
+      const endpoint = (req.body?.endpoint || "").trim();
+      if (endpoint.length < 40) return { success: false };
+      try {
+        const url = new URL(endpoint);
+        if (url.protocol !== "https:") return { success: false };
+      } catch {
+        return { success: false };
+      }
+      await this.repos.device.deleteByWebPushEndpoint(endpoint);
       return { success: true };
     });
   }

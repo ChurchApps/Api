@@ -1,6 +1,7 @@
 // TODO: Install Square SDK with: npm install squareup
 // import { Client, ApiResponse, CreatePaymentRequest, Money, Card } from 'squareup';
 
+import crypto from "crypto";
 import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/giving/models/index.js";
 
 export class SquareHelper {
@@ -214,19 +215,24 @@ export class SquareHelper {
     }
   }
 
-  static async validateWebhookSignature(
-    _body: string,
-    _signature: string,
-    _notificationUrl: string,
-    _webhookSignatureKey: string
-  ): Promise<boolean> {
-    try {
-      // TODO: Implement Square webhook signature validation
-      // Use Square's webhook signature validation logic
-      return true; // Mock validation for now
-    } catch {
-      return false;
-    }
+  static validateWebhookSignature(
+    body: string,
+    signature: string,
+    notificationUrl: string,
+    webhookSignatureKey: string
+  ): boolean {
+    if (!body || !signature || !notificationUrl || !webhookSignatureKey) return false;
+    const payload = notificationUrl + body;
+    const sha256 = crypto.createHmac("sha256", webhookSignatureKey).update(payload).digest("base64");
+    const sha1 = crypto.createHmac("sha1", webhookSignatureKey).update(payload).digest("base64");
+    return SquareHelper.signaturesMatch(signature, sha256) || SquareHelper.signaturesMatch(signature, sha1);
+  }
+
+  private static signaturesMatch(provided: string, expected: string): boolean {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
   }
 
   static calculateFees(amount: number, customFixedFee?: number, customPercentFee?: number): number {

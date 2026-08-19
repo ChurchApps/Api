@@ -11,10 +11,6 @@ export class ArrangementKeyController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const arrangementKey: ArrangementKey = await this.repos.arrangementKey.load(churchId, id);
       const arrangement: Arrangement = await this.repos.arrangement.load(churchId, arrangementKey.arrangementId);
-      if (!arrangement.freeShowId) {
-        arrangement.freeShowId = `chumssong_${arrangementKey.id}`;
-        await this.repos.arrangement.save(arrangement);
-      }
 
       const song: Song = await this.repos.song.load(churchId, arrangement.songId);
       const songDetail: SongDetail = await this.repos.songDetail.loadGlobal(arrangement.songDetailId);

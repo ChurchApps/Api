@@ -68,10 +68,10 @@ export class GatewayService {
     await provider.deleteWebhooksByChurchId(config, churchId);
   }
 
-  static async verifyWebhook(gateway: any, headers: any, body: any) {
+  static async verifyWebhook(gateway: any, headers: any, body: any, extras?: { notificationUrl?: string }) {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
-    return await provider.verifyWebhookSignature(config, headers, body);
+    return await provider.verifyWebhookSignature(config, headers, body, extras);
   }
 
   static classifyWebhookEvent(gateway: any, eventType: string): WebhookEventClassification {

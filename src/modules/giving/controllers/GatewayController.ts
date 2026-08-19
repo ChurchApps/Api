@@ -11,7 +11,16 @@ export class GatewayController extends GivingBaseController {
   @httpGet("/churchId/:churchId")
   public async getForChurch(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return this.repos.gateway.convertAllToModel(churchId, (await this.repos.gateway.loadAll(churchId)) as any[]);
+      const rows = this.repos.gateway.convertAllToModel(churchId, (await this.repos.gateway.loadAll(churchId)) as any[]);
+      return rows.map((g: any) => ({
+        id: g.id,
+        provider: g.provider,
+        publicKey: g.publicKey,
+        payFees: g.payFees,
+        currency: g.currency,
+        environment: g.environment,
+        productId: g.productId
+      }));
     });
   }
 

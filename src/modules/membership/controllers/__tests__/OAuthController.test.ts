@@ -2,7 +2,7 @@ import "reflect-metadata";
 jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
   Permissions: { settings: { edit: "settingsEdit" }, server: { admin: "serverAdmin" } },
-  UniqueIdHelper: { shortId: () => "short" },
+  UniqueIdHelper: { shortId: () => "short", secret: () => "a".repeat(64) },
   UserHelper: { loadExpandedPermissions: jest.fn(async () => []) }
 }));
 jest.mock("../../auth/index", () => ({ AuthenticatedUser: { getCombinedApiJwt: jest.fn() } }));

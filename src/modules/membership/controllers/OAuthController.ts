@@ -44,7 +44,7 @@ export class OAuthController extends MembershipBaseController {
       const authCode: OAuthCode = {
         userChurchId: userChurch.id,
         clientId: client.clientId,
-        code: UniqueIdHelper.shortId(),
+        code: UniqueIdHelper.secret(),
         redirectUri: redirect_uri,
         scopes: scope,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
@@ -126,7 +126,7 @@ export class OAuthController extends MembershipBaseController {
           clientId: client.clientId,
           userChurchId: authCode.userChurchId,
           accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(authCode.scopes)),
-          refreshToken: UniqueIdHelper.shortId(),
+          refreshToken: UniqueIdHelper.secret(),
           scopes: authCode.scopes,
           expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
         };
@@ -171,7 +171,7 @@ export class OAuthController extends MembershipBaseController {
           clientId: client.clientId,
           userChurchId: oldToken.userChurchId,
           accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(oldToken.scopes)),
-          refreshToken: UniqueIdHelper.shortId(),
+          refreshToken: UniqueIdHelper.secret(),
           scopes: oldToken.scopes,
           expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
         };
@@ -288,7 +288,7 @@ export class OAuthController extends MembershipBaseController {
         loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
         const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(dc.scopes));
-        const refreshToken = UniqueIdHelper.shortId();
+        const refreshToken = UniqueIdHelper.secret();
 
         // Refresh token expires in 90 days
         const token: OAuthToken = {

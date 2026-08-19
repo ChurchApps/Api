@@ -147,7 +147,7 @@ export class FormSubmissionController extends MembershipBaseController {
           formSubmission.questions.forEach((q) => {
             formSubmission.answers.forEach((a) => {
               if (q.id === a.questionId) {
-                contentRows.push("<tr><th style=\"font-size: 16px\" width=\"30%\">" + q.title + "</th><td style=\"font-size: 15px\">" + a.value + "</td></tr>");
+                contentRows.push("<tr><th style=\"font-size: 16px\" width=\"30%\">" + this.escapeHtml(q.title) + "</th><td style=\"font-size: 15px\">" + this.escapeHtml(a.value) + "</td></tr>");
               }
             });
           });
@@ -166,7 +166,7 @@ export class FormSubmissionController extends MembershipBaseController {
 
   private async sendFollowUp(churchId: string, email: string, firstName: string, subject: string, body: string) {
     const church: Church = await this.repos.church.loadById(churchId);
-    const tokens = { firstName, churchName: church?.name };
+    const tokens = { firstName: this.escapeHtml(firstName), churchName: this.escapeHtml(church?.name) };
     const resolvedSubject = ConversationalFormHelper.applyTokens(subject, tokens);
     const resolvedBody = ConversationalFormHelper.applyTokens(body, tokens);
     await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
@@ -214,5 +214,10 @@ export class FormSubmissionController extends MembershipBaseController {
     const data = (await this.repos.answer.loadForFormSubmission(churchId, formSubmission.id)) as any[];
     formSubmission.answers = this.repos.answer.convertAllToModel(churchId, data);
     return formSubmission;
+  }
+
+  private escapeHtml(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 }

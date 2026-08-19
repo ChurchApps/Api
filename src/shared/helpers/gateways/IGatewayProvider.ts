@@ -80,7 +80,7 @@ export interface IGatewayProvider {
   // Webhook management
   createWebhookEndpoint(config: GatewayConfig, webhookUrl: string): Promise<{ id: string; secret?: string }>;
   deleteWebhooksByChurchId(config: GatewayConfig, churchId: string): Promise<void>;
-  verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any): Promise<WebhookResult>;
+  verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any, extras?: { notificationUrl?: string }): Promise<WebhookResult>;
   // Semantic meaning of a verified webhook event; unknown events are "ignore".
   classifyWebhookEvent?(eventType: string): WebhookEventClassification;
 

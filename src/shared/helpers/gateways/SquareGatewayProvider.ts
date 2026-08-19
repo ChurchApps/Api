@@ -38,13 +38,14 @@ export class SquareGatewayProvider implements IGatewayProvider {
     // TODO: implement when Square SDK available
   }
 
-  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any): Promise<WebhookResult> {
+  async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any, extras?: { notificationUrl?: string }): Promise<WebhookResult> {
     try {
-      const signature = headers["x-square-signature"] as string;
-      const isValid = await SquareHelper.validateWebhookSignature(
-        JSON.stringify(body),
+      const signature = (headers["x-square-hmacsha256-signature"] || headers["x-square-signature"]) as string;
+      const raw = typeof body === "string" ? body : Buffer.isBuffer(body) ? body.toString("utf8") : JSON.stringify(body);
+      const isValid = SquareHelper.validateWebhookSignature(
+        raw,
         signature,
-        "", // notification URL
+        extras?.notificationUrl || "",
         config.webhookKey
       );
 
