@@ -11,6 +11,7 @@ jest.mock("axios", () => ({ post: jest.fn() }));
 
 import { FormSubmissionController } from "../FormSubmissionController.js";
 import { WebhookDispatcher } from "../../../../shared/webhooks/index.js";
+import { ConversationalFormHelper } from "../../helpers/index.js";
 
 function formSubmissionController(opts: any = {}) {
   const formRow = opts.form ?? { id: "f1", churchId: "c1", name: "Connect", restricted: false };
@@ -68,5 +69,19 @@ describe("FormSubmissionController.save churchId", () => {
     const result: any = await (controller as any).save({ body: [{ formId: "missing" }] }, {});
     expect(repos.formSubmission.save).not.toHaveBeenCalled();
     expect(result[0].error).toMatch(/not found/);
+  });
+});
+
+describe("FormSubmissionController.save autoCreatePerson", () => {
+  it("rewrites a pre-populated form contentType/contentId to the created person", async () => {
+    (ConversationalFormHelper.extractContact as jest.Mock).mockReturnValueOnce({ firstName: "Al", email: "al@example.com" });
+    (ConversationalFormHelper.findOrCreatePerson as jest.Mock).mockResolvedValueOnce({ id: "p1", name: { first: "Al" } });
+    const { controller, repos } = formSubmissionController({ form: { id: "f1", churchId: "c1", name: "Connect", restricted: false, autoCreatePerson: true } });
+    const body = [{ formId: "f1", contentType: "form", contentId: "f1", answers: [{ questionId: "q1", value: "al@example.com" }] }];
+    await (controller as any).save({ body }, {});
+    expect(ConversationalFormHelper.findOrCreatePerson).toHaveBeenCalledTimes(1);
+    const saved = repos.formSubmission.save.mock.calls[0][0];
+    expect(saved.contentType).toBe("person");
+    expect(saved.contentId).toBe("p1");
   });
 });

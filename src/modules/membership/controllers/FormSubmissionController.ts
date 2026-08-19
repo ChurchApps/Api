@@ -84,7 +84,7 @@ export class FormSubmissionController extends MembershipBaseController {
               const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
               contact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
               followUpFirstName = contact?.firstName;
-              if (wantsPerson && contact?.email && !formSubmission.contentId) {
+              if (wantsPerson && contact?.email && formSubmission.contentType !== "person") {
                 const person = await ConversationalFormHelper.findOrCreatePerson(this.repos, churchId, contact);
                 if (person) {
                   formSubmission.contentType = "person";
