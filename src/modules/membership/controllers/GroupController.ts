@@ -181,7 +181,7 @@ export class GroupController extends MembershipBaseController {
         .where("churchId", "=", au.churchId)
         .where((eb: any) => eb.or(associations.map((a) => {
           const base = eb("planTypeId", "=", a.contentId);
-          if (a.settings === "past") return eb.and([base, eb("serviceDate", "<", sql`CURDATE()`)]);
+          if (a.settings === "past") return eb.and([base, eb("serviceDate", "<=", sql`CURDATE()`)]);
           if (a.settings === "future") return eb.and([base, eb("serviceDate", ">=", sql`CURDATE()`)]);
           return base;
         })))
