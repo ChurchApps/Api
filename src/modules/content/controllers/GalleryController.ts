@@ -27,12 +27,12 @@ export class GalleryController extends ContentBaseController {
   }
 
   @httpPost("/requestUpload")
-  public async getUploadUrl(req: express.Request<{}, {}, { folder: string; fileName: string }>, res: express.Response): Promise<any> {
+  public async getUploadUrl(req: express.Request<{}, {}, { folder: string; fileName: string; contentType?: string; size?: number }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const key = au.churchId + "/gallery/" + path.basename(req.body.folder) + "/" + path.basename(req.body.fileName);
-        const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key) : {};
+        const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key, req.body.contentType, req.body.size) : {};
         return result;
       }
     });
