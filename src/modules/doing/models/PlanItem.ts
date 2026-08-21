@@ -5,6 +5,7 @@ export class PlanItem {
   public parentId?: string;
   public sort?: number;
   public itemType?: string;
+  public actionType?: string;
   public relatedId?: string;
   public positionId?: string;
   public label?: string;
