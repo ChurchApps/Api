@@ -6,6 +6,7 @@ export class PlanItem {
   public sort?: number;
   public itemType?: string;
   public relatedId?: string;
+  public positionId?: string;
   public label?: string;
   public description?: string;
   public seconds?: number;

@@ -101,7 +101,7 @@ export class PlanController extends DoingBaseController {
     return result;
   }
 
-  private async copyTimesAndPositions(churchId: string, sourcePlanId: string, targetPlan: Plan, oldPlan: Plan, copyAssignments: boolean): Promise<Map<string, string>> {
+  private async copyTimesAndPositions(churchId: string, sourcePlanId: string, targetPlan: Plan, oldPlan: Plan, copyAssignments: boolean): Promise<{ timeIdMap: Map<string, string>; positionIdMap: Map<string, string> }> {
     const times: Time[] = await this.repos.time.loadByPlanId(churchId, sourcePlanId) as Time[];
     const positions: Position[] = await this.repos.position.loadByPlanId(churchId, sourcePlanId) as Position[];
     const positionIdMap = new Map<string, string>();
@@ -144,10 +144,10 @@ export class PlanController extends DoingBaseController {
     }
 
     await Promise.all(promises);
-    return timeIdMap;
+    return { timeIdMap, positionIdMap };
   }
 
-  private async copyServiceOrderItems(churchId: string, sourcePlanId: string, targetPlanId: string): Promise<Map<string, string>> {
+  private async copyServiceOrderItems(churchId: string, sourcePlanId: string, targetPlanId: string, positionIdMap: Map<string, string>): Promise<Map<string, string>> {
     const planItems: PlanItem[] = await this.repos.planItem.loadForPlan(churchId, sourcePlanId) as PlanItem[];
     const planItemIdMap = new Map<string, string>();
 
@@ -156,6 +156,7 @@ export class PlanController extends DoingBaseController {
       const oldId = item.id;
       item.id = undefined;
       item.planId = targetPlanId;
+      item.positionId = positionIdMap.get(item.positionId || "");
       const savedItem = await this.repos.planItem.save(item);
       if (oldId) planItemIdMap.set(oldId, savedItem.id || "");
     }
@@ -168,6 +169,7 @@ export class PlanController extends DoingBaseController {
         item.id = undefined;
         item.planId = targetPlanId;
         item.parentId = newParentId;
+        item.positionId = positionIdMap.get(item.positionId || "");
         const savedItem = await this.repos.planItem.save(item);
         if (oldId) planItemIdMap.set(oldId, savedItem.id || "");
       }
@@ -265,14 +267,15 @@ export class PlanController extends DoingBaseController {
       const plan = await this.repos.plan.save(p);
 
       let timeIdMap = new Map<string, string>();
+      let positionIdMap = new Map<string, string>();
       let planItemIdMap = new Map<string, string>();
 
       if (copyMode !== "none") {
-        timeIdMap = await this.copyTimesAndPositions(au.churchId, id, plan, oldPlan, copyMode === "all");
+        ({ timeIdMap, positionIdMap } = await this.copyTimesAndPositions(au.churchId, id, plan, oldPlan, copyMode === "all"));
       }
 
       if (copyServiceOrder) {
-        planItemIdMap = await this.copyServiceOrderItems(au.churchId, id, plan.id!);
+        planItemIdMap = await this.copyServiceOrderItems(au.churchId, id, plan.id!, positionIdMap);
       }
 
       if (timeIdMap.size > 0 && planItemIdMap.size > 0) {
