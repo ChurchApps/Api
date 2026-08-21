@@ -143,6 +143,13 @@ export class MessageController extends MessagingBaseController {
       for (const message of req.body) {
         const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
         if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(au, conv.contentType)) return this.json({}, 401);
+        if (message.id) {
+          // Editing is author-or-staff only - leaders get delete, not rewrite - and authorship is never reassignable.
+          const existing = await this.repos.message.loadById(au.churchId, message.id);
+          const isOwner = !!existing?.personId && existing.personId === au.personId;
+          if (!isOwner && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+          message.personId = existing?.personId ?? null;
+        }
       }
       const promises: Promise<Message>[] = [];
       req.body.forEach((message) => {
@@ -246,6 +253,17 @@ export class MessageController extends MessagingBaseController {
     return false;
   }
 
+  // Staff with content.edit moderate anywhere; group leaders moderate their own group's
+  // conversations. Person notes are never leader-moderated - they run through the notes RBAC.
+  private async canModerate(au: any, conv: any): Promise<boolean> {
+    if (this.isPersonNote(conv?.contentType)) return this.canViewPersonNotes(au, conv.contentType);
+    if (au.checkAccess(Permissions.content.edit)) return true;
+    if (conv?.contentType === "group" || conv?.contentType === "groupAnnouncement") {
+      return !!conv.contentId && !!au.leaderGroupIds?.includes(conv.contentId);
+    }
+    return false;
+  }
+
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
@@ -253,9 +271,9 @@ export class MessageController extends MessagingBaseController {
       if (Object.keys(message).length === 0) {
         return this.json({ error: "Message not found" }, 404);
       }
-      const isOwner = message.personId === au.personId;
-      const canEdit = au.checkAccess(Permissions.content.edit);
-      if (!isOwner && !canEdit) {
+      const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
+      const isOwner = !!message.personId && message.personId === au.personId;
+      if (!isOwner && !(await this.canModerate(au, conv))) {
         return this.json({ error: "Unauthorized" }, 401);
       }
       await this.repos.message.delete(au.churchId, id);
