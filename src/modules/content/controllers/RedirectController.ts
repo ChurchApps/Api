@@ -49,7 +49,9 @@ export class RedirectController extends ContentBaseController {
         if (existing + creates > MAX_REDIRECTS) return this.json({ error: "Redirect limit (" + MAX_REDIRECTS + ") exceeded" }, 400);
       }
 
-      return await Promise.all(redirects.map((r) => this.repos.redirect.save(r)));
+      const result = await Promise.all(redirects.map((r) => this.repos.redirect.save(r)));
+      this.bumpSiteCache(au.churchId);
+      return result;
     });
   }
 
@@ -58,6 +60,7 @@ export class RedirectController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.redirect.delete(au.churchId, id);
+      this.bumpSiteCache(au.churchId);
       return this.json({});
     });
   }

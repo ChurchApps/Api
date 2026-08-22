@@ -26,6 +26,7 @@ export class ElementController extends ContentBaseController {
         const allElements: Element[] = await this.repos.element.loadForSection(element.churchId, element.sectionId);
         TreeHelper.getChildElements(element, allElements);
         const result = await TreeHelper.duplicateElement(element, element.sectionId, element.parentId);
+        this.bumpSiteCache(au.churchId);
         return result;
       }
     });
@@ -50,6 +51,7 @@ export class ElementController extends ContentBaseController {
         }
         await this.checkRows(result);
         await this.checkSlides(result);
+        this.bumpSiteCache(au.churchId);
         return result;
       }
     });
@@ -87,6 +89,7 @@ export class ElementController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         await this.repos.element.delete(au.churchId, id);
+        this.bumpSiteCache(au.churchId);
         return this.json({});
       }
     });

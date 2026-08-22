@@ -82,6 +82,7 @@ export class PageController2 extends ContentBaseController {
       const allElements: Element[] = await this.repos.element.loadForPage(au.churchId, page.id);
       const tree = TreeHelper.buildTree(sections, allElements);
       const publishedAt = await this.repos.page.savePublished(au.churchId, page.id, JSON.stringify({ sections: tree }));
+      this.bumpSiteCache(au.churchId);
       return { publishedAt };
     });
   }
@@ -93,6 +94,7 @@ export class PageController2 extends ContentBaseController {
       const snapshot = await this.loadPublishedSnapshot(au.churchId, id);
       if (!snapshot) return this.json({ error: "Page has no published version" }, 400);
       await TreeHelper.deleteAndRestoreContent(au.churchId, id, null, snapshot);
+      this.bumpSiteCache(au.churchId);
       return { success: true };
     });
   }
@@ -102,6 +104,7 @@ export class PageController2 extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.page.savePublished(au.churchId, id, null);
+      this.bumpSiteCache(au.churchId);
       return this.json({});
     });
   }
@@ -160,6 +163,7 @@ export class PageController2 extends ContentBaseController {
         });
         await Promise.all(promises);
 
+        this.bumpSiteCache(au.churchId);
         return newPage;
       }
     });
@@ -180,6 +184,7 @@ export class PageController2 extends ContentBaseController {
           promises.push(this.repos.element.save(element));
         });
         const result = await Promise.all(promises);
+        this.bumpSiteCache(au.churchId);
         return result[0];
       }
     });
@@ -197,6 +202,7 @@ export class PageController2 extends ContentBaseController {
           promises.push(this.repos.page.save(page));
         });
         const result = await Promise.all(promises);
+        this.bumpSiteCache(au.churchId);
         return result;
       }
     });
@@ -208,6 +214,7 @@ export class PageController2 extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         await this.repos.page.delete(au.churchId, id);
+        this.bumpSiteCache(au.churchId);
         return this.json({});
       }
     });

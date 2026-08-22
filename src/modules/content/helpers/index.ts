@@ -11,6 +11,7 @@ export { TreeHelper } from "./TreeHelper.js";
 export { SongHelper } from "./SongHelper.js";
 export { StreamingConfigHelper } from "./StreamingConfigHelper.js";
 export { SubDomainHelper } from "./SubDomainHelper.js";
+export { SiteCacheHelper } from "./SiteCacheHelper.js";
 export { PollyHelper } from "./PollyHelper.js";
 export { CalendarHelper } from "./CalendarHelper.js";
 export { RegistrationHelper } from "./RegistrationHelper.js";

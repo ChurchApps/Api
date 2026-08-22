@@ -86,6 +86,7 @@ export class BlockController extends ContentBaseController {
       const promises: Promise<Block>[] = [];
       req.body.forEach((item) => { (item as any).churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.block.save(item)); });
       const result = await Promise.all(promises);
+      this.bumpSiteCache(au.churchId);
       return this.repos.block.convertAllToModel(au.churchId, result);
     });
   }
@@ -95,6 +96,7 @@ export class BlockController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.block.delete(au.churchId, id);
+      this.bumpSiteCache(au.churchId);
       return {};
     });
   }

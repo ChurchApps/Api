@@ -53,6 +53,7 @@ export class GlobalStyleController extends ContentBaseController {
       const promises: Promise<GlobalStyle>[] = [];
       req.body.forEach((item) => { (item as any).churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.globalStyle.save(item)); });
       const result = await Promise.all(promises);
+      this.bumpSiteCache(au.churchId);
       return this.repos.globalStyle.convertAllToModel(au.churchId, result);
     });
   }
@@ -62,6 +63,7 @@ export class GlobalStyleController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.globalStyle.delete(au.churchId, id);
+      this.bumpSiteCache(au.churchId);
       return {};
     });
   }

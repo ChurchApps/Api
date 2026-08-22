@@ -94,6 +94,7 @@ export class LinkController extends ContentBaseController {
           // ignore sort errors
         }
       }
+      this.bumpSiteCache(au.churchId);
       return this.repos.link.convertAllToModel(au.churchId, result);
     });
   }
@@ -104,6 +105,7 @@ export class LinkController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         await this.repos.link.delete(au.churchId, id);
+        this.bumpSiteCache(au.churchId);
         return this.json({});
       }
     });
