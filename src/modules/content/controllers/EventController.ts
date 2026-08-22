@@ -355,7 +355,7 @@ export class EventController extends ContentBaseController {
       newEv.title = ev.title;
       newEv.description = ev.description || "";
       newEv.recurrenceRule = ev.recurrenceRule || "";
-      newEv.exclusionDates = ev.exceptionDates || [];
+      newEv.exclusionDates = (ev.exceptionDates || []).map((d) => new Date(d).getTime());
       result.push(newEv);
     });
     return result;
