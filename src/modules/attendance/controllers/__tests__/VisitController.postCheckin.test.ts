@@ -154,7 +154,7 @@ describe("postCheckin permissions", () => {
   });
 
   it("returns 401 when unprivileged user has no personId and checkAccess is false", async () => {
-    const { controller, repos } = makeController({ groups: [], counts: [] });
+    const { controller } = makeController({ groups: [], counts: [] });
     (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", id: "u1", checkAccess: () => false });
     const result: any = await (controller as any).postCheckin(req(memberVisit()), {});
     expect(result.status).toBe(401);

@@ -17,9 +17,7 @@ import { EventController } from "../EventController.js";
 describe("EventController.subscribe ICS", () => {
   it("emits a calendar for events that have exception dates", async () => {
     const controller = new EventController();
-    (controller as any).repos = {
-      event: { loadPublicForGroup: jest.fn(async () => [{ id: "e1", churchId: "c1", title: "Sunday Service", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z"), recurrenceRule: "FREQ=WEEKLY;BYDAY=SU" }]) }
-    };
+    (controller as any).repos = { event: { loadPublicForGroup: jest.fn(async () => [{ id: "e1", churchId: "c1", title: "Sunday Service", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z"), recurrenceRule: "FREQ=WEEKLY;BYDAY=SU" }]) } };
     (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
     const res: any = { status: jest.fn(() => res), send: jest.fn(), set: jest.fn() };
     await (controller as any).subscribe({ query: { groupId: "g1", churchId: "c1" } }, res);
