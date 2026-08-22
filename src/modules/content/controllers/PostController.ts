@@ -72,7 +72,9 @@ export class PostController extends ContentBaseController {
         post.churchId = au.churchId;
         promises.push(this.repos.post.save(post));
       });
-      return await Promise.all(promises);
+      const result = await Promise.all(promises);
+      this.bumpSiteCache(au.churchId);
+      return result;
     });
   }
 
@@ -81,6 +83,7 @@ export class PostController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.post.delete(au.churchId, id);
+      this.bumpSiteCache(au.churchId);
       return this.json({});
     });
   }

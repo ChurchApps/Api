@@ -2,7 +2,7 @@ import "reflect-metadata";
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "gen_id" } }));
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("../../helpers/index", () => ({ Permissions: { content: { edit: "contentEdit" } } }));
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } bumpSiteCache() {} } }));
 
 import { RedirectController } from "../RedirectController.js";
 

@@ -31,6 +31,7 @@ export class SectionController extends ContentBaseController {
         } else {
           result = await TreeHelper.duplicateSection(section);
         }
+        this.bumpSiteCache(au.churchId);
         return result;
       }
     });
@@ -54,6 +55,7 @@ export class SectionController extends ContentBaseController {
           else await this.repos.section.updateSort(req.body[0].churchId, req.body[0].pageId, req.body[0].zone);
         }
         TreeHelper.populateAnswers(result);
+        this.bumpSiteCache(au.churchId);
         return result;
       }
     });
@@ -75,6 +77,7 @@ export class SectionController extends ContentBaseController {
       const result = await TreeHelper.duplicateSection(section);
       if (section.blockId) await this.repos.section.updateSortForBlock(au.churchId, section.blockId);
       else await this.repos.section.updateSort(au.churchId, section.pageId, section.zone);
+      this.bumpSiteCache(au.churchId);
       return result;
     });
   }
@@ -134,13 +137,10 @@ export class SectionController extends ContentBaseController {
         const section = await this.repos.section.load(au.churchId, id);
         if (!section) return this.json({}, 404);
         await this.repos.section.delete(au.churchId, id);
-        if (section.blockId) {
-          await this.repos.section.updateSortForBlock(section.churchId, section.blockId);
-          return this.json({});
-        } else {
-          await this.repos.section.updateSort(section.churchId, section.pageId, section.zone);
-          return this.json({});
-        }
+        if (section.blockId) await this.repos.section.updateSortForBlock(section.churchId, section.blockId);
+        else await this.repos.section.updateSort(section.churchId, section.pageId, section.zone);
+        this.bumpSiteCache(au.churchId);
+        return this.json({});
       }
     });
   }

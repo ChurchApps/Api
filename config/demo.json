@@ -10,6 +10,7 @@
   "s3Bucket": "demo-churchapps-content",
   "supportEmail": "support@churchapps.org",
   "b1AdminRoot": "https://demo.b1.church",
+  "b1AppRoot": "https://{subdomain}.demosite.b1.church",
   "messagingApi": "https://api.demo.churchapps.org/messaging",
   "aiProvider": "openrouter",
   "storeApi": "https://api.staging.mutualministry.com",
