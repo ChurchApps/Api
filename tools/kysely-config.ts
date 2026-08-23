@@ -3,7 +3,7 @@ import { createPool } from "mysql2";
 import dotenv from "dotenv";
 import { DatabaseUrlParser } from "../src/shared/helpers/DatabaseUrlParser.js";
 
-const MODULES = ["membership", "attendance", "content", "giving", "messaging", "doing"] as const;
+const MODULES = ["membership", "attendance", "content", "giving", "messaging", "doing", "commons"] as const;
 export type ModuleName = (typeof MODULES)[number];
 
 let initialized = false;

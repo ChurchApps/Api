@@ -40,6 +40,10 @@ export class RepoManager {
         const { Repos: ReportingRepos } = await import("../../modules/reporting/index.js");
         return new ReportingRepos();
 
+      case "commons":
+        const { Repos: CommonsRepos } = await import("../../modules/commons/index.js");
+        return new CommonsRepos();
+
       default:
         throw new Error(`Unknown module: ${moduleName}`);
     }
