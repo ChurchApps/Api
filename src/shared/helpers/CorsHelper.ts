@@ -4,7 +4,7 @@ import type { CorsOptions } from "cors";
 export type CustomDomainLookup = (hostname: string) => Promise<boolean>;
 
 export class CorsHelper {
-  static readonly DEFAULT_ORIGINS = "https://b1.church,https://*.b1.church,https://lessons.church,https://*.lessons.church,https://churchapps.org,https://*.churchapps.org,https://chums.org,https://*.chums.org,https://streaminglive.church,https://*.streaminglive.church";
+  static readonly DEFAULT_ORIGINS = "https://b1.church,https://*.b1.church,https://lessons.church,https://*.lessons.church,https://churchapps.org,https://*.churchapps.org,https://chums.org,https://*.chums.org,https://streaminglive.church,https://*.streaminglive.church,https://worshipcommons.org,https://*.worshipcommons.org";
 
   // Churches point their own domains at us and B1Admin records them in the `domains` table
   // (the same rows CaddyHelper turns into proxy routes). Those sites call this API with

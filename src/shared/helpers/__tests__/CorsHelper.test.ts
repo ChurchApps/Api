@@ -48,6 +48,9 @@ describe("CorsHelper.isOriginAllowed", () => {
     expect(CorsHelper.isOriginAllowed("https://lessons.church", allowed)).toBe(true);
     expect(CorsHelper.isOriginAllowed("https://app.lessons.church", allowed)).toBe(true);
     expect(CorsHelper.isOriginAllowed("https://app.chums.org", allowed)).toBe(true);
+    expect(CorsHelper.isOriginAllowed("https://worshipcommons.org", allowed)).toBe(true);
+    expect(CorsHelper.isOriginAllowed("https://www.worshipcommons.org", allowed)).toBe(true);
+    expect(CorsHelper.isOriginAllowed("https://staging.worshipcommons.org", allowed)).toBe(true);
   });
 
   it("rejects an unknown origin", () => {
