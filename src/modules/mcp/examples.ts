@@ -29,21 +29,49 @@ export const EXAMPLES: Record<string, EndpointExample> = {
   },
 
   "GET /membership/groups": {
-    summary: "List groups in the current church.",
-    responseSample: [{ id: "g1", name: "Wednesday Bible Study", categoryName: "Adults" }]
+    summary: "List all groups. Mixes People Groups, Ministries, and Teams — prefer GET /membership/groups/tag/:tag to filter.",
+    responseSample: [
+      { id: "g1", name: "Wednesday Bible Study", categoryName: "Adults", tags: "standard" },
+      { id: "m1", name: "Wednesday Nights", categoryName: "Ministry", tags: "ministry" },
+      { id: "t1", name: "Cubbies", categoryName: "m1", tags: "team" }
+    ],
+    notes: "One table, three record types via tags: 'standard' (People Group / community roster), 'ministry' (Serving Ministry), 'team' (volunteer unit under a Ministry). categoryName is a human Group Category for standard, typically 'Ministry' for ministries, and the parent Ministry id for teams. Discover with /tag/:tag before creating."
+  },
+  "GET /membership/groups/tag/:tag": {
+    summary: "List groups filtered by tag. Use tag=standard|ministry|team.",
+    responseSample: [{ id: "m1", name: "Wednesday Nights", categoryName: "Ministry", tags: "ministry" }],
+    notes: "Preferred discovery before any Groups write. Call tag=ministry before creating a Team; tag=standard before creating a People Group. The same display name can correctly exist as Ministry, Team, Category, and Group — reuse rather than duplicate."
   },
   "POST /membership/groups": {
-    summary: "Create or update groups.",
-    requestBody: [{ name: "New Group", categoryName: "Adults", trackAttendance: true }]
+    summary: "Create or update groups. tags selects the record type.",
+    requestBody: [
+      { name: "Cubbies", categoryName: "Awana", tags: "standard", trackAttendance: true },
+      { name: "Wednesday Nights", categoryName: "Ministry", tags: "ministry" },
+      { name: "Cubbies", categoryName: "m1", tags: "team" }
+    ],
+    notes: "Set tags to 'standard', 'ministry', or 'team'. For teams, categoryName MUST be the parent Ministry id. For ministries, categoryName is typically 'Ministry'. For standard groups, categoryName is a human Group Category label — reuse an existing category when appropriate. Prefer GET /membership/groups/tag/:tag first. Deleting a ministry cascades delete of teams whose categoryName equals that ministry id. Do not auto-create both a Team and a People Group for the same activity."
   },
 
   "GET /membership/groupmembers": {
     summary: "List members of a group: ?groupId=g1",
-    responseSample: [{ id: "gm1", groupId: "g1", personId: "abc123", leader: false }]
+    responseSample: [{ id: "gm1", groupId: "g1", personId: "abc123", leader: false }],
+    notes: "Works for standard groups, ministries, and teams. Confirm the target group's tags first so membership lands on the correct record type."
   },
   "POST /membership/groupmembers": {
-    summary: "Add or update group memberships.",
-    requestBody: [{ groupId: "g1", personId: "abc123", leader: false }]
+    summary: "Add or update group memberships. leader marks Group Leaders.",
+    requestBody: [{ groupId: "g1", personId: "abc123", leader: false }],
+    notes: "leader:true sets Group Leader on that membership. Apply membership to the correct record type (standard vs ministry vs team) — Team membership is not the same as community People Group membership. An activity may need both; create/link them deliberately."
+  },
+
+  "POST /content/events": {
+    summary: "Create or update calendar events. Submit an array; omit id to create.",
+    requestBody: [{ groupId: "g1", title: "Bible Study", start: "2026-09-02T18:00:00.000Z", end: "2026-09-02T19:30:00.000Z", allDay: false, visibility: "public" }],
+    notes: "groupId MUST reference a standard People Group (tags contains 'standard'), never a Ministry or Team. Verify with GET /membership/groups/tag/standard (or GET by id) before writing. Reminders, RSVPs, and mobile deep-links treat groupId as a People Group membership graph."
+  },
+  "GET /content/events/group/:groupId": {
+    summary: "List events for a group.",
+    responseSample: [{ id: "e1", groupId: "g1", title: "Bible Study", start: "2026-09-02T18:00:00.000Z", end: "2026-09-02T19:30:00.000Z" }],
+    notes: "Pass a standard People Group id. Use after POST /content/events to verify the event landed on the intended group."
   },
 
   "GET /attendance/attendance": {
