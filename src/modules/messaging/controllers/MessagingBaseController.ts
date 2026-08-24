@@ -2,7 +2,7 @@ import { BaseController } from "../../../shared/infrastructure/index.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { Repos } from "../repositories/index.js";
 
-const PUBLIC_ANON_CONTENT_TYPES = new Set(["streamingLive"]);
+const PUBLIC_ANON_CONTENT_TYPES = new Set(["streamingLive", "freeshow"]);
 
 export class MessagingBaseController extends BaseController {
   public repos: Repos;

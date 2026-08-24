@@ -4,7 +4,7 @@ import path from "path";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { File } from "../models/index.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
-import type { IStorageProvider } from "@churchapps/apihelper";
+import { inferContentTypeFromKey, type IStorageProvider } from "@churchapps/apihelper";
 import { StorageResolver } from "../helpers/StorageResolver.js";
 import { BYOS_PROVIDERS } from "../helpers/ByosAuth.js";
 import { QuotaExceededError } from "../helpers/MinistryStuffStorageProvider.js";
@@ -139,7 +139,9 @@ export class FileController extends ContentBaseController {
         }
         const key = this.buildKey(au.churchId, req.body.contentType, req.body.contentId, req.body.fileName);
         try {
-          const result = await storage.provider.getUploadUrl(key, req.body.mimeType || "application/octet-stream", size);
+          // clients like FreeShow omit mimeType; infer from the key so zips presign as their real type
+          const mimeType = req.body.mimeType || inferContentTypeFromKey(key) || "application/octet-stream";
+          const result = await storage.provider.getUploadUrl(key, mimeType, size);
           return result || {};
         } catch (e) {
           if (e instanceof QuotaExceededError) return this.json({ error: "storage_quota_exceeded", usedBytes: e.usedBytes, quotaBytes: e.quotaBytes }, 400);
