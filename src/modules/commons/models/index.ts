@@ -1,17 +1,13 @@
+/** songs satellite row — the spine (title, themes, language, license, status, publisher, counters) lives on the asset. */
 export interface Song {
-  id?: string;
-  title?: string;
+  assetId?: string;
   writer?: string;
   year?: number;
-  themes?: string;
   songKey?: string;
   bpm?: number;
   timeSignature?: string;
-  language?: string;
   scripture?: string;
   scriptureText?: string;
-  license?: string;
-  churchCount?: number;
   hymnalCount?: number;
   chordPro?: string;
   demoAudioUrl?: string;
@@ -27,24 +23,32 @@ export interface Song {
   videoUrl?: string;
   writerPortraitUrl?: string;
   writerBio?: string;
-  artUrl?: string;
   parentSongId?: string;
   relationLabel?: string;
-  status?: string;
-  submittedBy?: string;
   proAnswer?: string;
   certified?: boolean;
   qualityScore?: number;
   qualityDetail?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
 }
 
-// Generalized across content families: contentType is "song" or "asset".
+/** Satellite joined to its asset, aliased back to the legacy song field names the site consumes. */
+export interface SongView extends Song {
+  id?: string;
+  title?: string;
+  themes?: string;
+  language?: string;
+  license?: string;
+  status?: string;
+  submittedBy?: string;
+  artUrl?: string;
+  downloadCount?: number;
+  likeCount?: number;
+  createdAt?: Date;
+}
+
 export interface Report {
   id?: string;
-  contentType?: string;
-  contentId?: string;
+  assetId?: string;
   contentText?: string;
   reporterRole?: string;
   details?: string;
@@ -61,18 +65,6 @@ export interface AbcSubmission {
   abc?: string;
   submittedBy?: string;
   status?: string;
-  createdAt?: Date;
-}
-
-export interface Sing {
-  songId?: string;
-  ipHash?: string;
-  createdAt?: Date;
-}
-
-export interface LibrarySong {
-  userId?: string;
-  songId?: string;
   createdAt?: Date;
 }
 

@@ -1,4 +1,4 @@
-import { Song } from "../models/index.js";
+import { SongView } from "../models/index.js";
 
 // chordPro format: stanzas separated by blank lines; first line of each stanza is its label; chords inline as [D]
 export class ChordProHelper {
@@ -6,7 +6,7 @@ export class ChordProHelper {
     return (title || "song").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   }
 
-  static toCho(song: Song) {
+  static toCho(song: SongView) {
     const lines = [`{title: ${song.title}}`, `{artist: ${song.writer}}`, `{key: ${song.songKey}}`];
     if (song.bpm) lines.push(`{tempo: ${song.bpm}}`);
     lines.push("");
@@ -20,7 +20,7 @@ export class ChordProHelper {
     return lines.join("\n");
   }
 
-  static toLyrics(song: Song) {
+  static toLyrics(song: SongView) {
     const lines = [song.title || "", song.writer ? `Words and music by ${song.writer}` : "", ""];
     for (const stanza of (song.chordPro || "").split(/\r?\n\s*\r?\n/)) {
       const stanzaLines = stanza.split(/\r?\n/).filter((l) => l.trim() !== "");

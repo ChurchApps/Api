@@ -1,5 +1,5 @@
 import { Environment } from "../../../shared/helpers/Environment.js";
-import { Song } from "../models/index.js";
+import { Song, SongView } from "../models/index.js";
 
 const MODEL = "gpt-4o-mini";
 const SYSTEM_PROMPT =
@@ -15,7 +15,7 @@ export class QualityHelper {
     return Environment.openAiApiKey || process.env.OPENAI_API_KEY || "";
   }
 
-  public static heuristicScore(song: Song): number {
+  public static heuristicScore(song: SongView): number {
     let pts = 0;
     if (song.demoAudioUrl) pts += 8;
     if (song.sheetPdfUrl) pts += 6;
@@ -39,7 +39,7 @@ export class QualityHelper {
     return pts;
   }
 
-  public static async llmScore(song: Song): Promise<{ llm: number; detail: any }> {
+  public static async llmScore(song: SongView): Promise<{ llm: number; detail: any }> {
     const lyrics = (song.chordPro || "").replace(/\[[^\]]*\]/g, "").slice(0, 6000);
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -63,7 +63,7 @@ export class QualityHelper {
     return { llm, detail: d };
   }
 
-  public static async score(song: Song): Promise<Partial<Song>> {
+  public static async score(song: SongView): Promise<Partial<Song>> {
     const heuristic = this.heuristicScore(song);
     if (!this.apiKey()) return { qualityScore: heuristic, qualityDetail: JSON.stringify({ heuristic, llm: 0, notes: "heuristic only — no OpenAI key configured" }) };
     try {

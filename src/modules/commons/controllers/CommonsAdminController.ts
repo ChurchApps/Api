@@ -3,6 +3,7 @@ import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { ContentLibraryHelper, QualityHelper } from "../helpers/index.js";
+import { Asset } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 
 @controller("/commons/admin")
@@ -77,16 +78,16 @@ export class CommonsAdminController extends CommonsBaseController {
     return this.setAbcStatus(req, res, "rejected");
   }
 
-  // authz-exempt: Server Admin gate lives in setSongStatus
+  // authz-exempt: Server Admin gate lives in setAssetStatus
   @httpPost("/songs/:id/approve")
   public async approve(req: express.Request, res: express.Response): Promise<any> {
-    return this.setSongStatus(req, res, "approved");
+    return this.setAssetStatus(req, res, "approved");
   }
 
-  // authz-exempt: Server Admin gate lives in setSongStatus
+  // authz-exempt: Server Admin gate lives in setAssetStatus
   @httpPost("/songs/:id/reject")
   public async reject(req: express.Request, res: express.Response): Promise<any> {
-    return this.setSongStatus(req, res, "removed");
+    return this.setAssetStatus(req, res, "removed");
   }
 
   @httpPost("/score-missing")
@@ -124,28 +125,16 @@ export class CommonsAdminController extends CommonsBaseController {
     });
   }
 
+  // authz-exempt: Server Admin gate lives in setAssetStatus
   @httpPost("/assets/:id/approve")
   public async approveAsset(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      const asset = await this.repos.asset.loadById(String(req.params.id));
-      if (!asset) return this.json({}, 404);
-      const updates = await ContentLibraryHelper.publishAsset(asset);
-      await this.repos.asset.update(asset.id, { ...updates, status: "approved", reviewedBy: au.id, reviewedAt: new Date() });
-      return { status: "approved" };
-    });
+    return this.setAssetStatus(req, res, "approved");
   }
 
+  // authz-exempt: Server Admin gate lives in setAssetStatus
   @httpPost("/assets/:id/reject")
   public async rejectAsset(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      const asset = await this.repos.asset.loadById(String(req.params.id));
-      if (!asset) return this.json({}, 404);
-      await ContentLibraryHelper.removeAssetObjects(asset);
-      await this.repos.asset.update(asset.id, { status: "removed", contentPath: null, thumbPath: null, reviewedBy: au.id, reviewedAt: new Date() } as any);
-      return { status: "removed" };
-    });
+    return this.setAssetStatus(req, res, "removed");
   }
 
   @httpPost("/assets/:id/feature")
@@ -170,19 +159,32 @@ export class CommonsAdminController extends CommonsBaseController {
     });
   }
 
-  private setSongStatus(req: express.Request, res: express.Response, status: string) {
+  // one review flow for every asset type; the per-type file work happens in publishFiles
+  private setAssetStatus(req: express.Request, res: express.Response, status: string) {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      const song = await this.repos.song.loadById(String(req.params.id));
-      if (!song) return this.json({}, 404);
-      if (status === "approved") {
-        const updates = await ContentLibraryHelper.publishSong({ ...song, status });
-        await this.repos.song.update(song.id, { status, ...updates });
-      } else {
-        await ContentLibraryHelper.removeSongObjects(song);
-        await this.repos.song.update(song.id, { status });
-      }
+      const asset = await this.repos.asset.loadById(String(req.params.id));
+      if (!asset) return this.json({}, 404);
+      const updates = await this.publishFiles(asset, status);
+      await this.repos.asset.update(asset.id, { ...updates, status, reviewedBy: au.id, reviewedAt: new Date() });
       return { status };
     });
+  }
+
+  private async publishFiles(asset: Asset, status: string): Promise<Partial<Asset>> {
+    if (asset.assetType === "song") {
+      const song = await this.repos.song.loadById(asset.id);
+      if (!song) return {};
+      if (status === "approved") {
+        const songUpdates = await ContentLibraryHelper.publishSong({ ...song, status });
+        if (Object.keys(songUpdates).length > 0) await this.repos.song.update(asset.id, songUpdates);
+      } else {
+        await ContentLibraryHelper.removeSongObjects(song);
+      }
+      return {};
+    }
+    if (status === "approved") return await ContentLibraryHelper.publishAsset(asset);
+    await ContentLibraryHelper.removeAssetObjects(asset);
+    return { contentPath: null, thumbPath: null } as Partial<Asset>;
   }
 }

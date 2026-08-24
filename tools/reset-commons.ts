@@ -63,10 +63,11 @@ async function migrate() {
 }
 
 async function seed(repoDir: string, contentRoot: string) {
-  const { rows } = buildCatalog(contentRoot, repoDir);
+  const { assets, songs } = buildCatalog(contentRoot, repoDir);
   const db = createKysely("commons");
   try {
-    for (const row of rows) await db.insertInto("songs").values(row).execute();
+    for (const row of assets) await db.insertInto("assets").values(row).execute();
+    for (const row of songs) await db.insertInto("songs").values(row).execute();
   } finally {
     await db.destroy();
   }
@@ -80,7 +81,7 @@ async function seed(repoDir: string, contentRoot: string) {
     }
     console.log(`  Mirrored ${MIRRORED_DIRS.join(", ")} into ${CONTENT_DIR}`);
   }
-  console.log(`Seeded ${rows.length} songs.`);
+  console.log(`Seeded ${songs.length} songs.`);
 }
 
 async function main() {

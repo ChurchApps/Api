@@ -48,9 +48,11 @@ export class AssetRepo {
       .orderBy("createdAt", "desc").execute() as Asset[];
   }
 
+  // review queue across every asset type — the song-specific queue lives on SongRepo
   public async loadPending(): Promise<Asset[]> {
-    return await getDb().selectFrom("assets").selectAll().where("status", "=", "pending")
-      .orderBy("createdAt", "asc").execute() as Asset[];
+    return await getDb().selectFrom("assets")
+      .select(["id", "name", "assetType", "publisherUserId", "license", "sizeBytes", "createdAt"])
+      .where("status", "=", "pending").orderBy("createdAt", "asc").execute() as Asset[];
   }
 
   public async loadByHash(contentHash: string): Promise<Asset | undefined> {
@@ -104,16 +106,28 @@ export class AssetRepo {
     return (await this.loadById(id))?.downloadCount || 0;
   }
 
-  public async toggleLike(assetId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
-    const existing = await getDb().selectFrom("assetLikes").select("id").where("assetId", "=", assetId).where("userId", "=", userId).executeTakeFirst();
-    if (existing) {
-      await getDb().deleteFrom("assetLikes").where("assetId", "=", assetId).where("userId", "=", userId).execute();
-      await getDb().updateTable("assets").set((eb) => ({ likeCount: eb("likeCount", "-", 1) } as any))
-        .where("id", "=", assetId).where("likeCount", ">", 0).execute();
+  public async likeExists(assetId: string, userId: string): Promise<boolean> {
+    const row = await getDb().selectFrom("assetLikes").select("id").where("assetId", "=", assetId).where("userId", "=", userId).executeTakeFirst();
+    return !!row;
+  }
+
+  public async setLike(assetId: string, userId: string, liked: boolean): Promise<{ liked: boolean; likeCount: number }> {
+    if (liked) {
+      const result = await getDb().insertInto("assetLikes").ignore().values({ id: UniqueIdHelper.shortId(), assetId, userId }).executeTakeFirst();
+      if (Number(result.numInsertedOrUpdatedRows || 0) > 0) {
+        await getDb().updateTable("assets").set((eb) => ({ likeCount: eb("likeCount", "+", 1) } as any)).where("id", "=", assetId).execute();
+      }
     } else {
-      await getDb().insertInto("assetLikes").ignore().values({ id: UniqueIdHelper.shortId(), assetId, userId }).execute();
-      await getDb().updateTable("assets").set((eb) => ({ likeCount: eb("likeCount", "+", 1) } as any)).where("id", "=", assetId).execute();
+      const result = await getDb().deleteFrom("assetLikes").where("assetId", "=", assetId).where("userId", "=", userId).executeTakeFirst();
+      if (Number(result.numDeletedRows || 0) > 0) {
+        await getDb().updateTable("assets").set((eb) => ({ likeCount: eb("likeCount", "-", 1) } as any))
+          .where("id", "=", assetId).where("likeCount", ">", 0).execute();
+      }
     }
-    return { liked: !existing, likeCount: (await this.loadById(assetId))?.likeCount || 0 };
+    return { liked, likeCount: (await this.loadById(assetId))?.likeCount || 0 };
+  }
+
+  public async toggleLike(assetId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+    return await this.setLike(assetId, userId, !(await this.likeExists(assetId, userId)));
   }
 }

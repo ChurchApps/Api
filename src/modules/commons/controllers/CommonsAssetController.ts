@@ -2,7 +2,7 @@
 import express from "express";
 import * as crypto from "crypto";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { assetSubmitError, ContentLibraryHelper, ipHash } from "../helpers/index.js";
+import { assetSubmitError, ContentLibraryHelper, recordAssetDownload } from "../helpers/index.js";
 import { Asset } from "../models/index.js";
 
 interface AssetSubmission extends Asset {
@@ -93,9 +93,9 @@ export class CommonsAssetController extends CommonsBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadApproved(String(req.params.id));
       if (!asset) return this.json({}, 404);
-      // ponytail: same IP-hash dedupe as /songs/:id/sing â€” undercounts behind NAT, fine for a popularity metric
-      const counted = await this.repos.asset.recordDownload(asset.id, ipHash(req));
-      const downloadCount = counted ? await this.repos.asset.incrementDownloadCount(asset.id) : asset.downloadCount;
+      const downloadCount = await recordAssetDownload(this.repos.asset, asset, req);
+      // song assets carry no contentPath - their files are served from the library folder
+      if (!asset.contentPath) return { downloadCount };
       const key = ContentLibraryHelper.storageKey(asset.contentPath);
       return { url: key ? ContentLibraryHelper.publicUrl(key) : asset.contentPath, downloadCount };
     });

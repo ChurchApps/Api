@@ -20,14 +20,14 @@ export class AbcSubmissionRepo {
   public async loadPending(): Promise<(AbcSubmission & { songTitle: string })[]> {
     return await getDb()
       .selectFrom("abcSubmissions")
-      .innerJoin("songs", "songs.id", "abcSubmissions.songId")
+      .innerJoin("assets", "assets.id", "abcSubmissions.songId")
       .select([
         "abcSubmissions.id",
         "abcSubmissions.songId",
         "abcSubmissions.abc",
         "abcSubmissions.submittedBy",
         "abcSubmissions.createdAt",
-        "songs.title as songTitle"
+        "assets.name as songTitle"
       ])
       .where("abcSubmissions.status", "=", "pending")
       .orderBy("abcSubmissions.createdAt", "asc")
