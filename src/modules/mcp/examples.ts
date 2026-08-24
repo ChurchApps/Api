@@ -3,11 +3,24 @@
 // payloads without an OpenAPI spec. For un-curated routes, describe_endpoint
 // falls back to "call GET first to see the shape".
 
+export interface EndpointGuidance {
+  humanPurpose?: string;
+  useWhen?: string[];
+  doNotUseWhen?: string[];
+  requiredDiscovery?: string[];
+  importantFields?: Record<string, string>;
+  companionCheck?: string[];
+  safeWrite?: string[];
+  verifyAfter?: string[];
+  relatedEndpoints?: string[];
+}
+
 export interface EndpointExample {
   summary: string;
   requestBody?: any;
   responseSample?: any;
   notes?: string;
+  guidance?: EndpointGuidance;
 }
 
 export const EXAMPLES: Record<string, EndpointExample> = {
@@ -29,12 +42,59 @@ export const EXAMPLES: Record<string, EndpointExample> = {
   },
 
   "GET /membership/groups": {
-    summary: "List groups in the current church.",
-    responseSample: [{ id: "g1", name: "Wednesday Bible Study", categoryName: "Adults" }]
+    summary: "List People Groups, Serving Ministries, and Serving Teams in the current church.",
+    responseSample: [{ id: "g1", name: "Wednesday Bible Study", tags: "standard", categoryName: "Adults" }],
+    guidance: {
+      humanPurpose: "Use this as the discovery inventory before creating or attaching a Group-like record. Similar names can correctly represent different record types.",
+      importantFields: {
+        tags: "The record type. Inspect tags rather than inferring type from the name or categoryName.",
+        categoryName: "For standard People Groups, a readable Group category. For Teams, the ID of the parent Serving Ministry.",
+        name: "A name is not a type. For example, Cubbies can correctly exist as both a Team and a People Group."
+      },
+      safeWrite: ["Check for a matching Ministry before creating a Ministry or Team.", "Check for a matching standard People Group and an appropriate Group Category before creating a People Group."],
+      relatedEndpoints: ["GET /membership/groups/tag/:tag", "POST /membership/groups"]
+    }
+  },
+  "GET /membership/groups/tag/:tag": {
+    summary: "List records by internal type: standard People Groups, Serving Ministries, or Serving Teams.",
+    responseSample: [{ id: "g1", name: "Cubbies", tags: "standard", categoryName: "Awana" }],
+    guidance: {
+      importantFields: {
+        standard: "People → Groups: the community connected to an activity, including participants, parents when appropriate, volunteers, and selected Group Leaders.",
+        ministry: "Serving → Plans: a service-planning area that can contain multiple Teams.",
+        team: "Serving → Plans: a schedulable volunteer or staff roster. categoryName identifies its parent Ministry by ID."
+      },
+      safeWrite: ["For a new Team, find the appropriate existing Ministry before creating another Ministry.", "For an event groupId, find a standard People Group — never a Ministry or Team."],
+      relatedEndpoints: ["POST /membership/groups", "POST /content/events"]
+    }
+  },
+  "GET /membership/groups/:id": {
+    summary: "Get one People Group, Serving Ministry, or Serving Team by ID before attaching members, events, or related records.",
+    responseSample: { id: "g1", name: "Cubbies", tags: "standard", categoryName: "Awana" },
+    guidance: {
+      humanPurpose: "Use this preflight read when a write depends on the target record's type or relationship.",
+      safeWrite: ["Inspect tags before changing memberships or using the record as an event groupId.", "For a Team, confirm categoryName matches the intended parent Ministry ID."],
+      relatedEndpoints: ["POST /membership/groupmembers", "POST /content/events"]
+    }
   },
   "POST /membership/groups": {
-    summary: "Create or update groups.",
-    requestBody: [{ name: "New Group", categoryName: "Adults", trackAttendance: true }]
+    summary: "Create or update a People Group, Serving Ministry, or Serving Team. tags and categoryName determine the record's purpose and location.",
+    requestBody: [{ name: "New Group", tags: "standard", categoryName: "Adults", trackAttendance: true }],
+    guidance: {
+      humanPurpose: "Choose the record according to the people and work it organizes: a Ministry organizes service planning, a Team is the volunteer or staff roster, and a standard People Group is the community connected to an activity.",
+      useWhen: ["Create a standard People Group for communication, Group calendar/events, attendance, check-in, participants, parents when appropriate, volunteers, and Group Leaders.", "Create a Ministry for a distinct service-planning area only when no appropriate Ministry already exists.", "Create a Team when a Ministry needs a distinct roster of volunteers or staff to schedule."],
+      doNotUseWhen: ["Do not create a Ministry simply because a People Group has a ministry-like name.", "Do not create a Team for participants or parents merely because they attend an activity.", "Do not use a People Group Category to parent a Serving Team."],
+      requiredDiscovery: ["List existing Groups first and compare name, tags, and categoryName.", "Reuse an appropriate existing Ministry for a new Team where possible.", "Reuse an appropriate existing Group Category when creating a standard People Group."],
+      companionCheck: ["A new Team may also need a People Group if the people involved need Group communication, a Group calendar/events, attendance, or Group Leaders.", "A new People Group may also need a Team if it needs a distinct, schedulable volunteer roster.", "Do not create both automatically. Ask when the counterpart decision materially changes the result."],
+      importantFields: {
+        "tags=standard": "Creates a People Group. categoryName is a readable Group Category such as Awana.",
+        "tags=ministry": "Creates a Serving Ministry. It is a parent for Teams and appears in Serving → Plans.",
+        "tags=team": "Creates a Serving Team. categoryName must be the ID of its parent Ministry.",
+        name: "May intentionally match a related Group or Team, but never determines the record type by itself."
+      },
+      verifyAfter: ["Retrieve the saved record and confirm its tags and categoryName relationship.", "For a Team, confirm categoryName matches the intended Ministry ID.", "For a standard People Group, confirm it appears under the intended Group Category."],
+      relatedEndpoints: ["GET /membership/groups", "GET /membership/groups/:id", "POST /membership/groupmembers"]
+    }
   },
 
   "GET /membership/groupmembers": {
@@ -43,7 +103,17 @@ export const EXAMPLES: Record<string, EndpointExample> = {
   },
   "POST /membership/groupmembers": {
     summary: "Add or update group memberships.",
-    requestBody: [{ groupId: "g1", personId: "abc123", leader: false }]
+    requestBody: [{ groupId: "g1", personId: "abc123", leader: false }],
+    guidance: {
+      humanPurpose: "Membership is not interchangeable across People Groups, Ministries, and Teams. Add a person everywhere they need the corresponding connection or capability.",
+      importantFields: {
+        groupId: "Retrieve the target record and inspect tags before writing. The record type determines the meaning of the membership.",
+        "leader=true": "Use for selected People Group Leaders who administer the Group's calendar, events, and community. It is not a label for every volunteer."
+      },
+      safeWrite: ["Add volunteers or staff to a Team when they should be scheduled for that role.", "Add a person to a Ministry when they need that Ministry's service-planning responsibility.", "Add participants, parents when appropriate, volunteers, and selected Group Leaders to a standard People Group when they belong to its community.", "Do not assume a membership in one record creates the other needed memberships."],
+      verifyAfter: ["Read the target membership list and confirm the person has the intended role in the intended record."],
+      relatedEndpoints: ["GET /membership/groups/:id", "POST /membership/groups"]
+    }
   },
 
   "GET /attendance/attendance": {
@@ -71,6 +141,17 @@ export const EXAMPLES: Record<string, EndpointExample> = {
   "GET /content/pages/:churchId/tree": {
     summary: "Load a fully populated page tree (sections + nested elements) for display. Pass ?url=/about or ?id=<pageId>. Returns parsed answers/styles/animations objects (not JSON strings).",
     notes: "Use this to verify a page after creating it, or to read the current structure before editing."
+  },
+  "POST /content/events": {
+    summary: "Create or update calendar events. When groupId is set, it identifies the People Group community that owns the event.",
+    requestBody: [{ title: "Cubbies", groupId: "g1", start: "2026-09-09T18:15:00", end: "2026-09-09T19:30:00" }],
+    guidance: {
+      humanPurpose: "A Group event belongs to the community being informed, attending, or led. Volunteer scheduling belongs in Serving plans and Teams.",
+      requiredDiscovery: ["If groupId is supplied, retrieve that record first and verify tags includes standard.", "If the request is for volunteer scheduling, identify the relevant Ministry and Team instead of using them as the event groupId."],
+      doNotUseWhen: ["Do not use a Serving Ministry or Team ID as groupId.", "Do not create a new People Group solely to attach an event before checking for an appropriate existing Group."],
+      verifyAfter: ["Read the event back and verify groupId is the intended standard People Group."],
+      relatedEndpoints: ["GET /membership/groups/:id", "GET /membership/groups/tag/:tag", "POST /membership/groups"]
+    }
   },
   "POST /content/pages": {
     summary: "Create or update pages. Submit an array; omit id to create, include id to update.",
