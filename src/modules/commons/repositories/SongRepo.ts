@@ -1,82 +1,107 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
-import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
-import { Song } from "../models/index.js";
+import { Song, SongView } from "../models/index.js";
 
-const SUMMARY_COLS = [
-  "id",
-  "title",
-  "writer",
-  "year",
-  "themes",
-  "songKey",
-  "bpm",
-  "timeSignature",
-  "language",
-  "scripture",
-  "license",
-  "churchCount",
-  "hymnalCount",
-  "demoAudioUrl",
-  "demoAudioBytes",
-  "sheetPdfUrl",
-  "sheetPdfBytes",
-  "stemsZipUrl",
-  "stemsZipBytes",
-  "midiUrl",
-  "midiBytes",
-  "lyricsUrl",
-  "abcUrl",
-  "parentSongId",
-  "relationLabel",
-  "qualityScore",
-  "artUrl"
+// Spine fields are aliased back to the legacy song names the site consumes.
+const SPINE_COLS = [
+  "assets.id as id",
+  "assets.name as title",
+  "assets.tags as themes",
+  "assets.language as language",
+  "assets.license as license",
+  "assets.status as status",
+  "assets.thumbPath as artUrl",
+  "assets.downloadCount as downloadCount",
+  "assets.likeCount as likeCount",
+  "assets.createdAt as createdAt"
 ] as const;
+
+const MODERATION_SPINE_COLS = [...SPINE_COLS, "assets.publisherUserId as submittedBy"] as const;
+
+// list payload omits chordPro (heavy) and moderation-only fields
+const SUMMARY_SONG_COLS = [
+  "songs.writer",
+  "songs.year",
+  "songs.songKey",
+  "songs.bpm",
+  "songs.timeSignature",
+  "songs.scripture",
+  "songs.hymnalCount",
+  "songs.demoAudioUrl",
+  "songs.demoAudioBytes",
+  "songs.sheetPdfUrl",
+  "songs.sheetPdfBytes",
+  "songs.stemsZipUrl",
+  "songs.stemsZipBytes",
+  "songs.midiUrl",
+  "songs.midiBytes",
+  "songs.lyricsUrl",
+  "songs.abcUrl",
+  "songs.parentSongId",
+  "songs.relationLabel",
+  "songs.qualityScore"
+] as const;
+
+const SONG_COLS = [
+  ...SUMMARY_SONG_COLS,
+  "songs.assetId",
+  "songs.scriptureText",
+  "songs.chordPro",
+  "songs.videoUrl",
+  "songs.writerPortraitUrl",
+  "songs.writerBio",
+  "songs.certified",
+  "songs.proAnswer",
+  "songs.qualityDetail"
+] as const;
+
+const SUMMARY_COLS = [...SPINE_COLS, ...SUMMARY_SONG_COLS] as const;
+const FULL_COLS = [...MODERATION_SPINE_COLS, ...SONG_COLS] as const;
 
 @injectable()
 export class SongRepo {
-  // list payload omits chordPro (heavy) and moderation-only fields
-  public async loadApprovedSummaries(): Promise<Song[]> {
-    return await getDb().selectFrom("songs").select(SUMMARY_COLS).where("status", "=", "approved")
-      .orderBy("churchCount", "desc").orderBy("hymnalCount", "desc").execute() as Song[];
+  public async loadApprovedSummaries(): Promise<SongView[]> {
+    return await this.joined().select(SUMMARY_COLS).where("assets.status", "=", "approved")
+      .orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
   }
 
-  public async loadBySubmitter(submittedBy: string): Promise<Song[]> {
-    return await getDb().selectFrom("songs").select([...SUMMARY_COLS, "status", "createdAt"])
-      .where("submittedBy", "=", submittedBy).orderBy("createdAt", "desc").execute() as Song[];
+  public async loadBySubmitter(submittedBy: string): Promise<SongView[]> {
+    return await this.joined().select(SUMMARY_COLS).where("assets.publisherUserId", "=", submittedBy)
+      .orderBy("assets.createdAt", "desc").execute() as SongView[];
   }
 
-  public async loadPending(): Promise<Song[]> {
-    return await getDb().selectFrom("songs").selectAll().where("status", "=", "pending")
-      .orderBy(sql`qualityScore is null`).orderBy("qualityScore", "desc").orderBy("createdAt", "asc").execute() as Song[];
+  public async loadLiked(userId: string): Promise<SongView[]> {
+    return await this.joined().innerJoin("assetLikes", "assetLikes.assetId", "assets.id")
+      .select(SUMMARY_COLS).where("assetLikes.userId", "=", userId).where("assets.status", "=", "approved")
+      .orderBy("assetLikes.timeAdded", "desc").execute() as SongView[];
   }
 
-  public async loadUnscored(limit: number): Promise<Song[]> {
-    return await getDb().selectFrom("songs").selectAll()
-      .where("qualityScore", "is", null).where("status", "!=", "removed").limit(limit).execute() as Song[];
+  public async loadPending(): Promise<SongView[]> {
+    return await this.joined().select(FULL_COLS).where("assets.status", "=", "pending")
+      .orderBy(sql`songs.qualityScore is null`).orderBy("songs.qualityScore", "desc").orderBy("assets.createdAt", "asc").execute() as SongView[];
   }
 
-  public async loadById(id: string): Promise<Song | undefined> {
-    return await getDb().selectFrom("songs").selectAll().where("id", "=", id).executeTakeFirst() as Song | undefined;
+  public async loadUnscored(limit: number): Promise<SongView[]> {
+    return await this.joined().select(FULL_COLS)
+      .where("songs.qualityScore", "is", null).where("assets.status", "!=", "removed").limit(limit).execute() as SongView[];
+  }
+
+  public async loadById(assetId: string): Promise<SongView | undefined> {
+    return await this.joined().select(FULL_COLS).where("assets.id", "=", assetId).executeTakeFirst() as SongView | undefined;
   }
 
   public async create(song: Song): Promise<Song> {
-    song.id = UniqueIdHelper.shortId();
     await getDb().insertInto("songs").values({
-      id: song.id,
-      title: song.title,
+      assetId: song.assetId,
       writer: song.writer,
       year: song.year,
-      themes: song.themes,
       songKey: song.songKey,
       bpm: song.bpm,
       timeSignature: song.timeSignature,
-      language: song.language,
       scripture: song.scripture,
       scriptureText: song.scriptureText,
-      license: song.license,
-      churchCount: song.churchCount || 0,
+      hymnalCount: song.hymnalCount || 0,
       chordPro: song.chordPro,
       demoAudioUrl: song.demoAudioUrl,
       demoAudioBytes: song.demoAudioBytes,
@@ -90,8 +115,6 @@ export class SongRepo {
       abcUrl: song.abcUrl,
       parentSongId: song.parentSongId,
       relationLabel: song.relationLabel,
-      status: song.status || "pending",
-      submittedBy: song.submittedBy,
       proAnswer: song.proAnswer,
       certified: song.certified,
       qualityScore: song.qualityScore,
@@ -100,32 +123,11 @@ export class SongRepo {
     return song;
   }
 
-  public async update(id: string, fields: Partial<Song>): Promise<void> {
-    await getDb().updateTable("songs").set({ ...fields, updatedAt: new Date() } as any).where("id", "=", id).execute();
+  public async update(assetId: string, fields: Partial<Song>): Promise<void> {
+    await getDb().updateTable("songs").set({ ...fields } as any).where("assetId", "=", assetId).execute();
   }
 
-  public async recordSing(songId: string, ipHash: string): Promise<boolean> {
-    const result = await getDb().insertInto("sings").ignore().values({ songId, ipHash }).executeTakeFirst();
-    return Number(result.numInsertedOrUpdatedRows || 0) > 0;
-  }
-
-  public async loadLibraryIds(userId: string): Promise<string[]> {
-    const rows = await getDb().selectFrom("libraries").select("songId").where("userId", "=", userId).orderBy("createdAt", "desc").execute();
-    return rows.map((r) => r.songId as string);
-  }
-
-  public async addToLibrary(userId: string, songId: string): Promise<boolean> {
-    const result = await getDb().insertInto("libraries").ignore().values({ userId, songId }).executeTakeFirst();
-    return Number(result.numInsertedOrUpdatedRows || 0) > 0;
-  }
-
-  public async removeFromLibrary(userId: string, songId: string): Promise<void> {
-    await getDb().deleteFrom("libraries").where("userId", "=", userId).where("songId", "=", songId).execute();
-  }
-
-  public async incrementChurchCount(id: string): Promise<number> {
-    await getDb().updateTable("songs").set((eb) => ({ churchCount: eb("churchCount", "+", 1) } as any)).where("id", "=", id).execute();
-    const row = await this.loadById(id);
-    return row?.churchCount || 0;
+  private joined() {
+    return getDb().selectFrom("assets").innerJoin("songs", "songs.assetId", "assets.id");
   }
 }

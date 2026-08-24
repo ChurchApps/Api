@@ -5,7 +5,7 @@ import { FileStorageHelper } from "@churchapps/apihelper";
 import { GetObjectCommand, PutObjectCommand, S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Environment } from "../../../shared/helpers/Environment.js";
-import { Asset, Song } from "../models/index.js";
+import { Asset, Song, SongView } from "../models/index.js";
 
 // The commons library mirrors the WorshipCommonsContent repo layout, rooted under
 // "commons/" so it can share the core Api content store. Approved songs get a
@@ -47,13 +47,13 @@ export class ContentLibraryHelper {
   // submissions get "<slug>--<id>" folders — unique without a bucket lookup.
   // ponytail: recomputed from the row (no stored path) — safe while titles are
   // immutable; a future edit endpoint must store the path or rename the folder.
-  static folderKey(song: Song): string {
+  static folderKey(song: SongView): string {
     const lang = LANG_CODES[song.language || ""] || "en";
     const section = song.license === "PD" ? "public-domain" : "wc-license";
     return `${ROOT}/songs/${lang}/${section}/${this.slugify(song.title || "")}--${song.id}`;
   }
 
-  static pendingFolderKey(song: Song): string {
+  static pendingFolderKey(song: SongView): string {
     return `${PENDING_ROOT}/${song.id}`;
   }
 
@@ -83,7 +83,7 @@ export class ContentLibraryHelper {
   }
 
   // library-shaped song.json — what tools/build-catalog.mjs reads on export
-  static songJson(song: Song): object {
+  static songJson(song: SongView): object {
     const uploads: Record<string, string> = {};
     for (const [field, urlCol] of UPLOAD_COLS) {
       const url = song[urlCol] as string | undefined;
@@ -101,7 +101,6 @@ export class ContentLibraryHelper {
       language: song.language,
       scripture: song.scripture,
       license: song.license,
-      churchCount: song.churchCount ?? 0,
       hymnalCount: song.hymnalCount ?? 0,
       status: song.status,
       submittedBy: song.submittedBy,
@@ -112,7 +111,7 @@ export class ContentLibraryHelper {
   }
 
   // matches lib.mjs renderChordpro — header must agree with song.json (validate.mjs checks)
-  static renderChordpro(song: Song): string {
+  static renderChordpro(song: SongView): string {
     const lines: string[] = [];
     const d = (name: string, v: unknown) => { if (v !== null && v !== undefined && v !== "") lines.push(`{${name}: ${v}}`); };
     d("title", song.title);
@@ -123,7 +122,7 @@ export class ContentLibraryHelper {
     return lines.join("\n") + "\n\n" + song.chordPro + "\n";
   }
 
-  static async writeSongFolder(song: Song): Promise<void> {
+  static async writeSongFolder(song: SongView): Promise<void> {
     const folder = this.folderKey(song);
     await FileStorageHelper.store(`${folder}/song.json`, "application/json", Buffer.from(JSON.stringify(this.songJson(song), null, 2) + "\n"));
     await FileStorageHelper.store(`${folder}/lyrics.chordpro`, "text/plain; charset=utf-8", Buffer.from(this.renderChordpro(song)));
@@ -138,7 +137,7 @@ export class ContentLibraryHelper {
     await FileStorageHelper.store(key, contentType, contents);
   }
 
-  static async publishSong(song: Song): Promise<Partial<Song>> {
+  static async publishSong(song: SongView): Promise<Partial<Song>> {
     const updates: Partial<Song> = {};
     const folder = this.folderKey(song);
     for (const [, urlCol] of UPLOAD_COLS) {
@@ -156,7 +155,7 @@ export class ContentLibraryHelper {
     return updates;
   }
 
-  static async removeSongObjects(song: Song): Promise<void> {
+  static async removeSongObjects(song: SongView): Promise<void> {
     await this.removePrefix(this.pendingFolderKey(song));
     await this.removePrefix(this.folderKey(song));
     for (const [, urlCol] of UPLOAD_COLS) {
@@ -192,7 +191,7 @@ export class ContentLibraryHelper {
     }
   }
 
-  static async withReviewUrls(song: Song, apiBase: string): Promise<Song> {
+  static async withReviewUrls(song: SongView, apiBase: string): Promise<SongView> {
     const exp = Math.floor(Date.now() / 1000) + REVIEW_TTL_SEC;
     const out = { ...song };
     for (const [field, urlCol] of UPLOAD_COLS) {
@@ -216,7 +215,7 @@ export class ContentLibraryHelper {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   }
 
-  static async readPendingField(song: Song, field: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  static async readPendingField(song: SongView, field: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     const col = UPLOAD_COLS.find(([f]) => f === field)?.[1];
     if (!col) return null;
     const key = this.storageKey(song[col] as string | undefined);

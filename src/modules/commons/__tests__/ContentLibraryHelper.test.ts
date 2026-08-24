@@ -24,9 +24,9 @@ jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { fileSto
 
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
 import { isPublicDiskFilePath } from "../../content/helpers/PublicFileAccess.js";
-import { Song } from "../models/index.js";
+import { SongView } from "../models/index.js";
 
-const song: Song = {
+const song: SongView = {
   id: "testpend001",
   title: "Pending Test Hymn",
   writer: "Tester",

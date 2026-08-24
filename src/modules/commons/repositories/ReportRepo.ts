@@ -9,8 +9,7 @@ export class ReportRepo {
     report.id = UniqueIdHelper.shortId();
     await getDb().insertInto("reports").values({
       id: report.id,
-      contentType: report.contentType || "song",
-      contentId: report.contentId,
+      assetId: report.assetId,
       contentText: report.contentText,
       reporterRole: report.reporterRole,
       details: report.details,
