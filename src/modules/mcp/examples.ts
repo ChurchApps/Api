@@ -42,8 +42,13 @@ export const EXAMPLES: Record<string, EndpointExample> = {
   },
 
   "GET /membership/groups": {
-    summary: "List People Groups, Serving Ministries, and Serving Teams in the current church.",
-    responseSample: [{ id: "g1", name: "Wednesday Bible Study", tags: "standard", categoryName: "Adults" }],
+    summary: "List all groups. Mixes People Groups, Ministries, and Teams — prefer GET /membership/groups/tag/:tag to filter.",
+    responseSample: [
+      { id: "g1", name: "Wednesday Bible Study", categoryName: "Adults", tags: "standard" },
+      { id: "m1", name: "Wednesday Nights", categoryName: "Ministry", tags: "ministry" },
+      { id: "t1", name: "Cubbies", categoryName: "m1", tags: "team" }
+    ],
+    notes: "One table, three record types via tags: 'standard' (People Group / community roster), 'ministry' (Serving Ministry), 'team' (volunteer unit under a Ministry). categoryName is a human Group Category for standard, typically 'Ministry' for ministries, and the parent Ministry id for teams. Discover with /tag/:tag before creating.",
     guidance: {
       humanPurpose: "Use this as the discovery inventory before creating or attaching a Group-like record. Similar names can correctly represent different record types.",
       importantFields: {
@@ -56,8 +61,9 @@ export const EXAMPLES: Record<string, EndpointExample> = {
     }
   },
   "GET /membership/groups/tag/:tag": {
-    summary: "List records by internal type: standard People Groups, Serving Ministries, or Serving Teams.",
-    responseSample: [{ id: "g1", name: "Cubbies", tags: "standard", categoryName: "Awana" }],
+    summary: "List groups filtered by tag. Use tag=standard|ministry|team.",
+    responseSample: [{ id: "m1", name: "Wednesday Nights", categoryName: "Ministry", tags: "ministry" }],
+    notes: "Preferred discovery before any Groups write. Call tag=ministry before creating a Team; tag=standard before creating a People Group. The same display name can correctly exist as Ministry, Team, Category, and Group — reuse rather than duplicate.",
     guidance: {
       importantFields: {
         standard: "People → Groups: the community connected to an activity, including participants, parents when appropriate, volunteers, and selected Group Leaders.",
@@ -78,8 +84,13 @@ export const EXAMPLES: Record<string, EndpointExample> = {
     }
   },
   "POST /membership/groups": {
-    summary: "Create or update a People Group, Serving Ministry, or Serving Team. tags and categoryName determine the record's purpose and location.",
-    requestBody: [{ name: "New Group", tags: "standard", categoryName: "Adults", trackAttendance: true }],
+    summary: "Create or update groups. tags selects the record type.",
+    requestBody: [
+      { name: "Cubbies", categoryName: "Awana", tags: "standard", trackAttendance: true },
+      { name: "Wednesday Nights", categoryName: "Ministry", tags: "ministry" },
+      { name: "Cubbies", categoryName: "m1", tags: "team" }
+    ],
+    notes: "Set tags to 'standard', 'ministry', or 'team'. For teams, categoryName MUST be the parent Ministry id. For ministries, categoryName is typically 'Ministry'. For standard groups, categoryName is a human Group Category label — reuse an existing category when appropriate. Prefer GET /membership/groups/tag/:tag first. Deleting a ministry cascades delete of teams whose categoryName equals that ministry id. Do not auto-create both a Team and a People Group for the same activity.",
     guidance: {
       humanPurpose: "Choose the record according to the people and work it organizes: a Ministry organizes service planning, a Team is the volunteer or staff roster, and a standard People Group is the community connected to an activity.",
       useWhen: ["Create a standard People Group for communication, Group calendar/events, attendance, check-in, participants, parents when appropriate, volunteers, and Group Leaders.", "Create a Ministry for a distinct service-planning area only when no appropriate Ministry already exists.", "Create a Team when a Ministry needs a distinct roster of volunteers or staff to schedule."],
@@ -99,11 +110,13 @@ export const EXAMPLES: Record<string, EndpointExample> = {
 
   "GET /membership/groupmembers": {
     summary: "List members of a group: ?groupId=g1",
-    responseSample: [{ id: "gm1", groupId: "g1", personId: "abc123", leader: false }]
+    responseSample: [{ id: "gm1", groupId: "g1", personId: "abc123", leader: false }],
+    notes: "Works for standard groups, ministries, and teams. Confirm the target group's tags first so membership lands on the correct record type."
   },
   "POST /membership/groupmembers": {
-    summary: "Add or update group memberships.",
+    summary: "Add or update group memberships. leader marks Group Leaders.",
     requestBody: [{ groupId: "g1", personId: "abc123", leader: false }],
+    notes: "leader:true sets Group Leader on that membership. Apply membership to the correct record type (standard vs ministry vs team) — Team membership is not the same as community People Group membership. An activity may need both; create/link them deliberately.",
     guidance: {
       humanPurpose: "Membership is not interchangeable across People Groups, Ministries, and Teams. Add a person everywhere they need the corresponding connection or capability.",
       importantFields: {
@@ -114,6 +127,11 @@ export const EXAMPLES: Record<string, EndpointExample> = {
       verifyAfter: ["Read the target membership list and confirm the person has the intended role in the intended record."],
       relatedEndpoints: ["GET /membership/groups/:id", "POST /membership/groups"]
     }
+  },
+  "GET /content/events/group/:groupId": {
+    summary: "List events for a group.",
+    responseSample: [{ id: "e1", groupId: "g1", title: "Bible Study", start: "2026-09-02T18:00:00.000Z", end: "2026-09-02T19:30:00.000Z" }],
+    notes: "Pass a standard People Group id. Use after POST /content/events to verify the event landed on the intended group."
   },
 
   "GET /attendance/attendance": {
@@ -145,6 +163,7 @@ export const EXAMPLES: Record<string, EndpointExample> = {
   "POST /content/events": {
     summary: "Create or update calendar events. When groupId is set, it identifies the People Group community that owns the event.",
     requestBody: [{ title: "Cubbies", groupId: "g1", start: "2026-09-09T18:15:00", end: "2026-09-09T19:30:00" }],
+    notes: "groupId MUST reference a standard People Group (tags contains 'standard'), never a Ministry or Team. Reminders, RSVPs, and mobile deep-links treat groupId as a People Group membership graph.",
     guidance: {
       humanPurpose: "A Group event belongs to the community being informed, attending, or led. Volunteer scheduling belongs in Serving plans and Teams.",
       requiredDiscovery: ["If groupId is supplied, retrieve that record first and verify tags includes standard.", "If the request is for volunteer scheduling, identify the relevant Ministry and Team instead of using them as the event groupId."],

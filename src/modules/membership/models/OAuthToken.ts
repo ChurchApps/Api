@@ -6,6 +6,7 @@ export class OAuthToken {
   public accessToken?: string;
   public refreshToken?: string;
   public scopes?: string;
+  public planTypeId?: string;
   public expiresAt?: Date;
   public createdAt?: Date;
 }

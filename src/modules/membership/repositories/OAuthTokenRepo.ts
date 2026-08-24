@@ -21,6 +21,7 @@ export class OAuthTokenRepo {
       clientId: token.clientId,
       userChurchId: token.userChurchId,
       scopes: token.scopes,
+      planTypeId: token.planTypeId,
       expiresAt: expiresAt as any,
       createdAt: sql`NOW()` as any
     }).execute();
@@ -35,6 +36,7 @@ export class OAuthTokenRepo {
       clientId: token.clientId,
       userChurchId: token.userChurchId,
       scopes: token.scopes,
+      planTypeId: token.planTypeId,
       expiresAt: expiresAt as any
     }).where("id", "=", token.id).execute();
     return token;
