@@ -173,6 +173,7 @@ export class OAuthController extends MembershipBaseController {
           accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(oldToken.scopes)),
           refreshToken: UniqueIdHelper.secret(),
           scopes: oldToken.scopes,
+          planTypeId: oldToken.planTypeId,
           expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
         };
         await this.repos.oAuthToken.save(token);
@@ -185,7 +186,9 @@ export class OAuthController extends MembershipBaseController {
           created_at: Math.floor(Date.now() / 1000),
           expires_in: 7 * 24 * 3600, // 7 days (matches JWT expiration)
           refresh_token: token.refreshToken,
-          scope: token.scopes
+          scope: token.scopes,
+          // Extension member (RFC 8628 allows extras): carry the ministry/lesson binding across refreshes
+          plan_type_id: token.planTypeId || undefined
         });
       } else return this.json({ error: "unsupported_grant_type" }, 400);
     });
@@ -297,6 +300,7 @@ export class OAuthController extends MembershipBaseController {
           accessToken,
           refreshToken,
           scopes: dc.scopes,
+          planTypeId: dc.planTypeId,
           expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
         };
         await this.repos.oAuthToken.save(token);
