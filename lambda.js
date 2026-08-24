@@ -13,7 +13,12 @@ const initializeEnvironment = async () => {
       ENVIRONMENT: process.env.ENVIRONMENT,
       APP_ENV: process.env.APP_ENV
     });
-    await Environment.init(stage);
+    try {
+      await Environment.init(stage);
+    } catch (err) {
+      Environment.currentEnvironment = undefined;
+      throw err;
+    }
     console.log("Environment initialized, connection strings loaded");
 
     // Pools now auto-initialize on first use
