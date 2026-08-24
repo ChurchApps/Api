@@ -4,7 +4,10 @@ import path from "path";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { File } from "../models/index.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
-import { inferContentTypeFromKey, type IStorageProvider } from "@churchapps/apihelper";
+import { EnvironmentBase, inferContentTypeFromKey, resolveMaxUploadBytes, type IStorageProvider } from "@churchapps/apihelper";
+// hoisted transitive dep of @churchapps/apihelper
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { S3Client } from "@aws-sdk/client-s3";
 import { StorageResolver } from "../helpers/StorageResolver.js";
 import { BYOS_PROVIDERS } from "../helpers/ByosAuth.js";
 import { QuotaExceededError } from "../helpers/MinistryStuffStorageProvider.js";
@@ -141,7 +144,9 @@ export class FileController extends ContentBaseController {
         try {
           // clients like FreeShow omit mimeType; infer from the key so zips presign as their real type
           const mimeType = req.body.mimeType || inferContentTypeFromKey(key) || "application/octet-stream";
-          const result = await storage.provider.getUploadUrl(key, mimeType, size);
+          const result = this.isFreeShowSync(req.body) && storage.name === "churchapps"
+            ? await this.freeShowPresignedUrl(key, size)
+            : await storage.provider.getUploadUrl(key, mimeType, size);
           return result || {};
         } catch (e) {
           if (e instanceof QuotaExceededError) return this.json({ error: "storage_quota_exceeded", usedBytes: e.usedBytes, quotaBytes: e.quotaBytes }, 400);
@@ -176,6 +181,28 @@ export class FileController extends ContentBaseController {
     if (typeof data === "string") return data.substring(0, 300);
     const summary = data.error_summary || data.error?.message || data.error_description || (typeof data.error === "string" ? data.error : null);
     return summary && data.required_scope ? summary + " (required scope: " + data.required_scope + ")" : summary;
+  }
+
+  private isFreeShowSync(body: { fileName: string; contentType: string; mimeType?: string }): boolean {
+    return body.contentType === "group" && !body.mimeType && ["current.zip", "previous.zip"].includes(path.basename(body.fileName || ""));
+  }
+
+  // Temp patch for FreeShow double appending content type and public read.
+  private async freeShowPresignedUrl(key: string, size?: number): Promise<{ url: string; fields: Record<string, string>; key: string } | null> {
+    if (EnvironmentBase.fileStore !== "S3") return null;
+    if (key.startsWith("/")) key = key.substring(1);
+    const config = process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true } : {};
+    const { url, fields } = await createPresignedPost(new S3Client(config), {
+      Bucket: EnvironmentBase.s3Bucket,
+      Key: key,
+      Conditions: [
+        ["eq", "$Content-Type", "application/zip"],
+        ["content-length-range", 1, resolveMaxUploadBytes(size)],
+        { acl: "public-read" }
+      ],
+      Expires: 3600
+    });
+    return { url, fields, key };
   }
 
   private buildKey(churchId: string, contentType: string, contentId: string, fileName: string): string {
