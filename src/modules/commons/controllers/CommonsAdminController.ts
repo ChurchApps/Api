@@ -175,16 +175,12 @@ export class CommonsAdminController extends CommonsBaseController {
     if (asset.assetType === "song") {
       const song = await this.repos.song.loadById(asset.id);
       if (!song) return {};
-      if (status === "approved") {
-        const songUpdates = await ContentLibraryHelper.publishSong({ ...song, status });
-        if (Object.keys(songUpdates).length > 0) await this.repos.song.update(asset.id, songUpdates);
-      } else {
-        await ContentLibraryHelper.removeSongObjects(song);
-      }
-      return {};
+      if (status === "approved") return await ContentLibraryHelper.publishSong({ ...song, status });
+      await ContentLibraryHelper.removeSongObjects(song);
+      return { path: null, files: null } as Partial<Asset>;
     }
     if (status === "approved") return await ContentLibraryHelper.publishAsset(asset);
     await ContentLibraryHelper.removeAssetObjects(asset);
-    return { contentPath: null, thumbPath: null } as Partial<Asset>;
+    return { path: null, files: null } as Partial<Asset>;
   }
 }

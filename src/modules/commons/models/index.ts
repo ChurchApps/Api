@@ -1,7 +1,7 @@
-/** songs satellite row — the spine (title, themes, language, license, status, publisher, counters) lives on the asset. */
+/** songs satellite row — the spine (title, themes, language, license, status, publisher, counters, path, files) lives on the asset. */
 export interface Song {
   assetId?: string;
-  writer?: string;
+  authorId?: string;
   year?: number;
   songKey?: string;
   bpm?: number;
@@ -10,19 +10,7 @@ export interface Song {
   scriptureText?: string;
   hymnalCount?: number;
   chordPro?: string;
-  demoAudioUrl?: string;
-  demoAudioBytes?: number;
-  sheetPdfUrl?: string;
-  sheetPdfBytes?: number;
-  stemsZipUrl?: string;
-  stemsZipBytes?: number;
-  midiUrl?: string;
-  midiBytes?: number;
-  lyricsUrl?: string;
-  abcUrl?: string;
   videoUrl?: string;
-  writerPortraitUrl?: string;
-  writerBio?: string;
   parentSongId?: string;
   relationLabel?: string;
   proAnswer?: string;
@@ -31,7 +19,15 @@ export interface Song {
   qualityDetail?: string;
 }
 
-/** Satellite joined to its asset, aliased back to the legacy song field names the site consumes. */
+export interface Author {
+  id?: string;
+  name?: string;
+  bio?: string;
+  portraitUrl?: string;
+  createdAt?: Date;
+}
+
+/** Satellite joined to its asset and author, aliased back to the legacy song field names the site consumes. */
 export interface SongView extends Song {
   id?: string;
   title?: string;
@@ -40,7 +36,12 @@ export interface SongView extends Song {
   license?: string;
   status?: string;
   submittedBy?: string;
-  artUrl?: string;
+  writer?: string;
+  writerBio?: string;
+  portraitKey?: string;
+  path?: string;
+  files?: string;
+  fileUrls?: Record<string, string>;
   downloadCount?: number;
   likeCount?: number;
   createdAt?: Date;
@@ -79,9 +80,9 @@ export interface Asset {
   publisherUserId?: string;
   publisherChurchId?: string;
   status?: string;
-  contentPath?: string;
-  thumbPath?: string;
-  sizeBytes?: number;
+  path?: string;
+  files?: string;
+  fileUrls?: Record<string, string>;
   contentHash?: string;
   version?: string;
   appMinVersion?: string;

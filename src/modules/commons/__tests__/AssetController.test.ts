@@ -7,8 +7,8 @@ jest.mock("../helpers/index", () => {
     ContentLibraryHelper: {
       assetPendingFolderKey: (id: string) => `commons/pending/assets/${id}`,
       storePending: jest.fn(async () => {}),
-      storageKey: (u: string) => u,
-      publicUrl: (k: string) => `http://localhost:8084/content/${k}`
+      publicUrl: (k: string) => `http://localhost:8084/content/${k}`,
+      withUrls: (v: any) => v
     }
   };
 });
@@ -49,7 +49,9 @@ describe("AssetController.submit validation", () => {
     const result: any = await controller.submit({ body: body() } as any, {} as any);
     expect(result.status).toBe("pending");
     expect(result.publisherUserId).toBe("user0000001");
-    expect(result.contentPath).toBe("commons/pending/assets/asset000001/slides.zip");
+    expect(result.path).toBe("commons/pending/assets/asset000001");
+    expect(result.files).toBe("content.zip");
+    expect(result.sizeBytes).toBeUndefined();
     expect(repos.asset.create).toHaveBeenCalled();
   });
 
