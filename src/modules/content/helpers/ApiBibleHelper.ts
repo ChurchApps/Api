@@ -131,7 +131,7 @@ export class ApiBibleHelper {
         const existing = ArrayHelper.getOne(result, "verseKey", item.attrs.verseId);
         if (existing) {
           const firstChar = item.text.trim().charAt(0);
-          const regex = /^[a-zA-Z0-9]+$/;
+          const regex = /^[\p{L}\p{N}]$/u;
           if (regex.test(firstChar)) existing.content += " " + item.text.trim();
           else existing.content += item.text.trim();
         } else {
