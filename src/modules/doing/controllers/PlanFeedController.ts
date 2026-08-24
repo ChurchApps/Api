@@ -1,39 +1,8 @@
 import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { PlanItem } from "../models/index.js";
-
-const LESSONS_API_BASE = "https://api.lessons.church";
-
-interface FeedAction {
-  id?: string;
-  actionType?: string;
-  content?: string;
-}
-
-interface FeedSection {
-  id?: string;
-  name?: string;
-  actions?: FeedAction[];
-}
-
-interface FeedVenue {
-  id?: string;
-  name?: string;
-  lessonName?: string;
-  sections?: FeedSection[];
-}
-
-async function fetchVenueFeed(venueId: string): Promise<FeedVenue | null> {
-  try {
-    const url = `${LESSONS_API_BASE}/venues/public/feed/${venueId}`;
-    const response = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-    if (!response.ok) return null;
-    return await response.json();
-  } catch {
-    return null;
-  }
-}
+import { Plan, PlanItem } from "../models/index.js";
+import { FeedVenue, SignageFeedHelper } from "../helpers/SignageFeedHelper.js";
 
 function venueFeedToDefaultPlanItems(venueFeed: FeedVenue, planId: string): PlanItem[] {
   const result: PlanItem[] = [];
@@ -101,7 +70,7 @@ export class PlanFeedController extends DoingBaseController {
       if (result.length === 0) {
         const plan = await this.repos.plan.load(churchId, planId);
         if (plan?.contentId) {
-          const venueFeed = await fetchVenueFeed(plan.contentId);
+          const venueFeed = await SignageFeedHelper.fetchVenueFeed(plan.contentId);
           if (venueFeed) {
             result = venueFeedToDefaultPlanItems(venueFeed, planId);
           }
@@ -109,6 +78,29 @@ export class PlanFeedController extends DoingBaseController {
       }
 
       return this.buildTree(result, null as any);
+    });
+  }
+
+  // SignPresenter-compatible external feed: resolves the plan type's current plan
+  // (like a lessons.church classroom feed) and emits {messages:[{name, files:[{url, seconds, loopVideo}]}]}.
+  @httpGet("/signage/:planTypeId")
+  public async getSignageFeed(
+    @requestParam("planTypeId") planTypeId: string,
+      req: express.Request<{}, {}, null>,
+      res: express.Response
+  ): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const plan = (await this.repos.plan.loadCurrentByPlanTypeId(planTypeId)) as Plan;
+      if (!plan) return { messages: [] };
+
+      const planItems = (await this.repos.planItem.loadForPlan(plan.churchId, plan.id)) as PlanItem[];
+      const venueId = SignageFeedHelper.getVenueId(plan, planItems);
+      const venueFeed = venueId ? await SignageFeedHelper.fetchVenueFeed(venueId) : null;
+
+      const tree = this.buildTree(planItems, null as any);
+      const messages = tree.length > 0 ? SignageFeedHelper.buildMessages(tree, venueFeed) : SignageFeedHelper.buildDefaultMessages(venueFeed);
+
+      return { messages, planName: plan.name, lessonName: venueFeed?.lessonName, venueName: venueFeed?.name };
     });
   }
 
