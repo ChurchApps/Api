@@ -1,10 +1,14 @@
 import { controller, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
+import { ASSET_TYPES, COMMONS_PRODUCT_LABELS } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
-import { ContentLibraryHelper, QualityHelper } from "../helpers/index.js";
-import { Asset } from "../models/index.js";
+import { ContentLibraryHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
+
+const REJECT_REASONS = ["quality", "duplicate", "licensing", "offtopic", "incomplete", "other"];
+const RESOLUTIONS = ["upheld", "dismissed", "duplicate"];
+const REMOVE_REASONS = ["copyright", "policy"];
 
 @controller("/commons/admin")
 export class CommonsAdminController extends CommonsBaseController {
@@ -14,33 +18,126 @@ export class CommonsAdminController extends CommonsBaseController {
     return this.actionWrapper(req, res, async (au) => ({ admin: !!au.id && au.checkAccess(Permissions.server.admin) }));
   }
 
-  @httpGet("/songs")
-  public async pendingSongs(req: express.Request, res: express.Response): Promise<any> {
+  @httpGet("/types")
+  public async types(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => Object.values(ASSET_TYPES).map((t) => ({ key: t.key, label: t.label, product: t.product, productLabel: COMMONS_PRODUCT_LABELS[t.product], hasPreview: !!t.previewUrl })));
+  }
+
+  /** The one queue: every pending submission across every product, oldest first. */
+  @httpGet("/submissions")
+  public async submissions(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const product = req.query.product?.toString();
+      let rows = await this.repos.submission.loadQueue({ status: req.query.status?.toString() || "pending", assetType: req.query.assetType?.toString(), page: Number(req.query.page) || 1 });
+      if (product) rows = rows.filter((r) => ASSET_TYPES[r.assetType || ""]?.product === product);
+      const names = await userNames(rows.flatMap((r) => [r.submittedBy, r.publisherUserId]));
+      const stats: Record<string, { total: number; approved: number }> = {};
+      const out = [];
+      for (const r of rows) {
+        stats[r.submittedBy || ""] ||= await this.repos.submission.countSubmitterStats(r.submittedBy || "");
+        const files = await this.repos.assetFile.loadBySubmission(r.id || "");
+        const def = ASSET_TYPES[r.assetType || ""];
+        out.push({
+          ...r,
+          payload: undefined,
+          typeLabel: def?.label || r.assetType,
+          product: def?.product,
+          productLabel: def ? COMMONS_PRODUCT_LABELS[def.product] : undefined,
+          submittedByName: names[r.submittedBy || ""],
+          publisherName: names[r.publisherUserId || ""],
+          submitterStats: stats[r.submittedBy || ""],
+          isNewAsset: !r.publishedSubmissionId,
+          isThirdParty: r.publisherUserId !== r.submittedBy,
+          filesChanged: PublishHelper.fileSummary(files)
+        });
+      }
+      return out;
+    });
+  }
+
+  @httpGet("/submissions/:id")
+  public async submission(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const sub = await this.repos.submission.loadById(String(req.params.id));
+      if (!sub) return this.json({}, 404);
+      const asset = await this.repos.asset.loadById(sub.assetId || "");
+      if (!asset) return this.json({}, 404);
       const apiBase = ContentLibraryHelper.requestApiBase(req);
-      return await Promise.all((await this.repos.song.loadPending()).map((s) => ContentLibraryHelper.withReviewUrls(s, apiBase)));
+      const proposed = await this.repos.assetFile.loadBySubmission(sub.id || "");
+      const files = [];
+      for (const f of proposed) files.push({ ...f, url: f.action === "remove" ? undefined : await ContentLibraryHelper.signedPendingUrl(sub.id || "", f.name || "", apiBase) });
+      const liveFiles = await this.repos.assetFile.loadLive(asset.id || "");
+      const livePayload = asset.publishedSubmissionId ? await PublishHelper.editablePayload(this.repos, asset) : undefined;
+      const names = await userNames([sub.submittedBy, asset.publisherUserId]);
+      const def = ASSET_TYPES[asset.assetType || ""];
+      const previewUrl = def?.previewUrl?.replace("{submissionId}", sub.id || "").replace("{token}", ContentLibraryHelper.previewToken(sub.id || ""));
+      return {
+        ...sub,
+        typeLabel: def?.label || asset.assetType,
+        product: def?.product,
+        assetType: asset.assetType,
+        assetName: asset.name,
+        assetStatus: asset.status,
+        isNewAsset: !asset.publishedSubmissionId,
+        isThirdParty: asset.publisherUserId !== sub.submittedBy,
+        submittedByName: names[sub.submittedBy || ""],
+        submitterStats: await this.repos.submission.countSubmitterStats(sub.submittedBy || ""),
+        files,
+        live: { ...asset, publisherName: names[asset.publisherUserId || ""], files: liveFiles, fileUrls: ContentLibraryHelper.fileUrls(asset, liveFiles), payload: livePayload },
+        diff: { fields: PublishHelper.diffFields(livePayload, sub.payload), files: PublishHelper.fileSummary(proposed) },
+        previewUrl
+      };
+    });
+  }
+
+  @httpPost("/submissions/:id/approve")
+  public async approve(req: express.Request<{ id: string }, {}, { note?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const sub = await this.repos.submission.loadById(String(req.params.id));
+      if (!sub) return this.json({}, 404);
+      if (sub.status !== "pending") return this.json({ errors: [`submission is ${sub.status}`] }, 400);
+      const asset = await this.repos.asset.loadById(sub.assetId || "");
+      if (!asset || asset.status === "removed") return this.json({ errors: ["asset was removed"] }, 400);
+      await PublishHelper.approve(this.repos, sub, asset, au.id, req.body?.note?.slice(0, 500));
+      return { status: "approved", assetId: asset.id };
+    });
+  }
+
+  @httpPost("/submissions/:id/reject")
+  public async reject(req: express.Request<{ id: string }, {}, { reason?: string; note?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const reason = String(req.body?.reason || "");
+      const note = String(req.body?.note || "").trim().slice(0, 500);
+      if (!REJECT_REASONS.includes(reason) || !note) return this.json({ errors: ["reason and note are required"] }, 400);
+      const sub = await this.repos.submission.loadById(String(req.params.id));
+      if (!sub) return this.json({}, 404);
+      if (sub.status !== "pending") return this.json({ errors: [`submission is ${sub.status}`] }, 400);
+      const asset = await this.repos.asset.loadById(sub.assetId || "");
+      await PublishHelper.reject(this.repos, sub, asset, au.id, reason, note);
+      return { status: "rejected" };
     });
   }
 
   // signature-gated rather than JWT-gated: review players and <img> tags never send the Authorization header
-  @httpGet("/pending-files/:id/:field")
+  @httpGet("/pending-files/:submissionId/:name")
   public async pendingFile(req: express.Request, res: express.Response): Promise<any> {
-    const id = String(req.params.id);
-    const field = String(req.params.field);
-    const exp = Number(req.query.exp);
-    const sig = String(req.query.sig || "");
-    if (!ContentLibraryHelper.verifyPendingFile(id, field, exp, sig)) {
+    const submissionId = String(req.params.submissionId);
+    const name = String(req.params.name);
+    if (!ContentLibraryHelper.verify(submissionId, name, Number(req.query.exp), String(req.query.sig || ""))) {
       res.status(404).json({});
       return;
     }
     const repos = await this.getRepos<Repos>();
-    const song = await repos.song.loadById(id);
-    if (!song || song.status !== "pending") {
+    const sub = await repos.submission.loadById(submissionId);
+    if (!sub || !["draft", "pending"].includes(sub.status || "")) {
       res.status(404).json({});
       return;
     }
-    const file = await ContentLibraryHelper.readPendingField(song, field);
+    const file = await ContentLibraryHelper.readPending(submissionId, name);
     if (!file) {
       res.status(404).json({});
       return;
@@ -51,43 +148,106 @@ export class CommonsAdminController extends CommonsBaseController {
   }
 
   @httpGet("/reports")
-  public async openReports(req: express.Request, res: express.Response): Promise<any> {
+  public async reports(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      return await this.repos.report.loadOpen();
+      const reports = await this.repos.report.loadAll(req.query.status?.toString(), req.query.reason?.toString());
+      const assets = await this.repos.asset.loadByIds([...new Set(reports.map((r) => r.assetId).filter((id): id is string => !!id))]);
+      const byId = new Map(assets.map((a) => [a.id, a]));
+      return reports.map((r) => ({ ...r, assetName: byId.get(r.assetId || "")?.name, assetStatus: byId.get(r.assetId || "")?.status }));
     });
   }
 
-  @httpGet("/abc-submissions")
-  public async abcSubmissions(req: express.Request, res: express.Response): Promise<any> {
+  @httpPost("/reports/:id/claim")
+  public async claim(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      return await this.repos.abcSubmission.loadPending();
+      const report = await this.repos.report.loadById(String(req.params.id));
+      if (!report) return this.json({}, 404);
+      if (report.status !== "open") return this.json({ errors: [`report is ${report.status}`] }, 400);
+      await this.repos.report.update(report.id || "", { status: "reviewing", reviewedBy: au.id });
+      return { status: "reviewing" };
     });
   }
 
-  // authz-exempt: Server Admin gate lives in setAbcStatus
-  @httpPost("/abc-submissions/:id/approve")
-  public async approveAbc(req: express.Request, res: express.Response): Promise<any> {
-    return this.setAbcStatus(req, res, "approved");
+  @httpPost("/reports/:id/resolve")
+  public async resolve(req: express.Request<{ id: string }, {}, { resolution?: string; note?: string; action?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const resolution = String(req.body?.resolution || "");
+      const action = String(req.body?.action || "none");
+      if (!RESOLUTIONS.includes(resolution) || !["none", "unpublish", "remove"].includes(action)) return this.json({ errors: ["resolution and action are required"] }, 400);
+      const report = await this.repos.report.loadById(String(req.params.id));
+      if (!report) return this.json({}, 404);
+      if (report.status === "resolved") return this.json({ errors: ["report is resolved"] }, 400);
+      const asset = report.assetId ? await this.repos.asset.loadById(report.assetId) : undefined;
+      if (action !== "none" && !asset) return this.json({ errors: ["report is not linked to an asset"] }, 400);
+      const reason = report.reason === "copyright" ? "copyright" : "policy";
+      if (asset && action === "remove" && asset.status !== "removed") await PublishHelper.remove(this.repos, asset, reason);
+      if (asset && action === "unpublish" && asset.status === "published") await this.repos.asset.update(asset.id || "", { status: "unpublished", unpublishedAt: new Date(), removedReason: reason });
+      await this.repos.report.update(report.id || "", { status: "resolved", resolution, resolutionNote: String(req.body?.note || "").slice(0, 500), reviewedBy: au.id, reviewedAt: new Date() });
+      return { status: "resolved" };
+    });
   }
 
-  // authz-exempt: Server Admin gate lives in setAbcStatus
-  @httpPost("/abc-submissions/:id/reject")
-  public async rejectAbc(req: express.Request, res: express.Response): Promise<any> {
-    return this.setAbcStatus(req, res, "rejected");
+  @httpGet("/assets")
+  public async assets(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const assets = await this.repos.asset.adminSearch({ q: req.query.q?.toString(), status: req.query.status?.toString(), assetType: req.query.assetType?.toString(), page: Number(req.query.page) || 1 });
+      const names = await userNames(assets.map((a) => a.publisherUserId));
+      return assets.map((a) => ({ ...a, publisherName: names[a.publisherUserId || ""], typeLabel: ASSET_TYPES[a.assetType || ""]?.label || a.assetType }));
+    });
   }
 
-  // authz-exempt: Server Admin gate lives in setAssetStatus
-  @httpPost("/songs/:id/approve")
-  public async approve(req: express.Request, res: express.Response): Promise<any> {
-    return this.setAssetStatus(req, res, "approved");
+  @httpPost("/assets/:id/unpublish")
+  public async unpublish(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const asset = await this.repos.asset.loadById(String(req.params.id));
+      if (!asset) return this.json({}, 404);
+      if (asset.status !== "published") return this.json({ errors: [`asset is ${asset.status}`] }, 400);
+      await this.repos.asset.update(asset.id || "", { status: "unpublished", unpublishedAt: new Date(), removedReason: "policy" });
+      return { status: "unpublished" };
+    });
   }
 
-  // authz-exempt: Server Admin gate lives in setAssetStatus
-  @httpPost("/songs/:id/reject")
-  public async reject(req: express.Request, res: express.Response): Promise<any> {
-    return this.setAssetStatus(req, res, "removed");
+  @httpPost("/assets/:id/republish")
+  public async republish(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const asset = await this.repos.asset.loadById(String(req.params.id));
+      if (!asset) return this.json({}, 404);
+      if (asset.status !== "unpublished") return this.json({ errors: [`asset is ${asset.status}`] }, 400);
+      await this.repos.asset.update(asset.id || "", { status: "published", unpublishedAt: null as any, removedReason: null as any });
+      return { status: "published" };
+    });
+  }
+
+  @httpPost("/assets/:id/remove")
+  public async remove(req: express.Request<{ id: string }, {}, { reason?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const reason = String(req.body?.reason || "");
+      if (!REMOVE_REASONS.includes(reason)) return this.json({ errors: ["reason must be copyright or policy"] }, 400);
+      const asset = await this.repos.asset.loadById(String(req.params.id));
+      if (!asset) return this.json({}, 404);
+      if (asset.status === "removed") return this.json({ errors: ["asset is already removed"] }, 400);
+      await PublishHelper.remove(this.repos, asset, reason);
+      return { status: "removed" };
+    });
+  }
+
+  @httpPost("/assets/:id/feature")
+  public async feature(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const asset = await this.repos.asset.loadById(String(req.params.id));
+      if (!asset) return this.json({}, 404);
+      const featured = !asset.featured;
+      await this.repos.asset.update(asset.id || "", { featured });
+      return { featured };
+    });
   }
 
   @httpPost("/score-missing")
@@ -98,89 +258,14 @@ export class CommonsAdminController extends CommonsBaseController {
       const songs = await this.repos.song.loadUnscored(8);
       let scored = 0;
       for (const s of songs) {
-        const fields = await QualityHelper.score(s);
+        const files = await this.repos.assetFile.loadLive(s.id || "");
+        const fields = await QualityHelper.score({ ...s, fileRoles: files.map((f) => (f.name || "").replace(/\.[^.]+$/, "")) });
         if (fields.qualityScore != null) {
-          await this.repos.song.update(s.id, fields);
+          await this.repos.song.update(s.id || "", fields);
           scored++;
         }
       }
       return { scored, remaining: (await this.repos.song.loadUnscored(1)).length };
     });
-  }
-
-  @httpPost("/reports/:id/resolve")
-  public async resolve(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      await this.repos.report.updateStatus(String(req.params.id), "resolved");
-      return { status: "resolved" };
-    });
-  }
-
-  @httpGet("/assets/pending")
-  public async pendingAssets(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      return await this.repos.asset.loadPending();
-    });
-  }
-
-  // authz-exempt: Server Admin gate lives in setAssetStatus
-  @httpPost("/assets/:id/approve")
-  public async approveAsset(req: express.Request, res: express.Response): Promise<any> {
-    return this.setAssetStatus(req, res, "approved");
-  }
-
-  // authz-exempt: Server Admin gate lives in setAssetStatus
-  @httpPost("/assets/:id/reject")
-  public async rejectAsset(req: express.Request, res: express.Response): Promise<any> {
-    return this.setAssetStatus(req, res, "removed");
-  }
-
-  @httpPost("/assets/:id/feature")
-  public async featureAsset(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      const asset = await this.repos.asset.loadById(String(req.params.id));
-      if (!asset) return this.json({}, 404);
-      const featured = !asset.featured;
-      await this.repos.asset.update(asset.id, { featured });
-      return { featured };
-    });
-  }
-
-  // status is bookkeeping only — an approved .abc is promoted by hand to the
-  // song's folder in the WorshipCommonsContent repo
-  private setAbcStatus(req: express.Request, res: express.Response, status: string) {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      await this.repos.abcSubmission.updateStatus(String(req.params.id), status);
-      return { status };
-    });
-  }
-
-  // one review flow for every asset type; the per-type file work happens in publishFiles
-  private setAssetStatus(req: express.Request, res: express.Response, status: string) {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      const asset = await this.repos.asset.loadById(String(req.params.id));
-      if (!asset) return this.json({}, 404);
-      const updates = await this.publishFiles(asset, status);
-      await this.repos.asset.update(asset.id, { ...updates, status, reviewedBy: au.id, reviewedAt: new Date() });
-      return { status };
-    });
-  }
-
-  private async publishFiles(asset: Asset, status: string): Promise<Partial<Asset>> {
-    if (asset.assetType === "song") {
-      const song = await this.repos.song.loadById(asset.id);
-      if (!song) return {};
-      if (status === "approved") return await ContentLibraryHelper.publishSong({ ...song, status });
-      await ContentLibraryHelper.removeSongObjects(song);
-      return { path: null, files: null } as Partial<Asset>;
-    }
-    if (status === "approved") return await ContentLibraryHelper.publishAsset(asset);
-    await ContentLibraryHelper.removeAssetObjects(asset);
-    return { path: null, files: null } as Partial<Asset>;
   }
 }

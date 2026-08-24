@@ -1,4 +1,4 @@
-/** songs satellite row — the spine (title, themes, language, license, status, publisher, counters, path, files) lives on the asset. */
+/** songs satellite row — the spine (name, tags, language, license, status, publisher, counters) lives on the asset. */
 export interface Song {
   assetId?: string;
   authorId?: string;
@@ -39,33 +39,30 @@ export interface SongView extends Song {
   writer?: string;
   writerBio?: string;
   portraitKey?: string;
-  path?: string;
-  files?: string;
   fileUrls?: Record<string, string>;
   downloadCount?: number;
-  likeCount?: number;
+  ratingCount?: number;
+  ratingSum?: number;
   createdAt?: Date;
+  publishedAt?: Date;
 }
 
 export interface Report {
   id?: string;
   assetId?: string;
   contentText?: string;
+  reason?: string;
+  reporterUserId?: string;
   reporterRole?: string;
   details?: string;
   name?: string;
   email?: string;
   signature?: string;
   status?: string;
-  createdAt?: Date;
-}
-
-export interface AbcSubmission {
-  id?: string;
-  songId?: string;
-  abc?: string;
-  submittedBy?: string;
-  status?: string;
+  resolution?: string;
+  resolutionNote?: string;
+  reviewedBy?: string;
+  reviewedAt?: Date;
   createdAt?: Date;
 }
 
@@ -80,30 +77,69 @@ export interface Asset {
   publisherUserId?: string;
   publisherChurchId?: string;
   status?: string;
-  path?: string;
-  files?: string;
-  fileUrls?: Record<string, string>;
-  contentHash?: string;
-  version?: string;
-  appMinVersion?: string;
-  downloadCount?: number;
-  likeCount?: number;
+  publishedSubmissionId?: string;
   featured?: boolean;
-  reviewedBy?: string;
-  reviewedAt?: Date;
+  downloadCount?: number;
+  ratingCount?: number;
+  ratingSum?: number;
+  removedReason?: string;
+  unpublishedAt?: Date;
   createdAt?: Date;
   modifiedAt?: Date;
+  publishedAt?: Date;
 }
 
-export interface AssetLike {
+export interface Submission {
   id?: string;
   assetId?: string;
+  submittedBy?: string;
+  status?: string;
+  payload?: SubmissionPayload;
+  note?: string;
+  triageScore?: number;
+  filesChanged?: { name: string; action: string }[];
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  reviewReason?: string;
+  reviewNote?: string;
+  createdAt?: Date;
+  submittedAt?: Date;
+}
+
+export interface SubmissionPayload {
+  name?: string;
+  description?: string;
+  tags?: string;
+  language?: string;
+  license?: string;
+  publisherChurchId?: string;
+  detail?: Record<string, any>;
+}
+
+export interface AssetFile {
+  id?: string;
+  assetId?: string;
+  submissionId?: string | null;
+  name?: string;
+  action?: string;
+  sizeBytes?: number;
+  contentHash?: string;
+  uploadedBy?: string;
+  createdAt?: Date;
+}
+
+export interface AssetRating {
+  assetId?: string;
   userId?: string;
-  timeAdded?: Date;
+  stars?: number | null;
+  saved?: boolean;
+  createdAt?: Date;
+  modifiedAt?: Date;
 }
 
 export interface AssetDownload {
   assetId?: string;
   ipHash?: string;
+  ymd?: string;
   createdAt?: Date;
 }

@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { Song, SongView } from "../models/index.js";
 
@@ -11,11 +10,11 @@ const SPINE_COLS = [
   "assets.language as language",
   "assets.license as license",
   "assets.status as status",
-  "assets.path as path",
-  "assets.files as files",
   "assets.downloadCount as downloadCount",
-  "assets.likeCount as likeCount",
-  "assets.createdAt as createdAt"
+  "assets.ratingCount as ratingCount",
+  "assets.ratingSum as ratingSum",
+  "assets.createdAt as createdAt",
+  "assets.publishedAt as publishedAt"
 ] as const;
 
 const MODERATION_SPINE_COLS = [...SPINE_COLS, "assets.publisherUserId as submittedBy"] as const;
@@ -56,8 +55,8 @@ const FULL_COLS = [...MODERATION_SPINE_COLS, ...AUTHOR_COLS, ...SONG_COLS] as co
 
 @injectable()
 export class SongRepo {
-  public async loadApprovedSummaries(): Promise<SongView[]> {
-    return await this.joined().select(SUMMARY_COLS).where("assets.status", "=", "approved")
+  public async loadPublishedSummaries(): Promise<SongView[]> {
+    return await this.joined().select(SUMMARY_COLS).where("assets.status", "=", "published")
       .orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
   }
 
@@ -66,15 +65,10 @@ export class SongRepo {
       .orderBy("assets.createdAt", "desc").execute() as SongView[];
   }
 
-  public async loadLiked(userId: string): Promise<SongView[]> {
-    return await this.joined().innerJoin("assetLikes", "assetLikes.assetId", "assets.id")
-      .select(SUMMARY_COLS).where("assetLikes.userId", "=", userId).where("assets.status", "=", "approved")
-      .orderBy("assetLikes.timeAdded", "desc").execute() as SongView[];
-  }
-
-  public async loadPending(): Promise<SongView[]> {
-    return await this.joined().select(FULL_COLS).where("assets.status", "=", "pending")
-      .orderBy(sql`songs.qualityScore is null`).orderBy("songs.qualityScore", "desc").orderBy("assets.createdAt", "asc").execute() as SongView[];
+  public async loadSaved(userId: string): Promise<SongView[]> {
+    return await this.joined().innerJoin("assetRatings", "assetRatings.assetId", "assets.id")
+      .select(SUMMARY_COLS).where("assetRatings.userId", "=", userId).where("assetRatings.saved", "=", true as any).where("assets.status", "=", "published")
+      .orderBy("assetRatings.modifiedAt", "desc").execute() as SongView[];
   }
 
   public async loadUnscored(limit: number): Promise<SongView[]> {
@@ -86,7 +80,13 @@ export class SongRepo {
     return await this.joined().select(FULL_COLS).where("assets.id", "=", assetId).executeTakeFirst() as SongView | undefined;
   }
 
-  public async create(song: Song): Promise<Song> {
+  public async loadSatellite(assetId: string): Promise<Song | undefined> {
+    return await getDb().selectFrom("songs").selectAll().where("assetId", "=", assetId).executeTakeFirst() as Song | undefined;
+  }
+
+  public async upsert(song: Song): Promise<void> {
+    const existing = await this.loadSatellite(song.assetId || "");
+    if (existing) { await this.update(song.assetId || "", song); return; }
     await getDb().insertInto("songs").values({
       assetId: song.assetId,
       authorId: song.authorId,
@@ -106,7 +106,6 @@ export class SongRepo {
       qualityScore: song.qualityScore,
       qualityDetail: song.qualityDetail
     } as any).execute();
-    return song;
   }
 
   public async update(assetId: string, fields: Partial<Song>): Promise<void> {
