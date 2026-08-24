@@ -96,3 +96,5 @@ layers/
 .env
 
 playground-app/.yarn/
+
+content/

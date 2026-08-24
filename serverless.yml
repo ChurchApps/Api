@@ -52,6 +52,7 @@ provider:
     MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/messagingApi/connectionString, ''}
     DOING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/doingApi/connectionString, ''}
     REPORTING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/reportingApi/connectionString, ''}
+    COMMONS_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/commonsApi/connectionString, ''}
 
     # Third-party API keys (non-DB secrets)
     HUBSPOT_KEY: ${ssm:/${self:custom.envLower}/hubspotKey, ''}

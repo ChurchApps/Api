@@ -162,7 +162,9 @@ export class Environment extends EnvironmentBase {
   }
 
   private static async initializeDatabaseConnections(_config: any) {
-    const modules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
+    const modules = [
+      "membership", "attendance", "content", "giving", "messaging", "doing", "reporting", "commons"
+    ];
 
     // Special case: DoingApi needs access to membership database
     if (process.env.DOING_MEMBERSHIP_CONNECTION_STRING) {
@@ -279,7 +281,9 @@ export class Environment extends EnvironmentBase {
   }
 
   static getConnectionStatus(): { loaded: string[]; missing: string[]; total: number } {
-    const expectedModules = ["membership", "attendance", "content", "giving", "messaging", "doing", "reporting"];
+    const expectedModules = [
+      "membership", "attendance", "content", "giving", "messaging", "doing", "reporting", "commons"
+    ];
     const loadedModules = Array.from(this.dbConnections.keys()).filter((key) => !key.includes("-"));
     const missing = expectedModules.filter((m) => !loadedModules.includes(m));
 

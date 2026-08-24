@@ -20,7 +20,8 @@ export const MODULE_ROUTES = {
   doing: "/doing",
   giving: "/giving",
   messaging: "/messaging",
-  reporting: "/reporting"
+  reporting: "/reporting",
+  commons: "/commons"
 } as const;
 
 /**

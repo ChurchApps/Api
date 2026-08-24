@@ -13,6 +13,8 @@ export function isPublicDiskFilePath(urlPath: string): boolean {
   if (decoded.includes("..")) return false;
   const parts = decoded.split("/").filter(Boolean);
   if (parts[0] === "content") parts.shift();
+  // The commons library is a public catalog; only its pending (unreviewed) submissions stay private.
+  if (parts[0] === "commons") return parts.length > 1 && parts[1] !== "pending";
   if (parts.length === 3 && parts[1] === "files") return true;
   if (parts.length === 5 && parts[1] === "files" && PUBLIC_CONTENT_TYPES.includes(parts[2])) return true;
   return false;

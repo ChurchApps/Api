@@ -208,6 +208,7 @@ async function loadModuleBindings(container: Container) {
       { name: "Giving", import: import("./modules/giving/controllers/index.js") },
       { name: "Messaging", import: import("./modules/messaging/controllers/index.js") },
       { name: "Reporting", import: import("./modules/reporting/controllers/index.js") },
+      { name: "Commons", import: import("./modules/commons/controllers/index.js") },
       { name: "MCP", import: import("./modules/mcp/index.js") }
     ];
 
