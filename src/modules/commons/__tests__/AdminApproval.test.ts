@@ -3,9 +3,9 @@ jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController
 jest.mock("../../../shared/helpers/index", () => ({ Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } } }));
 jest.mock("../helpers/index", () => ({
   ContentLibraryHelper: {
-    publishSong: jest.fn(async () => ({ demoAudioUrl: "public/demo.wav" })),
+    publishSong: jest.fn(async () => ({ path: "commons/songs/en/wc-license/hymn--song0000001" })),
     removeSongObjects: jest.fn(async () => {}),
-    publishAsset: jest.fn(async () => ({ contentPath: "public/slides.zip" })),
+    publishAsset: jest.fn(async () => ({ path: "commons/assets/freeshow/template/asset000001" })),
     removeAssetObjects: jest.fn(async () => {})
   },
   QualityHelper: { score: jest.fn(async () => ({})) }
@@ -32,15 +32,15 @@ const req = { params: { id: "song0000001" } } as any;
 describe("unified asset approval", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("runs the song publish hook for song assets", async () => {
-    const song = { id: "song0000001", title: "Hymn", status: "pending" };
+  it("runs the song publish hook and stores the published path on the asset", async () => {
+    const song = { id: "song0000001", title: "Hymn", status: "pending", path: "commons/pending/song0000001", files: "demoAudio.wav" };
     const { controller, repos } = adminController({ id: "song0000001", assetType: "song" }, song);
     const result: any = await controller.approve(req, {} as any);
 
     expect(ContentLibraryHelper.publishSong).toHaveBeenCalled();
     expect(ContentLibraryHelper.publishAsset).not.toHaveBeenCalled();
-    expect(repos.song.update).toHaveBeenCalledWith("song0000001", { demoAudioUrl: "public/demo.wav" });
-    expect(repos.asset.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ status: "approved", reviewedBy: "admin000001" }));
+    expect(repos.song.update).not.toHaveBeenCalled();
+    expect(repos.asset.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ path: "commons/songs/en/wc-license/hymn--song0000001", status: "approved", reviewedBy: "admin000001" }));
     expect(result).toEqual({ status: "approved" });
   });
 
@@ -50,17 +50,17 @@ describe("unified asset approval", () => {
 
     expect(ContentLibraryHelper.publishAsset).toHaveBeenCalled();
     expect(ContentLibraryHelper.publishSong).not.toHaveBeenCalled();
-    expect(repos.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ contentPath: "public/slides.zip", status: "approved" }));
+    expect(repos.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ path: "commons/assets/freeshow/template/asset000001", status: "approved" }));
   });
 
-  it("removes stored song objects on reject", async () => {
-    const song = { id: "song0000001", title: "Hymn", status: "pending" };
+  it("removes stored song objects and clears path/files on reject", async () => {
+    const song = { id: "song0000001", title: "Hymn", status: "pending", path: "commons/pending/song0000001" };
     const { controller, repos } = adminController({ id: "song0000001", assetType: "song" }, song);
     await controller.reject(req, {} as any);
 
     expect(ContentLibraryHelper.removeSongObjects).toHaveBeenCalledWith(song);
     expect(ContentLibraryHelper.removeAssetObjects).not.toHaveBeenCalled();
-    expect(repos.asset.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ status: "removed" }));
+    expect(repos.asset.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ path: null, files: null, status: "removed" }));
   });
 
   it("clears stored paths when a generic asset is rejected", async () => {
@@ -68,7 +68,7 @@ describe("unified asset approval", () => {
     await controller.rejectAsset({ params: { id: "asset000001" } } as any, {} as any);
 
     expect(ContentLibraryHelper.removeAssetObjects).toHaveBeenCalled();
-    expect(repos.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ contentPath: null, thumbPath: null, status: "removed" }));
+    expect(repos.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ path: null, files: null, status: "removed" }));
   });
 
   it("404s an unknown id", async () => {

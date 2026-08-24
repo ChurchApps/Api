@@ -51,7 +51,7 @@ export class AssetRepo {
   // review queue across every asset type — the song-specific queue lives on SongRepo
   public async loadPending(): Promise<Asset[]> {
     return await getDb().selectFrom("assets")
-      .select(["id", "name", "assetType", "publisherUserId", "license", "sizeBytes", "createdAt"])
+      .select(["id", "name", "assetType", "publisherUserId", "license", "createdAt"])
       .where("status", "=", "pending").orderBy("createdAt", "asc").execute() as Asset[];
   }
 
@@ -73,9 +73,8 @@ export class AssetRepo {
       publisherUserId: asset.publisherUserId,
       publisherChurchId: asset.publisherChurchId,
       status: asset.status || "pending",
-      contentPath: asset.contentPath,
-      thumbPath: asset.thumbPath,
-      sizeBytes: asset.sizeBytes,
+      path: asset.path,
+      files: asset.files,
       contentHash: asset.contentHash,
       version: asset.version,
       appMinVersion: asset.appMinVersion,

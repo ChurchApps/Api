@@ -3,7 +3,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { Song, SongView } from "../models/index.js";
 
-// Spine fields are aliased back to the legacy song names the site consumes.
+// Spine and author fields are aliased back to the legacy song names the site consumes.
 const SPINE_COLS = [
   "assets.id as id",
   "assets.name as title",
@@ -11,7 +11,8 @@ const SPINE_COLS = [
   "assets.language as language",
   "assets.license as license",
   "assets.status as status",
-  "assets.thumbPath as artUrl",
+  "assets.path as path",
+  "assets.files as files",
   "assets.downloadCount as downloadCount",
   "assets.likeCount as likeCount",
   "assets.createdAt as createdAt"
@@ -19,25 +20,20 @@ const SPINE_COLS = [
 
 const MODERATION_SPINE_COLS = [...SPINE_COLS, "assets.publisherUserId as submittedBy"] as const;
 
+const AUTHOR_COLS = [
+  "authors.name as writer",
+  "authors.bio as writerBio",
+  "authors.portraitUrl as portraitKey"
+] as const;
+
 // list payload omits chordPro (heavy) and moderation-only fields
 const SUMMARY_SONG_COLS = [
-  "songs.writer",
   "songs.year",
   "songs.songKey",
   "songs.bpm",
   "songs.timeSignature",
   "songs.scripture",
   "songs.hymnalCount",
-  "songs.demoAudioUrl",
-  "songs.demoAudioBytes",
-  "songs.sheetPdfUrl",
-  "songs.sheetPdfBytes",
-  "songs.stemsZipUrl",
-  "songs.stemsZipBytes",
-  "songs.midiUrl",
-  "songs.midiBytes",
-  "songs.lyricsUrl",
-  "songs.abcUrl",
   "songs.parentSongId",
   "songs.relationLabel",
   "songs.qualityScore"
@@ -46,18 +42,17 @@ const SUMMARY_SONG_COLS = [
 const SONG_COLS = [
   ...SUMMARY_SONG_COLS,
   "songs.assetId",
+  "songs.authorId",
   "songs.scriptureText",
   "songs.chordPro",
   "songs.videoUrl",
-  "songs.writerPortraitUrl",
-  "songs.writerBio",
   "songs.certified",
   "songs.proAnswer",
   "songs.qualityDetail"
 ] as const;
 
-const SUMMARY_COLS = [...SPINE_COLS, ...SUMMARY_SONG_COLS] as const;
-const FULL_COLS = [...MODERATION_SPINE_COLS, ...SONG_COLS] as const;
+const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS] as const;
+const FULL_COLS = [...MODERATION_SPINE_COLS, ...AUTHOR_COLS, ...SONG_COLS] as const;
 
 @injectable()
 export class SongRepo {
@@ -94,7 +89,7 @@ export class SongRepo {
   public async create(song: Song): Promise<Song> {
     await getDb().insertInto("songs").values({
       assetId: song.assetId,
-      writer: song.writer,
+      authorId: song.authorId,
       year: song.year,
       songKey: song.songKey,
       bpm: song.bpm,
@@ -103,16 +98,7 @@ export class SongRepo {
       scriptureText: song.scriptureText,
       hymnalCount: song.hymnalCount || 0,
       chordPro: song.chordPro,
-      demoAudioUrl: song.demoAudioUrl,
-      demoAudioBytes: song.demoAudioBytes,
-      sheetPdfUrl: song.sheetPdfUrl,
-      sheetPdfBytes: song.sheetPdfBytes,
-      stemsZipUrl: song.stemsZipUrl,
-      stemsZipBytes: song.stemsZipBytes,
-      midiUrl: song.midiUrl,
-      midiBytes: song.midiBytes,
-      lyricsUrl: song.lyricsUrl,
-      abcUrl: song.abcUrl,
+      videoUrl: song.videoUrl,
       parentSongId: song.parentSongId,
       relationLabel: song.relationLabel,
       proAnswer: song.proAnswer,
@@ -128,6 +114,7 @@ export class SongRepo {
   }
 
   private joined() {
-    return getDb().selectFrom("assets").innerJoin("songs", "songs.assetId", "assets.id");
+    return getDb().selectFrom("assets").innerJoin("songs", "songs.assetId", "assets.id")
+      .leftJoin("authors", "authors.id", "songs.authorId");
   }
 }

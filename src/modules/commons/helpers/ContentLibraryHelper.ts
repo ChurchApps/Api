@@ -5,13 +5,13 @@ import { FileStorageHelper } from "@churchapps/apihelper";
 import { GetObjectCommand, PutObjectCommand, S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Environment } from "../../../shared/helpers/Environment.js";
-import { Asset, Song, SongView } from "../models/index.js";
+import { Asset, SongView } from "../models/index.js";
 
 // The commons library mirrors the WorshipCommonsContent repo layout, rooted under
 // "commons/" so it can share the core Api content store. Approved songs get a
 // library-shaped folder so a bucket→repo export (aws s3 sync) yields valid library
 // folders and the DB row can be rebuilt from them. Conventions here (slugify,
-// chordpro header) must match WorshipCommonsContent/tools/lib.mjs.
+// chordpro header, file names) must match WorshipCommonsContent/tools/lib.mjs.
 
 const ROOT = "commons";
 const PENDING_ROOT = `${ROOT}/pending`;
@@ -30,7 +30,9 @@ const LANG_CODES: Record<string, string> = {
   Zulu: "zu"
 };
 
-const UPLOAD_COLS: [string, keyof Song][] = [["demoAudio", "demoAudioUrl"], ["sheetPdf", "sheetPdfUrl"], ["stemsZip", "stemsZipUrl"]];
+// content-repo names whose media key is not just basename-minus-extension
+const FILE_KEYS: Record<string, string> = { "tune.mid": "midi", "tune.abc": "abc", "timing.json": "timing" };
+export const UPLOAD_FIELDS = ["demoAudio", "sheetPdf", "stemsZip"] as const;
 const REVIEW_TTL_SEC = 7200;
 
 export class ContentLibraryHelper {
@@ -45,8 +47,7 @@ export class ContentLibraryHelper {
   }
 
   // submissions get "<slug>--<id>" folders — unique without a bucket lookup.
-  // ponytail: recomputed from the row (no stored path) — safe while titles are
-  // immutable; a future edit endpoint must store the path or rename the folder.
+  // used only as the publish target; the row's stored path is the source of truth after.
   static folderKey(song: SongView): string {
     const lang = LANG_CODES[song.language || ""] || "en";
     const section = song.license === "PD" ? "public-domain" : "wc-license";
@@ -70,24 +71,36 @@ export class ContentLibraryHelper {
     return `${(Environment.contentRoot || "").replace(/\/$/, "")}/${key}`;
   }
 
-  static storageKey(url?: string): string | undefined {
-    if (!url) return undefined;
-    if (url.startsWith(`${ROOT}/`)) return url;
-    const root = (Environment.contentRoot || "").replace(/\/$/, "");
-    if (root && url.startsWith(root + "/")) return url.slice(root.length + 1);
-    return undefined;
-  }
-
   static isPendingKey(key?: string): boolean {
     return !!key && key.startsWith(`${PENDING_ROOT}/`);
+  }
+
+  static fileKey(name: string): string {
+    return FILE_KEYS[name] || name.replace(/\.[^.]+$/, "");
+  }
+
+  static fileList(item: { files?: string }): string[] {
+    return (item.files || "").split(",").map((f) => f.trim()).filter(Boolean);
+  }
+
+  static fileUrls(item: { path?: string; files?: string; portraitKey?: string }): Record<string, string> {
+    const out: Record<string, string> = {};
+    if (item.path) for (const name of this.fileList(item)) out[this.fileKey(name)] = this.publicUrl(`${item.path}/${name}`);
+    if (item.portraitKey) out.portrait = this.publicUrl(item.portraitKey);
+    return out;
+  }
+
+  static withUrls<T extends { path?: string; files?: string; portraitKey?: string }>(item: T): Omit<T, "portraitKey"> & { fileUrls: Record<string, string> } {
+    const { portraitKey: _portraitKey, ...rest } = item;
+    return { ...rest, fileUrls: this.fileUrls(item) };
   }
 
   // library-shaped song.json — what tools/build-catalog.mjs reads on export
   static songJson(song: SongView): object {
     const uploads: Record<string, string> = {};
-    for (const [field, urlCol] of UPLOAD_COLS) {
-      const url = song[urlCol] as string | undefined;
-      if (url) uploads[field] = url.split("/").pop() as string;
+    for (const name of this.fileList(song)) {
+      const key = this.fileKey(name);
+      if ((UPLOAD_FIELDS as readonly string[]).includes(key)) uploads[key] = name;
     }
     return {
       id: song.id,
@@ -122,8 +135,7 @@ export class ContentLibraryHelper {
     return lines.join("\n") + "\n\n" + song.chordPro + "\n";
   }
 
-  static async writeSongFolder(song: SongView): Promise<void> {
-    const folder = this.folderKey(song);
+  static async writeSongFolder(song: SongView, folder: string): Promise<void> {
     await FileStorageHelper.store(`${folder}/song.json`, "application/json", Buffer.from(JSON.stringify(this.songJson(song), null, 2) + "\n"));
     await FileStorageHelper.store(`${folder}/lyrics.chordpro`, "text/plain; charset=utf-8", Buffer.from(this.renderChordpro(song)));
   }
@@ -137,70 +149,55 @@ export class ContentLibraryHelper {
     await FileStorageHelper.store(key, contentType, contents);
   }
 
-  static async publishSong(song: SongView): Promise<Partial<Song>> {
-    const updates: Partial<Song> = {};
+  static async publishSong(song: SongView): Promise<Partial<Asset>> {
     const folder = this.folderKey(song);
-    for (const [, urlCol] of UPLOAD_COLS) {
-      const key = this.storageKey(song[urlCol] as string | undefined);
-      if (!this.isPendingKey(key)) continue;
-      const file = await this.readKey(key);
-      if (!file) continue;
-      const dest = `${folder}/${key.split("/").pop()}`;
-      await FileStorageHelper.store(dest, file.contentType, file.buffer);
-      await this.removeKey(key);
-      (updates as any)[urlCol] = this.publicUrl(dest);
+    if (this.isPendingKey(song.path)) {
+      for (const name of this.fileList(song)) {
+        const file = await this.readKey(`${song.path}/${name}`);
+        if (!file) continue;
+        await FileStorageHelper.store(`${folder}/${name}`, file.contentType, file.buffer);
+      }
     }
-    await this.writeSongFolder({ ...song, ...updates });
+    await this.writeSongFolder(song, folder);
     await this.removePrefix(this.pendingFolderKey(song));
-    return updates;
+    return { path: folder };
   }
 
   static async removeSongObjects(song: SongView): Promise<void> {
     await this.removePrefix(this.pendingFolderKey(song));
-    await this.removePrefix(this.folderKey(song));
-    for (const [, urlCol] of UPLOAD_COLS) {
-      const key = this.storageKey(song[urlCol] as string | undefined);
-      if (key) await this.removeKey(key);
-    }
+    if (song.path) await this.removePrefix(song.path);
   }
 
-  /** Moves an approved asset's pending files into its public folder and returns the new paths. */
+  /** Moves an approved asset's pending files into its public folder and returns the new path. */
   static async publishAsset(asset: Asset): Promise<Partial<Asset>> {
     const folder = this.assetFolderKey(asset);
-    const updates: Partial<Asset> = {};
-    for (const col of ["contentPath", "thumbPath"] as (keyof Asset)[]) {
-      const key = this.storageKey(asset[col] as string | undefined);
-      if (!this.isPendingKey(key)) continue;
-      const file = await this.readKey(key);
-      if (!file) continue;
-      const dest = `${folder}/${key.split("/").pop()}`;
-      await FileStorageHelper.store(dest, file.contentType, file.buffer);
-      await this.removeKey(key);
-      (updates as any)[col] = this.publicUrl(dest);
+    if (this.isPendingKey(asset.path)) {
+      for (const name of this.fileList(asset)) {
+        const file = await this.readKey(`${asset.path}/${name}`);
+        if (!file) continue;
+        await FileStorageHelper.store(`${folder}/${name}`, file.contentType, file.buffer);
+      }
     }
     await this.removePrefix(this.assetPendingFolderKey(asset.id || ""));
-    return updates;
+    return { path: folder };
   }
 
   static async removeAssetObjects(asset: Asset): Promise<void> {
     await this.removePrefix(this.assetPendingFolderKey(asset.id || ""));
-    await this.removePrefix(this.assetFolderKey(asset));
-    for (const col of ["contentPath", "thumbPath"] as (keyof Asset)[]) {
-      const key = this.storageKey(asset[col] as string | undefined);
-      if (key) await this.removeKey(key);
-    }
+    if (asset.path) await this.removePrefix(asset.path);
   }
 
   static async withReviewUrls(song: SongView, apiBase: string): Promise<SongView> {
+    if (!this.isPendingKey(song.path) || !song.id) return this.withUrls(song);
     const exp = Math.floor(Date.now() / 1000) + REVIEW_TTL_SEC;
-    const out = { ...song };
-    for (const [field, urlCol] of UPLOAD_COLS) {
-      const key = this.storageKey(song[urlCol] as string | undefined);
-      if (!this.isPendingKey(key) || !song.id) continue;
-      if (Environment.fileStore === "S3") (out as any)[urlCol] = await getSignedUrl(this.s3Client(), new GetObjectCommand({ Bucket: Environment.s3Bucket, Key: key }), { expiresIn: REVIEW_TTL_SEC });
-      else (out as any)[urlCol] = `${apiBase.replace(/\/$/, "")}/commons/admin/pending-files/${song.id}/${field}?exp=${exp}&sig=${this.signPendingFile(song.id, field, exp)}`;
+    const fileUrls: Record<string, string> = {};
+    for (const name of this.fileList(song)) {
+      const field = this.fileKey(name);
+      if (Environment.fileStore === "S3") fileUrls[field] = await getSignedUrl(this.s3Client(), new GetObjectCommand({ Bucket: Environment.s3Bucket, Key: `${song.path}/${name}` }), { expiresIn: REVIEW_TTL_SEC });
+      else fileUrls[field] = `${apiBase.replace(/\/$/, "")}/commons/admin/pending-files/${song.id}/${field}?exp=${exp}&sig=${this.signPendingFile(song.id, field, exp)}`;
     }
-    return out;
+    const { portraitKey: _portraitKey, ...rest } = song;
+    return { ...rest, fileUrls };
   }
 
   static signPendingFile(songId: string, field: string, exp: number): string {
@@ -216,11 +213,10 @@ export class ContentLibraryHelper {
   }
 
   static async readPendingField(song: SongView, field: string): Promise<{ buffer: Buffer; contentType: string } | null> {
-    const col = UPLOAD_COLS.find(([f]) => f === field)?.[1];
-    if (!col) return null;
-    const key = this.storageKey(song[col] as string | undefined);
-    if (!this.isPendingKey(key)) return null;
-    return await this.readKey(key);
+    if (!this.isPendingKey(song.path)) return null;
+    const name = this.fileList(song).find((n) => this.fileKey(n) === field);
+    if (!name) return null;
+    return await this.readKey(`${song.path}/${name}`);
   }
 
   static requestApiBase(req: { protocol?: string; get?: (n: string) => string | undefined; headers: Record<string, unknown> }): string {

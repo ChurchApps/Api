@@ -14,7 +14,7 @@ interface AssetSubmission extends Asset {
 export class CommonsAssetController extends CommonsBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => await this.repos.asset.search({
+    return this.actionWrapperAnon(req, res, async () => (await this.repos.asset.search({
       assetType: req.query.assetType?.toString(),
       tags: req.query.tags?.toString(),
       language: req.query.language?.toString(),
@@ -22,14 +22,14 @@ export class CommonsAssetController extends CommonsBaseController {
       sort: req.query.sort?.toString(),
       page: Number(req.query.page) || 1,
       pageSize: Number(req.query.pageSize) || 50
-    }));
+    })).map((a) => ContentLibraryHelper.withUrls(a)));
   }
 
   @httpGet("/mine")
   public async mine(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
-      return await this.repos.asset.loadByPublisher(au.id);
+      return (await this.repos.asset.loadByPublisher(au.id)).map((a) => ContentLibraryHelper.withUrls(a));
     });
   }
 
@@ -55,7 +55,6 @@ export class CommonsAssetController extends CommonsBaseController {
         publisherUserId: au.id,
         publisherChurchId: au.churchId,
         status: "pending",
-        sizeBytes: buffer.length,
         contentHash,
         version: body.version,
         appMinVersion: body.appMinVersion
@@ -63,17 +62,17 @@ export class CommonsAssetController extends CommonsBaseController {
       await this.repos.asset.create(asset);
 
       const folder = ContentLibraryHelper.assetPendingFolderKey(asset.id);
-      const contentPath = `${folder}/${CommonsAssetController.safeName(body.file?.name, "asset")}`;
-      const updates: Partial<Asset> = { contentPath };
-      await ContentLibraryHelper.storePending(contentPath, body.file?.contentType || "application/octet-stream", buffer);
+      const names = [`content.${CommonsAssetController.safeExt(body.file?.name, "bin")}`];
+      await ContentLibraryHelper.storePending(`${folder}/${names[0]}`, body.file?.contentType || "application/octet-stream", buffer);
       if (body.thumb?.base64) {
         const thumb = Buffer.from(body.thumb.base64, "base64");
         if (thumb.length > 0 && thumb.length <= 2097152) {
-          const thumbPath = `${folder}/${CommonsAssetController.safeName(body.thumb.name, "thumb")}`;
-          updates.thumbPath = thumbPath;
-          await ContentLibraryHelper.storePending(thumbPath, body.thumb.contentType || "image/png", thumb);
+          const thumbName = `thumb.${CommonsAssetController.safeExt(body.thumb.name, "png")}`;
+          await ContentLibraryHelper.storePending(`${folder}/${thumbName}`, body.thumb.contentType || "image/png", thumb);
+          names.push(thumbName);
         }
       }
+      const updates: Partial<Asset> = { path: folder, files: names.join(",") };
       await this.repos.asset.update(asset.id, updates);
       return { ...asset, ...updates };
     });
@@ -84,7 +83,7 @@ export class CommonsAssetController extends CommonsBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadApproved(String(req.params.id));
       if (!asset) return this.json({}, 404);
-      return asset;
+      return ContentLibraryHelper.withUrls(asset);
     });
   }
 
@@ -94,10 +93,10 @@ export class CommonsAssetController extends CommonsBaseController {
       const asset = await this.repos.asset.loadApproved(String(req.params.id));
       if (!asset) return this.json({}, 404);
       const downloadCount = await recordAssetDownload(this.repos.asset, asset, req);
-      // song assets carry no contentPath - their files are served from the library folder
-      if (!asset.contentPath) return { downloadCount };
-      const key = ContentLibraryHelper.storageKey(asset.contentPath);
-      return { url: key ? ContentLibraryHelper.publicUrl(key) : asset.contentPath, downloadCount };
+      // song assets carry no content entry - their files are served from the library folder
+      const content = ContentLibraryHelper.fileList(asset).find((n) => ContentLibraryHelper.fileKey(n) === "content");
+      if (!content || !asset.path) return { downloadCount };
+      return { url: ContentLibraryHelper.publicUrl(`${asset.path}/${content}`), downloadCount };
     });
   }
 
@@ -124,7 +123,8 @@ export class CommonsAssetController extends CommonsBaseController {
     });
   }
 
-  private static safeName(name: string | undefined, fallback: string): string {
-    return (name || fallback).replace(/[^a-zA-Z0-9._-]/g, "_");
+  private static safeExt(name: string | undefined, fallback: string): string {
+    const ext = name?.includes(".") ? name.split(".").pop() || "" : "";
+    return ext.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || fallback;
   }
 }

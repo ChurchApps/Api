@@ -62,10 +62,11 @@ async function migrate() {
   }
 }
 
-async function seed(repoDir: string, contentRoot: string) {
-  const { assets, songs } = buildCatalog(contentRoot, repoDir);
+async function seed(repoDir: string) {
+  const { assets, songs, authors, copies } = buildCatalog(repoDir);
   const db = createKysely("commons");
   try {
+    for (const row of authors) await db.insertInto("authors").values(row).execute();
     for (const row of assets) await db.insertInto("assets").values(row).execute();
     for (const row of songs) await db.insertInto("songs").values(row).execute();
   } finally {
@@ -79,9 +80,17 @@ async function seed(repoDir: string, contentRoot: string) {
       fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
       fs.cpSync(src, path.join(CONTENT_DIR, dir), { recursive: true });
     }
-    console.log(`  Mirrored ${MIRRORED_DIRS.join(", ")} into ${CONTENT_DIR}`);
+    // shared works/writers media is copied into each song folder so path+files resolves every entry
+    for (const c of copies) {
+      const from = path.join(CONTENT_DIR, c.from);
+      const to = path.join(CONTENT_DIR, c.to);
+      if (!fs.existsSync(from) || fs.existsSync(to)) continue;
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.copyFileSync(from, to);
+    }
+    console.log(`  Mirrored ${MIRRORED_DIRS.join(", ")} into ${CONTENT_DIR} (+${copies.length} shared-file copies)`);
   }
-  console.log(`Seeded ${songs.length} songs.`);
+  console.log(`Seeded ${songs.length} songs, ${authors.length} authors.`);
 }
 
 async function main() {
@@ -109,7 +118,7 @@ async function main() {
   console.log("Running commons migrations...");
   await migrate();
   console.log(`Seeding from ${repoDir}...`);
-  await seed(repoDir, process.env.CONTENT_ROOT || "http://localhost:8084/content");
+  await seed(repoDir);
   console.log("\nDone.");
 }
 

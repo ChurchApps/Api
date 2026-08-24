@@ -6,7 +6,8 @@ import { Repos } from "../repositories/index.js";
 import { Asset, Song, SongView } from "../models/index.js";
 
 interface UploadedFile { name: string; contentType: string; base64: string; }
-interface SongSubmission extends SongView {
+// the wire "files" field carries upload payloads; SongView.files (the stored name list) is server-set
+interface SongSubmission extends Omit<SongView, "files"> {
   recordingOwned?: boolean;
   demoOwned?: boolean;
   files?: { demoAudio?: UploadedFile; sheetPdf?: UploadedFile; stemsZip?: UploadedFile };
@@ -16,14 +17,14 @@ interface SongSubmission extends SongView {
 export class CommonsSongController extends CommonsBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => await this.repos.song.loadApprovedSummaries());
+    return this.actionWrapperAnon(req, res, async () => (await this.repos.song.loadApprovedSummaries()).map((s) => ContentLibraryHelper.withUrls(s)));
   }
 
   @httpGet("/mine")
   public async mine(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
-      return await this.repos.song.loadBySubmitter(au.id);
+      return (await this.repos.song.loadBySubmitter(au.id)).map((s) => ContentLibraryHelper.withUrls(s));
     });
   }
 
@@ -32,7 +33,7 @@ export class CommonsSongController extends CommonsBaseController {
   public async library(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
-      return await this.repos.song.loadLiked(au.id);
+      return (await this.repos.song.loadLiked(au.id)).map((s) => ContentLibraryHelper.withUrls(s));
     });
   }
 
@@ -77,7 +78,7 @@ export class CommonsSongController extends CommonsBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const song = await this.repos.song.loadById(String(req.params.id));
       if (!song || song.status !== "approved") return this.json({}, 404);
-      const { proAnswer: _proAnswer, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = song as any;
+      const { proAnswer: _proAnswer, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = ContentLibraryHelper.withUrls(song) as any;
       return pub;
     });
   }
@@ -113,9 +114,10 @@ export class CommonsSongController extends CommonsBaseController {
       };
       await this.repos.asset.create(asset);
 
+      const writer = body.writer?.trim();
       const song: Song = {
         assetId: asset.id,
-        writer: body.writer,
+        authorId: writer ? await this.repos.author.findOrCreate(writer) : undefined,
         year: body.year,
         songKey: body.songKey,
         bpm: body.bpm,
@@ -136,33 +138,35 @@ export class CommonsSongController extends CommonsBaseController {
         license: asset.license,
         status: asset.status,
         submittedBy: asset.publisherUserId,
+        writer,
         downloadCount: 0,
         likeCount: 0
       };
 
-      const files: { field: string; file?: UploadedFile; urlCol: keyof Song; bytesCol: keyof Song }[] = [
-        { field: "demoAudio", file: body.files?.demoAudio, urlCol: "demoAudioUrl", bytesCol: "demoAudioBytes" },
-        { field: "sheetPdf", file: body.files?.sheetPdf, urlCol: "sheetPdfUrl", bytesCol: "sheetPdfBytes" },
-        { field: "stemsZip", file: body.files?.stemsZip, urlCol: "stemsZipUrl", bytesCol: "stemsZipBytes" }
+      const uploads: [string, UploadedFile | undefined, string][] = [
+        ["demoAudio", body.files?.demoAudio, "mp3"],
+        ["sheetPdf", body.files?.sheetPdf, "pdf"],
+        ["stemsZip", body.files?.stemsZip, "zip"]
       ];
-      const updates: Partial<Song> = {};
-      for (const f of files) {
-        if (!f.file?.base64) continue;
-        const buffer = Buffer.from(f.file.base64, "base64");
+      const pendingFolder = ContentLibraryHelper.pendingFolderKey(view);
+      const names: string[] = [];
+      for (const [field, file, defaultExt] of uploads) {
+        if (!file?.base64) continue;
+        const buffer = Buffer.from(file.base64, "base64");
         if (buffer.length === 0 || buffer.length > MAX_FILE_BYTES) continue;
-        const safeName = (f.file.name || f.field).replace(/[^a-zA-Z0-9._-]/g, "_");
-        const key = `${ContentLibraryHelper.pendingFolderKey(view)}/${safeName}`;
-        await ContentLibraryHelper.storePending(key, f.file.contentType || "application/octet-stream", buffer);
-        (updates as any)[f.urlCol] = key;
-        (updates as any)[f.bytesCol] = buffer.length;
+        const ext = (file.name?.includes(".") ? file.name.split(".").pop() || "" : "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || defaultExt;
+        const name = `${field}.${ext}`;
+        await ContentLibraryHelper.storePending(`${pendingFolder}/${name}`, file.contentType || "application/octet-stream", buffer);
+        names.push(name);
       }
-      if (Object.keys(updates).length > 0) await this.repos.song.update(view.id, updates);
+      const spineUpdates: Partial<Asset> = { path: pendingFolder, files: names.length ? names.join(",") : undefined };
+      await this.repos.asset.update(asset.id, spineUpdates);
 
       // must await: Lambda freezes after the response, fire-and-forget never completes
-      const scoreFields = await QualityHelper.score({ ...view, ...updates });
+      const scoreFields = await QualityHelper.score({ ...view, ...spineUpdates });
       if (scoreFields.qualityScore != null) await this.repos.song.update(view.id, scoreFields);
 
-      return { ...view, ...updates, ...scoreFields };
+      return { ...view, ...spineUpdates, ...scoreFields };
     });
   }
 

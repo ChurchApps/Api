@@ -1,5 +1,6 @@
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Song, SongView } from "../models/index.js";
+import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 
 const MODEL = "gpt-4o-mini";
 const SYSTEM_PROMPT =
@@ -17,9 +18,10 @@ export class QualityHelper {
 
   public static heuristicScore(song: SongView): number {
     let pts = 0;
-    if (song.demoAudioUrl) pts += 8;
-    if (song.sheetPdfUrl) pts += 6;
-    if (song.stemsZipUrl) pts += 6;
+    const files = new Set(ContentLibraryHelper.fileList(song).map((n) => ContentLibraryHelper.fileKey(n)));
+    if (files.has("demoAudio")) pts += 8;
+    if (files.has("sheetPdf")) pts += 6;
+    if (files.has("stemsZip")) pts += 6;
     if (song.scripture) pts += 4;
     if (song.themes) pts += 4;
     if (song.bpm) pts += 3;
