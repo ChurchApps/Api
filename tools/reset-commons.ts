@@ -63,34 +63,37 @@ async function migrate() {
 }
 
 async function seed(repoDir: string) {
-  const { assets, songs, authors, copies } = buildCatalog(repoDir);
+  const { assets, songs, authors, assetFiles, submissions, copies } = buildCatalog(repoDir);
   const db = createKysely("commons");
   try {
     for (const row of authors) await db.insertInto("authors").values(row).execute();
     for (const row of assets) await db.insertInto("assets").values(row).execute();
     for (const row of songs) await db.insertInto("songs").values(row).execute();
+    for (const row of submissions) await db.insertInto("submissions").values(row).execute();
+    for (const row of assetFiles) await db.insertInto("assetFiles").values(row).execute();
   } finally {
     await db.destroy();
   }
 
   if ((process.env.FILE_STORE || "").toUpperCase() !== "S3") {
+    for (const dir of [...MIRRORED_DIRS, "songs", "works", "assets", "pending"]) fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
     for (const dir of MIRRORED_DIRS) {
       const src = path.join(repoDir, dir);
-      if (!fs.existsSync(src)) continue;
-      fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
-      fs.cpSync(src, path.join(CONTENT_DIR, dir), { recursive: true });
+      if (fs.existsSync(src)) fs.cpSync(src, path.join(CONTENT_DIR, dir), { recursive: true });
     }
-    // shared works/writers media is copied into each song folder so path+files resolves every entry
+    // every media file lands in its asset's id-keyed live folder, whatever repo folder it came from
+    let copied = 0;
     for (const c of copies) {
-      const from = path.join(CONTENT_DIR, c.from);
+      const from = path.join(repoDir, c.from);
       const to = path.join(CONTENT_DIR, c.to);
-      if (!fs.existsSync(from) || fs.existsSync(to)) continue;
+      if (!fs.existsSync(from)) continue;
       fs.mkdirSync(path.dirname(to), { recursive: true });
       fs.copyFileSync(from, to);
+      copied++;
     }
-    console.log(`  Mirrored ${MIRRORED_DIRS.join(", ")} into ${CONTENT_DIR} (+${copies.length} shared-file copies)`);
+    console.log(`  Mirrored ${MIRRORED_DIRS.join(", ")} and copied ${copied} song files into ${CONTENT_DIR}/assets`);
   }
-  console.log(`Seeded ${songs.length} songs, ${authors.length} authors.`);
+  console.log(`Seeded ${songs.length} songs, ${authors.length} authors, ${assetFiles.length} files.`);
 }
 
 async function main() {

@@ -116,6 +116,12 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
   });
 
   await JobRunHelper.run("dailyEmails", () => NotificationHelper.sendEmailNotifications("daily"));
+  await JobRunHelper.run("commonsNightly", async () => {
+    const { MaintenanceHelper } = await import("../modules/commons/helpers/MaintenanceHelper.js");
+    const commonsRepos = await RepoManager.getRepos<any>("commons");
+    return MaintenanceHelper.nightly(commonsRepos);
+  });
+
 
   console.log("[handleMidnightTimer] ========== TIMER COMPLETE ==========");
   console.log("[handleMidnightTimer] Total execution time:", Date.now() - startTime, "ms");

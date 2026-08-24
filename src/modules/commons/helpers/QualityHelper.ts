@@ -1,6 +1,5 @@
 import { Environment } from "../../../shared/helpers/Environment.js";
-import { Song, SongView } from "../models/index.js";
-import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
+import { Song } from "../models/index.js";
 
 const MODEL = "gpt-4o-mini";
 const SYSTEM_PROMPT =
@@ -11,14 +10,27 @@ const SYSTEM_PROMPT =
   "authenticity: penalize AI-generated tells (generic vocabulary, rhyme-forced nonsense, buzzword mashups)\n" +
   'Reply ONLY JSON: {"coherence":n,"depth":n,"craft":n,"authenticity":n,"notes":"one sentence for a human reviewer"}';
 
+/** What the triage score is computed from — a song payload plus the roles of its resulting file set. */
+export interface ScoreInput {
+  id?: string;
+  title?: string;
+  writer?: string;
+  chordPro?: string;
+  scripture?: string;
+  themes?: string;
+  bpm?: number;
+  songKey?: string;
+  fileRoles?: string[];
+}
+
 export class QualityHelper {
   private static apiKey(): string {
     return Environment.openAiApiKey || process.env.OPENAI_API_KEY || "";
   }
 
-  public static heuristicScore(song: SongView): number {
+  public static heuristicScore(song: ScoreInput): number {
     let pts = 0;
-    const files = new Set(ContentLibraryHelper.fileList(song).map((n) => ContentLibraryHelper.fileKey(n)));
+    const files = new Set(song.fileRoles || []);
     if (files.has("demoAudio")) pts += 8;
     if (files.has("sheetPdf")) pts += 6;
     if (files.has("stemsZip")) pts += 6;
@@ -41,7 +53,7 @@ export class QualityHelper {
     return pts;
   }
 
-  public static async llmScore(song: SongView): Promise<{ llm: number; detail: any }> {
+  public static async llmScore(song: ScoreInput): Promise<{ llm: number; detail: any }> {
     const lyrics = (song.chordPro || "").replace(/\[[^\]]*\]/g, "").slice(0, 6000);
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -65,7 +77,7 @@ export class QualityHelper {
     return { llm, detail: d };
   }
 
-  public static async score(song: SongView): Promise<Partial<Song>> {
+  public static async score(song: ScoreInput): Promise<Partial<Song>> {
     const heuristic = this.heuristicScore(song);
     if (!this.apiKey()) return { qualityScore: heuristic, qualityDetail: JSON.stringify({ heuristic, llm: 0, notes: "heuristic only — no OpenAI key configured" }) };
     try {

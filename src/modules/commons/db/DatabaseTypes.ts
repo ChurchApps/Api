@@ -1,11 +1,12 @@
-import type { AbcSubmission, Asset, AssetDownload, AssetLike, Author, Report, Song } from "../models/index.js";
+import type { Asset, AssetDownload, AssetFile, AssetRating, Author, Report, Song, Submission } from "../models/index.js";
 
 export interface CommonsDatabase {
   songs: Song;
   authors: Author;
   reports: Report;
-  abcSubmissions: AbcSubmission;
   assets: Asset;
-  assetLikes: AssetLike;
+  submissions: Submission;
+  assetFiles: AssetFile;
+  assetRatings: AssetRating;
   assetDownloads: AssetDownload;
 }

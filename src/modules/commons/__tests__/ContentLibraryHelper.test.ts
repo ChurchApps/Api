@@ -3,6 +3,7 @@ import * as path from "path";
 
 const CONTENT_ROOT = "http://localhost:8084/content";
 
+jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 // apihelper is ESM-only; stand in a disk-backed store that mirrors its ./content layout
 jest.mock("@churchapps/apihelper", () => {
   const nodeFs = jest.requireActual("fs");
@@ -24,108 +25,83 @@ jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { fileSto
 
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
 import { isPublicDiskFilePath } from "../../content/helpers/PublicFileAccess.js";
-import { SongView } from "../models/index.js";
 
-const song: SongView = {
-  id: "testpend001",
-  title: "Pending Test Hymn",
-  writer: "Tester",
-  songKey: "G",
-  timeSignature: "4/4",
-  language: "English",
-  license: "WC",
-  chordPro: "Verse 1\n[G]Sing",
-  status: "pending",
-  submittedBy: "user0000001",
-  path: "commons/pending/testpend001",
-  files: "demoAudio.wav"
-};
-
-const pendingKey = `${song.path}/demoAudio.wav`;
-const publicDir = path.resolve("content", ContentLibraryHelper.folderKey(song));
-const publicFile = path.join(publicDir, "demoAudio.wav");
-const publicJson = path.join(publicDir, "song.json");
-const publicLyrics = path.join(publicDir, "lyrics.chordpro");
-const pendingFile = path.resolve("content", pendingKey);
+const asset = { id: "testasst001", assetType: "song" };
+const SUB = "testsubm001";
+const pendingKey = ContentLibraryHelper.pendingKey(SUB, "demoAudio.wav");
+const liveKey = ContentLibraryHelper.liveKey(asset, "demoAudio.wav");
 
 afterEach(() => {
-  for (const p of [pendingFile, publicFile, publicJson, publicLyrics]) {
-    try { fs.unlinkSync(p); } catch { /* gone */ }
+  for (const k of [pendingKey, liveKey]) {
+    try { fs.unlinkSync(path.resolve("content", k)); } catch { /* gone */ }
   }
 });
 
-describe("ContentLibraryHelper paths", () => {
-  it("keeps the pending folder off the public library path", () => {
-    expect(ContentLibraryHelper.pendingFolderKey(song)).toBe("commons/pending/testpend001");
-    expect(ContentLibraryHelper.folderKey(song).startsWith("commons/pending/")).toBe(false);
-    expect(ContentLibraryHelper.folderKey(song).startsWith("commons/songs/")).toBe(true);
-    expect(ContentLibraryHelper.isPendingKey(pendingKey)).toBe(true);
-    expect(ContentLibraryHelper.isPendingKey(ContentLibraryHelper.folderKey(song) + "/demoAudio.wav")).toBe(false);
+describe("storage keys", () => {
+  it("derives id-keyed live keys and submission-keyed pending keys", () => {
+    expect(liveKey).toBe("commons/assets/song/testasst001/demoAudio.wav");
+    expect(ContentLibraryHelper.liveKey({ id: "x", assetType: "freeshow/template" }, "content.fstemplate")).toBe("commons/assets/freeshow/template/x/content.fstemplate");
+    expect(pendingKey).toBe("commons/pending/testsubm001/demoAudio.wav");
   });
 
-  it("serves approved library files publicly but never pending ones", () => {
-    expect(isPublicDiskFilePath("/" + ContentLibraryHelper.folderKey(song) + "/demoAudio.wav")).toBe(true);
-    expect(isPublicDiskFilePath("/" + pendingKey)).toBe(false);
-    expect(isPublicDiskFilePath("/content/" + pendingKey)).toBe(false);
+  it("serves live keys publicly and never anything under pending", () => {
+    expect(isPublicDiskFilePath(`/${liveKey}`)).toBe(true);
+    expect(isPublicDiskFilePath(`/${pendingKey}`)).toBe(false);
+    expect(isPublicDiskFilePath("/commons/pending/../assets/song/x/y.mp3")).toBe(false);
   });
 
-  it("derives media keys from conventional file names", () => {
-    expect(ContentLibraryHelper.fileKey("demoAudio.mp3")).toBe("demoAudio");
-    expect(ContentLibraryHelper.fileKey("sheetPdf.pdf")).toBe("sheetPdf");
-    expect(ContentLibraryHelper.fileKey("stemsZip.zip")).toBe("stemsZip");
-    expect(ContentLibraryHelper.fileKey("tune.mid")).toBe("midi");
-    expect(ContentLibraryHelper.fileKey("tune.abc")).toBe("abc");
-    expect(ContentLibraryHelper.fileKey("timing.json")).toBe("timing");
-    expect(ContentLibraryHelper.fileKey("art.webp")).toBe("art");
-  });
-
-  it("builds absolute fileUrls from path + files and strips portraitKey", () => {
-    const view = { path: "commons/songs/en/public-domain/hymn--abc", files: "art.webp,tune.mid", portraitKey: "commons/writers/tester/portrait.jpg" };
-    const out = ContentLibraryHelper.withUrls(view as any);
-    expect(out.fileUrls).toEqual({
-      art: `${CONTENT_ROOT}/commons/songs/en/public-domain/hymn--abc/art.webp`,
-      midi: `${CONTENT_ROOT}/commons/songs/en/public-domain/hymn--abc/tune.mid`,
-      portrait: `${CONTENT_ROOT}/commons/writers/tester/portrait.jpg`
+  it("maps live files to role → public URL", () => {
+    const urls = ContentLibraryHelper.fileUrls(asset, [{ name: "tune.abc" }, { name: "demoAudio.wav" }, { name: "art-thumb.webp" }], "commons/writers/a.jpg");
+    expect(urls).toEqual({
+      abc: `${CONTENT_ROOT}/commons/assets/song/testasst001/tune.abc`,
+      demoAudio: `${CONTENT_ROOT}/commons/assets/song/testasst001/demoAudio.wav`,
+      thumb: `${CONTENT_ROOT}/commons/assets/song/testasst001/art-thumb.webp`,
+      portrait: `${CONTENT_ROOT}/commons/writers/a.jpg`
     });
-    expect((out as any).portraitKey).toBeUndefined();
   });
 });
 
-describe("ContentLibraryHelper storage", () => {
-  it("stores submitted files where the static server will not serve them", async () => {
-    await ContentLibraryHelper.storePending(pendingKey, "audio/wav", Buffer.from("RIFF....WAVEfmt"));
-    expect(fs.existsSync(pendingFile)).toBe(true);
-    expect(fs.existsSync(publicFile)).toBe(false);
-    expect(isPublicDiskFilePath("/" + pendingKey)).toBe(false);
+describe("promotion and signed access", () => {
+  it("copies a pending object to its live key and reports a missing source", async () => {
+    await ContentLibraryHelper.storePending(pendingKey, "audio/wav", Buffer.from("RIFF"));
+    expect(await ContentLibraryHelper.exists(pendingKey)).toBe(true);
+    expect(await ContentLibraryHelper.promote(pendingKey, liveKey)).toBe(true);
+    expect(fs.readFileSync(path.resolve("content", liveKey)).toString()).toBe("RIFF");
+    expect(await ContentLibraryHelper.promote(ContentLibraryHelper.pendingKey(SUB, "missing.wav"), liveKey)).toBe(false);
+    await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(SUB));
+    expect(await ContentLibraryHelper.exists(pendingKey)).toBe(false);
   });
 
-  it("hands reviewers signed API links, not public library paths", async () => {
-    const reviewed = await ContentLibraryHelper.withReviewUrls(song, "http://localhost:8084");
-    expect(reviewed.fileUrls?.demoAudio).toMatch(/^http:\/\/localhost:8084\/commons\/admin\/pending-files\/testpend001\/demoAudio\?exp=\d+&sig=[0-9a-f]+$/);
-    expect(reviewed.fileUrls?.demoAudio).not.toContain(pendingKey);
-    const u = new URL(reviewed.fileUrls?.demoAudio || "");
-    expect(ContentLibraryHelper.verifyPendingFile(song.id, "demoAudio", Number(u.searchParams.get("exp")), u.searchParams.get("sig") || "")).toBe(true);
-    expect(ContentLibraryHelper.verifyPendingFile(song.id, "demoAudio", Number(u.searchParams.get("exp")), "deadbeef")).toBe(false);
+  it("signs pending-file urls that verify, and refuses tampered or expired ones", async () => {
+    const url = await ContentLibraryHelper.signedPendingUrl(SUB, "demoAudio.wav", "http://api/");
+    const { searchParams } = new URL(url);
+    const exp = Number(searchParams.get("exp"));
+    const sig = searchParams.get("sig") || "";
+    expect(url.startsWith("http://api/commons/admin/pending-files/testsubm001/demoAudio.wav?")).toBe(true);
+    expect(ContentLibraryHelper.verify(SUB, "demoAudio.wav", exp, sig)).toBe(true);
+    expect(ContentLibraryHelper.verify(SUB, "other.wav", exp, sig)).toBe(false);
+    expect(ContentLibraryHelper.verify(SUB, "demoAudio.wav", exp - 10000, sig)).toBe(false);
   });
 
-  it("publishes approved songs into the public library folder", async () => {
-    await ContentLibraryHelper.storePending(pendingKey, "audio/wav", Buffer.from("RIFF....WAVEfmt"));
-    const updates = await ContentLibraryHelper.publishSong({ ...song, status: "approved" });
-    expect(updates.path).toBe(ContentLibraryHelper.folderKey(song));
-    expect(fs.existsSync(publicFile)).toBe(true);
-    expect(fs.existsSync(publicJson)).toBe(true);
-    expect(fs.existsSync(pendingFile)).toBe(false);
-    const json = JSON.parse(fs.readFileSync(publicJson, "utf8"));
+  it("preview tokens are scoped to one submission", () => {
+    const token = ContentLibraryHelper.previewToken(SUB);
+    expect(ContentLibraryHelper.verifyPreviewToken(SUB, token)).toBe(true);
+    expect(ContentLibraryHelper.verifyPreviewToken("other000001", token)).toBe(false);
+    expect(ContentLibraryHelper.verifyPreviewToken(SUB, "garbage")).toBe(false);
+  });
+
+  it("the local upload target mirrors the presigned POST shape and demands auth", async () => {
+    const upload = await ContentLibraryHelper.presignedUpload(SUB, "sheetPdf.pdf", "application/pdf", 1000, "http://api");
+    expect(upload).toEqual({ url: "http://api/commons/submissions/testsubm001/upload/sheetPdf.pdf", fields: {}, method: "POST", authRequired: true });
+  });
+});
+
+describe("song export artifacts", () => {
+  it("song.json lists uploads by role and the chordpro header agrees with the metadata", () => {
+    const song = { id: "testasst001", title: "Hymn", writer: "Anon", songKey: "G", timeSignature: "3/4", bpm: 90, chordPro: "Verse 1\n[G]Sing", license: "WC", language: "English" };
+    const json: any = ContentLibraryHelper.songJson(song, [{ name: "demoAudio.wav" }, { name: "tune.mid" }]);
+    expect(json.uploads).toEqual({ demoAudio: "demoAudio.wav" });
     expect(json.status).toBe("approved");
-    expect(json.uploads.demoAudio).toBe("demoAudio.wav");
-  });
-
-  it("removes pending and public objects on reject", async () => {
-    await ContentLibraryHelper.storePending(pendingKey, "audio/wav", Buffer.from("RIFF....WAVEfmt"));
-    const updates = await ContentLibraryHelper.publishSong({ ...song, status: "approved" });
-    await ContentLibraryHelper.removeSongObjects({ ...song, path: updates.path });
-    expect(fs.existsSync(pendingFile)).toBe(false);
-    expect(fs.existsSync(publicFile)).toBe(false);
-    expect(fs.existsSync(publicJson)).toBe(false);
+    expect(ContentLibraryHelper.renderChordpro(song)).toBe("{title: Hymn}\n{artist: Anon}\n{key: G}\n{time: 3/4}\n{tempo: 90}\n\nVerse 1\n[G]Sing\n");
   });
 });

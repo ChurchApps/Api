@@ -1,6 +1,10 @@
 export { ChordProHelper } from "./ChordProHelper.js";
-export { ContentLibraryHelper } from "./ContentLibraryHelper.js";
+export { ContentLibraryHelper, type PresignedUpload } from "./ContentLibraryHelper.js";
 export { recordAssetDownload } from "./DownloadHelper.js";
+export { MaintenanceHelper } from "./MaintenanceHelper.js";
+export { userNames } from "./NamesHelper.js";
+export { PublishHelper } from "./PublishHelper.js";
 export { QualityHelper } from "./QualityHelper.js";
 export { ipHash } from "./RequestHelper.js";
-export { assetSubmitError, demoOwnershipMissing, ASSET_LICENSES, MAX_FILE_BYTES } from "./SubmitValidation.js";
+export { SubmissionHelper, type Actor, type Outcome } from "./SubmissionHelper.js";
+export { validateSubmission, isUploadableName, resultingFileNames, fileSpec, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY } from "./SubmitValidation.js";

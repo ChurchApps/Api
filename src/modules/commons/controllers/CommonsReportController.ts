@@ -1,18 +1,34 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
+import { ipHash } from "../helpers/index.js";
 import { Report } from "../models/index.js";
+
+const REASONS = ["copyright", "policy", "quality", "other"];
+const RATE_LIMIT = 3;
+const RATE_WINDOW_MS = 3600000;
+// ponytail: per-process limiter — move to a table if abuse ever shows up across Lambda instances
+const recent = new Map<string, number[]>();
 
 @controller("/commons/reports")
 export class CommonsReportController extends CommonsBaseController {
   @httpPost("/")
   public async create(req: express.Request<{}, {}, Report>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
-      const b = req.body;
-      if (!b.contentText || !b.details || !b.name || !b.email || !b.signature) return this.json({ errors: ["All fields are required"] }, 400);
+    return this.actionWrapper(req, res, async (au) => {
+      const b = req.body || {};
+      const reason = REASONS.includes(b.reason || "") ? b.reason : "copyright";
+      if (!b.contentText || !b.details) return this.json({ errors: ["contentText and details are required"] }, 400);
+      if (reason === "copyright" && (!b.name || !b.email || !b.signature || !b.reporterRole)) return this.json({ errors: ["name, email, signature and reporterRole are required for copyright reports"] }, 400);
+      const key = ipHash(req);
+      const now = Date.now();
+      const hits = (recent.get(key) || []).filter((t) => now - t < RATE_WINDOW_MS);
+      if (hits.length >= RATE_LIMIT) return this.json({ errors: ["Too many reports from this address — try again later"] }, 429);
+      recent.set(key, [...hits, now]);
       const report = await this.repos.report.create({
         assetId: b.assetId,
-        contentText: b.contentText,
+        contentText: String(b.contentText).slice(0, 255),
+        reason,
+        reporterUserId: au.id || undefined,
         reporterRole: b.reporterRole,
         details: b.details,
         name: b.name,
