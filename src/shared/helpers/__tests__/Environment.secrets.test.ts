@@ -75,6 +75,13 @@ describe("Environment.init secret checks", () => {
     await expect(Environment.init("staging")).rejects.toThrow(/ENCRYPTION_KEY/);
   });
 
+  it("accepts the sample ENCRYPTION_KEY in staging", async () => {
+    process.env.JWT_SECRET = VALID_JWT;
+    process.env.ENCRYPTION_KEY = SAMPLE_ENCRYPTION;
+    await expect(Environment.init("staging")).resolves.toBeUndefined();
+    expect(Environment.encryptionKey).toBe(SAMPLE_ENCRYPTION);
+  });
+
   it("accepts the sample secrets in dev", async () => {
     process.env.JWT_SECRET = SAMPLE_JWT;
     process.env.ENCRYPTION_KEY = SAMPLE_ENCRYPTION;
