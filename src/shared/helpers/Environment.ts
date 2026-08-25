@@ -25,6 +25,7 @@ export class Environment extends EnvironmentBase {
 
   // Membership API specific
   static jwtExpiration: string;
+  static oauthAccessTokenSeconds: number;
   static emailOnRegistration: boolean;
   static supportEmail: string;
   static b1AdminRoot: string;
@@ -221,6 +222,8 @@ export class Environment extends EnvironmentBase {
 
     // Membership API specific
     this.jwtExpiration = "2 days";
+    const oauthTtl = parseInt(process.env.OAUTH_ACCESS_TOKEN_SECONDS || "", 10);
+    this.oauthAccessTokenSeconds = Number.isFinite(oauthTtl) && oauthTtl > 0 ? oauthTtl : 7 * 24 * 3600;
     this.emailOnRegistration = process.env.EMAIL_ON_REGISTRATION === "true" || config.emailOnRegistration === true;
     this.supportEmail = process.env.SUPPORT_EMAIL || config.supportEmail || "support@churchapps.org";
     this.b1AdminRoot = process.env.B1ADMIN_ROOT || config.b1AdminRoot || "https://admin.staging.b1.church";

@@ -30,3 +30,11 @@ describe("AuthenticatedUser.getUserJwt", () => {
     expect(ttlSeconds(AuthenticatedUser.getUserJwt(user, "2 hours"))).toBe(2 * 60 * 60);
   });
 });
+
+describe("AuthenticatedUser.getCombinedApiJwt", () => {
+  const userChurch = { church: { id: "c1" }, person: { id: "p1" }, groups: [], apis: [] } as any;
+
+  it("honors a numeric TTL in seconds (local 10-second JWTs)", () => {
+    expect(ttlSeconds(AuthenticatedUser.getCombinedApiJwt(user, userChurch, 10))).toBe(10);
+  });
+});
