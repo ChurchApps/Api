@@ -50,7 +50,7 @@ function churchController(opts: any = {}) {
     person: { load: jest.fn(async () => ({ id: "p1", membershipStatus: "Member", name: { first: "A", last: "B" } })) },
     group: { loadAllForPerson: jest.fn(async () => []) }
   };
-  const au = { id: "u1", churchId: opts.auChurchId ?? "c1", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
+  const au = "au" in opts ? opts.au : { id: "u1", churchId: opts.auChurchId ?? "c1", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
   const controller = new ChurchController();
   (controller as any).repos = repos;
   (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
@@ -117,12 +117,38 @@ describe("ChurchController.impersonate authorization", () => {
 });
 
 describe("ChurchController.select authorization", () => {
-  it("returns 401 when the caller has no role in the target church", async () => {
-    const { controller, repos } = churchController({ userPermission: null });
+  it("returns 401 for an anonymous caller", async () => {
+    const { controller, repos } = churchController({ au: null });
     const result: any = await (controller as any).select({ body: { churchId: "c1" } }, {});
     expect(result.status).toBe(401);
     expect(AuthenticatedUser.login).not.toHaveBeenCalled();
     expect(repos.user.load).not.toHaveBeenCalled();
+  });
+
+  it("lets a caller with no role in the target church join it", async () => {
+    const { controller } = churchController({ userPermission: null });
+    const result: any = await (controller as any).select({ body: { churchId: "c1" } }, {});
+    expect(PersonHelper.claim).toHaveBeenCalled();
+    expect(AuthenticatedUser.login).toHaveBeenCalled();
+    expect(result.status).toBe(200);
+    expect(result.obj.church.id).toBe("c1");
+    expect(result.obj.apis).toEqual([]);
+  });
+
+  it("returns 404 when the caller has no role and the church does not exist", async () => {
+    const { controller } = churchController({ userPermission: null, churchesById: {} });
+    const result: any = await (controller as any).select({ body: { churchId: "c1" } }, {});
+    expect(result.status).toBe(404);
+    expect(PersonHelper.claim).not.toHaveBeenCalled();
+    expect(AuthenticatedUser.login).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the caller has no role and the church is archived", async () => {
+    const churchesById = { c1: { id: "c1", name: "Test Church", subDomain: "testchurch", archivedDate: new Date("2025-01-01") } };
+    const { controller } = churchController({ userPermission: null, churchesById });
+    const result: any = await (controller as any).select({ body: { churchId: "c1" } }, {});
+    expect(result.status).toBe(404);
+    expect(PersonHelper.claim).not.toHaveBeenCalled();
   });
 
   it("lets a caller who already belongs to the church (post-registration owner) select it", async () => {
