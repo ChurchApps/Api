@@ -3,7 +3,8 @@ jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: clas
 jest.mock("../../helpers/index", () => ({
   Permissions: { forms: { admin: "formsAdmin", edit: "formsEdit" } },
   Environment: { messagingApi: "http://msg", supportEmail: "s@t", b1AdminRoot: "http://b1" },
-  ConversationalFormHelper: { extractContact: jest.fn(), findOrCreatePerson: jest.fn(), applyTokens: jest.fn() }
+  ConversationalFormHelper: { extractContact: jest.fn(), findOrCreatePerson: jest.fn(), applyTokens: jest.fn() },
+  UserChurchHelper: { createForGroupMember: jest.fn() }
 }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn() } }));
@@ -25,7 +26,12 @@ function formSubmissionController(opts: any = {}) {
     question: { loadForForm: jest.fn(async () => []), convertAllToModel: (_c: string, rows: any[]) => rows },
     memberPermission: { loadByEmailNotification: jest.fn(async () => []) },
     church: { loadById: jest.fn(async () => ({ id: "c1", name: "Test" })) },
-    person: { loadByIds: jest.fn(async () => []) }
+    person: { loadByIds: jest.fn(async () => []) },
+    groupMember: {
+      loadForGroup: jest.fn(async () => opts.groupMembers ?? []),
+      save: jest.fn(async (gm: any) => ({ ...gm, id: "gm1" }))
+    },
+    groupMemberHistory: { log: jest.fn() }
   };
   const au = opts.au ?? { churchId: opts.auChurchId, id: opts.auId, checkAccess: () => false };
   const controller = new FormSubmissionController();
@@ -83,5 +89,30 @@ describe("FormSubmissionController.save autoCreatePerson", () => {
     const saved = repos.formSubmission.save.mock.calls[0][0];
     expect(saved.contentType).toBe("person");
     expect(saved.contentId).toBe("p1");
+  });
+});
+
+describe("FormSubmissionController.save group auto-add", () => {
+  it("adds the resolved person to the form's group", async () => {
+    (ConversationalFormHelper.extractContact as jest.Mock).mockReturnValueOnce({ firstName: "Al", email: "al@example.com" });
+    (ConversationalFormHelper.findOrCreatePerson as jest.Mock).mockResolvedValueOnce({ id: "p1", name: { first: "Al" } });
+    const { controller, repos } = formSubmissionController({ form: { id: "f1", churchId: "c1", name: "Camp", restricted: false, autoCreatePerson: true, groupId: "g1" } });
+    await (controller as any).save({ body: [{ formId: "f1", contentType: "form", contentId: "f1", answers: [] }] }, {});
+    expect(repos.groupMember.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", groupId: "g1", personId: "p1" }));
+    expect(repos.groupMemberHistory.log).toHaveBeenCalledWith("c1", "g1", "p1", "joined");
+  });
+
+  it("skips someone already on the roster", async () => {
+    (ConversationalFormHelper.extractContact as jest.Mock).mockReturnValueOnce({ firstName: "Al", email: "al@example.com" });
+    (ConversationalFormHelper.findOrCreatePerson as jest.Mock).mockResolvedValueOnce({ id: "p1", name: { first: "Al" } });
+    const { controller, repos } = formSubmissionController({ form: { id: "f1", churchId: "c1", name: "Camp", restricted: false, autoCreatePerson: true, groupId: "g1" }, groupMembers: [{ personId: "p1" }] });
+    await (controller as any).save({ body: [{ formId: "f1", contentType: "form", contentId: "f1", answers: [] }] }, {});
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
+  });
+
+  it("leaves the roster alone when no group is linked", async () => {
+    const { controller, repos } = formSubmissionController();
+    await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
   });
 });
