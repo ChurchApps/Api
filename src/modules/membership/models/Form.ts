@@ -16,6 +16,7 @@ export class Form {
   public thankYouMessage?: string;
   public displayMode?: string;
   public autoCreatePerson?: boolean;
+  public groupId?: string;
   public followUpSubject?: string;
   public followUpBody?: string;
 }
