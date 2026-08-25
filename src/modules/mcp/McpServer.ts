@@ -23,7 +23,7 @@ export function buildMcpServer(authorization: string | undefined): McpServer {
     {
       title: "Describe API endpoint",
       description:
-        "Returns a brief summary and (where available) a curated request/response example for one endpoint. Use this after list_endpoints to learn the request body shape before calling POST/PUT. For /content/* routes (page building) describe_page_builder is more useful — it covers the whole Page→Section→Element model and all element types in one call.",
+        "Returns a summary and (where available) a curated request/response example plus operational guidance for one endpoint. Use this after list_endpoints before calling POST/PUT to learn the request shape, purpose, constraints, and safe workflow. For /content/* routes (page building) describe_page_builder is more useful — it covers the whole Page→Section→Element model and all element types in one call.",
       inputSchema: describeEndpointSchema
     },
     describeEndpointHandler
