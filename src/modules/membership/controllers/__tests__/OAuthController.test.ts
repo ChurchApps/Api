@@ -11,7 +11,7 @@ jest.mock("../../repositories/index", () => ({
   OAuthDeviceCodeRepo: { generateDeviceCode: () => "dc", generateUserCode: () => "uc" },
   OAuthRelaySessionRepo: { generateSessionCode: () => "sc" }
 }));
-jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { membershipApi: "https://api.example", b1AdminRoot: "https://admin.example" } }));
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { membershipApi: "https://api.example", b1AdminRoot: "https://admin.example", oauthAccessTokenSeconds: 10 } }));
 jest.mock("../../../../shared/auth/Scopes.js", () => ({ parseScopes: () => [] }));
 jest.mock("../../helpers/OAuthConnectionHelper.js", () => ({ toConnections: (rows: any) => rows }));
 
@@ -72,5 +72,44 @@ describe("OAuthController.relayCallback", () => {
     expect(getBody()).toContain("Success!");
     expect(getBody()).toContain("Authorization complete");
     expect(getBody()).not.toContain("<script>");
+  });
+});
+
+describe("OAuthController access token TTL", () => {
+  it("device grant expires_in matches Environment.oauthAccessTokenSeconds", async () => {
+    const { AuthenticatedUser } = jest.requireMock("../../auth/index");
+    AuthenticatedUser.getCombinedApiJwt.mockReturnValue("jwt");
+
+    const repos: any = {
+      oAuthDeviceCode: {
+        loadByDeviceCode: jest.fn(async () => ({
+          id: "d1",
+          clientId: "c1",
+          status: "approved",
+          userChurchId: "uc1",
+          scopes: "plans",
+          planTypeId: "pt1",
+          expiresAt: new Date(Date.now() + 60_000)
+        })),
+        delete: jest.fn()
+      },
+      userChurch: { load: jest.fn(async () => ({ id: "uc1", userId: "u1", churchId: "ch1", personId: "p1" })) },
+      user: { load: jest.fn(async () => ({ id: "u1", email: "a@b.c" })) },
+      church: { loadById: jest.fn(async () => ({ id: "ch1", churchName: "Demo", subDomain: "demo" })) },
+      person: { loadByIdsOnly: jest.fn(async () => [{ membershipStatus: "Member" }]) },
+      groupMember: { loadForPeople: jest.fn(async () => []) },
+      oAuthToken: { save: jest.fn(async (t: any) => t) }
+    };
+    const controller = new OAuthController();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    let payload: any;
+    (controller as any).json = (obj: any) => { payload = obj; return obj; };
+
+    await controller.token({ body: { grant_type: "urn:ietf:params:oauth:grant-type:device_code", device_code: "dc", client_id: "c1" } } as any, {} as any);
+
+    expect(payload.expires_in).toBe(10);
+    expect(payload.plan_type_id).toBe("pt1");
+    expect(AuthenticatedUser.getCombinedApiJwt).toHaveBeenCalledWith(expect.anything(), expect.anything(), 10, expect.anything());
   });
 });

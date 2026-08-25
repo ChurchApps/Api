@@ -89,7 +89,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
    * permission set, so no request-time scope check is ever needed. Absent or
    * empty scopes leave the full permission set (backward compatible).
    */
-  public static getCombinedApiJwt(user: User, userChurch: LoginUserChurch, expiresIn?: string, scopes?: string[]) {
+  public static getCombinedApiJwt(user: User, userChurch: LoginUserChurch, expiresIn?: string | number, scopes?: string[]) {
     const permList = filterPermissionsByScopes(buildPermStrings(userChurch.apis), scopes ?? []);
 
     const groupIds: string[] = [];
@@ -97,7 +97,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     const leaderGroupIds: string[] = [];
     userChurch.groups?.forEach((g) => { if (g.leader) leaderGroupIds.push(g.id); });
 
-    const options: SignOptions = { expiresIn: (expiresIn || Environment.jwtExpiration) as any };
+    const options: SignOptions = { expiresIn: (expiresIn || Environment.jwtExpiration) as SignOptions["expiresIn"] };
     return jwt.sign(
       {
         id: user.id,

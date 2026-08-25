@@ -9,6 +9,11 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 import { parseScopes } from "../../../shared/auth/Scopes.js";
 import { toConnections } from "../helpers/OAuthConnectionHelper.js";
 
+function accessTokenTtl(): { jwtExpiresIn: number; expiresInSeconds: number } {
+  const seconds = Environment.oauthAccessTokenSeconds > 0 ? Environment.oauthAccessTokenSeconds : 7 * 24 * 3600;
+  return { jwtExpiresIn: seconds, expiresInSeconds: seconds };
+}
+
 @controller("/membership/oauth")
 export class OAuthController extends MembershipBaseController {
 
@@ -121,14 +126,14 @@ export class OAuthController extends MembershipBaseController {
 
         loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
-        // Refresh token expires in 90 days
+        const ttl = accessTokenTtl();
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: authCode.userChurchId,
-          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(authCode.scopes)),
+          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, ttl.jwtExpiresIn, parseScopes(authCode.scopes)),
           refreshToken: UniqueIdHelper.secret(),
           scopes: authCode.scopes,
-          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
         };
         await this.repos.oAuthToken.save(token);
 
@@ -137,7 +142,7 @@ export class OAuthController extends MembershipBaseController {
         return this.json({
           access_token: token.accessToken,
           token_type: "Bearer",
-          expires_in: 7 * 24 * 3600, // 7 days (matches JWT expiration)
+          expires_in: ttl.expiresInSeconds,
           created_at: Math.floor(Date.now() / 1000),
           refresh_token: token.refreshToken,
           scope: token.scopes
@@ -166,15 +171,15 @@ export class OAuthController extends MembershipBaseController {
 
         loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
-        // Refresh token expires in 90 days
+        const ttl = accessTokenTtl();
         const token: OAuthToken = {
           clientId: client.clientId,
           userChurchId: oldToken.userChurchId,
-          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(oldToken.scopes)),
+          accessToken: AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, ttl.jwtExpiresIn, parseScopes(oldToken.scopes)),
           refreshToken: UniqueIdHelper.secret(),
           scopes: oldToken.scopes,
           planTypeId: oldToken.planTypeId,
-          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
         };
         await this.repos.oAuthToken.save(token);
 
@@ -184,10 +189,9 @@ export class OAuthController extends MembershipBaseController {
           access_token: token.accessToken,
           token_type: "Bearer",
           created_at: Math.floor(Date.now() / 1000),
-          expires_in: 7 * 24 * 3600, // 7 days (matches JWT expiration)
+          expires_in: ttl.expiresInSeconds,
           refresh_token: token.refreshToken,
           scope: token.scopes,
-          // Extension member (RFC 8628 allows extras): carry the ministry/lesson binding across refreshes
           plan_type_id: token.planTypeId || undefined
         });
       } else return this.json({ error: "unsupported_grant_type" }, 400);
@@ -290,10 +294,10 @@ export class OAuthController extends MembershipBaseController {
 
         loginUserChurch.apis = await UserHelper.loadExpandedPermissions(user.id, church.id, this.repos);
 
-        const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, "7 days", parseScopes(dc.scopes));
+        const ttl = accessTokenTtl();
+        const accessToken = AuthenticatedUser.getCombinedApiJwt(user, loginUserChurch, ttl.jwtExpiresIn, parseScopes(dc.scopes));
         const refreshToken = UniqueIdHelper.secret();
 
-        // Refresh token expires in 90 days
         const token: OAuthToken = {
           clientId: dc.clientId,
           userChurchId: dc.userChurchId,
@@ -301,7 +305,7 @@ export class OAuthController extends MembershipBaseController {
           refreshToken,
           scopes: dc.scopes,
           planTypeId: dc.planTypeId,
-          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
         };
         await this.repos.oAuthToken.save(token);
 
@@ -310,10 +314,10 @@ export class OAuthController extends MembershipBaseController {
         return this.json({
           access_token: accessToken,
           token_type: "Bearer",
-          expires_in: 7 * 24 * 3600, // 7 days (matches JWT expiration)
+          expires_in: ttl.expiresInSeconds,
+          created_at: Math.floor(Date.now() / 1000),
           refresh_token: refreshToken,
           scope: dc.scopes,
-          // Extension member (RFC 8628 allows extras): plan type the approver bound this screen to
           plan_type_id: dc.planTypeId || undefined
         });
 
