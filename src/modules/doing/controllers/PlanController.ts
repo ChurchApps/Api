@@ -161,18 +161,21 @@ export class PlanController extends DoingBaseController {
       if (oldId) planItemIdMap.set(oldId, savedItem.id || "");
     }
 
-    // Second pass: save child items with updated parentId
-    for (const item of planItems.filter(pi => pi.parentId)) {
-      const oldId = item.id;
-      const newParentId = planItemIdMap.get(item.parentId || "");
-      if (newParentId) {
+    // Children save once their parent has a new id; repeat so nested levels (section folders) copy too.
+    let pending = planItems.filter(pi => pi.parentId);
+    while (pending.length > 0) {
+      const ready = pending.filter(pi => planItemIdMap.has(pi.parentId || ""));
+      if (ready.length === 0) break;
+      for (const item of ready) {
+        const oldId = item.id;
         item.id = undefined;
         item.planId = targetPlanId;
-        item.parentId = newParentId;
+        item.parentId = planItemIdMap.get(item.parentId || "");
         item.positionId = positionIdMap.get(item.positionId || "");
         const savedItem = await this.repos.planItem.save(item);
         if (oldId) planItemIdMap.set(oldId, savedItem.id || "");
       }
+      pending = pending.filter(pi => !ready.includes(pi));
     }
 
     return planItemIdMap;
