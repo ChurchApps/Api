@@ -382,7 +382,9 @@ export class ChurchController extends MembershipBaseController {
   @httpPost("/select")
   public async select(req: express.Request<{}, {}, { churchId: string; subDomain: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      // authz-exempt: selection target must already be a church the caller belongs to (role via loadUserPermissionInChurch)
+      if (!au?.id) return this.json({ message: "Unauthorized" }, 401);
+      // Any signed-in user may join a live church here - this is the member self-signup path.
+      // authz-exempt: selection grants nothing beyond the role-less membership /people/claim already hands out
       let { churchId } = req.body;
       if (req.body.subDomain && !churchId) {
         const selectedChurch: Church = await this.repos.church.loadBySubDomain(req.body.subDomain);
@@ -390,8 +392,8 @@ export class ChurchController extends MembershipBaseController {
         churchId = selectedChurch.id;
       }
       if (!churchId) return this.json({ message: "No church specified" }, 400);
-      const userChurch = await this.fetchChurchPermissions(au, churchId);
-      if (!userChurch) return this.json({ message: "Unauthorized" }, 401);
+      const userChurch = (await this.fetchChurchPermissions(au, churchId)) ?? (await this.joinAsMember(au, churchId));
+      if (!userChurch) return this.json({ message: "Church not found" }, 404);
       const user = await this.repos.user.load(au.id);
 
       const data = await AuthenticatedUser.login([userChurch], user);
@@ -415,6 +417,31 @@ export class ChurchController extends MembershipBaseController {
     }
     userChurch.groups = [];
     (groups || []).forEach((g) => userChurch.groups.push({ id: g.id, tags: g.tags, name: g.name, leader: false }));
+  }
+
+  // Holding no role in a church is a normal member state - login merges these in via ChurchRepo.loadForUser -
+  // so selection falls back to a role-less user church rather than rejecting the join.
+  private async joinAsMember(au: AuthenticatedUser, churchId: string): Promise<LoginUserChurch> {
+    const church: Church = this.repos.church.convertToModel(await this.repos.church.loadById(churchId));
+    if (!church || church.archivedDate) return null;
+    const userChurch: LoginUserChurch = {
+      church: {
+        id: church.id,
+        name: church.name,
+        subDomain: church.subDomain,
+        archivedDate: church.archivedDate,
+        address1: church.address1,
+        address2: church.address2,
+        city: church.city,
+        state: church.state,
+        zip: church.zip,
+        country: church.country
+      },
+      person: { id: "", membershipStatus: "" },
+      apis: []
+    };
+    await this.appendPersonInfo(userChurch, au, churchId);
+    return userChurch;
   }
 
   private async fetchChurchPermissions(au: AuthenticatedUser, churchId: string): Promise<LoginUserChurch> {
