@@ -67,6 +67,7 @@ export interface GatewayConfig {
   productId?: string;
   settings?: Record<string, unknown> | null;
   environment?: string | null;
+  currency?: string;
 }
 
 export interface IGatewayProvider {
