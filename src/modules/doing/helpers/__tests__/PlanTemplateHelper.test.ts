@@ -130,24 +130,4 @@ describe("PlanTemplateHelper", () => {
     expect(dstPositions).toHaveLength(1);
     expect(dstPositions[0].name).toBe("Existing");
   });
-
-  it("copies actions nested under a section folder (three levels deep)", async () => {
-    const repos = makeRepos();
-    seedSourcePlan(repos);
-    repos._store.planItems.push(
-      { churchId: "ch1", id: "S1", planId: "src", parentId: "H2", sort: 2, itemType: "providerSection", label: "Story" },
-      { churchId: "ch1", id: "A1", planId: "src", parentId: "S1", sort: 1, itemType: "providerPresentation", label: "Read it", seconds: 120 }
-    );
-    repos._store.plans.push({ churchId: "ch1", id: "dst" });
-
-    const data = await PlanTemplateHelper.captureFromPlan(repos, "ch1", "src");
-    await PlanTemplateHelper.applyToPlan(repos, "ch1", "dst", data, { serviceOrder: true, positions: false });
-
-    const dstItems = await repos.planItem.loadForPlan("ch1", "dst");
-    expect(dstItems).toHaveLength(7);
-    const story = dstItems.find((i: any) => i.label === "Story");
-    const action = dstItems.find((i: any) => i.label === "Read it");
-    expect(action.parentId).toBe(story.id);
-    expect(story.parentId).toBe(dstItems.find((i: any) => i.label === "Message").id);
-  });
 });

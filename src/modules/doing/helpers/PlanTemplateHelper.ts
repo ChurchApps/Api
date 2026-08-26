@@ -54,7 +54,7 @@ export class PlanTemplateHelper {
     }
   }
 
-  // Roots first, then each level whose parent already has a new id (section folders nest actions a level deeper).
+  // Two-pass: create root items first, then children with remapped parentIds.
   private static async createItems(repos: any, churchId: string, planId: string, items: any[]): Promise<void> {
     const idMap = new Map<string, string>();
     for (const item of items.filter((i) => !i.parentId)) {
@@ -62,16 +62,12 @@ export class PlanTemplateHelper {
       const saved = await repos.planItem.save({ ...item, id: undefined, churchId, planId, parentId: undefined });
       if (oldId) idMap.set(oldId, saved.id || "");
     }
-    let pending = items.filter((i) => i.parentId);
-    while (pending.length > 0) {
-      const ready = pending.filter((i) => idMap.has(i.parentId || ""));
-      if (ready.length === 0) break;
-      for (const item of ready) {
-        const oldId = item.id;
-        const saved = await repos.planItem.save({ ...item, id: undefined, churchId, planId, parentId: idMap.get(item.parentId) });
-        if (oldId) idMap.set(oldId, saved.id || "");
-      }
-      pending = pending.filter((i) => !ready.includes(i));
+    for (const item of items.filter((i) => i.parentId)) {
+      const newParentId = idMap.get(item.parentId || "");
+      if (!newParentId) continue;
+      const oldId = item.id;
+      const saved = await repos.planItem.save({ ...item, id: undefined, churchId, planId, parentId: newParentId });
+      if (oldId) idMap.set(oldId, saved.id || "");
     }
   }
 }
