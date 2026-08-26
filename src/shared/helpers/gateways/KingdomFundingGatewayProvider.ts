@@ -315,7 +315,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         billing_cycle_anchor: anchorSrc
           ? Math.floor(new Date(anchorSrc).getTime() / 1000)
           : Math.floor(Date.now() / 1000),
-        default_payment_method: sub.payment_method_id ? String(sub.payment_method_id) : undefined,
+        default_payment_method: sub.payment_method_id ? String(sub.payment_method_id) : customerId,
         plan: {
           amount: amountCents,
           interval: freq.interval,
@@ -341,12 +341,12 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   }
 
   private getApiUrl(): string {
-    return process.env.NMI_API_URL || "https://secure.nmi.com/api/transact.php";
+    return process.env.NMI_API_URL || "https://lotusconsulting.transactiongateway.com/api/transact.php";
   }
 
   /** NMI Query API (read side: vault records, subscriptions). Returns XML. */
   private getQueryUrl(): string {
-    return process.env.NMI_QUERY_URL || "https://secure.nmi.com/api/query.php";
+    return process.env.NMI_QUERY_URL || "https://lotusconsulting.transactiongateway.com/api/query.php";
   }
 
   /**
