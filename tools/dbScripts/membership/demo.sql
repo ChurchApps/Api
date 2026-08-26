@@ -711,6 +711,35 @@ INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, action)
 INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
 ('RME00000099', 'CHU00000099', 'ROL00000099', 'USR00000002', '2024-01-01 00:00:00');
 
+-- ========================================
+-- Accra Community Church (CHU00000002) — Ghanaian church on a Paystack (GHS) gateway.
+-- Gives the Paystack Playwright suites their own church so they never touch Grace's Stripe gateway.
+-- demo@b1.church is a Domain Admin here too; B1App resolves it via accra.localtest.me.
+-- ========================================
+INSERT INTO churches (id, name, subDomain, address1, city, state, zip, country, latitude, longitude) VALUES
+('CHU00000002', 'Accra Community Church', 'accra', '12 Liberation Road', 'Accra', 'GA', 'GA-107', 'GH', 5.6037, -0.1870);
+
+INSERT INTO campuses (id, churchId, name, address1, city, state, zip, timezone, removed) VALUES
+('CAM00000002', 'CHU00000002', 'Accra Campus', '12 Liberation Road', 'Accra', 'GA', 'GA-107', 'Africa/Accra', 0);
+
+INSERT INTO households (id, churchId, name) VALUES
+('HOU00000098', 'CHU00000002', 'User Family');
+
+INSERT INTO people (id, churchId, displayName, firstName, middleName, lastName, prefix, suffix, gender, maritalStatus, birthDate, email, householdId, householdRole, membershipStatus, homePhone, mobilePhone, workPhone, address1, city, state, zip, removed, campusId) VALUES
+('PER00000098', 'CHU00000002', 'Demo User', 'Demo', NULL, 'User', 'Mr.', NULL, 'Male', 'Married', '1990-01-01', 'demo@b1.church', 'HOU00000098', 'Head', 'Member', NULL, NULL, NULL, '12 Liberation Road', 'Accra', 'GA', 'GA-107', 0, 'CAM00000002');
+
+INSERT INTO userChurches (id, userId, churchId, personId) VALUES
+('UCH00000004', 'USR00000001', 'CHU00000002', 'PER00000098');
+
+INSERT INTO roles (id, churchId, name) VALUES
+('ROL00000098', 'CHU00000002', 'Domain Admins');
+
+INSERT INTO rolePermissions (id, churchId, roleId, apiName, contentType, action) VALUES
+('RPM00000096', 'CHU00000002', 'ROL00000098', 'MembershipApi', 'Domain', 'Admin');
+
+INSERT INTO roleMembers (id, churchId, roleId, userId, dateAdded) VALUES
+('RME00000098', 'CHU00000002', 'ROL00000098', 'USR00000001', '2024-01-01 00:00:00');
+
 -- Single-site demo church: assign every person and group to the Main Campus.
 UPDATE people SET campusId = 'CAM00000001' WHERE churchId = 'CHU00000001';
 UPDATE `groups` SET campusId = 'CAM00000001' WHERE churchId = 'CHU00000001';

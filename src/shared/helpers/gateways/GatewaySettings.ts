@@ -66,7 +66,8 @@ export type GatewaySettings =
   | { provider: "paypal"; settings: PayPalSettings.Settings }
   | { provider: "square"; settings: SquareSettings.Settings }
   | { provider: "epaymints"; settings: ePayMintsSettings.Settings }
-  | { provider: "kingdomfunding"; settings: KingdomFundingSettings.Settings };
+  | { provider: "kingdomfunding"; settings: KingdomFundingSettings.Settings }
+  | { provider: "paystack"; settings: PaystackSettings.Settings };
 
 export function isStripeSettings(settings: any): settings is StripeSettings.Settings {
   return settings && typeof settings === "object";
@@ -88,6 +89,14 @@ export function isKingdomFundingSettings(settings: any): settings is KingdomFund
   return settings && typeof settings === "object";
 }
 
+export namespace PaystackSettings {
+  export type Settings = BaseGatewaySettings;
+}
+
+function isPaystackSettings(settings: any): settings is PaystackSettings.Settings {
+  return settings && typeof settings === "object";
+}
+
 export function validateGatewaySettings(provider: string, settings: Record<string, unknown> | null): BaseGatewaySettings | null {
   if (!settings) return null;
 
@@ -97,6 +106,7 @@ export function validateGatewaySettings(provider: string, settings: Record<strin
     case "square": return isSquareSettings(settings) ? settings : null;
     case "epaymints": return isEPayMintsSettings(settings) ? settings : null;
     case "kingdomfunding": return isKingdomFundingSettings(settings) ? settings : null;
+    case "paystack": return isPaystackSettings(settings) ? settings : null;
     default: return null;
   }
 }

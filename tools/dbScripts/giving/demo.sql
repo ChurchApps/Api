@@ -38,6 +38,16 @@ INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey,
 ('GAT00000001', 'CHU00000001', 'Stripe', 'pk_test_IsC6UPM4P5EZ6KAEorHwEMvU00M6ioef1d', 'FHY0qWkxbhUdqJlffjXuzg==|0EX5qs5+vvw9gMHAKQD8XhyxOabDkz5q/WMLaDne/iFXugUgW4sVwfIr', 'ZMjSV5CAubfN/Y9gf3iOmQ==|qe/e5/ltr5hUKCUsRAMW4jYc90sc7MmJPPxByyd/wSHDo1/9Jpw=', 'prod_LrPszPDWKmksbK', 0, 'USD');
 
 -- Customers (mapped to people from membership demo)
+-- Accra Community Church (CHU00000002): Paystack TEST-mode gateway in GHS for the Paystack Playwright suites.
+-- Keys are Paystack test keys (like the Stripe pk_test above); the secret is encrypted with the dev ENCRYPTION_KEY
+-- (regenerate with `npx tsx tools/manual/encrypt-secret.ts <sk_test_...>` if that key changes).
+INSERT INTO funds (id, churchId, name, taxDeductible, removed, productId) VALUES
+('FUN00000011', 'CHU00000002', 'General Fund', 1, 0, NULL),
+('FUN00000012', 'CHU00000002', 'Building Fund', 1, 0, NULL);
+
+INSERT INTO gateways (id, churchId, provider, publicKey, privateKey, webhookKey, productId, payFees, currency) VALUES
+('GAT00000002', 'CHU00000002', 'Paystack', 'pk_test_08fd58f3b97728b27cfb79fe890023ff3128526a', 'wY4HEZKgvaKLhavlvDZwhA==|QikquZQse7XIOxslrjdxSCj3vmYP0glBpVyCaSJO7y9aYgKcQC9FQJNx5gAeglIq', '', '', 0, 'GHS');
+
 INSERT INTO customers (id, churchId, personId) VALUES
 -- Regular givers
 ('CUS00000001', 'CHU00000001', 'PER00000001'),

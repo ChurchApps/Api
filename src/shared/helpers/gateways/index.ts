@@ -6,3 +6,4 @@ export * from "./PayPalGatewayProvider.js";
 export * from "./SquareGatewayProvider.js";
 export * from "./EPayMintsGatewayProvider.js";
 export * from "./AbstractExperimentalGatewayProvider.js";
+export * from "./PaystackGatewayProvider.js";

@@ -4,6 +4,7 @@ import { PayPalGatewayProvider } from "./PayPalGatewayProvider.js";
 import { SquareGatewayProvider } from "./SquareGatewayProvider.js";
 import { EPayMintsGatewayProvider } from "./EPayMintsGatewayProvider.js";
 import { KingdomFundingGatewayProvider } from "./KingdomFundingGatewayProvider.js";
+import { PaystackGatewayProvider } from "./PaystackGatewayProvider.js";
 
 export interface GatewayFeatureFlags {
   enableSquare?: boolean;
@@ -20,6 +21,7 @@ export class GatewayFactory {
     this.providers.set("stripe", new StripeGatewayProvider());
     this.providers.set("paypal", new PayPalGatewayProvider());
     this.providers.set("kingdomfunding", new KingdomFundingGatewayProvider());
+    this.providers.set("paystack", new PaystackGatewayProvider());
 
     this.loadFeatureFlags();
     this.syncFeatureFlagProviders();
