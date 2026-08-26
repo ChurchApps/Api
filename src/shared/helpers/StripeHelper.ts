@@ -136,14 +136,33 @@ export class StripeHelper {
     return await stripe.setupIntents.create(params);
   }
 
-  // Create SetupIntent specifically for ACH bank account with Financial Connections
-  static async createACHSetupIntent(secretKey: string, customerId: string) {
+  // CAD gateways use Canadian pre-authorized debit (acss_debit); everything else is US ACH.
+  static bankMethodType(currency?: string): "us_bank_account" | "acss_debit" {
+    return currency?.toLowerCase() === "cad" ? "acss_debit" : "us_bank_account";
+  }
+
+  static async createACHSetupIntent(secretKey: string, customerId: string, currency?: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
+    if (StripeHelper.bankMethodType(currency) === "acss_debit") {
+      return await stripe.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ["acss_debit"],
+        // default_for makes the mandate cover subscriptions/invoices automatically; one-off PaymentIntents pass the mandate id (see findAcssMandate)
+        payment_method_options: { acss_debit: { currency: "cad", mandate_options: { default_for: ["invoice", "subscription"] } } }
+      });
+    }
     return await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ["us_bank_account"],
       payment_method_options: { us_bank_account: { financial_connections: { permissions: ["payment_method"] } } }
     });
+  }
+
+  static async findAcssMandate(secretKey: string, customerId: string, paymentMethodId: string): Promise<string | undefined> {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    const list = await stripe.setupIntents.list({ customer: customerId, payment_method: paymentMethodId, limit: 10 });
+    const si = list.data.find(s => s.status === "succeeded" && s.mandate);
+    return si ? String(typeof si.mandate === "string" ? si.mandate : si.mandate?.id) : undefined;
   }
 
   // Retrieve a SetupIntent by ID
@@ -198,6 +217,8 @@ export class StripeHelper {
     // Get modern PaymentMethods (cards and us_bank_account)
     const cards = await stripe.paymentMethods.list({ customer: customer.id, type: "card" });
     const bankPaymentMethods = await stripe.paymentMethods.list({ customer: customer.id, type: "us_bank_account" });
+    const padPaymentMethods = await stripe.paymentMethods.list({ customer: customer.id, type: "acss_debit" });
+    bankPaymentMethods.data.push(...padPaymentMethods.data);
 
     // Also check for legacy bank account Sources (for backward compatibility during migration)
     let legacyBanks: Stripe.ApiList<Stripe.CustomerSource> = { data: [], has_more: false, object: "list", url: "" };
@@ -275,7 +296,7 @@ export class StripeHelper {
       payment_method_details = charge.payment_method_details;
     }
 
-    const methodTypes: any = { ach_debit: "ACH Debit", us_bank_account: "ACH Debit", card: "Card" };
+    const methodTypes: any = { ach_debit: "ACH Debit", us_bank_account: "ACH Debit", acss_debit: "PAD", card: "Card" };
     const paymentType = payment_method_details?.type || "card";
     const details = payment_method_details?.[paymentType];
     return { method: methodTypes[paymentType] || "Card", methodDetails: details?.last4 || "" };

@@ -53,5 +53,11 @@ describe("StripeGatewayProvider.calculateFees", () => {
       const fee = await provider.calculateFees(100000, "", "USD", "bank");
       expect(fee).toEqual(5);
     });
+
+    it("uses PAD pricing (1% + C$0.40, cap C$5) for CAD", async () => {
+      // (100.40 / 0.99) - 100 = 1.4141 -> 1.41
+      expect(await provider.calculateFees(100, "", "CAD", "bank")).toBeCloseTo(1.41, 2);
+      expect(await provider.calculateFees(100000, "", "CAD", "bank")).toEqual(5);
+    });
   });
 });

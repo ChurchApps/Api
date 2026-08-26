@@ -48,7 +48,8 @@ export class GatewayService {
       webhookKey: decryptIfPresent(gateway.webhookKey),
       productId: gateway.productId,
       settings: gateway.settings ?? null,
-      environment: gateway.environment ?? null
+      environment: gateway.environment ?? null,
+      currency: (gateway.currency || "usd").toLowerCase()
     };
   }
 
@@ -397,6 +398,7 @@ export class GatewayService {
   }
 
   static async createACHSetupIntent(gateway: any, customerId: string): Promise<any> {
+    // Stripe picks us_bank_account (ACH) or acss_debit (Canadian PAD) from config.currency
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createACHSetupIntent) {
       const config = this.getGatewayConfig(gateway);

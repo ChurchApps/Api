@@ -18,7 +18,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
     supportsPartialRefunds: false,
     supportsWebhooks: true,
     supportsOrders: false,
-    supportedPaymentMethods: ["card", "ach_debit", "link", "apple_pay", "google_pay"],
+    supportedPaymentMethods: ["card", "ach_debit", "acss_debit", "link", "apple_pay", "google_pay"],
     supportedCurrencies: [
       "usd", "eur", "gbp", "cad", "aud", "jpy", "mxn", "nzd", "sgd", "inr"
     ],
@@ -111,9 +111,11 @@ export class StripeGatewayProvider implements IGatewayProvider {
       if (donationData.id?.startsWith("pm_")) {
         // New PaymentMethod API flow - use Payment Intents
         (paymentData as any).payment_method = donationData.id;
-        (paymentData as any).payment_method_types = ["us_bank_account"];
+        const bankType = StripeHelper.bankMethodType(config.currency);
+        (paymentData as any).payment_method_types = [bankType];
         (paymentData as any).confirm = true;
         (paymentData as any).off_session = true;
+        if (bankType === "acss_debit") (paymentData as any).mandate = await StripeHelper.findAcssMandate(config.privateKey, donationData.customerId, donationData.id);
       } else {
         // Legacy Source-based flow (deprecated - will be removed after migration)
         (paymentData as any).source = donationData.id;
@@ -218,9 +220,12 @@ export class StripeGatewayProvider implements IGatewayProvider {
     }
 
     if (paymentType === "bank") {
-      const fixedPercent = customPercentFee ?? 0.008;
+      // Stripe PAD (CAD) is 1% + C$0.40 capped at C$5; ACH is 0.8% capped at $5.
+      const isPad = currency.toLowerCase() === "cad";
+      const fixedPercent = customPercentFee ?? (isPad ? 0.01 : 0.008);
+      const fixedFee = isPad ? 0.40 : 0;
       const fixedMaxFee = customMaxFee ?? 5.0;
-      const fee = Math.round((amount / (1 - fixedPercent) - amount) * 100) / 100;
+      const fee = Math.round(((amount + fixedFee) / (1 - fixedPercent) - amount) * 100) / 100;
       return Math.min(fee, fixedMaxFee);
     }
 
@@ -302,8 +307,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
           id: bank.id,
           type: "bank",
           provider: this.name,
-          name: bank.us_bank_account?.bank_name || "Bank Account",
-          last4: bank.us_bank_account?.last4,
+          name: bank.us_bank_account?.bank_name || bank.acss_debit?.bank_name || "Bank Account",
+          last4: bank.us_bank_account?.last4 || bank.acss_debit?.last4,
           customerId: bank.customer || customerData.customer?.id,
           gatewayId: config.gatewayId,
           status: "active"
@@ -441,7 +446,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
 
   // ACH SetupIntent for Financial Connections
   async createACHSetupIntent(config: GatewayConfig, customerId: string): Promise<any> {
-    return await StripeHelper.createACHSetupIntent(config.privateKey, customerId);
+    return await StripeHelper.createACHSetupIntent(config.privateKey, customerId, config.currency);
   }
 
   async createPaymentMethod(config: GatewayConfig, paymentMethodData: any): Promise<any> {
