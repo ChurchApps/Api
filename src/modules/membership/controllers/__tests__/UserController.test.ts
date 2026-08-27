@@ -17,11 +17,12 @@ jest.mock("../../helpers/index", () => {
       recordFailure: jest.fn(async () => {}),
       clearFailures: jest.fn(async () => {})
     },
+    PublicPersonRateLimiter: { allow: jest.fn(() => true) },
     UserHelper: { sendWelcomeEmail: jest.fn(), sendForgotEmail: jest.fn(), sendInviteEmail: jest.fn() },
     UserChurchHelper: { createForNewUser: jest.fn() },
     UniqueIdHelper: { shortId: () => "tmpPass" },
     Environment: { currentEnvironment: "test", isMailConfigured: true, emailOnRegistration: false },
-    Permissions: { people: { edit: "peopleEdit" }, server: { admin: "serverAdmin" } },
+    Permissions: { people: { edit: "peopleEdit" }, roles: { edit: "rolesEdit" }, server: { admin: "serverAdmin" } },
     AuditLogHelper: { getClientIp: () => "1.1.1.1", logLogin: jest.fn(), log: jest.fn() },
     MauticHelper: { trackLogin: jest.fn(() => Promise.resolve()) },
     ChurchHelper: { appendLogos: jest.fn(async () => {}) }
@@ -34,7 +35,7 @@ jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: (arr: any[], 
 
 import bcrypt from "bcryptjs";
 import { UserController } from "../UserController.js";
-import { AuthGuidHelper, AuditLogHelper, Environment } from "../../helpers/index.js";
+import { AuthGuidHelper, AuditLogHelper, Environment, UserHelper, UserChurchHelper } from "../../helpers/index.js";
 import { AuthenticatedUser } from "../../auth/index.js";
 
 // Backs the mocked repo with a single mutable "row" so loads hand out independent snapshots
@@ -284,5 +285,44 @@ describe("UserController.setPasswordGuid", () => {
     const result: any = await controller.setPasswordGuid({ body: { authGuid: "nope", newPassword: "freshpass" } } as any, {} as any);
     expect(result.success).toBe(false);
     expect(repos.user.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("UserController.loadOrCreate", () => {
+  beforeEach(() => {
+    (UserHelper.sendWelcomeEmail as jest.Mock).mockClear();
+  });
+
+  // Callers are an admin adding someone to a role, or an anonymous donation form -- in neither case
+  // did the person ask for an account, so a "finish creating your account" code is unexpected mail.
+  it("provisions a new user without emailing a verification code", async () => {
+    const { controller, repos } = userController(null);
+    repos.user.save.mockImplementation(async (u: any) => ({ ...u, id: "u9" }));
+
+    const result: any = await (controller as any).loadOrCreate({ body: { userEmail: "new@b.c", firstName: "New", lastName: "User" }, headers: {} }, {});
+
+    expect(result.status).toBe(200);
+    expect(result.obj.isNewUser).toBe(true);
+    expect(UserHelper.sendWelcomeEmail).not.toHaveBeenCalled();
+    expect(repos.user.updateVerification).not.toHaveBeenCalled();
+  });
+
+  it("still links the new user to a church", async () => {
+    const { controller, repos } = userController(null);
+    repos.user.save.mockImplementation(async (u: any) => ({ ...u, id: "u9" }));
+
+    await (controller as any).loadOrCreate({ body: { userEmail: "new@b.c", firstName: "New", lastName: "User" }, headers: {} }, {});
+
+    expect(UserChurchHelper.createForNewUser).toHaveBeenCalledWith("u9", "new@b.c");
+  });
+
+  it("does not email an existing user", async () => {
+    const { controller } = userController({ id: "u1", email: "a@b.c", firstName: "A", lastName: "B" });
+
+    const result: any = await (controller as any).loadOrCreate({ body: { userEmail: "a@b.c", firstName: "A", lastName: "B" }, headers: {} }, {});
+
+    expect(result.status).toBe(200);
+    expect(result.obj.isNewUser).toBe(false);
+    expect(UserHelper.sendWelcomeEmail).not.toHaveBeenCalled();
   });
 });
