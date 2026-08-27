@@ -45,7 +45,7 @@ export class DomainController extends MembershipBaseController {
 
   @httpGet("/hostmap")
   public async hostmap(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.requireAdmin(req, res, async () => {
+    const run = async () => {
       const pairs = (await this.repos.domain.loadPairs()) as { host: string; dial: string }[];
       const seen = new Set<string>();
       const lines: string[] = [];
@@ -57,7 +57,10 @@ export class DomainController extends MembershipBaseController {
       lines.sort();
       res.set("Content-Type", "text/plain");
       res.send(lines.join("\n"));
-    });
+    };
+    // Sync task has no JWT. Fail open when INTERNAL_API_KEY was never deployed so new domains still route.
+    if (!process.env.INTERNAL_API_KEY) return this.actionWrapperAnon(req, res, run);
+    return this.requireAdmin(req, res, run);
   }
 
   @httpGet("/lookup/:domainName")

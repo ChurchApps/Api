@@ -55,18 +55,33 @@ describe("DomainController admin route authorization", () => {
     expect(CaddyHelper.updateCaddy).not.toHaveBeenCalled();
   });
 
-  it("rejects caddy/init, hostmap, and health without server admin or internal key", async () => {
+  it("rejects caddy/init and health without server admin or internal key", async () => {
     delete process.env.INTERNAL_API_KEY;
     const { controller, repos } = domainController({ access: [] });
     const init: any = await (controller as any).caddyInit(req(), {});
-    const hostmap: any = await (controller as any).hostmap(req(), { set: jest.fn(), send: jest.fn() });
     const health: any = await (controller as any).runHealthCheck(req(), {});
     expect(init.status).toBe(401);
-    expect(hostmap.status).toBe(401);
     expect(health.status).toBe(401);
     expect(CaddyHelper.initializeCaddy).not.toHaveBeenCalled();
     expect(repos.domain.loadPairs).not.toHaveBeenCalled();
     expect(DomainHealthHelper.checkUncheckedDomains).not.toHaveBeenCalled();
+  });
+
+  it("serves hostmap anonymously when INTERNAL_API_KEY is not configured", async () => {
+    delete process.env.INTERNAL_API_KEY;
+    const { controller, repos } = domainController({ access: [] });
+    const res = { set: jest.fn(), send: jest.fn() };
+    await (controller as any).hostmap(req(), res);
+    expect(repos.domain.loadPairs).toHaveBeenCalled();
+    expect(res.send).toHaveBeenCalledWith("x.com firstchurch.b1.church");
+  });
+
+  it("rejects hostmap with a wrong x-internal-key when INTERNAL_API_KEY is set", async () => {
+    process.env.INTERNAL_API_KEY = "edge-secret";
+    const { controller, repos } = domainController({ access: [] });
+    const result: any = await (controller as any).hostmap(req({ "x-internal-key": "nope" }), { set: jest.fn(), send: jest.fn() });
+    expect(result.status).toBe(401);
+    expect(repos.domain.loadPairs).not.toHaveBeenCalled();
   });
 
   it("lets a server admin generate caddy JSON and update live routes", async () => {

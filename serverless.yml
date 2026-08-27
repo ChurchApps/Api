@@ -61,6 +61,7 @@ provider:
     MAUTIC_PASSWORD: ${ssm:/${self:custom.envLower}/mauticPassword, ''}
     CADDY_HOST: ${ssm:/${self:custom.envLower}/caddyHost, ''}
     CADDY_PORT: ${ssm:/${self:custom.envLower}/caddyPort, ''}
+    INTERNAL_API_KEY: ${ssm:/${self:custom.envLower}/internalApiKey, ''}
     YOUTUBE_API_KEY: ${ssm:/${self:custom.envLower}/youTubeApiKey, ''}
     PEXELS_KEY: ${ssm:/${self:custom.envLower}/pexelsKey, ''}
     VIMEO_TOKEN: ${ssm:/${self:custom.envLower}/vimeoToken, ''}
