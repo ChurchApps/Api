@@ -260,10 +260,8 @@ export class UserController extends MembershipBaseController {
         user.password = bcrypt.hashSync(tempPassword, 10);
         user = await this.repos.user.save(user);
 
-        const code = generateVerificationCode();
-        const codeHash = bcrypt.hashSync(code, 10);
-        await this.repos.user.updateVerification(user.id, codeHash, new Date(Date.now() + VERIFICATION_CODE_TTL_MS));
-        await UserHelper.sendWelcomeEmail(user.email, code, null, null);
+        // No mail here: nobody on this path asked for an account. Admins send the invite explicitly
+        // via /users/sendInviteEmail, and self-service signup goes through /users/register.
         await UserChurchHelper.createForNewUser(user.id, user.email);
       }
 
