@@ -40,4 +40,13 @@ describe("PlanItemRepo positionId", () => {
     expect(firstArg(calls, "updateTable")).toBe("planItems");
     expect(firstArg(calls, "set")).toMatchObject({ positionId: "pos2" });
   });
+
+  it("clears positionId on update when the saved item no longer has one", async () => {
+    const { proxy, calls } = recordingDb();
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new PlanItemRepo().save({ id: "pi1", churchId: "c1", planId: "pl1", label: "Sermon" });
+    const set = firstArg(calls, "set");
+    expect(set).toHaveProperty("positionId");
+    expect(set.positionId).toBeNull();
+  });
 });

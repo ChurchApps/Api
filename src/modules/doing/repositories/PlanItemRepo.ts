@@ -16,7 +16,7 @@ export class PlanItemRepo {
   }
 
   private async update(model: PlanItem): Promise<PlanItem> {
-    await getDb().updateTable("planItems").set({ planId: model.planId, parentId: model.parentId, sort: model.sort, itemType: model.itemType, actionType: model.actionType, relatedId: model.relatedId, positionId: model.positionId, label: model.label, description: model.description, seconds: model.seconds, link: model.link, providerId: model.providerId, providerPath: model.providerPath, providerContentPath: model.providerContentPath, thumbnailUrl: model.thumbnailUrl }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("planItems").set({ planId: model.planId, parentId: model.parentId, sort: model.sort, itemType: model.itemType, actionType: model.actionType, relatedId: model.relatedId, positionId: model.positionId ?? null, label: model.label, description: model.description, seconds: model.seconds, link: model.link, providerId: model.providerId, providerPath: model.providerPath, providerContentPath: model.providerContentPath, thumbnailUrl: model.thumbnailUrl }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
