@@ -69,7 +69,7 @@ export class MatrixEmailHelper {
     const membership = getMembershipModuleGateway();
     const church = await membership.loadChurch(churchId);
     const subDomain = church?.subDomain || "app";
-    const scheduleUrl = `https://${subDomain}.b1.church/my/plans`;
+    const scheduleUrl = `https://${subDomain}.b1.church/mobile/plans`;
 
     const names = new Map<string, string>();
     for (const p of (await membership.loadPeople(churchId, recipients.map((r) => r.personId))) as any[]) names.set(p.id, p.displayName);

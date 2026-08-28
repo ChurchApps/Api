@@ -47,6 +47,12 @@ describe("PlanReminderEmailHelper.build", () => {
     expect(emails.p1.html).not.toContain("Arrive 30 min early"); // no custom message passed
   });
 
+  it("links to the real plan route, not the non-existent /my/plans", async () => {
+    const emails = await PlanReminderEmailHelper.build("c1", "plan1", ["p1"], undefined);
+    expect(emails.p1.html).toContain("https://demo.b1.church/mobile/plans/plan1");
+    expect(emails.p1.html).not.toContain("/my/plans");
+  });
+
   it("returns an empty map when the plan is missing", async () => {
     load.mockResolvedValue(null);
     const emails = await PlanReminderEmailHelper.build("c1", "missing", ["p1"], undefined);

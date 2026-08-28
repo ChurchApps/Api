@@ -15,7 +15,7 @@ export class PlanReminderEmailHelper {
     const membership = getMembershipModuleGateway();
     const church = await membership.loadChurch(churchId);
     const subDomain = church?.subDomain || "app";
-    const planUrl = `https://${subDomain}.b1.church/my/plans?id=${plan.id}`;
+    const planUrl = `https://${subDomain}.b1.church/mobile/plans/${plan.id}`;
     const dateStr = new Date(plan.serviceDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
     const wanted = new Set(personIds);

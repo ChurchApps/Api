@@ -342,6 +342,11 @@ describe("PlanHelper.notifyLeadersOfResponse", () => {
     expect(notifyMock.mock.calls[0][4]).toContain("declined");
   });
 
+  it("links the leader notification to the real plan route, not the non-existent /my/plans", async () => {
+    await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos() as any);
+    expect(notifyMock.mock.calls[0][5]).toBe("https://demo.b1.church/mobile/plans/plan1");
+  });
+
   it("does nothing when the plan has no ministry", async () => {
     await PlanHelper.notifyLeadersOfResponse("c1", accepted as any, buildRepos({ ...plan, ministryId: undefined }) as any);
     expect(loadGroupLeaderPersonIdsMock).not.toHaveBeenCalled();

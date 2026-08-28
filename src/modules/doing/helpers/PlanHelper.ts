@@ -212,7 +212,7 @@ export class PlanHelper {
         gateway.loadPeople(churchId, [assignment.personId]),
         gateway.loadChurch(churchId)
       ]);
-      const planUrl = `https://${church?.subDomain || "app"}.b1.church/my/plans?id=${plan.id}`;
+      const planUrl = `https://${church?.subDomain || "app"}.b1.church/mobile/plans/${plan.id}`;
       const dateStr = plan.serviceDate
         ? new Date(plan.serviceDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
         : "";

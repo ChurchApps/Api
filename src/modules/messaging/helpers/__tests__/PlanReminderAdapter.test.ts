@@ -38,3 +38,13 @@ describe("PlanReminderAdapter.buildEmails", () => {
     expect(buildPlanReminderEmails).not.toHaveBeenCalled();
   });
 });
+
+describe("PlanReminderAdapter.link", () => {
+  it("uses the real plan detail route, not the non-existent /my/plans", () => {
+    expect(PlanReminderAdapter.link!({ id: "PLAN1" })).toBe("/mobile/plans/PLAN1");
+  });
+
+  it("returns an empty link when there is no plan id", () => {
+    expect(PlanReminderAdapter.link!({})).toBe("");
+  });
+});
