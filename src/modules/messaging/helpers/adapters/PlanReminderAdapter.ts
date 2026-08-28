@@ -43,7 +43,7 @@ export const PlanReminderAdapter: ReminderAdapter = {
   },
 
   link(entity: any) {
-    return entity?.id ? `/my/plans?id=${entity.id}` : "";
+    return entity?.id ? `/mobile/plans/${entity.id}` : "";
   },
 
   renderMessage(entity: any, _occLocalISO: string, custom?: string) {

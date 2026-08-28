@@ -103,6 +103,16 @@ describe("MatrixEmailHelper.sendConsolidated", () => {
     expect(result).toEqual({ sent: 2, failed: 0, capped: false });
   });
 
+  it("points \"View your schedule\" at the real plans route, not the non-existent /my/plans", async () => {
+    await MatrixEmailHelper.sendConsolidated("CHU1", rows, "MIN1");
+    const [
+      , , , , , link, , options
+    ] = createNotificationsMock.mock.calls[0];
+    expect(link).toBe("https://grace.b1.church/mobile/plans");
+    expect(options.emailByPerson.P1.html).toContain("https://grace.b1.church/mobile/plans");
+    expect(options.emailByPerson.P1.html).not.toContain("/my/plans");
+  });
+
   it("returns zero counts without calling the funnel when there are no assigned people", async () => {
     const result = await MatrixEmailHelper.sendConsolidated("CHU1", [{ personId: null, planId: "PL1", planName: "Sun AM", serviceDate: null, positionName: "Greeter" }], "MIN1");
 
