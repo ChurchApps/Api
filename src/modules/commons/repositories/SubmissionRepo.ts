@@ -88,6 +88,17 @@ export class SubmissionRepo {
     return Number(row?.n || 0);
   }
 
+  public async countByStatus(status: string): Promise<number> {
+    const row = await getDb().selectFrom("submissions").select(sql<number>`count(*)`.as("n")).where("status", "=", status).executeTakeFirst();
+    return Number(row?.n || 0);
+  }
+
+  public async countPendingOlderThan(hours: number): Promise<number> {
+    const row = await getDb().selectFrom("submissions").select(sql<number>`count(*)`.as("n")).where("status", "=", "pending")
+      .where("submittedAt", "<", sql<Date>`date_sub(now(), interval ${hours} hour)`).executeTakeFirst();
+    return Number(row?.n || 0);
+  }
+
   public async countSubmittedSince(userId: string, since: Date): Promise<number> {
     const row = await getDb().selectFrom("submissions").select(sql<number>`count(*)`.as("n")).where("submittedBy", "=", userId).where("submittedAt", ">=", since).executeTakeFirst();
     return Number(row?.n || 0);

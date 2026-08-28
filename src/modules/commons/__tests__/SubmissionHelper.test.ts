@@ -11,10 +11,12 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
   }
 }));
 jest.mock("../helpers/QualityHelper", () => ({ QualityHelper: { score: jest.fn(async () => ({ qualityScore: 21, qualityDetail: JSON.stringify({ heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" }) })) } }));
+jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyReceived: jest.fn(async () => {}) } }));
 
 import { SubmissionHelper } from "../helpers/SubmissionHelper";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
 import { QualityHelper } from "../helpers/QualityHelper";
+import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
 
 const au = { id: "user0000001", churchId: "church00001" };
 const payload = { name: "New Hymn", license: "WC", tags: "Grace", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true } };
@@ -111,6 +113,21 @@ describe("SubmissionHelper.submit", () => {
     const qualityDetail = { heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
     expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ qualityDetail }) }));
     expect(r.submission.submit).toHaveBeenCalledWith("sub00000001", "asset000001", 21);
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ licenseVersion: "1.0", attestationVersion: "1.0", attestedAt: expect.any(String) }) }));
+    expect(CommonsMailHelper.notifyReceived).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }));
+  });
+
+  it("defaults PD licenseVersion to CC0 and keeps an existing attestation stamp", async () => {
+    const r = repos({ assetFile: { loadBySubmission: jest.fn(async () => [{ name: "demoAudio.mp3", sizeBytes: 100, action: "add" }]) } });
+    const sub = draft();
+    sub.payload = { name: "Old Hymn", license: "PD", attestationVersion: "1.0", attestedAt: "2026-01-01T00:00:00.000Z", detail: { writer: "Anon", chordPro: "[C]x", certified: true, recordingOwned: true } };
+    await SubmissionHelper.submit(r, sub, asset);
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ license: "PD", licenseVersion: "CC0", attestationVersion: "1.0", attestedAt: "2026-01-01T00:00:00.000Z", name: "Old Hymn" }) }));
+  });
+
+  it("does not email the writer when submit is refused", async () => {
+    await SubmissionHelper.submit(repos(), { ...draft(), status: "pending" }, asset);
+    expect(CommonsMailHelper.notifyReceived).not.toHaveBeenCalled();
   });
 
   it("returns 400 with the registry's message when validation fails", async () => {

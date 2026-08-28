@@ -112,6 +112,9 @@ export interface SubmissionPayload {
   tags?: string;
   language?: string;
   license?: string;
+  licenseVersion?: string;
+  attestationVersion?: string;
+  attestedAt?: string;
   publisherChurchId?: string;
   detail?: Record<string, any>;
   qualityDetail?: any;

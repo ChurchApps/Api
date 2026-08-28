@@ -30,7 +30,11 @@ export class CommonsAdminController extends CommonsBaseController {
   // lets the SPA decide what to render without provoking a 401 on every load
   @httpGet("/status")
   public async status(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => ({ admin: !!au.id && au.checkAccess(Permissions.server.admin) }));
+    return this.actionWrapper(req, res, async (au) => {
+      const admin = !!au.id && au.checkAccess(Permissions.server.admin);
+      if (!admin) return { admin: false };
+      return { admin: true, pendingCount: await this.repos.submission.countByStatus("pending") };
+    });
   }
 
   @httpGet("/types")

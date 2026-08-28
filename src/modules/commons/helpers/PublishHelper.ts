@@ -1,6 +1,7 @@
 import { fileRole } from "@churchapps/helpers";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
+import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { manifestHook, PUBLISH_HOOKS, PublishContext } from "./publishHooks/index.js";
 import { userNames } from "./NamesHelper.js";
@@ -60,11 +61,13 @@ export class PublishHelper {
     await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null as any, removedReason: null as any });
     await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged });
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
+    void CommonsMailHelper.notifyApproved(sub, asset.id || "").catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
   }
 
   static async reject(repos: Repos, sub: Submission, asset: Asset | undefined, reviewerId: string, reason: string, note: string): Promise<void> {
     await repos.submission.update(sub.id || "", { status: "rejected", reviewedBy: reviewerId, reviewedAt: new Date(), reviewReason: reason, reviewNote: note });
     await this.discardProposed(repos, sub, asset);
+    void CommonsMailHelper.notifyRejected(sub, reason, note).catch((e) => console.error("[CommonsMailHelper] rejected failed:", e));
   }
 
   /** Withdraw / delete: drops the proposed files and, when nothing was ever published, the asset itself. */

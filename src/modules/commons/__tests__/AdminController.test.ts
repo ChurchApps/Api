@@ -31,7 +31,7 @@ const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submitt
 
 function adminController(overrides: any = {}, admin = true) {
   const repos: any = {
-    submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })) },
+    submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })), countByStatus: jest.fn(async () => 4) },
     asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []) },
     assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", action: "add" }]), loadLive: jest.fn(async () => []) },
     report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) }
@@ -49,6 +49,14 @@ const req = (body: any = {}, id = "sub00000001", query: any = {}) => ({ params: 
 
 describe("admin submissions", () => {
   beforeEach(() => jest.clearAllMocks());
+
+  it("returns pendingCount on /status only for admins", async () => {
+    const { controller, repos } = adminController();
+    expect(await controller.status(req(), {} as any)).toEqual({ admin: true, pendingCount: 4 });
+    expect(repos.submission.countByStatus).toHaveBeenCalledWith("pending");
+    const { controller: visitor } = adminController({}, false);
+    expect(await visitor.status(req(), {} as any)).toEqual({ admin: false });
+  });
 
   it("gates everything on Server/Admin", async () => {
     const { controller } = adminController({}, false);

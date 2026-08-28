@@ -16,9 +16,11 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
   }
 }));
 jest.mock("../helpers/NamesHelper", () => ({ userNames: jest.fn(async () => ({ owner000001: "Owner" })) }));
+jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyApproved: jest.fn(async () => {}), notifyRejected: jest.fn(async () => {}) } }));
 
 import { PublishHelper } from "../helpers/PublishHelper";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
+import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
 
 const asset = (): any => ({ id: "asset000001", assetType: "song", name: "Old", status: "published", publisherUserId: "owner000001", publishedAt: new Date("2026-01-01"), publishedSubmissionId: "sub00000000" });
 const qualityDetail = { heuristic: 30, parts: ["demo", "key"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
@@ -84,6 +86,7 @@ describe("PublishHelper.approve", () => {
       filesChanged: [{ name: "tune.abc", action: "add" }, { name: "demoAudio.mp3", action: "replace" }, { name: "sheetPdf.pdf", action: "remove" }]
     }));
     expect(ContentLibraryHelper.removePrefix).toHaveBeenCalledWith("commons/pending/sub00000001");
+    expect(CommonsMailHelper.notifyApproved).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }), "asset000001");
   });
 
   it("stamps publishedAt on a first approval and skips the satellite for hook-less types", async () => {
@@ -101,6 +104,7 @@ describe("PublishHelper.approve", () => {
     const r = repos([{ id: "pf1", name: "tune.abc", action: "add" }]);
     await expect(PublishHelper.approve(r, submission(), asset(), "admin000001")).rejects.toThrow(/pending file missing/);
     expect(r.submission.update).not.toHaveBeenCalled();
+    expect(CommonsMailHelper.notifyApproved).not.toHaveBeenCalled();
   });
 });
 
@@ -114,6 +118,7 @@ describe("PublishHelper.reject / discard / remove", () => {
     expect(ContentLibraryHelper.removePrefix).toHaveBeenCalledWith("commons/pending/sub00000001");
     expect(r.assetFile.deleteBySubmission).toHaveBeenCalledWith("sub00000001");
     expect(r.asset.delete).not.toHaveBeenCalled();
+    expect(CommonsMailHelper.notifyRejected).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }), "quality", "needs a chorus");
   });
 
   it("deletes a never-published asset when its only submission is rejected", async () => {

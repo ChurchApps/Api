@@ -369,7 +369,7 @@ export class UserController extends MembershipBaseController {
           await this.repos.user.save(user);
           const ip = AuditLogHelper.getClientIp(req);
           AuditLogHelper.log(this.repos, "", user.id, "security", "password_changed", "user", user.id, { email: user.email, method: "authGuid" }, ip);
-          return { success: true };
+          return { success: true, email: user.email };
         } else return { success: false };
       } catch (e) {
         if (Environment.currentEnvironment === "dev") {
@@ -635,7 +635,7 @@ export class UserController extends MembershipBaseController {
       const user = await this.repos.user.loadByEmail(email);
       if (user) {
         isExistingUser = true;
-        const minted = AuthGuidHelper.mint();
+        const minted = AuthGuidHelper.mint(true);
         user.authGuid = minted.stored;
         loginLink = `/login?auth=${minted.raw}`;
         await Promise.all([

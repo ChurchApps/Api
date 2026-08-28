@@ -140,11 +140,10 @@ export class CommonsSubmissionController extends CommonsBaseController {
   @httpPost("/:id/withdraw")
   public async withdraw(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { sub, asset, error } = await this.own(au, String(req.params.id), "pending");
+      const { sub, error } = await this.own(au, String(req.params.id), "pending");
       if (error) return error;
-      await this.repos.submission.update(sub.id || "", { status: "withdrawn" });
-      await PublishHelper.discardProposed(this.repos, sub, asset);
-      return { status: "withdrawn" };
+      await this.repos.submission.update(sub.id || "", { status: "draft" });
+      return { status: "draft" };
     });
   }
 

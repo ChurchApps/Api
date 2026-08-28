@@ -10,9 +10,10 @@ export class AuthGuidHelper {
     return crypto.createHash("sha256").update(raw).digest("hex");
   }
 
-  public static mint(): { raw: string; stored: string } {
+  // expires=0 means never (emailed invites are opened days later)
+  public static mint(neverExpires = false): { raw: string; stored: string } {
     const raw = v4();
-    return { raw, stored: `${this.hash(raw)}:${Date.now() + AUTH_GUID_TTL_MS}` };
+    return { raw, stored: `${this.hash(raw)}:${neverExpires ? 0 : Date.now() + AUTH_GUID_TTL_MS}` };
   }
 
   public static parse(stored: string | null | undefined): { hash: string; expires: number; loginUsed: boolean } | null {
@@ -27,7 +28,7 @@ export class AuthGuidHelper {
   public static isExpired(stored: string | null | undefined): boolean {
     const parsed = this.parse(stored);
     if (!parsed) return !stored;
-    return parsed.expires < Date.now();
+    return parsed.expires !== 0 && parsed.expires < Date.now();
   }
 
   public static canLogin(stored: string | null | undefined): boolean {

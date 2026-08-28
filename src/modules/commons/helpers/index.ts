@@ -1,4 +1,5 @@
 export { ChordProHelper } from "./ChordProHelper.js";
+export { CommonsMailHelper } from "./CommonsMailHelper.js";
 export { ContentLibraryHelper, type PresignedUpload } from "./ContentLibraryHelper.js";
 export { recordAssetDownload } from "./DownloadHelper.js";
 export { MaintenanceHelper } from "./MaintenanceHelper.js";

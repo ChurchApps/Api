@@ -1,4 +1,5 @@
 import { Repos } from "../repositories/Repos.js";
+import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { PublishHelper } from "./PublishHelper.js";
 
 export const DOWNLOAD_RETENTION_DAYS = 90;
@@ -13,6 +14,15 @@ export class MaintenanceHelper {
       const asset = await repos.asset.loadById(draft.assetId || "");
       await PublishHelper.discardProposed(repos, draft, asset, true);
       deletedDrafts++;
+    }
+    try {
+      const pending = await repos.submission.countByStatus("pending");
+      if (pending > 0) {
+        const stale = await repos.submission.countPendingOlderThan(72);
+        await CommonsMailHelper.notifyReviewerDigest(pending, stale);
+      }
+    } catch (e) {
+      console.error("[CommonsMailHelper] reviewer digest failed:", e);
     }
     return { prunedDownloads, deletedDrafts };
   }

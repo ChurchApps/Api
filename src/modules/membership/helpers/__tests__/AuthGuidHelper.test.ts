@@ -44,3 +44,9 @@ describe("AuthGuidHelper", () => {
     expect(AuthGuidHelper.canSetPassword(used)).toBe(true);
   });
 });
+
+test("invite guid never expires", () => {
+  const { stored } = AuthGuidHelper.mint(true);
+  expect(AuthGuidHelper.isExpired(stored)).toBe(false);
+  expect(AuthGuidHelper.canSetPassword(stored)).toBe(true);
+});

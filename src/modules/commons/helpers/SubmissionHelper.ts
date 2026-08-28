@@ -2,6 +2,7 @@ import { ASSET_TYPES } from "@churchapps/helpers";
 import { fileRole } from "@churchapps/helpers";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
+import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { QualityHelper } from "./QualityHelper.js";
 import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, resultingFileNames, validateSubmission } from "./SubmitValidation.js";
@@ -83,17 +84,22 @@ export class SubmissionHelper {
     if ((await repos.submission.countByUser(userId, "pending")) >= MAX_PENDING_PER_USER) return fail(429, `you already have ${MAX_PENDING_PER_USER} submissions waiting for review`);
     if ((await repos.submission.countSubmittedSince(userId, new Date(Date.now() - 86400000))) >= MAX_SUBMITTED_PER_DAY) return fail(429, "daily submission limit reached");
 
+    const payload = { ...(sub.payload || {}) };
+    payload.licenseVersion = payload.licenseVersion || (payload.license === "PD" ? "CC0" : "1.0");
+    payload.attestationVersion = payload.attestationVersion || "1.0";
+    payload.attestedAt = payload.attestedAt || new Date().toISOString();
+
     let triageScore: number | null = null;
     if (asset.assetType === "song") {
-      const d = sub.payload?.detail || {};
+      const d = payload.detail || {};
       // must await: Lambda freezes after the response, fire-and-forget never completes
       const scored = await QualityHelper.score({
         id: asset.id,
-        title: sub.payload?.name,
+        title: payload.name,
         writer: d.writer,
         chordPro: d.chordPro,
         scripture: d.scripture,
-        themes: sub.payload?.tags,
+        themes: payload.tags,
         bpm: d.bpm,
         songKey: d.songKey,
         fileRoles: resultingFileNames(live, proposed).map((n) => fileRole(n))
@@ -104,18 +110,18 @@ export class SubmissionHelper {
         if (typeof qualityDetail === "string") {
           try { qualityDetail = JSON.parse(qualityDetail); } catch { qualityDetail = undefined; }
         }
-        if (qualityDetail) {
-          sub.payload = { ...sub.payload, qualityDetail };
-          await repos.submission.update(sub.id || "", { payload: sub.payload });
-        }
+        if (qualityDetail) payload.qualityDetail = qualityDetail;
       }
     }
+    sub.payload = payload;
+    await repos.submission.update(sub.id || "", { payload });
     const moved = await repos.submission.submit(sub.id || "", asset.id || "", triageScore);
     if (!moved) {
       const pending = await repos.submission.loadPendingForAsset(asset.id || "");
       if (pending) return fail(409, `an edit by another contributor is already under review (${pending.id})`);
       return fail(400, "submission is no longer a draft");
     }
+    void CommonsMailHelper.notifyReceived(sub).catch((e) => console.error("[CommonsMailHelper] received failed:", e));
     return { ok: true, value: { status: "pending" } };
   }
 }
