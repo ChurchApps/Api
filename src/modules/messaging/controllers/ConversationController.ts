@@ -48,7 +48,9 @@ export class ConversationController extends MessagingBaseController {
       const ids = req.query.ids.toString().split(",");
       let result = (await this.repos.conversation.loadByIds(au.churchId, ids)) as Conversation[];
       if (result && Array.isArray(result)) {
-        result = result.filter((c) => !this.isPersonNote(c.contentType) || this.canViewPersonNotes(au, c.contentType));
+        const readable: Conversation[] = [];
+        for (const c of result) if (await this.canReadConversation(au, c)) readable.push(c);
+        result = readable;
         await this.appendMessages(result, au.churchId);
       }
       return result || [];
@@ -63,7 +65,7 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (this.isPersonNote(contentType) && !this.canViewPersonNotes(au, contentType)) return this.json([], 401);
+      if (!this.canReadContent(au, contentType, contentId)) return this.json([], 401);
       const churchId = au.churchId;
       const pageNumber = parseInt((req.query.page as string) || "1", 10);
       const pageSize = parseInt((req.query.limit as string) || "20", 10);
@@ -126,9 +128,7 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
-      if (this.isPersonNote(contentType)) {
-        if (!this.canViewPersonNotes(this.authUser(), contentType)) return this.json([], 401) as any;
-      }
+      if (!this.canReadContent(this.authUser(), contentType, contentId)) return this.json([], 401) as any;
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
       const result = this.repos.conversation.convertAllToModel(data as any[]);
       if (!this.isPersonNote(contentType) && !this.isSameChurch(this.authUser(), churchId) && result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
@@ -142,9 +142,7 @@ export class ConversationController extends MessagingBaseController {
       const data = await this.repos.conversation.loadById(churchId, id);
       if (!data) return this.json({}, 401);
       const result = this.repos.conversation.convertToModel(data);
-      if (this.isPersonNote(result?.contentType)) {
-        if (!this.canViewPersonNotes(this.authUser(), result.contentType)) return this.json({}, 401);
-      } else if (!this.isAnonPublicConversation(result) && !this.isSameChurch(this.authUser(), result.churchId)) return this.json({}, 401);
+      if (!(await this.canReadConversation(this.authUser(), result))) return this.json({}, 401);
       return result;
     }) as any;
   }
@@ -258,7 +256,7 @@ export class ConversationController extends MessagingBaseController {
     if (contentType !== "streamingLive") {
       return this.actionWrapper(req, res, async (au) => {
         if (!this.isSameChurch(au, churchId)) return this.json({}, 401);
-        if (this.isPersonNote(contentType) && !this.canViewPersonNotes(au, contentType)) return this.json({}, 401);
+        if (!this.canReadContent(au, contentType, contentId)) return this.json({}, 401);
         const conversation = await this.getOrCreate(churchId, contentType, contentId, "public", false, true);
         if (contentType === "streamingLiveHost" && conversation?.contentId) await this.getOrCreate(churchId, "streamingLive", conversation.contentId, "public", true, false);
         return conversation;
@@ -290,6 +288,18 @@ export class ConversationController extends MessagingBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.conversation.delete(au.churchId, id);
     }) as any;
+  }
+
+  // Content-type level gate for routes that authorize before the conversation row exists (or before it
+  // is loaded). Mirrors canReadConversation minus the row-level checks.
+  private canReadContent(au: any, contentType: string, contentId: string): boolean {
+    if (this.isPersonNote(contentType)) return this.canViewPersonNotes(au, contentType);
+    if (au?.checkAccess(Permissions.content.edit)) return true;
+    if (contentType === "group" || contentType === "groupAnnouncement") {
+      return !!contentId && (!!au?.groupIds?.includes(contentId) || !!au?.leaderGroupIds?.includes(contentId));
+    }
+    if (contentType === "streamingLiveHost") return !!au?.checkAccess(Permissions.chat.host);
+    return true;
   }
 
   private async getOrCreate(churchId: string, contentType: string, contentId: string, visibility: string, allowAnonymousPosts: boolean, decryptContentId: boolean) {
