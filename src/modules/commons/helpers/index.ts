@@ -8,4 +8,4 @@ export { PublishHelper } from "./PublishHelper.js";
 export { QualityHelper } from "./QualityHelper.js";
 export { ipHash } from "./RequestHelper.js";
 export { SubmissionHelper, type Actor, type Outcome } from "./SubmissionHelper.js";
-export { validateSubmission, isUploadableName, resultingFileNames, fileSpec, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY } from "./SubmitValidation.js";
+export { validateSubmission, normalizeTags, isUploadableName, resultingFileNames, fileSpec, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY } from "./SubmitValidation.js";

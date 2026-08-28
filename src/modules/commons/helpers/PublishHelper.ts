@@ -5,6 +5,7 @@ import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { manifestHook, PUBLISH_HOOKS, PublishContext } from "./publishHooks/index.js";
 import { userNames } from "./NamesHelper.js";
+import { normalizeTags } from "./SubmitValidation.js";
 
 const GENERIC_FIELDS = ["name", "description", "tags", "language", "license", "publisherChurchId"] as const;
 
@@ -15,7 +16,7 @@ export class PublishHelper {
     const payload = sub.payload || {};
     const generic: Partial<Asset> = {};
     for (const k of GENERIC_FIELDS) if (payload[k] !== undefined) (generic as any)[k] = payload[k];
-    if (generic.tags) generic.tags = String(generic.tags).split(",").map((t) => t.trim()).filter(Boolean).join(",");
+    if (generic.tags !== undefined) generic.tags = normalizeTags(String(generic.tags));
     await repos.asset.update(asset.id || "", generic);
     Object.assign(asset, generic);
 

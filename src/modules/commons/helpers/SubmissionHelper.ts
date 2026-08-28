@@ -5,11 +5,12 @@ import { Repos } from "../repositories/Repos.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { QualityHelper } from "./QualityHelper.js";
-import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, resultingFileNames, validateSubmission } from "./SubmitValidation.js";
+import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, normalizeTags, resultingFileNames, validateSubmission } from "./SubmitValidation.js";
 
 export interface Actor { id?: string; churchId?: string; }
-export type Outcome<T> = { ok: true; value: T } | { ok: false; status: number; error: string };
-const fail = (status: number, error: string): Outcome<never> => ({ ok: false, status, error });
+export type Outcome<T> = { ok: true; value: T } | { ok: false; status: number; error: string; errors?: string[] };
+const fail = (status: number, error: string | string[]): Outcome<never> =>
+  Array.isArray(error) ? { ok: false, status, error: error[0] || "", errors: error } : { ok: false, status, error };
 
 /** The submission lifecycle, shared by the submissions controller and the legacy shims. */
 export class SubmissionHelper {
@@ -70,8 +71,8 @@ export class SubmissionHelper {
     if (!def) return fail(400, "unknown asset type");
     const proposed = await repos.assetFile.loadBySubmission(sub.id || "");
     const live = await repos.assetFile.loadLive(asset.id || "");
-    const error = validateSubmission(def, sub.payload || {}, proposed, live);
-    if (error) return fail(400, error);
+    const errors = validateSubmission(def, sub.payload || {}, proposed, live);
+    if (errors.length) return fail(400, errors);
     for (const f of proposed) {
       if (f.action !== "remove" && !(await ContentLibraryHelper.exists(ContentLibraryHelper.pendingKey(sub.id || "", f.name || "")))) return fail(400, `${f.name} was not uploaded`);
     }
@@ -85,6 +86,7 @@ export class SubmissionHelper {
     if ((await repos.submission.countSubmittedSince(userId, new Date(Date.now() - 86400000))) >= MAX_SUBMITTED_PER_DAY) return fail(429, "daily submission limit reached");
 
     const payload = { ...(sub.payload || {}) };
+    if (payload.tags !== undefined) payload.tags = normalizeTags(payload.tags);
     payload.licenseVersion = payload.licenseVersion || (payload.license === "PD" ? "CC0" : "1.0");
     payload.attestationVersion = payload.attestationVersion || "1.0";
     payload.attestedAt = payload.attestedAt || new Date().toISOString();

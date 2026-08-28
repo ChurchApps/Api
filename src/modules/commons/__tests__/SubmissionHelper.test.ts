@@ -130,12 +130,23 @@ describe("SubmissionHelper.submit", () => {
     expect(CommonsMailHelper.notifyReceived).not.toHaveBeenCalled();
   });
 
-  it("returns 400 with the registry's message when validation fails", async () => {
+  it("returns 400 with every registry message when validation fails", async () => {
     const sub = draft();
-    sub.payload = { ...payload, detail: { ...payload.detail, writer: "" } };
+    sub.payload = { name: " ", license: "CC0", detail: { writer: "" } };
     const result: any = await SubmissionHelper.submit(repos(), sub, asset);
     expect(result.status).toBe(400);
-    expect(result.error).toMatch(/Writer/);
+    expect(result.errors.join("\n")).toMatch(/name/);
+    expect(result.errors.join("\n")).toMatch(/license/);
+    expect(result.errors.join("\n")).toMatch(/Writer/);
+    expect(result.error).toMatch(/name/);
+  });
+
+  it("normalizes tags onto the stored payload", async () => {
+    const r = repos();
+    const sub = draft();
+    sub.payload = { ...payload, tags: " hope ,  grace,Hope" };
+    await SubmissionHelper.submit(r, sub, asset);
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ tags: "Hope, Grace" }) }));
   });
 
   it("returns 400 when a recorded file was never uploaded", async () => {

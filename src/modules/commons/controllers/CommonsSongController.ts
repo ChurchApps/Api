@@ -76,11 +76,14 @@ export class CommonsSongController extends CommonsBaseController {
       if (!abc || abc.length > 100000) return this.json({ errors: ["abc text is required (max 100KB)"] }, 400);
       const payload = await this.editable(asset.id || "");
       const draft = await SubmissionHelper.createDraft(this.repos, au, { assetId: asset.id, payload, note: "ABC transcription" });
-      if (draft.ok === false) return this.json({ errors: [draft.error] }, draft.status);
+      if (draft.ok === false) return this.json({ errors: draft.errors || [draft.error] }, draft.status);
       const stored = await SubmissionHelper.storeInline(this.repos, draft.value.submission, asset, "tune.abc", "text/plain; charset=utf-8", Buffer.from(abc), au.id);
-      if (stored.ok === false) return this.json({ errors: [stored.error] }, stored.status);
+      if (stored.ok === false) return this.json({ errors: stored.errors || [stored.error] }, stored.status);
       const result = await SubmissionHelper.submit(this.repos, draft.value.submission, asset);
-      if (result.ok === false) return this.json({ errors: [result.error] }, result.status);
+      if (result.ok === false) {
+        const errors = result.errors || [result.error];
+        return this.json({ errors }, result.status);
+      }
       return { id: draft.value.submission.id, status: "pending" };
     });
   }
@@ -133,21 +136,22 @@ export class CommonsSongController extends CommonsBaseController {
         }
       };
       const draft = await SubmissionHelper.createDraft(this.repos, au, { assetType: "song", payload });
-      if (draft.ok === false) return this.json({ errors: [draft.error] }, draft.status);
+      if (draft.ok === false) return this.json({ errors: draft.errors || [draft.error] }, draft.status);
       const { submission, asset } = draft.value;
       const uploads: [string, UploadedFile | undefined, string][] = [["demoAudio", body.files?.demoAudio, "mp3"], ["sheetPdf", body.files?.sheetPdf, "pdf"], ["stemsZip", body.files?.stemsZip, "zip"]];
       for (const [field, file, defaultExt] of uploads) {
         if (!file?.base64) continue;
         const ext = (file.name?.includes(".") ? file.name.split(".").pop() || "" : "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || defaultExt;
         const stored = await SubmissionHelper.storeInline(this.repos, submission, asset, `${field}.${ext}`, file.contentType, Buffer.from(file.base64, "base64"), au.id);
-        if (stored.ok === false) return this.json({ errors: [stored.error] }, stored.status);
+        if (stored.ok === false) return this.json({ errors: stored.errors || [stored.error] }, stored.status);
       }
       const result = await SubmissionHelper.submit(this.repos, submission, asset);
       if (result.ok === false) {
         await this.repos.submission.delete(submission.id || "");
         await this.repos.assetFile.deleteBySubmission(submission.id || "");
         await this.repos.asset.delete(asset.id || "");
-        return this.json({ errors: [result.error] }, result.status);
+        const errors = result.errors || [result.error];
+        return this.json({ errors }, result.status);
       }
       return { id: asset.id, submissionId: submission.id, title: asset.name, status: "pending" };
     });

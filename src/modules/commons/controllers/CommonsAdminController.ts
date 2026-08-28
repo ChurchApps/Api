@@ -25,6 +25,18 @@ function submissionPreviewUrl(hasPreview: boolean, submissionId: string): string
   return `${root}/preview/submission/${submissionId}?token=${ContentLibraryHelper.previewToken(submissionId)}`;
 }
 
+const RIGHTS_RE = /GEMA|PRS|publisher|licensing admin/i;
+
+function foldName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function similarName(a: string, b: string): boolean {
+  const x = foldName(a), y = foldName(b);
+  if (!x || !y) return false;
+  return x === y || (x.length >= 8 && y.length >= 8 && (x.startsWith(y) || y.startsWith(x)));
+}
+
 @controller("/commons/admin")
 export class CommonsAdminController extends CommonsBaseController {
   // lets the SPA decide what to render without provoking a 401 on every load
@@ -52,21 +64,36 @@ export class CommonsAdminController extends CommonsBaseController {
       if (product) rows = rows.filter((r) => ASSET_TYPES[r.assetType || ""]?.product === product);
       const names = await userNames(rows.flatMap((r) => [r.submittedBy, r.publisherUserId]));
       const stats: Record<string, { total: number; approved: number }> = {};
+      const titles: Record<string, { assetId: string; name: string }[]> = {};
       const out = [];
       for (const r of rows) {
-        stats[r.submittedBy || ""] ||= await this.repos.submission.countSubmitterStats(r.submittedBy || "");
+        const userId = r.submittedBy || "";
+        stats[userId] ||= await this.repos.submission.countSubmitterStats(userId);
+        if (!titles[userId]) {
+          const [pending, assets] = await Promise.all([
+            this.repos.submission.loadMine(userId, "pending"),
+            this.repos.asset.loadByPublisher(userId)
+          ]);
+          const listed: { assetId: string; name: string }[] = [];
+          for (const s of pending) listed.push({ assetId: s.assetId || "", name: s.payload?.name || s.assetName || "" });
+          for (const a of assets) if (a.status === "published" || a.status === "pending") listed.push({ assetId: a.id || "", name: a.name || "" });
+          titles[userId] = listed;
+        }
         const files = await this.repos.assetFile.loadBySubmission(r.id || "");
         const def = ASSET_TYPES[r.assetType || ""];
+        const title = r.payload?.name || r.assetName || "";
         out.push({
           ...r,
           payload: undefined,
           qualityDetail: parseQualityDetail(r.payload?.qualityDetail),
+          rightsFlag: RIGHTS_RE.test(String(r.payload?.detail?.proAnswer || "")),
+          possibleDuplicate: titles[userId].some((t) => t.assetId !== (r.assetId || "") && similarName(title, t.name)),
           typeLabel: def?.label || r.assetType,
           product: def?.product,
           productLabel: def ? COMMONS_PRODUCT_LABELS[def.product] : undefined,
           submittedByName: names[r.submittedBy || ""],
           publisherName: names[r.publisherUserId || ""],
-          submitterStats: stats[r.submittedBy || ""],
+          submitterStats: stats[userId],
           isNewAsset: !r.publishedSubmissionId,
           isThirdParty: r.publisherUserId !== r.submittedBy,
           filesChanged: PublishHelper.fileSummary(files)

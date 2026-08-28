@@ -15,7 +15,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
       const result = await SubmissionHelper.createDraft(this.repos, au, req.body || {});
-      if (result.ok === false) return this.json({ errors: [result.error] }, result.status);
+      if (result.ok === false) return this.json({ errors: result.errors || [result.error] }, result.status);
       return { submissionId: result.value.submission.id, assetId: result.value.asset.id, status: "draft" };
     });
   }
@@ -88,7 +88,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
       if (!file) return this.json({ errors: ["file is required"] }, 400);
       const buffer: Buffer = file.data?.length ? file.data : fs.readFileSync(file.tempFilePath);
       const result = await SubmissionHelper.storeInline(this.repos, sub, asset, String(req.params.name), file.mimetype, buffer, au.id);
-      if (result.ok === false) return this.json({ errors: [result.error] }, result.status);
+      if (result.ok === false) return this.json({ errors: result.errors || [result.error] }, result.status);
       return result.value;
     });
   }
@@ -108,7 +108,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
       } else {
         result = await SubmissionHelper.recordFile(this.repos, sub, asset, { name: String(b.name || ""), sizeBytes: Number(b.sizeBytes) || undefined, contentHash: b.contentHash, action: b.action }, au.id);
       }
-      if (result.ok === false) return this.json({ errors: [result.error] }, result.status);
+      if (result.ok === false) return this.json({ errors: result.errors || [result.error] }, result.status);
       return result.value;
     });
   }
@@ -131,7 +131,10 @@ export class CommonsSubmissionController extends CommonsBaseController {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
       const result = await SubmissionHelper.submit(this.repos, sub, asset);
-      if (result.ok === false) return this.json({ errors: [result.error] }, result.status);
+      if (result.ok === false) {
+        const errors = result.errors || [result.error];
+        return this.json({ errors }, result.status);
+      }
       return result.value;
     });
   }

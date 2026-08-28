@@ -16,7 +16,11 @@ export const songPublishHook: PublishHook = {
     const song: Song = { assetId: asset.id, hymnalCount: existing?.hymnalCount || 0, certified: true };
     for (const k of SONG_FIELDS) if (detail[k] !== undefined) (song as any)[k] = detail[k] === "" ? null : detail[k];
     if (song.chordPro) song.chordPro = String(song.chordPro).replace(/\r\n/g, "\n"); // library files are LF
-    if (writer) song.authorId = await repos.author.findOrCreate(writer);
+    const writers = writer.split(/\s*(?:,|&| and )\s*/i).map((n) => n.trim()).filter(Boolean);
+    for (let i = 0; i < writers.length; i++) {
+      const id = await repos.author.findOrCreate(writers[i]);
+      if (i === 0) song.authorId = id;
+    }
     if (ctx.submission.triageScore != null) song.qualityScore = ctx.submission.triageScore;
     const qd = ctx.submission.payload?.qualityDetail;
     if (qd) song.qualityDetail = typeof qd === "string" ? qd : JSON.stringify(qd);

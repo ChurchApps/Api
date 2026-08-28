@@ -31,8 +31,8 @@ const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submitt
 
 function adminController(overrides: any = {}, admin = true) {
   const repos: any = {
-    submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })), countByStatus: jest.fn(async () => 4) },
-    asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []) },
+    submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), loadMine: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })), countByStatus: jest.fn(async () => 4) },
+    asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []), loadByPublisher: jest.fn(async () => []) },
     assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", action: "add" }]), loadLive: jest.fn(async () => []) },
     report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) }
   };
@@ -111,9 +111,43 @@ describe("admin submissions", () => {
     const rows: any = await controller.submissions(req(), {} as any);
     expect(rows[0].qualityDetail).toEqual(qualityDetail);
     expect(rows[0].payload).toBeUndefined();
+    expect(rows[0].rightsFlag).toBe(false);
+    expect(rows[0].possibleDuplicate).toBe(false);
     repos.submission.loadById.mockResolvedValueOnce({ ...pending(), payload: { name: "Proposed", qualityDetail } });
     const detail: any = await controller.submission(req(), {} as any);
     expect(detail.qualityDetail).toEqual(qualityDetail);
+  });
+
+  it("flags GEMA/PRS/publisher answers on the queue without leaking payload", async () => {
+    const { controller } = adminController({ submission: { loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song", payload: { name: "Proposed", detail: { proAnswer: "Yes — registered with GEMA" } } }]) } });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].rightsFlag).toBe(true);
+    expect(rows[0].payload).toBeUndefined();
+  });
+
+  it("flags a near-duplicate when the same submitter has another pending or published asset with a similar name", async () => {
+    const { controller } = adminController({
+      submission: {
+        loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song", assetName: "Amazing Grace Chorus", payload: { name: "Amazing Grace Chorus" } }]),
+        loadMine: jest.fn(async () => [{ assetId: "asset000777", payload: { name: "Amazing Grace" }, assetName: "Amazing Grace" }])
+      },
+      asset: { loadByPublisher: jest.fn(async () => [{ id: "asset000777", name: "Amazing Grace", status: "published" }]) }
+    });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].possibleDuplicate).toBe(true);
+    expect(rows[0].payload).toBeUndefined();
+  });
+
+  it("does not flag the same asset as a duplicate of itself", async () => {
+    const { controller } = adminController({
+      submission: {
+        loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song", assetName: "Hope", payload: { name: "Hope" } }]),
+        loadMine: jest.fn(async () => [{ assetId: "asset000001", payload: { name: "Hope" } }])
+      },
+      asset: { loadByPublisher: jest.fn(async () => [{ id: "asset000001", name: "Hope", status: "pending" }]) }
+    });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].possibleDuplicate).toBe(false);
   });
 });
 

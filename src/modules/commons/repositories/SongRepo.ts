@@ -60,6 +60,11 @@ export class SongRepo {
       .orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
   }
 
+  public async loadPublishedByAuthor(authorId: string): Promise<SongView[]> {
+    return await this.joined().select(SUMMARY_COLS).where("songs.authorId", "=", authorId).where("assets.status", "=", "published")
+      .orderBy("assets.publishedAt", "desc").orderBy("assets.name", "asc").execute() as SongView[];
+  }
+
   public async loadBySubmitter(submittedBy: string): Promise<SongView[]> {
     return await this.joined().select(SUMMARY_COLS).where("assets.publisherUserId", "=", submittedBy)
       .orderBy("assets.createdAt", "desc").execute() as SongView[];

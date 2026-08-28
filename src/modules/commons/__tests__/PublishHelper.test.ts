@@ -60,7 +60,7 @@ describe("PublishHelper.approve", () => {
     const a = asset();
     await PublishHelper.approve(r, submission(), a, "admin000001", "nice");
 
-    expect(r.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ name: "New Name", tags: "grace,praise", license: "WC" }));
+    expect(r.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ name: "New Name", tags: "Grace, Praise", license: "WC" }));
     expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/tune.abc", "commons/assets/song/asset000001/tune.abc");
     expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/demoAudio.mp3", "commons/assets/song/asset000001/demoAudio.mp3");
     expect(ContentLibraryHelper.removeKey).toHaveBeenCalledWith("commons/assets/song/asset000001/sheetPdf.pdf");
@@ -71,6 +71,7 @@ describe("PublishHelper.approve", () => {
     expect(r.assetFile.update).toHaveBeenCalledWith("pf2", { submissionId: null, action: "add" });
 
     expect(r.author.findOrCreate).toHaveBeenCalledWith("Fanny Crosby");
+    expect(r.author.findOrCreate).toHaveBeenCalledTimes(1);
     expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", authorId: "author00001", chordPro: "Verse 1\n[G]Sing", bpm: 80, hymnalCount: 3, qualityScore: 30, qualityDetail: JSON.stringify(qualityDetail) }));
     const written = (ContentLibraryHelper.store as jest.Mock).mock.calls.map((c) => c[0]);
     expect(written).toEqual(expect.arrayContaining(["commons/assets/song/asset000001/song.json", "commons/assets/song/asset000001/lyrics.chordpro", "commons/assets/song/asset000001/manifest.json"]));
@@ -97,6 +98,25 @@ describe("PublishHelper.approve", () => {
     expect(r.asset.update).toHaveBeenLastCalledWith("asset000002", expect.objectContaining({ status: "published", publishedAt: expect.any(Date) }));
     const manifest = JSON.parse((ContentLibraryHelper.store as jest.Mock).mock.calls[0][2].toString());
     expect(manifest.detail).toEqual({ appMinVersion: "1.4" });
+  });
+
+  it("findOrCreate each writer name instead of the combined byline", async () => {
+    const r = repos();
+    r.author.findOrCreate.mockImplementation(async (name: string) => name === "Ada" ? "authorAda001" : "authorBbb001");
+    const sub = { ...submission(), payload: { ...submission().payload, detail: { writer: "Ada & Bea", chordPro: "[C]x" } } };
+    await PublishHelper.approve(r, sub, asset(), "admin000001");
+    expect(r.author.findOrCreate.mock.calls.map((c: any) => c[0])).toEqual(["Ada", "Bea"]);
+    expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ authorId: "authorAda001" }));
+  });
+
+  it("splits writers on commas and 'and' and keeps the first author as authorId", async () => {
+    const r = repos();
+    const ids: Record<string, string> = { Ada: "a1", Bea: "a2", Cy: "a3" };
+    r.author.findOrCreate.mockImplementation(async (name: string) => ids[name]);
+    const sub = { ...submission(), payload: { ...submission().payload, detail: { writer: "Ada, Bea and Cy", chordPro: "[C]x" } } };
+    await PublishHelper.approve(r, sub, asset(), "admin000001");
+    expect(r.author.findOrCreate.mock.calls.map((c: any) => c[0])).toEqual(["Ada", "Bea", "Cy"]);
+    expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ authorId: "a1" }));
   });
 
   it("fails loudly when a pending object is missing so the approve can be retried", async () => {
