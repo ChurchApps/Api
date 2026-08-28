@@ -114,10 +114,18 @@ export class ConversationRepo {
   }
 
   public async updateStats(conversationId: string) {
+    // Was `CALL updateConversationStats(...)`, a procedure that exists in no environment, so lastPostId
+    // never moved off whatever the seed data set and every conversation preview came back empty.
     try {
-      await sql`CALL updateConversationStats(${conversationId})`.execute(getDb());
-    } catch {
-      // Stored procedure may not exist in every environment.
+      await sql`
+        UPDATE conversations c SET
+          c.firstPostId = (SELECT id FROM messages WHERE conversationId=c.id ORDER BY timeSent ASC, id ASC LIMIT 1),
+          c.lastPostId = (SELECT id FROM messages WHERE conversationId=c.id ORDER BY timeSent DESC, id DESC LIMIT 1),
+          c.postCount = (SELECT COUNT(*) FROM messages WHERE conversationId=c.id)
+        WHERE c.id=${conversationId}
+      `.execute(getDb());
+    } catch (e) {
+      console.error("Failed to update conversation stats", conversationId, e);
     }
   }
 

@@ -7,6 +7,7 @@ export class PrivateMessage {
   public toPersonId?: string;
   public conversationId?: string;
   public notifyPersonId?: string;
+  public lastMessageTime?: Date;
 
   public conversation?: Conversation;
 }

@@ -3,7 +3,6 @@ import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { PrivateMessage } from "../models/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/MembershipModuleGateway.js";
 import { MessagingSafetyHelper } from "../../../shared/helpers/index.js";
 
@@ -28,12 +27,10 @@ export class PrivateMessageController extends MessagingBaseController {
       req.body.forEach((conv) => {
         conv.churchId = au.churchId;
         conv.fromPersonId = au.personId;
-        const promise = this.repos.privateMessage.save(conv).then((c) => {
-          // For direct private message API, use generic notification since we don't have message content
-          // Private messages through conversations use the typed notification in checkShouldNotify
-          NotificationHelper.notifyUser(au.churchId, c.toPersonId, "New Private Message");
-          return c;
-        });
+        // One row per pair: reuse it rather than stacking duplicates. The message that follows carries the notification.
+        const promise = this.repos.privateMessage
+          .loadExisting(au.churchId, au.personId, conv.toPersonId)
+          .then((existing) => existing || this.repos.privateMessage.save(conv));
         promises.push(promise);
       });
       const result = await Promise.all(promises);
@@ -67,21 +64,22 @@ export class PrivateMessageController extends MessagingBaseController {
         });
       }
 
-      await this.repos.privateMessage.markAllRead(au.churchId, au.personId);
-      // Retire the escalator's DM shadow rows now that the inbox has been read.
-      await this.repos.notification.markPrivateMessagesRead(au.churchId, au.personId);
-
       return privateMessages;
     });
   }
 
   @httpGet("/existing/:personId")
-  public async getExisting(@requestParam("personId") _personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
-      // TODO: Implement loadExisting functionality to find existing conversation between two people
-      // const existing = await this.repos.privateMessage.loadExisting(au.churchId, au.personId, personId);
-      const existing: any = null; // Temporary placeholder
-      return existing || {};
+  public async getExisting(@requestParam("personId") personId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const existing = (await this.repos.privateMessage.loadExisting(au.churchId, au.personId, personId)) as any;
+      if (!existing) return {};
+      if (existing.notifyPersonId === au.personId) {
+        existing.notifyPersonId = null;
+        await this.repos.privateMessage.save(existing);
+        // The shadow row's contentId is the privateMessage id; retire it too.
+        await this.repos.notification.markPrivateMessageRead(au.churchId, au.personId, existing.id);
+      }
+      return existing;
     });
   }
 
