@@ -114,6 +114,7 @@ export interface SubmissionPayload {
   license?: string;
   publisherChurchId?: string;
   detail?: Record<string, any>;
+  qualityDetail?: any;
 }
 
 export interface AssetFile {

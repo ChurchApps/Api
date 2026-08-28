@@ -1,7 +1,10 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../../shared/helpers/index", () => ({ Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } } }));
+jest.mock("../../../shared/helpers/index", () => ({
+  Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } },
+  Environment: { worshipCommonsRoot: "http://localhost:3104" }
+}));
 jest.mock("../helpers/index", () => ({
   ContentLibraryHelper: {
     requestApiBase: () => "http://api",
@@ -84,8 +87,25 @@ describe("admin submissions", () => {
     expect(detail.isNewAsset).toBe(false);
     expect(detail.files[0].url).toBe("signed:sub00000001/tune.abc");
     expect(detail.diff.fields).toEqual([{ key: "name", from: "Live", to: "Proposed" }]);
-    expect(detail.previewUrl).toBe("https://worshipcommons.org/preview/submission/sub00000001?token=tok");
+    expect(detail.previewUrl).toBe("http://localhost:3104/preview/submission/sub00000001?token=tok");
     expect(detail.submittedByName).toBe("Sub Mitter");
+    expect(detail.detailFields?.some((f: any) => f.key === "chordPro")).toBe(true);
+  });
+
+  it("exposes qualityDetail from the payload on the queue and detail, without leaking payload on the queue", async () => {
+    const qualityDetail = { heuristic: 26, parts: ["demo", "scripture", "themes"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
+    const { controller, repos } = adminController({
+      submission: {
+        loadById: jest.fn(async () => ({ ...pending(), payload: { name: "Proposed", qualityDetail } })),
+        loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song", payload: { name: "Proposed", qualityDetail } }])
+      }
+    });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].qualityDetail).toEqual(qualityDetail);
+    expect(rows[0].payload).toBeUndefined();
+    repos.submission.loadById.mockResolvedValueOnce({ ...pending(), payload: { name: "Proposed", qualityDetail } });
+    const detail: any = await controller.submission(req(), {} as any);
+    expect(detail.qualityDetail).toEqual(qualityDetail);
   });
 });
 

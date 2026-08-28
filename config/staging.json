@@ -11,6 +11,7 @@
   "supportEmail": "support@churchapps.org",
   "b1AdminRoot": "https://admin.b1.church",
   "b1AppRoot": "https://{subdomain}.staging.b1.church",
+  "worshipCommonsRoot": "https://staging.worshipcommons.org",
   "messagingApi": "https://api.staging.churchapps.org/messaging",
   "aiProvider": "openrouter",
   "storeApi": "https://api.staging.mutualministry.com",

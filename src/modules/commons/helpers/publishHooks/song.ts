@@ -17,10 +17,9 @@ export const songPublishHook: PublishHook = {
     for (const k of SONG_FIELDS) if (detail[k] !== undefined) (song as any)[k] = detail[k] === "" ? null : detail[k];
     if (song.chordPro) song.chordPro = String(song.chordPro).replace(/\r\n/g, "\n"); // library files are LF
     if (writer) song.authorId = await repos.author.findOrCreate(writer);
-    if (ctx.submission.triageScore != null) {
-      song.qualityScore = ctx.submission.triageScore;
-      song.qualityDetail = JSON.stringify({ triage: ctx.submission.triageScore });
-    }
+    if (ctx.submission.triageScore != null) song.qualityScore = ctx.submission.triageScore;
+    const qd = ctx.submission.payload?.qualityDetail;
+    if (qd) song.qualityDetail = typeof qd === "string" ? qd : JSON.stringify(qd);
     await repos.song.upsert(song);
 
     const view = (await repos.song.loadById(asset.id || "")) as SongView;

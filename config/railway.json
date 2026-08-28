@@ -10,6 +10,7 @@
   "s3Bucket": "",
   "supportEmail": "support@churchapps.org",
   "b1AdminRoot": "",
+  "worshipCommonsRoot": "http://localhost:3104",
   "messagingApi": "",
   "aiProvider": "openrouter",
   "storeApi": ""

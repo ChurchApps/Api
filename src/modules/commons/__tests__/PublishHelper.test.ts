@@ -21,7 +21,8 @@ import { PublishHelper } from "../helpers/PublishHelper";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
 
 const asset = (): any => ({ id: "asset000001", assetType: "song", name: "Old", status: "published", publisherUserId: "owner000001", publishedAt: new Date("2026-01-01"), publishedSubmissionId: "sub00000000" });
-const submission = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "stranger0001", status: "pending", triageScore: 30, payload: { name: "New Name", tags: " grace , praise ", license: "WC", detail: { writer: "Fanny Crosby", chordPro: "Verse 1\r\n[G]Sing", bpm: 80 } } });
+const qualityDetail = { heuristic: 30, parts: ["demo", "key"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
+const submission = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "stranger0001", status: "pending", triageScore: 30, payload: { name: "New Name", tags: " grace , praise ", license: "WC", qualityDetail, detail: { writer: "Fanny Crosby", chordPro: "Verse 1\r\n[G]Sing", bpm: 80 } } });
 
 function repos(files: any[] = [], liveFiles: any[] = []) {
   const live = [...liveFiles];
@@ -68,7 +69,7 @@ describe("PublishHelper.approve", () => {
     expect(r.assetFile.update).toHaveBeenCalledWith("pf2", { submissionId: null, action: "add" });
 
     expect(r.author.findOrCreate).toHaveBeenCalledWith("Fanny Crosby");
-    expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", authorId: "author00001", chordPro: "Verse 1\n[G]Sing", bpm: 80, hymnalCount: 3, qualityScore: 30 }));
+    expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", authorId: "author00001", chordPro: "Verse 1\n[G]Sing", bpm: 80, hymnalCount: 3, qualityScore: 30, qualityDetail: JSON.stringify(qualityDetail) }));
     const written = (ContentLibraryHelper.store as jest.Mock).mock.calls.map((c) => c[0]);
     expect(written).toEqual(expect.arrayContaining(["commons/assets/song/asset000001/song.json", "commons/assets/song/asset000001/lyrics.chordpro", "commons/assets/song/asset000001/manifest.json"]));
     const manifest = JSON.parse((ContentLibraryHelper.store as jest.Mock).mock.calls.find((c) => c[0].endsWith("manifest.json"))[2].toString());

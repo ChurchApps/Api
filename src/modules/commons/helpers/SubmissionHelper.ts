@@ -87,8 +87,28 @@ export class SubmissionHelper {
     if (asset.assetType === "song") {
       const d = sub.payload?.detail || {};
       // must await: Lambda freezes after the response, fire-and-forget never completes
-      const scored = await QualityHelper.score({ id: asset.id, title: sub.payload?.name, writer: d.writer, chordPro: d.chordPro, scripture: d.scripture, themes: sub.payload?.tags, bpm: d.bpm, songKey: d.songKey, fileRoles: resultingFileNames(live, proposed).map((n) => fileRole(n)) });
+      const scored = await QualityHelper.score({
+        id: asset.id,
+        title: sub.payload?.name,
+        writer: d.writer,
+        chordPro: d.chordPro,
+        scripture: d.scripture,
+        themes: sub.payload?.tags,
+        bpm: d.bpm,
+        songKey: d.songKey,
+        fileRoles: resultingFileNames(live, proposed).map((n) => fileRole(n))
+      });
       triageScore = scored.qualityScore ?? null;
+      if (scored.qualityDetail) {
+        let qualityDetail: any = scored.qualityDetail;
+        if (typeof qualityDetail === "string") {
+          try { qualityDetail = JSON.parse(qualityDetail); } catch { qualityDetail = undefined; }
+        }
+        if (qualityDetail) {
+          sub.payload = { ...sub.payload, qualityDetail };
+          await repos.submission.update(sub.id || "", { payload: sub.payload });
+        }
+      }
     }
     const moved = await repos.submission.submit(sub.id || "", asset.id || "", triageScore);
     if (!moved) {

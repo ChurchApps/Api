@@ -2,13 +2,28 @@ import { controller, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import { ASSET_TYPES, COMMONS_PRODUCT_LABELS } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { Permissions } from "../../../shared/helpers/index.js";
+import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { ContentLibraryHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 
 const REJECT_REASONS = ["quality", "duplicate", "licensing", "offtopic", "incomplete", "other"];
 const RESOLUTIONS = ["upheld", "dismissed", "duplicate"];
 const REMOVE_REASONS = ["copyright", "policy"];
+
+function parseQualityDetail(v: unknown): unknown {
+  if (!v) return undefined;
+  if (typeof v === "object") return v;
+  if (typeof v === "string") {
+    try { return JSON.parse(v); } catch { return undefined; }
+  }
+  return undefined;
+}
+
+function submissionPreviewUrl(hasPreview: boolean, submissionId: string): string | undefined {
+  const root = (Environment.worshipCommonsRoot || "").replace(/\/$/, "");
+  if (!hasPreview || !root) return undefined;
+  return `${root}/preview/submission/${submissionId}?token=${ContentLibraryHelper.previewToken(submissionId)}`;
+}
 
 @controller("/commons/admin")
 export class CommonsAdminController extends CommonsBaseController {
@@ -41,6 +56,7 @@ export class CommonsAdminController extends CommonsBaseController {
         out.push({
           ...r,
           payload: undefined,
+          qualityDetail: parseQualityDetail(r.payload?.qualityDetail),
           typeLabel: def?.label || r.assetType,
           product: def?.product,
           productLabel: def ? COMMONS_PRODUCT_LABELS[def.product] : undefined,
@@ -72,7 +88,6 @@ export class CommonsAdminController extends CommonsBaseController {
       const livePayload = asset.publishedSubmissionId ? await PublishHelper.editablePayload(this.repos, asset) : undefined;
       const names = await userNames([sub.submittedBy, asset.publisherUserId]);
       const def = ASSET_TYPES[asset.assetType || ""];
-      const previewUrl = def?.previewUrl?.replace("{submissionId}", sub.id || "").replace("{token}", ContentLibraryHelper.previewToken(sub.id || ""));
       return {
         ...sub,
         typeLabel: def?.label || asset.assetType,
@@ -87,7 +102,10 @@ export class CommonsAdminController extends CommonsBaseController {
         files,
         live: { ...asset, publisherName: names[asset.publisherUserId || ""], files: liveFiles, fileUrls: ContentLibraryHelper.fileUrls(asset, liveFiles), payload: livePayload },
         diff: { fields: PublishHelper.diffFields(livePayload, sub.payload), files: PublishHelper.fileSummary(proposed) },
-        previewUrl
+        qualityDetail: parseQualityDetail(sub.payload?.qualityDetail),
+        detailFields: def?.detailFields || [],
+        attestations: def?.attestations || [],
+        previewUrl: submissionPreviewUrl(!!def?.previewUrl, sub.id || "")
       };
     });
   }

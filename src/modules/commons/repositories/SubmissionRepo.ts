@@ -96,7 +96,7 @@ export class SubmissionRepo {
   public async countSubmitterStats(userId: string): Promise<{ total: number; approved: number }> {
     const row = await getDb().selectFrom("submissions")
       .select([sql<number>`count(*)`.as("total"), sql<number>`sum(status = 'approved')`.as("approved")])
-      .where("submittedBy", "=", userId).where("status", "in", ["pending", "approved", "rejected"]).executeTakeFirst();
+      .where("submittedBy", "=", userId).where("status", "in", ["approved", "rejected"]).executeTakeFirst();
     return { total: Number(row?.total || 0), approved: Number(row?.approved || 0) };
   }
 

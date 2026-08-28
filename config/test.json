@@ -3,5 +3,6 @@
   "apiUrl": "http://localhost:8084",
   "deliveryProvider": "local",
   "contentRoot": "http://localhost:8084/content/",
-  "fileStore": "memory"
+  "fileStore": "memory",
+  "worshipCommonsRoot": "http://localhost:3104"
 }

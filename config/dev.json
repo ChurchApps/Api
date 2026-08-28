@@ -11,6 +11,7 @@
   "supportEmail": "support@churchapps.org",
   "b1AdminRoot": "https://admin.staging.b1.church",
   "b1AppRoot": "http://{subdomain}.localtest.me:3301",
+  "worshipCommonsRoot": "http://localhost:3104",
   "messagingApi": "https://api.staging.churchapps.org/messaging",
   "aiProvider": "openrouter",
   "storeApi": "http://localhost:8096",

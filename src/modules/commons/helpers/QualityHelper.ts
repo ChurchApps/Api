@@ -29,17 +29,23 @@ export class QualityHelper {
   }
 
   public static heuristicScore(song: ScoreInput): number {
+    return this.heuristicBreakdown(song).score;
+  }
+
+  private static heuristicBreakdown(song: ScoreInput): { score: number; parts: string[] } {
+    const parts: string[] = [];
     let pts = 0;
     const files = new Set(song.fileRoles || []);
-    if (files.has("demoAudio")) pts += 8;
-    if (files.has("sheetPdf")) pts += 6;
-    if (files.has("stemsZip")) pts += 6;
-    if (song.scripture) pts += 4;
-    if (song.themes) pts += 4;
-    if (song.bpm) pts += 3;
-    if (song.songKey) pts += 3;
-    pts += this.chordProScore(song.chordPro || "");
-    return pts;
+    if (files.has("demoAudio")) { pts += 8; parts.push("demo"); }
+    if (files.has("sheetPdf")) { pts += 6; parts.push("sheet"); }
+    if (files.has("stemsZip")) { pts += 6; parts.push("stems"); }
+    if (song.scripture) { pts += 4; parts.push("scripture"); }
+    if (song.themes) { pts += 4; parts.push("themes"); }
+    if (song.bpm) { pts += 3; parts.push("bpm"); }
+    if (song.songKey) { pts += 3; parts.push("key"); }
+    const cp = this.chordProScore(song.chordPro || "");
+    if (cp > 0) { pts += cp; parts.push("chordpro"); }
+    return { score: pts, parts };
   }
 
   // ponytail: naive text stats — real chordpro parser if this misjudges songs
@@ -78,14 +84,14 @@ export class QualityHelper {
   }
 
   public static async score(song: ScoreInput): Promise<Partial<Song>> {
-    const heuristic = this.heuristicScore(song);
-    if (!this.apiKey()) return { qualityScore: heuristic, qualityDetail: JSON.stringify({ heuristic, llm: 0, notes: "heuristic only — no OpenAI key configured" }) };
+    const { score: heuristic, parts } = this.heuristicBreakdown(song);
+    if (!this.apiKey()) return { qualityScore: heuristic, qualityDetail: JSON.stringify({ heuristic, parts, llm: 0, notes: "completeness heuristic only — not an AI judgment" }) };
     try {
       const { llm, detail } = await this.llmScore(song);
-      return { qualityScore: heuristic + llm, qualityDetail: JSON.stringify({ heuristic, llm, ...detail }) };
+      return { qualityScore: heuristic + llm, qualityDetail: JSON.stringify({ heuristic, parts, llm, ...detail }) };
     } catch (e) {
       console.error("Quality scoring failed", song.id, e);
-      return { qualityScore: heuristic, qualityDetail: JSON.stringify({ heuristic, llm: 0, notes: "heuristic only — llm scoring failed" }) };
+      return { qualityScore: heuristic, qualityDetail: JSON.stringify({ heuristic, parts, llm: 0, notes: "completeness heuristic only — LLM scoring failed" }) };
     }
   }
 }

@@ -10,7 +10,7 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
     sha256: () => "hash"
   }
 }));
-jest.mock("../helpers/QualityHelper", () => ({ QualityHelper: { score: jest.fn(async () => ({ qualityScore: 21 })) } }));
+jest.mock("../helpers/QualityHelper", () => ({ QualityHelper: { score: jest.fn(async () => ({ qualityScore: 21, qualityDetail: JSON.stringify({ heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" }) })) } }));
 
 import { SubmissionHelper } from "../helpers/SubmissionHelper";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
@@ -30,6 +30,7 @@ function repos(overrides: any = {}) {
       countByUser: jest.fn(async () => 0),
       countSubmittedSince: jest.fn(async () => 0),
       submit: jest.fn(async () => true),
+      update: jest.fn(async () => {}),
       loadPendingForAsset: jest.fn(async () => undefined)
     },
     assetFile: {
@@ -107,6 +108,8 @@ describe("SubmissionHelper.submit", () => {
     const result: any = await SubmissionHelper.submit(r, sub, asset);
     expect(result).toEqual({ ok: true, value: { status: "pending" } });
     expect(QualityHelper.score).toHaveBeenCalledWith(expect.objectContaining({ title: "New Hymn", fileRoles: ["demoAudio"] }));
+    const qualityDetail = { heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ qualityDetail }) }));
     expect(r.submission.submit).toHaveBeenCalledWith("sub00000001", "asset000001", 21);
   });
 
