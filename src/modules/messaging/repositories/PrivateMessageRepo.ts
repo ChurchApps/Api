@@ -50,6 +50,21 @@ export class PrivateMessageRepo {
     return (result.rows || []).map((d: any) => this.rowToModel(d));
   }
 
+  public async loadExisting(churchId: string, personA: string, personB: string) {
+    const result = await sql<any>`
+      SELECT c.*, pm.id as pmId, pm.fromPersonId, pm.toPersonId, pm.notifyPersonId, m.timeSent as lastMessageTime
+      FROM privateMessages pm
+      INNER JOIN conversations c on c.id=pm.conversationId
+      LEFT JOIN messages m on m.id=c.lastPostId
+      WHERE pm.churchId=${churchId}
+        AND ((pm.fromPersonId=${personA} AND pm.toPersonId=${personB}) OR (pm.fromPersonId=${personB} AND pm.toPersonId=${personA}))
+      ORDER BY COALESCE(m.timeSent, c.dateCreated) DESC
+      LIMIT 1
+    `.execute(getDb());
+    const row = (result.rows || [])[0];
+    return row ? this.rowToModel(row) : null;
+  }
+
   public async loadByChurchId(churchId: string) {
     return getDb().selectFrom("privateMessages").selectAll()
       .where("churchId", "=", churchId)
@@ -67,10 +82,6 @@ export class PrivateMessageRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public async markAllRead(churchId: string, personId: string) {
-    await getDb().updateTable("privateMessages").set({ notifyPersonId: null }).where("churchId", "=", churchId).where("notifyPersonId", "=", personId).execute();
-  }
-
   protected rowToModel(data: any): PrivateMessage {
     const result: PrivateMessage = {
       id: data.pmId || data.id,
@@ -79,6 +90,7 @@ export class PrivateMessageRepo {
       toPersonId: data.toPersonId,
       conversationId: data.pmId ? data.id : data.conversationId,
       notifyPersonId: data.notifyPersonId,
+      lastMessageTime: data.lastMessageTime,
 
       conversation: {
         id: data.id,

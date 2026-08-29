@@ -15,7 +15,7 @@ export class MessageController extends MessagingBaseController {
   public async loadByConversation(@requestParam("conversationId") conversationId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, conversationId));
-      if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(au, conv.contentType)) return this.json([], 401);
+      if (!(await this.canReadConversation(au, conv))) return this.json([], 401);
       const messages: Message[] = await this.repos.message.loadForConversation(au.churchId, conversationId);
       return this.repos.message.convertAllToModel(messages);
     });
@@ -27,9 +27,7 @@ export class MessageController extends MessagingBaseController {
       const data = await this.repos.conversation.loadById(churchId, conversationId);
       if (!data) return this.json([], 401);
       const conv = this.repos.conversation.convertToModel(data);
-      if (this.isPersonNote(conv?.contentType)) {
-        if (!this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json([], 401);
-      } else if (!this.isAnonPublicConversation(conv) && !this.isSameChurch(this.authUser(), conv.churchId)) return this.json([], 401);
+      if (!(await this.canReadConversation(this.authUser(), conv))) return this.json([], 401);
       const messages: Message[] = await this.repos.message.loadForConversation(churchId, conversationId);
       return this.repos.message.convertAllToModel(messages);
     }) as any;
@@ -130,9 +128,7 @@ export class MessageController extends MessagingBaseController {
       const convData = await this.repos.conversation.loadById(churchId, message.conversationId);
       if (!convData) return this.json({}, 401);
       const conv = this.repos.conversation.convertToModel(convData);
-      if (this.isPersonNote(conv?.contentType)) {
-        if (!this.canViewPersonNotes(this.authUser(), conv.contentType)) return this.json({}, 401);
-      } else if (!this.isAnonPublicConversation(conv) && !this.isSameChurch(this.authUser(), conv.churchId)) return this.json({}, 401);
+      if (!(await this.canReadConversation(this.authUser(), conv))) return this.json({}, 401);
       return message;
     }) as any;
   }
@@ -143,6 +139,8 @@ export class MessageController extends MessagingBaseController {
       for (const message of req.body) {
         const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
         if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(au, conv.contentType)) return this.json({}, 401);
+        // New posts need participation; an edit's author already participated, so it keeps the author-or-staff rule below.
+        if (!message.id && (!conv?.id || !(await this.canParticipate(au, conv)))) return this.json({}, 401);
         if (message.id) {
           // Editing is author-or-staff only - leaders get delete, not rewrite - and authorship is never reassignable.
           const existing = await this.repos.message.loadById(au.churchId, message.id);
@@ -246,6 +244,8 @@ export class MessageController extends MessagingBaseController {
     if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
       return !!conv.contentId && au.groupIds?.includes(conv.contentId);
     }
+    if (conv.contentType === "streamingLive") return this.isAnonPublicConversation(conv);
+    if (conv.contentType === "streamingLiveHost") return !!au.checkAccess(Permissions.chat.host);
     if (conv.contentType === "privateMessage") {
       const pm = (await this.repos.privateMessage.loadById(au.churchId, conv.contentId)) as any;
       return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);

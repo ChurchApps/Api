@@ -9,7 +9,7 @@ jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: jest.fn() }, EncryptionHelper: { decrypt } }));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn(), sendAttendance: jest.fn(), sendBlockedIps: jest.fn() } }));
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
-jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
+jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
 const loadChurch = jest.fn(async (id: string) => (id === "c1" ? { id } : null));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch }) }));
 
@@ -28,6 +28,7 @@ const legacyFlag = { id: "leg1", churchId: "c1", contentType: "group", contentId
 // built from an empty Principal, i.e. blank strings rather than null.
 const ANON_AU = { id: "", churchId: "", personId: "", checkAccess: () => false };
 const memberAu = (churchId = "c1") => ({ id: "u1", churchId, personId: "p1", checkAccess: () => false });
+const hostAu = (churchId = "c1") => ({ id: "u2", churchId, personId: "p2", checkAccess: (p: string) => p === "chatHost" });
 
 function attach(controller: any, repos: any, opts: any = {}) {
   const au = opts.au ?? ANON_AU;
@@ -52,7 +53,8 @@ function conversationRepos(opts: any = {}) {
       updateStats: jest.fn(async () => undefined),
       convertToModel: (c: any) => c,
       convertAllToModel: (rows: any[]) => rows
-    }
+    },
+    privateMessage: { loadById: jest.fn(async () => opts.privateMessage ?? null) }
   };
 }
 
@@ -167,7 +169,7 @@ describe("ConversationController.current", () => {
 
   it("ensures a public livestream room when an authenticated host opens host chat", async () => {
     const repos = conversationRepos({ current: null });
-    const controller = attach(new ConversationController(), repos, { au: memberAu() });
+    const controller = attach(new ConversationController(), repos, { au: hostAu() });
     await (controller as any).current("c1", "streamingLiveHost", "encrypted-room-id-longer-than-eleven", {}, {});
     expect(decrypt).toHaveBeenCalledWith("encrypted-room-id-longer-than-eleven");
     expect(repos.conversation.save).toHaveBeenCalledWith(expect.objectContaining({ contentType: "streamingLiveHost", allowAnonymousPosts: false, contentId: "decrypted:encrypted-room-id-longer-than-eleven" }));
@@ -386,16 +388,24 @@ describe("ConnectionController", () => {
     expect(repos.connection.save).not.toHaveBeenCalled();
   });
 
-  it("allows an authenticated same-church client to join host chat", async () => {
+  it("401s an authenticated same-church client without chat.host joining host chat", async () => {
     const repos = connectionRepos({ byIdOnly: hostConv, byId: hostConv });
     const controller = attach(new ConnectionController(), repos, { au: memberAu() });
+    const result = await (controller as any).save({ body: [{ churchId: "ignored", conversationId: "host1" }] }, {});
+    expect(result.status).toBe(401);
+    expect(repos.connection.save).not.toHaveBeenCalled();
+  });
+
+  it("allows a chat.host client to join host chat", async () => {
+    const repos = connectionRepos({ byIdOnly: hostConv, byId: hostConv });
+    const controller = attach(new ConnectionController(), repos, { au: hostAu() });
     await (controller as any).save({ body: [{ churchId: "ignored", conversationId: "host1" }] }, {});
     expect(repos.connection.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1" }));
   });
 
   it("401s a different church's authenticated client joining host chat", async () => {
     const repos = connectionRepos({ byIdOnly: hostConv, byId: hostConv });
-    const controller = attach(new ConnectionController(), repos, { au: memberAu("c2") });
+    const controller = attach(new ConnectionController(), repos, { au: hostAu("c2") });
     const result = await (controller as any).save({ body: [{ churchId: "c2", conversationId: "host1" }] }, {});
     expect(result.status).toBe(401);
     expect(repos.connection.save).not.toHaveBeenCalled();

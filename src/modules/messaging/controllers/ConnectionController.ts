@@ -49,7 +49,7 @@ export class ConnectionController extends MessagingBaseController {
         const convData = connection.conversationId ? await this.repos.conversation.loadByIdOnly(connection.conversationId) : null;
         const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
         if (!conv) return this.json({}, 401);
-        if (!this.isAnonPublicConversation(conv) && !this.isSameChurch(au, conv.churchId)) return this.json({}, 401);
+        if (!(await this.canReadConversation(au, conv))) return this.json({}, 401);
         connection.churchId = conv.churchId;
         if (connection.personId === undefined) connection.personId = null;
         planned.push({ connection, before: await this.loadOwnedConnection(connection) });
@@ -107,7 +107,7 @@ export class ConnectionController extends MessagingBaseController {
       for (const connection of connections) {
         const convData = await this.repos.conversation.loadById(connection.churchId, connection.conversationId);
         const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
-        if (this.isAnonPublicConversation(conv) || this.isSameChurch(au, conv?.churchId)) allowed.push(connection);
+        if (await this.canReadConversation(au, conv)) allowed.push(connection);
       }
       if (connections.length > 0 && allowed.length === 0) return this.json({}, 401);
       const promises: Promise<Connection>[] = [];
@@ -128,8 +128,7 @@ export class ConnectionController extends MessagingBaseController {
     const data = await this.repos.conversation.loadById(churchId, conversationId);
     if (!data) return false;
     const conv = this.repos.conversation.convertToModel(data);
-    if (this.isAnonPublicConversation(conv)) return true;
-    return this.isSameChurch(this.authUser(), conv.churchId);
+    return this.canReadConversation(this.authUser(), conv);
   }
 
   // A client-supplied connection id is only honoured when it already names this socket's connection in
