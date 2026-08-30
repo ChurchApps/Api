@@ -4,6 +4,15 @@ jest.mock("../../../../shared/helpers/index", () => ({ Environment: { contentApi
 jest.mock("../../helpers/StorageResolver", () => ({ StorageResolver: { forFile: jest.fn(), forChurch: jest.fn(), forUrl: jest.fn(), publicUrl: jest.fn(), keyFromUrl: jest.fn((u: string) => (u || "").split("?")[0]) } }));
 jest.mock("../../helpers/ByosAuth", () => ({ BYOS_PROVIDERS: ["googledrive", "dropbox", "onedrive"] }));
 jest.mock("../../helpers/MinistryStuffStorageProvider", () => ({ QuotaExceededError: class QuotaExceededError extends Error {} }));
+// apihelper ships untransformed ESM; stub the symbols FileController uses.
+jest.mock("@churchapps/apihelper", () => ({
+  __esModule: true,
+  EnvironmentBase: { fileStore: "disk", s3Bucket: "bucket" },
+  inferContentTypeFromKey: jest.fn(() => "application/octet-stream"),
+  resolveMaxUploadBytes: jest.fn((n: number) => n)
+}));
+jest.mock("@aws-sdk/s3-presigned-post", () => ({ createPresignedPost: jest.fn() }));
+jest.mock("@aws-sdk/client-s3", () => ({ S3Client: class {} }));
 
 import { FileController } from "../FileController.js";
 import { StorageResolver } from "../../helpers/StorageResolver.js";

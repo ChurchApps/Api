@@ -15,4 +15,11 @@ describe("PublicPersonRateLimiter", () => {
     expect(PublicPersonRateLimiter.allow("1.1.1.1", "c1", "loadOrCreate")).toBe(true);
     expect(PublicPersonRateLimiter.allow("1.1.1.1", "c2", "guest-register")).toBe(true);
   });
+
+  it("does not throttle loopback (local demo / Playwright)", () => {
+    for (let i = 0; i < PublicPersonRateLimiter.maxHits + 5; i++) {
+      expect(PublicPersonRateLimiter.allow("127.0.0.1", "c1", "guest-register")).toBe(true);
+      expect(PublicPersonRateLimiter.allow("::ffff:127.0.0.1", "c1", "loadOrCreate")).toBe(true);
+    }
+  });
 });

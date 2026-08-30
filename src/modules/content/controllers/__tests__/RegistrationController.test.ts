@@ -47,6 +47,7 @@ function makeController(opts: any = {}) {
   (controller as any).repos = repos;
   (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
   (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+  (controller as any).authUser = () => au;
   (controller as any).json = (obj: any, status: number) => ({ obj, status });
   return { controller, repos };
 }
