@@ -65,7 +65,28 @@ describe("StorageResolver.keyFromUrl", () => {
     expect(StorageResolver.keyFromUrl("https://ms.example.com/c1/files/arrangement/a1/mix.mp3")).toBe("/c1/files/arrangement/a1/mix.mp3");
   });
 
+  it("collapses a doubled slash from joining a trailing-slash contentRoot with a keyed path", () => {
+    expect(StorageResolver.keyFromUrl("https://content.churchapps.org//c1/files/logo.png?dt=1")).toBe("/c1/files/logo.png");
+  });
+
   it("returns empty string for a missing path", () => {
     expect(StorageResolver.keyFromUrl(undefined)).toBe("");
+  });
+});
+
+describe("StorageResolver.publicUrl", () => {
+  it("joins churchapps contentRoot and key without a double slash", () => {
+    expect(StorageResolver.publicUrl("churchapps", "/c1/files/logo.png")).toBe("https://content.churchapps.org/c1/files/logo.png");
+  });
+
+  it("strips a trailing slash on contentRoot before joining", () => {
+    const { Environment } = jest.requireMock("../../../../shared/helpers/Environment.js");
+    const orig = Environment.contentRoot;
+    Environment.contentRoot = "https://content.churchapps.org/";
+    try {
+      expect(StorageResolver.publicUrl("churchapps", "/c1/files/logo.png")).toBe("https://content.churchapps.org/c1/files/logo.png");
+    } finally {
+      Environment.contentRoot = orig;
+    }
   });
 });

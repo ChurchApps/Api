@@ -73,13 +73,14 @@ export class StorageResolver {
     const roots = [Environment.contentRoot, Environment.ministryStuffContentRoot].filter((r) => r);
     for (const root of roots) {
       const trimmed = root.replace(/\/$/, "");
-      if (base.startsWith(trimmed)) return base.substring(trimmed.length);
+      if (base.startsWith(trimmed)) return base.substring(trimmed.length).replace(/^\/+/, "/");
     }
     return base;
   }
 
   static publicUrl(name: string, key: string): string {
-    if (name === "ministrystuff") return Environment.ministryStuffContentRoot.replace(/\/$/, "") + key;
-    return Environment.contentRoot + key;
+    const root = ((name === "ministrystuff" ? Environment.ministryStuffContentRoot : Environment.contentRoot) || "").replace(/\/$/, "");
+    if (!key) return root;
+    return root + (key.startsWith("/") ? key : "/" + key);
   }
 }
