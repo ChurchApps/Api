@@ -20,16 +20,23 @@ export class PageController2 extends ContentBaseController {
       // Id-based (editor) loads carry no ?siteId — the page row itself knows its site (footer selection).
       const effectiveSiteId = (page as any)?.siteId ?? siteId;
 
+      let au: any = null;
+      try {
+        au = this.authUser();
+      } catch {
+        au = null;
+      }
+      // An `?id=` load only escapes the public gate when the JWT is a content editor of this church.
+      const editorRequest = !!id && !url && !!au?.churchId && au.churchId === churchId && au.checkAccess(Permissions.content.edit);
+
       let result: Page = {};
       if (page?.id !== undefined) {
-        // Only url-based (public render) requests are gated; the editor's id-based requests are unchanged.
-        if (url && !canViewPage(page, this.authUser())) {
+        if (!editorRequest && !canViewPage(page, au)) {
           return { restricted: true, visibility: page.visibility || PUBLIC_VISIBILITY };
         }
         result = page;
-        // Public (url-based) requests serve the published snapshot when one exists; the
-        // editor's id-based requests always see the working tree.
-        const snapshot = url && page.publishedAt ? await this.loadPublishedSnapshot(churchId, page.id) : null;
+        // Public requests serve the published snapshot when one exists; editors always see the working tree.
+        const snapshot = !editorRequest && page.publishedAt ? await this.loadPublishedSnapshot(churchId, page.id) : null;
         if (snapshot) {
           result.sections = snapshot.sections || [];
           const allElements = this.flattenTreeElements(result.sections);
@@ -44,7 +51,7 @@ export class PageController2 extends ContentBaseController {
           result.sections = TreeHelper.buildTree(sections, allElements);
           await TreeHelper.insertBlocks(result.sections, allElements, churchId, effectiveSiteId);
         }
-        if (url) this.removeTreeFields(result);
+        if (!editorRequest) this.removeTreeFields(result);
       }
       return result;
     });
