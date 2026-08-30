@@ -95,6 +95,20 @@ export class BlockController extends ContentBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+
+      const ownElements: Element[] = await this.repos.element.loadForBlock(au.churchId, id);
+      const ownSections: Section[] = await this.repos.section.loadForBlock(au.churchId, id);
+
+      const allSections: Section[] = await this.repos.section.loadAll(au.churchId);
+      const allElements: Element[] = await this.repos.element.loadAll(au.churchId);
+      TreeHelper.populateAnswers(allSections);
+      TreeHelper.populateAnswers(allElements);
+      const consumerSections = allSections.filter((s) => s.targetBlockId === id);
+      const consumerElements = allElements.filter((e) => e.answers?.targetBlockId === id);
+
+      for (const e of [...ownElements, ...consumerElements]) await this.repos.element.delete(au.churchId, e.id);
+      for (const s of [...ownSections, ...consumerSections]) await this.repos.section.delete(au.churchId, s.id);
+
       await this.repos.block.delete(au.churchId, id);
       this.bumpSiteCache(au.churchId);
       return {};
