@@ -180,19 +180,14 @@ export class YouVersionHelper {
     const chapterKey = `${bookKey}.${chapterNumber}`;
     const url = this.baseUrl + "/bibles/" + translationKey + "/passages/" + chapterKey + "?format=html";
 
-    try {
-      const data = await this.getContent(url);
-      if (data.content) {
-        const verses = this.parseChapterHtml(data.content, bookKey, chapterNumber, translationKey);
-        // Filter to only return requested verse range
-        for (const verse of verses) {
-          if (verse.verseNumber >= startVerse && verse.verseNumber <= endVerse) {
-            result.push(verse);
-          }
+    const data = await this.getContent(url);
+    if (data.content) {
+      const verses = this.parseChapterHtml(data.content, bookKey, chapterNumber, translationKey);
+      for (const verse of verses) {
+        if (verse.verseNumber >= startVerse && verse.verseNumber <= endVerse) {
+          result.push(verse);
         }
       }
-    } catch (e: any) {
-      console.log(`Failed to fetch chapter ${chapterKey}:`, e.message);
     }
 
     return result;
