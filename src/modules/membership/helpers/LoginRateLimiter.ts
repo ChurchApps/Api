@@ -46,10 +46,15 @@ export class LoginRateLimiter {
   }
 
   /** The buckets that apply to one attempt, each with its own ceiling. */
+  private static isLoopback(ip: string): boolean {
+    const host = (ip || "").replace(/^::ffff:/i, "").split("%")[0];
+    return !host || host === "127.0.0.1" || host === "::1" || host === "localhost" || host.startsWith("127.");
+  }
+
   private static buckets(ip: string, account: string): { key: string; max: number }[] {
     const result: { key: string; max: number }[] = [];
     if (account) result.push({ key: "account|" + account.slice(0, 150), max: this.maxPerAccount });
-    if (ip) result.push({ key: "ip|" + ip.slice(0, 150), max: this.maxPerIp });
+    if (ip && !this.isLoopback(ip)) result.push({ key: "ip|" + ip.slice(0, 150), max: this.maxPerIp });
     return result;
   }
 

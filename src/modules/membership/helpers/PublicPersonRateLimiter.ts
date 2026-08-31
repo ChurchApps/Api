@@ -4,8 +4,8 @@ export class PublicPersonRateLimiter {
   static maxHits = 10;
 
   static allow(ip: string, churchId: string, bucket: string): boolean {
-    const host = (ip || "").replace(/^::ffff:/, "");
-    if (!host || host === "127.0.0.1" || host === "::1" || host === "localhost") return true;
+    const host = (ip || "").replace(/^::ffff:/i, "").split("%")[0];
+    if (!host || host === "127.0.0.1" || host === "::1" || host === "localhost" || host.startsWith("127.")) return true;
     const key = bucket + "|" + (ip || "unknown") + "|" + (churchId || "");
     const now = Date.now();
     const times = (this.hits.get(key) || []).filter((t) => now - t < this.windowMs);

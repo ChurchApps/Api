@@ -65,7 +65,8 @@ export class StreamingServiceController extends ContentBaseController {
         let services: StreamingService[] = req.body;
         const promises: Promise<StreamingService>[] = [];
         services.forEach((service) => {
-          if (service.churchId === au.churchId) promises.push(this.repos.streamingService.save(service));
+          service.churchId = au.churchId;
+          promises.push(this.repos.streamingService.save(service));
         });
         services = await Promise.all(promises);
         return this.json(services, 200);
