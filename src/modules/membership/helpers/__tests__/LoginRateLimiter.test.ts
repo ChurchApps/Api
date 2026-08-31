@@ -46,6 +46,12 @@ describe("LoginRateLimiter.allow", () => {
     expect(await LoginRateLimiter.allow(repos, "1.1.1.1", "a@b.c")).toBe(true);
     (console.error as jest.Mock).mockRestore();
   });
+
+  it("does not apply the ip bucket on loopback (local demo / Playwright)", async () => {
+    const { repos } = fakeRepos({ "ip|127.0.0.1": LoginRateLimiter.maxPerIp });
+    expect(await LoginRateLimiter.allow(repos, "127.0.0.1", "a@b.c")).toBe(true);
+    expect(repos.loginAttempt.loadCount).not.toHaveBeenCalledWith("ip|127.0.0.1", LoginRateLimiter.windowSeconds);
+  });
 });
 
 describe("LoginRateLimiter counters", () => {
@@ -53,6 +59,12 @@ describe("LoginRateLimiter counters", () => {
     const { repos, incremented } = fakeRepos();
     await LoginRateLimiter.recordFailure(repos, "1.1.1.1", "a@b.c");
     expect(incremented).toEqual([ACCOUNT_KEY, IP_KEY]);
+  });
+
+  it("records a loopback failure against the account bucket only", async () => {
+    const { repos, incremented } = fakeRepos();
+    await LoginRateLimiter.recordFailure(repos, "127.0.0.1", "a@b.c");
+    expect(incremented).toEqual([ACCOUNT_KEY]);
   });
 
   it("clears the account bucket on success but leaves the ip bucket standing", async () => {

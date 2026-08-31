@@ -20,6 +20,7 @@ describe("PublicPersonRateLimiter", () => {
     for (let i = 0; i < PublicPersonRateLimiter.maxHits + 5; i++) {
       expect(PublicPersonRateLimiter.allow("127.0.0.1", "c1", "guest-register")).toBe(true);
       expect(PublicPersonRateLimiter.allow("::ffff:127.0.0.1", "c1", "loadOrCreate")).toBe(true);
+      expect(PublicPersonRateLimiter.allow("127.0.0.2", "c1", "guest-register")).toBe(true);
     }
   });
 });
