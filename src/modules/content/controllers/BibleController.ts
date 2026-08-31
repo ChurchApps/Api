@@ -20,9 +20,8 @@ export class BibleController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const query = req.query.query as string;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
-      const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
-      const source = translation?.source || "api.bible";
-      const result = await BibleSourceFactory.search(source, translationKey, query, limit);
+      const { source, sourceKey } = await this.resolveTranslation(translationKey);
+      const result = await BibleSourceFactory.search(source, sourceKey, query, limit);
       return result;
     });
   }
@@ -55,22 +54,23 @@ export class BibleController extends ContentBaseController {
   public async updateCopyright(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      const bible = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
-      const copyright = await BibleSourceFactory.getCopyright(bible?.source || "api.bible", translationKey);
-      bible.copyright = copyright || "";
-      await this.repos.bibleTranslation.save(bible);
-      return bible;
+      const { source, sourceKey, translation } = await this.resolveTranslation(translationKey);
+      if (!translation) return this.json({}, 404);
+      const copyright = await BibleSourceFactory.getCopyright(source, sourceKey);
+      translation.copyright = copyright || "";
+      await this.repos.bibleTranslation.save(translation);
+      return translation;
     });
   }
 
   @httpGet("/:translationKey/books")
   public async getBooks(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      let result = await this.repos.bibleBook.loadAll(translationKey);
+      const { source, sourceKey } = await this.resolveTranslation(translationKey);
+      let result = await this.repos.bibleBook.loadAll(sourceKey);
       if (result.length === 0) {
-        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
-        const source = translation?.source || "api.bible";
-        result = await BibleSourceFactory.getBooks(source, translationKey);
+        result = await BibleSourceFactory.getBooks(source, sourceKey);
+        result.forEach((r: any) => { r.translationKey = sourceKey; });
         await this.repos.bibleBook.saveAll(result);
       }
       return result;
@@ -81,12 +81,12 @@ export class BibleController extends ContentBaseController {
   public async getChapters(@requestParam("translationKey") translationKey: string, @requestParam("bookKey") bookKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const resolvedBookKey = await this.resolveBookKey(bookKey);
+      const { source, sourceKey } = await this.resolveTranslation(translationKey);
 
-      let result = await this.repos.bibleChapter.loadByBook(translationKey, resolvedBookKey);
+      let result = await this.repos.bibleChapter.loadByBook(sourceKey, resolvedBookKey);
       if (result.length === 0) {
-        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
-        const source = translation?.source || "api.bible";
-        result = await BibleSourceFactory.getChapters(source, translationKey, resolvedBookKey);
+        result = await BibleSourceFactory.getChapters(source, sourceKey, resolvedBookKey);
+        result.forEach((r: any) => { r.translationKey = sourceKey; });
         await this.repos.bibleChapter.saveAll(result);
       }
       return result;
@@ -101,11 +101,11 @@ export class BibleController extends ContentBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      let result = await this.repos.bibleVerse.loadByChapter(translationKey, chapterKey);
+      const { source, sourceKey } = await this.resolveTranslation(translationKey);
+      let result = await this.repos.bibleVerse.loadByChapter(sourceKey, chapterKey);
       if (result.length === 0) {
-        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
-        const source = translation?.source || "api.bible";
-        result = await BibleSourceFactory.getVerses(source, translationKey, chapterKey);
+        result = await BibleSourceFactory.getVerses(source, sourceKey, chapterKey);
+        result.forEach((r: any) => { r.translationKey = sourceKey; });
         await this.repos.bibleVerse.saveAll(result);
       }
       return result;
@@ -121,22 +121,22 @@ export class BibleController extends ContentBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const canCache = !this.noCache.includes(translationKey);
+      const { source, sourceKey } = await this.resolveTranslation(translationKey);
+      const canCache = !this.noCache.includes(sourceKey);
       let result: BibleVerseText[] = [];
       const ipAddress = (req.headers["x-forwarded-for"] || req.socket.remoteAddress).toString().split(",")[0];
-      this.logLookup(ipAddress, translationKey, startVerseKey, endVerseKey);
+      this.logLookup(ipAddress, sourceKey, startVerseKey, endVerseKey);
 
-      if (canCache) result = await this.repos.bibleVerseText.loadRange(translationKey, startVerseKey, endVerseKey);
+      if (canCache) result = await this.repos.bibleVerseText.loadRange(sourceKey, startVerseKey, endVerseKey);
       if (result.length === 0) {
-        const translation = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
-        const source = translation?.source || "api.bible";
-        result = await BibleSourceFactory.getVerseText(source, translationKey, startVerseKey, endVerseKey);
+        result = await BibleSourceFactory.getVerseText(source, sourceKey, startVerseKey, endVerseKey);
         if (canCache) {
           result.forEach((r: BibleVerseText) => {
             const parts = r.verseKey.split(".");
             r.bookKey = parts[0];
             r.chapterNumber = parseInt(parts[1], 0);
             r.verseNumber = parseInt(parts[2], 0);
+            r.translationKey = sourceKey;
           });
           await this.repos.bibleVerseText.saveAll(result);
         }
@@ -218,6 +218,23 @@ export class BibleController extends ContentBaseController {
   private async logLookup(ipAddress: string, translationKey: string, startVerseKey: string, endVerseKey: string) {
     const lookup = { translationKey, ipAddress, startVerseKey, endVerseKey };
     await this.repos.bibleLookup.save(lookup);
+  }
+
+  private async resolveTranslation(translationKey: string): Promise<{ source: string; sourceKey: string; translation?: BibleTranslation }> {
+    const bySourceKey = await this.repos.bibleTranslation.loadBySourceKey(null, translationKey);
+    if (bySourceKey?.source) return { source: bySourceKey.source, sourceKey: bySourceKey.sourceKey || translationKey, translation: bySourceKey };
+
+    const byId = await this.repos.bibleTranslation.load(translationKey);
+    if (byId?.source) return { source: byId.source, sourceKey: byId.sourceKey || translationKey, translation: byId };
+
+    const byAbbreviation = await this.repos.bibleTranslation.loadByAbbreviation(translationKey);
+    if (byAbbreviation?.source) return { source: byAbbreviation.source, sourceKey: byAbbreviation.sourceKey || translationKey, translation: byAbbreviation };
+
+    if (translationKey.startsWith("YOUVERSION-") || /^\d+$/.test(translationKey)) {
+      const sourceKey = translationKey.startsWith("YOUVERSION-") ? translationKey : "YOUVERSION-" + translationKey;
+      return { source: "youversion", sourceKey };
+    }
+    return { source: "api.bible", sourceKey: translationKey };
   }
 
   // Book keys are 3 chars: LLL (e.g. GEN) or NLL (e.g. 1CO, 2TI)

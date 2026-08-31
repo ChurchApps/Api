@@ -65,6 +65,12 @@ export class BibleTranslationRepo {
       .executeTakeFirst()) ?? null;
   }
 
+  public async loadByAbbreviation(abbreviation: string) {
+    return (await getDb().selectFrom("bibleTranslations").selectAll()
+      .where("abbreviation", "=", abbreviation)
+      .executeTakeFirst()) ?? null;
+  }
+
   public async loadAll() {
     return getDb().selectFrom("bibleTranslations").selectAll().orderBy("name").execute() as any;
   }

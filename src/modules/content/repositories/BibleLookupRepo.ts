@@ -47,7 +47,11 @@ export class BibleLookupRepo {
     const start = DateHelper.toMysqlDate(startDate);
     const end = DateHelper.toMysqlDate(endDate);
     const result = await getDb().selectFrom("bibleTranslations as bt")
-      .innerJoin("bibleLookups as bl", "bl.translationKey", "bt.abbreviation")
+      .innerJoin("bibleLookups as bl", (join) =>
+        join.on((eb) => eb.or([
+          eb("bl.translationKey", "=", eb.ref("bt.abbreviation")),
+          eb("bl.translationKey", "=", eb.ref("bt.sourceKey"))
+        ])))
       .select(["bt.abbreviation", sql<number>`count(distinct(bl.ipAddress))`.as("lookups")])
       .where("bl.lookupTime", ">=", start as any)
       .where("bl.lookupTime", "<=", end as any)

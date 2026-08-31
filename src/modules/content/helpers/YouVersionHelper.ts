@@ -93,18 +93,21 @@ export class YouVersionHelper {
       !this.excludedAbbreviations.includes(t.abbreviation));
   }
 
+  static cacheKey(apiId: string) {
+    return apiId.startsWith("YOUVERSION-") ? apiId : "YOUVERSION-" + apiId;
+  }
+
   static async getBooks(translationKey: string) {
     const result: BibleBook[] = [];
     const url = this.baseUrl + "/bibles/" + translationKey + "/books";
     const data = await this.getContent(url);
 
-    // YouVersion returns: { data: [{ id: "GEN", title: "Genesis", full_title: "Genesis", abbreviation: "Gen", canon: "old_testament", chapters: [...] }, ...] }
     const books = data.data || data;
     if (Array.isArray(books)) {
       books.forEach((d: any, i: number) => {
         result.push({
-          translationKey,
-          keyName: d.id,  // USFM code like "GEN", "EXO", "REV"
+          translationKey: this.cacheKey(translationKey),
+          keyName: d.id,
           abbreviation: d.abbreviation || d.id,
           name: d.title || d.full_title || d.id,
           sort: i
@@ -126,7 +129,7 @@ export class YouVersionHelper {
         const chapterNum = typeof d.id === "number" ? d.id : parseInt(d.id, 10);
         if (!isNaN(chapterNum)) {
           result.push({
-            translationKey,
+            translationKey: this.cacheKey(translationKey),
             bookKey,
             keyName: bookKey + "." + chapterNum,
             number: chapterNum
@@ -152,7 +155,7 @@ export class YouVersionHelper {
         const verseNum = typeof d.id === "number" ? d.id : parseInt(d.id, 10);
         if (!isNaN(verseNum)) {
           result.push({
-            translationKey,
+            translationKey: this.cacheKey(translationKey),
             chapterKey,
             keyName: bookKey + "." + chapterNumber + "." + verseNum,
             number: verseNum
@@ -214,11 +217,8 @@ export class YouVersionHelper {
       // Get content after the verse marker
       let content = part.substring(verseMatch[0].length);
 
-      // Remove verse label spans like <span class="yv-vlbl">1</span>
       content = content.replace(/<span class="yv-vlbl">\d+<\/span>/g, "");
-
-      // Remove all HTML tags
-      content = content.replace(/<[^>]*>/g, "");
+      content = content.replace(/<[^>]*>/g, " ");
 
       // Decode HTML entities
       content = content
@@ -245,7 +245,7 @@ export class YouVersionHelper {
     const verses = this.parseVersesFromHtml(html);
 
     return verses.map(v => ({
-      translationKey: "YOUVERSION-" + translationKey,
+      translationKey: this.cacheKey(translationKey),
       verseKey: `${bookKey}.${chapterNumber}.${v.verseNumber}`,
       bookKey,
       chapterNumber,
