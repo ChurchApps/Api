@@ -3,6 +3,10 @@ name: Deploy Prod
 on:
   workflow_dispatch:
 
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
 env:
   SERVERLESS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
 

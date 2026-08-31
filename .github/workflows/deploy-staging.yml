@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
 env:
   SERVERLESS_ACCESS_KEY: ${{ secrets.STAGING_AWS_ACCESS_KEY_ID }}
 
