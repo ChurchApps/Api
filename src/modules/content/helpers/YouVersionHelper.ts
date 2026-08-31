@@ -278,12 +278,25 @@ export class YouVersionHelper {
     //return data;
   }
 
+  // Rate-limit circuit breaker: after an upstream 429, skip calls until the retry-after window clears so cache misses can't keep the limit pinned.
+  static blockedUntil = 0;
+
   static async getContent(url: string) {
+    if (Date.now() < this.blockedUntil) {
+      const err: any = new Error("YouVersion rate limit cooldown");
+      err.status = 429;
+      err.response = { status: 429 };
+      throw err;
+    }
     try {
       const resp = await axios.get(url, { headers: { "X-YVP-App-Key": Environment.youVersionApiKey } });
       return resp.data;
     } catch (error: any) {
       if (error.response) {
+        if (error.response.status === 429) {
+          const retryAfter = parseInt(error.response.headers?.["retry-after"], 10) || 300;
+          this.blockedUntil = Date.now() + retryAfter * 1000;
+        }
         console.log("YouVersion API error response:", JSON.stringify(error.response.data));
       }
       throw error;
