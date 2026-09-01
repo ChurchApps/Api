@@ -32,8 +32,7 @@ export class CommonsAssetController extends CommonsBaseController {
 
   @httpGet("/saved")
   public async saved(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const ids = await this.repos.rating.loadSavedAssetIds(au.id);
       const assets = (await this.repos.asset.loadByIds(ids)).filter((a) => a.status === "published");
       const byId = new Map(assets.map((a) => [a.id, a]));
@@ -43,8 +42,7 @@ export class CommonsAssetController extends CommonsBaseController {
 
   @httpGet("/mine")
   public async mine(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const assets = await this.repos.asset.loadByPublisher(au.id);
       const views = await this.publicViews(assets);
       for (const v of views) v.hasPendingSubmission = !!(await this.repos.submission.loadPendingForAsset(v.id || ""));
@@ -101,8 +99,7 @@ export class CommonsAssetController extends CommonsBaseController {
 
   @httpGet("/:id/editable")
   public async editable(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async () => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.status === "removed" || asset.status === "pending") return this.json({}, 404);
       return await PublishHelper.editablePayload(this.repos, asset);
@@ -137,8 +134,7 @@ export class CommonsAssetController extends CommonsBaseController {
   // authz-exempt: ratings are keyed by au.id, so a signed-in user can only write their own row
   @httpPut("/:id/rating")
   public async rate(req: express.Request<{ id: string }, {}, { stars?: number | null }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset) return this.json({}, 404);
       if (asset.publisherUserId === au.id) return this.json({ errors: ["You cannot rate your own asset"] }, 409);
@@ -153,8 +149,7 @@ export class CommonsAssetController extends CommonsBaseController {
   // authz-exempt: saves are keyed by au.id, so a signed-in user can only write their own row
   @httpPut("/:id/saved")
   public async save(req: express.Request<{ id: string }, {}, { saved?: boolean }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset) return this.json({}, 404);
       const saved = !!req.body.saved;
@@ -177,8 +172,7 @@ export class CommonsAssetController extends CommonsBaseController {
 
   // authz-exempt: publisher ownership check lives inside
   private ownVisibility(req: express.Request, res: express.Response, from: string, to: string) {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.publisherUserId !== au.id) return this.json({}, 404);
       if (asset.status !== from) return this.json({ errors: [`asset is ${asset.status}`] }, 400);

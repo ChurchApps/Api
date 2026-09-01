@@ -12,8 +12,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
   // authz-exempt: au.id required and ownership enforced in own()
   @httpPost("/")
   public async create(req: express.Request<{}, {}, { assetId?: string; assetType?: string; payload?: SubmissionPayload; note?: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const result = await SubmissionHelper.createDraft(this.repos, au, req.body || {});
       if (result.ok === false) return this.json({ errors: result.errors || [result.error] }, result.status);
       return { submissionId: result.value.submission.id, assetId: result.value.asset.id, status: "draft" };
@@ -22,8 +21,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
 
   @httpGet("/mine")
   public async mine(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const rows = await this.repos.submission.loadMine(au.id, req.query.status?.toString());
       return rows.map((r) => ({ ...r, isNewAsset: !r.publishedSubmissionId || r.publishedSubmissionId === r.id, isThirdParty: r.publisherUserId !== r.submittedBy }));
     });

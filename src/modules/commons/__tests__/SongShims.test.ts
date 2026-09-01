@@ -1,6 +1,14 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
-jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../controllers/CommonsBaseController", () => ({
+  CommonsBaseController: class {
+    json(obj: any, status: number) { return { obj, status }; }
+    // stands in for BaseController.actionWrapperAuth; the real one is covered in BaseControllerAuth.test.ts
+    actionWrapperAuth(req: any, res: any, fn: any) {
+      return (this as any).actionWrapper(req, res, async (au: any) => (au?.id ? fn(au) : (this as any).json({ errors: ["Sign in required"] }, 401)));
+    }
+  }
+}));
 jest.mock("../helpers/index", () => ({
   ChordProHelper: { slug: (t: string) => t, toCho: () => "cho", toLyrics: () => "txt" },
   ContentLibraryHelper: { fileUrls: () => ({}) },
