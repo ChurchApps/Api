@@ -287,6 +287,16 @@ export class BaseController extends CustomBaseController {
     });
   }
 
+  // A missing/invalid JWT still yields an AuthenticatedUser (built from an empty Principal), so
+  // routes that need a signed-in caller must reject on au.id rather than trust the wrapper.
+  // Delegates to actionWrapper so repo hydration and the audit pipeline still apply.
+  public actionWrapperAuth(req: express.Request, res: express.Response, action: (au: AuthenticatedUser) => Promise<any>) {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+      return await action(au);
+    });
+  }
+
   private async writeAuditRows(req: express.Request, au: AuthenticatedUser, ctx: AuditContext, payload: any, beforeImage: any, beforeImages?: Map<string, any>, batchId?: string) {
     if (!au.churchId) return;
     const { AuditLogHelper } = await import("../../modules/membership/helpers/AuditLogHelper.js");

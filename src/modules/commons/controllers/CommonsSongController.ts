@@ -37,8 +37,7 @@ export class CommonsSongController extends CommonsBaseController {
 
   @httpGet("/mine")
   public async mine(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       return await this.withUrls(await this.repos.song.loadBySubmitter(au.id));
     });
   }
@@ -46,8 +45,7 @@ export class CommonsSongController extends CommonsBaseController {
   // shim: the saved library is now GET /commons/assets/saved
   @httpGet("/library")
   public async library(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       return await this.withUrls(await this.repos.song.loadSaved(au.id));
     });
   }
@@ -68,8 +66,7 @@ export class CommonsSongController extends CommonsBaseController {
   // authz-exempt: au.id required; rows are created for the caller only
   @httpPost("/:id/abc")
   public async submitAbc(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
       const abc = typeof req.body?.abc === "string" ? req.body.abc.trim() : "";
@@ -158,8 +155,7 @@ export class CommonsSongController extends CommonsBaseController {
   }
 
   private setSaved(req: express.Request, res: express.Response, saved: boolean) {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.id) return this.json({ errors: ["Sign in required"] }, 401);
+    return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
       await this.repos.rating.setSaved(asset.id || "", au.id, saved);
