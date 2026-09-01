@@ -72,7 +72,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
             "groupJoinRequest",
             saved.id,
             `${requesterDisplay} requested to join ${group.name}`,
-            `/groups/${groupId}`,
+            `/mobile/groups/${groupId}`,
             au.personId
           );
         }
