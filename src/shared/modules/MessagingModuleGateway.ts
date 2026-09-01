@@ -15,6 +15,10 @@ export interface MessagingModuleGateway {
   loadNotificationsByPerson(churchId: string, personId: string): Promise<any[]>;
   loadNotificationPreferencesByPerson(churchId: string, personId: string): Promise<any[]>;
   loadPrivateMessagesByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadConnectionsByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadDeliveryLogsByPerson(churchId: string, personId: string): Promise<any[]>;
+  // Person notes are conversations; the caller passes the contentTypes it is allowed to read.
+  loadPersonNotes(churchId: string, personId: string, contentTypes: string[]): Promise<any[]>;
   createNotifications(notifications: any[]): Promise<any[]>;
   // Render a saved EmailTemplate and send through notification funnel; returns false if template missing or no email.
   sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
@@ -53,6 +57,26 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
 
   public async loadPrivateMessagesByPerson(churchId: string, personId: string) {
     return (await this.repos()).privateMessage.loadByPersonId(churchId, personId);
+  }
+
+  public async loadConnectionsByPerson(churchId: string, personId: string) {
+    // Lazy-load so importers of this gateway don't transitively pull Environment at module scope.
+    const { KyselyPool } = await import("../infrastructure/KyselyPool.js");
+    return KyselyPool.getDb<any>("messaging").selectFrom("connections").selectAll()
+      .where("churchId", "=", churchId)
+      .where("personId", "=", personId)
+      .execute();
+  }
+
+  public async loadDeliveryLogsByPerson(churchId: string, personId: string) {
+    return (await this.repos()).deliveryLog.loadByPerson(churchId, personId);
+  }
+
+  public async loadPersonNotes(churchId: string, personId: string, contentTypes: string[]) {
+    if (contentTypes.length === 0) return [];
+    const repos = await this.repos();
+    const conversations = (await Promise.all(contentTypes.map((ct) => repos.conversation.loadForContent(churchId, ct, personId)))).flat();
+    return Promise.all(conversations.map(async (c: any) => ({ ...c, messages: await repos.message.loadForConversation(churchId, c.id) })));
   }
 
   public async createNotifications(notifications: any[]) {

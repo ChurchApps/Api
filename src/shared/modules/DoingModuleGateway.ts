@@ -3,6 +3,8 @@ import { RepoManager } from "../infrastructure/RepoManager.js";
 // Gateway: the only seam through which other modules read doing data.
 export interface DoingModuleGateway {
   loadAssignmentsByPerson(churchId: string, personId: string): Promise<any[]>;
+  // Tasks the person is assigned or created, any status.
+  loadTasksByPerson(churchId: string, personId: string): Promise<any[]>;
   loadBlockoutDatesByPerson(churchId: string, personId: string): Promise<any[]>;
   loadUnconfirmedAssignments(): Promise<any[]>;
   loadPosition(churchId: string, positionId: string): Promise<any | null>;
@@ -23,6 +25,15 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
 
   public async loadAssignmentsByPerson(churchId: string, personId: string) {
     return (await this.repos()).assignment.loadByByPersonId(churchId, personId);
+  }
+
+  public async loadTasksByPerson(churchId: string, personId: string) {
+    // Lazy-load so importers of this gateway don't transitively pull Environment at module scope.
+    const { KyselyPool } = await import("../infrastructure/KyselyPool.js");
+    return KyselyPool.getDb<any>("doing").selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where((eb: any) => eb.or([eb("assignedToId", "=", personId), eb("createdById", "=", personId)]))
+      .execute();
   }
 
   public async loadBlockoutDatesByPerson(churchId: string, personId: string) {

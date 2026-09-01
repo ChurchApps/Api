@@ -14,7 +14,8 @@ export class GdprController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.denyAccess(["Access denied"]);
       const personId = req.params.personId;
-      return GdprExportHelper.exportPersonData(au.churchId, personId, this.repos);
+      const includeConfidentialNotes = au.checkAccess(Permissions.people.viewConfidentialNotes);
+      return GdprExportHelper.exportPersonData(au.churchId, personId, this.repos, { includeConfidentialNotes });
     });
   }
 
