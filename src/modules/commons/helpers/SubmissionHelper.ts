@@ -4,6 +4,7 @@ import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index
 import { Repos } from "../repositories/Repos.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
+import { MusicHelper } from "./MusicHelper.js";
 import { QualityHelper } from "./QualityHelper.js";
 import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, normalizeTags, resultingFileNames, validateSubmission } from "./SubmitValidation.js";
 
@@ -114,6 +115,11 @@ export class SubmissionHelper {
         }
         if (qualityDetail) payload.qualityDetail = qualityDetail;
       }
+      const keyNotes = await this.keyNotes(sub.id || "", proposed, payload);
+      if (keyNotes.length) {
+        const detail = (payload.qualityDetail && typeof payload.qualityDetail === "object" ? payload.qualityDetail : (payload.qualityDetail = {})) as { notes?: string };
+        detail.notes = [detail.notes, ...keyNotes].filter(Boolean).join("; ");
+      }
     }
     sub.payload = payload;
     await repos.submission.update(sub.id || "", { payload });
@@ -125,5 +131,30 @@ export class SubmissionHelper {
     }
     void CommonsMailHelper.notifyReceived(sub).catch((e) => console.error("[CommonsMailHelper] received failed:", e));
     return { ok: true, value: { status: "pending" } };
+  }
+
+  /** Advisory reviewer notes when an uploaded tune's key disagrees with the stated key. Never blocks. */
+  private static async keyNotes(submissionId: string, proposed: AssetFile[], payload: SubmissionPayload): Promise<string[]> {
+    const names = proposed.filter((f) => f.action !== "remove").map((f) => f.name || "");
+    if (!names.includes("tune.mid") && !names.includes("tune.abc")) return [];
+    const detail = payload.detail || {};
+    const songRoot = MusicHelper.keyRoot(detail.songKey || "");
+    const chartRoot = MusicHelper.chordProKeyRoot(detail.chordPro || "") || songRoot;
+    const notes: string[] = [];
+    try {
+      if (names.includes("tune.mid") && songRoot) {
+        const file = await ContentLibraryHelper.readPending(submissionId, "tune.mid");
+        const midiRoot = file ? MusicHelper.midiKeyRoot(file.buffer) : "";
+        if (midiRoot && !MusicHelper.sameRoot(midiRoot, songRoot)) notes.push(`MIDI sounds like ${midiRoot}, song key is ${songRoot}`);
+      }
+      if (names.includes("tune.abc") && chartRoot) {
+        const file = await ContentLibraryHelper.readPending(submissionId, "tune.abc");
+        const abcRoot = file ? MusicHelper.abcKeyRoot(file.buffer.toString("utf8")) : "";
+        if (abcRoot && !MusicHelper.sameRoot(abcRoot, chartRoot)) notes.push(`ABC is in ${abcRoot}, chart key is ${chartRoot}`);
+      }
+    } catch (e) {
+      console.error("[SubmissionHelper] key check failed", submissionId, e);
+    }
+    return notes;
   }
 }

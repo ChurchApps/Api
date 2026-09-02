@@ -7,7 +7,8 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
     exists: jest.fn(async () => true),
     removeKey: jest.fn(async () => {}),
     contentTypeFor: () => "application/octet-stream",
-    sha256: () => "hash"
+    sha256: () => "hash",
+    readPending: jest.fn(async () => null)
   }
 }));
 jest.mock("../helpers/QualityHelper", () => ({ QualityHelper: { score: jest.fn(async () => ({ qualityScore: 21, qualityDetail: JSON.stringify({ heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" }) })) } }));
@@ -181,5 +182,74 @@ describe("SubmissionHelper.submit", () => {
 
   it("refuses anything that is not a draft", async () => {
     expect((await SubmissionHelper.submit(repos(), { ...draft(), status: "pending" }, asset) as any).status).toBe(400);
+  });
+});
+
+describe("SubmissionHelper key checks", () => {
+  beforeEach(() => jest.clearAllMocks());
+  const asset: any = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
+  const baseNotes = "completeness heuristic only — not an AI judgment";
+
+  // C major scale as a one-track format-0 SMF
+  function midi(): Buffer {
+    const events: number[] = [];
+    for (const n of [
+      60, 62, 64, 65, 67, 69, 71, 72
+    ]) events.push(0x00, 0x90, n, 0x40, 0x60, 0x80, n, 0x00);
+    events.push(0x00, 0xff, 0x2f, 0x00);
+    const track = Buffer.from(events);
+    const head = Buffer.alloc(14);
+    head.write("MThd", 0, "latin1");
+    head.writeUInt32BE(6, 4);
+    head.writeUInt16BE(0, 8);
+    head.writeUInt16BE(1, 10);
+    head.writeUInt16BE(480, 12);
+    const chunk = Buffer.alloc(8);
+    chunk.write("MTrk", 0, "latin1");
+    chunk.writeUInt32BE(track.length, 4);
+    return Buffer.concat([head, chunk, track]);
+  }
+
+  const pending = (files: Record<string, Buffer>) =>
+    (ContentLibraryHelper.readPending as jest.Mock).mockImplementation(async (_id: string, name: string) =>
+      files[name] ? { buffer: files[name], contentType: "application/octet-stream" } : null);
+
+  function submitWith(names: string[], detail: any) {
+    const r = repos({ assetFile: { loadBySubmission: jest.fn(async () => names.map((name) => ({ name, sizeBytes: 100, action: "add" }))) } });
+    const sub: any = { id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload: { ...payload, detail: { writer: "Anon", certified: true, ...detail } } };
+    return SubmissionHelper.submit(r, sub, asset).then((result) => ({ result, notes: r.submission.update.mock.calls[0]?.[1].payload.qualityDetail.notes }));
+  }
+
+  it("notes a MIDI whose estimated key disagrees with songKey", async () => {
+    pending({ "tune.mid": midi() });
+    const { result, notes } = await submitWith(["tune.mid"], { chordPro: "Verse 1\n[D]Sing", songKey: "D" });
+    expect(result).toEqual({ ok: true, value: { status: "pending" } });
+    expect(notes).toBe(`${baseNotes}; MIDI sounds like C, song key is D`);
+  });
+
+  it("notes an ABC whose K: header disagrees with the ChordPro {key:}", async () => {
+    pending({ "tune.abc": Buffer.from("X:1\nT:Hymn\nK:G\nGABc|") });
+    const { notes } = await submitWith(["tune.abc"], { chordPro: "{key: A}\n\nVerse 1\n[A]Sing", songKey: "D" });
+    expect(notes).toBe(`${baseNotes}; ABC is in G, chart key is A`);
+  });
+
+  it("falls back to songKey when the ChordPro declares no key, and stays silent when the keys agree", async () => {
+    pending({ "tune.mid": midi(), "tune.abc": Buffer.from("X:1\nK:C\n") });
+    const { notes } = await submitWith(["tune.mid", "tune.abc"], { chordPro: "Verse 1\n[C]Sing", songKey: "C" });
+    expect(notes).toBe(baseNotes);
+  });
+
+  it("never blocks: an unreadable tune, a missing object or a missing key just produce no note", async () => {
+    pending({ "tune.mid": Buffer.from("junk") });
+    expect((await submitWith(["tune.mid"], { chordPro: "[D]x", songKey: "D" })).notes).toBe(baseNotes);
+    pending({});
+    expect((await submitWith(["tune.abc"], { chordPro: "[D]x", songKey: "D" })).notes).toBe(baseNotes);
+    pending({ "tune.mid": midi() });
+    expect((await submitWith(["tune.mid"], { chordPro: "[D]x" })).notes).toBe(baseNotes);
+  });
+
+  it("does not read pending objects when no tune was submitted", async () => {
+    await submitWith(["demoAudio.mp3"], { chordPro: "[D]x", songKey: "D", recordingOwned: true });
+    expect(ContentLibraryHelper.readPending).not.toHaveBeenCalled();
   });
 });
