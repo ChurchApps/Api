@@ -136,7 +136,8 @@ export class SubmissionRepo {
   }
 
   private joined() {
-    return getDb().selectFrom("submissions").innerJoin("assets", "assets.id", "submissions.assetId")
+    // left join: rejecting a never-published song deletes its asset, and the writer still needs to see that row on /my-songs
+    return getDb().selectFrom("submissions").leftJoin("assets", "assets.id", "submissions.assetId")
       .select([
         "submissions.id",
         "submissions.assetId",
@@ -153,7 +154,7 @@ export class SubmissionRepo {
         "submissions.createdAt",
         "submissions.submittedAt",
         "assets.assetType as assetType",
-        "assets.name as assetName",
+        sql<string>`coalesce(assets.name, json_unquote(json_extract(submissions.payload, '$.name')))`.as("assetName"),
         "assets.status as assetStatus",
         "assets.publisherUserId as publisherUserId",
         "assets.publishedSubmissionId as publishedSubmissionId"
