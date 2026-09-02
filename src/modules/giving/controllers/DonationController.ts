@@ -6,19 +6,6 @@ import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 @controller("/giving/donations")
 export class DonationController extends GivingBaseController {
-  @httpGet("/kpis")
-  public async getKpis(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
-      else {
-        const startDate = req.query.startDate ? new Date(req.query.startDate.toString()) : new Date(2000, 1, 1);
-        const endDate = req.query.endDate ? new Date(req.query.endDate.toString()) : new Date();
-        const fundId = req.query.fundId?.toString() || "";
-        const result = await this.repos.donation.loadDashboardKpis(au.churchId, startDate, endDate, fundId || undefined);
-        return result || { totalGiving: 0, avgGift: 0, donorCount: 0, donationCount: 0 };
-      }
-    });
-  }
 
   @httpGet("/summary")
   public async getSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
@@ -69,6 +56,22 @@ export class DonationController extends GivingBaseController {
         else if (personId) result = await this.repos.donation.loadByPersonId(au.churchId, personId);
         else result = await this.repos.donation.loadAll(au.churchId);
         return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);
+      }
+    });
+  }
+
+  @httpPost("/kpis")
+  public async sendkpis (req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
+      else {
+        const startDate = req.body.startDate ? new Date(req.body.startDate.toString()) : new Date(2000, 1, 1);
+        const endDate = req.body.endDate ? new Date(req.body.endDate.toString()) : new Date();
+        const fundId = req.body?.fundId ? req.body.fundId.toString() : "";
+        const currency = req.body?.currency ? req.body.currency.toString() : "usd";
+        const rates = req.body.rates ? req.body.rates: {};
+        const result = await this.repos.donation.loadDashboardKpis(au.churchId, startDate, endDate, fundId || undefined, currency, rates);
+        return result || { totalGiving: 0, avgGift: 0, donorCount: 0, donationCount: 0 };
       }
     });
   }
