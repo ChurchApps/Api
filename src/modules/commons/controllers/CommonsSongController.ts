@@ -1,7 +1,7 @@
 import { controller, httpDelete, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { ChordProHelper, ContentLibraryHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
+import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 import { SongView } from "../models/index.js";
 
@@ -33,6 +33,16 @@ export class CommonsSongController extends CommonsBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => await this.withUrls(await this.repos.song.loadPublishedSummaries()));
+  }
+
+  // public: a writer about to submit deserves to know the song is already here, before signing in
+  @httpGet("/similar")
+  public async similar(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const query = { title: String(req.query.title || ""), writer: String(req.query.writer || ""), firstLine: String(req.query.firstLine || "") };
+      if (!query.title.trim() && !query.firstLine.trim()) return [];
+      return DuplicateHelper.matches(query, await this.repos.song.loadPublishedForDuplicates());
+    });
   }
 
   @httpGet("/mine")

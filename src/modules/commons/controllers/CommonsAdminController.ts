@@ -3,7 +3,7 @@ import express from "express";
 import { ASSET_TYPES, COMMONS_PRODUCT_LABELS } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
-import { CommonsMailHelper, ContentLibraryHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
+import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 
 const REJECT_REASONS = ["quality", "duplicate", "licensing", "ccli", "offtopic", "incomplete", "other"];
@@ -26,16 +26,6 @@ function submissionPreviewUrl(hasPreview: boolean, submissionId: string): string
 }
 
 const RIGHTS_RE = /GEMA|PRS|publisher|licensing admin/i;
-
-function foldName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function similarName(a: string, b: string): boolean {
-  const x = foldName(a), y = foldName(b);
-  if (!x || !y) return false;
-  return x === y || (x.length >= 8 && y.length >= 8 && (x.startsWith(y) || y.startsWith(x)));
-}
 
 @controller("/commons/admin")
 export class CommonsAdminController extends CommonsBaseController {
@@ -63,6 +53,8 @@ export class CommonsAdminController extends CommonsBaseController {
       let rows = await this.repos.submission.loadQueue({ status: req.query.status?.toString() || "pending", assetType: req.query.assetType?.toString(), page: Number(req.query.page) || 1 });
       if (product) rows = rows.filter((r) => ASSET_TYPES[r.assetType || ""]?.product === product);
       const names = await userNames(rows.flatMap((r) => [r.submittedBy, r.publisherUserId]));
+      // the published library, once, so a duplicate is caught even when a different writer sent the original
+      const library = rows.length ? await this.repos.song.loadPublishedForDuplicates() : [];
       const stats: Record<string, { total: number; approved: number }> = {};
       const titles: Record<string, { assetId: string; name: string }[]> = {};
       const out = [];
@@ -87,7 +79,8 @@ export class CommonsAdminController extends CommonsBaseController {
           payload: undefined,
           qualityDetail: parseQualityDetail(r.payload?.qualityDetail),
           rightsFlag: RIGHTS_RE.test(String(r.payload?.detail?.proAnswer || "")),
-          possibleDuplicate: titles[userId].some((t) => t.assetId !== (r.assetId || "") && similarName(title, t.name)),
+          possibleDuplicate: titles[userId].some((t) => t.assetId !== (r.assetId || "") && DuplicateHelper.similarName(title, t.name))
+            || (r.assetType === "song" && DuplicateHelper.matches({ title, writer: r.payload?.detail?.writer, firstLine: DuplicateHelper.firstLine(r.payload?.detail?.chordPro || "") }, library.filter((s) => s.id !== (r.assetId || "")), 1).length > 0),
           typeLabel: def?.label || r.assetType,
           product: def?.product,
           productLabel: def ? COMMONS_PRODUCT_LABELS[def.product] : undefined,

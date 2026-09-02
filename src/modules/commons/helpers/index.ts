@@ -1,6 +1,7 @@
 export { ChordProHelper } from "./ChordProHelper.js";
 export { CommonsMailHelper } from "./CommonsMailHelper.js";
 export { ContentLibraryHelper, type PresignedUpload } from "./ContentLibraryHelper.js";
+export { DuplicateHelper, type DuplicateMatch, type DuplicateQuery } from "./DuplicateHelper.js";
 export { recordAssetDownload } from "./DownloadHelper.js";
 export { MaintenanceHelper } from "./MaintenanceHelper.js";
 export { MusicHelper } from "./MusicHelper.js";

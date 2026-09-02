@@ -1,4 +1,5 @@
 import { injectable } from "inversify";
+import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { Song, SongView } from "../models/index.js";
 
@@ -59,6 +60,13 @@ export class SongRepo {
   public async loadPublishedSummaries(): Promise<SongView[]> {
     return await this.joined().select(SUMMARY_COLS).where("assets.status", "=", "published")
       .orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
+  }
+
+  /** id/title/writer plus enough of chordPro to read its first line — the duplicate check's whole corpus. */
+  public async loadPublishedForDuplicates(): Promise<SongView[]> {
+    return await this.joined()
+      .select(["assets.id as id", "assets.name as title", "authors.name as writer", sql<string>`substring(songs.chordPro, 1, 500)`.as("chordPro")])
+      .where("assets.status", "=", "published").execute() as SongView[];
   }
 
   public async loadPublishedByAuthor(authorId: string): Promise<SongView[]> {
