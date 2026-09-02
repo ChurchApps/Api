@@ -20,11 +20,18 @@ export interface Song {
   qualityDetail?: string;
 }
 
+export interface AuthorLink {
+  label?: string;
+  url?: string;
+}
+
 export interface Author {
   id?: string;
   name?: string;
   bio?: string;
   portraitUrl?: string;
+  userId?: string;
+  links?: string;
   createdAt?: Date;
 }
 
