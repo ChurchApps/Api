@@ -6,6 +6,7 @@ export interface Song {
   songKey?: string;
   bpm?: number;
   timeSignature?: string;
+  meter?: string;
   scripture?: string;
   scriptureText?: string;
   hymnalCount?: number;
