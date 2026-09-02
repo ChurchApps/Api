@@ -8,9 +8,9 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 // approved "Imported" submission so every asset starts with a non-empty history. Media is
 // copied into the id-keyed live folder commons/assets/song/{id}/{name} ("copies").
 
-const SONG_COLS = ["year", "songKey", "bpm", "timeSignature", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer", "certified"];
+const SONG_COLS = ["year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer", "certified"];
 const FILE_COLS = ["artUrl", "midiUrl", "lyricsUrl", "abcUrl", "demoAudioUrl", "sheetPdfUrl", "stemsZipUrl"];
-const DETAIL_COLS = ["year", "songKey", "bpm", "timeSignature", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"];
+const DETAIL_COLS = ["year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"];
 
 /** Directories of the content repo that are mirrored as-is into the commons content store. */
 export const MIRRORED_DIRS = ["writers"];

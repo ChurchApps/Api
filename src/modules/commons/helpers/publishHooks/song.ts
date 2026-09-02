@@ -3,7 +3,7 @@ import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
 import type { PublishHook } from "./index.js";
 
 const SONG_FIELDS = [
-  "year", "songKey", "bpm", "timeSignature", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"
+  "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"
 ] as const;
 
 // The one type with a satellite: WorshipCommons facets on key/tempo/scripture, and the content

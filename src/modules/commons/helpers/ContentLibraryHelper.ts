@@ -68,6 +68,7 @@ export class ContentLibraryHelper {
       key: song.songKey,
       bpm: song.bpm,
       timeSignature: song.timeSignature,
+      meter: song.meter,
       language: song.language,
       scripture: song.scripture,
       license: song.license,
