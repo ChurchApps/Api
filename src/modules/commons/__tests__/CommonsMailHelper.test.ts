@@ -76,6 +76,14 @@ describe("CommonsMailHelper writer emails", () => {
     expect(body).not.toContain("needs a chorus");
   });
 
+  it("points a ccli rejection at a SongSelect search for the title", async () => {
+    await CommonsMailHelper.notifyRejected(sub(), "ccli");
+    const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
+    expect(body).toContain("CCLI catalog");
+    expect(body).toContain("https://songselect.ccli.com/search/results?SearchText=New%20Hymn");
+    expect(body).not.toContain("{songselect}");
+  });
+
   it("skips the email when the writer has no address", async () => {
     loadByIds.mockResolvedValueOnce([{ id: "user0000001" }]);
     await CommonsMailHelper.notifyReceived(sub());

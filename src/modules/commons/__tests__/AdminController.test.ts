@@ -88,6 +88,12 @@ describe("admin submissions", () => {
     expect(PublishHelper.reject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), "admin000001", "quality", "needs a bridge");
   });
 
+  it("accepts ccli as a reject reason", async () => {
+    const { controller } = adminController();
+    expect(await controller.reject(req({ reason: "ccli", note: "in the CCLI catalog" }), {} as any)).toEqual({ status: "rejected" });
+    expect(PublishHelper.reject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), "admin000001", "ccli", "in the CCLI catalog");
+  });
+
   it("detail carries the diff, signed pending urls, third-party badge and a token-bearing preview url", async () => {
     const { controller } = adminController();
     const detail: any = await controller.submission(req(), {} as any);
