@@ -1,7 +1,7 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { ipHash } from "../helpers/index.js";
+import { CommonsMailHelper, ipHash } from "../helpers/index.js";
 import { Report } from "../models/index.js";
 
 const REASONS = ["copyright", "policy", "quality", "other"];
@@ -42,6 +42,7 @@ export class CommonsReportController extends CommonsBaseController {
         email: b.email || au.email || undefined,
         signature: b.signature
       });
+      void CommonsMailHelper.notifyReportReceived(report).catch((e) => console.error("[CommonsMailHelper] report received failed:", e));
       return { id: report.id };
     });
   }

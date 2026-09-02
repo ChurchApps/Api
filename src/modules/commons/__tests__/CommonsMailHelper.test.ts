@@ -134,3 +134,86 @@ describe("CommonsMailHelper.notifyReviewerDigest", () => {
     expect(TransactionalEmailHelper.sendTransactional).not.toHaveBeenCalled();
   });
 });
+
+describe("CommonsMailHelper report emails", () => {
+  const report = (over: any = {}): any => ({ id: "rep00000001", contentText: "Old Hymn", reason: "copyright", email: "reporter@example.com", ...over });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    loadByIds.mockResolvedValue([{ id: "owner000001", email: "publisher@example.com" }]);
+  });
+
+  it("acknowledges the reporter at the raw address on the report, with no user lookup", async () => {
+    await CommonsMailHelper.notifyReportReceived(report());
+    expect(RepoManager.getRepos).not.toHaveBeenCalled();
+    const [from, to, app, url, subject, body] = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0];
+    expect(from).toBe("support@churchapps.org");
+    expect(to).toBe("reporter@example.com");
+    expect(app).toBe("WorshipCommons");
+    expect(url).toBe("https://worshipcommons.org");
+    expect(subject).toBe("We received your report (rep00000001)");
+    expect(body).toContain("Old Hymn");
+    expect(body).toContain("rep00000001");
+    expect(body).toContain("support@churchapps.org");
+  });
+
+  it("falls back to generic wording when the report has no content text", async () => {
+    await CommonsMailHelper.notifyReportReceived(report({ contentText: "  " }));
+    const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
+    expect(body).toContain("the content you reported");
+  });
+
+  it.each([
+    ["upheld", "agreed with your report"],
+    ["dismissed", "no action was needed"],
+    ["duplicate", "already received this report"]
+  ])("tells the reporter the %s outcome", async (resolution, snippet) => {
+    await CommonsMailHelper.notifyReportResolved(report({ resolutionNote: "removed at the writer's request" }), resolution);
+    const [, to, , , subject, body] = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0];
+    expect(to).toBe("reporter@example.com");
+    expect(subject).toBe("Your report (rep00000001) is resolved");
+    expect(body).toContain(snippet);
+    expect(body).toContain("removed at the writer's request");
+  });
+
+  it("omits an empty resolution note", async () => {
+    await CommonsMailHelper.notifyReportResolved(report({ resolutionNote: "   " }), "dismissed");
+    const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
+    expect(body).toContain("rep00000001");
+    expect(body).not.toContain("<p>   </p>");
+  });
+
+  it.each(["notifyReportReceived", "notifyReportResolved"])("skips %s when the report has no email", async (method) => {
+    await (CommonsMailHelper as any)[method](report({ email: undefined }), "upheld");
+    expect(TransactionalEmailHelper.sendTransactional).not.toHaveBeenCalled();
+  });
+
+  it("emails the publisher when a report takes their song down", async () => {
+    await CommonsMailHelper.notifyTakedown({ id: "asset000001", name: "Old Hymn", publisherUserId: "owner000001" }, report());
+    expect(loadByIds).toHaveBeenCalledWith(["owner000001"]);
+    const [, to, , , subject, body] = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0];
+    expect(to).toBe("publisher@example.com");
+    expect(subject).toBe("Old Hymn was taken down from WorshipCommons");
+    expect(body).toContain("a copyright report");
+    expect(body).toContain("counter-notice");
+  });
+
+  it("names a policy report in the takedown notice", async () => {
+    await CommonsMailHelper.notifyTakedown({ id: "asset000001", name: "Old Hymn", publisherUserId: "owner000001" }, report({ reason: "policy" }));
+    const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
+    expect(body).toContain("a policy report");
+  });
+
+  it("skips the takedown notice when the asset has no publisher", async () => {
+    await CommonsMailHelper.notifyTakedown({ id: "asset000001", name: "Old Hymn" }, report());
+    expect(TransactionalEmailHelper.sendTransactional).not.toHaveBeenCalled();
+  });
+
+  it("does not fail the caller when a report email throws", async () => {
+    const err = jest.spyOn(console, "error").mockImplementation(() => {});
+    sendTransactional.mockRejectedValueOnce(new Error("ses down"));
+    await expect(CommonsMailHelper.notifyReportReceived(report())).resolves.toBeUndefined();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+});

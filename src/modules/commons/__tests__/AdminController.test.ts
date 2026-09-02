@@ -5,7 +5,10 @@ jest.mock("../../../shared/helpers/index", () => ({
   Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } },
   Environment: { worshipCommonsRoot: "http://localhost:3104" }
 }));
+const notifyTakedown = jest.fn(async () => {});
+const notifyReportResolved = jest.fn(async () => {});
 jest.mock("../helpers/index", () => ({
+  CommonsMailHelper: { notifyTakedown, notifyReportResolved },
   ContentLibraryHelper: {
     requestApiBase: () => "http://api",
     signedPendingUrl: jest.fn(async (id: string, name: string) => `signed:${id}/${name}`),
@@ -173,6 +176,28 @@ describe("admin reports and assets", () => {
     expect(await controller.resolve(req({ resolution: "upheld", note: "confirmed", action: "remove" }, "rep00000001"), {} as any)).toEqual({ status: "resolved" });
     expect(PublishHelper.remove).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "asset000001" }), "copyright");
     expect(repos.report.update).toHaveBeenCalledWith("rep00000001", expect.objectContaining({ status: "resolved", resolution: "upheld", resolutionNote: "confirmed" }));
+  });
+
+  it("emails the publisher and the reporter when a report takes the song down", async () => {
+    const { controller, repos } = adminController({ report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open", email: "reporter@example.com" })) } });
+    await controller.resolve(req({ resolution: "upheld", note: "confirmed", action: "unpublish" }, "rep00000001"), {} as any);
+    expect(repos.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ status: "unpublished" }));
+    expect(notifyTakedown).toHaveBeenCalledWith(expect.objectContaining({ id: "asset000001" }), expect.objectContaining({ id: "rep00000001" }));
+    expect(notifyReportResolved).toHaveBeenCalledWith(expect.objectContaining({ email: "reporter@example.com", resolutionNote: "confirmed" }), "upheld");
+  });
+
+  it("emails only the reporter when nothing is taken down", async () => {
+    const { controller } = adminController();
+    await controller.resolve(req({ resolution: "dismissed", note: "no issue", action: "none" }, "rep00000001"), {} as any);
+    expect(notifyTakedown).not.toHaveBeenCalled();
+    expect(notifyReportResolved).toHaveBeenCalledWith(expect.objectContaining({ resolutionNote: "no issue" }), "dismissed");
+  });
+
+  it("sends nothing when the resolution is refused", async () => {
+    const { controller } = adminController();
+    expect((await controller.resolve(req({ resolution: "maybe", action: "none" }, "rep00000001"), {} as any) as any).status).toBe(400);
+    expect(notifyReportResolved).not.toHaveBeenCalled();
+    expect(notifyTakedown).not.toHaveBeenCalled();
   });
 
   it("dismissed with action=none leaves the asset alone; unknown resolutions are refused", async () => {
