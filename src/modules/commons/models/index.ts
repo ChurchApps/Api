@@ -31,6 +31,8 @@ export interface Author {
 /** Satellite joined to its asset and author, aliased back to the legacy song field names the site consumes. */
 export interface SongView extends Song {
   id?: string;
+  /** Opaque popularity/quality blend computed in SQL; the public song payloads sort on this instead of qualityScore. */
+  rank?: number;
   title?: string;
   themes?: string;
   language?: string;

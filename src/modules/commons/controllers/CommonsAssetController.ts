@@ -64,7 +64,7 @@ export class CommonsAssetController extends CommonsBaseController {
       if (asset.assetType === "song") {
         const s = await this.repos.song.loadSatellite(asset.id || "");
         if (s) {
-          const { qualityDetail: _q, proAnswer: _p, ...detail } = s;
+          const { qualityDetail: _q, proAnswer: _p, qualityScore: _qs, ...detail } = s;
           view.detail = detail;
         }
       }
