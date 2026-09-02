@@ -36,9 +36,12 @@ const SUMMARY_SONG_COLS = [
   "songs.scripture",
   "songs.hymnalCount",
   "songs.parentSongId",
-  "songs.relationLabel",
-  "songs.qualityScore"
+  "songs.relationLabel"
 ] as const;
+
+// Popularity dominates, moderation quality is a kicker; unscored songs sit at a neutral 50.
+// Rounded to an opaque integer so the reviewer-only qualityScore cannot be read back out of it.
+const RANK_COL = sql<number>`cast(round(assets.downloadCount / greatest(1, (select max(maxDl.downloadCount) from assets maxDl where maxDl.status = 'published')) * 60 + coalesce(songs.qualityScore, 50) / 100 * 40) as signed)`.as("rank");
 
 const SONG_COLS = [
   ...SUMMARY_SONG_COLS,
@@ -49,17 +52,18 @@ const SONG_COLS = [
   "songs.videoUrl",
   "songs.certified",
   "songs.proAnswer",
+  "songs.qualityScore",
   "songs.qualityDetail"
 ] as const;
 
-const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS] as const;
-const FULL_COLS = [...MODERATION_SPINE_COLS, ...AUTHOR_COLS, ...SONG_COLS] as const;
+const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS, RANK_COL];
+const FULL_COLS = [...MODERATION_SPINE_COLS, ...AUTHOR_COLS, ...SONG_COLS, RANK_COL];
 
 @injectable()
 export class SongRepo {
   public async loadPublishedSummaries(): Promise<SongView[]> {
     return await this.joined().select(SUMMARY_COLS).where("assets.status", "=", "published")
-      .orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
+      .orderBy(sql.ref("rank"), "desc").orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
   }
 
   /** id/title/writer plus enough of chordPro to read its first line — the duplicate check's whole corpus. */

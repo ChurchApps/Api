@@ -3,6 +3,7 @@ jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers")
 jest.mock("../controllers/CommonsBaseController", () => ({
   CommonsBaseController: class {
     json(obj: any, status: number) { return { obj, status }; }
+    actionWrapperAnon(_req: any, _res: any, fn: any) { return fn(); }
     // stands in for BaseController.actionWrapperAuth; the real one is covered in BaseControllerAuth.test.ts
     actionWrapperAuth(req: any, res: any, fn: any) {
       return (this as any).actionWrapper(req, res, async (au: any) => (au?.id ? fn(au) : (this as any).json({ errors: ["Sign in required"] }, 401)));
@@ -29,7 +30,12 @@ function songController(signedIn = true) {
     submission: { delete: jest.fn(async () => {}) },
     assetFile: { deleteBySubmission: jest.fn(async () => {}), loadLiveMany: jest.fn(async () => ({})) },
     rating: { setSaved: jest.fn(async () => {}) },
-    song: { loadById: jest.fn(async () => ({ id: "asset000009", title: "Old Hymn", writer: "Anon", chordPro: "[C]x", license: "PD", language: "English" })) }
+    song: {
+      loadById: jest.fn(async () => ({ id: "asset000009", title: "Old Hymn", writer: "Anon", chordPro: "[C]x", license: "PD", language: "English", status: "published", rank: 71, qualityScore: 88, qualityDetail: "{}", proAnswer: "no" })),
+      loadPublishedSummaries: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
+      loadBySubmitter: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
+      loadSaved: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }])
+    }
   };
   const au = signedIn ? { id: "user0000001", churchId: "church00001", checkAccess: () => false } : { checkAccess: () => false };
   const controller = new CommonsSongController();
@@ -75,6 +81,25 @@ describe("legacy song shims", () => {
     expect(await controller.removeFromLibrary({ params: { id: "asset000009" } } as any, {} as any)).toEqual({ inLibrary: false });
     expect(repos.rating.setSaved).toHaveBeenCalledWith("asset000009", "user0000001", true);
     expect(repos.rating.setSaved).toHaveBeenCalledWith("asset000009", "user0000001", false);
+  });
+
+  it("the public list, mine and library payloads carry rank and never qualityScore", async () => {
+    const { controller } = songController();
+    const payloads: any[] = [await controller.getAll({} as any, {} as any), await controller.mine({} as any, {} as any), await controller.library({} as any, {} as any)];
+    for (const rows of payloads) {
+      expect(rows).toHaveLength(1);
+      expect(rows[0].rank).toBe(71);
+      expect(rows[0]).not.toHaveProperty("qualityScore");
+    }
+  });
+
+  it("GET /songs/:id carries rank and strips the reviewer-only fields", async () => {
+    const { controller } = songController();
+    const song: any = await controller.get({ params: { id: "asset000009" } } as any, {} as any);
+    expect(song.rank).toBe(71);
+    expect(song).not.toHaveProperty("qualityScore");
+    expect(song).not.toHaveProperty("qualityDetail");
+    expect(song).not.toHaveProperty("proAnswer");
   });
 
   it("every shim requires a signed-in user", async () => {

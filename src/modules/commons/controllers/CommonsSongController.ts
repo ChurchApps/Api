@@ -101,7 +101,7 @@ export class CommonsSongController extends CommonsBaseController {
       const song = await this.repos.song.loadById(String(req.params.id));
       if (!song || song.status !== "published") return this.json({}, 404);
       const [view] = await this.withUrls([song]);
-      const { proAnswer: _proAnswer, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = view as any;
+      const { proAnswer: _proAnswer, qualityScore: _qualityScore, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = view as any;
       return pub;
     });
   }
@@ -181,7 +181,8 @@ export class CommonsSongController extends CommonsBaseController {
   private async withUrls(songs: SongView[]): Promise<SongView[]> {
     const files = await this.repos.assetFile.loadLiveMany(songs.map((s) => s.id || ""));
     return songs.map((s) => {
-      const { portraitKey, ...rest } = s;
+      // qualityScore is reviewer-only: it never leaves an anonymous endpoint, only the opaque rank does
+      const { portraitKey, qualityScore: _qualityScore, ...rest } = s;
       return { ...rest, fileUrls: ContentLibraryHelper.fileUrls({ assetType: "song", id: s.id }, files[s.id || ""] || [], portraitKey) };
     });
   }
