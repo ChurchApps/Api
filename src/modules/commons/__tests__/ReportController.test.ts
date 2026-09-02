@@ -1,6 +1,7 @@
 import "reflect-metadata";
 jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../helpers/index", () => ({ ipHash: jest.fn(() => "ip-unique") }));
+const notifyReportReceived = jest.fn(async () => {});
+jest.mock("../helpers/index", () => ({ ipHash: jest.fn(() => "ip-unique"), CommonsMailHelper: { notifyReportReceived } }));
 
 import { CommonsReportController } from "../controllers/CommonsReportController.js";
 import { ipHash } from "../helpers/index.js";
@@ -51,6 +52,15 @@ describe("CommonsReportController.create", () => {
     await controller.create({ body: { reporterRole: "writer", assetId: "asset000001", details: "z", reason: "other" } } as any, {} as any);
     const limited: any = await controller.create({ body: { reporterRole: "writer", assetId: "asset000001", details: "nope", reason: "other" } } as any, {} as any);
     expect(limited.status).toBe(429);
+  });
+
+  it("acknowledges the reporter with the stored report, and skips the email on a rejected report", async () => {
+    const { controller } = reportController(false);
+    await controller.create({ body: { contentText: "Hymn", details: "stolen", reason: "copyright", name: "Rep Orter", email: "reporter@example.com", signature: "Rep Orter", reporterRole: "owner" } } as any, {} as any);
+    expect(notifyReportReceived).toHaveBeenCalledWith(expect.objectContaining({ id: "rep00000001", email: "reporter@example.com", contentText: "Hymn" }));
+    notifyReportReceived.mockClear();
+    await controller.create({ body: { contentText: "Hymn", details: "stolen", reason: "copyright" } } as any, {} as any);
+    expect(notifyReportReceived).not.toHaveBeenCalled();
   });
 
   it("still requires name, email and signature for anonymous copyright reports", async () => {

@@ -1,7 +1,7 @@
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
-import { Submission } from "../models/index.js";
+import { Asset, Report, Submission } from "../models/index.js";
 
 const APP = "WorshipCommons";
 
@@ -13,6 +13,16 @@ const REJECT_REASONS: Record<string, string> = {
   incomplete: "The submission was missing required information or files.",
   other: "A reviewer decided not to add it at this time."
 };
+
+const RESOLUTION_TEXT: Record<string, string> = {
+  upheld: "We agreed with your report and acted on it.",
+  dismissed: "We reviewed it and decided no action was needed.",
+  duplicate: "We had already received this report and it is being handled there."
+};
+
+function reportedTitle(report: Report): string {
+  return (report.contentText || "").trim() || "the content you reported";
+}
 
 function titleOf(sub: Submission): string {
   return (sub.payload?.name || "").trim() || "your submission";
@@ -57,16 +67,43 @@ export class CommonsMailHelper {
     }
   }
 
+  /** Reporters may be anonymous, so these go to the address on the report itself. */
+  static notifyReportReceived(report: Report): Promise<void> {
+    return this.mailTo(report.email, `We received your report (${report.id})`, `<p>We received your report about <strong>${reportedTitle(report)}</strong>.</p><p>Your reference is <strong>${report.id}</strong>. A reviewer will look at it and email you when it is resolved.</p><p>Questions? Email ${Environment.supportEmail}.</p>`);
+  }
+
+  static notifyReportResolved(report: Report, resolution: string): Promise<void> {
+    const what = RESOLUTION_TEXT[resolution] || RESOLUTION_TEXT.dismissed;
+    let body = `<p>Your report about <strong>${reportedTitle(report)}</strong> (reference <strong>${report.id}</strong>) is resolved.</p><p>${what}</p>`;
+    if (report.resolutionNote?.trim()) body += `<p>${report.resolutionNote.trim()}</p>`;
+    body += `<p>Questions? Email ${Environment.supportEmail}.</p>`;
+    return this.mailTo(report.email, `Your report (${report.id}) is resolved`, body);
+  }
+
+  /** The publisher of a song taken down by a report — reply-to-counter-notice is the appeal path. */
+  static notifyTakedown(asset: Asset, report: Report): Promise<void> {
+    const title = (asset.name || "").trim() || "your song";
+    const why = report.reason === "copyright" ? "a copyright report" : "a policy report";
+    return this.mailWriter(asset.publisherUserId, `${title} was taken down from WorshipCommons`, `<p><strong>${title}</strong> is no longer available on WorshipCommons after ${why}.</p><p>If you believe this is a mistake, reply to this email with a counter-notice explaining why you have the right to publish it.</p><p>Questions? Email ${Environment.supportEmail}.</p>`);
+  }
+
   private static async mailWriter(userId: string | undefined, subject: string, contents: string): Promise<void> {
     try {
       if (!userId) return;
       const repos = await RepoManager.getRepos<any>("membership");
       const users: any[] = await repos.user.loadByIds([userId]);
-      const email = users?.[0]?.email;
+      await this.mailTo(users?.[0]?.email, subject, contents);
+    } catch (e) {
+      console.error("[CommonsMailHelper] writer email failed:", e);
+    }
+  }
+
+  private static async mailTo(email: string | undefined, subject: string, contents: string): Promise<void> {
+    try {
       if (!email) return;
       await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, APP, Environment.worshipCommonsRoot || "", subject, contents);
     } catch (e) {
-      console.error("[CommonsMailHelper] writer email failed:", e);
+      console.error("[CommonsMailHelper] email failed:", e);
     }
   }
 }
