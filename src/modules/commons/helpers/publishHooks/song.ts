@@ -21,6 +21,13 @@ export const songPublishHook: PublishHook = {
       const id = await repos.author.findOrCreate(writers[i]);
       if (i === 0) song.authorId = id;
     }
+    // A song credited to exactly one writer claims that author row for the submitter, so they can
+    // edit their own bio and links. Co-written songs stay unclaimed — we cannot tell whose row it is.
+    const submittedBy = ctx.submission.submittedBy;
+    if (writers.length === 1 && submittedBy && song.authorId) {
+      const author = await repos.author.loadById(song.authorId);
+      if (author && !author.userId) await repos.author.update(song.authorId, { userId: submittedBy });
+    }
     if (ctx.submission.triageScore != null) song.qualityScore = ctx.submission.triageScore;
     const qd = ctx.submission.payload?.qualityDetail;
     if (qd) song.qualityDetail = typeof qd === "string" ? qd : JSON.stringify(qd);
