@@ -5,10 +5,12 @@ import { Submission } from "../models/index.js";
 
 const APP = "WorshipCommons";
 
+// {songselect} is replaced with a SongSelect search URL for the submission's title.
 const REJECT_REASONS: Record<string, string> = {
   quality: "It didn't meet the library's quality bar.",
   duplicate: "It looks like a duplicate of something already in the library.",
   licensing: "We couldn't confirm the licensing for this work.",
+  ccli: 'This appears to be a song in the CCLI catalog, which cannot be released here. If it is licensed through CCLI, churches can find it on SongSelect: <a href="{songselect}">{songselect}</a>',
   offtopic: "It isn't a fit for the WorshipCommons library.",
   incomplete: "The submission was missing required information or files.",
   other: "A reviewer decided not to add it at this time."
@@ -16,6 +18,10 @@ const REJECT_REASONS: Record<string, string> = {
 
 function titleOf(sub: Submission): string {
   return (sub.payload?.name || "").trim() || "your submission";
+}
+
+function songSelectUrl(title: string): string {
+  return `https://songselect.ccli.com/search/results?SearchText=${encodeURIComponent(title)}`;
 }
 
 function siteRoot(): string {
@@ -37,7 +43,7 @@ export class CommonsMailHelper {
 
   static notifyRejected(sub: Submission, reason: string, note?: string): Promise<void> {
     const title = titleOf(sub);
-    const why = REJECT_REASONS[reason] || REJECT_REASONS.other;
+    const why = (REJECT_REASONS[reason] || REJECT_REASONS.other).replace(/\{songselect\}/g, songSelectUrl(title));
     let body = `<p><strong>${title}</strong> didn't make the WorshipCommons library.</p><p>${why}</p>`;
     if (note?.trim()) body += `<p>${note.trim()}</p>`;
     body += `<p>Questions? Email ${Environment.supportEmail}.</p>`;

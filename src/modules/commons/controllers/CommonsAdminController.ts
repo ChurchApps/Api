@@ -6,7 +6,7 @@ import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { ContentLibraryHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 
-const REJECT_REASONS = ["quality", "duplicate", "licensing", "offtopic", "incomplete", "other"];
+const REJECT_REASONS = ["quality", "duplicate", "licensing", "ccli", "offtopic", "incomplete", "other"];
 const RESOLUTIONS = ["upheld", "dismissed", "duplicate"];
 const REMOVE_REASONS = ["copyright", "policy"];
 
