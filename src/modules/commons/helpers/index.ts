@@ -3,6 +3,7 @@ export { CommonsMailHelper } from "./CommonsMailHelper.js";
 export { ContentLibraryHelper, type PresignedUpload } from "./ContentLibraryHelper.js";
 export { recordAssetDownload } from "./DownloadHelper.js";
 export { MaintenanceHelper } from "./MaintenanceHelper.js";
+export { MusicHelper } from "./MusicHelper.js";
 export { userNames } from "./NamesHelper.js";
 export { PublishHelper } from "./PublishHelper.js";
 export { QualityHelper } from "./QualityHelper.js";

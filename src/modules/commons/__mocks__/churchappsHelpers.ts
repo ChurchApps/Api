@@ -13,6 +13,7 @@ export const ASSET_TYPES: Record<string, any> = {
       { role: "demoAudio", namePattern: "demoAudio.{ext}", extensions: ["mp3", "wav"], maxBytes: 25 * MB },
       { role: "sheetPdf", namePattern: "sheetPdf.{ext}", extensions: ["pdf"], maxBytes: 25 * MB },
       { role: "stemsZip", namePattern: "stemsZip.{ext}", extensions: ["zip"], maxBytes: 50 * MB },
+      { role: "midi", namePattern: "tune.mid", extensions: ["mid", "midi"], maxBytes: MB },
       { role: "abc", namePattern: "tune.abc", extensions: ["abc"], maxBytes: MB },
       { role: "song", namePattern: "song.json", extensions: ["json"], generated: true },
       { role: "chart", namePattern: "lyrics.chordpro", extensions: ["chordpro"], generated: true },
