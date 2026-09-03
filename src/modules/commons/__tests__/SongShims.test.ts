@@ -58,6 +58,16 @@ describe("legacy song shims", () => {
     expect(result).toEqual({ id: "asset000001", submissionId: "sub00000001", title: "New Hymn", status: "pending" });
   });
 
+  it("POST /songs passes the chosen license through unchanged so the registry, not the shim, decides what is uploadable", async () => {
+    const { controller } = songController();
+    for (const license of ["CC-BY", "CC-BY-NC"]) {
+      await controller.submit({ body: { title: "CC Hymn", writer: "W", chordPro: "[G]x", certified: true, license } } as any, {} as any);
+      expect(SubmissionHelper.createDraft).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ payload: expect.objectContaining({ license }) }));
+    }
+    await controller.submit({ body: { title: "Default", writer: "W", chordPro: "[G]x", certified: true } } as any, {} as any);
+    expect(SubmissionHelper.createDraft).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ payload: expect.objectContaining({ license: "WC" }) }));
+  });
+
   it("POST /songs cleans up the draft and asset when submit is refused", async () => {
     (SubmissionHelper.submit as jest.Mock).mockResolvedValueOnce({ ok: false, status: 400, error: "recordingOwned confirmation is required" });
     const { controller, repos } = songController();

@@ -72,6 +72,8 @@ export class ContentLibraryHelper {
       language: song.language,
       scripture: song.scripture,
       license: song.license,
+      licenseVersion: song.licenseVersion ?? undefined,
+      licenseUrl: song.licenseUrl ?? undefined,
       hymnalCount: song.hymnalCount ?? 0,
       status: "approved",
       submittedBy: song.submittedBy,
