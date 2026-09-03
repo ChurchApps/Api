@@ -349,6 +349,9 @@ export class DonateController extends GivingBaseController {
       const gateway = await this.getGateway(churchId, donationData.provider, donationData.gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
+      // Anonymous is enforced here, not on the client: the email is kept for the receipt, everything identifying is dropped.
+      if (donationData.anonymous) donationData.person = { id: "", email: donationData.person?.email || "", name: "" };
+
       const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
       const normalizedCurrency = rawCurrency.toLowerCase();
       donationData.currency = normalizedCurrency;
@@ -372,7 +375,8 @@ export class DonateController extends GivingBaseController {
               amount: donationData.amount,
               funds: donationData.funds,
               person: donationData.person,
-              notes: donationData.notes
+              notes: donationData.notes,
+              anonymous: donationData.anonymous
             };
             await GatewayService.logDonation(gateway, churchId, logData, this.repos, "complete");
           } catch (logErr: any) {
@@ -381,7 +385,7 @@ export class DonateController extends GivingBaseController {
         }
 
         try {
-          await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
+          await this.sendEmails(donationData.person?.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
         } catch (emailErr) {
           console.warn("Charge: Failed to send confirmation email (non-fatal)", emailErr);
         }
