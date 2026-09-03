@@ -182,6 +182,14 @@ export class StripeHelper {
     return await stripe.paymentMethods.create(paymentMethodData);
   }
 
+  static async registerPaymentMethodDomain(secretKey: string, domainName: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    const existing = await stripe.paymentMethodDomains.list({ domain_name: domainName, limit: 1 });
+    if (existing.data.length > 0) return { id: existing.data[0].id, created: false };
+    const created = await stripe.paymentMethodDomains.create({ domain_name: domainName });
+    return { id: created.id, created: true };
+  }
+
   static async confirmSetupIntent(secretKey: string, setupIntentId: string, paymentMethodId: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.setupIntents.confirm(setupIntentId, { payment_method: paymentMethodId });

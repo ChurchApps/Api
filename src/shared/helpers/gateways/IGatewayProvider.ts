@@ -144,6 +144,8 @@ export interface IGatewayProvider {
 
   // Provider-specific functionality
   generateClientToken?(config: GatewayConfig): Promise<string>;
+  // Wallet (Apple Pay) domain verification; providers without wallets omit it.
+  registerPaymentMethodDomain?(config: GatewayConfig, domainName: string): Promise<{ id: string; created: boolean }>;
   createOrder?(config: GatewayConfig, orderData: any): Promise<any>;
 
   // Subscription plan management
