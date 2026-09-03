@@ -288,7 +288,7 @@ export class PayPalHelper {
   static async logDonation(_clientId: string, _clientSecret: string, churchId: string, eventData: any, givingRepos: any) {
     const amount = parseFloat(eventData.amount?.value ?? eventData.purchase_units?.[0]?.amount?.value ?? "0");
     const payerId = eventData.payer?.payer_id || eventData.subscriber?.payer_id || "";
-    const customerData = (await givingRepos.customer.load(churchId, payerId)) as any;
+    const customerData = eventData.anonymous ? null : ((await givingRepos.customer.load(churchId, payerId)) as any);
     const personId = customerData?.personId;
     const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
     const donationData: Donation = {
