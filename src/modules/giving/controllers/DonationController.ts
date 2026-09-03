@@ -3,6 +3,7 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Donation } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 
 @controller("/giving/donations")
 export class DonationController extends GivingBaseController {
@@ -43,6 +44,17 @@ export class DonationController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repos.donation.loadByPersonId(au.churchId, au.personId);
       return this.repos.donation.convertAllToModel(au.churchId, result as any[]);
+    });
+  }
+
+  @httpGet("/failed")
+  public async getFailed(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
+      const rows = (await this.repos.donation.loadFailed(au.churchId)) as any[];
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const canRetry = gateways.some((g) => GatewayService.supportsRetry(g));
+      return rows.map((row) => ({ ...this.repos.donation.convertToModel(au.churchId, row), gatewayMessage: row.gatewayMessage, canRetry }));
     });
   }
 

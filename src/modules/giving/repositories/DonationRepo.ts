@@ -217,6 +217,29 @@ export class DonationRepo {
     return row ? this.rowToModel(row) : null;
   }
 
+  // The gateway message lives on eventLogs, which keys off the gateway customer rather than the
+  // donation, so the newest failure event for that donor is the closest available match.
+  public async loadFailed(churchId: string) {
+    const result = await sql<any>`
+      SELECT d.*, (
+        SELECT e.message FROM eventLogs e
+        INNER JOIN customers c ON c.id = e.customerId AND c.churchId = e.churchId
+        WHERE e.churchId = d.churchId AND c.personId = d.personId AND e.eventType LIKE '%failed%'
+        ORDER BY e.created DESC LIMIT 1
+      ) as gatewayMessage
+      FROM donations d
+      WHERE d.churchId = ${churchId} AND d.status = 'failed'
+      ORDER BY d.donationDate DESC`.execute(getDb());
+    return result.rows;
+  }
+
+  public async loadFailedByAge(daysOld: number) {
+    const result = await sql<any>`
+      SELECT * FROM donations
+      WHERE status = 'failed' AND donationDate = DATE_SUB(CURDATE(), INTERVAL ${daysOld} DAY)`.execute(getDb());
+    return result.rows;
+  }
+
   public async updateStatus(churchId: string, transactionId: string, status: string): Promise<void> {
     await getDb().updateTable("donations").set({ status } as any).where("churchId", "=", churchId).where("transactionId", "=", transactionId).execute();
   }

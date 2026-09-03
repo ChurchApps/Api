@@ -267,6 +267,7 @@ export class StripeHelper {
       url: webhookUrl,
       enabled_events: [
         "invoice.paid",
+        "invoice.payment_failed",
         "payment_intent.processing",  // ACH payments start in processing state
         "payment_intent.succeeded",
         "payment_intent.payment_failed",
@@ -330,10 +331,11 @@ export class StripeHelper {
     return givingRepos.eventLog.save(eventLog);
   }
 
-  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any, status: "pending" | "complete" = "complete") {
+  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any, status: "pending" | "complete" | "failed" = "complete") {
     // Handle both Charge events (amount) and PaymentIntent events (amount)
     // PaymentIntent amounts are in cents, same as Charge events
-    const rawAmount = eventData.amount || eventData.amount_paid || eventData.amount_received;
+    // amount_due is the failed-invoice case; amount_paid is 0 there.
+    const rawAmount = eventData.amount || eventData.amount_paid || eventData.amount_received || eventData.amount_due;
     const currencyLower = (eventData.currency || "usd").toLowerCase();
 
     // Zero‑decimal currencies: Stripe reports amounts in whole units already
@@ -407,6 +409,11 @@ export class StripeHelper {
 
   static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", givingRepos: any) {
     await givingRepos.donation.updateStatus(churchId, transactionId, status);
+  }
+
+  static async payInvoice(secretKey: string, invoiceId: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.invoices.pay(invoiceId);
   }
 
   static async listEvents(secretKey: string, options: {
