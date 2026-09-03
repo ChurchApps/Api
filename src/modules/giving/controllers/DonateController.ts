@@ -737,6 +737,67 @@ export class DonateController extends GivingBaseController {
   }
 
 
+  @httpPost("/register-domain")
+  public async registerDomain(req: express.Request<{}, {}, { churchId?: string; domain?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: public donate widget; the domain itself has to prove it belongs to the posted churchId
+      const churchId = (req.body?.churchId || "").trim();
+      const domain = DonateController.normalizeDomain(req.body?.domain);
+      if (!churchId || !domain) return this.json({ error: "Missing churchId or domain" }, 400);
+
+      // Doubles as the rate limit: an unauthenticated caller can only reach Stripe once an hour per church+domain.
+      const cacheKey = churchId + "|" + domain;
+      const registeredAt = DonateController.registeredDomains.get(cacheKey);
+      if (registeredAt && Date.now() - registeredAt < 3600000) return { registered: true, created: false };
+
+      if (!(await this.domainBelongsToChurch(churchId, domain))) return this.json({ error: "Domain does not belong to this church" }, 400);
+
+      // Apple Pay verification only means anything on a public host, so local dev stops here.
+      if (DonateController.isLocalHost(domain)) return { registered: false, reason: "local" };
+
+      const gateway = await this.getGateway(churchId, "stripe");
+      if (!gateway) return this.json({ error: "Gateway not found" }, 404);
+
+      try {
+        const result = await GatewayService.registerPaymentMethodDomain(gateway, domain);
+        if (!result) return { registered: false, reason: "unsupported" };
+        DonateController.registeredDomains.set(cacheKey, Date.now());
+        return { registered: true, created: result.created };
+      } catch (e) {
+        console.error("Payment method domain registration failed", e);
+        return this.json({ error: "Domain registration failed" }, 502);
+      }
+    });
+  }
+
+  private static registeredDomains = new Map<string, number>();
+
+  private static normalizeDomain(raw?: string): string {
+    const host = (raw || "").trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(host) ? host : "";
+  }
+
+  private static isLocalHost(domain: string): boolean {
+    return domain === "localhost" || domain.endsWith(".localhost") || domain === "localtest.me" || domain.endsWith(".localtest.me");
+  }
+
+  private async domainBelongsToChurch(churchId: string, domain: string): Promise<boolean> {
+    if (DonateController.isLocalHost(domain)) return true;
+    try {
+      const church = (await Axios.get(Environment.membershipApi + "/churches/lookup/?id=" + churchId)).data;
+      if (church?.subDomain && domain === church.subDomain.toLowerCase() + ".b1.church") return true;
+    } catch (e) {
+      console.error("Church lookup failed during domain registration", e);
+      return false;
+    }
+    try {
+      const owner = (await Axios.get(`${Environment.membershipApi}/domains/public/owner/${domain}?churchId=${encodeURIComponent(churchId)}`)).data;
+      return owner?.owned === true;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Get gateway by provider name or ID using the centralized helper
    */
