@@ -36,7 +36,9 @@ const SUMMARY_SONG_COLS = [
   "songs.scripture",
   "songs.hymnalCount",
   "songs.parentSongId",
-  "songs.relationLabel"
+  "songs.relationLabel",
+  "songs.licenseVersion",
+  "songs.licenseUrl"
 ] as const;
 
 // Popularity dominates, moderation quality is a kicker; unscored songs sit at a neutral 50.
@@ -120,6 +122,8 @@ export class SongRepo {
       videoUrl: song.videoUrl,
       parentSongId: song.parentSongId,
       relationLabel: song.relationLabel,
+      licenseVersion: song.licenseVersion,
+      licenseUrl: song.licenseUrl,
       proAnswer: song.proAnswer,
       certified: song.certified,
       qualityScore: song.qualityScore,
