@@ -1,0 +1,94 @@
+{
+  "keyName": "lapsedGivers",
+  "displayName": "Lapsed Givers",
+  "description": "People who gave in the previous period but have not given since",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "giving",
+      "sqlLines": [
+        "SELECT d.personId, MAX(d.donationDate) as lastGiftDate, SUM(fd.amount) as previousTotal",
+        " FROM donations d",
+        " INNER JOIN fundDonations fd on fd.donationId = d.id",
+        " WHERE d.churchId=:churchId",
+        " AND d.personId IS NOT NULL",
+        " AND d.donationDate BETWEEN :prevStart AND :prevEnd",
+        " AND d.personId NOT IN (",
+        "   SELECT d2.personId FROM donations d2",
+        "   WHERE d2.churchId=:churchId AND d2.personId IS NOT NULL AND d2.donationDate BETWEEN :currStart AND :currEnd",
+        " )",
+        " GROUP BY d.personId",
+        " ORDER BY previousTotal DESC"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "prevStart",
+      "displayName": "Previous Period Start",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "lastYearStart"
+    },
+    {
+      "keyName": "prevEnd",
+      "displayName": "Previous Period End",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "lastYearEnd"
+    },
+    {
+      "keyName": "currStart",
+      "displayName": "Current Period Start",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "yearStart"
+    },
+    {
+      "keyName": "currEnd",
+      "displayName": "Current Period End",
+      "source": "date",
+      "sourceKey": "date",
+      "defaultValue": "today"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Person",
+          "value": "personId",
+          "formatter": "person"
+        },
+        {
+          "header": "Last Gift Date",
+          "value": "lastGiftDate",
+          "formatter": "date"
+        },
+        {
+          "header": "Previous Total",
+          "value": "previousTotal",
+          "formatter": "dollars"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "GivingApi",
+          "contentType": "Donations",
+          "action": "View"
+        }
+      ]
+    }
+  ]
+}

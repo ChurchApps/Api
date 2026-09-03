@@ -426,6 +426,12 @@ export class GatewayService {
     return undefined;
   }
 
+  static async registerPaymentMethodDomain(gateway: any, domainName: string): Promise<{ id: string; created: boolean } | null> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.registerPaymentMethodDomain) return null;
+    return await provider.registerPaymentMethodDomain(this.getGatewayConfig(gateway), domainName);
+  }
+
   static async createOrder(gateway: any, orderData: any): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createOrder) {

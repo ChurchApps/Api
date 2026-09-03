@@ -469,4 +469,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
   async confirmSetupIntent(config: GatewayConfig, setupIntentId: string, paymentMethodId: string): Promise<any> {
     return await StripeHelper.confirmSetupIntent(config.privateKey, setupIntentId, paymentMethodId);
   }
+
+  async registerPaymentMethodDomain(config: GatewayConfig, domainName: string): Promise<{ id: string; created: boolean }> {
+    return await StripeHelper.registerPaymentMethodDomain(config.privateKey, domainName);
+  }
 }
