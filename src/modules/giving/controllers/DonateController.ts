@@ -7,6 +7,7 @@ import { CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { DunningHelper } from "../helpers/DunningHelper.js";
 import Axios from "axios";
 import dayjs from "dayjs";
 
@@ -188,7 +189,8 @@ export class DonateController extends GivingBaseController {
 
           const classification = GatewayService.classifyWebhookEvent(gateway, webhookResult.eventType!);
           if (classification.action === "donation") {
-            const isPending = classification.status === "pending";
+            const donationStatus = classification.status || "complete";
+            const isPending = donationStatus === "pending";
             // Some providers put the transaction ID at reference_number or transaction.id, not at
             // the top-level id. Check every candidate so the idempotency match is reliable even if
             // the webhook surfaces the id under a different field than the /charge response stored.
@@ -222,11 +224,15 @@ export class DonateController extends GivingBaseController {
                 await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "pending");
               }
             } else if (existingDonation && transactionId) {
-              // Update existing pending/in-flight donation to complete
-              await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
+              // Move the existing pending/failed donation to the status this event reports.
+              await GatewayService.updateDonationStatus(gateway, churchId, transactionId, donationStatus, this.repos);
             } else {
-              // No prior donation found, create a new complete donation
-              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
+              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, donationStatus);
+            }
+
+            if (donationStatus === "failed" && transactionId) {
+              const failed = await this.repos.donation.loadByTransactionId(churchId, transactionId);
+              if (failed) await DunningHelper.notify(churchId, failed, 0, this.repos);
             }
           } else if (classification.action === "cancel-subscription") {
             await this.repos.subscription.delete(churchId, webhookResult.eventData.id);
@@ -238,6 +244,28 @@ export class DonateController extends GivingBaseController {
       }
 
       return this.json({}, 200);
+    });
+  }
+
+  @httpPost("/retry/:donationId")
+  public async retry(req: express.Request<{ donationId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const donation = await this.repos.donation.load(au.churchId, req.params.donationId);
+      if (!donation) return this.json({ error: "Donation not found" }, 404);
+      if (donation.status !== "failed") return this.json({ error: "Only failed donations can be retried" }, 400);
+
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateway = gateways.find((g) => GatewayService.supportsRetry(g));
+      if (!gateway) return this.json({ error: "This gateway does not support retrying failed payments" }, 400);
+
+      const result = await GatewayService.retryFailedPayment(gateway, donation);
+      if (!result.success) return this.json({ error: result.error || "Retry failed" }, 400);
+
+      // The gateway's invoice.paid webhook also promotes this row; updating here keeps the UI honest.
+      await this.repos.donation.updateStatus(au.churchId, donation.transactionId as string, "complete");
+      return { success: true };
     });
   }
 

@@ -165,7 +165,7 @@ export class GatewayService {
     await provider.logEvent(churchId, event, eventData, repos);
   }
 
-  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any, status: "pending" | "complete" = "complete"): Promise<any> {
+  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any, status: "pending" | "complete" | "failed" = "complete"): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.logDonation(config, churchId, eventData, repos, status);
@@ -176,6 +176,16 @@ export class GatewayService {
     if (provider.updateDonationStatus) {
       await provider.updateDonationStatus(churchId, transactionId, status, repos);
     }
+  }
+
+  static supportsRetry(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).retryFailedPayment;
+  }
+
+  static async retryFailedPayment(gateway: any, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.retryFailedPayment) return { success: false, error: `${provider.name} does not support retrying failed payments` };
+    return await provider.retryFailedPayment(this.getGatewayConfig(gateway), donation);
   }
 
   static async createCustomer(gateway: any, email: string, name: string, options?: { personId?: string }): Promise<string | undefined> {

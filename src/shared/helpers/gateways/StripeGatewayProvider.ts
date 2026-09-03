@@ -38,6 +38,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
     if (DONATION_EVENTS.includes(eventType)) {
       return { action: "donation", status: eventType === "payment_intent.processing" ? "pending" : "complete" };
     }
+    if (eventType === "invoice.payment_failed") return { action: "donation", status: "failed" };
     if (eventType === "customer.subscription.deleted") return { action: "cancel-subscription" };
     return { action: "ignore" };
   }
@@ -264,12 +265,24 @@ export class StripeGatewayProvider implements IGatewayProvider {
     await StripeHelper.logEvent(churchId, event, eventData, repos);
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status: "pending" | "complete" = "complete"): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status: "pending" | "complete" | "failed" = "complete"): Promise<any> {
     return await StripeHelper.logDonation(config.privateKey, churchId, eventData, repos, status);
   }
 
   async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void> {
     await StripeHelper.updateDonationStatus(churchId, transactionId, status, repos);
+  }
+
+  async retryFailedPayment(config: GatewayConfig, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }> {
+    const invoiceId = donation.transactionId || "";
+    if (!invoiceId.startsWith("in_")) return { success: false, error: "Only failed subscription invoices can be retried" };
+    try {
+      const invoice = await StripeHelper.payInvoice(config.privateKey, invoiceId);
+      if (invoice.status === "paid") return { success: true };
+      return { success: false, error: `Invoice is ${invoice.status}` };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Retry failed" };
+    }
   }
 
   // Customer management
