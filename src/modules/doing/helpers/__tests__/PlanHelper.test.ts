@@ -359,3 +359,32 @@ describe("PlanHelper.notifyLeadersOfResponse", () => {
     expect(notifyMock).not.toHaveBeenCalled();
   });
 });
+
+describe("PlanHelper.attachAssignees", () => {
+  it("labels positioned items with their non-declined assignees, nested items included", async () => {
+    const loadByPlanId = jest.fn().mockResolvedValue([
+      { positionId: "pos1", personId: "p1", status: "Accepted" },
+      { positionId: "pos2", personId: "p2", status: "Unconfirmed" },
+      { positionId: "pos2", personId: "p3", status: "Accepted" },
+      { positionId: "pos2", personId: "p4", status: "Declined" }
+    ]);
+    loadPeopleMock.mockResolvedValue([{ id: "p1", displayName: "Jane Smith" }, { id: "p2", displayName: "Bob Jones" }, { id: "p3", displayName: "Amy Lee" }]);
+    const tree: any[] = [
+      { id: "i1", positionId: "pos1", children: [{ id: "i2", positionId: "pos2" }] },
+      { id: "i3" },
+      { id: "i4", positionId: "pos9" }
+    ];
+    await PlanHelper.attachAssignees("c1", "plan1", tree, { assignment: { loadByPlanId } } as any);
+    expect(tree[0].assignees).toBe("Jane Smith");
+    expect(tree[0].children[0].assignees).toBe("Bob Jones, Amy Lee");
+    expect(tree[1].assignees).toBeUndefined();
+    expect(tree[2].assignees).toBeUndefined();
+    expect(loadPeopleMock).toHaveBeenCalledWith("c1", ["p1", "p2", "p3"]);
+  });
+
+  it("skips the queries when no item has a position", async () => {
+    const loadByPlanId = jest.fn();
+    await PlanHelper.attachAssignees("c1", "plan1", [{ id: "i1" }], { assignment: { loadByPlanId } } as any);
+    expect(loadByPlanId).not.toHaveBeenCalled();
+  });
+});

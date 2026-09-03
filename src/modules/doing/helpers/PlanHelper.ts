@@ -2,7 +2,7 @@ import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
-import { Plan, Position, Assignment, BlockoutDate, SchedulingPreference, Time } from "../models/index.js";
+import { Plan, PlanItem, Position, Assignment, BlockoutDate, SchedulingPreference, Time } from "../models/index.js";
 
 export interface TeamCandidates {
   positionId: string;
@@ -225,6 +225,27 @@ export class PlanHelper {
     } catch (e) {
       console.error("notifyLeadersOfResponse failed:", e);
     }
+  }
+
+  // Presenter view: items linked to a position get a comma-joined "assignees" string of accepted/unconfirmed people.
+  static async attachAssignees(churchId: string, planId: string, items: PlanItem[], repositories?: Repos): Promise<void> {
+    if (!items.some((i) => i.positionId || i.children?.length)) return;
+    const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
+    const assignments = ((await repos.assignment.loadByPlanId(churchId, planId)) as Assignment[]).filter((a) => a.status !== "Declined");
+    const personIds = [...new Set(assignments.map((a) => a.personId).filter(Boolean))];
+    const people = personIds.length > 0 ? await getMembershipModuleGateway().loadPeople(churchId, personIds) : [];
+    const names = new Map(people.map((p) => [p.id, p.displayName]));
+    const byPosition = new Map<string, string[]>();
+    assignments.forEach((a) => {
+      const name = names.get(a.personId);
+      if (name) byPosition.set(a.positionId, [...(byPosition.get(a.positionId) || []), name]);
+    });
+    const walk = (list: PlanItem[]) => list.forEach((i) => {
+      const list2 = i.positionId ? byPosition.get(i.positionId) : undefined;
+      if (list2?.length) i.assignees = list2.join(", ");
+      if (i.children) walk(i.children);
+    });
+    walk(items);
   }
 
   // true = a preferred time matches this plan, false = preference set but no match,
