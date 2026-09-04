@@ -36,6 +36,31 @@ export class MessagingBaseController extends BaseController {
     return !!(au && au.id && au.churchId);
   }
 
+  // Who may write into a group's chat feeds (posting, or seeding the conversation row). Stricter than
+  // reading/reacting: members only, announcements are leader-only, and each feed honors the group's
+  // per-feed toggle (ChurchAppsSupport#1054). Staff with content.edit moderate anywhere.
+  protected async canPostToGroupFeed(au: any, contentType: string, contentId?: string): Promise<boolean> {
+    if (au?.checkAccess(Permissions.content.edit)) return true;
+    if (!contentId || !au?.groupIds?.includes(contentId)) return false;
+    if (contentType === "groupAnnouncement" && !au.leaderGroupIds?.includes(contentId)) return false;
+    // Lazy import: the gateway chain pulls in DB/env modules the unit-test harness doesn't stub.
+    const { getMembershipModuleGateway } = await import("../../../shared/modules/MembershipModuleGateway.js");
+    const group = await getMembershipModuleGateway().loadGroup(au.churchId, contentId);
+    if (!group) return false;
+    return this.feedEnabled(contentType === "groupAnnouncement" ? group.announcementsEnabled : group.discussionsEnabled);
+  }
+
+  // loadGroup hands back the raw row, so a toggle may arrive as a boolean, a 0/1 number, or be
+  // missing entirely (pre-migration rows). Only an explicit off value disables the feed.
+  private feedEnabled(value: unknown): boolean {
+    if (value === undefined || value === null) return true;
+    return !(value === false || value === 0 || value === "0");
+  }
+
+  protected isGroupFeed(contentType?: string) {
+    return contentType === "group" || contentType === "groupAnnouncement";
+  }
+
   protected isSameChurch(au: { id?: string; churchId?: string }, churchId: string) {
     return this.isAuthenticated(au) && !!churchId && au.churchId === churchId;
   }
