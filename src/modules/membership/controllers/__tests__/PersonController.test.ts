@@ -32,11 +32,11 @@ function personController(opts: any = {}) {
       delete: jest.fn(),
       deleteByIds: jest.fn()
     },
-    groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false) },
+    groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async () => []) },
     auditLog: { loadCount: jest.fn(async () => 0), create: jest.fn() },
     household: { deleteUnused: jest.fn() },
     formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) },
-    visibilityPreference: { loadForPerson: jest.fn(async () => null) },
+    visibilityPreference: { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => []) },
     church: { loadById: jest.fn(async () => opts.church ?? { id: "c1" }) },
     setting: {
       loadPublicSettings: jest.fn(async () => opts.settings ?? []),
@@ -115,7 +115,6 @@ describe("PersonController.get authorization", () => {
 
   it("uses directory visibility for a member without people.view and does not attach form submissions", async () => {
     const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: "Member", person: { id: "p2", name: {}, contactInfo: {} } });
-    repos.visibilityPreference = { loadForPerson: jest.fn(async () => null) };
     await (controller as any).get("p2", {}, {});
     expect(repos.formSubmission.loadForContent).not.toHaveBeenCalled();
   });
@@ -336,5 +335,66 @@ describe("PersonController.publicEmail", () => {
     const { controller } = personController({ isPublicGroupLeader: true, person: { email: "leader@x.com" } });
     await (controller as any).publicEmail(emailReq({ subject: "<b>x</b>", body: "a<br />b<script>alert(1)</script>" }), {});
     expect(sendTransactional).toHaveBeenCalledWith("support@test", "leader@x.com", "B1", null, "&lt;b&gt;x&lt;/b&gt;", "a<br />b&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
+// Contact visibility levels: everyone > members > groups > leaders > staff (ChurchAppsSupport#1058).
+describe("PersonController contact visibility levels", () => {
+  const target = { id: "p2", name: { display: "Donald Clark" }, membershipStatus: "Member", contactInfo: { email: "donald@x.org", mobilePhone: "555", homePhone: "556", workPhone: "557", address1: "1 Main", city: "Springfield", state: "IL", zip: "62701" } };
+  const sharedGroup = [{ churchId: "c1", personId: "p2", groupId: "g1" }];
+
+  function visController(opts: any) {
+    const { controller, repos } = personController({ personId: "p1", access: [], membershipStatus: "Member", person: { ...target, contactInfo: { ...target.contactInfo } }, settings: opts.settings ?? [] });
+    repos.visibilityPreference = { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => opts.prefs ?? []) };
+    repos.groupMember.loadForPeople = jest.fn(async () => opts.groupRows ?? []);
+    repos.person.loadMembersByVisibility = jest.fn(async () => [{ ...target, contactInfo: { ...target.contactInfo } }]);
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", id: "u1", personId: "p1", membershipStatus: "Member", groupIds: opts.groupIds ?? [], leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: () => false });
+    return { controller, repos };
+  }
+
+  it("'leaders' church default: a leader of a shared group sees email/phone/address", async () => {
+    const settings = [{ keyName: "emailVisibility", value: "leaders" }, { keyName: "phoneVisibility", value: "leaders" }, { keyName: "addressVisibility", value: "leaders" }];
+    const { controller } = visController({ settings, groupRows: sharedGroup, groupIds: ["g1"], leaderGroupIds: ["g1"] });
+    const result = await (controller as any).get("p2", {}, {});
+    expect(result.contactInfo.email).toBe("donald@x.org");
+    expect(result.contactInfo.mobilePhone).toBe("555");
+    expect(result.contactInfo.address1).toBe("1 Main");
+  });
+
+  it("'leaders' church default: a plain group-mate sees none of it", async () => {
+    const settings = [{ keyName: "emailVisibility", value: "leaders" }, { keyName: "phoneVisibility", value: "leaders" }, { keyName: "addressVisibility", value: "leaders" }];
+    const { controller } = visController({ settings, groupRows: sharedGroup, groupIds: ["g1"] });
+    const result = await (controller as any).get("p2", {}, {});
+    expect(result.contactInfo.email).toBeUndefined();
+    expect(result.contactInfo.mobilePhone).toBeUndefined();
+    expect(result.contactInfo.homePhone).toBeUndefined();
+    expect(result.contactInfo.address1).toBeUndefined();
+  });
+
+  it("'staff' person preference: even a group leader sees nothing", async () => {
+    const prefs = [{ personId: "p2", address: "staff", phoneNumber: "staff", email: "staff" }];
+    const { controller } = visController({ prefs, groupRows: sharedGroup, groupIds: ["g1"], leaderGroupIds: ["g1"] });
+    const result = await (controller as any).get("p2", {}, {});
+    expect(result.contactInfo.email).toBeUndefined();
+    expect(result.contactInfo.mobilePhone).toBeUndefined();
+    expect(result.contactInfo.address1).toBeUndefined();
+  });
+
+  it("staff with people.view bypass every level", async () => {
+    const { controller, repos } = personController({ personId: "p1", access: ["peopleView"], person: { ...target, contactInfo: { ...target.contactInfo } }, settings: [{ keyName: "emailVisibility", value: "staff" }] });
+    repos.visibilityPreference = { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => [{ personId: "p2", email: "staff" }]) };
+    const result = await (controller as any).get("p2", {}, {});
+    expect(result.contactInfo.email).toBe("donald@x.org");
+  });
+
+  it("the directory list (GET /people) redacts with the same rules", async () => {
+    const settings = [{ keyName: "emailVisibility", value: "leaders" }, { keyName: "phoneVisibility", value: "staff" }, { keyName: "addressVisibility", value: "everyone" }];
+    const { controller } = visController({ settings, groupRows: sharedGroup, groupIds: ["g1"] });
+    const result = await (controller as any).getAll({ query: {} }, {});
+    expect(result).toHaveLength(1);
+    expect(result[0].name.display).toBe("Donald Clark");
+    expect(result[0].contactInfo.email).toBeUndefined();
+    expect(result[0].contactInfo.mobilePhone).toBeUndefined();
+    expect(result[0].contactInfo.address1).toBe("1 Main");
   });
 });
