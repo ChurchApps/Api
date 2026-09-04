@@ -7,6 +7,9 @@ jest.mock("../MessagingBaseController", () => ({
       if (!au) return false;
       return au.checkAccess(contentType === "personConfidential" ? "peopleViewConfidentialNotes" : "peopleEdit");
     }
+    isGroupFeed(contentType?: string) { return contentType === "group" || contentType === "groupAnnouncement"; }
+    // Membership-only stand-in; the real toggle/leader rules are covered in MessageParticipation.test.ts.
+    async canPostToGroupFeed(au: any, _contentType: string, contentId?: string) { return !!contentId && !!au?.groupIds?.includes(contentId); }
   }
 }));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn() } }));

@@ -30,6 +30,9 @@ export class Group {
   public minVolunteers?: number;
 
   public joinPolicy?: "open" | "request" | "closed";
+  // Group chat feeds; both default on. Enforced by the messaging module's post gate.
+  public discussionsEnabled?: boolean;
+  public announcementsEnabled?: boolean;
 
   public memberCount?: number;
   public importKey?: string;
