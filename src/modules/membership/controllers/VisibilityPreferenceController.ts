@@ -22,9 +22,9 @@ export class VisibilityPreferenceController extends MembershipBaseController {
   @httpGet("/my")
   public async loadMy(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      // loadForPerson returns a single row (or null); an empty list is the legacy "nothing saved" shape clients expect.
       const result = await this.repos.visibilityPreference.loadForPerson(au.churchId, au.personId);
-      const preferences = result as VisibilityPreference[];
-      return preferences?.length > 0 ? preferences[0] : [];
+      return result ?? [];
     });
   }
 }

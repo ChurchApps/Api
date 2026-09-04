@@ -10,6 +10,7 @@ export type IPermission = { contentType: string; action: string };
 // Module-specific helpers
 export { CaddyHelper } from "./CaddyHelper.js";
 export { ChurchHelper } from "./ChurchHelper.js";
+export { ContactVisibilityHelper, CONTACT_VISIBILITY_LEVELS, type ContactVisibilityLevel } from "./ContactVisibilityHelper.js";
 export { ConversationalFormHelper, type FormContact } from "./ConversationalFormHelper.js";
 export { GeoHelper } from "./GeoHelper.js";
 export { HubspotHelper } from "./HubspotHelper.js";

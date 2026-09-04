@@ -69,9 +69,24 @@ export class GroupMemberController extends MembershipBaseController {
         else if (req.query.groupIds !== undefined) result = await this.repos.groupMember.loadForGroups(au.churchId, req.query.groupIds.toString().split(","));
         else if (req.query.personId !== undefined) result = await this.repos.groupMember.loadForPerson(au.churchId, req.query.personId.toString());
         else result = await this.repos.groupMember.loadAll(au.churchId);
-        return this.repos.groupMember.convertAllToModel(au.churchId, result);
+        return this.stripContactInfo(this.repos.groupMember.convertAllToModel(au.churchId, result), au);
       }
     });
+  }
+
+  // Roster rows embed the person's contact fields. Staff (groupMembers.view) and the group's
+  // leaders keep them; any other viewer gets name/photo/role only (contact details go through
+  // GET /people/:id, which applies the per-field visibility levels).
+  private stripContactInfo(models: GroupMember[], au: any): GroupMember[] {
+    if (!Array.isArray(models)) return models;
+    if (au.checkAccess(Permissions.groupMembers.view)) return models;
+    models.forEach((gm) => {
+      if (!gm.person || au.leaderGroupIds?.includes(gm.groupId)) return;
+      delete gm.person.contactInfo;
+      delete gm.person.householdId;
+      delete gm.person.householdRole;
+    });
+    return models;
   }
 
   // Under-13 privacy: regular members see the roster without known minors;

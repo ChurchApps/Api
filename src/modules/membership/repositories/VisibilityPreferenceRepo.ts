@@ -48,6 +48,11 @@ export class VisibilityPreferenceRepo {
     return (await getDb().selectFrom("visibilityPreferences").selectAll().where("churchId", "=", churchId).where("personId", "=", personId).executeTakeFirst()) ?? null;
   }
 
+  public async loadForPeople(churchId: string, personIds: string[]) {
+    if (!personIds.length) return [];
+    return getDb().selectFrom("visibilityPreferences").selectAll().where("churchId", "=", churchId).where("personId", "in", personIds).execute();
+  }
+
   public saveAll(models: VisibilityPreference[]) {
     const promises: Promise<VisibilityPreference>[] = [];
     models.forEach((model) => { promises.push(this.save(model)); });
