@@ -1,6 +1,7 @@
 export { AttendanceRecord } from "./AttendanceRecord.js";
 export { Campus } from "./Campus.js";
 export { GroupServiceTime } from "./GroupServiceTime.js";
+export { Headcount } from "./Headcount.js";
 export { LabelTemplate } from "./LabelTemplate.js";
 export { Service } from "./Service.js";
 export { ServiceTime } from "./ServiceTime.js";
