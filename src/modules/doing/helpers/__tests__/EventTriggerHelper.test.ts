@@ -32,9 +32,16 @@ describe("EventTriggerHelper.resolve form.submission.created", () => {
     expect(loadPersonMock).toHaveBeenCalledWith("c1", "p2");
   });
 
-  it("yields no subject without a person contentId or submittedBy", async () => {
-    const result = await resolve({ formId: "f1", contentType: "form", contentId: "f1" });
-    expect(result).toEqual([]);
+  it("uses the submission itself as the subject for anonymous posts", async () => {
+    const result = await resolve({ id: "s1", formId: "f1", contentType: "form", contentId: "f1", formName: "VBS", submitterName: "Jane Doe" });
+    expect(result).toHaveLength(1);
+    expect(result[0].subject).toEqual({ type: "formSubmission", id: "s1", label: "Jane Doe" });
+    expect(result[0].facts["formSubmission.formId"]).toBe("f1");
     expect(loadPersonMock).not.toHaveBeenCalled();
+  });
+
+  it("labels an anonymous post with the form name when no contact was extracted", async () => {
+    const result = await resolve({ id: "s1", formId: "f1", contentType: "form", contentId: "f1", formName: "VBS" });
+    expect(result[0].subject.label).toBe("VBS");
   });
 });

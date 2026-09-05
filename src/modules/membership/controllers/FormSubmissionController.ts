@@ -78,19 +78,15 @@ export class FormSubmissionController extends MembershipBaseController {
 
             const wantsPerson = form.autoCreatePerson === true;
             const wantsFollowUp = !!(form.followUpSubject && form.followUpBody);
-            let contact: FormContact = null;
-            let followUpFirstName: string = null;
-            if (wantsPerson || wantsFollowUp) {
-              const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
-              contact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
-              followUpFirstName = contact?.firstName;
-              if (wantsPerson && contact?.email && formSubmission.contentType !== "person") {
-                const person = await ConversationalFormHelper.findOrCreatePerson(this.repos, churchId, contact);
-                if (person) {
-                  formSubmission.contentType = "person";
-                  formSubmission.contentId = person.id;
-                  followUpFirstName = person.name?.first || contact.firstName;
-                }
+            const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
+            const contact: FormContact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
+            let followUpFirstName: string = contact?.firstName;
+            if (wantsPerson && contact?.email && formSubmission.contentType !== "person") {
+              const person = await ConversationalFormHelper.findOrCreatePerson(this.repos, churchId, contact);
+              if (person) {
+                formSubmission.contentType = "person";
+                formSubmission.contentId = person.id;
+                followUpFirstName = person.name?.first || contact.firstName;
               }
             }
 
@@ -117,7 +113,8 @@ export class FormSubmissionController extends MembershipBaseController {
             results.push(savedSubmissions);
             // Submitters land in workflows via the unified trigger engine, which
             // subscribes to this event (form.submission.created) on the internal bus.
-            await WebhookDispatcher.emit(churchId, "form.submission.created", savedSubmissions);
+            const submitterName = [contact?.firstName, contact?.lastName].filter(Boolean).join(" ") || contact?.email;
+            await WebhookDispatcher.emit(churchId, "form.submission.created", { ...savedSubmissions, formName: form.name, submitterName });
 
             try {
               await this.sendEmails(formSubmission, form, churchId);

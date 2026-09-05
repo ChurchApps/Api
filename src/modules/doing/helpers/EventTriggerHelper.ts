@@ -227,17 +227,17 @@ export class EventTriggerHelper {
       case "form.submission.created": {
         // payload is a submission (or, defensively, an array of them). The subject is
         // the person the submission is about (contentType "person"), falling back to
-        // the logged-in submitter when the submission isn't tied to a person.
+        // the logged-in submitter, then to the submission itself for anonymous posts.
         const subs = Array.isArray(payload) ? payload : [payload];
         const out: { subject: Subject; facts: Record<string, any> }[] = [];
         for (const sub of subs) {
           const personId = sub?.contentType === "person" && sub.contentId ? sub.contentId : sub?.submittedBy;
-          if (!personId) continue;
-          const person = await getMembershipModuleGateway().loadPerson(churchId, personId);
-          out.push({
-            subject: { type: "person", id: personId },
-            facts: { "formSubmission.formId": sub.formId, "person.membershipStatus": person?.membershipStatus }
-          });
+          const subject: Subject = personId
+            ? { type: "person", id: personId }
+            : { type: "formSubmission", id: sub?.id, label: String(sub?.submitterName || sub?.formName || "Form submission").slice(0, 45) };
+          if (!subject.id) continue;
+          const person = personId ? await getMembershipModuleGateway().loadPerson(churchId, personId) : null;
+          out.push({ subject, facts: { "formSubmission.formId": sub.formId, "person.membershipStatus": person?.membershipStatus } });
         }
         return out;
       }
