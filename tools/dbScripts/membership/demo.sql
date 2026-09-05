@@ -617,9 +617,9 @@ INSERT INTO questions (id, churchId, formId, parentId, title, description, field
 -- Exercises the anonymous flow: GET /forms/standalone + GET /questions/unrestricted + POST /formsubmissions.
 -- FRM00000004 is public (restricted=0); FRM00000005 is members-only (restricted=1).
 -- ========================================
-INSERT INTO forms (id, churchId, name, contentType, createdTime, modifiedTime, restricted, archived, removed, thankYouMessage) VALUES
-('FRM00000004', 'CHU00000001', 'VBS Registration (Public)', 'form', '2025-07-01 10:00:00', '2025-07-01 10:00:00', b'0', b'0', b'0', 'Your child is registered for Vacation Bible School! See you there.'),
-('FRM00000005', 'CHU00000001', 'Members Only Survey', 'form', '2025-07-01 10:00:00', '2025-07-01 10:00:00', b'1', b'0', b'0', 'Thank you for your feedback!');
+INSERT INTO forms (id, churchId, name, description, contentType, createdTime, modifiedTime, restricted, archived, removed, thankYouMessage) VALUES
+('FRM00000004', 'CHU00000001', 'VBS Registration (Public)', 'Register your child for Vacation Bible School. Please fill out one form per child so we can plan snacks and supplies.', 'form', '2025-07-01 10:00:00', '2025-07-01 10:00:00', b'0', b'0', b'0', 'Your child is registered for Vacation Bible School! See you there.'),
+('FRM00000005', 'CHU00000001', 'Members Only Survey', NULL, 'form', '2025-07-01 10:00:00', '2025-07-01 10:00:00', b'1', b'0', b'0', 'Thank you for your feedback!');
 
 INSERT INTO questions (id, churchId, formId, parentId, title, description, fieldType, placeholder, sort, choices, removed, required) VALUES
 ('QST00000013', 'CHU00000001', 'FRM00000004', NULL, 'Child Full Name', NULL, 'Textbox', 'Enter child name', 1, NULL, b'0', b'1'),

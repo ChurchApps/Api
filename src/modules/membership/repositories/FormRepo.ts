@@ -19,6 +19,7 @@ export class FormRepo {
       id: form.id,
       churchId: form.churchId,
       name: form.name,
+      description: form.description,
       contentType: form.contentType,
       accessStartTime: accessStartTime as any,
       accessEndTime: accessEndTime as any,
@@ -42,6 +43,7 @@ export class FormRepo {
     const accessEndTime = form.accessEndTime ? DateHelper.toMysqlDate(form.accessEndTime) : null;
     await getDb().updateTable("forms").set({
       name: form.name,
+      description: form.description,
       contentType: form.contentType,
       restricted: form.restricted,
       accessStartTime: accessStartTime as any,
@@ -165,6 +167,7 @@ export class FormRepo {
       id: row.id,
       churchId: row.churchId,
       name: row.name,
+      description: row.description,
       contentType: row.contentType,
       createdTime: row.createdTime,
       modifiedTime: row.modifiedTime,

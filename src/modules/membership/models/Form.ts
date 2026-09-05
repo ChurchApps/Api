@@ -4,6 +4,7 @@ export class Form {
   public id?: string;
   public churchId?: string;
   public name?: string;
+  public description?: string;
   public contentType?: string;
   public createdTime?: Date;
   public modifiedTime?: Date;
