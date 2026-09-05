@@ -110,6 +110,7 @@ export class BaseController extends CustomBaseController {
     "/attendance/services": { category: "attendance", entityType: "service", dbModule: "attendance", table: "services" },
     "/attendance/servicetimes": { category: "attendance", entityType: "serviceTime", dbModule: "attendance", table: "serviceTimes" },
     "/attendance/groupservicetimes": { category: "attendance", entityType: "groupServiceTime", dbModule: "attendance", table: "groupServiceTimes" },
+    "/attendance/headcounts": { category: "attendance", entityType: "headcount", dbModule: "attendance", table: "headcounts" },
     "/giving/funds": { category: "fund", entityType: "fund", dbModule: "giving", table: "funds" },
     "/giving/donationbatches": { category: "donation", entityType: "donationBatch", dbModule: "giving", table: "donationBatches" },
     "/giving/funddonations": { category: "donation", entityType: "fundDonation", dbModule: "giving", table: "fundDonations" },
