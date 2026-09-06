@@ -395,6 +395,19 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
+  @httpPost("/duplicates")
+  public async duplicates(req: express.Request<{}, {}, { email?: string; phone?: string; firstName?: string; lastName?: string; birthDate?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      else {
+        const { email, phone, firstName, lastName, birthDate } = req.body || {};
+        const data = await this.repos.person.findPossibleDuplicates(au.churchId, { email, phone, firstName, lastName, birthDate: birthDate ? new Date(birthDate) : undefined });
+        const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
+        return await this.filterPeople(result, au);
+      }
+    });
+  }
+
   @httpPost("/advancedSearch")
   public async advancedSearch(req: express.Request<{}, {}, SearchCondition[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
