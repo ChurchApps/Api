@@ -196,6 +196,7 @@ export class DonateController extends GivingBaseController {
             // the webhook surfaces the id under a different field than the /charge response stored.
             const candidateIds = [
               webhookResult.eventData?.id,
+              webhookResult.eventData?.payment_intent,
               webhookResult.eventData?.reference_number,
               webhookResult.eventData?.transaction?.id
             ].map((v) => (v == null ? "" : String(v))).filter((v) => v !== "");
@@ -226,7 +227,8 @@ export class DonateController extends GivingBaseController {
             } else if (existingDonation && transactionId) {
               // Move the existing pending/failed donation to the status this event reports.
               await GatewayService.updateDonationStatus(gateway, churchId, transactionId, donationStatus, this.repos);
-            } else {
+            } else if (donationStatus !== "refunded") {
+              // A refund for a transaction we never recorded has nothing to update; never create a row for it.
               await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, donationStatus);
             }
 
@@ -266,6 +268,30 @@ export class DonateController extends GivingBaseController {
       // The gateway's invoice.paid webhook also promotes this row; updating here keeps the UI honest.
       await this.repos.donation.updateStatus(au.churchId, donation.transactionId as string, "complete");
       return { success: true };
+    });
+  }
+
+  @httpPost("/refund/:donationId")
+  public async refund(req: express.Request<{ donationId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const donation = (await this.repos.donation.load(au.churchId, req.params.donationId)) as any;
+      if (!donation) return this.json({ error: "Donation not found" }, 404);
+      if ((donation.status || "complete") !== "complete") return this.json({ error: "Only completed donations can be refunded" }, 400);
+      if (!donation.transactionId) return this.json({ error: "This donation has no gateway transaction to refund" }, 400);
+
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateway = gateways.find((g) => GatewayService.supportsRefund(g));
+      if (!gateway) return this.json({ error: "This gateway does not support refunds" }, 400);
+
+      // ponytail: full refund only; partial refunds would need an amount and a separate status.
+      const result = await GatewayService.refundDonation(gateway, donation.transactionId);
+      if (!result.success) return this.json({ error: result.error || "Refund failed" }, 400);
+
+      // The gateway's charge.refunded webhook also flips this row; updating here keeps the UI honest.
+      await this.repos.donation.updateStatus(au.churchId, donation.transactionId, "refunded");
+      return { success: true, refundId: result.refundId };
     });
   }
 

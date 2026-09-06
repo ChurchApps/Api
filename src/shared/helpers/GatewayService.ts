@@ -171,7 +171,7 @@ export class GatewayService {
     return await provider.logDonation(config, churchId, eventData, repos, status);
   }
 
-  static async updateDonationStatus(gateway: any, churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void> {
+  static async updateDonationStatus(gateway: any, churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: any): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.updateDonationStatus) {
       await provider.updateDonationStatus(churchId, transactionId, status, repos);
@@ -186,6 +186,16 @@ export class GatewayService {
     const provider = this.getProviderFromGateway(gateway);
     if (!provider.retryFailedPayment) return { success: false, error: `${provider.name} does not support retrying failed payments` };
     return await provider.retryFailedPayment(this.getGatewayConfig(gateway), donation);
+  }
+
+  static supportsRefund(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).refundCharge;
+  }
+
+  static async refundDonation(gateway: any, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.refundCharge) return { success: false, error: `${provider.name} does not support refunds` };
+    return await provider.refundCharge(this.getGatewayConfig(gateway), transactionId);
   }
 
   static async createCustomer(gateway: any, email: string, name: string, options?: { personId?: string }): Promise<string | undefined> {

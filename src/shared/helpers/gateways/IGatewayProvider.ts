@@ -10,7 +10,7 @@ export interface WebhookResult {
 
 export interface WebhookEventClassification {
   action: "donation" | "cancel-subscription" | "ignore";
-  status?: "pending" | "complete" | "failed";
+  status?: "pending" | "complete" | "failed" | "refunded";
 }
 
 export interface ProviderCapabilities {
@@ -168,7 +168,9 @@ export interface IGatewayProvider {
   // Event logging
   logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void>;
   logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status?: "pending" | "complete" | "failed"): Promise<any>;
-  updateDonationStatus?(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void>;
+  updateDonationStatus?(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: any): Promise<void>;
   // Re-charges a failed recurring payment; absent = the provider has no retry and the UI hides Retry.
   retryFailedPayment?(config: GatewayConfig, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }>;
+  // Full refund of a settled charge; absent = the provider has no refunds and the UI hides Refund.
+  refundCharge?(config: GatewayConfig, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }>;
 }

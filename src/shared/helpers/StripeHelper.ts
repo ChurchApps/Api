@@ -273,6 +273,7 @@ export class StripeHelper {
         "payment_intent.payment_failed",
         "charge.succeeded",  // Keep for backward compatibility during migration
         "charge.failed",     // Keep for backward compatibility during migration
+        "charge.refunded",   // Refunds started from the Stripe dashboard reconcile back to the donation
         "customer.subscription.deleted"
       ]
     });
@@ -407,8 +408,13 @@ export class StripeHelper {
     return await Promise.all(promises);
   }
 
-  static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", givingRepos: any) {
+  static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", givingRepos: any) {
     await givingRepos.donation.updateStatus(churchId, transactionId, status);
+  }
+
+  static async createRefund(secretKey: string, params: { charge: string } | { payment_intent: string }) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.refunds.create(params);
   }
 
   static async payInvoice(secretKey: string, invoiceId: string) {
