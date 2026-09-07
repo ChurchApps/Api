@@ -26,7 +26,8 @@ export class SermonRepo {
       publishDate: m.publishDate,
       thumbnail: m.thumbnail,
       duration: m.duration,
-      permanentUrl: m.permanentUrl
+      permanentUrl: m.permanentUrl,
+      audioUrl: m.audioUrl ?? null
     } as any).execute();
     return model;
   }
@@ -44,7 +45,8 @@ export class SermonRepo {
       publishDate: m.publishDate,
       thumbnail: m.thumbnail,
       duration: m.duration,
-      permanentUrl: m.permanentUrl
+      permanentUrl: m.permanentUrl,
+      audioUrl: m.audioUrl ?? null
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -94,7 +96,8 @@ export class SermonRepo {
       publishDate: row.publishDate,
       thumbnail: row.thumbnail,
       duration: row.duration,
-      permanentUrl: row.permanentUrl
+      permanentUrl: row.permanentUrl,
+      audioUrl: row.audioUrl
     };
   }
 }

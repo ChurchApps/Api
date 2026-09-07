@@ -11,4 +11,5 @@ export class Sermon {
   thumbnail: string;
   duration: number;
   permanentUrl: boolean;
+  audioUrl?: string;
 }
