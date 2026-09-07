@@ -182,6 +182,14 @@ export class StripeHelper {
     return await stripe.paymentMethods.create(paymentMethodData);
   }
 
+  static async registerPaymentMethodDomain(secretKey: string, domainName: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    const existing = await stripe.paymentMethodDomains.list({ domain_name: domainName, limit: 1 });
+    if (existing.data.length > 0) return { id: existing.data[0].id, created: false };
+    const created = await stripe.paymentMethodDomains.create({ domain_name: domainName });
+    return { id: created.id, created: true };
+  }
+
   static async confirmSetupIntent(secretKey: string, setupIntentId: string, paymentMethodId: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
     return await stripe.setupIntents.confirm(setupIntentId, { payment_method: paymentMethodId });
@@ -259,11 +267,13 @@ export class StripeHelper {
       url: webhookUrl,
       enabled_events: [
         "invoice.paid",
+        "invoice.payment_failed",
         "payment_intent.processing",  // ACH payments start in processing state
         "payment_intent.succeeded",
         "payment_intent.payment_failed",
         "charge.succeeded",  // Keep for backward compatibility during migration
         "charge.failed",     // Keep for backward compatibility during migration
+        "charge.refunded",   // Refunds started from the Stripe dashboard reconcile back to the donation
         "customer.subscription.deleted"
       ]
     });
@@ -322,10 +332,11 @@ export class StripeHelper {
     return givingRepos.eventLog.save(eventLog);
   }
 
-  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any, status: "pending" | "complete" = "complete") {
+  static async logDonation(secretKey: string, churchId: string, eventData: any, givingRepos: any, status: "pending" | "complete" | "failed" = "complete") {
     // Handle both Charge events (amount) and PaymentIntent events (amount)
     // PaymentIntent amounts are in cents, same as Charge events
-    const rawAmount = eventData.amount || eventData.amount_paid || eventData.amount_received;
+    // amount_due is the failed-invoice case; amount_paid is 0 there.
+    const rawAmount = eventData.amount || eventData.amount_paid || eventData.amount_received || eventData.amount_due;
     const currencyLower = (eventData.currency || "usd").toLowerCase();
 
     // Zero‑decimal currencies: Stripe reports amounts in whole units already
@@ -397,8 +408,18 @@ export class StripeHelper {
     return await Promise.all(promises);
   }
 
-  static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", givingRepos: any) {
+  static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", givingRepos: any) {
     await givingRepos.donation.updateStatus(churchId, transactionId, status);
+  }
+
+  static async createRefund(secretKey: string, params: { charge: string } | { payment_intent: string }) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.refunds.create(params);
+  }
+
+  static async payInvoice(secretKey: string, invoiceId: string) {
+    const stripe = StripeHelper.getStripeObj(secretKey);
+    return await stripe.invoices.pay(invoiceId);
   }
 
   static async listEvents(secretKey: string, options: {

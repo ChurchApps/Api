@@ -3,10 +3,10 @@ import express from "express";
 import { ASSET_TYPES, COMMONS_PRODUCT_LABELS } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
-import { ContentLibraryHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
+import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 
-const REJECT_REASONS = ["quality", "duplicate", "licensing", "offtopic", "incomplete", "other"];
+const REJECT_REASONS = ["quality", "duplicate", "licensing", "ccli", "offtopic", "incomplete", "other"];
 const RESOLUTIONS = ["upheld", "dismissed", "duplicate"];
 const REMOVE_REASONS = ["copyright", "policy"];
 
@@ -26,16 +26,6 @@ function submissionPreviewUrl(hasPreview: boolean, submissionId: string): string
 }
 
 const RIGHTS_RE = /GEMA|PRS|publisher|licensing admin/i;
-
-function foldName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function similarName(a: string, b: string): boolean {
-  const x = foldName(a), y = foldName(b);
-  if (!x || !y) return false;
-  return x === y || (x.length >= 8 && y.length >= 8 && (x.startsWith(y) || y.startsWith(x)));
-}
 
 @controller("/commons/admin")
 export class CommonsAdminController extends CommonsBaseController {
@@ -63,6 +53,8 @@ export class CommonsAdminController extends CommonsBaseController {
       let rows = await this.repos.submission.loadQueue({ status: req.query.status?.toString() || "pending", assetType: req.query.assetType?.toString(), page: Number(req.query.page) || 1 });
       if (product) rows = rows.filter((r) => ASSET_TYPES[r.assetType || ""]?.product === product);
       const names = await userNames(rows.flatMap((r) => [r.submittedBy, r.publisherUserId]));
+      // the published library, once, so a duplicate is caught even when a different writer sent the original
+      const library = rows.length ? await this.repos.song.loadPublishedForDuplicates() : [];
       const stats: Record<string, { total: number; approved: number }> = {};
       const titles: Record<string, { assetId: string; name: string }[]> = {};
       const out = [];
@@ -87,7 +79,8 @@ export class CommonsAdminController extends CommonsBaseController {
           payload: undefined,
           qualityDetail: parseQualityDetail(r.payload?.qualityDetail),
           rightsFlag: RIGHTS_RE.test(String(r.payload?.detail?.proAnswer || "")),
-          possibleDuplicate: titles[userId].some((t) => t.assetId !== (r.assetId || "") && similarName(title, t.name)),
+          possibleDuplicate: titles[userId].some((t) => t.assetId !== (r.assetId || "") && DuplicateHelper.similarName(title, t.name))
+            || (r.assetType === "song" && DuplicateHelper.matches({ title, writer: r.payload?.detail?.writer, firstLine: DuplicateHelper.firstLine(r.payload?.detail?.chordPro || "") }, library.filter((s) => s.id !== (r.assetId || "")), 1).length > 0),
           typeLabel: def?.label || r.assetType,
           product: def?.product,
           productLabel: def ? COMMONS_PRODUCT_LABELS[def.product] : undefined,
@@ -232,9 +225,13 @@ export class CommonsAdminController extends CommonsBaseController {
       const asset = report.assetId ? await this.repos.asset.loadById(report.assetId) : undefined;
       if (action !== "none" && !asset) return this.json({ errors: ["report is not linked to an asset"] }, 400);
       const reason = report.reason === "copyright" ? "copyright" : "policy";
-      if (asset && action === "remove" && asset.status !== "removed") await PublishHelper.remove(this.repos, asset, reason);
-      if (asset && action === "unpublish" && asset.status === "published") await this.repos.asset.update(asset.id || "", { status: "unpublished", unpublishedAt: new Date(), removedReason: reason });
-      await this.repos.report.update(report.id || "", { status: "resolved", resolution, resolutionNote: String(req.body?.note || "").slice(0, 500), reviewedBy: au.id, reviewedAt: new Date() });
+      let tookDown = false;
+      if (asset && action === "remove" && asset.status !== "removed") { await PublishHelper.remove(this.repos, asset, reason); tookDown = true; }
+      if (asset && action === "unpublish" && asset.status === "published") { await this.repos.asset.update(asset.id || "", { status: "unpublished", unpublishedAt: new Date(), removedReason: reason }); tookDown = true; }
+      const note = String(req.body?.note || "").slice(0, 500);
+      await this.repos.report.update(report.id || "", { status: "resolved", resolution, resolutionNote: note, reviewedBy: au.id, reviewedAt: new Date() });
+      if (asset && tookDown) void CommonsMailHelper.notifyTakedown(asset, report).catch((e) => console.error("[CommonsMailHelper] takedown failed:", e));
+      void CommonsMailHelper.notifyReportResolved({ ...report, resolutionNote: note }, resolution).catch((e) => console.error("[CommonsMailHelper] report resolved failed:", e));
       return { status: "resolved" };
     });
   }

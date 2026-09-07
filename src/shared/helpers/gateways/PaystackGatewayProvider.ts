@@ -413,8 +413,8 @@ export class PaystackGatewayProvider implements IGatewayProvider {
   async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status: "pending" | "complete" = "complete"): Promise<any> {
     const amount = eventData.person ? Number(eventData.amount) : fromSubunits(eventData.amount);
     const customerCode = eventData.customer?.customer_code;
-    let personId: string | undefined = eventData.person?.id || eventData.metadata?.personId;
-    if (!personId && customerCode) {
+    let personId: string | undefined = eventData.anonymous ? undefined : (eventData.person?.id || eventData.metadata?.personId);
+    if (!personId && !eventData.anonymous && customerCode) {
       const customer = await repos.customer.load(churchId, customerCode) as any;
       personId = customer?.personId;
     }

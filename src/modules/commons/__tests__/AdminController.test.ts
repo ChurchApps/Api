@@ -5,7 +5,11 @@ jest.mock("../../../shared/helpers/index", () => ({
   Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } },
   Environment: { worshipCommonsRoot: "http://localhost:3104" }
 }));
+const notifyTakedown = jest.fn(async () => {});
+const notifyReportResolved = jest.fn(async () => {});
 jest.mock("../helpers/index", () => ({
+  CommonsMailHelper: { notifyTakedown, notifyReportResolved },
+  DuplicateHelper: jest.requireActual("../helpers/DuplicateHelper").DuplicateHelper,
   ContentLibraryHelper: {
     requestApiBase: () => "http://api",
     signedPendingUrl: jest.fn(async (id: string, name: string) => `signed:${id}/${name}`),
@@ -34,7 +38,8 @@ function adminController(overrides: any = {}, admin = true) {
     submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), loadMine: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })), countByStatus: jest.fn(async () => 4) },
     asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []), loadByPublisher: jest.fn(async () => []) },
     assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", action: "add" }]), loadLive: jest.fn(async () => []) },
-    report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) }
+    report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) },
+    song: { loadPublishedForDuplicates: jest.fn(async () => []) }
   };
   for (const [k, v] of Object.entries(overrides)) Object.assign(repos[k], v);
   const au = { id: "admin000001", checkAccess: () => admin };
@@ -88,6 +93,12 @@ describe("admin submissions", () => {
     expect(PublishHelper.reject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), "admin000001", "quality", "needs a bridge");
   });
 
+  it("accepts ccli as a reject reason", async () => {
+    const { controller } = adminController();
+    expect(await controller.reject(req({ reason: "ccli", note: "in the CCLI catalog" }), {} as any)).toEqual({ status: "rejected" });
+    expect(PublishHelper.reject).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), "admin000001", "ccli", "in the CCLI catalog");
+  });
+
   it("detail carries the diff, signed pending urls, third-party badge and a token-bearing preview url", async () => {
     const { controller } = adminController();
     const detail: any = await controller.submission(req(), {} as any);
@@ -138,13 +149,32 @@ describe("admin submissions", () => {
     expect(rows[0].payload).toBeUndefined();
   });
 
+  it("flags a duplicate of a published song nobody in this submitter's history wrote", async () => {
+    const { controller } = adminController({
+      submission: { loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song", assetName: "The Old Rugged Cross", payload: { name: "The Old Rugged Cross", detail: { writer: "A Newcomer" } } }]) },
+      song: { loadPublishedForDuplicates: jest.fn(async () => [{ id: "asset000555", title: "Old Rugged Cross", writer: "George Bennard", chordPro: "" }]) }
+    });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].possibleDuplicate).toBe(true);
+  });
+
+  it("flags a published song whose first sung line matches, even under a different title", async () => {
+    const { controller } = adminController({
+      submission: { loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song", assetName: "Grace Astounding", payload: { name: "Grace Astounding", detail: { chordPro: "Verse 1\n[G]Amazing grace! how [C]sweet the [G]sound," } } }]) },
+      song: { loadPublishedForDuplicates: jest.fn(async () => [{ id: "asset000556", title: "Amazing Grace", writer: "John Newton", chordPro: "{title: Amazing Grace}\n\nVerse 1\nAmazing grace! how sweet the sound," }]) }
+    });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].possibleDuplicate).toBe(true);
+  });
+
   it("does not flag the same asset as a duplicate of itself", async () => {
     const { controller } = adminController({
       submission: {
         loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song", assetName: "Hope", payload: { name: "Hope" } }]),
         loadMine: jest.fn(async () => [{ assetId: "asset000001", payload: { name: "Hope" } }])
       },
-      asset: { loadByPublisher: jest.fn(async () => [{ id: "asset000001", name: "Hope", status: "pending" }]) }
+      asset: { loadByPublisher: jest.fn(async () => [{ id: "asset000001", name: "Hope", status: "pending" }]) },
+      song: { loadPublishedForDuplicates: jest.fn(async () => [{ id: "asset000001", title: "Hope", writer: "Anon", chordPro: "" }]) }
     });
     const rows: any = await controller.submissions(req(), {} as any);
     expect(rows[0].possibleDuplicate).toBe(false);
@@ -167,6 +197,28 @@ describe("admin reports and assets", () => {
     expect(await controller.resolve(req({ resolution: "upheld", note: "confirmed", action: "remove" }, "rep00000001"), {} as any)).toEqual({ status: "resolved" });
     expect(PublishHelper.remove).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "asset000001" }), "copyright");
     expect(repos.report.update).toHaveBeenCalledWith("rep00000001", expect.objectContaining({ status: "resolved", resolution: "upheld", resolutionNote: "confirmed" }));
+  });
+
+  it("emails the publisher and the reporter when a report takes the song down", async () => {
+    const { controller, repos } = adminController({ report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open", email: "reporter@example.com" })) } });
+    await controller.resolve(req({ resolution: "upheld", note: "confirmed", action: "unpublish" }, "rep00000001"), {} as any);
+    expect(repos.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ status: "unpublished" }));
+    expect(notifyTakedown).toHaveBeenCalledWith(expect.objectContaining({ id: "asset000001" }), expect.objectContaining({ id: "rep00000001" }));
+    expect(notifyReportResolved).toHaveBeenCalledWith(expect.objectContaining({ email: "reporter@example.com", resolutionNote: "confirmed" }), "upheld");
+  });
+
+  it("emails only the reporter when nothing is taken down", async () => {
+    const { controller } = adminController();
+    await controller.resolve(req({ resolution: "dismissed", note: "no issue", action: "none" }, "rep00000001"), {} as any);
+    expect(notifyTakedown).not.toHaveBeenCalled();
+    expect(notifyReportResolved).toHaveBeenCalledWith(expect.objectContaining({ resolutionNote: "no issue" }), "dismissed");
+  });
+
+  it("sends nothing when the resolution is refused", async () => {
+    const { controller } = adminController();
+    expect((await controller.resolve(req({ resolution: "maybe", action: "none" }, "rep00000001"), {} as any) as any).status).toBe(400);
+    expect(notifyReportResolved).not.toHaveBeenCalled();
+    expect(notifyTakedown).not.toHaveBeenCalled();
   });
 
   it("dismissed with action=none leaves the asset alone; unknown resolutions are refused", async () => {

@@ -6,6 +6,7 @@ export interface Song {
   songKey?: string;
   bpm?: number;
   timeSignature?: string;
+  meter?: string;
   scripture?: string;
   scriptureText?: string;
   hymnalCount?: number;
@@ -13,10 +14,19 @@ export interface Song {
   videoUrl?: string;
   parentSongId?: string;
   relationLabel?: string;
+  /** exact license version the writer applied: "1.0" (WC), "4.0" | "3.0" (CC), "CC0" (PD dedication); null for historic PD */
+  licenseVersion?: string;
+  /** canonical URL of that exact license — a CC BY 3.0 song must not silently read as 4.0 */
+  licenseUrl?: string;
   proAnswer?: string;
   certified?: boolean;
   qualityScore?: number;
   qualityDetail?: string;
+}
+
+export interface AuthorLink {
+  label?: string;
+  url?: string;
 }
 
 export interface Author {
@@ -24,12 +34,16 @@ export interface Author {
   name?: string;
   bio?: string;
   portraitUrl?: string;
+  userId?: string;
+  links?: string;
   createdAt?: Date;
 }
 
 /** Satellite joined to its asset and author, aliased back to the legacy song field names the site consumes. */
 export interface SongView extends Song {
   id?: string;
+  /** Opaque popularity/quality blend computed in SQL; the public song payloads sort on this instead of qualityScore. */
+  rank?: number;
   title?: string;
   themes?: string;
   language?: string;

@@ -16,6 +16,7 @@ export class PlanItem {
   public providerPath?: string;
   public providerContentPath?: string;
   public thumbnailUrl?: string;
+  public assignees?: string;
 
   public children?: PlanItem[];
 }

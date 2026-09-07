@@ -139,8 +139,8 @@ export class MessageController extends MessagingBaseController {
       for (const message of req.body) {
         const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
         if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(au, conv.contentType)) return this.json({}, 401);
-        // New posts need participation; an edit's author already participated, so it keeps the author-or-staff rule below.
-        if (!message.id && (!conv?.id || !(await this.canParticipate(au, conv)))) return this.json({}, 401);
+        // New posts need posting rights; an edit's author already participated, so it keeps the author-or-staff rule below.
+        if (!message.id && (!conv?.id || !(await this.canPost(au, conv)))) return this.json({}, 401);
         if (message.id) {
           // Editing is author-or-staff only - leaders get delete, not rewrite - and authorship is never reassignable.
           const existing = await this.repos.message.loadById(au.churchId, message.id);
@@ -234,6 +234,14 @@ export class MessageController extends MessagingBaseController {
 
       return { messageId, emoji, added };
     }) as any;
+  }
+
+  // Creating a message. Group feeds are stricter than participating (leader-only announcements and the
+  // group's per-feed toggles); everything else is the participation rule. Reactions stay on
+  // canParticipate so members can still react in a feed they cannot post to.
+  private async canPost(au: any, conv: any): Promise<boolean> {
+    if (this.isGroupFeed(conv.contentType)) return this.canPostToGroupFeed(au, conv.contentType, conv.contentId);
+    return this.canParticipate(au, conv);
   }
 
   // Group / announcement conversations gate on group membership; DMs on being a

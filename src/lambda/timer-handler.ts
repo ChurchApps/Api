@@ -115,6 +115,11 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     return membershipRepos.loginAttempt.deleteOld(1);
   });
 
+  await JobRunHelper.run("dunningEmails", async () => {
+    const { DunningHelper } = await import("../modules/giving/helpers/DunningHelper.js");
+    return DunningHelper.run();
+  });
+
   await JobRunHelper.run("dailyEmails", () => NotificationHelper.sendEmailNotifications("daily"));
   await JobRunHelper.run("commonsNightly", async () => {
     const { MaintenanceHelper } = await import("../modules/commons/helpers/MaintenanceHelper.js");

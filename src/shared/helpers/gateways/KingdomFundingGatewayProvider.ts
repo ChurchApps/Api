@@ -1195,7 +1195,9 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       // Find person — from direct person data (charge flow) or from customer/transaction lookup (webhook flow).
       let personId: string | undefined;
-      if (eventData.person?.id) {
+      if (eventData.anonymous) {
+        personId = undefined;
+      } else if (eventData.person?.id) {
         personId = eventData.person.id;
       } else {
         const customerVaultId = eventData.customer_vault_id || eventData.transaction?.customer_vault_id;

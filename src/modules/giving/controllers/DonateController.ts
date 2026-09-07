@@ -7,6 +7,7 @@ import { CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { DunningHelper } from "../helpers/DunningHelper.js";
 import Axios from "axios";
 import dayjs from "dayjs";
 
@@ -188,12 +189,14 @@ export class DonateController extends GivingBaseController {
 
           const classification = GatewayService.classifyWebhookEvent(gateway, webhookResult.eventType!);
           if (classification.action === "donation") {
-            const isPending = classification.status === "pending";
+            const donationStatus = classification.status || "complete";
+            const isPending = donationStatus === "pending";
             // Some providers put the transaction ID at reference_number or transaction.id, not at
             // the top-level id. Check every candidate so the idempotency match is reliable even if
             // the webhook surfaces the id under a different field than the /charge response stored.
             const candidateIds = [
               webhookResult.eventData?.id,
+              webhookResult.eventData?.payment_intent,
               webhookResult.eventData?.reference_number,
               webhookResult.eventData?.transaction?.id
             ].map((v) => (v == null ? "" : String(v))).filter((v) => v !== "");
@@ -222,11 +225,16 @@ export class DonateController extends GivingBaseController {
                 await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "pending");
               }
             } else if (existingDonation && transactionId) {
-              // Update existing pending/in-flight donation to complete
-              await GatewayService.updateDonationStatus(gateway, churchId, transactionId, "complete", this.repos);
-            } else {
-              // No prior donation found, create a new complete donation
-              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, "complete");
+              // Move the existing pending/failed donation to the status this event reports.
+              await GatewayService.updateDonationStatus(gateway, churchId, transactionId, donationStatus, this.repos);
+            } else if (donationStatus !== "refunded") {
+              // A refund for a transaction we never recorded has nothing to update; never create a row for it.
+              await GatewayService.logDonation(gateway, churchId, webhookResult.eventData, this.repos, donationStatus);
+            }
+
+            if (donationStatus === "failed" && transactionId) {
+              const failed = await this.repos.donation.loadByTransactionId(churchId, transactionId);
+              if (failed) await DunningHelper.notify(churchId, failed, 0, this.repos);
             }
           } else if (classification.action === "cancel-subscription") {
             await this.repos.subscription.delete(churchId, webhookResult.eventData.id);
@@ -238,6 +246,52 @@ export class DonateController extends GivingBaseController {
       }
 
       return this.json({}, 200);
+    });
+  }
+
+  @httpPost("/retry/:donationId")
+  public async retry(req: express.Request<{ donationId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const donation = await this.repos.donation.load(au.churchId, req.params.donationId);
+      if (!donation) return this.json({ error: "Donation not found" }, 404);
+      if (donation.status !== "failed") return this.json({ error: "Only failed donations can be retried" }, 400);
+
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateway = gateways.find((g) => GatewayService.supportsRetry(g));
+      if (!gateway) return this.json({ error: "This gateway does not support retrying failed payments" }, 400);
+
+      const result = await GatewayService.retryFailedPayment(gateway, donation);
+      if (!result.success) return this.json({ error: result.error || "Retry failed" }, 400);
+
+      // The gateway's invoice.paid webhook also promotes this row; updating here keeps the UI honest.
+      await this.repos.donation.updateStatus(au.churchId, donation.transactionId as string, "complete");
+      return { success: true };
+    });
+  }
+
+  @httpPost("/refund/:donationId")
+  public async refund(req: express.Request<{ donationId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const donation = (await this.repos.donation.load(au.churchId, req.params.donationId)) as any;
+      if (!donation) return this.json({ error: "Donation not found" }, 404);
+      if ((donation.status || "complete") !== "complete") return this.json({ error: "Only completed donations can be refunded" }, 400);
+      if (!donation.transactionId) return this.json({ error: "This donation has no gateway transaction to refund" }, 400);
+
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      const gateway = gateways.find((g) => GatewayService.supportsRefund(g));
+      if (!gateway) return this.json({ error: "This gateway does not support refunds" }, 400);
+
+      // ponytail: full refund only; partial refunds would need an amount and a separate status.
+      const result = await GatewayService.refundDonation(gateway, donation.transactionId);
+      if (!result.success) return this.json({ error: result.error || "Refund failed" }, 400);
+
+      // The gateway's charge.refunded webhook also flips this row; updating here keeps the UI honest.
+      await this.repos.donation.updateStatus(au.churchId, donation.transactionId, "refunded");
+      return { success: true, refundId: result.refundId };
     });
   }
 
@@ -349,6 +403,9 @@ export class DonateController extends GivingBaseController {
       const gateway = await this.getGateway(churchId, donationData.provider, donationData.gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
+      // Anonymous is enforced here, not on the client: the email is kept for the receipt, everything identifying is dropped.
+      if (donationData.anonymous) donationData.person = { id: "", email: donationData.person?.email || "", name: "" };
+
       const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
       const normalizedCurrency = rawCurrency.toLowerCase();
       donationData.currency = normalizedCurrency;
@@ -372,7 +429,8 @@ export class DonateController extends GivingBaseController {
               amount: donationData.amount,
               funds: donationData.funds,
               person: donationData.person,
-              notes: donationData.notes
+              notes: donationData.notes,
+              anonymous: donationData.anonymous
             };
             await GatewayService.logDonation(gateway, churchId, logData, this.repos, "complete");
           } catch (logErr: any) {
@@ -381,7 +439,7 @@ export class DonateController extends GivingBaseController {
         }
 
         try {
-          await this.sendEmails(donationData.person.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
+          await this.sendEmails(donationData.person?.email, donationData?.church, donationData.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
         } catch (emailErr) {
           console.warn("Charge: Failed to send confirmation email (non-fatal)", emailErr);
         }
@@ -736,6 +794,67 @@ export class DonateController extends GivingBaseController {
     });
   }
 
+
+  @httpPost("/register-domain")
+  public async registerDomain(req: express.Request<{}, {}, { churchId?: string; domain?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: public donate widget; the domain itself has to prove it belongs to the posted churchId
+      const churchId = (req.body?.churchId || "").trim();
+      const domain = DonateController.normalizeDomain(req.body?.domain);
+      if (!churchId || !domain) return this.json({ error: "Missing churchId or domain" }, 400);
+
+      // Doubles as the rate limit: an unauthenticated caller can only reach Stripe once an hour per church+domain.
+      const cacheKey = churchId + "|" + domain;
+      const registeredAt = DonateController.registeredDomains.get(cacheKey);
+      if (registeredAt && Date.now() - registeredAt < 3600000) return { registered: true, created: false };
+
+      if (!(await this.domainBelongsToChurch(churchId, domain))) return this.json({ error: "Domain does not belong to this church" }, 400);
+
+      // Apple Pay verification only means anything on a public host, so local dev stops here.
+      if (DonateController.isLocalHost(domain)) return { registered: false, reason: "local" };
+
+      const gateway = await this.getGateway(churchId, "stripe");
+      if (!gateway) return this.json({ error: "Gateway not found" }, 404);
+
+      try {
+        const result = await GatewayService.registerPaymentMethodDomain(gateway, domain);
+        if (!result) return { registered: false, reason: "unsupported" };
+        DonateController.registeredDomains.set(cacheKey, Date.now());
+        return { registered: true, created: result.created };
+      } catch (e) {
+        console.error("Payment method domain registration failed", e);
+        return this.json({ error: "Domain registration failed" }, 502);
+      }
+    });
+  }
+
+  private static registeredDomains = new Map<string, number>();
+
+  private static normalizeDomain(raw?: string): string {
+    const host = (raw || "").trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0];
+    return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/.test(host) ? host : "";
+  }
+
+  private static isLocalHost(domain: string): boolean {
+    return domain === "localhost" || domain.endsWith(".localhost") || domain === "localtest.me" || domain.endsWith(".localtest.me");
+  }
+
+  private async domainBelongsToChurch(churchId: string, domain: string): Promise<boolean> {
+    if (DonateController.isLocalHost(domain)) return true;
+    try {
+      const church = (await Axios.get(Environment.membershipApi + "/churches/lookup/?id=" + churchId)).data;
+      if (church?.subDomain && domain === church.subDomain.toLowerCase() + ".b1.church") return true;
+    } catch (e) {
+      console.error("Church lookup failed during domain registration", e);
+      return false;
+    }
+    try {
+      const owner = (await Axios.get(`${Environment.membershipApi}/domains/public/owner/${domain}?churchId=${encodeURIComponent(churchId)}`)).data;
+      return owner?.owned === true;
+    } catch {
+      return false;
+    }
+  }
 
   /**
    * Get gateway by provider name or ID using the centralized helper

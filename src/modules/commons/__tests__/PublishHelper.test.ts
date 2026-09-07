@@ -42,7 +42,7 @@ function repos(files: any[] = [], liveFiles: any[] = []) {
       deleteByAsset: jest.fn(async () => {})
     },
     song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", hymnalCount: 3 })), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "New Name" })) },
-    author: { findOrCreate: jest.fn(async () => "author00001") }
+    author: { findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001", name: "Fanny Crosby" })), update: jest.fn(async () => {}) }
   };
   return r;
 }
@@ -117,6 +117,26 @@ describe("PublishHelper.approve", () => {
     await PublishHelper.approve(r, sub, asset(), "admin000001");
     expect(r.author.findOrCreate.mock.calls.map((c: any) => c[0])).toEqual(["Ada", "Bea", "Cy"]);
     expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ authorId: "a1" }));
+  });
+
+  it("claims the author row for the submitter when the song credits one writer", async () => {
+    const r = repos();
+    await PublishHelper.approve(r, submission(), asset(), "admin000001");
+    expect(r.author.update).toHaveBeenCalledWith("author00001", { userId: "stranger0001" });
+  });
+
+  it("leaves an already claimed author row alone", async () => {
+    const r = repos();
+    r.author.loadById.mockResolvedValue({ id: "author00001", name: "Fanny Crosby", userId: "someoneelse" });
+    await PublishHelper.approve(r, submission(), asset(), "admin000001");
+    expect(r.author.update).not.toHaveBeenCalled();
+  });
+
+  it("does not claim an author row for a co-written song", async () => {
+    const r = repos();
+    const sub = { ...submission(), payload: { ...submission().payload, detail: { writer: "Ada & Bea", chordPro: "[C]x" } } };
+    await PublishHelper.approve(r, sub, asset(), "admin000001");
+    expect(r.author.update).not.toHaveBeenCalled();
   });
 
   it("fails loudly when a pending object is missing so the approve can be retried", async () => {

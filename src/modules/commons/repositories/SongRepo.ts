@@ -1,4 +1,5 @@
 import { injectable } from "inversify";
+import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { Song, SongView } from "../models/index.js";
 
@@ -31,12 +32,18 @@ const SUMMARY_SONG_COLS = [
   "songs.songKey",
   "songs.bpm",
   "songs.timeSignature",
+  "songs.meter",
   "songs.scripture",
   "songs.hymnalCount",
   "songs.parentSongId",
   "songs.relationLabel",
-  "songs.qualityScore"
+  "songs.licenseVersion",
+  "songs.licenseUrl"
 ] as const;
+
+// Popularity dominates, moderation quality is a kicker; unscored songs sit at a neutral 50.
+// Rounded to an opaque integer so the reviewer-only qualityScore cannot be read back out of it.
+const RANK_COL = sql<number>`cast(round(assets.downloadCount / greatest(1, (select max(maxDl.downloadCount) from assets maxDl where maxDl.status = 'published')) * 60 + coalesce(songs.qualityScore, 50) / 100 * 40) as signed)`.as("rank");
 
 const SONG_COLS = [
   ...SUMMARY_SONG_COLS,
@@ -47,17 +54,25 @@ const SONG_COLS = [
   "songs.videoUrl",
   "songs.certified",
   "songs.proAnswer",
+  "songs.qualityScore",
   "songs.qualityDetail"
 ] as const;
 
-const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS] as const;
-const FULL_COLS = [...MODERATION_SPINE_COLS, ...AUTHOR_COLS, ...SONG_COLS] as const;
+const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS, RANK_COL];
+const FULL_COLS = [...MODERATION_SPINE_COLS, ...AUTHOR_COLS, ...SONG_COLS, RANK_COL];
 
 @injectable()
 export class SongRepo {
   public async loadPublishedSummaries(): Promise<SongView[]> {
     return await this.joined().select(SUMMARY_COLS).where("assets.status", "=", "published")
-      .orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
+      .orderBy(sql.ref("rank"), "desc").orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
+  }
+
+  /** id/title/writer plus enough of chordPro to read its first line — the duplicate check's whole corpus. */
+  public async loadPublishedForDuplicates(): Promise<SongView[]> {
+    return await this.joined()
+      .select(["assets.id as id", "assets.name as title", "authors.name as writer", sql<string>`substring(songs.chordPro, 1, 500)`.as("chordPro")])
+      .where("assets.status", "=", "published").execute() as SongView[];
   }
 
   public async loadPublishedByAuthor(authorId: string): Promise<SongView[]> {
@@ -99,6 +114,7 @@ export class SongRepo {
       songKey: song.songKey,
       bpm: song.bpm,
       timeSignature: song.timeSignature,
+      meter: song.meter,
       scripture: song.scripture,
       scriptureText: song.scriptureText,
       hymnalCount: song.hymnalCount || 0,
@@ -106,6 +122,8 @@ export class SongRepo {
       videoUrl: song.videoUrl,
       parentSongId: song.parentSongId,
       relationLabel: song.relationLabel,
+      licenseVersion: song.licenseVersion,
+      licenseUrl: song.licenseUrl,
       proAnswer: song.proAnswer,
       certified: song.certified,
       qualityScore: song.qualityScore,

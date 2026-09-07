@@ -14,7 +14,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
     supportsSubscriptions: true,
     supportsVault: true,
     supportsACH: true,
-    supportsRefunds: false,
+    supportsRefunds: true,
     supportsPartialRefunds: false,
     supportsWebhooks: true,
     supportsOrders: false,
@@ -38,6 +38,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
     if (DONATION_EVENTS.includes(eventType)) {
       return { action: "donation", status: eventType === "payment_intent.processing" ? "pending" : "complete" };
     }
+    if (eventType === "invoice.payment_failed") return { action: "donation", status: "failed" };
+    if (eventType === "charge.refunded") return { action: "donation", status: "refunded" };
     if (eventType === "customer.subscription.deleted") return { action: "cancel-subscription" };
     return { action: "ignore" };
   }
@@ -264,12 +266,39 @@ export class StripeGatewayProvider implements IGatewayProvider {
     await StripeHelper.logEvent(churchId, event, eventData, repos);
   }
 
-  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status: "pending" | "complete" = "complete"): Promise<any> {
+  async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status: "pending" | "complete" | "failed" = "complete"): Promise<any> {
     return await StripeHelper.logDonation(config.privateKey, churchId, eventData, repos, status);
   }
 
-  async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void> {
+  async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: any): Promise<void> {
     await StripeHelper.updateDonationStatus(churchId, transactionId, status, repos);
+  }
+
+  async retryFailedPayment(config: GatewayConfig, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }> {
+    const invoiceId = donation.transactionId || "";
+    if (!invoiceId.startsWith("in_")) return { success: false, error: "Only failed subscription invoices can be retried" };
+    try {
+      const invoice = await StripeHelper.payInvoice(config.privateKey, invoiceId);
+      if (invoice.status === "paid") return { success: true };
+      return { success: false, error: `Invoice is ${invoice.status}` };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Retry failed" };
+    }
+  }
+
+  // ponytail: full refund only; a partial refund would take an amount and a "partially refunded" status.
+  async refundCharge(config: GatewayConfig, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
+    const id = transactionId || "";
+    // A donation's transactionId is whichever id the charge path stored, so pass the matching Stripe key.
+    const params = id.startsWith("ch_") ? { charge: id } : id.startsWith("pi_") ? { payment_intent: id } : null;
+    if (!params) return { success: false, error: "Only card and bank charges can be refunded" };
+    try {
+      const refund = await StripeHelper.createRefund(config.privateKey, params);
+      if (refund.status === "failed" || refund.status === "canceled") return { success: false, error: `Refund ${refund.status}` };
+      return { success: true, refundId: refund.id };
+    } catch (e: any) {
+      return { success: false, error: e?.message || "Refund failed" };
+    }
   }
 
   // Customer management
@@ -455,5 +484,9 @@ export class StripeGatewayProvider implements IGatewayProvider {
 
   async confirmSetupIntent(config: GatewayConfig, setupIntentId: string, paymentMethodId: string): Promise<any> {
     return await StripeHelper.confirmSetupIntent(config.privateKey, setupIntentId, paymentMethodId);
+  }
+
+  async registerPaymentMethodDomain(config: GatewayConfig, domainName: string): Promise<{ id: string; created: boolean }> {
+    return await StripeHelper.registerPaymentMethodDomain(config.privateKey, domainName);
   }
 }

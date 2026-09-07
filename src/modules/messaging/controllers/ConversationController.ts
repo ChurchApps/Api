@@ -153,6 +153,8 @@ export class ConversationController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       for (const conversation of req.body) {
         if (this.isPersonNote(conversation.contentType) && !this.canViewPersonNotes(au, conversation.contentType)) return this.json({}, 401);
+        // A group feed row is seeded lazily by the first poster, so seeding needs the same rights as posting.
+        if (this.isGroupFeed(conversation.contentType) && !(await this.canPostToGroupFeed(au, conversation.contentType, conversation.contentId))) return this.json({}, 401);
       }
       const promises: Promise<Conversation>[] = [];
       req.body.forEach((conversation) => {
@@ -203,6 +205,7 @@ export class ConversationController extends MessagingBaseController {
   public async start(req: express.Request<{}, {}, { groupId: string; contentType: string; contentId: string; title: string; comment: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (this.isPersonNote(req.body.contentType) && !this.canViewPersonNotes(au, req.body.contentType)) return this.json({}, 401);
+      if (this.isGroupFeed(req.body.contentType) && !(await this.canPostToGroupFeed(au, req.body.contentType, req.body.contentId))) return this.json({}, 401);
       const c: Conversation = {
         churchId: au.churchId,
         contentType: req.body.contentType,

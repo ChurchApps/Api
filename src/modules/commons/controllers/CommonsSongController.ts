@@ -1,7 +1,7 @@
 import { controller, httpDelete, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { ChordProHelper, ContentLibraryHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
+import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 import { SongView } from "../models/index.js";
 
@@ -33,6 +33,16 @@ export class CommonsSongController extends CommonsBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => await this.withUrls(await this.repos.song.loadPublishedSummaries()));
+  }
+
+  // public: a writer about to submit deserves to know the song is already here, before signing in
+  @httpGet("/similar")
+  public async similar(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const query = { title: String(req.query.title || ""), writer: String(req.query.writer || ""), firstLine: String(req.query.firstLine || "") };
+      if (!query.title.trim() && !query.firstLine.trim()) return [];
+      return DuplicateHelper.matches(query, await this.repos.song.loadPublishedForDuplicates());
+    });
   }
 
   @httpGet("/mine")
@@ -91,7 +101,7 @@ export class CommonsSongController extends CommonsBaseController {
       const song = await this.repos.song.loadById(String(req.params.id));
       if (!song || song.status !== "published") return this.json({}, 404);
       const [view] = await this.withUrls([song]);
-      const { proAnswer: _proAnswer, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = view as any;
+      const { proAnswer: _proAnswer, qualityScore: _qualityScore, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = view as any;
       return pub;
     });
   }
@@ -118,7 +128,7 @@ export class CommonsSongController extends CommonsBaseController {
         name: body.title,
         tags: body.themes,
         language: body.language || "English",
-        license: body.license === "PD" ? "PD" : "WC",
+        license: body.license || "WC", // validated against ASSET_TYPES.song.licenses on submit; unknown codes are a 400
         detail: {
           writer: body.writer,
           year: body.year,
@@ -171,7 +181,8 @@ export class CommonsSongController extends CommonsBaseController {
   private async withUrls(songs: SongView[]): Promise<SongView[]> {
     const files = await this.repos.assetFile.loadLiveMany(songs.map((s) => s.id || ""));
     return songs.map((s) => {
-      const { portraitKey, ...rest } = s;
+      // qualityScore is reviewer-only: it never leaves an anonymous endpoint, only the opaque rank does
+      const { portraitKey, qualityScore: _qualityScore, ...rest } = s;
       return { ...rest, fileUrls: ContentLibraryHelper.fileUrls({ assetType: "song", id: s.id }, files[s.id || ""] || [], portraitKey) };
     });
   }

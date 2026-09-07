@@ -78,6 +78,18 @@ export class DomainController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/public/owner/:domainName")
+  public async getPublicOwnership(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: public yes/no oracle for the donate widget; the churchId is only compared, never used to scope a read
+      const churchId = typeof req.query.churchId === "string" ? req.query.churchId : "";
+      if (!churchId) return { owned: false };
+      const row = await this.repos.domain.loadByName(domainName) as { churchId?: string } | null;
+      // Yes/no only; the public lookup deliberately never hands out the owning churchId.
+      return { owned: row?.churchId === churchId };
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

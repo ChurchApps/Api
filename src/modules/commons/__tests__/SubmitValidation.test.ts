@@ -20,6 +20,11 @@ describe("registry-driven submission validation", () => {
     expect(validateSubmission(song, { ...goodSong, name: " " }, [], []).join("\n")).toMatch(/name/);
   });
 
+  it("songs may be uploaded as WC, PD or CC-BY; the share-alike and non-commercial variants are harvest-only", () => {
+    for (const license of ["WC", "PD", "CC-BY"]) expect(validateSubmission(song, { ...goodSong, license }, [], [])).toEqual([]);
+    for (const license of ["CC-BY-NC", "CC-BY-SA", "CC-BY-NC-SA", "CC0", "ND"]) expect(validateSubmission(song, { ...goodSong, license }, [], []).join("\n")).toMatch(/license must be one of: WC, PD, CC-BY/);
+  });
+
   it("returns every blocking problem at once", () => {
     const errors = validateSubmission(song, { name: " ", license: "CC0", detail: {} }, [file("virus.exe")], []);
     expect(errors.join("\n")).toMatch(/name/);

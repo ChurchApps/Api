@@ -165,17 +165,37 @@ export class GatewayService {
     await provider.logEvent(churchId, event, eventData, repos);
   }
 
-  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any, status: "pending" | "complete" = "complete"): Promise<any> {
+  static async logDonation(gateway: any, churchId: string, eventData: any, repos: any, status: "pending" | "complete" | "failed" = "complete"): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     const config = this.getGatewayConfig(gateway);
     return await provider.logDonation(config, churchId, eventData, repos, status);
   }
 
-  static async updateDonationStatus(gateway: any, churchId: string, transactionId: string, status: "pending" | "complete" | "failed", repos: any): Promise<void> {
+  static async updateDonationStatus(gateway: any, churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", repos: any): Promise<void> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.updateDonationStatus) {
       await provider.updateDonationStatus(churchId, transactionId, status, repos);
     }
+  }
+
+  static supportsRetry(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).retryFailedPayment;
+  }
+
+  static async retryFailedPayment(gateway: any, donation: { transactionId?: string }): Promise<{ success: boolean; error?: string }> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.retryFailedPayment) return { success: false, error: `${provider.name} does not support retrying failed payments` };
+    return await provider.retryFailedPayment(this.getGatewayConfig(gateway), donation);
+  }
+
+  static supportsRefund(gateway: any): boolean {
+    return !!this.getProviderFromGateway(gateway).refundCharge;
+  }
+
+  static async refundDonation(gateway: any, transactionId: string): Promise<{ success: boolean; refundId?: string; error?: string }> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.refundCharge) return { success: false, error: `${provider.name} does not support refunds` };
+    return await provider.refundCharge(this.getGatewayConfig(gateway), transactionId);
   }
 
   static async createCustomer(gateway: any, email: string, name: string, options?: { personId?: string }): Promise<string | undefined> {
@@ -414,6 +434,12 @@ export class GatewayService {
       return await provider.generateClientToken(config);
     }
     return undefined;
+  }
+
+  static async registerPaymentMethodDomain(gateway: any, domainName: string): Promise<{ id: string; created: boolean } | null> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.registerPaymentMethodDomain) return null;
+    return await provider.registerPaymentMethodDomain(this.getGatewayConfig(gateway), domainName);
   }
 
   static async createOrder(gateway: any, orderData: any): Promise<any> {

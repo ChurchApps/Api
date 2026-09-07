@@ -180,6 +180,21 @@ describe("PaystackGatewayProvider", () => {
       expect(r.donation.save.mock.calls[0][0]).toMatchObject({ amount: 1500, personId: "PER_CUS", method: "Mobile Money", methodDetails: "MTN ****1234" });
       expect(r.gatewayPaymentMethod.save).not.toHaveBeenCalled();
     });
+
+    it("leaves an anonymous gift unlinked even when the gateway customer maps to a person", async () => {
+      const r = repos();
+      await provider.logDonation(config, "CHU1", {
+        reference: "ref_3",
+        amount: 25,
+        anonymous: true,
+        person: { id: "", email: "donor@example.com", name: "" },
+        funds: [{ id: "FUN1", amount: 25 }],
+        customer: { customer_code: "CUS_1" },
+        authorization: { channel: "card", brand: "visa", last4: "4081" }
+      }, r);
+      expect(r.donation.save.mock.calls[0][0].personId).toBeUndefined();
+      expect(r.fundDonation.save).toHaveBeenCalledWith(expect.objectContaining({ fundId: "FUN1", amount: 25 }));
+    });
   });
 
   describe("calculateFees", () => {

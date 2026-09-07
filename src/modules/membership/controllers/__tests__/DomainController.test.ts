@@ -121,6 +121,17 @@ describe("DomainController public lookup", () => {
     expect(result.siteId).toBeUndefined();
   });
 
+  it("answers domain ownership with a yes/no and never the churchId", async () => {
+    const { controller, repos } = domainController();
+    const owned: any = await (controller as any).getPublicOwnership("x.com", { query: { churchId: "c1" } }, {});
+    expect(owned).toEqual({ owned: true });
+    expect(repos.domain.loadByName).toHaveBeenCalledWith("x.com");
+    const foreign: any = await (controller as any).getPublicOwnership("x.com", { query: { churchId: "c2" } }, {});
+    expect(foreign).toEqual({ owned: false });
+    const anonymous: any = await (controller as any).getPublicOwnership("x.com", { query: {} }, {});
+    expect(anonymous).toEqual({ owned: false });
+  });
+
   it("returns an empty object when the domain is unknown", async () => {
     const { controller } = domainController({ domainRow: null });
     const result: any = await (controller as any).getPublicByName("gone.com", {}, {});

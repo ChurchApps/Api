@@ -2,7 +2,9 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanItem } from "../models/index.js";
-import { PlanAuth } from "../../../shared/helpers/index.js";
+import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
+import { PlanHelper } from "../helpers/PlanHelper.js";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 
 @controller("/doing/planItems")
 export class PlanItemController extends DoingBaseController {
@@ -27,7 +29,12 @@ export class PlanItemController extends DoingBaseController {
   public async getForPresenter(@requestParam("churchId") churchId: string, @requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const result = (await this.repos.planItem.loadForPlan(churchId, planId)) as PlanItem[];
-      return this.buildTree(result, null as any);
+      const tree = this.buildTree(result, null as any);
+      // Stays anonymous for presenters; a Plans editor of this church additionally gets assignee names on positioned items.
+      let au: AuthenticatedUser | null = null;
+      try { au = this.authUser(); } catch { au = null; }
+      if (au?.churchId === churchId && au.checkAccess(Permissions.plans.edit)) await PlanHelper.attachAssignees(churchId, planId, tree, this.repos);
+      return tree;
     });
   }
 

@@ -48,6 +48,10 @@ const runMidnight = async (): Promise<void> => {
     const membershipRepos = await RepoManager.getRepos<any>("membership");
     return membershipRepos.jobRun.deleteOld(30);
   });
+  await JobRunHelper.run("dunningEmails", async () => {
+    const { DunningHelper } = await import("../../modules/giving/helpers/DunningHelper.js");
+    return DunningHelper.run();
+  });
   await JobRunHelper.run("dailyEmails", () => NotificationHelper.sendEmailNotifications("daily"));
   await JobRunHelper.run("commonsNightly", async () => {
     const { MaintenanceHelper } = await import("../../modules/commons/helpers/MaintenanceHelper.js");
