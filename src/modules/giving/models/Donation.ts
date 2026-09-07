@@ -1,6 +1,6 @@
 import { Fund } from "./index.js";
 
-export type DonationStatus = "pending" | "complete" | "failed";
+export type DonationStatus = "pending" | "complete" | "failed" | "refunded";
 
 export class Donation {
   public id?: string;
