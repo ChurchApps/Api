@@ -30,7 +30,8 @@ function personController(opts: any = {}) {
       convertToPreferenceModel: (_c: string, data: any) => data,
       load: jest.fn(async () => opts.person ?? null),
       delete: jest.fn(),
-      deleteByIds: jest.fn()
+      deleteByIds: jest.fn(),
+      findPossibleDuplicates: jest.fn(async () => opts.duplicates ?? [])
     },
     groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async () => []) },
     auditLog: { loadCount: jest.fn(async () => 0), create: jest.fn() },
@@ -396,5 +397,28 @@ describe("PersonController contact visibility levels", () => {
     expect(result[0].contactInfo.email).toBeUndefined();
     expect(result[0].contactInfo.mobilePhone).toBeUndefined();
     expect(result[0].contactInfo.address1).toBe("1 Main");
+  });
+});
+
+describe("PersonController.duplicates", () => {
+  it("blocks a caller without people.view or member status (401)", async () => {
+    const { controller, repos } = personController({ access: [], membershipStatus: "Guest" });
+    const result: any = await (controller as any).duplicates({ body: { email: "a@b.com" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.findPossibleDuplicates).not.toHaveBeenCalled();
+  });
+
+  it("passes email/phone/name/birthDate through and returns matches", async () => {
+    const match = { id: "p2", name: { display: "Donald Clark" } };
+    const { controller, repos } = personController({ access: ["peopleView"], duplicates: [match] });
+    const result = await (controller as any).duplicates({ body: { email: "donald@x.org", phone: "555-1212", firstName: "Donald", lastName: "Clark", birthDate: "1980-01-01" } }, {});
+    expect(repos.person.findPossibleDuplicates).toHaveBeenCalledWith("c1", { email: "donald@x.org", phone: "555-1212", firstName: "Donald", lastName: "Clark", birthDate: new Date("1980-01-01") });
+    expect(result).toEqual([match]);
+  });
+
+  it("returns [] when the repo finds no matches", async () => {
+    const { controller } = personController({ access: ["peopleView"], duplicates: [] });
+    const result = await (controller as any).duplicates({ body: { email: "nobody@x.org" } }, {});
+    expect(result).toEqual([]);
   });
 });
