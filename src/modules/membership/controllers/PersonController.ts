@@ -434,10 +434,15 @@ export class PersonController extends MembershipBaseController {
       if (!canEdit && !isSelfOnly) return this.json({}, 401);
       else {
         const promises: Promise<Person>[] = [];
-        req.body.forEach((person) => {
+        for (const person of req.body) {
           person.churchId = au.churchId;
           if (person.contactInfo === undefined) person.contactInfo = {};
           const isNew = !person.id;
+          if (isNew && !person.householdId) {
+            const household: Household = { churchId: au.churchId, name: person.name?.last || person.name?.display || "" };
+            await this.repos.household.save(household);
+            person.householdId = household.id;
+          }
           promises.push(
             this.repos.person.save(person).then(async (p) => {
               // const r = this.repos.person.convertToModel(au.churchId, p);
@@ -449,7 +454,7 @@ export class PersonController extends MembershipBaseController {
               return p;
             })
           );
-        });
+        }
         return this.repos.person.convertAllToModelWithPermissions(au.churchId, await Promise.all(promises), au.checkAccess(Permissions.people.edit));
       }
     });

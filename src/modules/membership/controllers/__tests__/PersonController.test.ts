@@ -35,7 +35,7 @@ function personController(opts: any = {}) {
     },
     groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async () => []) },
     auditLog: { loadCount: jest.fn(async () => 0), create: jest.fn() },
-    household: { deleteUnused: jest.fn() },
+    household: { deleteUnused: jest.fn(), save: jest.fn(async (h: any) => { h.id = "genH"; return h; }) },
     formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) },
     visibilityPreference: { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => []) },
     church: { loadById: jest.fn(async () => opts.church ?? { id: "c1" }) },
@@ -70,6 +70,21 @@ describe("PersonController.save authorization", () => {
     const { controller, repos } = personController({ access: ["peopleEdit"] });
     await (controller as any).save(saveReq([{ id: "p2" }]), {});
     expect(repos.person.save).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives a new person a household named from the last name when none is supplied", async () => {
+    const { controller, repos } = personController({ access: ["peopleEdit"] });
+    const person: any = { name: { first: "Zacchaeus", last: "Smith" } };
+    await (controller as any).save(saveReq([person]), {});
+    expect(repos.household.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", name: "Smith" }));
+    expect(person.householdId).toBe("genH");
+    expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ householdId: "genH" }));
+  });
+
+  it("keeps a supplied householdId and never creates one for an existing person", async () => {
+    const { controller, repos } = personController({ access: ["peopleEdit"] });
+    await (controller as any).save(saveReq([{ name: { last: "Smith" }, householdId: "h9" }, { id: "p2", name: { last: "Jones" } }]), {});
+    expect(repos.household.save).not.toHaveBeenCalled();
   });
 
   it("allows editSelf when body[0].id matches the caller's personId", async () => {
