@@ -12,6 +12,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const MODULES = ["membership", "attendance", "content", "giving", "messaging", "doing"] as const;
+// Commons is migrated in place (not dropped) so a local catalog survives reset-demo.
+const MIGRATE_ONLY_MODULES = ["commons"] as const;
 
 const moduleDemoFiles: Record<string, string[]> = {
   membership: ["demo.sql", "populateData.sql"],
@@ -206,6 +208,16 @@ async function resetDatabases(options: InitOptions = {}) {
     if (!options.schemaOnly) {
       await loadDemoData(moduleName);
     }
+  }
+
+  for (const moduleName of MIGRATE_ONLY_MODULES) {
+    const envVar = `${moduleName.toUpperCase()}_CONNECTION_STRING`;
+    if (!process.env[envVar]) {
+      console.log(`  No connection string for ${moduleName}, skipping migrate-only.`);
+      continue;
+    }
+    console.log(`\n  Migrating ${moduleName} in place...`);
+    await runMigrations(moduleName);
   }
 
   console.log("\nDatabase reset completed!");
