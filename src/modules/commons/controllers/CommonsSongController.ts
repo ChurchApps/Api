@@ -128,7 +128,7 @@ export class CommonsSongController extends CommonsBaseController {
         name: body.title,
         tags: body.themes,
         language: body.language || "English",
-        license: body.license === "PD" ? "PD" : "WC",
+        license: body.license || "WC", // validated against ASSET_TYPES.song.licenses on submit; unknown codes are a 400
         detail: {
           writer: body.writer,
           year: body.year,

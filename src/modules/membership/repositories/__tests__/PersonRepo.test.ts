@@ -164,3 +164,52 @@ describe("PersonRepo model conversion", () => {
     expect(pref.name.display).toBe("Jane Doe");
   });
 });
+
+describe("PersonRepo.findPossibleDuplicates", () => {
+  it("returns [] without querying when no criteria are usable", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const result = await new PersonRepo().findPossibleDuplicates("c1", { firstName: "Donald" });
+    expect(result).toEqual([]);
+    expect(calls.length).toBe(0);
+  });
+
+  it("matches on email alone", async () => {
+    const row = { id: "p2" };
+    const { proxy, calls } = recordingDb([row]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const result = await new PersonRepo().findPossibleDuplicates("c1", { email: "Donald@X.org" });
+    expect(result).toEqual([row]);
+    const wheres = whereCalls(calls);
+    expect(wheres.some((c) => c.args[0] === "churchId" && c.args[2] === "c1")).toBe(true);
+    expect(wheres.some((c) => typeof c.args[0] === "function")).toBe(true);
+  });
+
+  it("matches on phone digits alone, ignoring formatting", async () => {
+    const { proxy, calls } = recordingDb([{ id: "p2" }]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const result = await new PersonRepo().findPossibleDuplicates("c1", { phone: "(555) 123-4567" });
+    expect(result).toEqual([{ id: "p2" }]);
+    expect(whereCalls(calls).length).toBeGreaterThan(0);
+  });
+
+  it("matches on first+last name only when birthDate is also present", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new PersonRepo().findPossibleDuplicates("c1", { firstName: "Donald", lastName: "Clark" });
+    expect(calls.length).toBe(0);
+
+    const { proxy: proxy2, calls: calls2 } = recordingDb([{ id: "p2" }]);
+    (getDb as jest.Mock).mockReturnValue(proxy2);
+    const result = await new PersonRepo().findPossibleDuplicates("c1", { firstName: "Donald", lastName: "Clark", birthDate: "1980-01-01" });
+    expect(result).toEqual([{ id: "p2" }]);
+    expect(whereCalls(calls2).length).toBeGreaterThan(0);
+  });
+
+  it("returns [] when nothing matches", async () => {
+    const { proxy } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const result = await new PersonRepo().findPossibleDuplicates("c1", { email: "nobody@x.org" });
+    expect(result).toEqual([]);
+  });
+});

@@ -7,7 +7,7 @@ export const ASSET_TYPES: Record<string, any> = {
     key: "song",
     label: "Song",
     product: "worshipcommons",
-    licenses: ["WC", "PD"],
+    licenses: ["WC", "PD", "CC-BY"],
     defaultLicense: "WC",
     files: [
       { role: "demoAudio", namePattern: "demoAudio.{ext}", extensions: ["mp3", "wav"], maxBytes: 25 * MB },

@@ -14,6 +14,10 @@ export interface Song {
   videoUrl?: string;
   parentSongId?: string;
   relationLabel?: string;
+  /** exact license version the writer applied: "1.0" (WC), "4.0" | "3.0" (CC), "CC0" (PD dedication); null for historic PD */
+  licenseVersion?: string;
+  /** canonical URL of that exact license — a CC BY 3.0 song must not silently read as 4.0 */
+  licenseUrl?: string;
   proAnswer?: string;
   certified?: boolean;
   qualityScore?: number;

@@ -1,0 +1,99 @@
+{
+  "keyName": "headcountTrend",
+  "displayName": "Headcount Trend",
+  "description": "Manually entered headcount totals for each week.",
+  "queries": [
+    {
+      "depth": 0,
+      "keyName": "main",
+      "db": "attendance",
+      "sqlLines": [
+        "SELECT STR_TO_DATE(concat(year(h.headcountDate), ' ', week(h.headcountDate, 0), ' Sunday'), '%X %V %W') AS week, SUM(h.value) as headcount",
+        "FROM headcounts h",
+        "LEFT JOIN serviceTimes st on st.id = h.serviceTimeId",
+        "LEFT JOIN services ser on ser.id = COALESCE(h.serviceId, st.serviceId)",
+        "WHERE h.churchId=:churchId",
+        "AND (:groupId='' OR h.groupId = :groupId)",
+        "AND (:serviceTimeId='' OR h.serviceTimeId = :serviceTimeId)",
+        "AND (:serviceId='' OR ser.id = :serviceId)",
+        "AND (:campusId='' OR COALESCE(h.campusId, ser.campusId) = :campusId)",
+        "GROUP BY year(h.headcountDate), week(h.headcountDate, 0), STR_TO_DATE(concat(year(h.headcountDate), ' ', week(h.headcountDate, 0), ' Sunday'), '%X %V %W')",
+        "ORDER BY year(h.headcountDate), week(h.headcountDate, 0);"
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "keyName": "churchId",
+      "source": "au",
+      "sourceKey": "churchId"
+    },
+    {
+      "keyName": "campusId",
+      "displayName": "Campus",
+      "source": "dropdown",
+      "sourceKey": "campus"
+    },
+    {
+      "keyName": "serviceId",
+      "displayName": "Service",
+      "source": "dropdown",
+      "sourceKey": "service"
+    },
+    {
+      "keyName": "serviceTimeId",
+      "displayName": "Service Time",
+      "source": "dropdown",
+      "sourceKey": "serviceTime"
+    },
+    {
+      "keyName": "groupId",
+      "displayName": "Group",
+      "source": "dropdown",
+      "sourceKey": "group"
+    }
+  ],
+  "outputs": [
+    {
+      "outputType": "lineChart",
+      "columns": [
+        {
+          "header": "Week",
+          "value": "week",
+          "formatter": "date"
+        },
+        {
+          "header": "Headcount",
+          "value": "headcount",
+          "formatter": "number"
+        }
+      ]
+    },
+    {
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Week",
+          "value": "week",
+          "formatter": "date"
+        },
+        {
+          "header": "Headcount",
+          "value": "headcount",
+          "formatter": "number"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "AttendanceApi",
+          "contentType": "Attendance",
+          "action": "View"
+        }
+      ]
+    }
+  ]
+}

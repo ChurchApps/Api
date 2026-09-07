@@ -5,6 +5,7 @@ import { ContentBaseController } from "./ContentBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { YouTubeHelper, Environment, VimeoHelper, OpenAiHelper } from "../helpers/index.js";
 import { FileStorageHelper } from "@churchapps/apihelper";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 @controller("/content/sermons")
 export class SermonController extends ContentBaseController {
@@ -255,6 +256,89 @@ export class SermonController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.sermon.loadPublicAll(churchId);
     });
+  }
+
+  @httpGet("/rss/:churchId")
+  public async rss(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      const siteUrl = req.query.siteUrl ? req.query.siteUrl.toString().replace(/\/$/, "") : "";
+      const sermons = await this.repos.sermon.loadPublicAll(churchId);
+      const church = await getMembershipModuleGateway().loadChurch(churchId);
+      const settings: any[] = await this.repos.setting.loadByKeyNames(churchId, ["podcastTitle", "podcastImage"]);
+      const values: any = {};
+      settings.forEach((s) => { values[s.keyName] = s.value; });
+      let image = values.podcastImage || "";
+      if (!image) image = (await getMembershipModuleGateway().loadSetting(churchId, "logoLight")) || "";
+      res.set("Content-Type", "application/rss+xml");
+      res.send(this.buildPodcastRss(sermons, siteUrl, values.podcastTitle || church?.name || "Sermons", church?.name || "", image));
+    });
+  }
+
+  private getEnclosureUrl(sermon: Sermon): string {
+    if (sermon.audioUrl) return sermon.audioUrl;
+    // Embed players (YouTube/Vimeo/Facebook) are not valid enclosures; only direct media files are.
+    return /\.(mp3|m4a|mp4)(\?|$)/i.test(sermon.videoUrl || "") ? sermon.videoUrl : "";
+  }
+
+  private getEnclosureType(url: string): string {
+    if (/\.mp3(\?|$)/i.test(url)) return "audio/mpeg";
+    if (/\.m4a(\?|$)/i.test(url)) return "audio/x-m4a";
+    return "video/mp4";
+  }
+
+  private formatDuration(seconds: number): string {
+    const total = Math.max(0, Math.floor(seconds || 0));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const pad = (n: number) => (n < 10 ? "0" + n : String(n));
+    return h > 0 ? h + ":" + pad(m) + ":" + pad(s) : pad(m) + ":" + pad(s);
+  }
+
+  private buildPodcastRss(sermons: Sermon[], siteUrl: string, title: string, churchName: string, image: string): string {
+    const items = sermons.map((sermon) => {
+      const enclosure = this.getEnclosureUrl(sermon);
+      if (!enclosure) return "";
+      const link = siteUrl + "/sermons/" + (sermon.id || "");
+      const pubDate = sermon.publishDate ? new Date(sermon.publishDate).toUTCString() : "";
+      return [
+        "    <item>",
+        "      <title>" + this.escapeXml(sermon.title || "") + "</title>",
+        "      <link>" + this.escapeXml(link) + "</link>",
+        "      <guid isPermaLink=\"false\">" + this.escapeXml(sermon.id || link) + "</guid>",
+        "      <description>" + this.escapeXml(sermon.description || "") + "</description>",
+        "      <enclosure url=\"" + this.escapeXml(enclosure) + "\" type=\"" + this.getEnclosureType(enclosure) + "\" length=\"0\" />",
+        sermon.duration ? "      <itunes:duration>" + this.formatDuration(sermon.duration) + "</itunes:duration>" : "",
+        sermon.thumbnail ? "      <itunes:image href=\"" + this.escapeXml(sermon.thumbnail) + "\" />" : "",
+        pubDate ? "      <pubDate>" + pubDate + "</pubDate>" : "",
+        "    </item>"
+      ].filter(Boolean).join("\n");
+    }).filter(Boolean).join("\n");
+    return [
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+      "<rss version=\"2.0\" xmlns:itunes=\"http://www.itunes.com/dtds/podcast-1.0.dtd\">",
+      "  <channel>",
+      "    <title>" + this.escapeXml(title) + "</title>",
+      "    <link>" + this.escapeXml(siteUrl || "/sermons") + "</link>",
+      "    <description>" + this.escapeXml("Sermons from " + (churchName || title)) + "</description>",
+      "    <language>en-us</language>",
+      "    <itunes:author>" + this.escapeXml(churchName || title) + "</itunes:author>",
+      "    <itunes:explicit>false</itunes:explicit>",
+      "    <itunes:category text=\"Religion &amp; Spirituality\"><itunes:category text=\"Christianity\" /></itunes:category>",
+      image ? "    <itunes:image href=\"" + this.escapeXml(image) + "\" />" : "",
+      items,
+      "  </channel>",
+      "</rss>"
+    ].filter(Boolean).join("\n");
+  }
+
+  private escapeXml(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 
   @httpDelete("/:id")

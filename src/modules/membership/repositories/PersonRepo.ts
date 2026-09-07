@@ -275,6 +275,39 @@ export class PersonRepo {
       .execute() as any;
   }
 
+  // Digits-only compare so "(555) 123-4567" matches "555-123-4567".
+  private phoneDigitsSql(column: string) {
+    return sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${sql.ref(column)},'-',''),' ',''),'(',''),')',''),'+','')`;
+  }
+
+  public async findPossibleDuplicates(churchId: string, params: { email?: string; phone?: string; firstName?: string; lastName?: string; birthDate?: Date | string }) {
+    const email = params.email?.trim().toLowerCase();
+    const phoneDigits = (params.phone || "").replace(/\D/g, "");
+    const firstName = params.firstName?.trim().toLowerCase();
+    const lastName = params.lastName?.trim().toLowerCase();
+    const birthDate = params.birthDate ? DateHelper.toMysqlDateOnly(params.birthDate) : null;
+    if (!email && !phoneDigits && !(firstName && lastName && birthDate)) return [];
+
+    return getDb().selectFrom("people").selectAll()
+      .where("churchId", "=", churchId)
+      .where("removed", "=", false as any)
+      .where((eb) => {
+        const clauses = [];
+        if (email) clauses.push(eb(sql`LOWER(email)`, "=", email));
+        if (phoneDigits) {
+          clauses.push(eb(this.phoneDigitsSql("HomePhone"), "=", phoneDigits));
+          clauses.push(eb(this.phoneDigitsSql("WorkPhone"), "=", phoneDigits));
+          clauses.push(eb(this.phoneDigitsSql("MobilePhone"), "=", phoneDigits));
+        }
+        if (firstName && lastName && birthDate) {
+          clauses.push(eb.and([eb(sql`LOWER(FirstName)`, "=", firstName), eb(sql`LOWER(LastName)`, "=", lastName), eb("birthDate", "=", birthDate as any)]));
+        }
+        return eb.or(clauses);
+      })
+      .limit(25)
+      .execute();
+  }
+
   public async loadAttendees(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, categoryName: string, groupId: string, startDate: Date, endDate: Date) {
     const conditions: ReturnType<typeof sql>[] = [];
     conditions.push(sql`p.churchId = ${churchId} AND v.visitDate BETWEEN ${startDate as any} AND ${endDate as any}`);

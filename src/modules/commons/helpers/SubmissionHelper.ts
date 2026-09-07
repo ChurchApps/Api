@@ -88,7 +88,7 @@ export class SubmissionHelper {
 
     const payload = { ...(sub.payload || {}) };
     if (payload.tags !== undefined) payload.tags = normalizeTags(payload.tags);
-    payload.licenseVersion = payload.licenseVersion || (payload.license === "PD" ? "CC0" : "1.0");
+    payload.licenseVersion = payload.licenseVersion || (payload.license === "PD" ? "CC0" : payload.license?.startsWith("CC-") ? "4.0" : "1.0");
     payload.attestationVersion = payload.attestationVersion || "1.0";
     payload.attestedAt = payload.attestedAt || new Date().toISOString();
 

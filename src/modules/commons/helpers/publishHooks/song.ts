@@ -6,6 +6,9 @@ const SONG_FIELDS = [
   "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"
 ] as const;
 
+// the exact license an upload is released under; WC/PD notices need no URL beyond the site itself
+const LICENSE_URLS: Record<string, string> = { "CC-BY": "https://creativecommons.org/licenses/by/4.0/" };
+
 // The one type with a satellite: WorshipCommons facets on key/tempo/scripture, and the content
 // repo export reads song.json + lyrics.chordpro from the asset folder.
 export const songPublishHook: PublishHook = {
@@ -16,6 +19,11 @@ export const songPublishHook: PublishHook = {
     const song: Song = { assetId: asset.id, hymnalCount: existing?.hymnalCount || 0, certified: true };
     for (const k of SONG_FIELDS) if (detail[k] !== undefined) (song as any)[k] = detail[k] === "" ? null : detail[k];
     if (song.chordPro) song.chordPro = String(song.chordPro).replace(/\r\n/g, "\n"); // library files are LF
+    // the notice on the song page, print chart and zip names this exact version and URL
+    const licenseVersion = ctx.submission.payload?.licenseVersion || existing?.licenseVersion;
+    if (licenseVersion) song.licenseVersion = licenseVersion;
+    const licenseUrl = LICENSE_URLS[asset.license || ""] || existing?.licenseUrl;
+    if (licenseUrl) song.licenseUrl = licenseUrl;
     const writers = writer.split(/\s*(?:,|&| and )\s*/i).map((n) => n.trim()).filter(Boolean);
     for (let i = 0; i < writers.length; i++) {
       const id = await repos.author.findOrCreate(writers[i]);

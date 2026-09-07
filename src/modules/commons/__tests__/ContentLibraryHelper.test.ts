@@ -102,6 +102,9 @@ describe("song export artifacts", () => {
     const json: any = ContentLibraryHelper.songJson(song, [{ name: "demoAudio.wav" }, { name: "tune.mid" }]);
     expect(json.uploads).toEqual({ demoAudio: "demoAudio.wav" });
     expect(json.status).toBe("approved");
+    expect(json.licenseVersion).toBeUndefined();
+    const cc: any = ContentLibraryHelper.songJson({ ...song, license: "CC-BY", licenseVersion: "3.0", licenseUrl: "https://creativecommons.org/licenses/by/3.0/" } as any, []);
+    expect(cc).toMatchObject({ license: "CC-BY", licenseVersion: "3.0", licenseUrl: "https://creativecommons.org/licenses/by/3.0/" });
     expect(json.meter).toBe("8.7.8.7 D");
     expect(ContentLibraryHelper.renderChordpro(song)).toBe("{title: Hymn}\n{artist: Anon}\n{key: G}\n{time: 3/4}\n{tempo: 90}\n\nVerse 1\n[G]Sing\n");
   });
