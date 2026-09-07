@@ -59,3 +59,27 @@ describe("FormRepo description round-trip", () => {
     expect(updated[0].description).toBe("Updated intro");
   });
 });
+
+describe("FormRepo.loadByIds and submission history", () => {
+  const repo = new FormRepo();
+
+  it("does not filter out archived forms", async () => {
+    // Issue #1067: PersonController.appendFormSubmissions hydrates a person's
+    // submission history through loadByIds and drops any submission whose form
+    // is missing. Filtering archived here erased the history of every archived
+    // form from the person record and the person export.
+    const wheres: [string, string, any][] = [];
+    const chain: any = {
+      selectAll: () => chain,
+      where: (col: string, op: string, val: any) => { wheres.push([col, op, val]); return chain; },
+      orderBy: () => chain,
+      execute: async () => []
+    };
+    (getDb as jest.Mock).mockReturnValue({ selectFrom: () => chain });
+
+    await repo.loadByIds("ch1", ["f1", "f2"]);
+
+    expect(wheres.map((w) => w[0])).toEqual(expect.arrayContaining(["churchId", "removed", "id"]));
+    expect(wheres.map((w) => w[0])).not.toContain("archived");
+  });
+});

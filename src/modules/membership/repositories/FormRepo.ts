@@ -76,12 +76,13 @@ export class FormRepo {
     return getDb().selectFrom("forms").selectAll().where("churchId", "=", churchId).where("removed", "=", false as any).where("archived", "=", true as any).execute();
   }
 
+  // Archived forms are included on purpose: this hydrates a person's existing
+  // submission history, and archiving a form only stops new submissions.
   public async loadByIds(churchId: string, ids: string[]) {
     if (ids.length === 0) return [];
     return getDb().selectFrom("forms").selectAll()
       .where("churchId", "=", churchId)
       .where("removed", "=", false as any)
-      .where("archived", "=", false as any)
       .where("id", "in", ids)
       .orderBy("name")
       .execute();
