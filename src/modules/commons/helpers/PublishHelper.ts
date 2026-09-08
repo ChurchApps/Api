@@ -1,10 +1,10 @@
-import { fileRole } from "@churchapps/helpers";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { manifestHook, PUBLISH_HOOKS, PublishContext } from "./publishHooks/index.js";
 import { userNames } from "./NamesHelper.js";
+import { findByBase, packagePath, packageRole } from "./PackageLayout.js";
 import { DeclinedFile } from "./ReviewerHelper.js";
 import { normalizeTags } from "./SubmitValidation.js";
 
@@ -24,9 +24,11 @@ export class PublishHelper {
     Object.assign(asset, generic);
 
     const proposed = await repos.assetFile.loadBySubmission(sub.id || "");
+    const liveFiles = await repos.assetFile.loadLive(asset.id || "");
+    // filesChanged names the live (package-relative) file, which is what history and the manifest describe
     const filesChanged: { name: string; action: string; reason?: string }[] = [];
     for (const f of proposed) {
-      const name = f.name || "";
+      const name = f.name || ""; // pending names are flat; the package folder is decided here by role
       const decline = declined.find((d) => d.name === name);
       if (decline) {
         // the pending copy goes with the rest of the pending prefix below
@@ -34,19 +36,25 @@ export class PublishHelper {
         filesChanged.push({ name, action: "declined", reason: decline.reason });
         continue;
       }
-      const live = await repos.assetFile.loadOne(asset.id || "", name, null);
+      const liveName = packagePath(asset.assetType, name);
+      const live = findByBase(liveFiles, asset.assetType, name);
       if (f.action === "remove") {
-        await ContentLibraryHelper.removeKey(ContentLibraryHelper.liveKey(asset, name));
+        await ContentLibraryHelper.removeKey(ContentLibraryHelper.liveKey(asset, live?.name || liveName));
         if (live) await repos.assetFile.delete(live.id || "");
         await repos.assetFile.delete(f.id || "");
-        filesChanged.push({ name, action: "remove" });
+        filesChanged.push({ name: live?.name || liveName, action: "remove" });
         continue;
       }
-      const copied = await ContentLibraryHelper.promote(ContentLibraryHelper.pendingKey(sub.id || "", name), ContentLibraryHelper.liveKey(asset, name));
+      const copied = await ContentLibraryHelper.promote(ContentLibraryHelper.pendingKey(sub.id || "", name), ContentLibraryHelper.liveKey(asset, liveName));
       if (!copied) throw new Error(`pending file missing: ${name}`);
-      if (live) await repos.assetFile.delete(live.id || "");
-      await repos.assetFile.update(f.id || "", { submissionId: null, action: "add" });
-      filesChanged.push({ name, action: live ? "replace" : "add" });
+      // a live file of the same basename in another folder (a seeded derivatives/score.musicxml under an uploaded
+      // sources/score.musicxml) is superseded, not kept beside the upload
+      if (live) {
+        if (live.name !== liveName) await ContentLibraryHelper.removeKey(ContentLibraryHelper.liveKey(asset, live.name || ""));
+        await repos.assetFile.delete(live.id || "");
+      }
+      await repos.assetFile.update(f.id || "", { submissionId: null, action: "add", name: liveName });
+      filesChanged.push({ name: liveName, action: live ? "replace" : "add" });
     }
 
     const version = (await repos.submission.countApproved(asset.id || "")) + 1;
@@ -61,10 +69,12 @@ export class PublishHelper {
       publisherName: names[asset.publisherUserId || ""],
       submitterName: names[sub.submittedBy || ""],
       repos,
-      readFile: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, name)))?.buffer || null,
+      // hooks may name a file flat or with its folder; either way it lands where the layout says
+      readFile: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, packagePath(asset.assetType, name))))?.buffer || null,
       writeFile: async (name, contentType, body) => {
-        await ContentLibraryHelper.store(ContentLibraryHelper.liveKey(asset, name), contentType, body);
-        await repos.assetFile.upsert({ assetId: asset.id, submissionId: null, name, action: "add", sizeBytes: body.length, contentHash: ContentLibraryHelper.sha256(body), uploadedBy: null as any });
+        const liveName = packagePath(asset.assetType, name);
+        await ContentLibraryHelper.store(ContentLibraryHelper.liveKey(asset, liveName), contentType, body);
+        await repos.assetFile.upsert({ assetId: asset.id, submissionId: null, name: liveName, action: "add", sizeBytes: body.length, contentHash: ContentLibraryHelper.sha256(body), uploadedBy: null as any });
         ctx.files = await repos.assetFile.loadLive(asset.id || "");
       }
     };
@@ -154,7 +164,7 @@ export class PublishHelper {
   }
 
   static fileSummary(files: AssetFile[]): { name: string; action: string; role: string }[] {
-    return files.map((f) => ({ name: f.name || "", action: f.action || "add", role: fileRole(f.name || "") }));
+    return files.map((f) => ({ name: f.name || "", action: f.action || "add", role: packageRole(f.name) }));
   }
 
   /** The approved-submission timeline of an asset — GET /assets/:id/history and the song page share it. */

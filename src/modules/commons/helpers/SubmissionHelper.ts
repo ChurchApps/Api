@@ -1,10 +1,10 @@
-import { fileRole } from "@churchapps/helpers";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
 import { ASSET_TYPES } from "./AssetTypes.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { MusicHelper } from "./MusicHelper.js";
+import { findByBase, packageRole } from "./PackageLayout.js";
 import { QualityHelper } from "./QualityHelper.js";
 import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, normalizeTags, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
 
@@ -49,7 +49,7 @@ export class SubmissionHelper {
   static async recordFile(repos: Repos, sub: Submission, asset: Asset, file: { name: string; sizeBytes?: number; contentHash?: string; action?: string }, uploadedBy?: string): Promise<Outcome<AssetFile>> {
     const def = ASSET_TYPES[asset.assetType || ""];
     if (!def || !isUploadableName(def, file.name)) return fail(400, notAcceptedMessage(def, file.name));
-    const live = await repos.assetFile.loadOne(asset.id || "", file.name, null);
+    const live = findByBase(await repos.assetFile.loadLive(asset.id || ""), asset.assetType, file.name);
     const action = file.action === "remove" ? "remove" : live ? "replace" : "add";
     if (action === "remove" && !live) return fail(400, `${file.name} is not a live file`);
     const row = await repos.assetFile.upsert({ assetId: asset.id, submissionId: sub.id, name: file.name, action, sizeBytes: file.sizeBytes, contentHash: file.contentHash, uploadedBy });
@@ -95,7 +95,7 @@ export class SubmissionHelper {
     for (const f of proposed) {
       if (f.action !== "remove" && !(await ContentLibraryHelper.exists(ContentLibraryHelper.pendingKey(sub.id || "", f.name || "")))) return fail(400, `${f.name} was not uploaded`);
     }
-    const primary = proposed.find((f) => f.action !== "remove" && def.files.find((s) => s.required && s.role === fileRole(f.name || "")));
+    const primary = proposed.find((f) => f.action !== "remove" && def.files.find((s) => s.required && s.role === packageRole(f.name)));
     if (primary?.contentHash) {
       const dup = await repos.assetFile.loadLiveByHash(primary.contentHash);
       if (dup && dup.assetId !== asset.id) return fail(409, "an identical file has already been published");
@@ -122,7 +122,7 @@ export class SubmissionHelper {
         themes: payload.tags,
         bpm: d.bpm,
         songKey: d.songKey,
-        fileRoles: resultingFileNames(live, proposed).map((n) => fileRole(n))
+        fileRoles: resultingFileNames(live, proposed).map((n) => packageRole(n))
       });
       triageScore = scored.qualityScore ?? null;
       if (scored.qualityDetail) {

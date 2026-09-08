@@ -87,9 +87,13 @@ describe("SubmissionHelper files", () => {
     expect(ContentLibraryHelper.storePending).toHaveBeenCalledWith("commons/pending/sub00000001/tune.abc", "text/plain", expect.any(Buffer));
     expect(r.assetFile.upsert).toHaveBeenCalledWith(expect.objectContaining({ submissionId: "sub00000001", name: "tune.abc", action: "add", uploadedBy: "user0000001" }));
 
-    r.assetFile.loadOne.mockResolvedValueOnce({ id: "live0000001", name: "demoAudio.mp3" });
+    // the live copy sits in its package folder; the proposed name is flat
+    r.assetFile.loadLive.mockResolvedValueOnce([{ id: "live0000001", name: "sources/demoAudio.mp3" }]);
     await SubmissionHelper.recordFile(r, sub, asset, { name: "demoAudio.mp3", sizeBytes: 10 });
     expect(r.assetFile.upsert).toHaveBeenLastCalledWith(expect.objectContaining({ name: "demoAudio.mp3", action: "replace" }));
+    r.assetFile.loadLive.mockResolvedValueOnce([{ id: "live0000001", name: "sources/demoAudio.mp3" }]);
+    await SubmissionHelper.recordFile(r, sub, asset, { name: "demoAudio.mp3", action: "remove" });
+    expect(r.assetFile.upsert).toHaveBeenLastCalledWith(expect.objectContaining({ name: "demoAudio.mp3", action: "remove" }));
   });
 
   it("rejects names the registry does not know and removals of files that are not live", async () => {

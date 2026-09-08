@@ -41,6 +41,14 @@ describe("packageFields", () => {
     expect(seeded).toMatchObject({ confidence: "converted-from-abc", scoreSource: "abc" });
   });
 
+  it("reads file names by basename, whatever package folder they sit in", () => {
+    const f = packageFields({ chordPro: CHART, songKey: "G" }, undefined, "WC", "Ada", ["derivatives/score.musicxml", "sources/demoAudio.mp3", "masters/art.png", "masters/lyrics.chordpro"], ["sources/score.musicxml"]);
+    expect(f).toMatchObject({ confidence: "proofread-score", scoreSource: "master" });
+    expect(parse(f.rights)).toMatchObject({ recording: { license: "WC", holder: "Ada" }, artwork: { license: "WC", holder: "Ada" } });
+    const gate = packageFields({ chordPro: CHART }, { chordPro: CHART, confidence: "sunday-ready", scoreSource: "abc" }, "PD", "W", ["derivatives/score.musicxml", "sources/tune.abc"], ["sources/tune.abc"]);
+    expect(gate).toMatchObject({ confidence: "converted-from-abc", listenedKeys: null });
+  });
+
   it("keeps sunday-ready, the listen record, an approved form and a key pin when neither lyrics nor score files changed", () => {
     const existing = { chordPro: CHART, confidence: "sunday-ready", scoreSource: "abc", listenedKeys: '["G","F"]', publishedKeys: '["G","F"]', form: '{"status":"approved","sections":[{"label":"Verse 1","lyric":1}],"defaultOrder":["Verse 1"]}', rights: '{"text":{"license":"PD","basis":"published 1779","holder":"John Newton"},"tune":null}' };
     const f = packageFields({ chordPro: CHART, songKey: "G", bpm: 90 }, existing, "PD", "John Newton", ["score.musicxml", "demoAudio.mp3"], ["demoAudio.mp3"]);
@@ -68,7 +76,7 @@ describe("packageFields", () => {
 });
 
 describe("songPublishHook.onPublish", () => {
-  it("upserts the package columns and writes song.json from the asset status, never a literal", async () => {
+  it("upserts the package columns and writes masters/song.json from the asset status, never a literal", async () => {
     const repos: any = {
       song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
       author: { findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
@@ -78,8 +86,8 @@ describe("songPublishHook.onPublish", () => {
       asset: { id: "asset000001", assetType: "song", license: "WC", status: "unpublished" },
       submission: { id: "sub00000001", submittedBy: "user0000001", payload: {} },
       detail: { writer: "Ada", chordPro: CHART, songKey: "G" },
-      files: [{ name: "demoAudio.mp3" }],
-      filesChanged: [{ name: "demoAudio.mp3", action: "add" }],
+      files: [{ name: "sources/demoAudio.mp3" }],
+      filesChanged: [{ name: "sources/demoAudio.mp3", action: "add" }],
       version: 1,
       repos,
       writeFile: async (name, _ct, body) => { written[name] = body.toString(); }
@@ -87,6 +95,7 @@ describe("songPublishHook.onPublish", () => {
     expect(repos.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", confidence: "chart-only", firstLine: "Amazing grace! how sweet the sound", hasChords: true, publishedKeys: '["G"]' }));
     expect(parse(repos.song.upsert.mock.calls[0][0].rights).recording).toEqual({ license: "WC", holder: "Ada" });
     expect(ContentLibraryHelper.songJson).toHaveBeenCalledWith(expect.objectContaining({ status: "unpublished" }), expect.anything());
-    expect(JSON.parse(written["song.json"])).toEqual({ id: "asset000001", status: "unpublished" });
+    expect(Object.keys(written).sort()).toEqual(["masters/lyrics.chordpro", "masters/song.json"]);
+    expect(JSON.parse(written["masters/song.json"])).toEqual({ id: "asset000001", status: "unpublished" });
   });
 });

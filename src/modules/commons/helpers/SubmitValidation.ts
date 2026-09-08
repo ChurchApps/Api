@@ -1,5 +1,6 @@
 import { AssetFileRole, AssetTypeDefinition, conventionalFileName, fileRole } from "@churchapps/helpers";
 import { AssetFile, SubmissionPayload } from "../models/index.js";
+import { baseName } from "./PackageLayout.js";
 
 export const INLINE_MAX_BYTES = 1048576;
 export const DEFAULT_MAX_FILE_BYTES = 26214400;
@@ -46,14 +47,14 @@ export function notAcceptedMessage(def: AssetTypeDefinition | undefined, name: s
   return `${name || "(unnamed)"} is not an accepted file for ${def?.label || "this type"}`;
 }
 
-/** The live file set after a submission's add/replace/remove actions apply. */
+/** The live file set after a submission's add/replace/remove actions apply. Live names carry their package folder, proposed names are flat: a file is the same file by basename. */
 export function resultingFileNames(live: AssetFile[], proposed: AssetFile[]): string[] {
-  const names = new Set(live.map((f) => f.name || ""));
+  const names = new Map(live.map((f) => [baseName(f.name), f.name || ""]));
   for (const f of proposed) {
-    if (f.action === "remove") names.delete(f.name || "");
-    else names.add(f.name || "");
+    if (f.action === "remove") names.delete(baseName(f.name));
+    else names.set(baseName(f.name), f.name || "");
   }
-  return [...names].filter(Boolean);
+  return [...names.values()].filter(Boolean);
 }
 
 /** Split, trim, collapse spaces, title-case, drop empties, case-insensitive dedupe; join with `, `. */
@@ -142,7 +143,7 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
     }
   }
   const resulting = resultingFileNames(live, proposed);
-  const roles = new Set(resulting.map((n) => fileRole(n)));
+  const roles = new Set(resulting.map((n) => fileRole(baseName(n))));
   for (const spec of def.files) if (spec.required && !spec.generated && !roles.has(spec.role)) errors.push(`a ${spec.role} file is required`);
 
   const liveSizes = new Map(live.map((f) => [f.name || "", f.sizeBytes || 0]));

@@ -1,5 +1,5 @@
 {
-  "id": "fixsong0001", "title": "A Child of Light", "writer": "Harriet Buell", "year": 1877, "language": "English", "key": "Eb", "license": "PD",
+  "id": "fixsong0001", "title": "A Child of Light", "writer": "Harriet Buell", "year": 1877, "language": "English", "themes": "Assurance,Kids,Heritage", "key": "Eb", "bpm": 96, "timeSignature": "3/4", "license": "PD",
   "rights": { "text": { "license": "PD", "basis": "published 1877", "source": "open-hymnal" }, "tune": { "license": "PD", "basis": "open-hymnal" }, "arrangement": null, "recording": null, "artwork": { "license": "PD", "basis": "worshipcommons" } },
   "form": { "status": "draft", "sections": [{ "label": "Verse 1", "lyric": 1 }, { "label": "Chorus", "lyric": 2 }], "defaultOrder": ["Verse 1", "Chorus"] }
 }

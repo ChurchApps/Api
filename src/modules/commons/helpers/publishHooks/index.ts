@@ -1,5 +1,5 @@
 import { Asset, AssetFile, Submission } from "../../models/index.js";
-import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
+import { packageRole } from "../PackageLayout.js";
 import { Repos } from "../../repositories/Repos.js";
 import { songPublishHook } from "./song.js";
 
@@ -74,7 +74,7 @@ export async function sourceRows(ctx: PublishContext): Promise<SourceRow[]> {
   return rows;
 }
 
-/** Runs for every type: one unauthenticated GET tells any client what an asset is and which files it has. */
+/** Runs for every type: one unauthenticated GET tells any client what an asset is and which files it has. Lives at the package root; `files[].name` and `sources[].file` are package-relative. */
 export const manifestHook: PublishHook = {
   async onPublish(ctx) {
     const manifest = {
@@ -88,7 +88,7 @@ export const manifestHook: PublishHook = {
       publisher: { userName: ctx.publisherName, churchId: ctx.asset.publisherChurchId },
       version: ctx.version,
       publishedAt: (ctx.asset.publishedAt || new Date()).toISOString(),
-      files: ctx.files.filter((f) => f.name !== "manifest.json").map((f) => ({ name: f.name, role: ContentLibraryHelper.role(f.name || ""), sizeBytes: f.sizeBytes, sha256: f.contentHash })),
+      files: ctx.files.filter((f) => f.name !== "manifest.json").map((f) => ({ name: f.name, role: packageRole(f.name), sizeBytes: f.sizeBytes, sha256: f.contentHash })),
       // ponytail: lives inside manifest.json rather than a second sources/manifest.json object; the content
       // repo export can split it out when it reads the package
       sources: await sourceRows(ctx),

@@ -4,6 +4,7 @@ import { CommonsBaseController } from "./CommonsBaseController.js";
 import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
 // imported by path, not through the barrel: pure, and the shim tests mock the barrel
 import { SongPackageHelper, SongDetail, SongSummary } from "../helpers/SongPackageHelper.js";
+import { packagePath } from "../helpers/PackageLayout.js";
 import { Repos } from "../repositories/index.js";
 import { SongView } from "../models/index.js";
 
@@ -218,7 +219,7 @@ export class CommonsSongController extends CommonsBaseController {
   private async detail(song: SongView): Promise<SongDetail> {
     const asset = { assetType: "song", id: song.id };
     const files = await this.repos.assetFile.loadLive(song.id || "");
-    return await SongPackageHelper.detail(song, ContentLibraryHelper.fileUrls(asset, files, song.portraitKey), { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, name)))?.buffer.toString("utf8") ?? null });
+    return await SongPackageHelper.detail(song, ContentLibraryHelper.fileUrls(asset, files, song.portraitKey), { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, packagePath("song", name))))?.buffer.toString("utf8") ?? null });
   }
 
   private async download(req: express.Request, res: express.Response, ext: string, convert: (song: SongView) => string): Promise<any> {

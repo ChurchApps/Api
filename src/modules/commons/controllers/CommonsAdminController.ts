@@ -5,6 +5,7 @@ import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { ASSET_TYPES } from "../helpers/AssetTypes.js";
 import { parseContributors } from "../helpers/ContributorsHelper.js";
+import { baseName, packagePath } from "../helpers/PackageLayout.js";
 import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, ReviewerHelper, userNames, type Reviewer } from "../helpers/index.js";
 import { SongPackageHelper } from "../helpers/SongPackageHelper.js";
 import { Repos } from "../repositories/index.js";
@@ -157,7 +158,7 @@ export class CommonsAdminController extends CommonsBaseController {
         const rights = ReviewerHelper.rightsChange(livePayload, sub.payload, proposed);
         if (rights) return this.json({ errors: [`Rights changes need a server admin (${rights})`] }, 403);
       }
-      const liveNames = (await this.repos.assetFile.loadLive(asset.id || "")).map((f) => f.name || "");
+      const liveNames = (await this.repos.assetFile.loadLive(asset.id || "")).map((f) => baseName(f.name)); // proposed names are flat
       const requiredRoles = (ASSET_TYPES[asset.assetType || ""]?.files || []).filter((f) => f.required).map((f) => f.role);
       const { declined, error } = ReviewerHelper.parseDeclined(req.body?.declineFiles, proposed, liveNames, requiredRoles);
       if (error) return this.json({ errors: [error] }, 400);
@@ -355,7 +356,7 @@ export class CommonsAdminController extends CommonsBaseController {
         ? { listenedKeys: JSON.stringify(keys), sundayReadyBy: au.id, sundayReadyAt: new Date(), confidence: ready ? "sunday-ready" : base }
         : { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, confidence: base });
       const fresh = await this.repos.song.loadById(song.id || "");
-      return await SongPackageHelper.detail(fresh || song, urls, { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id: song.id }, name)))?.buffer.toString("utf8") ?? null });
+      return await SongPackageHelper.detail(fresh || song, urls, { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id: song.id }, packagePath("song", name))))?.buffer.toString("utf8") ?? null });
     });
   }
 
@@ -368,7 +369,7 @@ export class CommonsAdminController extends CommonsBaseController {
       let scored = 0;
       for (const s of songs) {
         const files = await this.repos.assetFile.loadLive(s.id || "");
-        const fields = await QualityHelper.score({ ...s, fileRoles: files.map((f) => (f.name || "").replace(/\.[^.]+$/, "")) });
+        const fields = await QualityHelper.score({ ...s, fileRoles: files.map((f) => ContentLibraryHelper.role(f.name || "")) });
         if (fields.qualityScore != null) {
           await this.repos.song.update(s.id || "", fields);
           scored++;

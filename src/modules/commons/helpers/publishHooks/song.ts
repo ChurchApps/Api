@@ -1,6 +1,7 @@
 import { Contributor, FormMap, RightsLayer, RightsMap, Song, SongView } from "../../models/index.js";
 import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
 import { appendContributors, parseContributors } from "../ContributorsHelper.js";
+import { baseName } from "../PackageLayout.js";
 import { SongPackageHelper } from "../SongPackageHelper.js";
 import { SUBMISSION_TYPE_LABELS, SubmissionType } from "../SubmitValidation.js";
 import type { PublishContext, PublishHook } from "./index.js";
@@ -63,14 +64,17 @@ export const songPublishHook: PublishHook = {
     Object.assign(song, packageFields(song, existing, asset.license || "", writer, ctx.files.map((f) => f.name || ""), (ctx.filesChanged || []).map((f) => f.name)));
     await repos.song.upsert(song);
 
+    // the two masters a person is answerable for; the content repo export reads them from the package
     const view = (await repos.song.loadById(asset.id || "")) as SongView;
-    await ctx.writeFile("song.json", "application/json", Buffer.from(JSON.stringify(ContentLibraryHelper.songJson(view, ctx.files), null, 2) + "\n"));
-    await ctx.writeFile("lyrics.chordpro", "text/plain; charset=utf-8", Buffer.from(ContentLibraryHelper.renderChordpro(view)));
+    await ctx.writeFile("masters/song.json", "application/json", Buffer.from(JSON.stringify(ContentLibraryHelper.songJson(view, ctx.files), null, 2) + "\n"));
+    await ctx.writeFile("masters/lyrics.chordpro", "text/plain; charset=utf-8", Buffer.from(ContentLibraryHelper.renderChordpro(view)));
   }
 };
 
-/** The package-model columns a publish derives: confidence, first line, rights, form, keys, and the listen-gate invalidation. */
-export function packageFields(song: Song, existing: Song | undefined, license: string, writer: string, fileNames: string[], changed: string[]): Partial<Song> {
+/** The package-model columns a publish derives: confidence, first line, rights, form, keys, and the listen-gate invalidation. File names may carry their package folder; only the basename matters here. */
+export function packageFields(song: Song, existing: Song | undefined, license: string, writer: string, liveNames: string[], changedNames: string[]): Partial<Song> {
+  const fileNames = liveNames.map(baseName);
+  const changed = changedNames.map(baseName);
   const chordPro = song.chordPro ?? existing?.chordPro ?? "";
   const lyricsChanged = !!existing && (existing.chordPro || "") !== chordPro;
   const scoreChanged = changed.some((n) => SCORE_FILES.test(n));
