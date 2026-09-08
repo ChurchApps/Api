@@ -4,7 +4,7 @@ import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { manifestHook, PUBLISH_HOOKS, PublishContext } from "./publishHooks/index.js";
 import { userNames } from "./NamesHelper.js";
-import { findByBase, packagePath, packageRole } from "./PackageLayout.js";
+import { findByBase, packageDirFrom, packageKey, packageRole, songPackageDir } from "./PackageLayout.js";
 import { DeclinedFile } from "./ReviewerHelper.js";
 import { normalizeTags } from "./SubmitValidation.js";
 
@@ -25,7 +25,12 @@ export class PublishHelper {
 
     const proposed = await repos.assetFile.loadBySubmission(sub.id || "");
     const liveFiles = await repos.assetFile.loadLive(asset.id || "");
-    // filesChanged names the live (package-relative) file, which is what history and the manifest describe
+    // A song's files live in its package: the folder any live file already sits in, else the one this title,
+    // language and license give a song landing in the layout for the first time (frozen from then on). Files
+    // still in the legacy id-keyed folder keep serving until a re-upload supersedes them in the package.
+    const packageDir = asset.assetType === "song" ? packageDirFrom(liveFiles) || songPackageDir(asset) : null;
+    const place = (name: string) => packageKey(packageDir, asset.assetType, name);
+    // filesChanged names the live file by its stored name (catalog key), which is what history and the manifest describe
     const filesChanged: { name: string; action: string; reason?: string }[] = [];
     for (const f of proposed) {
       const name = f.name || ""; // pending names are flat; the package folder is decided here by role
@@ -36,7 +41,7 @@ export class PublishHelper {
         filesChanged.push({ name, action: "declined", reason: decline.reason });
         continue;
       }
-      const liveName = packagePath(asset.assetType, name);
+      const liveName = place(name);
       const live = findByBase(liveFiles, asset.assetType, name);
       if (f.action === "remove") {
         await ContentLibraryHelper.removeKey(ContentLibraryHelper.liveKey(asset, live?.name || liveName));
@@ -69,10 +74,22 @@ export class PublishHelper {
       publisherName: names[asset.publisherUserId || ""],
       submitterName: names[sub.submittedBy || ""],
       repos,
-      // hooks may name a file flat or with its folder; either way it lands where the layout says
-      readFile: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, packagePath(asset.assetType, name))))?.buffer || null,
+      // hooks may name a file flat or with its folder; either way it lands where the layout says. Reads try the
+      // registered file first, then the package, then the legacy folder a pre-cut-over song may still hold it in.
+      readFile: async (name) => {
+        const keys = [
+          ContentLibraryHelper.fileKey(asset, ctx.files, name),
+          ContentLibraryHelper.liveKey(asset, place(name)),
+          ContentLibraryHelper.liveKey(asset, packageKey(null, asset.assetType, name))
+        ];
+        for (const key of [...new Set(keys)]) {
+          const found = await ContentLibraryHelper.readKey(key);
+          if (found) return found.buffer;
+        }
+        return null;
+      },
       writeFile: async (name, contentType, body) => {
-        const liveName = packagePath(asset.assetType, name);
+        const liveName = place(name);
         await ContentLibraryHelper.store(ContentLibraryHelper.liveKey(asset, liveName), contentType, body);
         await repos.assetFile.upsert({ assetId: asset.id, submissionId: null, name: liveName, action: "add", sizeBytes: body.length, contentHash: ContentLibraryHelper.sha256(body), uploadedBy: null as any });
         ctx.files = await repos.assetFile.loadLive(asset.id || "");
@@ -124,9 +141,11 @@ export class PublishHelper {
     }
   }
 
-  /** Terminal takedown: files gone, id kept so links 410 with the reason. */
+  /** Terminal takedown: files gone, id kept so links 410 with the reason. A work's shared files are never the song's to delete. */
   static async remove(repos: Repos, asset: Asset, reason: string): Promise<void> {
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.livePrefix(asset));
+    const packageDir = packageDirFrom(await repos.assetFile.loadLive(asset.id || ""));
+    if (packageDir) await ContentLibraryHelper.removePrefix(ContentLibraryHelper.packagePrefix(packageDir));
     for (const sub of await repos.submission.loadByAsset(asset.id || "", ["draft", "pending"])) {
       await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
       await repos.submission.update(sub.id || "", { status: "withdrawn" });

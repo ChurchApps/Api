@@ -24,7 +24,7 @@ jest.mock("@churchapps/apihelper", () => {
 jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { fileStore: "disk", contentRoot: CONTENT_ROOT, jwtSecret: "test-secret" } }));
 
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
-import { findByBase, packagePath } from "../helpers/PackageLayout.js";
+import { findByBase, idFromFolder, packageDirFrom, packageDirOf, packageFolder, packageKey, packagePath, relativeName, slugify, songPackageDir } from "../helpers/PackageLayout.js";
 import { isPublicDiskFilePath } from "../../content/helpers/PublicFileAccess.js";
 
 const asset = { id: "testasst001", assetType: "song" };
@@ -102,6 +102,77 @@ describe("storage keys", () => {
     expect(ContentLibraryHelper.role("sources/tune.abc")).toBe("abc");
     expect(ContentLibraryHelper.role("masters/song.json")).toBe("song");
     expect(ContentLibraryHelper.role("manifest.json")).toBe("manifest");
+  });
+});
+
+describe("package layout keys", () => {
+  const PKG = "songs/en/public-domain/amazing-grace-YxPfAFYWOaG";
+
+  it("slugifies titles the way the content repo does and freezes <slug>-<id> with the id as the last 11 characters", () => {
+    expect(slugify("Amazing Grace")).toBe("amazing-grace");
+    expect(slugify("Ach Gott, vom Himmel Sieh’ Darein")).toBe("ach-gott-vom-himmel-sieh-darein");
+    expect(slugify("O God, Our Help / in Ages Past!")).toBe("o-god-our-help-in-ages-past");
+    expect(slugify("Señor, ¿quién entrará?")).toBe("señor-quién-entrará");
+    expect(slugify("")).toBe("untitled");
+    expect(packageFolder("Amazing Grace", "YxPfAFYWOaG")).toBe("amazing-grace-YxPfAFYWOaG");
+    // ids may begin with "-" or "_": never split on the dash
+    expect(packageFolder("Come, Thou Fount", "-444poRqpG_")).toBe("come-thou-fount--444poRqpG_");
+    expect(idFromFolder("come-thou-fount--444poRqpG_")).toBe("-444poRqpG_");
+    expect(idFromFolder("amazing-grace-YxPfAFYWOaG")).toBe("YxPfAFYWOaG");
+    expect(idFromFolder("amazing-grace")).toBeNull();
+  });
+
+  it("derives a new song's package dir from language, license section and title", () => {
+    expect(songPackageDir({ id: "YxPfAFYWOaG", name: "Amazing Grace", language: "English", license: "PD" })).toBe(PKG);
+    expect(songPackageDir({ id: "-444poRqpG_", name: "Bleib bei uns", language: "German", license: "WC" })).toBe("songs/de/wc-license/bleib-bei-uns--444poRqpG_");
+    expect(songPackageDir({ id: "abcdefghijk", name: "Sublime Gracia", language: "Spanish", license: "CC-BY-SA" })).toBe("songs/es/cc-by-sa/sublime-gracia-abcdefghijk");
+    // unknown language or license still yields a stable folder rather than throwing
+    expect(songPackageDir({ id: "abcdefghijk", name: "X", language: "Klingon", license: "CC0" })).toBe("songs/klingon/cc0/x-abcdefghijk");
+  });
+
+  it("reads the frozen package dir back from any live song file, ignoring the work's and legacy names", () => {
+    expect(packageDirOf(`${PKG}/sources/tune.mid`)).toBe(PKG);
+    expect(packageDirOf("songs/de/wc-license/bleib-bei-uns--444poRqpG_/derivatives/timing.json")).toBe("songs/de/wc-license/bleib-bei-uns--444poRqpG_");
+    expect(packageDirOf("works/amazing-grace/sources/tune.abc")).toBeNull();
+    expect(packageDirOf("sources/tune.mid")).toBeNull();
+    expect(packageDirFrom([{ name: "works/amazing-grace/sources/tune.abc" }, { name: "sources/tune.mid" }, { name: `${PKG}/masters/song.json` }])).toBe(PKG);
+    expect(packageDirFrom([{ name: "sources/tune.mid" }])).toBeNull();
+    expect(relativeName(`${PKG}/sources/tune.mid`)).toBe("sources/tune.mid");
+    expect(relativeName("works/amazing-grace/masters/cover.webp")).toBe("masters/cover.webp");
+    expect(relativeName("sources/tune.mid")).toBe("sources/tune.mid");
+  });
+
+  it("places a flat name inside the package and leaves catalog keys and non-song names alone", () => {
+    expect(packageKey(PKG, "song", "tune.abc")).toBe(`${PKG}/sources/tune.abc`);
+    expect(packageKey(PKG, "song", "song.json")).toBe(`${PKG}/masters/song.json`);
+    expect(packageKey(PKG, "song", "art-thumb.webp")).toBe(`${PKG}/derivatives/cover-thumb.webp`);
+    expect(packageKey(PKG, "song", "sources/manifest.json")).toBe(`${PKG}/sources/manifest.json`);
+    expect(packageKey(PKG, "song", "works/amazing-grace/sources/tune.abc")).toBe("works/amazing-grace/sources/tune.abc");
+    expect(packageKey(null, "song", "tune.abc")).toBe("sources/tune.abc");
+    expect(packageKey(PKG, "freeshow/template", "thumb.png")).toBe("thumb.png");
+    expect(packagePath("song", `${PKG}/sources/tune.abc`)).toBe(`${PKG}/sources/tune.abc`);
+  });
+
+  it("serves a catalog key straight under the commons prefix and a legacy name from the id-keyed folder", () => {
+    expect(ContentLibraryHelper.liveKey(asset, `${PKG}/sources/tune.mid`)).toBe(`commons/${PKG}/sources/tune.mid`);
+    expect(ContentLibraryHelper.liveKey(asset, "works/amazing-grace/sources/tune.abc")).toBe("commons/works/amazing-grace/sources/tune.abc");
+    expect(ContentLibraryHelper.liveKey(asset, "sources/tune.mid")).toBe("commons/assets/song/testasst001/sources/tune.mid");
+    expect(ContentLibraryHelper.packagePrefix(PKG)).toBe(`commons/${PKG}`);
+    const urls = ContentLibraryHelper.fileUrls(asset, [{ name: `${PKG}/sources/tune.mid` }, { name: "works/amazing-grace/sources/tune.abc" }, { name: "derivatives/slides.json" }], "commons/writers/john-newton/portrait.jpg");
+    expect(urls).toEqual({
+      midi: `${CONTENT_ROOT}/commons/${PKG}/sources/tune.mid`,
+      abc: `${CONTENT_ROOT}/commons/works/amazing-grace/sources/tune.abc`,
+      slides: `${CONTENT_ROOT}/commons/assets/song/testasst001/derivatives/slides.json`,
+      portrait: `${CONTENT_ROOT}/commons/writers/john-newton/portrait.jpg`
+    });
+  });
+
+  it("fileKey reads a registered file wherever it is, else places the name in the package, else in the legacy folder", () => {
+    const files = [{ name: `${PKG}/masters/song.json` }, { name: "derivatives/attribution.txt" }, { name: "works/amazing-grace/sources/tune.abc" }];
+    expect(ContentLibraryHelper.fileKey(asset, files, "attribution.txt")).toBe("commons/assets/song/testasst001/derivatives/attribution.txt");
+    expect(ContentLibraryHelper.fileKey(asset, files, "tune.abc")).toBe("commons/works/amazing-grace/sources/tune.abc");
+    expect(ContentLibraryHelper.fileKey(asset, files, "sources/manifest.json")).toBe(`commons/${PKG}/sources/manifest.json`);
+    expect(ContentLibraryHelper.fileKey(asset, [{ name: "sources/tune.mid" }], "chart.pdf")).toBe("commons/assets/song/testasst001/derivatives/chart.pdf");
   });
 });
 

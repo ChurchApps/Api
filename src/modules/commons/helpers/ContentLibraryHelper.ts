@@ -7,12 +7,15 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AssetFile, SongView } from "../models/index.js";
-import { baseName, packageRole } from "./PackageLayout.js";
+import { baseName, findByBase, isPackageKey, packageDirFrom, packageKey, packageRole } from "./PackageLayout.js";
 
-// Storage keys are derived, never stored. Live objects sit under commons/assets/{assetType}/{assetId}/{name}
-// (public) where a song's {name} carries its package folder (sources/, masters/, derivatives/ — see
-// PackageLayout.ts); proposed objects under commons/pending/{submissionId}/{name} (flat), which PublicFileAccess
-// never serves and S3 keeps private. song.json / lyrics.chordpro conventions must match WorshipCommonsContent/tools/lib.mjs.
+// Storage keys are derived from assetFiles.name, never stored twice. A song file's name is its catalog key
+// (songs/<lang>/<section>/<slug>-<id>/{sources,masters,derivatives}/<file>, or works/… for an inherited file) and
+// lives at commons/<name> — the same path the content repo holds, so `sync pull` picks it up unchanged. Names
+// without that prefix (rows from before the cut-over, and every non-song asset) still resolve to the id-keyed
+// folder commons/assets/{assetType}/{assetId}/{name}. Proposed objects sit under commons/pending/{submissionId}/
+// {name} (flat), which PublicFileAccess never serves and S3 keeps private. song.json / lyrics.chordpro
+// conventions must match WorshipCommonsContent/tools/lib.mjs.
 
 const ROOT = "commons";
 const PENDING_ROOT = `${ROOT}/pending`;
@@ -35,12 +38,30 @@ export interface PresignedUpload { url: string; fields: Record<string, string>; 
 export class ContentLibraryHelper {
   private static s3: S3Client;
 
+  /** The pre-cut-over id-keyed folder; still where legacy names and non-song assets live. */
   static livePrefix(asset: { assetType?: string; id?: string }): string {
     return `${ROOT}/assets/${asset.assetType}/${asset.id}`;
   }
 
+  /** Storage key of a live file: a catalog key sits directly under the commons prefix, anything else under the legacy folder. */
   static liveKey(asset: { assetType?: string; id?: string }, name: string): string {
-    return `${this.livePrefix(asset)}/${name}`;
+    return isPackageKey(name) ? `${ROOT}/${name}` : `${this.livePrefix(asset)}/${name}`;
+  }
+
+  /** Storage key of the song package's own files: commons/songs/<lang>/<section>/<slug>-<id>. */
+  static packagePrefix(packageDir: string): string {
+    return `${ROOT}/${packageDir}`;
+  }
+
+  /**
+   * Storage key of the live file a flat or folder-relative name refers to. A registered file of that basename wins
+   * (whichever layout it is in); otherwise the name is placed in the song's package when one exists, else in the
+   * legacy folder.
+   */
+  static fileKey(asset: { assetType?: string; id?: string }, files: AssetFile[], name: string): string {
+    const live = findByBase(files, asset.assetType, name);
+    if (live?.name) return this.liveKey(asset, live.name);
+    return this.liveKey(asset, packageKey(packageDirFrom(files), asset.assetType, name));
   }
 
   static pendingPrefix(submissionId: string): string {

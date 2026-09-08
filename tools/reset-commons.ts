@@ -63,7 +63,7 @@ async function migrate() {
 }
 
 async function seed(repoDir: string) {
-  const { assets, songs, authors, assetFiles, submissions, copies } = buildCatalog(repoDir);
+  const { assets, songs, authors, assetFiles, submissions } = buildCatalog(repoDir);
   const db = createKysely("commons");
   try {
     for (const row of authors) await db.insertInto("authors").values(row).execute();
@@ -76,20 +76,17 @@ async function seed(repoDir: string) {
   }
 
   if ((process.env.FILE_STORE || "").toUpperCase() !== "S3") {
-    // nothing is mirrored as-is any more: songs/ and works/ live only as id-keyed packages under assets/,
-    // and writers/ keeps just the portraits the authors rows point at (they travel in `copies`)
+    // the local content dir holds exactly the repo's layout, the way the bucket does after the content repo's
+    // `sync push`: assetFiles.name is the catalog key and the public URL is that key under the commons prefix
     for (const dir of ["writers", "songs", "works", "assets", "pending"]) fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
-    // every package file lands in its asset's id-keyed live folder, keeping its sources/ masters/ derivatives/ folder
-    let copied = 0;
-    for (const c of copies) {
-      const from = path.join(repoDir, c.from);
-      const to = path.join(CONTENT_DIR, c.to);
+    let mirrored = 0;
+    for (const dir of ["songs", "works", "writers"]) {
+      const from = path.join(repoDir, dir);
       if (!fs.existsSync(from)) continue;
-      fs.mkdirSync(path.dirname(to), { recursive: true });
-      fs.copyFileSync(from, to);
-      copied++;
+      fs.cpSync(from, path.join(CONTENT_DIR, dir), { recursive: true });
+      mirrored++;
     }
-    console.log(`  Copied ${copied} package files and portraits into ${CONTENT_DIR}`);
+    console.log(`  Mirrored ${mirrored} top-level folders of the package layout into ${CONTENT_DIR}`);
   }
   console.log(`Seeded ${songs.length} songs, ${authors.length} authors, ${assetFiles.length} files.`);
 }
