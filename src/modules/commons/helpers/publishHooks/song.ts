@@ -1,5 +1,6 @@
-import { Song, SongView } from "../../models/index.js";
+import { FormMap, RightsLayer, RightsMap, Song, SongView } from "../../models/index.js";
 import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
+import { SongPackageHelper } from "../SongPackageHelper.js";
 import type { PublishHook } from "./index.js";
 
 const SONG_FIELDS = [
@@ -8,6 +9,11 @@ const SONG_FIELDS = [
 
 // the exact license an upload is released under; WC/PD notices need no URL beyond the site itself
 const LICENSE_URLS: Record<string, string> = { "CC-BY": "https://creativecommons.org/licenses/by/4.0/" };
+
+// a change to any of these invalidates the listen gate: what was heard is no longer what is served
+const SCORE_FILES = /^(score\.musicxml|tune\.abc|tune\.mid|sheetPdf\.(xml|musicxml))$/;
+
+const has = (names: string[], re: RegExp) => names.some((n) => re.test(n));
 
 // The one type with a satellite: WorshipCommons facets on key/tempo/scripture, and the content
 // repo export reads song.json + lyrics.chordpro from the asset folder.
@@ -39,6 +45,8 @@ export const songPublishHook: PublishHook = {
     if (ctx.submission.triageScore != null) song.qualityScore = ctx.submission.triageScore;
     const qd = ctx.submission.payload?.qualityDetail;
     if (qd) song.qualityDetail = typeof qd === "string" ? qd : JSON.stringify(qd);
+
+    Object.assign(song, packageFields(song, existing, asset.license || "", writer, ctx.files.map((f) => f.name || ""), (ctx.filesChanged || []).map((f) => f.name)));
     await repos.song.upsert(song);
 
     const view = (await repos.song.loadById(asset.id || "")) as SongView;
@@ -46,3 +54,53 @@ export const songPublishHook: PublishHook = {
     await ctx.writeFile("lyrics.chordpro", "text/plain; charset=utf-8", Buffer.from(ContentLibraryHelper.renderChordpro(view)));
   }
 };
+
+/** The package-model columns a publish derives: confidence, first line, rights, form, keys, and the listen-gate invalidation. */
+export function packageFields(song: Song, existing: Song | undefined, license: string, writer: string, fileNames: string[], changed: string[]): Partial<Song> {
+  const chordPro = song.chordPro ?? existing?.chordPro ?? "";
+  const lyricsChanged = !!existing && (existing.chordPro || "") !== chordPro;
+  const scoreChanged = changed.some((n) => SCORE_FILES.test(n));
+  const hasScore = fileNames.includes("score.musicxml");
+  const hasChords = SongPackageHelper.hasChords(chordPro);
+  // ponytail: no server-side abc2xml — a score.musicxml here was either seeded (scoreSource kept) or uploaded as a master
+  const scoreSource = hasScore ? (changed.includes("score.musicxml") || !existing?.scoreSource ? "master" : existing.scoreSource) : null;
+  const invalidated = lyricsChanged || scoreChanged;
+  const base = SongPackageHelper.baseConfidence({ hasScore, scoreSource, hasChords });
+  const out: Partial<Song> = {
+    firstLine: SongPackageHelper.firstLine(chordPro),
+    hasChords,
+    scoreSource,
+    confidence: !invalidated && existing?.confidence === "sunday-ready" ? "sunday-ready" : base,
+    rights: JSON.stringify(rightsFor(SongPackageHelper.normalizeRights(existing?.rights), license, writer, fileNames)),
+    form: JSON.stringify(formFor(SongPackageHelper.parseJson<FormMap>(existing?.form), chordPro, lyricsChanged)),
+    publishedKeys: JSON.stringify(keysFor(SongPackageHelper.parseKeys(existing?.publishedKeys), song.songKey ?? existing?.songKey, song.recommendedKey ?? existing?.recommendedKey))
+  };
+  if (invalidated) Object.assign(out, { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null });
+  return out;
+}
+
+// text/tune/arrangement follow the asset license with the writer as holder; a layer whose license did not
+// change keeps its recorded basis/source; recording and artwork exist only while their file is served
+function rightsFor(existing: RightsMap | null, license: string, writer: string, fileNames: string[]): RightsMap {
+  const layer = (prev: RightsLayer | null | undefined): RightsLayer => prev && prev.license === license ? { holder: writer || undefined, ...prev } : { license, holder: writer || undefined };
+  return {
+    text: layer(existing?.text),
+    translation: existing?.translation ?? null,
+    tune: layer(existing?.tune),
+    arrangement: layer(existing?.arrangement),
+    recording: has(fileNames, /^demoAudio\./) ? layer(existing?.recording) : null,
+    artwork: has(fileNames, /^(art\.|cover\.)/) ? layer(existing?.artwork) : null
+  };
+}
+
+// an approved form survives a publish that left the lyrics alone; anything else is redrafted from the stanza labels
+function formFor(existing: FormMap | null, chordPro: string, lyricsChanged: boolean): FormMap | null {
+  if (existing?.status === "approved" && !lyricsChanged) return existing;
+  return SongPackageHelper.draftForm(chordPro);
+}
+
+// [songKey] plus the recommended key; an existing list that still names the song key is a pin and wins
+function keysFor(existing: string[], songKey?: string, recommendedKey?: string): string[] {
+  if (songKey && existing.includes(songKey)) return existing;
+  return [...new Set([songKey, recommendedKey].filter((k): k is string => !!k))];
+}

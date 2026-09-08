@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
-import { Song, SongView } from "../models/index.js";
+import { Contributor, Song, SongView } from "../models/index.js";
 
 // Spine and author fields are aliased back to the legacy song names the site consumes.
 const SPINE_COLS = [
@@ -11,6 +11,7 @@ const SPINE_COLS = [
   "assets.language as language",
   "assets.license as license",
   "assets.status as status",
+  "assets.featured as featured",
   "assets.downloadCount as downloadCount",
   "assets.ratingCount as ratingCount",
   "assets.ratingSum as ratingSum",
@@ -38,7 +39,13 @@ const SUMMARY_SONG_COLS = [
   "songs.parentSongId",
   "songs.relationLabel",
   "songs.licenseVersion",
-  "songs.licenseUrl"
+  "songs.licenseUrl",
+  "songs.confidence",
+  "songs.firstLine",
+  "songs.tune",
+  "songs.hasChords",
+  "songs.recommendedKey",
+  "songs.singTimeSeconds"
 ] as const;
 
 // Popularity dominates, moderation quality is a kicker; unscored songs sit at a neutral 50.
@@ -55,16 +62,64 @@ const SONG_COLS = [
   "songs.certified",
   "songs.proAnswer",
   "songs.qualityScore",
-  "songs.qualityDetail"
+  "songs.qualityDetail",
+  "songs.rights",
+  "songs.form",
+  "songs.recommendedKeyReason",
+  "songs.publishedKeys",
+  "songs.scoreSource",
+  "songs.listenedKeys",
+  "songs.sundayReadyBy",
+  "songs.sundayReadyAt"
 ] as const;
 
 const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS, RANK_COL];
 const FULL_COLS = [...MODERATION_SPINE_COLS, ...AUTHOR_COLS, ...SONG_COLS, RANK_COL];
 
+const PACKAGE_COLS = [
+  "confidence",
+  "firstLine",
+  "tune",
+  "hasChords",
+  "rights",
+  "form",
+  "recommendedKey",
+  "recommendedKeyReason",
+  "publishedKeys",
+  "singTimeSeconds",
+  "scoreSource",
+  "listenedKeys",
+  "sundayReadyBy",
+  "sundayReadyAt"
+] as const;
+
+export interface SongFilters {
+  /** only Sunday-ready packages (B1Admin and FreeShow pull with this) */
+  sundayReady?: boolean;
+  confidence?: string;
+  language?: string;
+  /** case-insensitive substring of title, first line or writer */
+  q?: string;
+}
+
 @injectable()
 export class SongRepo {
-  public async loadPublishedSummaries(): Promise<SongView[]> {
+  public async loadPublishedSummaries(filters: SongFilters = {}): Promise<SongView[]> {
+    let q = this.joined().select(SUMMARY_COLS).where("assets.status", "=", "published");
+    if (filters.sundayReady) q = q.where("songs.confidence", "=", "sunday-ready");
+    else if (filters.confidence) q = q.where("songs.confidence", "=", filters.confidence);
+    if (filters.language) q = q.where("assets.language", "=", filters.language);
+    if (filters.q) {
+      const like = `%${filters.q.toLowerCase()}%`;
+      q = q.where((eb) => eb.or([eb(sql`lower(assets.name)`, "like", like), eb(sql`lower(songs.firstLine)`, "like", like), eb(sql`lower(authors.name)`, "like", like)]));
+    }
+    return await q.orderBy(sql.ref("rank"), "desc").orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
+  }
+
+  /** The root song and every song pointing at it — the /page family, in catalog (rank) order. */
+  public async loadFamily(rootId: string): Promise<SongView[]> {
     return await this.joined().select(SUMMARY_COLS).where("assets.status", "=", "published")
+      .where((eb) => eb.or([eb("assets.id", "=", rootId), eb("songs.parentSongId", "=", rootId)]))
       .orderBy(sql.ref("rank"), "desc").orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
   }
 
@@ -104,10 +159,21 @@ export class SongRepo {
     return await getDb().selectFrom("songs").selectAll().where("assetId", "=", assetId).executeTakeFirst() as Song | undefined;
   }
 
+  // ponytail: songs.contributors arrives with the submission-types branch; until that migration lands the
+  // column is absent and the raw select fails, so a missing column reads as "no contributors".
+  public async loadContributors(assetId: string): Promise<Contributor[]> {
+    try {
+      const result = await sql<{ contributors: string | null }>`select contributors from songs where assetId = ${assetId}`.execute(getDb());
+      const raw = result.rows[0]?.contributors;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  }
+
   public async upsert(song: Song): Promise<void> {
     const existing = await this.loadSatellite(song.assetId || "");
     if (existing) { await this.update(song.assetId || "", song); return; }
-    await getDb().insertInto("songs").values({
+    const row: Record<string, unknown> = {
       assetId: song.assetId,
       authorId: song.authorId,
       year: song.year,
@@ -128,7 +194,9 @@ export class SongRepo {
       certified: song.certified,
       qualityScore: song.qualityScore,
       qualityDetail: song.qualityDetail
-    } as any).execute();
+    };
+    for (const c of PACKAGE_COLS) if (song[c] !== undefined) row[c] = song[c];
+    await getDb().insertInto("songs").values(row as any).execute();
   }
 
   public async update(assetId: string, fields: Partial<Song>): Promise<void> {

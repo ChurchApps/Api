@@ -28,13 +28,14 @@ function songController(signedIn = true) {
   const repos: any = {
     asset: { loadPublished: jest.fn(async (id: string) => ({ id, assetType: "song", status: "published" })), delete: jest.fn(async () => {}) },
     submission: { delete: jest.fn(async () => {}) },
-    assetFile: { deleteBySubmission: jest.fn(async () => {}), loadLiveMany: jest.fn(async () => ({})) },
+    assetFile: { deleteBySubmission: jest.fn(async () => {}), loadLiveMany: jest.fn(async () => ({})), loadLive: jest.fn(async () => []) },
     rating: { setSaved: jest.fn(async () => {}) },
     song: {
       loadById: jest.fn(async () => ({ id: "asset000009", title: "Old Hymn", writer: "Anon", chordPro: "[C]x", license: "PD", language: "English", status: "published", rank: 71, qualityScore: 88, qualityDetail: "{}", proAnswer: "no" })),
       loadPublishedSummaries: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
       loadBySubmitter: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
-      loadSaved: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }])
+      loadSaved: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
+      loadContributors: jest.fn(async () => [])
     }
   };
   const au = signedIn ? { id: "user0000001", churchId: "church00001", checkAccess: () => false } : { checkAccess: () => false };

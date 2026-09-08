@@ -10,5 +10,7 @@ export { PublishHelper } from "./PublishHelper.js";
 export { QualityHelper } from "./QualityHelper.js";
 export { ReviewerHelper, type DeclinedFile, type Reviewer } from "./ReviewerHelper.js";
 export { ipHash } from "./RequestHelper.js";
+export { RightsHelper, USES } from "./RightsHelper.js";
+export { SongPackageHelper, type SongSummary, type SongDetail, type SimilarSong } from "./SongPackageHelper.js";
 export { SubmissionHelper, type Actor, type Outcome } from "./SubmissionHelper.js";
 export { validateSubmission, normalizeTags, isUploadableName, resultingFileNames, fileSpec, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY } from "./SubmitValidation.js";

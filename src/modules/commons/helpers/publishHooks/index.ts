@@ -1,5 +1,5 @@
-import { fileRole } from "@churchapps/helpers";
 import { Asset, AssetFile, Submission } from "../../models/index.js";
+import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
 import { Repos } from "../../repositories/Repos.js";
 import { songPublishHook } from "./song.js";
 
@@ -8,6 +8,8 @@ export interface PublishContext {
   submission: Submission;
   detail: Record<string, any>;
   files: AssetFile[];
+  /** what this submission added, replaced or removed — hooks use it to invalidate derived state */
+  filesChanged?: { name: string; action: string }[];
   version: number;
   publisherName?: string;
   repos: Repos;
@@ -33,7 +35,7 @@ export const manifestHook: PublishHook = {
       publisher: { userName: ctx.publisherName, churchId: ctx.asset.publisherChurchId },
       version: ctx.version,
       publishedAt: (ctx.asset.publishedAt || new Date()).toISOString(),
-      files: ctx.files.filter((f) => f.name !== "manifest.json").map((f) => ({ name: f.name, role: fileRole(f.name || ""), sizeBytes: f.sizeBytes, sha256: f.contentHash })),
+      files: ctx.files.filter((f) => f.name !== "manifest.json").map((f) => ({ name: f.name, role: ContentLibraryHelper.role(f.name || ""), sizeBytes: f.sizeBytes, sha256: f.contentHash })),
       detail: ctx.detail
     };
     await ctx.writeFile("manifest.json", "application/json", Buffer.from(JSON.stringify(manifest, null, 2) + "\n"));

@@ -11,6 +11,7 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
     removeKey: jest.fn(async () => {}),
     removePrefix: jest.fn(async () => {}),
     sha256: () => "hash",
+    role: (n: string) => n.replace(/\.[^.]+$/, ""),
     songJson: () => ({}),
     renderChordpro: () => "{title: x}\n"
   }
