@@ -2,22 +2,33 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import { FileStorageHelper } from "@churchapps/apihelper";
-import { fileRole } from "@churchapps/helpers";
 import { GetObjectCommand, PutObjectCommand, S3Client, S3ClientConfig } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AssetFile, SongView } from "../models/index.js";
+import { baseName, packageRole } from "./PackageLayout.js";
 
 // Storage keys are derived, never stored. Live objects sit under commons/assets/{assetType}/{assetId}/{name}
-// (public); proposed objects under commons/pending/{submissionId}/{name}, which PublicFileAccess never
-// serves and S3 keeps private. song.json / lyrics.chordpro conventions must match WorshipCommonsContent/tools/lib.mjs.
+// (public) where a song's {name} carries its package folder (sources/, masters/, derivatives/ — see
+// PackageLayout.ts); proposed objects under commons/pending/{submissionId}/{name} (flat), which PublicFileAccess
+// never serves and S3 keeps private. song.json / lyrics.chordpro conventions must match WorshipCommonsContent/tools/lib.mjs.
 
 const ROOT = "commons";
 const PENDING_ROOT = `${ROOT}/pending`;
 const REVIEW_TTL_SEC = 7200;
 const UPLOAD_TTL_SEC = 3600;
 export const UPLOAD_FIELDS = ["demoAudio", "sheetPdf", "stemsZip"] as const;
+// when two files share a role the freshest wins: masters/lyrics.chordpro is rewritten on every publish while
+// derivatives/chart.chordpro waits for the pipeline (an uploaded art-thumb is renamed onto the generated thumb, so no rule)
+const PREFERRED = new Set(["lyrics.chordpro"]);
+// song.json status follows the asset; anything not taken down exports as approved
+const SONG_JSON_STATUS: Record<string, string> = { unpublished: "unpublished", removed: "removed" };
+
+const parseJson = (v: unknown): unknown => {
+  if (typeof v !== "string") return v ?? undefined;
+  try { return JSON.parse(v); } catch { return undefined; }
+};
 
 export interface PresignedUpload { url: string; fields: Record<string, string>; method: "POST"; authRequired?: boolean; }
 
@@ -44,10 +55,19 @@ export class ContentLibraryHelper {
     return `${(Environment.contentRoot || "").replace(/\/$/, "")}/${key}`;
   }
 
-  /** role → public URL for an asset's live files (+ the author portrait for songs). */
+  /** Role by basename, whatever package folder the file sits in. */
+  static role(name: string): string {
+    return packageRole(name);
+  }
+
+  /** role → public URL for an asset's live files (+ the author portrait for songs). Keys are roles; only the URL path carries the folder. */
   static fileUrls(asset: { assetType?: string; id?: string }, files: AssetFile[], portraitKey?: string): Record<string, string> {
     const out: Record<string, string> = {};
-    for (const f of files) if (f.name) out[fileRole(f.name)] = this.publicUrl(this.liveKey(asset, f.name));
+    for (const f of files) {
+      if (!f.name) continue;
+      const role = this.role(f.name);
+      if (!(role in out) || PREFERRED.has(baseName(f.name))) out[role] = this.publicUrl(this.liveKey(asset, f.name));
+    }
     if (portraitKey) out.portrait = this.publicUrl(portraitKey);
     return out;
   }
@@ -56,8 +76,8 @@ export class ContentLibraryHelper {
   static songJson(song: SongView, files: AssetFile[]): object {
     const uploads: Record<string, string> = {};
     for (const f of files) {
-      const role = fileRole(f.name || "");
-      if ((UPLOAD_FIELDS as readonly string[]).includes(role)) uploads[role] = f.name || "";
+      const role = this.role(f.name || "");
+      if ((UPLOAD_FIELDS as readonly string[]).includes(role)) uploads[role] = baseName(f.name); // build-catalog.mjs looks in sources/<name>
     }
     return {
       id: song.id,
@@ -75,10 +95,15 @@ export class ContentLibraryHelper {
       licenseVersion: song.licenseVersion ?? undefined,
       licenseUrl: song.licenseUrl ?? undefined,
       hymnalCount: song.hymnalCount ?? 0,
-      status: "approved",
+      status: SONG_JSON_STATUS[song.status || ""] || "approved",
       submittedBy: song.submittedBy,
       proAnswer: song.proAnswer,
       certified: true,
+      confidence: song.confidence ?? undefined,
+      rights: parseJson(song.rights),
+      form: parseJson(song.form),
+      publishedKeys: parseJson(song.publishedKeys),
+      scoreSource: song.scoreSource ?? undefined,
       uploads: Object.keys(uploads).length ? uploads : undefined
     };
   }
@@ -187,7 +212,10 @@ export class ContentLibraryHelper {
     if (ext === "webp") return "image/webp";
     if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
     if (ext === "mid" || ext === "midi") return "audio/midi";
-    if (ext === "abc" || ext === "chordpro" || ext === "txt") return "text/plain; charset=utf-8";
+    if (ext === "tif") return "image/tiff";
+    if (ext === "xml" || ext === "musicxml") return "application/vnd.recordare.musicxml+xml";
+    if (ext === "mxl") return "application/vnd.recordare.musicxml";
+    if (ext === "abc" || ext === "chordpro" || ext === "cho" || ext === "crd" || ext === "ly" || ext === "txt") return "text/plain; charset=utf-8";
     return "application/octet-stream";
   }
 
@@ -229,12 +257,16 @@ export class ContentLibraryHelper {
     return this.s3;
   }
 
-  // disk listing returns bare file names; S3 returns full keys
+  // S3 lists every key under the prefix; the disk store only lists one directory, so walk the package folders ourselves
   private static async listKeys(prefix: string): Promise<string[]> {
     const normalized = prefix.replace(/\/$/, "");
-    try {
-      const names = await FileStorageHelper.list(normalized);
-      return names.filter(Boolean).map((n) => (n.includes("/") ? n : `${normalized}/${n}`));
-    } catch { return []; }
+    if (Environment.fileStore === "S3") {
+      try { return (await FileStorageHelper.list(normalized)).filter(Boolean); } catch { return []; }
+    }
+    const dir = path.resolve("content", normalized);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir, { recursive: true }).map(String)
+      .filter((rel) => fs.statSync(path.join(dir, rel)).isFile())
+      .map((rel) => `${normalized}/${rel.split(path.sep).join("/")}`);
   }
 }

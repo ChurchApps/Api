@@ -1,0 +1,21 @@
+{
+  "rows": [
+    {
+      "id": "fixsong0001", "title": "A Child of Light", "writer": "Harriet Buell", "year": 1877, "themes": "Assurance,Kids", "songKey": "Eb", "bpm": 120, "timeSignature": "3/4", "meter": null,
+      "language": "English", "scripture": "Rom 8:14-17", "license": "PD", "confidence": "converted-from-abc", "hymnalCount": 446,
+      "chordPro": "Verse 1\n[Eb]My Father is rich in houses and lands, He [Bb7]holdeth\nthe wealth [Eb]of the world\n\nChorus\nI'm a child of the King",
+      "parentSongId": null, "relationLabel": null, "status": "approved", "submittedBy": null, "proAnswer": null, "certified": true,
+      "midiUrl": "songs/en/public-domain/a-child-of-light/sources/tune.mid", "lyricsUrl": "songs/en/public-domain/a-child-of-light/derivatives/timing.json",
+      "abcUrl": "songs/en/public-domain/a-child-of-light/sources/tune.abc", "artUrl": "songs/en/public-domain/a-child-of-light/masters/cover.webp",
+      "videoUrl": null, "demoAudioUrl": null, "sheetPdfUrl": null, "stemsZipUrl": null
+    },
+    {
+      "id": "fixsong0002", "title": "Bleib bei uns", "writer": "Joshua Stegmann", "year": 1628, "themes": "Grace", "songKey": "F", "bpm": 100, "timeSignature": "4/4", "meter": null,
+      "language": "German", "scripture": "Johannes 15,10", "license": "PD", "confidence": "lyrics-only", "hymnalCount": 0,
+      "chordPro": "Verse 1\nAch bleib mit deiner Gnade\nBei uns, Herr Jesu Christ",
+      "parentSongId": "fixsong0001", "relationLabel": "German original", "status": "approved", "submittedBy": null, "proAnswer": null, "certified": true,
+      "midiUrl": "works/abide-fixture/sources/tune.mid", "lyricsUrl": null, "abcUrl": "works/abide-fixture/sources/tune.abc", "artUrl": null,
+      "videoUrl": null, "demoAudioUrl": null, "sheetPdfUrl": null, "stemsZipUrl": null
+    }
+  ]
+}

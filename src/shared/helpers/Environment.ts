@@ -31,6 +31,8 @@ export class Environment extends EnvironmentBase {
   static b1AdminRoot: string;
   static b1AppRoot: string;
   static worshipCommonsRoot: string;
+  /** comma-separated user ids or emails allowed to review WorshipCommons submissions without Server/Admin */
+  static commonsMusicEditors: string;
   static hubspotKey: string;
   static mauticUrl: string;
   static mauticUser: string;
@@ -230,6 +232,7 @@ export class Environment extends EnvironmentBase {
     this.b1AdminRoot = process.env.B1ADMIN_ROOT || config.b1AdminRoot || "https://admin.staging.b1.church";
     this.b1AppRoot = process.env.B1APP_ROOT || config.b1AppRoot || "https://{subdomain}.b1.church";
     this.worshipCommonsRoot = process.env.WORSHIPCOMMONS_ROOT || config.worshipCommonsRoot || "";
+    this.commonsMusicEditors = process.env.COMMONS_MUSIC_EDITORS || config.commonsMusicEditors || "";
     this.mailSystem = process.env.MAIL_SYSTEM ?? config.mailSystem ?? "";
     EnvironmentBase.mailSystem = this.mailSystem;
 

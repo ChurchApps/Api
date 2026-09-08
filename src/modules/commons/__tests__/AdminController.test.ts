@@ -1,9 +1,10 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+const mockEnv = { worshipCommonsRoot: "http://localhost:3104", commonsMusicEditors: "" };
 jest.mock("../../../shared/helpers/index", () => ({
   Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } },
-  Environment: { worshipCommonsRoot: "http://localhost:3104" }
+  Environment: mockEnv
 }));
 const notifyTakedown = jest.fn(async () => {});
 const notifyReportResolved = jest.fn(async () => {});
@@ -16,9 +17,11 @@ jest.mock("../helpers/index", () => ({
     previewToken: () => "tok",
     fileUrls: () => ({})
   },
+  ReviewerHelper: jest.requireActual("../helpers/ReviewerHelper").ReviewerHelper,
   PublishHelper: {
     approve: jest.fn(async () => {}),
     reject: jest.fn(async () => {}),
+    requestChanges: jest.fn(async () => {}),
     remove: jest.fn(async () => {}),
     editablePayload: jest.fn(async () => ({ name: "Live", license: "WC", detail: {} })),
     diffFields: jest.fn(() => [{ key: "name", from: "Live", to: "Proposed" }]),
@@ -31,18 +34,17 @@ jest.mock("../helpers/index", () => ({
 import { CommonsAdminController } from "../controllers/CommonsAdminController.js";
 import { PublishHelper } from "../helpers/index.js";
 
-const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "user0000001", status: "pending", payload: { name: "Proposed" } });
+const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "user0000001", status: "pending", type: "correction", payload: { name: "Proposed" } });
 
-function adminController(overrides: any = {}, admin = true) {
+function adminController(overrides: any = {}, admin = true, au: any = { id: "admin000001", email: "admin@example.com", checkAccess: () => admin }) {
   const repos: any = {
     submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), loadMine: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })), countByStatus: jest.fn(async () => 4) },
     asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []), loadByPublisher: jest.fn(async () => []) },
     assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", action: "add" }]), loadLive: jest.fn(async () => []) },
     report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) },
-    song: { loadPublishedForDuplicates: jest.fn(async () => []) }
+    song: { loadPublishedForDuplicates: jest.fn(async () => []), loadSatellite: jest.fn(async () => ({ assetId: "asset000001", contributors: JSON.stringify([{ name: "Ada", what: "new song", submissionId: "sub00000000" }]) })) }
   };
   for (const [k, v] of Object.entries(overrides)) Object.assign(repos[k], v);
-  const au = { id: "admin000001", checkAccess: () => admin };
   const controller = new CommonsAdminController();
   (controller as any).repos = repos;
   (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
@@ -52,15 +54,24 @@ function adminController(overrides: any = {}, admin = true) {
 
 const req = (body: any = {}, id = "sub00000001", query: any = {}) => ({ params: { id }, body, query, headers: {} } as any);
 
+/** A signed-in user listed in COMMONS_MUSIC_EDITORS by email, with no Server/Admin permission. */
+function editorController(overrides: any = {}) {
+  mockEnv.commonsMusicEditors = "someone0001, editor@example.com";
+  return adminController(overrides, false, { id: "editor00001", email: "Editor@Example.com", checkAccess: () => false });
+}
+
 describe("admin submissions", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnv.commonsMusicEditors = "";
+  });
 
   it("returns pendingCount on /status only for admins", async () => {
     const { controller, repos } = adminController();
-    expect(await controller.status(req(), {} as any)).toEqual({ admin: true, pendingCount: 4 });
+    expect(await controller.status(req(), {} as any)).toEqual({ admin: true, musicEditor: false, pendingCount: 4 });
     expect(repos.submission.countByStatus).toHaveBeenCalledWith("pending");
     const { controller: visitor } = adminController({}, false);
-    expect(await visitor.status(req(), {} as any)).toEqual({ admin: false });
+    expect(await visitor.status(req(), {} as any)).toEqual({ admin: false, musicEditor: false });
   });
 
   it("gates everything on Server/Admin", async () => {
@@ -72,8 +83,8 @@ describe("admin submissions", () => {
 
   it("approves a pending submission through PublishHelper", async () => {
     const { controller } = adminController();
-    expect(await controller.approve(req({ note: "ok" }), {} as any)).toEqual({ status: "approved", assetId: "asset000001" });
-    expect(PublishHelper.approve).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), "admin000001", "ok");
+    expect(await controller.approve(req({ note: "ok" }), {} as any)).toEqual({ status: "approved", assetId: "asset000001", declined: [] });
+    expect(PublishHelper.approve).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), "admin000001", "ok", []);
   });
 
   it("refuses to approve anything not pending or whose asset was removed", async () => {
@@ -109,6 +120,16 @@ describe("admin submissions", () => {
     expect(detail.previewUrl).toBe("http://localhost:3104/preview/submission/sub00000001?token=tok");
     expect(detail.submittedByName).toBe("Sub Mitter");
     expect(detail.detailFields?.some((f: any) => f.key === "chordPro")).toBe(true);
+  });
+
+  it("carries the proposal type on the queue and the detail, and the song's contributors on the detail", async () => {
+    const { controller } = adminController({ submission: { loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song" }]) } });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].type).toBe("correction");
+    const detail: any = await controller.submission(req(), {} as any);
+    expect(detail.type).toBe("correction");
+    expect(detail.live.contributors).toEqual([{ name: "Ada", what: "new song", submissionId: "sub00000000" }]);
+    expect(detail.detailFields.map((f: any) => f.key)).toEqual(expect.arrayContaining(["parentSongId", "relationLabel", "translator", "arranger"]));
   });
 
   it("exposes qualityDetail from the payload on the queue and detail, without leaking payload on the queue", async () => {
@@ -178,6 +199,157 @@ describe("admin submissions", () => {
     });
     const rows: any = await controller.submissions(req(), {} as any);
     expect(rows[0].possibleDuplicate).toBe(false);
+  });
+});
+
+describe("request changes", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("sends a pending submission back to draft with the note", async () => {
+    const { controller } = adminController();
+    expect(await controller.requestChanges(req({ note: "  Please add the bridge chords.  " }), {} as any)).toEqual({ status: "draft" });
+    expect(PublishHelper.requestChanges).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), "admin000001", "Please add the bridge chords.");
+  });
+
+  it("needs a note and clips it to 500 characters", async () => {
+    const { controller } = adminController();
+    expect((await controller.requestChanges(req({}), {} as any) as any).status).toBe(400);
+    expect((await controller.requestChanges(req({ note: "   " }), {} as any) as any).status).toBe(400);
+    await controller.requestChanges(req({ note: "x".repeat(600) }), {} as any);
+    expect((PublishHelper.requestChanges as jest.Mock).mock.calls[0][3]).toHaveLength(500);
+  });
+
+  it("409s when the submission is not pending", async () => {
+    const { controller } = adminController({ submission: { loadById: jest.fn(async () => ({ ...pending(), status: "draft" })) } });
+    const out: any = await controller.requestChanges(req({ note: "again" }), {} as any);
+    expect(out.status).toBe(409);
+    expect(PublishHelper.requestChanges).not.toHaveBeenCalled();
+  });
+
+  it("404s an unknown submission and 401s a non-reviewer", async () => {
+    const { controller } = adminController({ submission: { loadById: jest.fn(async () => undefined) } });
+    expect((await controller.requestChanges(req({ note: "x" }), {} as any) as any).status).toBe(404);
+    const { controller: visitor } = adminController({}, false);
+    expect(await visitor.requestChanges(req({ note: "x" }), {} as any)).toEqual({ obj: {}, status: 401 });
+  });
+});
+
+describe("partial approve", () => {
+  beforeEach(() => jest.clearAllMocks());
+  const proposed = [{ name: "lyrics.chordpro", action: "replace" }, { name: "demoAudio.mp3", action: "add" }, { name: "sheetPdf.pdf", action: "add" }];
+
+  it("passes validated declines through to PublishHelper and echoes them", async () => {
+    const { controller } = adminController({ assetFile: { loadBySubmission: jest.fn(async () => proposed), loadLive: jest.fn(async () => [{ name: "lyrics.chordpro" }]) } });
+    const out = await controller.approve(req({ note: "score is good", declineFiles: [{ name: "sheetPdf.pdf", reason: " blurry scan " }] }), {} as any);
+    expect(out).toEqual({ status: "approved", assetId: "asset000001", declined: ["sheetPdf.pdf"] });
+    expect(PublishHelper.approve).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), "admin000001", "score is good", [{ name: "sheetPdf.pdf", reason: "blurry scan" }]);
+  });
+
+  it("refuses names outside the proposal, missing reasons, duplicates and a non-list body", async () => {
+    const { controller } = adminController({ assetFile: { loadBySubmission: jest.fn(async () => proposed), loadLive: jest.fn(async () => []) } });
+    for (const declineFiles of [
+      [{ name: "cover.webp", reason: "x" }],
+      [{ name: "sheetPdf.pdf" }],
+      [{ name: "sheetPdf.pdf", reason: "a" }, { name: "sheetPdf.pdf", reason: "b" }],
+      "sheetPdf.pdf"
+    ]) {
+      const out: any = await controller.approve(req({ declineFiles }), {} as any);
+      expect(out.status).toBe(400);
+    }
+    expect(PublishHelper.approve).not.toHaveBeenCalled();
+  });
+
+  it("only lets a required file be declined when the live asset still has one", async () => {
+    const template = { id: "asset000001", assetType: "freeshow/template", name: "Wide", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" };
+    const files = [{ name: "content.fstemplate", action: "replace" }];
+    const decline = { declineFiles: [{ name: "content.fstemplate", reason: "keep the old one" }] };
+    const { controller, repos } = adminController({ asset: { loadById: jest.fn(async () => template) }, assetFile: { loadBySubmission: jest.fn(async () => files), loadLive: jest.fn(async () => []) } });
+    expect((await controller.approve(req(decline), {} as any) as any).status).toBe(400);
+    repos.assetFile.loadLive.mockResolvedValueOnce([{ name: "content.fstemplate" }]);
+    expect((await controller.approve(req(decline), {} as any) as any).declined).toEqual(["content.fstemplate"]);
+  });
+});
+
+describe("music editor", () => {
+  beforeEach(() => jest.clearAllMocks());
+  const sameRights = (): any => ({ ...pending(), payload: { name: "Proposed", license: "WC", detail: { writer: "Someone" } } });
+
+  it("shows up on /status with the pending count", async () => {
+    const { controller } = editorController();
+    expect(await controller.status(req(), {} as any)).toEqual({ admin: false, musicEditor: true, pendingCount: 4 });
+  });
+
+  it("is matched by user id as well as email, and not when the list is empty", async () => {
+    const { controller } = editorController();
+    mockEnv.commonsMusicEditors = "editor00001";
+    expect((await controller.status(req(), {} as any) as any).musicEditor).toBe(true);
+    mockEnv.commonsMusicEditors = "";
+    expect(await controller.status(req(), {} as any)).toEqual({ admin: false, musicEditor: false });
+    expect(await controller.submissions(req(), {} as any)).toEqual({ obj: {}, status: 401 });
+  });
+
+  it("can read the queue and a submission detail", async () => {
+    const { controller } = editorController();
+    expect(await controller.submissions(req(), {} as any)).toEqual([]);
+    const detail: any = await controller.submission(req(), {} as any);
+    expect(detail.id).toBe("sub00000001");
+  });
+
+  it("can approve, request changes and reject when the rights stand", async () => {
+    const { controller } = editorController({ submission: { loadById: jest.fn(async () => sameRights()) } });
+    expect(await controller.approve(req({ note: "proofread" }), {} as any)).toEqual({ status: "approved", assetId: "asset000001", declined: [] });
+    expect(PublishHelper.approve).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), "editor00001", "proofread", []);
+    expect(await controller.requestChanges(req({ note: "bar 12 is wrong" }), {} as any)).toEqual({ status: "draft" });
+    expect(await controller.reject(req({ reason: "quality", note: "unreadable" }), {} as any)).toEqual({ status: "rejected" });
+  });
+
+  it.each([
+    ["license", { name: "Proposed", license: "CC-BY", detail: {} }, []],
+    ["proAnswer", { name: "Proposed", license: "WC", detail: { proAnswer: "Yes, GEMA" } }, []],
+    ["recordingOwned", { name: "Proposed", license: "WC", detail: { recordingOwned: true } }, []],
+    ["demoAudio.mp3", { name: "Proposed", license: "WC", detail: {} }, [{ name: "demoAudio.mp3", action: "add" }]]
+  ])("gets a 403 when the proposal changes rights (%s)", async (what, payload, files) => {
+    const { controller } = editorController({
+      submission: { loadById: jest.fn(async () => ({ ...pending(), payload })) },
+      assetFile: { loadBySubmission: jest.fn(async () => files) }
+    });
+    const out: any = await controller.approve(req({}), {} as any);
+    expect(out.status).toBe(403);
+    expect(out.obj.errors[0]).toContain("Rights changes need a server admin");
+    expect(out.obj.errors[0]).toContain(what);
+    expect(PublishHelper.approve).not.toHaveBeenCalled();
+  });
+
+  it("cannot approve a brand-new asset, whose license is being set for the first time", async () => {
+    const { controller } = editorController({ asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", status: "pending", publisherUserId: "user0000001" })) } });
+    const out: any = await controller.approve(req({}), {} as any);
+    expect(out.status).toBe(403);
+  });
+
+  it("gets a 403 on reports, feature, remove and the other admin-only routes", async () => {
+    const { controller } = editorController();
+    for (const call of [
+      () => controller.reports(req(), {} as any),
+      () => controller.claim(req({}, "rep00000001"), {} as any),
+      () => controller.resolve(req({ resolution: "dismissed", action: "none" }, "rep00000001"), {} as any),
+      () => controller.assets(req(), {} as any),
+      () => controller.unpublish(req({}, "asset000001"), {} as any),
+      () => controller.republish(req({}, "asset000001"), {} as any),
+      () => controller.remove(req({ reason: "policy" }, "asset000001"), {} as any),
+      () => controller.feature(req({}, "asset000001"), {} as any),
+      () => controller.scoreMissing(req(), {} as any)
+    ]) {
+      const out: any = await call();
+      expect(out.status).toBe(403);
+      expect(out.obj.errors).toEqual(["Server admin required"]);
+    }
+    expect(PublishHelper.remove).not.toHaveBeenCalled();
+  });
+
+  it("server admins are unaffected by the rights check", async () => {
+    mockEnv.commonsMusicEditors = "editor@example.com";
+    const { controller } = adminController({ submission: { loadById: jest.fn(async () => ({ ...pending(), payload: { name: "Proposed", license: "CC-BY" } })) } });
+    expect(await controller.approve(req({}), {} as any)).toEqual({ status: "approved", assetId: "asset000001", declined: [] });
   });
 });
 

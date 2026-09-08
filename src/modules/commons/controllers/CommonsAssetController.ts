@@ -1,10 +1,10 @@
 import { controller, httpGet, httpPost, httpPut } from "inversify-express-utils";
 import express from "express";
-import { fileRole } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { ContentLibraryHelper, PublishHelper, recordAssetDownload, userNames } from "../helpers/index.js";
 import { Asset, AssetFile } from "../models/index.js";
+import { baseName } from "../helpers/PackageLayout.js";
 
 const MIN_RATINGS_SHOWN = 3;
 
@@ -82,18 +82,7 @@ export class CommonsAssetController extends CommonsBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.status === "pending") return this.json({}, 404);
-      const approved = await this.repos.submission.loadHistory(asset.id || "");
-      const names = await userNames(approved.map((s) => s.submittedBy));
-      return approved.map((s, i) => ({
-        submissionId: s.id,
-        submittedBy: s.submittedBy,
-        submittedByName: names[s.submittedBy || ""],
-        submittedAt: s.submittedAt,
-        approvedAt: s.reviewedAt,
-        note: s.note,
-        filesChanged: s.filesChanged || [],
-        fieldsChanged: i === 0 ? [] : PublishHelper.diffFields(approved[i - 1].payload, s.payload).map((d) => d.key)
-      }));
+      return await PublishHelper.history(this.repos, asset.id || "");
     });
   }
 
@@ -113,7 +102,7 @@ export class CommonsAssetController extends CommonsBaseController {
       if (!asset) return this.json({}, 404);
       const downloadCount = await recordAssetDownload(this.repos.asset, asset, req);
       const files = await this.repos.assetFile.loadLive(asset.id || "");
-      const content = files.find((f) => fileRole(f.name || "") === "content");
+      const content = files.find((f) => ContentLibraryHelper.role(f.name || "") === "content");
       if (!content) return { downloadCount };
       return { url: ContentLibraryHelper.publicUrl(ContentLibraryHelper.liveKey(asset, content.name || "")), downloadCount };
     });
@@ -124,7 +113,9 @@ export class CommonsAssetController extends CommonsBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset) return this.json({}, 404);
-      const file = await this.repos.assetFile.loadOne(asset.id || "", String(req.params.name), null);
+      // :name is the package-relative name (slash URL-encoded) or, for convenience, just the basename
+      const name = String(req.params.name);
+      const file = (await this.repos.assetFile.loadLive(asset.id || "")).find((f) => f.name === name || baseName(f.name) === name);
       if (!file) return this.json({}, 404);
       const downloadCount = await recordAssetDownload(this.repos.asset, asset, req);
       return { url: ContentLibraryHelper.publicUrl(ContentLibraryHelper.liveKey(asset, file.name || "")), downloadCount };
@@ -192,7 +183,7 @@ export class CommonsAssetController extends CommonsBaseController {
     return assets.map((a) => {
       const { ratingSum: _sum, ...rest } = a;
       const live = files[a.id || ""] || [];
-      return { ...rest, publisherName: names[a.publisherUserId || ""], files: live.map((f) => ({ ...f, role: fileRole(f.name || "") })), fileUrls: ContentLibraryHelper.fileUrls(a, live), ratingAverage: this.average(a) };
+      return { ...rest, publisherName: names[a.publisherUserId || ""], files: live.map((f) => ({ ...f, role: ContentLibraryHelper.role(f.name || "") })), fileUrls: ContentLibraryHelper.fileUrls(a, live), ratingAverage: this.average(a) };
     });
   }
 }

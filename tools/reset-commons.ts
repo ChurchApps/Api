@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 import { Migrator, type Migration, type MigrationProvider } from "kysely";
 import { DatabaseUrlParser } from "../src/shared/helpers/DatabaseUrlParser.js";
 import { createKysely, ensureEnvironment } from "./kysely-config.js";
-import { buildCatalog, MIRRORED_DIRS } from "./commons-seed/catalog.js";
+import { buildCatalog } from "./commons-seed/catalog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ALLOWED_HOSTS = ["localhost", "127.0.0.1"] as const;
@@ -76,12 +76,10 @@ async function seed(repoDir: string) {
   }
 
   if ((process.env.FILE_STORE || "").toUpperCase() !== "S3") {
-    for (const dir of [...MIRRORED_DIRS, "songs", "works", "assets", "pending"]) fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
-    for (const dir of MIRRORED_DIRS) {
-      const src = path.join(repoDir, dir);
-      if (fs.existsSync(src)) fs.cpSync(src, path.join(CONTENT_DIR, dir), { recursive: true });
-    }
-    // every media file lands in its asset's id-keyed live folder, whatever repo folder it came from
+    // nothing is mirrored as-is any more: songs/ and works/ live only as id-keyed packages under assets/,
+    // and writers/ keeps just the portraits the authors rows point at (they travel in `copies`)
+    for (const dir of ["writers", "songs", "works", "assets", "pending"]) fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
+    // every package file lands in its asset's id-keyed live folder, keeping its sources/ masters/ derivatives/ folder
     let copied = 0;
     for (const c of copies) {
       const from = path.join(repoDir, c.from);
@@ -91,7 +89,7 @@ async function seed(repoDir: string) {
       fs.copyFileSync(from, to);
       copied++;
     }
-    console.log(`  Mirrored ${MIRRORED_DIRS.join(", ")} and copied ${copied} song files into ${CONTENT_DIR}/assets`);
+    console.log(`  Copied ${copied} package files and portraits into ${CONTENT_DIR}`);
   }
   console.log(`Seeded ${songs.length} songs, ${authors.length} authors, ${assetFiles.length} files.`);
 }

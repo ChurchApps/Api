@@ -22,6 +22,60 @@ export interface Song {
   certified?: boolean;
   qualityScore?: number;
   qualityDetail?: string;
+  /** package confidence tier; "sunday-ready" is only ever set by the listen gate */
+  confidence?: string;
+  firstLine?: string;
+  /** reserved (hymn tune name), null today */
+  tune?: string;
+  hasChords?: boolean;
+  /** JSON RightsMap */
+  rights?: string;
+  /** JSON FormMap */
+  form?: string;
+  recommendedKey?: string;
+  recommendedKeyReason?: string;
+  /** JSON string[] */
+  publishedKeys?: string;
+  singTimeSeconds?: number;
+  /** "master" | "abc" | "midi" — how the served score.musicxml was produced */
+  scoreSource?: string;
+  /** JSON string[] — the listen-gate record */
+  listenedKeys?: string;
+  sundayReadyBy?: string;
+  sundayReadyAt?: Date;
+  /** JSON array of Contributor rows, appended on every approve */
+  contributors?: string | null;
+}
+
+export type Confidence = "sunday-ready" | "proofread-score" | "converted-from-abc" | "generated-from-midi" | "chart-only" | "lyrics-only";
+
+export interface RightsLayer {
+  license: string;
+  basis?: string;
+  source?: string;
+  holder?: string;
+  note?: string;
+  review?: string;
+}
+
+export type RightsMap = Record<"text" | "translation" | "tune" | "arrangement" | "recording" | "artwork", RightsLayer | null>;
+
+export type RightsUse = "project" | "print" | "stream" | "arrange" | "record";
+export interface UseRule { allowed: boolean; conditions: string[]; }
+export type RightsMatrix = Record<RightsUse, UseRule>;
+
+export interface FormMap {
+  status: "draft" | "approved";
+  sections: { label: string; lyric: number }[];
+  defaultOrder: string[];
+}
+
+/** One credit line on a song: who proposed what, and the submission that carried it. */
+export interface Contributor {
+  name: string;
+  what: string;
+  submissionId?: string;
+  at?: string;
 }
 
 export interface AuthorLink {
@@ -59,6 +113,7 @@ export interface SongView extends Song {
   ratingSum?: number;
   createdAt?: Date;
   publishedAt?: Date;
+  featured?: boolean;
 }
 
 export interface Report {
@@ -108,10 +163,13 @@ export interface Submission {
   assetId?: string;
   submittedBy?: string;
   status?: string;
+  /** new | translation | arrangement | correction | additionalFile | removal */
+  type?: string;
   payload?: SubmissionPayload;
   note?: string;
   triageScore?: number;
-  filesChanged?: { name: string; action: string }[];
+  /** add | replace | remove, or declined (partial approve) with the reviewer's reason */
+  filesChanged?: { name: string; action: string; reason?: string }[];
   reviewedBy?: string;
   reviewedAt?: Date;
   reviewReason?: string;
@@ -121,6 +179,7 @@ export interface Submission {
 }
 
 export interface SubmissionPayload {
+  type?: string;
   name?: string;
   description?: string;
   tags?: string;

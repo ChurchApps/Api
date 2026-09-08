@@ -1,9 +1,14 @@
 import { controller, httpDelete, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
+import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
+// imported by path, not through the barrel: pure, and the shim tests mock the barrel
+import { SongPackageHelper, SongDetail, SongSummary } from "../helpers/SongPackageHelper.js";
+import { packagePath } from "../helpers/PackageLayout.js";
 import { Repos } from "../repositories/index.js";
 import { SongView } from "../models/index.js";
+
+const MAX_QUERY = 100;
 
 interface UploadedFile { name: string; contentType: string; base64: string; }
 interface LegacySongSubmission {
@@ -32,7 +37,10 @@ interface LegacySongSubmission {
 export class CommonsSongController extends CommonsBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => await this.withUrls(await this.repos.song.loadPublishedSummaries()));
+    return this.actionWrapperAnon(req, res, async () => {
+      const str = (k: string) => String(req.query?.[k] || "").trim().slice(0, MAX_QUERY) || undefined;
+      return await this.withUrls(await this.repos.song.loadPublishedSummaries({ sundayReady: req.query?.sundayReady === "true", confidence: str("confidence"), language: str("language"), q: str("q") }));
+    });
   }
 
   // public: a writer about to submit deserves to know the song is already here, before signing in
@@ -81,8 +89,8 @@ export class CommonsSongController extends CommonsBaseController {
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
       const abc = typeof req.body?.abc === "string" ? req.body.abc.trim() : "";
       if (!abc || abc.length > 100000) return this.json({ errors: ["abc text is required (max 100KB)"] }, 400);
-      const payload = await this.editable(asset.id || "");
-      const draft = await SubmissionHelper.createDraft(this.repos, au, { assetId: asset.id, payload, note: "ABC transcription" });
+      const payload = { ...(await this.editable(asset.id || "")), type: "additionalFile" };
+      const draft = await SubmissionHelper.createDraft(this.repos, au, { assetId: asset.id, payload, note: "ABC transcription of the tune" });
       if (draft.ok === false) return this.json({ errors: draft.errors || [draft.error] }, draft.status);
       const stored = await SubmissionHelper.storeInline(this.repos, draft.value.submission, asset, "tune.abc", "text/plain; charset=utf-8", Buffer.from(abc), au.id);
       if (stored.ok === false) return this.json({ errors: stored.errors || [stored.error] }, stored.status);
@@ -100,9 +108,33 @@ export class CommonsSongController extends CommonsBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const song = await this.repos.song.loadById(String(req.params.id));
       if (!song || song.status !== "published") return this.json({}, 404);
-      const [view] = await this.withUrls([song]);
-      const { proAnswer: _proAnswer, qualityScore: _qualityScore, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = view as any;
-      return pub;
+      return await this.detail(song);
+    });
+  }
+
+  // The single fetch the song page needs; `rating.mine` only with a user JWT (actionWrapper tolerates anonymous callers).
+  @httpGet("/:id/page")
+  public async page(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const row = await this.repos.song.loadById(String(req.params.id));
+      if (!row || row.status !== "published") return this.json({}, 404);
+      const song = await this.detail(row);
+      const mine = au.id ? (await this.repos.rating.load(song.id || "", au.id))?.stars ?? null : null;
+      const count = row.ratingCount || 0;
+      const family = await this.withUrls(SongPackageHelper.family(row, await this.repos.song.loadFamily(row.parentSongId || row.id || "")));
+      const familyIds = new Set(family.map((f) => f.id || ""));
+      // ponytail: scores every published song of the language in memory (a few hundred rows); index it when the catalog grows past ~10k
+      const candidates = (await this.repos.song.loadPublishedSummaries({ language: row.language })).map((c) => SongPackageHelper.summary(c, {}));
+      const picked = SongPackageHelper.similar(row, candidates, familyIds);
+      const withUrls = await this.withUrls(picked);
+      const similar = withUrls.map((s, i) => ({ ...s, reason: picked[i].reason }));
+      return {
+        song,
+        rating: { average: count ? Math.round(((row.ratingSum || 0) / count) * 10) / 10 : 0, count, mine },
+        history: await PublishHelper.history(this.repos, song.id || ""),
+        family,
+        similar
+      };
     });
   }
 
@@ -178,13 +210,16 @@ export class CommonsSongController extends CommonsBaseController {
     return { name: s?.title, tags: s?.themes, language: s?.language, license: s?.license, detail: { writer: s?.writer, year: s?.year, songKey: s?.songKey, bpm: s?.bpm, timeSignature: s?.timeSignature, scripture: s?.scripture, chordPro: s?.chordPro, certified: true } };
   }
 
-  private async withUrls(songs: SongView[]): Promise<SongView[]> {
+  // one files query for the whole list; has* flags and fileUrls come from it. qualityScore is reviewer-only and never leaves here.
+  private async withUrls(songs: SongView[]): Promise<SongSummary[]> {
     const files = await this.repos.assetFile.loadLiveMany(songs.map((s) => s.id || ""));
-    return songs.map((s) => {
-      // qualityScore is reviewer-only: it never leaves an anonymous endpoint, only the opaque rank does
-      const { portraitKey, qualityScore: _qualityScore, ...rest } = s;
-      return { ...rest, fileUrls: ContentLibraryHelper.fileUrls({ assetType: "song", id: s.id }, files[s.id || ""] || [], portraitKey) };
-    });
+    return songs.map((s) => SongPackageHelper.summary(s, ContentLibraryHelper.fileUrls({ assetType: "song", id: s.id }, files[s.id || ""] || [], s.portraitKey)));
+  }
+
+  private async detail(song: SongView): Promise<SongDetail> {
+    const asset = { assetType: "song", id: song.id };
+    const files = await this.repos.assetFile.loadLive(song.id || "");
+    return await SongPackageHelper.detail(song, ContentLibraryHelper.fileUrls(asset, files, song.portraitKey), { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, packagePath("song", name))))?.buffer.toString("utf8") ?? null });
   }
 
   private async download(req: express.Request, res: express.Response, ext: string, convert: (song: SongView) => string): Promise<any> {

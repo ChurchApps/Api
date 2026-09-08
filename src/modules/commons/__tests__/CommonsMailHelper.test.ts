@@ -49,6 +49,52 @@ describe("CommonsMailHelper writer emails", () => {
     );
   });
 
+  it("lists what a partial approve left out", async () => {
+    await CommonsMailHelper.notifyApproved(sub(), "asset000001", [{ name: "sheetPdf.pdf", reason: "blurry scan" }, { name: "demoAudio.mp3", reason: "clipping <loud>" }]);
+    const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
+    expect(body).toContain("https://worshipcommons.org/songs/asset000001");
+    expect(body).toContain("Not included this time");
+    expect(body).toContain("<strong>sheetPdf.pdf</strong> — blurry scan");
+    expect(body).toContain("clipping &lt;loud&gt;");
+  });
+
+  it("does not mention declined files on a full approve", async () => {
+    await CommonsMailHelper.notifyApproved(sub(), "asset000001");
+    const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
+    expect(body).not.toContain("Not included");
+  });
+
+  it("emails the writer when a reviewer asks for changes", async () => {
+    await CommonsMailHelper.notifyChangesRequested(sub(), "  Bar 12 needs a chord.  ");
+    const [from, to, app, url, subject, body] = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0];
+    expect(from).toBe("support@churchapps.org");
+    expect(to).toBe("writer@example.com");
+    expect(app).toBe("WorshipCommons");
+    expect(url).toBe("https://worshipcommons.org");
+    expect(subject).toBe("Changes requested: New Hymn");
+    expect(body).toContain("asked for changes");
+    expect(body).toContain("back in your drafts");
+    expect(body).toContain("<p>Bar 12 needs a chord.</p>");
+    expect(body).toContain("https://worshipcommons.org/my-songs");
+    expect(body).toContain("support@churchapps.org");
+  });
+
+  it.each(["notifyReceived", "notifyApproved", "notifyChangesRequested", "notifyRejected"])("%s shares the my-songs link and support footer", async (method) => {
+    await (CommonsMailHelper as any)[method](sub(), method === "notifyApproved" ? "asset000001" : method === "notifyRejected" ? "quality" : "a note");
+    const body = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5];
+    expect(body).toContain('<a href="https://worshipcommons.org/my-songs">');
+    expect(body).toContain("Questions? Email support@churchapps.org.");
+    expect(body).toContain("New Hymn");
+  });
+
+  it("escapes user text but keeps the SongSelect search on the raw title", async () => {
+    await CommonsMailHelper.notifyRejected({ ...sub(), payload: { name: "Rock & Roll <3" } }, "ccli", "see <b>SongSelect</b>");
+    const [, , , , subject, body] = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0];
+    expect(subject).toBe("An update on Rock &amp; Roll &lt;3");
+    expect(body).toContain("see &lt;b&gt;SongSelect&lt;/b&gt;");
+    expect(body).toContain("SearchText=Rock%20%26%20Roll%20%3C3");
+  });
+
   it("maps reject reasons and includes the reviewer note", async () => {
     await CommonsMailHelper.notifyRejected(sub(), "quality", "needs a chorus");
     const [from, to, app, url, subject, body] = (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0];
@@ -215,5 +261,42 @@ describe("CommonsMailHelper report emails", () => {
     await expect(CommonsMailHelper.notifyReportReceived(report())).resolves.toBeUndefined();
     expect(err).toHaveBeenCalled();
     err.mockRestore();
+  });
+});
+
+describe("CommonsMailHelper proposal-type wording", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    loadByIds.mockResolvedValue([{ id: "user0000001", email: "writer@example.com" }]);
+  });
+  const typed = (type: string): any => ({ ...sub(), type });
+  const last = () => (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls.at(-1) as any[];
+
+  it("names the proposal in the received, approved and rejected mails", async () => {
+    await CommonsMailHelper.notifyReceived(typed("correction"));
+    expect(last()[4]).toBe("We received your correction to New Hymn");
+    await CommonsMailHelper.notifyApproved(typed("correction"), "asset000001");
+    expect(last()[4]).toBe("Your correction to New Hymn was approved");
+    expect(last()[5]).toContain("https://worshipcommons.org/songs/asset000001");
+    await CommonsMailHelper.notifyRejected(typed("additionalFile"), "quality", "the scan is blurry");
+    expect(last()[4]).toBe("An update on your file for New Hymn");
+    expect(last()[5]).toContain("not to apply <strong>your file for New Hymn</strong>");
+    expect(last()[5]).toContain("the scan is blurry");
+    await CommonsMailHelper.notifyApproved(typed("translation"), "asset000001");
+    expect(last()[4]).toBe("Your translation (New Hymn) was approved");
+    await CommonsMailHelper.notifyReceived(typed("arrangement"));
+    expect(last()[4]).toBe("We received your arrangement (New Hymn)");
+  });
+
+  it("tells a writer their removal request was applied and that the page is kept", async () => {
+    await CommonsMailHelper.notifyApproved(typed("removal"), "asset000001");
+    expect(last()[4]).toBe("Your removal request for New Hymn was approved");
+    expect(last()[5]).toContain("no longer listed");
+    expect(last()[5]).not.toContain("/songs/asset000001");
+  });
+
+  it("keeps the plain title wording for a new song", async () => {
+    await CommonsMailHelper.notifyApproved(typed("new"), "asset000001");
+    expect(last()[4]).toBe("New Hymn is live on WorshipCommons");
   });
 });

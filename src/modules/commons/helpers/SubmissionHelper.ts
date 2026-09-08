@@ -1,12 +1,12 @@
-import { ASSET_TYPES } from "@churchapps/helpers";
-import { fileRole } from "@churchapps/helpers";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
+import { ASSET_TYPES } from "./AssetTypes.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { MusicHelper } from "./MusicHelper.js";
+import { findByBase, packageRole } from "./PackageLayout.js";
 import { QualityHelper } from "./QualityHelper.js";
-import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, normalizeTags, resultingFileNames, validateSubmission } from "./SubmitValidation.js";
+import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, normalizeTags, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
 
 export interface Actor { id?: string; churchId?: string; }
 export type Outcome<T> = { ok: true; value: T } | { ok: false; status: number; error: string; errors?: string[] };
@@ -15,6 +15,11 @@ const fail = (status: number, error: string | string[]): Outcome<never> =>
 
 /** The submission lifecycle, shared by the submissions controller and the legacy shims. */
 export class SubmissionHelper {
+  /** The proposal type a payload carries against this asset (payload.type, else the contract default). */
+  static typeOf(payload: SubmissionPayload | undefined, asset: Asset | undefined): string {
+    return submissionType(payload, !asset?.publishedSubmissionId);
+  }
+
   static async createDraft(repos: Repos, au: Actor, body: { assetId?: string; assetType?: string; payload?: SubmissionPayload; note?: string }): Promise<Outcome<{ submission: Submission; asset: Asset }>> {
     const payload = body.payload || {};
     let asset: Asset | undefined;
@@ -36,15 +41,15 @@ export class SubmissionHelper {
         status: "pending"
       });
     }
-    const submission = await repos.submission.create({ assetId: asset.id, submittedBy: au.id, payload, note: body.note?.slice(0, 500) });
+    const submission = await repos.submission.create({ assetId: asset.id, submittedBy: au.id, type: this.typeOf(payload, asset), payload, note: body.note?.slice(0, 500) });
     return { ok: true, value: { submission, asset } };
   }
 
   /** Records (or re-records) a proposed file; the action is inferred from whether a live file of that name exists. */
   static async recordFile(repos: Repos, sub: Submission, asset: Asset, file: { name: string; sizeBytes?: number; contentHash?: string; action?: string }, uploadedBy?: string): Promise<Outcome<AssetFile>> {
     const def = ASSET_TYPES[asset.assetType || ""];
-    if (!def || !isUploadableName(def, file.name)) return fail(400, `${file.name} is not an accepted file for ${def?.label || asset.assetType}`);
-    const live = await repos.assetFile.loadOne(asset.id || "", file.name, null);
+    if (!def || !isUploadableName(def, file.name)) return fail(400, notAcceptedMessage(def, file.name));
+    const live = findByBase(await repos.assetFile.loadLive(asset.id || ""), asset.assetType, file.name);
     const action = file.action === "remove" ? "remove" : live ? "replace" : "add";
     if (action === "remove" && !live) return fail(400, `${file.name} is not a live file`);
     const row = await repos.assetFile.upsert({ assetId: asset.id, submissionId: sub.id, name: file.name, action, sizeBytes: file.sizeBytes, contentHash: file.contentHash, uploadedBy });
@@ -54,7 +59,7 @@ export class SubmissionHelper {
   static async storeInline(repos: Repos, sub: Submission, asset: Asset, name: string, contentType: string, buffer: Buffer, uploadedBy?: string): Promise<Outcome<AssetFile>> {
     if (!buffer.length) return fail(400, `${name} is empty`);
     const def = ASSET_TYPES[asset.assetType || ""];
-    if (!def || !isUploadableName(def, name)) return fail(400, `${name} is not an accepted file for ${def?.label || asset.assetType}`);
+    if (!def || !isUploadableName(def, name)) return fail(400, notAcceptedMessage(def, name));
     await ContentLibraryHelper.storePending(ContentLibraryHelper.pendingKey(sub.id || "", name), contentType || ContentLibraryHelper.contentTypeFor(name), buffer);
     return await this.recordFile(repos, sub, asset, { name, sizeBytes: buffer.length, contentHash: ContentLibraryHelper.sha256(buffer) }, uploadedBy);
   }
@@ -65,19 +70,32 @@ export class SubmissionHelper {
     await ContentLibraryHelper.removeKey(ContentLibraryHelper.pendingKey(sub.id || "", name));
   }
 
-  /** draft → pending: registry validation, upload presence, duplicate hash, rate limits, triage score, 409 on a competing pending submission. */
+  /** draft → pending: registry + proposal-type validation, upload presence, duplicate hash, rate limits, triage score, 409 on a competing pending submission. */
   static async submit(repos: Repos, sub: Submission, asset: Asset): Promise<Outcome<{ status: string }>> {
     if (sub.status !== "draft") return fail(400, "only drafts can be submitted");
     const def = ASSET_TYPES[asset.assetType || ""];
     if (!def) return fail(400, "unknown asset type");
+    const payload: SubmissionPayload = { ...(sub.payload || {}), detail: { ...(sub.payload?.detail || {}) } };
+    const type = this.typeOf(payload, asset);
+    payload.type = type;
+    const detail = payload.detail || {};
+    if (type === "translation" && !detail.relationLabel) detail.relationLabel = `Translation (${payload.language || "English"})`;
+    if (type === "arrangement" && !detail.relationLabel) detail.relationLabel = "Arrangement";
+
     const proposed = await repos.assetFile.loadBySubmission(sub.id || "");
     const live = await repos.assetFile.loadLive(asset.id || "");
-    const errors = validateSubmission(def, sub.payload || {}, proposed, live);
+    const ctx: ValidationContext = { type, note: sub.note, isNewAsset: !asset.publishedSubmissionId };
+    if ((type === "translation" || type === "arrangement") && detail.parentSongId) {
+      const parent = await repos.asset.loadById(String(detail.parentSongId));
+      ctx.parent = parent ? { status: parent.status, language: parent.language } : null;
+    }
+    if (type === "removal" && asset.publishedSubmissionId) ctx.livePayload = (await repos.submission.loadById(asset.publishedSubmissionId))?.payload;
+    const errors = validateSubmission(def, payload, proposed, live, ctx);
     if (errors.length) return fail(400, errors);
     for (const f of proposed) {
       if (f.action !== "remove" && !(await ContentLibraryHelper.exists(ContentLibraryHelper.pendingKey(sub.id || "", f.name || "")))) return fail(400, `${f.name} was not uploaded`);
     }
-    const primary = proposed.find((f) => f.action !== "remove" && def.files.find((s) => s.required && s.role === fileRole(f.name || "")));
+    const primary = proposed.find((f) => f.action !== "remove" && def.files.find((s) => s.required && s.role === packageRole(f.name)));
     if (primary?.contentHash) {
       const dup = await repos.assetFile.loadLiveByHash(primary.contentHash);
       if (dup && dup.assetId !== asset.id) return fail(409, "an identical file has already been published");
@@ -86,14 +104,13 @@ export class SubmissionHelper {
     if ((await repos.submission.countByUser(userId, "pending")) >= MAX_PENDING_PER_USER) return fail(429, `you already have ${MAX_PENDING_PER_USER} submissions waiting for review`);
     if ((await repos.submission.countSubmittedSince(userId, new Date(Date.now() - 86400000))) >= MAX_SUBMITTED_PER_DAY) return fail(429, "daily submission limit reached");
 
-    const payload = { ...(sub.payload || {}) };
     if (payload.tags !== undefined) payload.tags = normalizeTags(payload.tags);
     payload.licenseVersion = payload.licenseVersion || (payload.license === "PD" ? "CC0" : payload.license?.startsWith("CC-") ? "4.0" : "1.0");
     payload.attestationVersion = payload.attestationVersion || "1.0";
     payload.attestedAt = payload.attestedAt || new Date().toISOString();
 
     let triageScore: number | null = null;
-    if (asset.assetType === "song") {
+    if (asset.assetType === "song" && type !== "removal") {
       const d = payload.detail || {};
       // must await: Lambda freezes after the response, fire-and-forget never completes
       const scored = await QualityHelper.score({
@@ -105,7 +122,7 @@ export class SubmissionHelper {
         themes: payload.tags,
         bpm: d.bpm,
         songKey: d.songKey,
-        fileRoles: resultingFileNames(live, proposed).map((n) => fileRole(n))
+        fileRoles: resultingFileNames(live, proposed).map((n) => packageRole(n))
       });
       triageScore = scored.qualityScore ?? null;
       if (scored.qualityDetail) {
@@ -117,12 +134,13 @@ export class SubmissionHelper {
       }
       const keyNotes = await this.keyNotes(sub.id || "", proposed, payload);
       if (keyNotes.length) {
-        const detail = (payload.qualityDetail && typeof payload.qualityDetail === "object" ? payload.qualityDetail : (payload.qualityDetail = {})) as { notes?: string };
-        detail.notes = [detail.notes, ...keyNotes].filter(Boolean).join("; ");
+        const qd = (payload.qualityDetail && typeof payload.qualityDetail === "object" ? payload.qualityDetail : (payload.qualityDetail = {})) as { notes?: string };
+        qd.notes = [qd.notes, ...keyNotes].filter(Boolean).join("; ");
       }
     }
     sub.payload = payload;
-    await repos.submission.update(sub.id || "", { payload });
+    sub.type = type;
+    await repos.submission.update(sub.id || "", { payload, type });
     const moved = await repos.submission.submit(sub.id || "", asset.id || "", triageScore);
     if (!moved) {
       const pending = await repos.submission.loadPendingForAsset(asset.id || "");
