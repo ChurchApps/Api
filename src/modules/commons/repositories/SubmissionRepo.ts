@@ -37,6 +37,7 @@ export class SubmissionRepo {
       assetId: sub.assetId,
       submittedBy: sub.submittedBy,
       status: "draft",
+      type: sub.type || "new",
       payload: JSON.stringify(sub.payload || {}),
       note: sub.note
     } as any).execute();
@@ -63,13 +64,13 @@ export class SubmissionRepo {
     return fromRow(await getDb().selectFrom("submissions").selectAll().where("assetId", "=", assetId).where("status", "=", "pending").executeTakeFirst());
   }
 
-  /** The one moderation queue: pending submissions across every product, oldest first. */
+  /** The one moderation queue: pending submissions across every product, best triage score first, then oldest. */
   public async loadQueue(filter: QueueFilter): Promise<QueueRow[]> {
     const pageSize = Math.min(Math.max(filter.pageSize || 100, 1), 500);
     const page = Math.max(filter.page || 1, 1);
     let q = this.joined().where("submissions.status", "=", filter.status || "pending");
     if (filter.assetType) q = q.where("assets.assetType", "=", filter.assetType);
-    const rows = await q.orderBy("submissions.submittedAt", "asc").orderBy("submissions.createdAt", "asc").limit(pageSize).offset((page - 1) * pageSize).execute();
+    const rows = await q.orderBy("submissions.triageScore", "desc").orderBy("submissions.submittedAt", "asc").orderBy("submissions.createdAt", "asc").limit(pageSize).offset((page - 1) * pageSize).execute();
     return rows.map((r) => fromRow<QueueRow>(r));
   }
 
@@ -143,6 +144,7 @@ export class SubmissionRepo {
         "submissions.assetId",
         "submissions.submittedBy",
         "submissions.status",
+        "submissions.type",
         "submissions.payload",
         "submissions.note",
         "submissions.triageScore",

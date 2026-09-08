@@ -13,6 +13,7 @@ const GENERIC_FIELDS = ["name", "description", "tags", "language", "license", "p
 // the submission only flips to approved last), so a failed approve is simply retried.
 export class PublishHelper {
   static async approve(repos: Repos, sub: Submission, asset: Asset, reviewerId: string, note?: string): Promise<void> {
+    if (sub.type === "removal") return await this.approveRemoval(repos, sub, asset, reviewerId, note);
     const payload = sub.payload || {};
     const generic: Partial<Asset> = {};
     for (const k of GENERIC_FIELDS) if (payload[k] !== undefined) (generic as any)[k] = payload[k];
@@ -40,15 +41,18 @@ export class PublishHelper {
     }
 
     const version = (await repos.submission.countApproved(asset.id || "")) + 1;
-    const names = await userNames([asset.publisherUserId]);
+    const names = await userNames([asset.publisherUserId, sub.submittedBy]);
     const ctx: PublishContext = {
       asset,
       submission: sub,
       detail: payload.detail || {},
       files: await repos.assetFile.loadLive(asset.id || ""),
+      filesChanged,
       version,
       publisherName: names[asset.publisherUserId || ""],
+      submitterName: names[sub.submittedBy || ""],
       repos,
+      readFile: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, name)))?.buffer || null,
       writeFile: async (name, contentType, body) => {
         await ContentLibraryHelper.store(ContentLibraryHelper.liveKey(asset, name), contentType, body);
         await repos.assetFile.upsert({ assetId: asset.id, submissionId: null, name, action: "add", sizeBytes: body.length, contentHash: ContentLibraryHelper.sha256(body), uploadedBy: null as any });
@@ -61,6 +65,16 @@ export class PublishHelper {
     const now = new Date();
     await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null as any, removedReason: null as any });
     await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged });
+    await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
+    void CommonsMailHelper.notifyApproved(sub, asset.id || "").catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
+  }
+
+  /** An approved removal request unpublishes the asset: files, satellite and history stay so a republish is one status flip. */
+  private static async approveRemoval(repos: Repos, sub: Submission, asset: Asset, reviewerId: string, note?: string): Promise<void> {
+    const now = new Date();
+    if (asset.status === "published") await repos.asset.update(asset.id || "", { status: "unpublished", unpublishedAt: now, removedReason: "publisher" });
+    await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged: [] });
+    await repos.assetFile.deleteBySubmission(sub.id || "");
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
     void CommonsMailHelper.notifyApproved(sub, asset.id || "").catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
   }
@@ -105,7 +119,7 @@ export class PublishHelper {
     const payload: SubmissionPayload = { name: asset.name, description: asset.description, tags: asset.tags, language: asset.language, license: asset.license, publisherChurchId: asset.publisherChurchId, detail: {} };
     if (asset.assetType === "song") {
       const s = await repos.song.loadById(asset.id || "");
-      if (s) payload.detail = { writer: s.writer, year: s.year, songKey: s.songKey, bpm: s.bpm, timeSignature: s.timeSignature, scripture: s.scripture, scriptureText: s.scriptureText, chordPro: s.chordPro, videoUrl: s.videoUrl, proAnswer: s.proAnswer, certified: true };
+      if (s) payload.detail = { writer: s.writer, year: s.year, songKey: s.songKey, bpm: s.bpm, timeSignature: s.timeSignature, scripture: s.scripture, scriptureText: s.scriptureText, chordPro: s.chordPro, videoUrl: s.videoUrl, parentSongId: s.parentSongId, relationLabel: s.relationLabel, proAnswer: s.proAnswer, certified: true };
     }
     return payload;
   }

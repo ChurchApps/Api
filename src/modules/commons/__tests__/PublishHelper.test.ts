@@ -10,12 +10,13 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
     store: jest.fn(async () => {}),
     removeKey: jest.fn(async () => {}),
     removePrefix: jest.fn(async () => {}),
+    readKey: jest.fn(async () => null),
     sha256: () => "hash",
     songJson: () => ({}),
     renderChordpro: () => "{title: x}\n"
   }
 }));
-jest.mock("../helpers/NamesHelper", () => ({ userNames: jest.fn(async () => ({ owner000001: "Owner" })) }));
+jest.mock("../helpers/NamesHelper", () => ({ userNames: jest.fn(async () => ({ owner000001: "Owner", stranger0001: "Stranger Sam" })) }));
 jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyApproved: jest.fn(async () => {}), notifyRejected: jest.fn(async () => {}) } }));
 
 import { PublishHelper } from "../helpers/PublishHelper";
@@ -35,13 +36,20 @@ function repos(files: any[] = [], liveFiles: any[] = []) {
       loadBySubmission: jest.fn(async () => files),
       loadOne: jest.fn(async (_a: string, name: string) => live.find((f) => f.name === name)),
       loadLive: jest.fn(async () => live),
-      update: jest.fn(async () => {}),
-      delete: jest.fn(async () => {}),
+      // mirrors the DB: clearing submissionId makes a proposed row live; delete drops a live row
+      update: jest.fn(async (id: string, fields: any) => {
+        const promoted = fields.submissionId === null && files.find((f) => f.id === id);
+        if (promoted) live.push({ ...promoted, ...fields });
+      }),
+      delete: jest.fn(async (id: string) => {
+        const i = live.findIndex((f) => f.id === id);
+        if (i >= 0) live.splice(i, 1);
+      }),
       upsert: jest.fn(async (f: any) => { live.push(f); return f; }),
       deleteBySubmission: jest.fn(async () => {}),
       deleteByAsset: jest.fn(async () => {})
     },
-    song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", hymnalCount: 3 })), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "New Name" })) },
+    song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", hymnalCount: 3, contributors: null })), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "New Name" })) },
     author: { findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001", name: "Fanny Crosby" })), update: jest.fn(async () => {}) }
   };
   return r;
@@ -196,5 +204,112 @@ describe("PublishHelper.diffFields", () => {
       { key: "detail.writer", from: "X", to: "Y" },
       { key: "detail.songKey", from: undefined, to: "G" }
     ]);
+  });
+});
+
+const manifestWritten = () => JSON.parse((ContentLibraryHelper.store as jest.Mock).mock.calls.find((c) => c[0].endsWith("manifest.json"))[2].toString());
+const contributorsUpserted = (r: any) => JSON.parse(r.song.upsert.mock.calls[0][0].contributors);
+
+describe("PublishHelper.approve — sources manifest", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("writes a contributor row per uploaded file inside manifest.json, and none for generated files", async () => {
+    const proposed = [{ id: "pf1", name: "tune.abc", action: "add", contentHash: "abc123", uploadedBy: "stranger0001" }];
+    const r = repos(proposed, []);
+    await PublishHelper.approve(r, { ...submission(), note: "transcribed from the 1912 hymnal" }, asset(), "admin000001");
+    const manifest = manifestWritten();
+    expect(manifest.sources).toEqual([
+      {
+        file: "tune.abc",
+        url: null,
+        acquired: new Date().toISOString().slice(0, 10),
+        sha256: "abc123",
+        licenseBasis: "contributor",
+        original: true,
+        submittedBy: "stranger0001",
+        submission: "sub00000001",
+        note: "transcribed from the 1912 hymnal"
+      }
+    ]);
+    expect(manifest.files.map((f: any) => f.name)).toEqual(expect.arrayContaining(["tune.abc", "song.json", "lyrics.chordpro"]));
+  });
+
+  it("preserves earlier rows across approvals, replaces the row of a re-uploaded file, and backfills a legacy upload", async () => {
+    const previous = { file: "demoAudio.mp3", url: null, acquired: "2026-01-02", sha256: "oldhash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: "sub00000000", note: "first demo" };
+    (ContentLibraryHelper.readKey as jest.Mock).mockResolvedValueOnce({ buffer: Buffer.from(JSON.stringify({ sources: [previous, { ...previous, file: "sheetPdf.pdf", sha256: "stale" }] })), contentType: "application/json" });
+    const live = [
+      { id: "lf1", name: "demoAudio.mp3", contentHash: "oldhash", uploadedBy: "owner000001", createdAt: new Date("2026-01-02") },
+      { id: "lf2", name: "sheetPdf.pdf", contentHash: "pdfhash", uploadedBy: "owner000001", createdAt: new Date("2026-02-03") },
+      { id: "lf3", name: "art.png", contentHash: "arthash", uploadedBy: "owner000001", createdAt: new Date("2026-03-04T12:00:00Z") },
+      { id: "lf4", name: "song.json", contentHash: "gen", uploadedBy: null }
+    ];
+    const proposed = [{ id: "pf2", name: "sheetPdf.pdf", action: "replace", contentHash: "pdfhash", uploadedBy: "stranger0001" }];
+    const r = repos(proposed, live);
+    await PublishHelper.approve(r, { ...submission(), note: "cleaner scan" }, asset(), "admin000001");
+    const sources = manifestWritten().sources;
+    expect(sources.find((s: any) => s.file === "demoAudio.mp3")).toEqual(previous);
+    expect(sources.find((s: any) => s.file === "sheetPdf.pdf")).toMatchObject({ sha256: "pdfhash", submission: "sub00000001", submittedBy: "stranger0001", note: "cleaner scan" });
+    expect(sources.find((s: any) => s.file === "art.png")).toEqual({ file: "art.png", url: null, acquired: "2026-03-04", sha256: "arthash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: null, note: null });
+    expect(sources.some((s: any) => s.file === "song.json")).toBe(false);
+  });
+});
+
+describe("PublishHelper.approve — contributors", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("appends the submitter with the type label and keeps earlier credits", async () => {
+    const r = repos();
+    r.song.loadSatellite.mockResolvedValueOnce({ assetId: "asset000001", hymnalCount: 3, contributors: JSON.stringify([{ name: "Owner", what: "new song", submissionId: "sub00000000", at: "2026-01-01T00:00:00.000Z" }]) });
+    await PublishHelper.approve(r, { ...submission(), type: "correction" }, asset(), "admin000001");
+    const rows = contributorsUpserted(r);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toEqual({ name: "Owner", what: "new song", submissionId: "sub00000000", at: "2026-01-01T00:00:00.000Z" });
+    expect(rows[1]).toMatchObject({ name: "Stranger Sam", what: "correction", submissionId: "sub00000001" });
+    expect(new Date(rows[1].at).getTime()).toBeGreaterThan(0);
+  });
+
+  it("dedupes by submission on an approve retry and credits a named translator alongside the submitter", async () => {
+    const r = repos();
+    r.song.loadSatellite.mockResolvedValueOnce({ assetId: "asset000001", contributors: JSON.stringify([{ name: "Stranger Sam", what: "translation", submissionId: "sub00000001", at: "2026-05-05T00:00:00.000Z" }]) });
+    const sub = { ...submission(), type: "translation", payload: { ...submission().payload, detail: { writer: "Anon", chordPro: "[C]x", translator: "Ana Lopez", parentSongId: "asset000009" } } };
+    await PublishHelper.approve(r, sub, asset(), "admin000001");
+    const rows = contributorsUpserted(r);
+    expect(rows.map((c: any) => [c.name, c.what])).toEqual([["Stranger Sam", "translation"], ["Ana Lopez", "translator"]]);
+  });
+
+  it("labels the other types and survives an unreadable contributors column", async () => {
+    for (const [type, what] of [["new", "new song"], ["arrangement", "arrangement"], ["additionalFile", "additional file"]]) {
+      jest.clearAllMocks();
+      const r = repos();
+      r.song.loadSatellite.mockResolvedValueOnce({ assetId: "asset000001", contributors: "not json" });
+      await PublishHelper.approve(r, { ...submission(), type }, asset(), "admin000001");
+      expect(contributorsUpserted(r)).toEqual([expect.objectContaining({ name: "Stranger Sam", what })]);
+    }
+  });
+});
+
+describe("PublishHelper.approve — removal", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("unpublishes the asset, keeps files, satellite and history, and approves the submission without touching fields", async () => {
+    const r = repos();
+    const a = asset();
+    await PublishHelper.approve(r, { ...submission(), type: "removal", payload: { type: "removal" } }, a, "admin000001", "as requested");
+    expect(r.asset.update).toHaveBeenCalledTimes(1);
+    expect(r.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ status: "unpublished", removedReason: "publisher", unpublishedAt: expect.any(Date) }));
+    expect(r.song.upsert).not.toHaveBeenCalled();
+    expect(ContentLibraryHelper.promote).not.toHaveBeenCalled();
+    expect(ContentLibraryHelper.store).not.toHaveBeenCalled();
+    expect(r.assetFile.deleteByAsset).not.toHaveBeenCalled();
+    expect(r.asset.delete).not.toHaveBeenCalled();
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ status: "approved", reviewedBy: "admin000001", reviewNote: "as requested", filesChanged: [] }));
+    expect(CommonsMailHelper.notifyApproved).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001", type: "removal" }), "asset000001");
+  });
+
+  it("leaves an already unpublished asset alone", async () => {
+    const r = repos();
+    await PublishHelper.approve(r, { ...submission(), type: "removal" }, { ...asset(), status: "unpublished" }, "admin000001");
+    expect(r.asset.update).not.toHaveBeenCalled();
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ status: "approved" }));
   });
 });

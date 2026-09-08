@@ -1,7 +1,7 @@
 import { controller, httpDelete, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
+import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, parseContributors, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
 import { Repos } from "../repositories/index.js";
 import { SongView } from "../models/index.js";
 
@@ -81,8 +81,8 @@ export class CommonsSongController extends CommonsBaseController {
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
       const abc = typeof req.body?.abc === "string" ? req.body.abc.trim() : "";
       if (!abc || abc.length > 100000) return this.json({ errors: ["abc text is required (max 100KB)"] }, 400);
-      const payload = await this.editable(asset.id || "");
-      const draft = await SubmissionHelper.createDraft(this.repos, au, { assetId: asset.id, payload, note: "ABC transcription" });
+      const payload = { ...(await this.editable(asset.id || "")), type: "additionalFile" };
+      const draft = await SubmissionHelper.createDraft(this.repos, au, { assetId: asset.id, payload, note: "ABC transcription of the tune" });
       if (draft.ok === false) return this.json({ errors: draft.errors || [draft.error] }, draft.status);
       const stored = await SubmissionHelper.storeInline(this.repos, draft.value.submission, asset, "tune.abc", "text/plain; charset=utf-8", Buffer.from(abc), au.id);
       if (stored.ok === false) return this.json({ errors: stored.errors || [stored.error] }, stored.status);
@@ -102,7 +102,7 @@ export class CommonsSongController extends CommonsBaseController {
       if (!song || song.status !== "published") return this.json({}, 404);
       const [view] = await this.withUrls([song]);
       const { proAnswer: _proAnswer, qualityScore: _qualityScore, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = view as any;
-      return pub;
+      return { ...pub, contributors: parseContributors(pub.contributors) };
     });
   }
 

@@ -22,6 +22,16 @@ export interface Song {
   certified?: boolean;
   qualityScore?: number;
   qualityDetail?: string;
+  /** JSON array of Contributor rows, appended on every approve */
+  contributors?: string | null;
+}
+
+/** One credit line on a song: who proposed what, and the submission that carried it. */
+export interface Contributor {
+  name: string;
+  what: string;
+  submissionId?: string;
+  at?: string;
 }
 
 export interface AuthorLink {
@@ -108,6 +118,8 @@ export interface Submission {
   assetId?: string;
   submittedBy?: string;
   status?: string;
+  /** new | translation | arrangement | correction | additionalFile | removal */
+  type?: string;
   payload?: SubmissionPayload;
   note?: string;
   triageScore?: number;
@@ -121,6 +133,7 @@ export interface Submission {
 }
 
 export interface SubmissionPayload {
+  type?: string;
   name?: string;
   description?: string;
   tags?: string;

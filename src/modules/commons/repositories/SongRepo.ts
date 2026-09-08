@@ -55,7 +55,8 @@ const SONG_COLS = [
   "songs.certified",
   "songs.proAnswer",
   "songs.qualityScore",
-  "songs.qualityDetail"
+  "songs.qualityDetail",
+  "songs.contributors"
 ] as const;
 
 const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS, RANK_COL];
@@ -127,7 +128,8 @@ export class SongRepo {
       proAnswer: song.proAnswer,
       certified: song.certified,
       qualityScore: song.qualityScore,
-      qualityDetail: song.qualityDetail
+      qualityDetail: song.qualityDetail,
+      contributors: song.contributors
     } as any).execute();
   }
 

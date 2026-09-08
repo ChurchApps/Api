@@ -30,6 +30,16 @@ function titleOf(sub: Submission): string {
   return (sub.payload?.name || "").trim() || "your submission";
 }
 
+// "your correction to <title>" for changes to a published song; a new song is just its title
+const TYPE_PHRASES: Record<string, string> = { translation: "your translation", arrangement: "your arrangement", correction: "your correction to", additionalFile: "your file for", removal: "your removal request for" };
+
+function whatOf(sub: Submission): string {
+  const title = titleOf(sub);
+  const phrase = TYPE_PHRASES[sub.type || ""];
+  if (!phrase) return title;
+  return sub.type === "translation" || sub.type === "arrangement" ? `${phrase} (${title})` : `${phrase} ${title}`;
+}
+
 function songSelectUrl(title: string): string {
   return `https://songselect.ccli.com/search/results?SearchText=${encodeURIComponent(title)}`;
 }
@@ -40,24 +50,28 @@ function siteRoot(): string {
 
 export class CommonsMailHelper {
   static notifyReceived(sub: Submission): Promise<void> {
-    const title = titleOf(sub);
+    const what = whatOf(sub);
     const root = siteRoot();
-    return this.mailWriter(sub.submittedBy, `We received ${title}`, `<p>We received <strong>${title}</strong> and a human reviewer will look at it, usually within a few days.</p><p>Track it at <a href="${root}/my-songs">${root}/my-songs</a>.</p>`);
+    return this.mailWriter(sub.submittedBy, `We received ${what}`, `<p>We received <strong>${what}</strong> and a human reviewer will look at it, usually within a few days.</p><p>Track it at <a href="${root}/my-songs">${root}/my-songs</a>.</p>`);
   }
 
   static notifyApproved(sub: Submission, assetId: string): Promise<void> {
     const title = titleOf(sub);
     const root = siteRoot();
-    return this.mailWriter(sub.submittedBy, `${title} is live on WorshipCommons`, `<p><strong>${title}</strong> is now in the library.</p><p><a href="${root}/songs/${assetId}">${root}/songs/${assetId}</a></p>`);
+    if (sub.type === "removal") return this.mailWriter(sub.submittedBy, `Your removal request for ${title} was approved`, `<p><strong>${title}</strong> is no longer listed in the library. Its page and history are kept, so a reviewer can bring it back if you change your mind.</p>`);
+    if (!TYPE_PHRASES[sub.type || ""]) return this.mailWriter(sub.submittedBy, `${title} is live on WorshipCommons`, `<p><strong>${title}</strong> is now in the library.</p><p><a href="${root}/songs/${assetId}">${root}/songs/${assetId}</a></p>`);
+    const what = whatOf(sub);
+    return this.mailWriter(sub.submittedBy, `${what[0].toUpperCase()}${what.slice(1)} was approved`, `<p>${what[0].toUpperCase()}${what.slice(1)} is now live in the library.</p><p><a href="${root}/songs/${assetId}">${root}/songs/${assetId}</a></p>`);
   }
 
   static notifyRejected(sub: Submission, reason: string, note?: string): Promise<void> {
     const title = titleOf(sub);
+    const what = whatOf(sub);
     const why = (REJECT_REASONS[reason] || REJECT_REASONS.other).replace(/\{songselect\}/g, songSelectUrl(title));
-    let body = `<p><strong>${title}</strong> didn't make the WorshipCommons library.</p><p>${why}</p>`;
+    let body = TYPE_PHRASES[sub.type || ""] ? `<p>A reviewer decided not to apply <strong>${what}</strong>.</p><p>${why}</p>` : `<p><strong>${title}</strong> didn't make the WorshipCommons library.</p><p>${why}</p>`;
     if (note?.trim()) body += `<p>${note.trim()}</p>`;
     body += `<p>Questions? Email ${Environment.supportEmail}.</p>`;
-    return this.mailWriter(sub.submittedBy, `An update on ${title}`, body);
+    return this.mailWriter(sub.submittedBy, `An update on ${what}`, body);
   }
 
   static async notifyReviewerDigest(pending: number, stale = 0): Promise<void> {
