@@ -212,7 +212,10 @@ export class ContentLibraryHelper {
     if (ext === "webp") return "image/webp";
     if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
     if (ext === "mid" || ext === "midi") return "audio/midi";
-    if (ext === "abc" || ext === "chordpro" || ext === "txt") return "text/plain; charset=utf-8";
+    if (ext === "tif") return "image/tiff";
+    if (ext === "xml" || ext === "musicxml") return "application/vnd.recordare.musicxml+xml";
+    if (ext === "mxl") return "application/vnd.recordare.musicxml";
+    if (ext === "abc" || ext === "chordpro" || ext === "cho" || ext === "crd" || ext === "ly" || ext === "txt") return "text/plain; charset=utf-8";
     return "application/octet-stream";
   }
 

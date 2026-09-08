@@ -61,8 +61,12 @@ describe("storage keys", () => {
   });
 
   it("names the package derivatives and lets the freshest file win a shared role", () => {
-    const urls = ContentLibraryHelper.fileUrls(asset, [{ name: "chart.chordpro" }, { name: "score.musicxml" }, { name: "slides.json" }, { name: "chart.pdf" }, { name: "attribution.txt" }, { name: "cover-thumb.webp" }, { name: "duration.json" }, { name: "timing.json" }]);
-    expect(Object.keys(urls).sort()).toEqual(["attribution", "chart", "chartPdf", "duration", "score", "slides", "thumb", "timing"]);
+    const urls = ContentLibraryHelper.fileUrls(asset, [
+      { name: "chart.chordpro" }, { name: "score.musicxml" }, { name: "slides.json" }, { name: "chart.pdf" }, { name: "attribution.txt" }, { name: "cover-thumb.webp" }, { name: "duration.json" }, { name: "timing.json" }
+    ]);
+    expect(Object.keys(urls).sort()).toEqual([
+      "attribution", "chart", "chartPdf", "duration", "score", "slides", "thumb", "timing"
+    ]);
     expect(urls.chart).toBe(`${CONTENT_ROOT}/commons/assets/song/testasst001/chart.chordpro`);
     expect(urls.thumb).toBe(`${CONTENT_ROOT}/commons/assets/song/testasst001/cover-thumb.webp`);
     // lyrics.chordpro is rewritten on every publish and an uploaded art-thumb outranks the generated one, whatever the listing order

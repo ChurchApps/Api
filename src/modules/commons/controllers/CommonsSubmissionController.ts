@@ -1,9 +1,9 @@
 import { controller, httpDelete, httpGet, httpPost, httpPut } from "inversify-express-utils";
 import express from "express";
 import * as fs from "fs";
-import { ASSET_TYPES } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { ContentLibraryHelper, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
+import { ASSET_TYPES } from "../helpers/AssetTypes.js";
+import { ContentLibraryHelper, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, notAcceptedMessage, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 
 @controller("/commons/submissions")
@@ -52,9 +52,10 @@ export class CommonsSubmissionController extends CommonsBaseController {
   @httpPut("/:id")
   public async update(req: express.Request<{ id: string }, {}, { payload?: SubmissionPayload; note?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { sub, error } = await this.own(au, String(req.params.id), "draft");
+      const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
-      await this.repos.submission.update(sub.id || "", { payload: req.body.payload || sub.payload, note: req.body.note?.slice(0, 500) ?? sub.note });
+      const payload = req.body.payload || sub.payload;
+      await this.repos.submission.update(sub.id || "", { payload, type: SubmissionHelper.typeOf(payload, asset), note: req.body.note?.slice(0, 500) ?? sub.note });
       return this.json({}, 204);
     });
   }
@@ -68,7 +69,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
       const def = ASSET_TYPES[asset.assetType || ""];
       const name = String(req.body.name || "");
       const spec = def && fileSpec(def, name);
-      if (!spec || spec.generated) return this.json({ errors: [`${name} is not an accepted file for ${def?.label || asset.assetType}`] }, 400);
+      if (!spec || spec.generated) return this.json({ errors: [notAcceptedMessage(def, name)] }, 400);
       const contentType = req.body.contentType || ContentLibraryHelper.contentTypeFor(name);
       return await ContentLibraryHelper.presignedUpload(sub.id || "", name, contentType, spec.maxBytes || DEFAULT_MAX_FILE_BYTES, ContentLibraryHelper.requestApiBase(req));
     });

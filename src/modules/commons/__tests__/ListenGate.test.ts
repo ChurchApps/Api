@@ -26,14 +26,28 @@ const FULL = [{ name: "score.musicxml" }, { name: "slides.json" }, { name: "lyri
 
 function listenController(overrides: Partial<any> = {}, files: any[] = FULL, admin = true) {
   const song: any = {
-    id: "song0000001", title: "Amazing Grace", status: "published", license: "PD", language: "English", writer: "John Newton", songKey: "G",
-    hasChords: 1, confidence: "converted-from-abc", scoreSource: "abc", publishedKeys: JSON.stringify(["G", "F"]), listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, rights: null, form: null, ...overrides
+    id: "song0000001",
+    title: "Amazing Grace",
+    status: "published",
+    license: "PD",
+    language: "English",
+    writer: "John Newton",
+    songKey: "G",
+    hasChords: 1,
+    confidence: "converted-from-abc",
+    scoreSource: "abc",
+    publishedKeys: JSON.stringify(["G", "F"]),
+    listenedKeys: null,
+    sundayReadyBy: null,
+    sundayReadyAt: null,
+    rights: null,
+    form: null,
+    ...overrides
   };
   const repos: any = {
     song: {
       loadById: jest.fn(async () => song),
-      update: jest.fn(async (_id: string, fields: any) => Object.assign(song, fields)),
-      loadContributors: jest.fn(async () => [])
+      update: jest.fn(async (_id: string, fields: any) => Object.assign(song, fields))
     },
     assetFile: { loadLive: jest.fn(async () => files) }
   };

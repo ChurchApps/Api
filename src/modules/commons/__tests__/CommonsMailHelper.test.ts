@@ -263,3 +263,40 @@ describe("CommonsMailHelper report emails", () => {
     err.mockRestore();
   });
 });
+
+describe("CommonsMailHelper proposal-type wording", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    loadByIds.mockResolvedValue([{ id: "user0000001", email: "writer@example.com" }]);
+  });
+  const typed = (type: string): any => ({ ...sub(), type });
+  const last = () => (TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls.at(-1) as any[];
+
+  it("names the proposal in the received, approved and rejected mails", async () => {
+    await CommonsMailHelper.notifyReceived(typed("correction"));
+    expect(last()[4]).toBe("We received your correction to New Hymn");
+    await CommonsMailHelper.notifyApproved(typed("correction"), "asset000001");
+    expect(last()[4]).toBe("Your correction to New Hymn was approved");
+    expect(last()[5]).toContain("https://worshipcommons.org/songs/asset000001");
+    await CommonsMailHelper.notifyRejected(typed("additionalFile"), "quality", "the scan is blurry");
+    expect(last()[4]).toBe("An update on your file for New Hymn");
+    expect(last()[5]).toContain("not to apply <strong>your file for New Hymn</strong>");
+    expect(last()[5]).toContain("the scan is blurry");
+    await CommonsMailHelper.notifyApproved(typed("translation"), "asset000001");
+    expect(last()[4]).toBe("Your translation (New Hymn) was approved");
+    await CommonsMailHelper.notifyReceived(typed("arrangement"));
+    expect(last()[4]).toBe("We received your arrangement (New Hymn)");
+  });
+
+  it("tells a writer their removal request was applied and that the page is kept", async () => {
+    await CommonsMailHelper.notifyApproved(typed("removal"), "asset000001");
+    expect(last()[4]).toBe("Your removal request for New Hymn was approved");
+    expect(last()[5]).toContain("no longer listed");
+    expect(last()[5]).not.toContain("/songs/asset000001");
+  });
+
+  it("keeps the plain title wording for a new song", async () => {
+    await CommonsMailHelper.notifyApproved(typed("new"), "asset000001");
+    expect(last()[4]).toBe("New Hymn is live on WorshipCommons");
+  });
+});

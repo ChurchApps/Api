@@ -253,3 +253,71 @@ describe("SubmissionHelper key checks", () => {
     expect(ContentLibraryHelper.readPending).not.toHaveBeenCalled();
   });
 });
+
+describe("SubmissionHelper proposal types", () => {
+  beforeEach(() => jest.clearAllMocks());
+  const newAsset: any = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
+  const publishedAsset: any = { id: "asset000001", assetType: "song", publisherUserId: "user0000001", status: "published", publishedSubmissionId: "sub00000000" };
+  const draft = (extra: any = {}): any => ({ id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload, ...extra });
+
+  it("stores the resolved type on the draft row", async () => {
+    const r = repos();
+    await SubmissionHelper.createDraft(r, au, { assetType: "song", payload });
+    expect(r.submission.create).toHaveBeenCalledWith(expect.objectContaining({ type: "new" }));
+    r.asset.loadById.mockResolvedValueOnce(publishedAsset);
+    await SubmissionHelper.createDraft(r, au, { assetId: "asset000001", payload, note: "fixed the bridge chords" });
+    expect(r.submission.create).toHaveBeenLastCalledWith(expect.objectContaining({ type: "correction" }));
+    expect(SubmissionHelper.typeOf({ type: "removal" }, publishedAsset)).toBe("removal");
+  });
+
+  it("looks the parent song up for a translation, defaults the relation label and stores the type", async () => {
+    const r = repos({ asset: { loadById: jest.fn(async () => ({ id: "asset000009", status: "published", language: "English" })) } });
+    const sub = draft({ payload: { ...payload, language: "Spanish", detail: { ...payload.detail, translator: "Ana", parentSongId: "asset000009" } } });
+    expect(await SubmissionHelper.submit(r, sub, newAsset)).toEqual({ ok: true, value: { status: "pending" } });
+    expect(r.asset.loadById).toHaveBeenCalledWith("asset000009");
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ type: "translation", payload: expect.objectContaining({ type: "translation", detail: expect.objectContaining({ relationLabel: "Translation (Spanish)" }) }) }));
+  });
+
+  it("blocks a translation into the parent's language and an arrangement of a song that is not in the library, with plain messages", async () => {
+    const r = repos({ asset: { loadById: jest.fn(async () => ({ id: "asset000009", status: "published", language: "English" })) } });
+    const same = draft({ payload: { ...payload, type: "translation", language: "English", detail: { ...payload.detail, translator: "Ana", parentSongId: "asset000009" } } });
+    expect(await SubmissionHelper.submit(r, same, newAsset)).toMatchObject({ status: 400, error: "A translation must be in a different language from the original (English)" });
+    r.asset.loadById.mockResolvedValueOnce(undefined);
+    const orphan = draft({ payload: { ...payload, type: "arrangement", detail: { ...payload.detail, arranger: "Bo", parentSongId: "gone" } } });
+    expect(await SubmissionHelper.submit(r, orphan, newAsset)).toMatchObject({ status: 400, error: "The original song is not in the library" });
+    const nameless = draft({ payload: { ...payload, type: "arrangement", detail: { ...payload.detail, parentSongId: "asset000009" } } });
+    expect(await SubmissionHelper.submit(r, nameless, newAsset)).toMatchObject({ status: 400, error: "Arranger is required for an arrangement" });
+    expect(r.submission.submit).not.toHaveBeenCalled();
+  });
+
+  it("blocks a correction without a real note and an unmatched ChordPro bracket", async () => {
+    const r = repos();
+    expect(await SubmissionHelper.submit(r, draft({ note: "typo" }), publishedAsset)).toMatchObject({ status: 400, error: "A note of at least 10 characters is required: say what changed and why" });
+    const broken = draft({ note: "fixed the second verse wording", payload: { ...payload, detail: { ...payload.detail, chordPro: "Verse 1\n[G]Sing\n[C sing" } } });
+    expect(await SubmissionHelper.submit(r, broken, publishedAsset)).toMatchObject({ status: 400, error: "Unmatched bracket on line 3 — every [ needs a closing ]" });
+    expect(r.submission.submit).not.toHaveBeenCalled();
+  });
+
+  it("blocks audio without the recordingOwned attestation", async () => {
+    const r = repos({ assetFile: { loadBySubmission: jest.fn(async () => [{ name: "demoAudio.mp3", sizeBytes: 100, action: "add" }]) } });
+    expect(await SubmissionHelper.submit(r, draft(), newAsset)).toMatchObject({ status: 400, error: "recordingOwned confirmation is required" });
+  });
+
+  it("checks a removal against the published payload, skips scoring, and moves it to pending", async () => {
+    const r = repos({ submission: { loadById: jest.fn(async () => ({ id: "sub00000000", payload })) } });
+    const sub = draft({ note: "I want this taken down, the writer asked me to", payload: { type: "removal" } });
+    expect(await SubmissionHelper.submit(r, sub, publishedAsset)).toEqual({ ok: true, value: { status: "pending" } });
+    expect(r.submission.loadById).toHaveBeenCalledWith("sub00000000");
+    expect(QualityHelper.score).not.toHaveBeenCalled();
+    expect(r.submission.submit).toHaveBeenCalledWith("sub00000001", "asset000001", null);
+    const changed = draft({ note: "I want this taken down, the writer asked me to", payload: { type: "removal", name: "Renamed" } });
+    expect(await SubmissionHelper.submit(r, changed, publishedAsset)).toMatchObject({ status: 400, error: "A removal request cannot change fields (name)" });
+  });
+
+  it("names the generated chart when someone tries to upload lyrics.chordpro", async () => {
+    const r = repos();
+    expect(await SubmissionHelper.recordFile(r, draft(), newAsset, { name: "lyrics.chordpro", sizeBytes: 5 })).toMatchObject({ status: 400, error: "lyrics.chordpro is generated on publish — upload ChordPro text as lyrics.cho" });
+    expect((await SubmissionHelper.storeInline(r, draft(), newAsset, "lyrics.cho", "text/plain", Buffer.from("[G]x"), "user0000001") as any).ok).toBe(true);
+    expect((await SubmissionHelper.storeInline(r, draft(), newAsset, "score.musicxml", "application/xml", Buffer.from("<score/>"), "user0000001") as any).ok).toBe(true);
+  });
+});

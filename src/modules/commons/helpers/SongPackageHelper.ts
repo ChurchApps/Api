@@ -1,4 +1,5 @@
 import { Confidence, Contributor, FormMap, RightsLayer, RightsMap, RightsMatrix, SongView } from "../models/index.js";
+import { parseContributors } from "./ContributorsHelper.js";
 import { DuplicateHelper } from "./DuplicateHelper.js";
 import { RightsHelper } from "./RightsHelper.js";
 
@@ -27,7 +28,7 @@ export interface SongSummary extends SongView {
   fileUrls: Record<string, string>;
 }
 
-export interface SongDetail extends Omit<SongSummary, "rights" | "form" | "publishedKeys" | "listenedKeys" | "sundayReadyAt"> {
+export interface SongDetail extends Omit<SongSummary, "rights" | "form" | "publishedKeys" | "listenedKeys" | "sundayReadyAt" | "contributors"> {
   rights: RightsMap | null;
   rightsMatrix: RightsMatrix;
   ccliReport: boolean;
@@ -119,7 +120,7 @@ export class SongPackageHelper {
   }
 
   /** Detail row: summary plus the parsed rights/form/keys, the computed matrix, and the attribution text. */
-  static async detail(row: SongView, fileUrls: Record<string, string>, opts: { contributors?: Contributor[]; readText?: (name: string) => Promise<string | null> } = {}): Promise<SongDetail> {
+  static async detail(row: SongView, fileUrls: Record<string, string>, opts: { readText?: (name: string) => Promise<string | null> } = {}): Promise<SongDetail> {
     const { proAnswer: _proAnswer, qualityDetail: _qualityDetail, submittedBy: _submittedBy, ...pub } = this.summary(row, fileUrls) as SongSummary & { qualityDetail?: string };
     const rights = this.normalizeRights(row.rights);
     const layers = rights ? Object.values(rights) : [];
@@ -135,7 +136,7 @@ export class SongPackageHelper {
       publishedKeys: publishedKeys.length ? publishedKeys : row.songKey ? [row.songKey] : [],
       recommendedKeyReason: row.recommendedKeyReason || null,
       scoreSource: row.scoreSource || null,
-      contributors: opts.contributors || [],
+      contributors: parseContributors(row.contributors),
       sundayReadyAt: row.sundayReadyAt ? new Date(row.sundayReadyAt).toISOString() : null,
       sundayReadyBy: row.sundayReadyBy || null,
       listenedKeys: this.parseKeys(row.listenedKeys)

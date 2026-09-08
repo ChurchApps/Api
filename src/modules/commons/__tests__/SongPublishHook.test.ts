@@ -1,8 +1,6 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
-jest.mock("../helpers/ContentLibraryHelper", () => ({
-  ContentLibraryHelper: { songJson: jest.fn((view: any) => ({ id: view.id, status: view.status })), renderChordpro: () => "{title: x}\n" }
-}));
+jest.mock("../helpers/ContentLibraryHelper", () => ({ ContentLibraryHelper: { songJson: jest.fn((view: any) => ({ id: view.id, status: view.status })), renderChordpro: () => "{title: x}\n" } }));
 
 import { packageFields, songPublishHook } from "../helpers/publishHooks/song";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
@@ -16,8 +14,12 @@ describe("packageFields", () => {
     const f = packageFields({ chordPro: CHART, songKey: "G" }, undefined, "WC", "Ada Writer", ["demoAudio.mp3", "lyrics.chordpro"], ["demoAudio.mp3"]);
     expect(f).toMatchObject({ confidence: "chart-only", firstLine: "Amazing grace! how sweet the sound", hasChords: true, scoreSource: null });
     expect(parse(f.rights)).toEqual({
-      text: { license: "WC", holder: "Ada Writer" }, translation: null, tune: { license: "WC", holder: "Ada Writer" }, arrangement: { license: "WC", holder: "Ada Writer" },
-      recording: { license: "WC", holder: "Ada Writer" }, artwork: null
+      text: { license: "WC", holder: "Ada Writer" },
+      translation: null,
+      tune: { license: "WC", holder: "Ada Writer" },
+      arrangement: { license: "WC", holder: "Ada Writer" },
+      recording: { license: "WC", holder: "Ada Writer" },
+      artwork: null
     });
     expect(parse(f.form)).toEqual({ status: "draft", sections: [{ label: "Verse 1", lyric: 1 }, { label: "Chorus", lyric: 2 }], defaultOrder: ["Verse 1", "Chorus"] });
     expect(parse(f.publishedKeys)).toEqual(["G"]);

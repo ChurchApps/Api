@@ -13,6 +13,7 @@ jest.mock("../controllers/CommonsBaseController", () => ({
 jest.mock("../helpers/index", () => ({
   ChordProHelper: { slug: (t: string) => t, toCho: () => "cho", toLyrics: () => "txt" },
   ContentLibraryHelper: { fileUrls: () => ({}) },
+  parseContributors: jest.requireActual("../helpers/ContributorsHelper").parseContributors,
   recordAssetDownload: jest.fn(async () => 7),
   SubmissionHelper: {
     createDraft: jest.fn(async (_r: any, _au: any, body: any) => ({ ok: true, value: { submission: { id: "sub00000001", status: "draft" }, asset: { id: body.assetId || "asset000001", assetType: "song", name: body.payload?.name } } })),
@@ -31,11 +32,10 @@ function songController(signedIn = true) {
     assetFile: { deleteBySubmission: jest.fn(async () => {}), loadLiveMany: jest.fn(async () => ({})), loadLive: jest.fn(async () => []) },
     rating: { setSaved: jest.fn(async () => {}) },
     song: {
-      loadById: jest.fn(async () => ({ id: "asset000009", title: "Old Hymn", writer: "Anon", chordPro: "[C]x", license: "PD", language: "English", status: "published", rank: 71, qualityScore: 88, qualityDetail: "{}", proAnswer: "no" })),
+      loadById: jest.fn(async () => ({ id: "asset000009", title: "Old Hymn", writer: "Anon", chordPro: "[C]x", license: "PD", language: "English", status: "published", rank: 71, qualityScore: 88, qualityDetail: "{}", proAnswer: "no", contributors: JSON.stringify([{ name: "Ada", what: "new song", submissionId: "sub00000000", at: "2026-01-01T00:00:00.000Z" }]) })),
       loadPublishedSummaries: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
       loadBySubmitter: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
-      loadSaved: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }]),
-      loadContributors: jest.fn(async () => [])
+      loadSaved: jest.fn(async () => [{ id: "asset000009", title: "Old Hymn", rank: 71, qualityScore: 88 }])
     }
   };
   const au = signedIn ? { id: "user0000001", churchId: "church00001", checkAccess: () => false } : { checkAccess: () => false };
@@ -81,7 +81,7 @@ describe("legacy song shims", () => {
   it("POST /songs/:id/abc becomes a modification submission carrying tune.abc", async () => {
     const { controller } = songController();
     const result = await controller.submitAbc({ params: { id: "asset000009" }, body: { abc: "X:1\nK:C\nCDEF|" } } as any, {} as any);
-    expect(SubmissionHelper.createDraft).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ assetId: "asset000009", note: "ABC transcription", payload: expect.objectContaining({ name: "Old Hymn" }) }));
+    expect(SubmissionHelper.createDraft).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ assetId: "asset000009", note: "ABC transcription of the tune", payload: expect.objectContaining({ name: "Old Hymn", type: "additionalFile" }) }));
     expect(SubmissionHelper.storeInline).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), "tune.abc", "text/plain; charset=utf-8", expect.any(Buffer), "user0000001");
     expect(result).toEqual({ id: "sub00000001", status: "pending" });
   });
@@ -108,6 +108,7 @@ describe("legacy song shims", () => {
     const { controller } = songController();
     const song: any = await controller.get({ params: { id: "asset000009" } } as any, {} as any);
     expect(song.rank).toBe(71);
+    expect(song.contributors).toEqual([{ name: "Ada", what: "new song", submissionId: "sub00000000", at: "2026-01-01T00:00:00.000Z" }]);
     expect(song).not.toHaveProperty("qualityScore");
     expect(song).not.toHaveProperty("qualityDetail");
     expect(song).not.toHaveProperty("proAnswer");

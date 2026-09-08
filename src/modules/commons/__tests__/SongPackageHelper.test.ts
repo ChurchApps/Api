@@ -41,12 +41,40 @@ describe("SongPackageHelper.baseConfidence", () => {
 });
 
 const row = (): any => ({
-  id: "song0000001", title: "Amazing Grace", writer: "John Newton", year: 1779, language: "English", license: "PD", licenseVersion: null, status: "published",
-  themes: "Grace,Salvation", meter: "CM", scripture: "Eph 2:8", songKey: "G", hymnalCount: 1200, rank: 70, portraitKey: "commons/writers/n.jpg", qualityScore: 88, qualityDetail: "{}", proAnswer: "no", submittedBy: "u1",
-  confidence: "converted-from-abc", firstLine: "Amazing grace! how sweet the sound,", tune: null, hasChords: 1, featured: 1, recommendedKey: null, singTimeSeconds: 150,
+  id: "song0000001",
+  title: "Amazing Grace",
+  writer: "John Newton",
+  year: 1779,
+  language: "English",
+  license: "PD",
+  licenseVersion: null,
+  status: "published",
+  themes: "Grace,Salvation",
+  meter: "CM",
+  scripture: "Eph 2:8",
+  songKey: "G",
+  hymnalCount: 1200,
+  rank: 70,
+  portraitKey: "commons/writers/n.jpg",
+  qualityScore: 88,
+  qualityDetail: "{}",
+  proAnswer: "no",
+  submittedBy: "u1",
+  confidence: "converted-from-abc",
+  firstLine: "Amazing grace! how sweet the sound,",
+  tune: null,
+  hasChords: 1,
+  featured: 1,
+  recommendedKey: null,
+  singTimeSeconds: 150,
   rights: JSON.stringify({ text: { license: "PD" }, tune: { license: "PD" }, arrangement: null, recording: null, artwork: null }),
   form: JSON.stringify({ status: "draft", sections: [{ label: "Verse 1", lyric: 1 }], defaultOrder: ["Verse 1"] }),
-  publishedKeys: JSON.stringify(["G", "F"]), listenedKeys: null, scoreSource: "abc", recommendedKeyReason: null, sundayReadyBy: null, sundayReadyAt: null
+  publishedKeys: JSON.stringify(["G", "F"]),
+  listenedKeys: null,
+  scoreSource: "abc",
+  recommendedKeyReason: null,
+  sundayReadyBy: null,
+  sundayReadyAt: null
 });
 const URLS = { score: "u/score.musicxml", slides: "u/slides.json", timing: "u/timing.json", attribution: "u/attribution.txt" };
 
@@ -62,7 +90,7 @@ describe("SongPackageHelper.summary", () => {
 
 describe("SongPackageHelper.detail", () => {
   it("parses rights/form/keys, computes the matrix and report flag, reads attribution.txt when served", async () => {
-    const d = await SongPackageHelper.detail(row(), URLS, { contributors: [{ name: "Ada", what: "correction" }], readText: async (name) => `served ${name}\n` });
+    const d = await SongPackageHelper.detail({ ...row(), contributors: JSON.stringify([{ name: "Ada", what: "correction" }]) }, URLS, { readText: async (name) => `served ${name}\n` });
     expect(d.rights).toEqual({ text: { license: "PD" }, translation: null, tune: { license: "PD" }, arrangement: null, recording: null, artwork: null });
     expect(d.rightsMatrix.arrange).toEqual({ allowed: true, conditions: [] });
     expect(d.ccliReport).toBe(false);

@@ -59,7 +59,9 @@ describe("buildCatalog reads the package, not just the catalog row", () => {
 
   it("registers one live assetFiles row per copied file with its size", () => {
     const names = assetFiles.filter((f) => f.assetId === "fixsong0001").map((f) => f.name).sort();
-    expect(names).toEqual(["attribution.txt", "chart.chordpro", "cover.webp", "duration.json", "score.musicxml", "slides.json", "timing.json", "tune.abc", "tune.mid"]);
+    expect(names).toEqual([
+      "attribution.txt", "chart.chordpro", "cover.webp", "duration.json", "score.musicxml", "slides.json", "timing.json", "tune.abc", "tune.mid"
+    ]);
     expect(assetFiles.find((f) => f.assetId === "fixsong0001" && f.name === "duration.json").sizeBytes).toBeGreaterThan(0);
     expect(new Set(assetFiles.map((f) => f.id)).size).toBe(assetFiles.length);
   });

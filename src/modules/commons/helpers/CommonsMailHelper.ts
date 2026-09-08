@@ -39,6 +39,20 @@ function esc(v: string): string {
   return v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// "your correction to <title>" for changes to a published song; a new song is just its title
+const TYPE_PHRASES: Record<string, string> = { translation: "your translation", arrangement: "your arrangement", correction: "your correction to", additionalFile: "your file for", removal: "your removal request for" };
+
+function whatOf(sub: Submission): string {
+  const title = titleOf(sub);
+  const phrase = TYPE_PHRASES[sub.type || ""];
+  if (!phrase) return title;
+  return sub.type === "translation" || sub.type === "arrangement" ? `${phrase} (${title})` : `${phrase} ${title}`;
+}
+
+function capitalize(v: string): string {
+  return v ? `${v[0].toUpperCase()}${v.slice(1)}` : v;
+}
+
 function songSelectUrl(title: string): string {
   return `https://songselect.ccli.com/search/results?SearchText=${encodeURIComponent(title)}`;
 }
@@ -50,32 +64,37 @@ function siteRoot(): string {
 export class CommonsMailHelper {
   /** The four decisions a submitter hears about: received, approved, changes requested, rejected. */
   static notifyReceived(sub: Submission): Promise<void> {
-    const title = titleOf(sub);
-    return this.submitterMail(sub, `We received ${title}`, [`<p>We received <strong>${title}</strong> and a human reviewer will look at it, usually within a few days.</p>`]);
+    const what = whatOf(sub);
+    return this.submitterMail(sub, `We received ${what}`, [`<p>We received <strong>${what}</strong> and a human reviewer will look at it, usually within a few days.</p>`]);
   }
 
   static notifyApproved(sub: Submission, assetId: string, declined: { name: string; reason: string }[] = []): Promise<void> {
     const title = titleOf(sub);
     const root = siteRoot();
-    const paragraphs = [`<p><strong>${title}</strong> is now in the library.</p><p><a href="${root}/songs/${assetId}">${root}/songs/${assetId}</a></p>`];
+    if (sub.type === "removal") return this.submitterMail(sub, `Your removal request for ${title} was approved`, [`<p><strong>${title}</strong> is no longer listed in the library. Its page and history are kept, so a reviewer can bring it back if you change your mind.</p>`]);
+    const what = capitalize(whatOf(sub));
+    const link = `<p><a href="${root}/songs/${assetId}">${root}/songs/${assetId}</a></p>`;
+    const typed = !!TYPE_PHRASES[sub.type || ""];
+    const paragraphs = [typed ? `<p>${what} is now live in the library.</p>${link}` : `<p><strong>${title}</strong> is now in the library.</p>${link}`];
     if (declined.length) paragraphs.push(`<p>Not included this time:</p><ul>${declined.map((d) => `<li><strong>${esc(d.name)}</strong> — ${esc(d.reason)}</li>`).join("")}</ul>`);
-    return this.submitterMail(sub, `${title} is live on WorshipCommons`, paragraphs);
+    return this.submitterMail(sub, typed ? `${what} was approved` : `${title} is live on WorshipCommons`, paragraphs);
   }
 
   static notifyChangesRequested(sub: Submission, note: string): Promise<void> {
-    const title = titleOf(sub);
-    return this.submitterMail(sub, `Changes requested: ${title}`, [
-      `<p>A reviewer looked at <strong>${title}</strong> and asked for changes before it goes live. It is back in your drafts.</p>`,
+    const what = whatOf(sub);
+    return this.submitterMail(sub, `Changes requested: ${what}`, [
+      `<p>A reviewer looked at <strong>${what}</strong> and asked for changes before it goes live. It is back in your drafts.</p>`,
       `<p>${esc(note.trim())}</p>`
     ]);
   }
 
   static notifyRejected(sub: Submission, reason: string, note?: string): Promise<void> {
     const title = titleOf(sub);
+    const what = whatOf(sub);
     const why = (REJECT_REASONS[reason] || REJECT_REASONS.other).replace(/\{songselect\}/g, songSelectUrl(rawTitle(sub)));
-    const paragraphs = [`<p><strong>${title}</strong> didn't make the WorshipCommons library.</p><p>${why}</p>`];
+    const paragraphs = [TYPE_PHRASES[sub.type || ""] ? `<p>A reviewer decided not to apply <strong>${what}</strong>.</p><p>${why}</p>` : `<p><strong>${title}</strong> didn't make the WorshipCommons library.</p><p>${why}</p>`];
     if (note?.trim()) paragraphs.push(`<p>${esc(note.trim())}</p>`);
-    return this.submitterMail(sub, `An update on ${title}`, paragraphs);
+    return this.submitterMail(sub, `An update on ${what}`, paragraphs);
   }
 
   /** One shape for every decision mail: the decision, then where to track it and who to ask. */

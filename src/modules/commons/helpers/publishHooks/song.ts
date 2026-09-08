@@ -1,7 +1,9 @@
-import { FormMap, RightsLayer, RightsMap, Song, SongView } from "../../models/index.js";
+import { Contributor, FormMap, RightsLayer, RightsMap, Song, SongView } from "../../models/index.js";
 import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
+import { appendContributors, parseContributors } from "../ContributorsHelper.js";
 import { SongPackageHelper } from "../SongPackageHelper.js";
-import type { PublishHook } from "./index.js";
+import { SUBMISSION_TYPE_LABELS, SubmissionType } from "../SubmitValidation.js";
+import type { PublishContext, PublishHook } from "./index.js";
 
 const SONG_FIELDS = [
   "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"
@@ -14,6 +16,18 @@ const LICENSE_URLS: Record<string, string> = { "CC-BY": "https://creativecommons
 const SCORE_FILES = /^(score\.musicxml|tune\.abc|tune\.mid|sheetPdf\.(xml|musicxml))$/;
 
 const has = (names: string[], re: RegExp) => names.some((n) => re.test(n));
+
+/** The submitter's credit line for this approval, plus the named translator / arranger when they differ. */
+export function contributorRows(ctx: PublishContext): Contributor[] {
+  const sub = ctx.submission;
+  const type = (sub.type || "new") as SubmissionType;
+  const at = new Date().toISOString();
+  const rows: Contributor[] = [];
+  if (ctx.submitterName) rows.push({ name: ctx.submitterName, what: SUBMISSION_TYPE_LABELS[type] || type, submissionId: sub.id, at });
+  const named = type === "translation" ? ["translator", ctx.detail.translator] : type === "arrangement" ? ["arranger", ctx.detail.arranger] : null;
+  if (named && typeof named[1] === "string" && named[1].trim() && named[1].trim() !== ctx.submitterName) rows.push({ name: named[1].trim(), what: named[0] as string, submissionId: sub.id, at });
+  return rows;
+}
 
 // The one type with a satellite: WorshipCommons facets on key/tempo/scripture, and the content
 // repo export reads song.json + lyrics.chordpro from the asset folder.
@@ -45,7 +59,7 @@ export const songPublishHook: PublishHook = {
     if (ctx.submission.triageScore != null) song.qualityScore = ctx.submission.triageScore;
     const qd = ctx.submission.payload?.qualityDetail;
     if (qd) song.qualityDetail = typeof qd === "string" ? qd : JSON.stringify(qd);
-
+    song.contributors = JSON.stringify(appendContributors(parseContributors(existing?.contributors), contributorRows(ctx)));
     Object.assign(song, packageFields(song, existing, asset.license || "", writer, ctx.files.map((f) => f.name || ""), (ctx.filesChanged || []).map((f) => f.name)));
     await repos.song.upsert(song);
 

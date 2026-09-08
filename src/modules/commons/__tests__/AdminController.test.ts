@@ -34,7 +34,7 @@ jest.mock("../helpers/index", () => ({
 import { CommonsAdminController } from "../controllers/CommonsAdminController.js";
 import { PublishHelper } from "../helpers/index.js";
 
-const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "user0000001", status: "pending", payload: { name: "Proposed" } });
+const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "user0000001", status: "pending", type: "correction", payload: { name: "Proposed" } });
 
 function adminController(overrides: any = {}, admin = true, au: any = { id: "admin000001", email: "admin@example.com", checkAccess: () => admin }) {
   const repos: any = {
@@ -42,7 +42,7 @@ function adminController(overrides: any = {}, admin = true, au: any = { id: "adm
     asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []), loadByPublisher: jest.fn(async () => []) },
     assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", action: "add" }]), loadLive: jest.fn(async () => []) },
     report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) },
-    song: { loadPublishedForDuplicates: jest.fn(async () => []) }
+    song: { loadPublishedForDuplicates: jest.fn(async () => []), loadSatellite: jest.fn(async () => ({ assetId: "asset000001", contributors: JSON.stringify([{ name: "Ada", what: "new song", submissionId: "sub00000000" }]) })) }
   };
   for (const [k, v] of Object.entries(overrides)) Object.assign(repos[k], v);
   const controller = new CommonsAdminController();
@@ -120,6 +120,16 @@ describe("admin submissions", () => {
     expect(detail.previewUrl).toBe("http://localhost:3104/preview/submission/sub00000001?token=tok");
     expect(detail.submittedByName).toBe("Sub Mitter");
     expect(detail.detailFields?.some((f: any) => f.key === "chordPro")).toBe(true);
+  });
+
+  it("carries the proposal type on the queue and the detail, and the song's contributors on the detail", async () => {
+    const { controller } = adminController({ submission: { loadQueue: jest.fn(async () => [{ ...pending(), assetType: "song" }]) } });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].type).toBe("correction");
+    const detail: any = await controller.submission(req(), {} as any);
+    expect(detail.type).toBe("correction");
+    expect(detail.live.contributors).toEqual([{ name: "Ada", what: "new song", submissionId: "sub00000000" }]);
+    expect(detail.detailFields.map((f: any) => f.key)).toEqual(expect.arrayContaining(["parentSongId", "relationLabel", "translator", "arranger"]));
   });
 
   it("exposes qualityDetail from the payload on the queue and detail, without leaking payload on the queue", async () => {

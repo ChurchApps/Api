@@ -23,7 +23,7 @@ jest.mock("../helpers/index", () => ({
 import { CommonsSongController } from "../controllers/CommonsSongController.js";
 
 const base = { language: "English", license: "PD", status: "published", writer: "John Newton", year: 1779, themes: "Grace,Salvation", meter: "CM", scripture: "Eph 2:8", songKey: "G", hasChords: 1, confidence: "converted-from-abc", featured: 0, rank: 50 };
-const SONG: any = { ...base, id: "song0000001", title: "Amazing Grace", parentSongId: null, ratingCount: 4, ratingSum: 18, chordPro: "[G]x", qualityScore: 88, qualityDetail: "{}", proAnswer: "no", submittedBy: "u1", portraitKey: "commons/writers/n.jpg", scoreSource: "abc", publishedKeys: JSON.stringify(["G"]), rights: JSON.stringify({ text: { license: "PD" } }), form: null, listenedKeys: null };
+const SONG: any = { ...base, id: "song0000001", title: "Amazing Grace", parentSongId: null, ratingCount: 4, ratingSum: 18, chordPro: "[G]x", qualityScore: 88, qualityDetail: "{}", proAnswer: "no", submittedBy: "u1", portraitKey: "commons/writers/n.jpg", scoreSource: "abc", publishedKeys: JSON.stringify(["G"]), rights: JSON.stringify({ text: { license: "PD" } }), form: null, listenedKeys: null, contributors: JSON.stringify([{ name: "Ada", what: "correction", submissionId: "sub00000009" }]) };
 const LIBRARY: any[] = [
   { ...base, id: "song0000001", title: "Amazing Grace", parentSongId: null },
   { ...base, id: "song0000002", title: "Amazing Grace (Spanish)", parentSongId: "song0000001", language: "Spanish" },
@@ -43,8 +43,7 @@ function songController(au: any) {
     song: {
       loadById: jest.fn(async (id: string) => (id === "song0000001" ? SONG : undefined)),
       loadFamily: jest.fn(async (root: string) => LIBRARY.filter((s) => s.id === root || s.parentSongId === root)),
-      loadPublishedSummaries: jest.fn(async (filters: any) => LIBRARY.filter((s) => !filters?.language || s.language === filters.language)),
-      loadContributors: jest.fn(async () => [{ name: "Ada", what: "correction", submissionId: "sub00000009" }])
+      loadPublishedSummaries: jest.fn(async (filters: any) => LIBRARY.filter((s) => !filters?.language || s.language === filters.language))
     }
   };
   const controller = new CommonsSongController();
@@ -75,8 +74,23 @@ describe("GET /commons/songs/:id/page", () => {
     const { controller } = songController(signedIn);
     const { song }: any = await controller.page({ params: { id: "song0000001" }, query: {} } as any, {} as any);
     expect(song).toMatchObject({
-      id: "song0000001", rank: 50, confidence: "converted-from-abc", sundayReady: false, featured: false, hasChords: true, hasScore: true, hasSlides: true, hasTiming: false, hasAccompaniment: false,
-      ccliReport: false, attribution: "Amazing Grace\nJohn Newton, 1779\nPublic domain.", publishedKeys: ["G"], listenedKeys: [], scoreSource: "abc", form: null, tune: null,
+      id: "song0000001",
+      rank: 50,
+      confidence: "converted-from-abc",
+      sundayReady: false,
+      featured: false,
+      hasChords: true,
+      hasScore: true,
+      hasSlides: true,
+      hasTiming: false,
+      hasAccompaniment: false,
+      ccliReport: false,
+      attribution: "Amazing Grace\nJohn Newton, 1779\nPublic domain.",
+      publishedKeys: ["G"],
+      listenedKeys: [],
+      scoreSource: "abc",
+      form: null,
+      tune: null,
       contributors: [{ name: "Ada", what: "correction", submissionId: "sub00000009" }],
       fileUrls: { score: "http://c/song0000001/score.musicxml", slides: "http://c/song0000001/slides.json", attribution: "http://c/song0000001/attribution.txt", chart: "http://c/song0000001/lyrics.chordpro" }
     });
@@ -108,7 +122,9 @@ describe("GET /commons/songs query params", () => {
   it("every list row carries the summary keys of the contract", async () => {
     const { controller } = songController(anon);
     const rows: any[] = await controller.getAll({ query: {} } as any, {} as any);
-    const keys = ["confidence", "sundayReady", "featured", "firstLine", "tune", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasTiming", "hasAccompaniment", "recommendedKey", "singTimeSeconds", "fileUrls", "rank"];
+    const keys = [
+      "confidence", "sundayReady", "featured", "firstLine", "tune", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasTiming", "hasAccompaniment", "recommendedKey", "singTimeSeconds", "fileUrls", "rank"
+    ];
     for (const r of rows) for (const k of keys) expect(r).toHaveProperty(k);
     expect(rows[0]).not.toHaveProperty("rights");
     expect(rows[0]).not.toHaveProperty("rightsMatrix");

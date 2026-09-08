@@ -1,7 +1,7 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
-import { Contributor, Song, SongView } from "../models/index.js";
+import { Song, SongView } from "../models/index.js";
 
 // Spine and author fields are aliased back to the legacy song names the site consumes.
 const SPINE_COLS = [
@@ -70,7 +70,8 @@ const SONG_COLS = [
   "songs.scoreSource",
   "songs.listenedKeys",
   "songs.sundayReadyBy",
-  "songs.sundayReadyAt"
+  "songs.sundayReadyAt",
+  "songs.contributors"
 ] as const;
 
 const SUMMARY_COLS = [...SPINE_COLS, ...AUTHOR_COLS, ...SUMMARY_SONG_COLS, RANK_COL];
@@ -159,17 +160,6 @@ export class SongRepo {
     return await getDb().selectFrom("songs").selectAll().where("assetId", "=", assetId).executeTakeFirst() as Song | undefined;
   }
 
-  // ponytail: songs.contributors arrives with the submission-types branch; until that migration lands the
-  // column is absent and the raw select fails, so a missing column reads as "no contributors".
-  public async loadContributors(assetId: string): Promise<Contributor[]> {
-    try {
-      const result = await sql<{ contributors: string | null }>`select contributors from songs where assetId = ${assetId}`.execute(getDb());
-      const raw = result.rows[0]?.contributors;
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      return Array.isArray(parsed) ? parsed : [];
-    } catch { return []; }
-  }
-
   public async upsert(song: Song): Promise<void> {
     const existing = await this.loadSatellite(song.assetId || "");
     if (existing) { await this.update(song.assetId || "", song); return; }
@@ -193,7 +183,8 @@ export class SongRepo {
       proAnswer: song.proAnswer,
       certified: song.certified,
       qualityScore: song.qualityScore,
-      qualityDetail: song.qualityDetail
+      qualityDetail: song.qualityDetail,
+      contributors: song.contributors
     };
     for (const c of PACKAGE_COLS) if (song[c] !== undefined) row[c] = song[c];
     await getDb().insertInto("songs").values(row as any).execute();

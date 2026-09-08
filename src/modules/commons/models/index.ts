@@ -43,6 +43,8 @@ export interface Song {
   listenedKeys?: string;
   sundayReadyBy?: string;
   sundayReadyAt?: Date;
+  /** JSON array of Contributor rows, appended on every approve */
+  contributors?: string | null;
 }
 
 export type Confidence = "sunday-ready" | "proofread-score" | "converted-from-abc" | "generated-from-midi" | "chart-only" | "lyrics-only";
@@ -68,6 +70,7 @@ export interface FormMap {
   defaultOrder: string[];
 }
 
+/** One credit line on a song: who proposed what, and the submission that carried it. */
 export interface Contributor {
   name: string;
   what: string;
@@ -160,6 +163,8 @@ export interface Submission {
   assetId?: string;
   submittedBy?: string;
   status?: string;
+  /** new | translation | arrangement | correction | additionalFile | removal */
+  type?: string;
   payload?: SubmissionPayload;
   note?: string;
   triageScore?: number;
@@ -174,6 +179,7 @@ export interface Submission {
 }
 
 export interface SubmissionPayload {
+  type?: string;
   name?: string;
   description?: string;
   tags?: string;

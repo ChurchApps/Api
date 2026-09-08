@@ -46,8 +46,11 @@ describe("RightsHelper.matrixForLicense — one row of the contract table each",
   it("-NC-SA stacks both", () => {
     const m = RightsHelper.matrixForLicense("CC-BY-NC-SA");
     expect(conditions(m)).toEqual({
-      project: [CREDIT, NON_COMMERCIAL], print: [CREDIT, NON_COMMERCIAL], stream: [CREDIT, NON_COMMERCIAL],
-      arrange: [CREDIT, NON_COMMERCIAL, SA_ARRANGE], record: [CREDIT, NON_COMMERCIAL, SA_RECORD]
+      project: [CREDIT, NON_COMMERCIAL],
+      print: [CREDIT, NON_COMMERCIAL],
+      stream: [CREDIT, NON_COMMERCIAL],
+      arrange: [CREDIT, NON_COMMERCIAL, SA_ARRANGE],
+      record: [CREDIT, NON_COMMERCIAL, SA_RECORD]
     });
   });
 

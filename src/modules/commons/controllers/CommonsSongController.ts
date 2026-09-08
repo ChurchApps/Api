@@ -88,8 +88,8 @@ export class CommonsSongController extends CommonsBaseController {
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
       const abc = typeof req.body?.abc === "string" ? req.body.abc.trim() : "";
       if (!abc || abc.length > 100000) return this.json({ errors: ["abc text is required (max 100KB)"] }, 400);
-      const payload = await this.editable(asset.id || "");
-      const draft = await SubmissionHelper.createDraft(this.repos, au, { assetId: asset.id, payload, note: "ABC transcription" });
+      const payload = { ...(await this.editable(asset.id || "")), type: "additionalFile" };
+      const draft = await SubmissionHelper.createDraft(this.repos, au, { assetId: asset.id, payload, note: "ABC transcription of the tune" });
       if (draft.ok === false) return this.json({ errors: draft.errors || [draft.error] }, draft.status);
       const stored = await SubmissionHelper.storeInline(this.repos, draft.value.submission, asset, "tune.abc", "text/plain; charset=utf-8", Buffer.from(abc), au.id);
       if (stored.ok === false) return this.json({ errors: stored.errors || [stored.error] }, stored.status);
@@ -218,10 +218,7 @@ export class CommonsSongController extends CommonsBaseController {
   private async detail(song: SongView): Promise<SongDetail> {
     const asset = { assetType: "song", id: song.id };
     const files = await this.repos.assetFile.loadLive(song.id || "");
-    return await SongPackageHelper.detail(song, ContentLibraryHelper.fileUrls(asset, files, song.portraitKey), {
-      contributors: await this.repos.song.loadContributors(song.id || ""),
-      readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, name)))?.buffer.toString("utf8") ?? null
-    });
+    return await SongPackageHelper.detail(song, ContentLibraryHelper.fileUrls(asset, files, song.portraitKey), { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey(asset, name)))?.buffer.toString("utf8") ?? null });
   }
 
   private async download(req: express.Request, res: express.Response, ext: string, convert: (song: SongView) => string): Promise<any> {
