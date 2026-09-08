@@ -10,7 +10,6 @@ import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
 import { isPublicDiskFilePath } from "./modules/content/helpers/PublicFileAccess.js";
-import { CorsHelper } from "./shared/helpers/CorsHelper.js";
 
 export const createApp = async () => {
   const environment = process.env.ENVIRONMENT || "dev";
@@ -26,11 +25,10 @@ export const createApp = async () => {
   const server = new InversifyExpressServer(container, null, { rootPath: "" }, null, CustomAuthProvider);
 
   server.setConfig((app) => {
-    app.use(cors(CorsHelper.buildOptions(Environment.corsOrigin)));
+    app.use(cors());
 
-    app.options("*", async (req, res) => {
-      const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
-      await CorsHelper.applyOriginHeaders(res, origin, Environment.corsOrigin);
+    app.options("*", (_req, res) => {
+      res.header("Access-Control-Allow-Origin", "*");
       res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
       res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Batch-Id");
       res.sendStatus(200);

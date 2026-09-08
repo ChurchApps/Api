@@ -1,6 +1,5 @@
 import { EnvironmentBase, AwsHelper } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser.js";
-import { CorsHelper } from "./CorsHelper.js";
 
 export class Environment extends EnvironmentBase {
   // Current environment and server configuration
@@ -110,7 +109,7 @@ export class Environment extends EnvironmentBase {
     this.socketPort = process.env.SOCKET_PORT ? parseInt(process.env.SOCKET_PORT) : 8087;
     this.encryptionKey = process.env.ENCRYPTION_KEY || "";
     this.appName = data.appName || "API";
-    this.corsOrigin = CorsHelper.resolveOrigin(environment, process.env.CORS_ORIGIN);
+    this.corsOrigin = process.env.CORS_ORIGIN || "*";
     this.jwtSecret = process.env.JWT_SECRET || "";
     this.assertRuntimeSecrets(environment);
     this.currentEnvironment = environment;
