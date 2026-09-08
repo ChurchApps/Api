@@ -16,7 +16,7 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
   }
 }));
 jest.mock("../helpers/NamesHelper", () => ({ userNames: jest.fn(async () => ({ owner000001: "Owner" })) }));
-jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyApproved: jest.fn(async () => {}), notifyRejected: jest.fn(async () => {}) } }));
+jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyApproved: jest.fn(async () => {}), notifyRejected: jest.fn(async () => {}), notifyChangesRequested: jest.fn(async () => {}) } }));
 
 import { PublishHelper } from "../helpers/PublishHelper";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
@@ -87,7 +87,35 @@ describe("PublishHelper.approve", () => {
       filesChanged: [{ name: "tune.abc", action: "add" }, { name: "demoAudio.mp3", action: "replace" }, { name: "sheetPdf.pdf", action: "remove" }]
     }));
     expect(ContentLibraryHelper.removePrefix).toHaveBeenCalledWith("commons/pending/sub00000001");
-    expect(CommonsMailHelper.notifyApproved).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }), "asset000001");
+    expect(CommonsMailHelper.notifyApproved).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }), "asset000001", []);
+  });
+
+  it("partial approve: declined files are neither promoted nor kept, and the record says why", async () => {
+    const proposed = [
+      { id: "pf1", name: "tune.abc", action: "add" },
+      { id: "pf2", name: "demoAudio.mp3", action: "replace" },
+      { id: "pf3", name: "sheetPdf.pdf", action: "add" }
+    ];
+    const r = repos(proposed, [{ id: "lf1", name: "demoAudio.mp3" }]);
+    const declined = [{ name: "sheetPdf.pdf", reason: "blurry scan" }, { name: "demoAudio.mp3", reason: "clipping" }];
+    await PublishHelper.approve(r, submission(), asset(), "admin000001", "score is good", declined);
+
+    expect(ContentLibraryHelper.promote).toHaveBeenCalledTimes(1);
+    expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/tune.abc", "commons/assets/song/asset000001/tune.abc");
+    expect(r.assetFile.delete).toHaveBeenCalledWith("pf2");
+    expect(r.assetFile.delete).toHaveBeenCalledWith("pf3");
+    expect(r.assetFile.delete).not.toHaveBeenCalledWith("lf1");
+    expect(r.assetFile.update).toHaveBeenCalledTimes(1);
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({
+      status: "approved",
+      filesChanged: [
+        { name: "tune.abc", action: "add" },
+        { name: "demoAudio.mp3", action: "declined", reason: "clipping" },
+        { name: "sheetPdf.pdf", action: "declined", reason: "blurry scan" }
+      ]
+    }));
+    expect(ContentLibraryHelper.removePrefix).toHaveBeenCalledWith("commons/pending/sub00000001");
+    expect(CommonsMailHelper.notifyApproved).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }), "asset000001", declined);
   });
 
   it("stamps publishedAt on a first approval and skips the satellite for hook-less types", async () => {
@@ -185,6 +213,21 @@ describe("PublishHelper.reject / discard / remove", () => {
     expect(r.submission.update).toHaveBeenCalledWith("sub00000005", { status: "withdrawn" });
     expect(r.assetFile.deleteByAsset).toHaveBeenCalledWith("asset000001");
     expect(r.asset.update).toHaveBeenCalledWith("asset000001", { status: "removed", removedReason: "copyright" });
+  });
+});
+
+describe("PublishHelper.requestChanges", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns the submission to draft with the note and leaves the proposed files in place", async () => {
+    const r = repos([{ id: "pf1", name: "tune.abc", action: "add" }]);
+    await PublishHelper.requestChanges(r, submission(), "admin000001", "bar 12 needs a chord");
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", { status: "draft", reviewedBy: "admin000001", reviewedAt: expect.any(Date), reviewReason: "changes", reviewNote: "bar 12 needs a chord" });
+    expect(ContentLibraryHelper.removePrefix).not.toHaveBeenCalled();
+    expect(r.assetFile.deleteBySubmission).not.toHaveBeenCalled();
+    expect(r.assetFile.delete).not.toHaveBeenCalled();
+    expect(r.asset.delete).not.toHaveBeenCalled();
+    expect(CommonsMailHelper.notifyChangesRequested).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }), "bar 12 needs a chord");
   });
 });
 

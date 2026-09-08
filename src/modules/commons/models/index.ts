@@ -111,7 +111,8 @@ export interface Submission {
   payload?: SubmissionPayload;
   note?: string;
   triageScore?: number;
-  filesChanged?: { name: string; action: string }[];
+  /** add | replace | remove, or declined (partial approve) with the reviewer's reason */
+  filesChanged?: { name: string; action: string; reason?: string }[];
   reviewedBy?: string;
   reviewedAt?: Date;
   reviewReason?: string;

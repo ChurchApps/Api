@@ -3,8 +3,7 @@ import express from "express";
 import * as fs from "fs";
 import { ASSET_TYPES } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { Permissions } from "../../../shared/helpers/index.js";
-import { ContentLibraryHelper, PublishHelper, SubmissionHelper, userNames, fileSpec, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome } from "../helpers/index.js";
+import { ContentLibraryHelper, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 
 @controller("/commons/submissions")
@@ -159,11 +158,11 @@ export class CommonsSubmissionController extends CommonsBaseController {
     });
   }
 
-  private async own(au: { id?: string; checkAccess: (p: any) => boolean }, id: string, status?: string): Promise<{ sub: Submission; asset: Asset; error?: any }> {
+  private async own(au: Reviewer, id: string, status?: string): Promise<{ sub: Submission; asset: Asset; error?: any }> {
     if (!au.id) return { sub: null as any, asset: null as any, error: this.json({ errors: ["Sign in required"] }, 401) };
     const sub = await this.repos.submission.loadById(id);
     if (!sub) return { sub: null as any, asset: null as any, error: this.json({}, 404) };
-    if (sub.submittedBy !== au.id && !au.checkAccess(Permissions.server.admin)) return { sub, asset: null as any, error: this.json({}, 404) };
+    if (sub.submittedBy !== au.id && !ReviewerHelper.canReview(au)) return { sub, asset: null as any, error: this.json({}, 404) };
     if (status && sub.status !== status) return { sub, asset: null as any, error: this.json({ errors: [`submission is ${sub.status}, not ${status}`] }, 400) };
     const asset = await this.repos.asset.loadById(sub.assetId || "");
     if (!asset) return { sub, asset: null as any, error: this.json({}, 404) };

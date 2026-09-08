@@ -5,6 +5,7 @@ import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { manifestHook, PUBLISH_HOOKS, PublishContext } from "./publishHooks/index.js";
 import { userNames } from "./NamesHelper.js";
+import { DeclinedFile } from "./ReviewerHelper.js";
 import { normalizeTags } from "./SubmitValidation.js";
 
 const GENERIC_FIELDS = ["name", "description", "tags", "language", "license", "publisherChurchId"] as const;
@@ -12,7 +13,8 @@ const GENERIC_FIELDS = ["name", "description", "tags", "language", "license", "p
 // ponytail: no DB transaction — every step is idempotent (copy overwrites, delete is best-effort,
 // the submission only flips to approved last), so a failed approve is simply retried.
 export class PublishHelper {
-  static async approve(repos: Repos, sub: Submission, asset: Asset, reviewerId: string, note?: string): Promise<void> {
+  /** declined: partial approve — those proposed files are dropped instead of promoted, each with the reviewer's reason. */
+  static async approve(repos: Repos, sub: Submission, asset: Asset, reviewerId: string, note?: string, declined: DeclinedFile[] = []): Promise<void> {
     const payload = sub.payload || {};
     const generic: Partial<Asset> = {};
     for (const k of GENERIC_FIELDS) if (payload[k] !== undefined) (generic as any)[k] = payload[k];
@@ -21,9 +23,16 @@ export class PublishHelper {
     Object.assign(asset, generic);
 
     const proposed = await repos.assetFile.loadBySubmission(sub.id || "");
-    const filesChanged: { name: string; action: string }[] = [];
+    const filesChanged: { name: string; action: string; reason?: string }[] = [];
     for (const f of proposed) {
       const name = f.name || "";
+      const decline = declined.find((d) => d.name === name);
+      if (decline) {
+        // the pending copy goes with the rest of the pending prefix below
+        await repos.assetFile.delete(f.id || "");
+        filesChanged.push({ name, action: "declined", reason: decline.reason });
+        continue;
+      }
       const live = await repos.assetFile.loadOne(asset.id || "", name, null);
       if (f.action === "remove") {
         await ContentLibraryHelper.removeKey(ContentLibraryHelper.liveKey(asset, name));
@@ -62,7 +71,13 @@ export class PublishHelper {
     await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null as any, removedReason: null as any });
     await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged });
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
-    void CommonsMailHelper.notifyApproved(sub, asset.id || "").catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
+    void CommonsMailHelper.notifyApproved(sub, asset.id || "", declined).catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
+  }
+
+  /** pending → draft with the reviewer's note; proposed files stay put so the submitter can keep working on the draft. */
+  static async requestChanges(repos: Repos, sub: Submission, reviewerId: string, note: string): Promise<void> {
+    await repos.submission.update(sub.id || "", { status: "draft", reviewedBy: reviewerId, reviewedAt: new Date(), reviewReason: "changes", reviewNote: note });
+    void CommonsMailHelper.notifyChangesRequested(sub, note).catch((e) => console.error("[CommonsMailHelper] changes requested failed:", e));
   }
 
   static async reject(repos: Repos, sub: Submission, asset: Asset | undefined, reviewerId: string, reason: string, note: string): Promise<void> {

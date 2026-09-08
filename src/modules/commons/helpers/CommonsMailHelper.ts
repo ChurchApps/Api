@@ -26,8 +26,17 @@ function reportedTitle(report: Report): string {
   return (report.contentText || "").trim() || "the content you reported";
 }
 
-function titleOf(sub: Submission): string {
+function rawTitle(sub: Submission): string {
   return (sub.payload?.name || "").trim() || "your submission";
+}
+
+function titleOf(sub: Submission): string {
+  return esc(rawTitle(sub));
+}
+
+/** Reviewer notes, reasons, titles and file names are user text; the templates around them are ours. */
+function esc(v: string): string {
+  return v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function songSelectUrl(title: string): string {
@@ -39,25 +48,41 @@ function siteRoot(): string {
 }
 
 export class CommonsMailHelper {
+  /** The four decisions a submitter hears about: received, approved, changes requested, rejected. */
   static notifyReceived(sub: Submission): Promise<void> {
     const title = titleOf(sub);
-    const root = siteRoot();
-    return this.mailWriter(sub.submittedBy, `We received ${title}`, `<p>We received <strong>${title}</strong> and a human reviewer will look at it, usually within a few days.</p><p>Track it at <a href="${root}/my-songs">${root}/my-songs</a>.</p>`);
+    return this.submitterMail(sub, `We received ${title}`, [`<p>We received <strong>${title}</strong> and a human reviewer will look at it, usually within a few days.</p>`]);
   }
 
-  static notifyApproved(sub: Submission, assetId: string): Promise<void> {
+  static notifyApproved(sub: Submission, assetId: string, declined: { name: string; reason: string }[] = []): Promise<void> {
     const title = titleOf(sub);
     const root = siteRoot();
-    return this.mailWriter(sub.submittedBy, `${title} is live on WorshipCommons`, `<p><strong>${title}</strong> is now in the library.</p><p><a href="${root}/songs/${assetId}">${root}/songs/${assetId}</a></p>`);
+    const paragraphs = [`<p><strong>${title}</strong> is now in the library.</p><p><a href="${root}/songs/${assetId}">${root}/songs/${assetId}</a></p>`];
+    if (declined.length) paragraphs.push(`<p>Not included this time:</p><ul>${declined.map((d) => `<li><strong>${esc(d.name)}</strong> — ${esc(d.reason)}</li>`).join("")}</ul>`);
+    return this.submitterMail(sub, `${title} is live on WorshipCommons`, paragraphs);
+  }
+
+  static notifyChangesRequested(sub: Submission, note: string): Promise<void> {
+    const title = titleOf(sub);
+    return this.submitterMail(sub, `Changes requested: ${title}`, [
+      `<p>A reviewer looked at <strong>${title}</strong> and asked for changes before it goes live. It is back in your drafts.</p>`,
+      `<p>${esc(note.trim())}</p>`
+    ]);
   }
 
   static notifyRejected(sub: Submission, reason: string, note?: string): Promise<void> {
     const title = titleOf(sub);
-    const why = (REJECT_REASONS[reason] || REJECT_REASONS.other).replace(/\{songselect\}/g, songSelectUrl(title));
-    let body = `<p><strong>${title}</strong> didn't make the WorshipCommons library.</p><p>${why}</p>`;
-    if (note?.trim()) body += `<p>${note.trim()}</p>`;
-    body += `<p>Questions? Email ${Environment.supportEmail}.</p>`;
-    return this.mailWriter(sub.submittedBy, `An update on ${title}`, body);
+    const why = (REJECT_REASONS[reason] || REJECT_REASONS.other).replace(/\{songselect\}/g, songSelectUrl(rawTitle(sub)));
+    const paragraphs = [`<p><strong>${title}</strong> didn't make the WorshipCommons library.</p><p>${why}</p>`];
+    if (note?.trim()) paragraphs.push(`<p>${esc(note.trim())}</p>`);
+    return this.submitterMail(sub, `An update on ${title}`, paragraphs);
+  }
+
+  /** One shape for every decision mail: the decision, then where to track it and who to ask. */
+  private static submitterMail(sub: Submission, subject: string, paragraphs: string[]): Promise<void> {
+    const root = siteRoot();
+    const body = [...paragraphs, `<p>Track it at <a href="${root}/my-songs">${root}/my-songs</a>.</p>`, `<p>Questions? Email ${Environment.supportEmail}.</p>`].join("");
+    return this.mailWriter(sub.submittedBy, subject, body);
   }
 
   static async notifyReviewerDigest(pending: number, stale = 0): Promise<void> {
