@@ -46,6 +46,7 @@ export class PublishHelper {
       submission: sub,
       detail: payload.detail || {},
       files: await repos.assetFile.loadLive(asset.id || ""),
+      filesChanged,
       version,
       publisherName: names[asset.publisherUserId || ""],
       repos,
@@ -126,5 +127,21 @@ export class PublishHelper {
 
   static fileSummary(files: AssetFile[]): { name: string; action: string; role: string }[] {
     return files.map((f) => ({ name: f.name || "", action: f.action || "add", role: fileRole(f.name || "") }));
+  }
+
+  /** The approved-submission timeline of an asset — GET /assets/:id/history and the song page share it. */
+  static async history(repos: Repos, assetId: string) {
+    const approved = await repos.submission.loadHistory(assetId);
+    const names = await userNames(approved.map((s) => s.submittedBy));
+    return approved.map((s, i) => ({
+      submissionId: s.id,
+      submittedBy: s.submittedBy,
+      submittedByName: names[s.submittedBy || ""],
+      submittedAt: s.submittedAt,
+      approvedAt: s.reviewedAt,
+      note: s.note,
+      filesChanged: s.filesChanged || [],
+      fieldsChanged: i === 0 ? [] : PublishHelper.diffFields(approved[i - 1].payload, s.payload).map((d) => d.key)
+    }));
   }
 }

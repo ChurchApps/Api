@@ -59,6 +59,19 @@ describe("storage keys", () => {
       portrait: `${CONTENT_ROOT}/commons/writers/a.jpg`
     });
   });
+
+  it("names the package derivatives and lets the freshest file win a shared role", () => {
+    const urls = ContentLibraryHelper.fileUrls(asset, [{ name: "chart.chordpro" }, { name: "score.musicxml" }, { name: "slides.json" }, { name: "chart.pdf" }, { name: "attribution.txt" }, { name: "cover-thumb.webp" }, { name: "duration.json" }, { name: "timing.json" }]);
+    expect(Object.keys(urls).sort()).toEqual(["attribution", "chart", "chartPdf", "duration", "score", "slides", "thumb", "timing"]);
+    expect(urls.chart).toBe(`${CONTENT_ROOT}/commons/assets/song/testasst001/chart.chordpro`);
+    expect(urls.thumb).toBe(`${CONTENT_ROOT}/commons/assets/song/testasst001/cover-thumb.webp`);
+    // lyrics.chordpro is rewritten on every publish and an uploaded art-thumb outranks the generated one, whatever the listing order
+    const both = ContentLibraryHelper.fileUrls(asset, [{ name: "lyrics.chordpro" }, { name: "chart.chordpro" }, { name: "cover-thumb.webp" }, { name: "art-thumb.webp" }]);
+    expect(both.chart).toContain("/lyrics.chordpro");
+    expect(both.thumb).toContain("/art-thumb.webp");
+    expect(ContentLibraryHelper.role("chart.pdf")).toBe("chartPdf");
+    expect(ContentLibraryHelper.role("tune.abc")).toBe("abc");
+  });
 });
 
 describe("promotion and signed access", () => {
@@ -102,6 +115,10 @@ describe("song export artifacts", () => {
     const json: any = ContentLibraryHelper.songJson(song, [{ name: "demoAudio.wav" }, { name: "tune.mid" }]);
     expect(json.uploads).toEqual({ demoAudio: "demoAudio.wav" });
     expect(json.status).toBe("approved");
+    expect(ContentLibraryHelper.songJson({ ...song, status: "unpublished" } as any, []).status).toBe("unpublished");
+    const pkg: any = ContentLibraryHelper.songJson({ ...song, status: "published", confidence: "chart-only", rights: JSON.stringify({ text: { license: "WC" } }), form: null, publishedKeys: JSON.stringify(["G"]) } as any, []);
+    expect(pkg).toMatchObject({ status: "approved", confidence: "chart-only", rights: { text: { license: "WC" } }, publishedKeys: ["G"] });
+    expect(pkg.form).toBeUndefined();
     expect(json.licenseVersion).toBeUndefined();
     const cc: any = ContentLibraryHelper.songJson({ ...song, license: "CC-BY", licenseVersion: "3.0", licenseUrl: "https://creativecommons.org/licenses/by/3.0/" } as any, []);
     expect(cc).toMatchObject({ license: "CC-BY", licenseVersion: "3.0", licenseUrl: "https://creativecommons.org/licenses/by/3.0/" });

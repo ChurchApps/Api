@@ -82,18 +82,7 @@ export class CommonsAssetController extends CommonsBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.status === "pending") return this.json({}, 404);
-      const approved = await this.repos.submission.loadHistory(asset.id || "");
-      const names = await userNames(approved.map((s) => s.submittedBy));
-      return approved.map((s, i) => ({
-        submissionId: s.id,
-        submittedBy: s.submittedBy,
-        submittedByName: names[s.submittedBy || ""],
-        submittedAt: s.submittedAt,
-        approvedAt: s.reviewedAt,
-        note: s.note,
-        filesChanged: s.filesChanged || [],
-        fieldsChanged: i === 0 ? [] : PublishHelper.diffFields(approved[i - 1].payload, s.payload).map((d) => d.key)
-      }));
+      return await PublishHelper.history(this.repos, asset.id || "");
     });
   }
 

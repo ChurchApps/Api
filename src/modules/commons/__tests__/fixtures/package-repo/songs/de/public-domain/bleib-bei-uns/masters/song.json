@@ -1,0 +1,5 @@
+{
+  "id": "fixsong0002", "title": "Bleib bei uns", "writer": "Joshua Stegmann", "year": 1628, "language": "German", "key": "F", "license": "PD", "meter": "7.6.7.6", "workRef": "abide-fixture",
+  "rights": { "text": { "license": "PD", "basis": "published 1628" }, "tune": null, "arrangement": null, "recording": null, "artwork": null },
+  "form": { "status": "approved", "sections": [{ "label": "Verse 1", "lyric": 1 }], "defaultOrder": ["Verse 1"] }
+}

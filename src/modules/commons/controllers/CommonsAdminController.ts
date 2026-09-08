@@ -4,7 +4,13 @@ import { ASSET_TYPES, COMMONS_PRODUCT_LABELS } from "@churchapps/helpers";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, userNames } from "../helpers/index.js";
+// by path, not the barrel: pure helpers the admin tests do not mock
+import { canReview } from "../helpers/ReviewAccess.js";
+import { SongPackageHelper } from "../helpers/SongPackageHelper.js";
 import { Repos } from "../repositories/index.js";
+
+const MAX_LISTENED_KEYS = 12;
+const KEY_RE = /^[A-G][#b]?m?$/;
 
 const REJECT_REASONS = ["quality", "duplicate", "licensing", "ccli", "offtopic", "incomplete", "other"];
 const RESOLUTIONS = ["upheld", "dismissed", "duplicate"];
@@ -293,6 +299,39 @@ export class CommonsAdminController extends CommonsBaseController {
       const featured = !asset.featured;
       await this.repos.asset.update(asset.id || "", { featured });
       return { featured };
+    });
+  }
+
+  /**
+   * The listen gate: a reviewer records the keys they heard. Covering every published key of a package that
+   * serves a score, chords and slides makes it sunday-ready; an empty list clears back to the computed tier.
+   */
+  @httpPost("/songs/:id/listen")
+  public async listen(req: express.Request<{ id: string }, {}, { keys?: unknown }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!canReview(au)) return this.json({}, 401);
+      const raw = Array.isArray(req.body?.keys) ? req.body.keys : null;
+      if (!raw) return this.json({ errors: ["keys must be an array"] }, 400);
+      const keys = [...new Set(raw.map((k) => String(k).trim()))].filter(Boolean);
+      if (keys.length > MAX_LISTENED_KEYS || keys.some((k) => !KEY_RE.test(k))) return this.json({ errors: ["keys must be note names like G, Bb or F#m"] }, 400);
+      const song = await this.repos.song.loadById(String(req.params.id));
+      if (!song || song.status === "removed") return this.json({}, 404);
+      const files = await this.repos.assetFile.loadLive(song.id || "");
+      const urls = ContentLibraryHelper.fileUrls({ assetType: "song", id: song.id }, files, song.portraitKey);
+      const hasScore = !!urls.score;
+      const base = SongPackageHelper.baseConfidence({ hasScore, scoreSource: song.scoreSource, hasChords: !!song.hasChords });
+      const published = SongPackageHelper.parseKeys(song.publishedKeys);
+      const publishedKeys = published.length ? published : song.songKey ? [song.songKey] : [];
+      const covered = publishedKeys.length > 0 && publishedKeys.every((k) => keys.includes(k));
+      const ready = keys.length > 0 && covered && hasScore && !!song.hasChords && !!urls.slides;
+      await this.repos.song.update(song.id || "", keys.length
+        ? { listenedKeys: JSON.stringify(keys), sundayReadyBy: au.id, sundayReadyAt: new Date(), confidence: ready ? "sunday-ready" : base }
+        : { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, confidence: base });
+      const fresh = await this.repos.song.loadById(song.id || "");
+      return await SongPackageHelper.detail(fresh || song, urls, {
+        contributors: await this.repos.song.loadContributors(song.id || ""),
+        readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id: song.id }, name)))?.buffer.toString("utf8") ?? null
+      });
     });
   }
 
