@@ -7,6 +7,7 @@ jest.mock("../../../shared/helpers/index", () => ({
 }));
 const ROLES: Record<string, string> = { "score.musicxml": "score", "slides.json": "slides", "timing.json": "timing" };
 jest.mock("../helpers/index", () => ({
+  ReviewerHelper: jest.requireActual("../helpers/ReviewerHelper").ReviewerHelper,
   CommonsMailHelper: {},
   DuplicateHelper: {},
   ContentLibraryHelper: {
