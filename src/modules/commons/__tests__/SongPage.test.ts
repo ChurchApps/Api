@@ -12,6 +12,7 @@ jest.mock("../helpers/index", () => ({
   ContentLibraryHelper: {
     fileUrls: (asset: any, files: any[]) => Object.fromEntries(files.map((f) => [ROLES[f.name] || f.name, `http://c/${asset.id}/${f.name}`])),
     liveKey: (asset: any, name: string) => `commons/assets/song/${asset.id}/${name}`,
+    fileKey: (asset: any, _files: any[], name: string) => `commons/assets/song/${asset.id}/${name}`,
     readKey: jest.fn(async (key: string) => (key.endsWith("attribution.txt") ? { buffer: Buffer.from("Amazing Grace\nJohn Newton, 1779\nPublic domain.\n"), contentType: "text/plain" } : null))
   },
   DuplicateHelper: {},

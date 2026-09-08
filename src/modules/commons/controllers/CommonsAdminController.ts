@@ -5,7 +5,7 @@ import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { ASSET_TYPES } from "../helpers/AssetTypes.js";
 import { parseContributors } from "../helpers/ContributorsHelper.js";
-import { baseName, packagePath } from "../helpers/PackageLayout.js";
+import { baseName } from "../helpers/PackageLayout.js";
 import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, ReviewerHelper, userNames, type Reviewer } from "../helpers/index.js";
 import { SongPackageHelper } from "../helpers/SongPackageHelper.js";
 import { Repos } from "../repositories/index.js";
@@ -356,7 +356,7 @@ export class CommonsAdminController extends CommonsBaseController {
         ? { listenedKeys: JSON.stringify(keys), sundayReadyBy: au.id, sundayReadyAt: new Date(), confidence: ready ? "sunday-ready" : base }
         : { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, confidence: base });
       const fresh = await this.repos.song.loadById(song.id || "");
-      return await SongPackageHelper.detail(fresh || song, urls, { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id: song.id }, packagePath("song", name))))?.buffer.toString("utf8") ?? null });
+      return await SongPackageHelper.detail(fresh || song, urls, { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.fileKey({ assetType: "song", id: song.id }, files, name)))?.buffer.toString("utf8") ?? null });
     });
   }
 

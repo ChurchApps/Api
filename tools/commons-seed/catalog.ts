@@ -2,9 +2,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
-// The content repo (WorshipCommonsContent) is a tree of packages: songs/<lang>/<license>/<slug>/ and
+// The content repo (WorshipCommonsContent) is a tree of packages: songs/<lang>/<license>/<slug>-<id>/ and
 // works/<slug>/, each with sources/ (came from somewhere else), masters/ (a person asserted it) and
-// derivatives/ (the pipeline built it). catalog.json at its root is an index of those packages.
+// derivatives/ (the pipeline built it). catalog.json at its root is THE index of those packages; nothing
+// discovers songs by listing folders.
 //
 // Each package becomes an assets row (the spine, keyed by the frozen song id), a songs satellite row,
 // an authors row per distinct writer, one live assetFiles row per served file, and one approved
@@ -12,10 +13,11 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 //
 // The song row is built from masters/song.json + masters/lyrics.chordpro (+ sources/hymnary.json,
 // sources/video.json, derivatives/duration.json); the catalog row only supplies what the package lacks
-// (id, package paths, confidence, parentSongId, writer bio/portrait). Files are copied into the id-keyed
-// live folder commons/assets/song/{id}/ keeping their package folder, so assetFiles.name is the
-// package-relative name ("sources/tune.mid", "derivatives/slides.json"). Files a song inherits from its
-// work land in the song's own package under the same folder.
+// (id, package paths, confidence, parentSongId, writer bio/portrait). Nothing is copied: the bucket holds
+// exactly the repo's layout under the commons prefix (the content repo's `sync push`), so assetFiles.name is
+// the catalog key itself ("songs/en/public-domain/amazing-grace-YxPfAFYWOaG/sources/tune.mid",
+// "works/amazing-grace/sources/tune.abc" for a file inherited from the work) and the public URL is that key
+// under the commons prefix.
 
 const SONG_COLS = [
   "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "proAnswer", "certified", "confidence"
@@ -27,16 +29,16 @@ const SONG_JSON_FIELDS: Record<string, string> = {
   title: "title", writer: "writer", year: "year", themes: "themes", key: "songKey", bpm: "bpm", timeSignature: "timeSignature", meter: "meter", language: "language", scripture: "scripture", scriptureText: "scriptureText",
   license: "license", licenseVersion: "licenseVersion", licenseUrl: "licenseUrl", proAnswer: "proAnswer", certified: "certified", submittedBy: "submittedBy", status: "status", relationLabel: "relationLabel", parentSongId: "parentSongId"
 };
-// served masters registered as live files (song.json and lyrics.chordpro are copied but not registered:
-// the publish hook writes them, and fileUrls keeps naming the pipeline chart until then)
-const MASTERS = ["score.musicxml"];
-const UNREGISTERED_MASTERS = ["song.json", "lyrics.chordpro"];
+// served masters registered as live files. song.json is registered so every seeded song has a live file inside
+// its own package (a publish reads the frozen package dir from it — a translation may otherwise only hold files
+// inherited from its work); lyrics.chordpro is not, so fileUrls keeps naming the pipeline chart until the
+// publish hook rewrites it.
+const MASTERS = ["song.json", "score.musicxml"];
 // generated files registered when the package has them
 const DERIVATIVES = ["score.musicxml", "slides.json", "chart.chordpro", "chart.pdf", "attribution.txt", "duration.json", "cover-thumb.webp", "sources.txt"];
 // a song without its own inherits these from its work — exactly the way abcUrl already resolves through works/<slug>
 const WORK_INHERITED = new Set(["score.musicxml", "cover-thumb.webp"]);
 const PACKAGE_SUBDIR = /\/(sources|masters|derivatives)\/.*$/;
-const PACKAGE_NAME = /^.*?\/(sources|masters|derivatives)\//;
 const CHORD = /\[[A-G][#b]?[^\]]*\]/;
 const STANZA_LABEL = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|ending|interlude|coda)\b/i;
 
@@ -48,12 +50,6 @@ function readJson(file: string): any {
 
 function readText(file: string): string | null {
   try { return fs.readFileSync(file, "utf8"); } catch { return null; }
-}
-
-/** Package-relative name of a repo path: "songs/en/pd/x/sources/tune.mid" → "sources/tune.mid"; a path outside the three folders is a source. */
-export function packageName(repoPath: string): string {
-  if (PACKAGE_NAME.test(repoPath)) return repoPath.replace(PACKAGE_NAME, "$1/");
-  return `sources/${repoPath.split("/").pop() || ""}`;
 }
 
 // mirrors lib.mjs splitChordpro: directive header lines, one blank line, body verbatim, one trailing \n
@@ -75,7 +71,7 @@ function firstLine(chordPro: string): string | null {
   return null;
 }
 
-/** id → package dir for rows whose paths all point at a work: walks songs/<lang>/<license>/<slug>/masters/song.json once. */
+/** id → package dir for rows whose paths all point at a work: walks songs/<lang>/<license>/<slug>-<id>/masters/song.json once. */
 function indexPackages(repoDir: string): Map<string, string> {
   const index = new Map<string, string>();
   const songsDir = path.join(repoDir, "songs");
@@ -140,8 +136,6 @@ export function buildCatalog(repoDir: string) {
   const assetFiles: any[] = [];
   const submissions: any[] = [];
   const authorIdByKey: Record<string, string> = {};
-  const copies: { from: string; to: string }[] = [];
-  const copied = new Set<string>();
   const now = new Date();
   let packageIndex: Map<string, string> | undefined;
   const index = () => (packageIndex ||= indexPackages(repoDir));
@@ -150,18 +144,14 @@ export function buildCatalog(repoDir: string) {
     const pkg = readPackage(repoDir, row, index);
     const rec = songRecord(row, pkg);
     const seen = new Set<string>();
-    const copy = (from: string) => {
-      const to = `assets/song/${row.id}/${packageName(from)}`;
-      if (!copied.has(to)) { copied.add(to); copies.push({ from, to }); }
-    };
-    const addFile = (from: string) => {
-      const name = packageName(from);
+    // name = the catalog key, verbatim (forward slashes; the repo path is the bucket key)
+    const addFile = (key: string) => {
+      const name = key.replace(/\\/g, "/");
       const base = name.split("/").pop() || "";
       if (seen.has(base)) return; // one file per basename: the first registered wins (masters before derivatives)
       seen.add(base);
-      const src = path.join(repoDir, from);
+      const src = path.join(repoDir, name);
       assetFiles.push({ id: UniqueIdHelper.shortId(), assetId: row.id, submissionId: null, name, action: "add", sizeBytes: fs.existsSync(src) ? fs.statSync(src).size : null, uploadedBy: rec.submittedBy || null });
-      copy(from);
     };
     for (const c of FILE_COLS) if (row[c]) addFile(row[c]);
     const served: Record<string, string | null> = {};
@@ -173,14 +163,6 @@ export function buildCatalog(repoDir: string) {
     for (const name of DERIVATIVES) {
       const rel = packageFile(repoDir, pkg, "derivatives", name);
       if (rel && !seen.has(name)) { addFile(rel); served[name] = rel; }
-    }
-    for (const name of UNREGISTERED_MASTERS) {
-      const rel = pkg.dir ? `${pkg.dir}/masters/${name}` : null;
-      if (rel && fs.existsSync(path.join(repoDir, rel))) copy(rel);
-    }
-    if (row.writerPortraitUrl) {
-      const to = String(row.writerPortraitUrl);
-      if (!copied.has(to)) { copied.add(to); copies.push({ from: to, to }); }
     }
 
     let authorId: string | null = null;
@@ -229,7 +211,7 @@ export function buildCatalog(repoDir: string) {
     Object.assign(song, packageColumns(repoDir, rec, pkg, served, masterScore));
     songs.push(song);
   }
-  return { assets, songs, authors, assetFiles, submissions, copies };
+  return { assets, songs, authors, assetFiles, submissions };
 }
 
 /** The package-model columns: what song.json, duration.json and the served files say about the row. */

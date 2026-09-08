@@ -1,5 +1,5 @@
 import { Asset, AssetFile, Submission } from "../../models/index.js";
-import { packageRole } from "../PackageLayout.js";
+import { packageRole, relativeName } from "../PackageLayout.js";
 import { Repos } from "../../repositories/Repos.js";
 import { songPublishHook } from "./song.js";
 
@@ -24,43 +24,60 @@ export interface PublishHook {
   onUnpublish?(ctx: PublishContext): Promise<void>;
 }
 
-/** One row per contributor upload, shaped like the content repo's sources/manifest.json. */
+/** One row per source file, the content repo's sources/manifest.json shape (files.md 1.6) plus the submission that carried it. */
 export interface SourceRow {
   file: string;
   url: string | null;
-  acquired: string;
+  acquired: string | null;
   sha256: string | null;
   licenseBasis: string;
   original: boolean;
   submittedBy: string | null;
-  submission: string | null;
+  submission?: string | null;
   note: string | null;
 }
 
 const isoDate = (d?: Date | string | null) => (d ? new Date(d) : new Date()).toISOString().slice(0, 10);
 
+/** Manifest row name: relative to sources/ ("tune.mid"); an upload placed elsewhere keeps its folder ("masters/art.png"). */
+export function sourceFileName(name: string | null | undefined): string {
+  return relativeName(name).replace(/^sources\//, "");
+}
+
+// the repo shape ({files:[{file,…}]}), or the pre-cut-over root manifest.json ({sources:[…]}) a legacy song still holds
+async function previousRows(ctx: PublishContext): Promise<SourceRow[]> {
+  const candidates = ctx.asset.assetType === "song" ? ["sources/manifest.json", "manifest.json"] : ["manifest.json"];
+  for (const name of candidates) {
+    try {
+      const raw = await ctx.readFile(name);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw.toString("utf8"));
+      const files = Array.isArray(parsed?.files) && parsed.files.every((r: any) => typeof r?.file === "string") ? parsed.files : null;
+      const rows = files ?? (Array.isArray(parsed?.sources) ? parsed.sources : null);
+      if (rows) return rows.filter((r: any) => typeof r?.file === "string").map((r: any) => ({ ...r, file: sourceFileName(r.file) }));
+    } catch { /* no usable previous manifest */ }
+  }
+  return [];
+}
+
 /**
- * The sources inventory: a row for every live file a contributor uploaded. Rows from earlier approvals are
- * preserved from the previous manifest as long as the file still exists with the same hash; files this
- * approval added or replaced get a fresh row naming this submission.
+ * The sources inventory: every row of the previous manifest (harvested files, earlier uploads) survives unless
+ * this approval removed the file; each live file a contributor uploaded gets a row — kept from the previous
+ * manifest while the hash matches, freshly written (naming this submission) when this approval added or replaced it.
  */
 export async function sourceRows(ctx: PublishContext): Promise<SourceRow[]> {
-  let previous: SourceRow[] = [];
-  try {
-    const raw = await ctx.readFile("manifest.json");
-    const parsed = raw ? JSON.parse(raw.toString("utf8")) : null;
-    if (Array.isArray(parsed?.sources)) previous = parsed.sources;
-  } catch { /* no usable previous manifest */ }
-  const changed = new Set(ctx.filesChanged.filter((c) => c.action !== "remove").map((c) => c.name));
-  const rows: SourceRow[] = [];
+  const removed = new Set(ctx.filesChanged.filter((c) => c.action === "remove").map((c) => sourceFileName(c.name)));
+  const changed = new Set(ctx.filesChanged.filter((c) => c.action !== "remove" && c.action !== "declined").map((c) => sourceFileName(c.name)));
+  const rows = new Map<string, SourceRow>();
+  for (const p of await previousRows(ctx)) if (!removed.has(p.file)) rows.set(p.file, p);
   for (const f of ctx.files) {
-    const name = f.name || "";
-    if (!name || !f.uploadedBy) continue; // generated files have no uploader
-    const kept = previous.find((p) => p.file === name && p.sha256 === (f.contentHash || null));
-    if (!changed.has(name) && kept) { rows.push(kept); continue; }
-    const mine = changed.has(name);
-    rows.push({
-      file: name,
+    if (!f.name || !f.uploadedBy) continue; // generated and seeded files have no uploader
+    const file = sourceFileName(f.name);
+    const kept = rows.get(file);
+    if (!changed.has(file) && kept && kept.sha256 === (f.contentHash || null)) continue;
+    const mine = changed.has(file);
+    rows.set(file, {
+      file,
       url: null,
       acquired: mine ? isoDate() : isoDate(f.createdAt),
       sha256: f.contentHash || null,
@@ -71,12 +88,21 @@ export async function sourceRows(ctx: PublishContext): Promise<SourceRow[]> {
       note: mine ? ctx.submission.note || null : null
     });
   }
-  return rows;
+  return [...rows.values()];
 }
 
-/** Runs for every type: one unauthenticated GET tells any client what an asset is and which files it has. Lives at the package root; `files[].name` and `sources[].file` are package-relative. */
+/**
+ * Runs for every type. A song package carries the content repo's sources/manifest.json (one row per source file;
+ * the browse metadata is the database's) so `sync pull` takes the package as-is. Every other asset keeps one
+ * unauthenticated manifest.json at its root telling any client what it is and which files it has.
+ */
 export const manifestHook: PublishHook = {
   async onPublish(ctx) {
+    if (ctx.asset.assetType === "song") {
+      const body = { files: await sourceRows(ctx) };
+      await ctx.writeFile("sources/manifest.json", "application/json", Buffer.from(JSON.stringify(body, null, 2) + "\n"));
+      return;
+    }
     const manifest = {
       id: ctx.asset.id,
       assetType: ctx.asset.assetType,

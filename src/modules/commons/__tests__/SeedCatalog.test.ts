@@ -1,18 +1,20 @@
+import * as fs from "fs";
 import * as path from "path";
 
 let n = 0;
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => `seedid${String(++n).padStart(5, "0")}` } }));
 
-import { buildCatalog, chordproBody, packageName } from "../../../../tools/commons-seed/catalog";
+import { buildCatalog, chordproBody } from "../../../../tools/commons-seed/catalog";
 
 const REPO = path.join(__dirname, "fixtures", "package-repo");
+const OWN = "songs/en/public-domain/a-child-of-light-fixsong0001";
+const WORK = "works/abide-fixture";
 
 describe("buildCatalog seeds the database from the package, with the catalog row as the fallback", () => {
-  const { assets, songs, authors, assetFiles, submissions, copies } = buildCatalog(REPO);
-  const own = songs.find((s) => s.assetId === "fixsong0001");
-  const inherited = songs.find((s) => s.assetId === "fixsong0002");
-  const copiesFor = (id: string) => copies.filter((c) => c.to.startsWith(`assets/song/${id}/`)).map((c) => `${c.from} -> ${c.to.replace(`assets/song/${id}/`, "")}`);
-  const namesFor = (id: string) => assetFiles.filter((f) => f.assetId === id).map((f) => f.name).sort();
+  const { assets, songs, authors, assetFiles, submissions } = buildCatalog(REPO) as any;
+  const own = songs.find((s: any) => s.assetId === "fixsong0001");
+  const inherited = songs.find((s: any) => s.assetId === "fixsong0002");
+  const namesFor = (id: string) => assetFiles.filter((f: any) => f.assetId === id).map((f: any) => f.name).sort();
 
   it("builds the song row from masters/song.json and masters/lyrics.chordpro, not the catalog row", () => {
     // song.json says bpm 96 and three themes; the catalog row says 120 and two
@@ -55,67 +57,53 @@ describe("buildCatalog seeds the database from the package, with the catalog row
     expect(inherited.scoreSource).toBe("abc");
   });
 
-  it("copies the package's files into sources/ masters/ derivatives/ under the live folder, keeping each file's folder", () => {
-    expect(copiesFor("fixsong0001")).toEqual(expect.arrayContaining([
-      "songs/en/public-domain/a-child-of-light/sources/tune.mid -> sources/tune.mid",
-      "songs/en/public-domain/a-child-of-light/sources/tune.abc -> sources/tune.abc",
-      "songs/en/public-domain/a-child-of-light/masters/cover.webp -> masters/cover.webp",
-      "songs/en/public-domain/a-child-of-light/masters/song.json -> masters/song.json",
-      "songs/en/public-domain/a-child-of-light/masters/lyrics.chordpro -> masters/lyrics.chordpro",
-      "songs/en/public-domain/a-child-of-light/derivatives/timing.json -> derivatives/timing.json",
-      "songs/en/public-domain/a-child-of-light/derivatives/score.musicxml -> derivatives/score.musicxml",
-      "songs/en/public-domain/a-child-of-light/derivatives/slides.json -> derivatives/slides.json",
-      "songs/en/public-domain/a-child-of-light/derivatives/chart.chordpro -> derivatives/chart.chordpro",
-      "songs/en/public-domain/a-child-of-light/derivatives/attribution.txt -> derivatives/attribution.txt",
-      "songs/en/public-domain/a-child-of-light/derivatives/duration.json -> derivatives/duration.json"
-    ]));
-    expect(copiesFor("fixsong0001")).not.toContainEqual(expect.stringContaining("chart.pdf"));
-    expect(copiesFor("fixsong0001")).not.toContainEqual(expect.stringContaining("cover-thumb"));
-    expect(copies.every((c) => !c.to.includes("\\"))).toBe(true);
-  });
-
-  it("finds a works-only row's package by id and lands the work's inherited files under the song's own package", () => {
-    expect(copiesFor("fixsong0002")).toEqual(expect.arrayContaining([
-      "works/abide-fixture/sources/tune.abc -> sources/tune.abc",
-      "works/abide-fixture/sources/tune.mid -> sources/tune.mid",
-      "works/abide-fixture/derivatives/score.musicxml -> derivatives/score.musicxml",
-      "works/abide-fixture/derivatives/cover-thumb.webp -> derivatives/cover-thumb.webp",
-      "songs/de/public-domain/bleib-bei-uns/masters/song.json -> masters/song.json"
-    ]));
-    expect(copiesFor("fixsong0002")).not.toContainEqual(expect.stringContaining("slides.json"));
-  });
-
-  it("registers one live assetFiles row per served file under its package-relative name, with its size", () => {
+  it("registers one live assetFiles row per served file under its catalog key — the repo path is the bucket key, nothing is copied", () => {
     expect(namesFor("fixsong0001")).toEqual([
-      "derivatives/attribution.txt",
-      "derivatives/chart.chordpro",
-      "derivatives/duration.json",
-      "derivatives/score.musicxml",
-      "derivatives/slides.json",
-      "derivatives/timing.json",
-      "masters/cover.webp",
-      "sources/tune.abc",
-      "sources/tune.mid"
+      `${OWN}/derivatives/attribution.txt`,
+      `${OWN}/derivatives/chart.chordpro`,
+      `${OWN}/derivatives/duration.json`,
+      `${OWN}/derivatives/score.musicxml`,
+      `${OWN}/derivatives/slides.json`,
+      `${OWN}/derivatives/timing.json`,
+      `${OWN}/masters/cover.webp`,
+      `${OWN}/masters/song.json`,
+      `${OWN}/sources/tune.abc`,
+      `${OWN}/sources/tune.mid`
     ]);
-    // song.json and lyrics.chordpro are copied but not registered: the publish hook owns those rows
-    expect(namesFor("fixsong0002")).toEqual(["derivatives/cover-thumb.webp", "derivatives/score.musicxml", "sources/tune.abc", "sources/tune.mid"]);
-    expect(assetFiles.find((f) => f.assetId === "fixsong0001" && f.name === "derivatives/duration.json").sizeBytes).toBeGreaterThan(0);
-    expect(new Set(assetFiles.map((f) => f.id)).size).toBe(assetFiles.length);
+    expect(namesFor("fixsong0001")).not.toContainEqual(expect.stringContaining("chart.pdf"));
+    expect(namesFor("fixsong0001")).not.toContainEqual(expect.stringContaining("cover-thumb"));
+    // lyrics.chordpro is served but not registered: the publish hook owns that row
+    expect(namesFor("fixsong0001")).not.toContainEqual(expect.stringContaining("lyrics.chordpro"));
+    expect(assetFiles.every((f: any) => !f.name.includes("\\"))).toBe(true);
+    expect(assetFiles.find((f: any) => f.assetId === "fixsong0001" && f.name === `${OWN}/derivatives/duration.json`).sizeBytes).toBeGreaterThan(0);
+    expect(new Set(assetFiles.map((f: any) => f.id)).size).toBe(assetFiles.length);
+    expect(buildCatalog(REPO)).not.toHaveProperty("copies");
   });
 
-  it("copies nothing outside the packages: no writers/ mirror when no row names a portrait", () => {
-    expect(copies.some((c) => c.to.startsWith("writers/"))).toBe(false);
-    expect(authors.every((a) => a.portraitUrl === null)).toBe(true);
+  it("finds a works-only row's package by id and points inherited files at the work's own keys; song.json anchors the song's package", () => {
+    expect(namesFor("fixsong0002")).toEqual([
+      "songs/de/public-domain/bleib-bei-uns-fixsong0002/masters/song.json",
+      `${WORK}/derivatives/cover-thumb.webp`,
+      `${WORK}/derivatives/score.musicxml`,
+      `${WORK}/sources/tune.abc`,
+      `${WORK}/sources/tune.mid`
+    ]);
+  });
+
+  it("maps the catalog row's url columns to files by catalog key and carries its confidence onto the songs row", () => {
+    const row = JSON.parse(fs.readFileSync(path.join(REPO, "catalog.json"), "utf8")).rows.find((r: any) => r.id === "fixsong0001");
+    for (const col of ["midiUrl", "abcUrl", "artUrl", "lyricsUrl"]) expect(namesFor("fixsong0001")).toContain(row[col]);
+    expect(own.confidence).toBe(row.confidence);
+    expect(inherited.confidence).toBe("lyrics-only");
+    expect(["proofread-score", "converted-from-abc", "generated-from-midi", "chart-only", "lyrics-only"]).toContain(own.confidence);
+  });
+
+  it("keeps the writer portrait as a key under the commons prefix, and none when no row names one", () => {
+    expect(authors.every((a: any) => a.portraitUrl === null)).toBe(true);
   });
 });
 
 describe("package path helpers", () => {
-  it("packageName keeps the package folder and treats anything else as a source", () => {
-    expect(packageName("songs/en/pd/x/sources/tune.mid")).toBe("sources/tune.mid");
-    expect(packageName("works/abide/derivatives/score.musicxml")).toBe("derivatives/score.musicxml");
-    expect(packageName("songs/en/pd/x/masters/cover.webp")).toBe("masters/cover.webp");
-    expect(packageName("songs/en/pd/x/demoAudio.mp3")).toBe("sources/demoAudio.mp3");
-  });
 
   it("chordproBody strips the directive header and the one blank line after it, keeping the body verbatim", () => {
     expect(chordproBody("{title: T}\n{key: G}\n\nVerse 1\n[G]Sing\n")).toBe("Verse 1\n[G]Sing");
