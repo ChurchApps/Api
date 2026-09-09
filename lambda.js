@@ -29,10 +29,6 @@ let cachedHandler;
 
 export const web = async function (event, context) {
   try {
-    console.log("Web handler invoked");
-    console.log("Event httpMethod:", event.httpMethod);
-    console.log("Event path:", event.path);
-
     if (event.path === "/test") {
       return {
         statusCode: 200,
