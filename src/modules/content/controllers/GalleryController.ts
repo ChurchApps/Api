@@ -7,6 +7,13 @@ import { ContentBaseController } from "./ContentBaseController.js";
 
 @controller("/content/gallery")
 export class GalleryController extends ContentBaseController {
+  // Group leaders can create and edit their group's calendar events (see EventController.save), and
+  // the description editor's "Insert Image" button posts here, so they need the gallery too.
+  // Deleting from the shared church gallery stays admin-only.
+  private canUseGallery(au: any) {
+    return au.checkAccess(Permissions.content.edit) || au.leaderGroupIds?.length > 0;
+  }
+
   @httpGet("/stock/:folder")
   public async getStock(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -18,7 +25,7 @@ export class GalleryController extends ContentBaseController {
   @httpGet("/:folder")
   public async getAll(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
         const files = await FileStorageHelper.list(au.churchId + "/gallery/" + folder);
         return { images: files };
@@ -29,7 +36,7 @@ export class GalleryController extends ContentBaseController {
   @httpPost("/requestUpload")
   public async getUploadUrl(req: express.Request<{}, {}, { folder: string; fileName: string; contentType?: string; size?: number }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
         const key = au.churchId + "/gallery/" + path.basename(req.body.folder) + "/" + path.basename(req.body.fileName);
         const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key, req.body.contentType, req.body.size) : {};
