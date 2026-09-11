@@ -37,7 +37,7 @@ describe("buildCatalog seeds the database from the package, with the catalog row
   });
 
   it("falls back to the catalog row for what the package lacks: confidence, parentSongId, a missing song.json field", () => {
-    expect(own).toMatchObject({ confidence: "converted-from-abc", tune: null, year: 1877, scripture: "Rom 8:14-17" });
+    expect(own).toMatchObject({ confidence: "proofread-score", tune: null, year: 1877, scripture: "Rom 8:14-17" });
     expect(inherited).toMatchObject({ confidence: "lyrics-only", parentSongId: "fixsong0001", relationLabel: "German original", firstLine: "Ach bleib mit deiner Gnade", hasChords: false });
   });
 
@@ -51,10 +51,10 @@ describe("buildCatalog seeds the database from the package, with the catalog row
     expect(JSON.parse(inherited.form).status).toBe("approved");
   });
 
-  it("publishes the song key and marks a served score as converted from abc", () => {
+  it("publishes the song key and marks a served ABC score in masters/ as the notes master", () => {
     expect(JSON.parse(own.publishedKeys)).toEqual(["Eb"]);
-    expect(own.scoreSource).toBe("abc");
-    expect(inherited.scoreSource).toBe("abc");
+    expect(own.scoreSource).toBe("master");
+    expect(inherited.scoreSource).toBe("master");
   });
 
   it("registers one live assetFiles row per served file under its catalog key — the repo path is the bucket key, nothing is copied", () => {
@@ -62,10 +62,10 @@ describe("buildCatalog seeds the database from the package, with the catalog row
       `${OWN}/derivatives/attribution.txt`,
       `${OWN}/derivatives/chart.chordpro`,
       `${OWN}/derivatives/duration.json`,
-      `${OWN}/derivatives/score.musicxml`,
       `${OWN}/derivatives/slides.json`,
       `${OWN}/derivatives/timing.json`,
       `${OWN}/masters/cover.webp`,
+      `${OWN}/masters/score.musicxml`,
       `${OWN}/masters/song.json`,
       `${OWN}/sources/tune.abc`,
       `${OWN}/sources/tune.mid`
@@ -84,7 +84,7 @@ describe("buildCatalog seeds the database from the package, with the catalog row
     expect(namesFor("fixsong0002")).toEqual([
       "songs/de/public-domain/bleib-bei-uns-fixsong0002/masters/song.json",
       `${WORK}/derivatives/cover-thumb.webp`,
-      `${WORK}/derivatives/score.musicxml`,
+      `${WORK}/masters/score.musicxml`,
       `${WORK}/sources/tune.abc`,
       `${WORK}/sources/tune.mid`
     ]);
