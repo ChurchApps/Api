@@ -185,6 +185,15 @@ export class TaskRepo {
       .execute();
   }
 
+  public async loadForAccountDeletion(churchId: string, personId: string) {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("taskType", "=", "accountDeletion")
+      .where("status", "=", "Open")
+      .where("churchId", "=", churchId)
+      .where("associatedWithId", "=", personId)
+      .execute();
+  }
+
   public async loadByWorkflow(churchId: string, workflowId: string, status = "Open") {
     return getDb().selectFrom("tasks").selectAll()
       .where("churchId", "=", churchId)

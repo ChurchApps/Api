@@ -48,7 +48,6 @@ export class GdprErasureHelper {
       anniversary: null,
       gender: null,
       maritalStatus: null,
-      photo: null,
       photoUpdated: null,
       nametagNotes: null,
       donorNumber: null,
