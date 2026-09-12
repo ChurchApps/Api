@@ -46,17 +46,17 @@ export class BibleLookupRepo {
   public async getStats(startDate: Date, endDate: Date) {
     const start = DateHelper.toMysqlDate(startDate);
     const end = DateHelper.toMysqlDate(endDate);
-    const result = await getDb().selectFrom("bibleTranslations as bt")
-      .innerJoin("bibleLookups as bl", (join) =>
-        join.on((eb) => eb.or([
-          eb("bl.translationKey", "=", eb.ref("bt.abbreviation")),
-          eb("bl.translationKey", "=", eb.ref("bt.sourceKey"))
-        ])))
-      .select(["bt.abbreviation", sql<number>`count(distinct(bl.ipAddress))`.as("lookups")])
+    const db = getDb();
+    // An OR join can't use an index; a keyed derived table turns it into one lookup per row.
+    const keys = db.selectFrom("bibleTranslations").select(["abbreviation as k", "abbreviation"])
+      .union(db.selectFrom("bibleTranslations").select(["sourceKey as k", "abbreviation"]).where("sourceKey", "is not", null));
+    const result = await db.selectFrom("bibleLookups as bl")
+      .innerJoin(keys.as("m"), "m.k", "bl.translationKey")
+      .select(["m.abbreviation", sql<number>`count(distinct(bl.ipAddress))`.as("lookups")])
       .where("bl.lookupTime", ">=", start as any)
       .where("bl.lookupTime", "<=", end as any)
-      .groupBy("bt.abbreviation")
-      .orderBy("bt.abbreviation")
+      .groupBy("m.abbreviation")
+      .orderBy("m.abbreviation")
       .execute();
     return result;
   }
