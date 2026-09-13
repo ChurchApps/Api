@@ -96,7 +96,7 @@ describe("proposal types", () => {
   });
 
   it("rejects an unknown type outright", () => {
-    expect(validateSubmission(song, { ...goodSong, type: "remix" }, [], [])).toEqual(["type must be one of: new, translation, arrangement, correction, additionalFile, removal"]);
+    expect(validateSubmission(song, { ...goodSong, type: "remix" }, [], [])).toEqual(["type must be one of: new, translation, arrangement, correction, additionalFile, recording, removal"]);
   });
 
   it("new song: happy path, and refused against a published asset", () => {

@@ -8,7 +8,7 @@ export interface Reviewer { id?: string; email?: string; checkAccess: (p: any) =
 export interface DeclinedFile { name: string; reason: string }
 
 /** File roles whose upload is a recording-ownership attestation, so adding one to a live song is a rights change. */
-const RIGHTS_FILE_ROLES = ["demoAudio", "stemsZip"];
+const RIGHTS_FILE_ROLES = ["demoAudio", "stemsZip", "master"];
 
 const text = (v: unknown) => (v === undefined || v === null ? "" : String(v).trim());
 
@@ -42,6 +42,7 @@ export class ReviewerHelper {
     if (text(live.licenseVersion) && text(live.licenseVersion) !== text(proposed?.licenseVersion)) return "licenseVersion";
     if (!!live.detail?.recordingOwned !== !!proposed?.detail?.recordingOwned) return "recordingOwned";
     if (text(live.detail?.proAnswer) !== text(proposed?.detail?.proAnswer)) return "proAnswer";
+    if (text(live.detail?.masterLicense) !== text(proposed?.detail?.masterLicense)) return "masterLicense";
     const upload = proposedFiles.find((f) => f.action !== "remove" && RIGHTS_FILE_ROLES.includes(fileRole(f.name || "")));
     return upload?.name;
   }

@@ -10,15 +10,22 @@ const SONG_FILES: AssetFileRole[] = [
   { role: "score", namePattern: "score.{ext}", extensions: ["musicxml", "xml", "mxl", "mscz", "ly"], maxBytes: 25 * MB },
   { role: "scoreImage", namePattern: "scoreImage.{ext}", extensions: ["pdf", "png", "jpg", "jpeg", "tif"], maxBytes: 25 * MB },
   // lyrics.chordpro is the chart generated on publish, so ChordPro text uploads travel as lyrics.cho
-  { role: "lyrics", namePattern: "lyrics.{ext}", extensions: ["cho", "crd", "txt"], maxBytes: MB }
+  { role: "lyrics", namePattern: "lyrics.{ext}", extensions: ["cho", "crd", "txt"], maxBytes: MB },
+  // the finished mix: a second rights layer (detail.masterLicense) that unlocks stems and a full mix; demoAudio stays a writer demo
+  { role: "master", namePattern: "master.{ext}", extensions: ["wav", "mp3", "m4a", "flac", "ogg"], maxBytes: 90 * MB }
 ];
 
 const SONG_DETAIL_FIELDS: AssetDetailField[] = [
   { key: "parentSongId", label: "Original song", type: "text", maxLength: 32 },
   { key: "relationLabel", label: "Relation to the original", type: "text", maxLength: 60 },
   { key: "translator", label: "Translator", type: "text", maxLength: 120 },
-  { key: "arranger", label: "Arranger", type: "text", maxLength: 120 }
+  { key: "arranger", label: "Arranger", type: "text", maxLength: 120 },
+  // checked against def.licenses in SubmitValidation once a master file is present: the uploadable set is the registry's
+  { key: "masterLicense", label: "Master recording license", type: "text", maxLength: 16 }
 ];
+
+// a master is a recording too: the same ownership attestation the demo needs
+const MASTER_ATTESTATION = { key: "recordingOwned", label: "This recording is mine (or I have the owner's permission to share it).", requiredWhenRole: "master" };
 
 function extendSong(def: AssetTypeDefinition): AssetTypeDefinition {
   const roles = new Set(SONG_FILES.map((f) => f.role));
@@ -27,7 +34,8 @@ function extendSong(def: AssetTypeDefinition): AssetTypeDefinition {
   const files = firstGenerated < 0 ? [...kept, ...SONG_FILES] : [...kept.slice(0, firstGenerated), ...SONG_FILES, ...kept.slice(firstGenerated)];
   const keys = new Set(SONG_DETAIL_FIELDS.map((f) => f.key));
   const detailFields = [...(def.detailFields || []).filter((f) => !keys.has(f.key)), ...SONG_DETAIL_FIELDS];
-  return { ...def, files, detailFields };
+  const attestations = [...(def.attestations || []).filter((a) => a.requiredWhenRole !== "master"), MASTER_ATTESTATION];
+  return { ...def, files, detailFields, attestations, maxTotalBytes: Math.max(def.maxTotalBytes, 200 * MB) };
 }
 
 export const ASSET_TYPES: Record<string, AssetTypeDefinition> = { ...BASE_ASSET_TYPES, song: extendSong(BASE_ASSET_TYPES.song) };

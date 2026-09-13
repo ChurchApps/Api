@@ -21,7 +21,7 @@ const ROOT = "commons";
 const PENDING_ROOT = `${ROOT}/pending`;
 const REVIEW_TTL_SEC = 7200;
 const UPLOAD_TTL_SEC = 3600;
-export const UPLOAD_FIELDS = ["demoAudio", "sheetPdf", "stemsZip"] as const;
+export const UPLOAD_FIELDS = ["demoAudio", "sheetPdf", "stemsZip", "master"] as const;
 // when two files share a role the freshest wins: masters/lyrics.chordpro is rewritten on every publish while
 // derivatives/chart.chordpro waits for the pipeline (an uploaded art-thumb is renamed onto the generated thumb, so no rule)
 const PREFERRED = new Set(["lyrics.chordpro"]);

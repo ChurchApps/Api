@@ -8,7 +8,7 @@ export const MAX_PENDING_PER_USER = 5;
 export const MAX_SUBMITTED_PER_DAY = 20;
 export const MIN_NOTE_LENGTH = 10;
 
-export const SUBMISSION_TYPES = ["new", "translation", "arrangement", "correction", "additionalFile", "removal"] as const;
+export const SUBMISSION_TYPES = ["new", "translation", "arrangement", "correction", "additionalFile", "recording", "removal"] as const;
 export type SubmissionType = (typeof SUBMISSION_TYPES)[number];
 /** Types that create a package; the rest change a published one. */
 export const NEW_PACKAGE_TYPES: readonly string[] = ["new", "translation", "arrangement"];
@@ -18,6 +18,7 @@ export const SUBMISSION_TYPE_LABELS: Record<SubmissionType, string> = {
   arrangement: "arrangement",
   correction: "correction",
   additionalFile: "additional file",
+  recording: "master recording",
   removal: "removal request"
 };
 
@@ -152,6 +153,9 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
   for (const n of resulting) total += liveSizes.get(n) || 0;
   if (total > def.maxTotalBytes) errors.push(`all files together exceed the ${Math.round(def.maxTotalBytes / 1048576)}MB limit`);
 
+  // a master recording is its own rights layer: it needs a license from the uploadable set, which may differ from the composition's
+  if (roles.has("master") && !def.licenses.includes(detail.masterLicense)) errors.push(`masterLicense must be one of: ${def.licenses.join(", ")}`);
+
   for (const att of def.attestations || []) {
     const required = !att.requiredWhenRole || proposed.some((f) => f.action !== "remove" && fileRole(f.name || "") === att.requiredWhenRole);
     if (required && detail[att.key] !== true) errors.push(`${att.key} confirmation is required`);
@@ -180,9 +184,10 @@ function validateProposalType(type: string, payload: SubmissionPayload, proposed
       else if (type === "translation" && ctx.parent.language && (payload.language || "English") === ctx.parent.language) errors.push(`A translation must be in a different language from the original (${ctx.parent.language})`);
     }
   }
-  if (type === "correction" || type === "additionalFile") {
+  if (type === "correction" || type === "additionalFile" || type === "recording") {
     if (text(ctx.note).length < MIN_NOTE_LENGTH) errors.push(`A note of at least ${MIN_NOTE_LENGTH} characters is required: say what changed and why`);
     if (type === "additionalFile" && !proposed.some((f) => f.action !== "remove")) errors.push("An additionalFile proposal must add a file");
+    if (type === "recording" && !proposed.some((f) => f.action !== "remove" && fileRole(f.name || "") === "master")) errors.push("A recording proposal must add a master file");
   }
   return errors;
 }
