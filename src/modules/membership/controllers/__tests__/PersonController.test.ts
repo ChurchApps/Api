@@ -1,3 +1,4 @@
+jest.mock("../../../../shared/modules/index.js", () => ({ getMembershipModuleGateway: jest.fn(() => ({ getOrCreateGuestPerson: jest.fn() })) }));
 import "reflect-metadata";
 jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 const sendTransactional = jest.fn();

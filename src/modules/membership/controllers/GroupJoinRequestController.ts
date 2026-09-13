@@ -1,10 +1,12 @@
-import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { Permissions, UserChurchHelper } from "../helpers/index.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { UserChurchHelper } from "../helpers/UserChurchHelper.js";
 import { GroupJoinRequest, GroupMember } from "../models/index.js";
 import { NotificationService } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 
 @controller("/membership/groupjoinrequests")
 export class GroupJoinRequestController extends MembershipBaseController {
@@ -109,6 +111,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       request.decidedBy = au.personId;
       request.decidedDate = new Date();
       await this.repos.groupJoinRequest.save(request);
+      await InternalEventBus.publish(au.churchId, "group.joinRequest.decided", request);
 
       try {
         const group: any = await this.repos.group.load(au.churchId, request.groupId);
@@ -144,6 +147,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
       request.decidedDate = new Date();
       request.declineReason = req.body?.declineReason?.slice(0, 500) ?? null;
       await this.repos.groupJoinRequest.save(request);
+      await InternalEventBus.publish(au.churchId, "group.joinRequest.decided", request);
 
       try {
         const group: any = await this.repos.group.load(au.churchId, request.groupId);
@@ -178,6 +182,7 @@ export class GroupJoinRequestController extends MembershipBaseController {
         request.decidedBy = au.personId;
         request.decidedDate = new Date();
         await this.repos.groupJoinRequest.save(request);
+        await InternalEventBus.publish(au.churchId, "group.joinRequest.decided", request);
       }
       return {};
     });

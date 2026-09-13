@@ -1,7 +1,8 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { Person, Household, SearchCondition, Group } from "../models/index.js";
+import { Person, Household, SearchCondition, Group, GroupJoinRequest } from "../models/index.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
@@ -66,6 +67,36 @@ export class PersonController extends MembershipBaseController {
       // Recorded before the send so a slow send cannot let concurrent requests past the cap.
       await PublicEmailThrottle.record(this.repos, churchId, personId, ipAddress);
       await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, appName, null, subject, body);
+
+      // Create a task and pending join request so the contact form submission appears on the Admin Dashboard Tasks
+      if (groupId && req.body.email && (req.body.firstName || req.body.lastName)) {
+        try {
+          const membershipGateway = getMembershipModuleGateway();
+          const guestPerson = await membershipGateway.getOrCreateGuestPerson(churchId, {
+            firstName: req.body.firstName || "Guest",
+            lastName: req.body.lastName || "Visitor",
+            email: req.body.email,
+            phone: req.body.phone
+          });
+          if (guestPerson?.personId) {
+            const existingPending = await this.repos.groupJoinRequest.loadExistingPending(churchId, groupId, guestPerson.personId);
+            if (!existingPending) {
+              const groupJoinReq: GroupJoinRequest = {
+                churchId,
+                groupId,
+                personId: guestPerson.personId,
+                message: req.body.message || req.body.body,
+                status: "pending"
+              };
+              const savedReq = await this.repos.groupJoinRequest.save(groupJoinReq);
+              await WebhookDispatcher.emit(churchId, "group.member.requested", savedReq);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to create join request from public contact:", err);
+        }
+      }
+
       return { success: true };
     });
   }

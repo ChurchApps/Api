@@ -6,6 +6,7 @@ export * from "./models/index.js";
 import { InternalEventBus } from "../../shared/events/InternalEventBus.js";
 import { RuleEngine } from "./helpers/RuleEngine.js";
 import { DirectoryUpdateHelper } from "./helpers/DirectoryUpdateHelper.js";
+import { GroupJoinRequestTaskHelper } from "./helpers/GroupJoinRequestTaskHelper.js";
 
 export function initializeDoingModule() {
   // Event-driven rules run through the unified RuleEngine; form submissions are just
@@ -13,4 +14,6 @@ export function initializeDoingModule() {
   InternalEventBus.subscribe(RuleEngine.onEvent);
   // SSO logins submit member photos into the directory-update approval flow.
   InternalEventBus.subscribe(DirectoryUpdateHelper.onEvent);
+  // Group join requests generate tasks for group leaders and staff.
+  InternalEventBus.subscribe(GroupJoinRequestTaskHelper.onEvent);
 }
