@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
+import { CurrencyHelper } from "@churchapps/helpers";
 import { DateHelper as LocalDateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Donation, DonationSummary } from "../models/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
@@ -136,28 +137,34 @@ export class DonationRepo {
     return row ? this.rowToModel(row) : null;
   }
 
-  public async loadDashboardKpis(churchId: string, startDate: Date, endDate: Date, fundId?: string) {
+  public async loadDashboardKpis(churchId: string, startDate: Date, endDate: Date, fundId?: string, currency: string = "usd", rates?: any) {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
+    let result;
     if (fundId) {
-      const result = await sql<any>`
-        SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
+      result = await sql<any>`
+        SELECT fd.amount as fdAmount, d.amount as dAmount, d.personId, d.id, d.currency
         FROM donations d
         INNER JOIN fundDonations fd on fd.donationId = d.id
         INNER JOIN funds f on f.id = fd.fundId
         WHERE d.churchId = ${churchId}
           AND d.donationDate BETWEEN ${sDate} AND ${eDate}
           AND fd.fundId = ${fundId}`.execute(getDb());
-      return result.rows[0] ?? null;
     } else {
-      const result = await sql<any>`
-        SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
+      result = await sql<any>`
+        SELECT fd.amount as fdAmount, d.amount as dAmount, d.personId, d.id, d.currency
         FROM donations d
         INNER JOIN fundDonations fd on fd.donationId = d.id
         INNER JOIN funds f on f.id = fd.fundId
         WHERE d.churchId = ${churchId}
-          AND d.donationDate BETWEEN ${sDate} AND ${eDate}`.execute(getDb());
-      return result.rows[0] ?? null;
+        AND d.donationDate BETWEEN ${sDate} AND ${eDate}`.execute(getDb());
+    }
+    if (result.rows) {
+      const donationCount = ArrayHelper.getIds(result.rows, "id").length;
+      const donorCount = ArrayHelper.getUniqueValues(result.rows, "personId").filter(i => i !== null).length;
+      const totalGiving = result.rows.reduce((sum, item) => sum + CurrencyHelper.convertAmount(item.fdAmount, item.currency, currency, rates), 0);
+      const avgGift = totalGiving / donationCount;
+      return { totalGiving, avgGift, donorCount, donationCount };
     }
   }
 
