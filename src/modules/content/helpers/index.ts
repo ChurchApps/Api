@@ -5,6 +5,7 @@ export { OpenAiHelper } from "./OpenAiHelper.js";
 export { ApiBibleHelper } from "./ApiBibleHelper.js";
 export { PraiseChartsHelper } from "./PraiseChartsHelper.js";
 export { MusicBrainzHelper } from "./MusicBrainzHelper.js";
+export { PodcastFeedHelper, PodcastFeedError } from "./PodcastFeedHelper.js";
 
 // Content-specific helpers
 export { TreeHelper } from "./TreeHelper.js";
