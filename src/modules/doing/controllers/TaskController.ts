@@ -91,11 +91,18 @@ export class TaskController extends DoingBaseController {
         const prepared = await AccountDeletionHelper.prepareRequest(au, task);
         if (prepared.error) return this.json({ message: prepared.error }, 400);
         const saved = await this.repos.task.save(task);
+        await AccountDeletionHelper.notifyReviewers(saved);
         await InternalEventBus.publish(au.churchId, "task.updated", saved);
         return [saved];
       }
       const result: Task[] = [];
       for (const task of req.body) {
+        if (task.id) {
+          const existing = await this.repos.task.load(au.churchId, task.id);
+          if (existing?.taskType === AccountDeletionHelper.taskType && existing.status !== "Closed" && task.status === "Closed") {
+            return this.json({ message: "Account deletion requests must be decided from the review action" }, 400);
+          }
+        }
         task.churchId = au.churchId;
         if (type === "directoryUpdate") await DirectoryUpdateHelper.handleDirectoryUpdate(au.churchId, task);
         const saved = await this.repos.task.save(task);
@@ -183,6 +190,21 @@ export class TaskController extends DoingBaseController {
       if (!task) return this.json({}, 404);
       if (!this.canEditCard(au, task)) return this.json({}, 401);
       return await op(task);
+    });
+  }
+
+  // Staff decide a member's account-deletion request (approve = GDPR anonymize, reject requires a reason).
+  @httpPost("/:id/accountDeletionDecision")
+  public async accountDeletionDecision(@requestParam("id") id: string, req: express.Request<{}, {}, { outcome?: string; reason?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (!task || task.taskType !== AccountDeletionHelper.taskType) return this.json({}, 404);
+      if (task.status !== "Open") return this.json({ message: "Request is already closed" }, 400);
+      const result = await AccountDeletionHelper.completeDecision(task, req.body || {}, this.repos);
+      if (result.error) return this.json({ message: result.error }, 400);
+      await InternalEventBus.publish(au.churchId, "task.updated", result.task);
+      return result.task;
     });
   }
 

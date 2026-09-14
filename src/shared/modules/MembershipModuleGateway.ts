@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { KyselyPool } from "../infrastructure/KyselyPool.js";
 import { WebhookDispatcher } from "../webhooks/WebhookDispatcher.js";
+import { GdprErasureHelper } from "../../modules/membership/helpers/GdprErasureHelper.js";
 
 // Gateway contract; Db impl is swappable for HTTP if ever separate service.
 
@@ -43,6 +44,7 @@ export interface MembershipModuleGateway {
   loadSetting(churchId: string, keyName: string): Promise<string | null>;
   loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]>;
   loadHouseholdAdults(churchId: string, personIds: string[]): Promise<HouseholdAdult[]>;
+  anonymizePerson(churchId: string, personId: string): Promise<void>;
 }
 
 export interface CheckinGroup {
@@ -340,6 +342,15 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .where("churchId", "=", churchId)
       .where("id", "=", personId)
       .execute();
+  }
+
+  public async anonymizePerson(churchId: string, personId: string): Promise<void> {
+    const repos = await this.repos();
+    const userChurch = await repos.userChurch.loadByPersonId(personId, churchId);
+    const userId = userChurch?.userId || null;
+    const person: any = await repos.person.load(churchId, personId);
+    await GdprErasureHelper.anonymize(churchId, personId, userId, repos);
+    await WebhookDispatcher.emit(churchId, "person.destroyed", { id: personId, churchId, email: person?.email });
   }
 }
 

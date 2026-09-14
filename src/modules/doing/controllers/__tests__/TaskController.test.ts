@@ -1,13 +1,20 @@
 import "reflect-metadata";
 
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { tasks: { edit: "tasksEdit", view: "tasksView" } } }));
+jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { tasks: { edit: "tasksEdit", view: "tasksView" }, people: { edit: "peopleEdit" } } }));
 jest.mock("../../../../shared/events/InternalEventBus", () => ({ InternalEventBus: { publish: jest.fn() } }));
 const prepareRequest = jest.fn();
+const completeDecision = jest.fn();
+const notifyReviewers = jest.fn();
 jest.mock("../../helpers/index", () => ({
   WorkflowHelper: {},
   DirectoryUpdateHelper: { handleDirectoryUpdate: jest.fn() },
-  AccountDeletionHelper: { taskType: "accountDeletion", prepareRequest: (...args: any[]) => prepareRequest.apply(null, args as any) }
+  AccountDeletionHelper: {
+    taskType: "accountDeletion",
+    prepareRequest: (...args: any[]) => prepareRequest.apply(null, args as any),
+    completeDecision: (...args: any[]) => completeDecision.apply(null, args as any),
+    notifyReviewers: (...args: any[]) => notifyReviewers.apply(null, args as any)
+  }
 }));
 
 import { TaskController } from "../TaskController.js";
@@ -24,7 +31,9 @@ describe("TaskController.save accountDeletion self-service", () => {
   let repos: any;
   beforeEach(() => {
     prepareRequest.mockReset();
-    repos = { task: { save: jest.fn(async (t: any) => ({ ...t, id: t.id || "new" })), loadForAccountDeletion: jest.fn(async () => []) } };
+    completeDecision.mockReset();
+    notifyReviewers.mockReset().mockResolvedValue(undefined);
+    repos = { task: { save: jest.fn(async (t: any) => ({ ...t, id: t.id || "new" })), loadForAccountDeletion: jest.fn(async () => []), load: jest.fn() } };
   });
 
   it("still requires tasks edit for ordinary task creation", async () => {
@@ -38,6 +47,7 @@ describe("TaskController.save accountDeletion self-service", () => {
     expect(prepareRequest).toHaveBeenCalledTimes(1);
     expect(repos.task.save).toHaveBeenCalledTimes(1);
     expect(repos.task.save).toHaveBeenCalledWith(prepareRequest.mock.calls[0][1]);
+    expect(notifyReviewers).toHaveBeenCalledTimes(1);
     expect(result).toHaveLength(1);
   });
 
@@ -55,5 +65,41 @@ describe("TaskController.save accountDeletion self-service", () => {
     const result = await (makeController([], repos) as any).save({ query: { type: "accountDeletion" }, body: [{ title: "x" }] }, {});
     expect(result.status).toBe(400);
     expect(repos.task.save).not.toHaveBeenCalled();
+  });
+
+  it("does not let staff close an account deletion request through the generic save", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", taskType: "accountDeletion", status: "Open" });
+    const result = await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", status: "Closed" }] }, {});
+    expect(result.status).toBe(400);
+    expect(repos.task.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("TaskController.accountDeletionDecision", () => {
+  let repos: any;
+  beforeEach(() => {
+    completeDecision.mockReset();
+    repos = { task: { load: jest.fn(), save: jest.fn() } };
+  });
+
+  it("requires People > Edit", async () => {
+    const result = await (makeController([], repos) as any).accountDeletionDecision("t1", { body: { outcome: "approved" } }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(completeDecision).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the task is not an open account deletion request", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", taskType: "directoryUpdate", status: "Open" });
+    const result = await (makeController(["peopleEdit"], repos) as any).accountDeletionDecision("t1", { body: { outcome: "approved" } }, {});
+    expect(result.status).toBe(404);
+  });
+
+  it("runs completeDecision and returns the closed task", async () => {
+    const open = { id: "t1", taskType: "accountDeletion", status: "Open" };
+    repos.task.load.mockResolvedValue(open);
+    completeDecision.mockResolvedValue({ task: { ...open, status: "Closed" } });
+    const result = await (makeController(["peopleEdit"], repos) as any).accountDeletionDecision("t1", { body: { outcome: "rejected", reason: "legal retention of donation records" } }, {});
+    expect(completeDecision).toHaveBeenCalledWith(open, { outcome: "rejected", reason: "legal retention of donation records" }, repos);
+    expect(result.status).toBe("Closed");
   });
 });
