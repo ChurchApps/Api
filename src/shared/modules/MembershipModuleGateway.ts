@@ -27,6 +27,7 @@ export interface MembershipModuleGateway {
   loadGroupMembersForPerson(churchId: string, personId: string): Promise<{ groupId: string }[]>;
   loadGroupMemberPersonIds(churchId: string, groupId: string): Promise<string[]>;
   loadGroupLeaderPersonIds(churchId: string, groupId: string): Promise<string[]>;
+  loadPersonIdsWithPermission(churchId: string, contentType: string, action: string): Promise<string[]>;
   loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]>;
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string; timeZone?: string } | null>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string; discussionsEnabled?: boolean | number; announcementsEnabled?: boolean | number } | null>;
@@ -175,6 +176,21 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .where("leader", "=", 1)
       .execute()) as { personId: string }[];
     return rows.map((r) => r.personId).filter((id) => !!id);
+  }
+
+  public async loadPersonIdsWithPermission(churchId: string, contentType: string, action: string): Promise<string[]> {
+    const result = await sql<{ id: string }>`
+      SELECT DISTINCT p.id
+      FROM roleMembers rm
+      INNER JOIN roles r ON r.id = rm.roleId
+      INNER JOIN rolePermissions rp ON (rp.roleId = r.id OR (rp.roleId IS NULL AND rp.churchId = rm.churchId))
+      INNER JOIN userChurches uc ON uc.userId = rm.userId AND uc.churchId = r.churchId
+      INNER JOIN people p ON p.id = uc.personId AND p.churchId = uc.churchId AND (p.removed = 0 OR p.removed IS NULL)
+      WHERE r.churchId = ${churchId}
+        AND rp.contentType = ${contentType}
+        AND rp.action = ${action}
+    `.execute(this.getDb());
+    return result.rows.map((r) => r.id).filter((id) => !!id);
   }
 
   public async loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]> {
