@@ -185,6 +185,14 @@ export class TaskRepo {
       .execute();
   }
 
+  public async loadOpenByTaskType(churchId: string, taskType: string) {
+    return getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("taskType", "=", taskType)
+      .where("status", "=", "Open")
+      .execute();
+  }
+
   public async loadForAccountDeletion(churchId: string, personId: string) {
     return getDb().selectFrom("tasks").selectAll()
       .where("taskType", "=", "accountDeletion")
