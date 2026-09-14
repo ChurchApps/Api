@@ -3896,6 +3896,7 @@ __metadata:
     express: "npm:^4.21.2"
     express-fileupload: "npm:^1.5.1"
     express-validator: "npm:^7.2.1"
+    fast-xml-parser: "npm:^5.7.3"
     ics: "npm:^3.8.1"
     inversify: "npm:^6.2.2"
     inversify-binding-decorators: "npm:^4.0.0"
@@ -6577,7 +6578,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fast-xml-parser@npm:5.7.3":
+"fast-xml-parser@npm:5.7.3, fast-xml-parser@npm:^5.7.3":
   version: 5.7.3
   resolution: "fast-xml-parser@npm:5.7.3"
   dependencies:

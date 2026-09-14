@@ -74,6 +74,7 @@
     "express": "^4.21.2",
     "express-fileupload": "^1.5.1",
     "express-validator": "^7.2.1",
+    "fast-xml-parser": "^5.7.3",
     "ics": "^3.8.1",
     "inversify": "^6.2.2",
     "inversify-binding-decorators": "^4.0.0",

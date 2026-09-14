@@ -15,6 +15,7 @@ export { RedirectController } from "./RedirectController.js";
 
 // Media controllers
 export { SermonController } from "./SermonController.js";
+export { PodcastController } from "./PodcastController.js";
 export { PlaylistController } from "./PlaylistController.js";
 export { StreamingServiceController } from "./StreamingServiceController.js";
 

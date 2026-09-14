@@ -74,6 +74,7 @@ You'll need the user's \`churchId\` for the tree endpoint. Get it from \`GET /me
 ### Church-specific
 - \`logo\` — \`{ url:"https://..." }\` (link the logo points at).
 - \`sermons\` — Sermon list. \`{ layout:"browse"|"grid"|"list"|"featuredLatest", playlistId?, itemCount:6, showTitles:"true", showDates:"true" }\`. \`browse\` (default) is the interactive playlist browser; \`grid\`/\`list\` render a flat set (respect \`itemCount\`/\`playlistId\`); \`featuredLatest\` is a single hero for the newest sermon.
+- \`podcast\` — Episode list pulled live from an external podcast RSS feed (Apple/Spotify-style feed URL the church already publishes elsewhere; separate from \`sermons\`). \`{ feedUrl:"https://example.com/feed.xml", itemCount:10, showDates:"true", showDescriptions:"true" }\`. Renders title, date, description and an audio player per episode.
 - \`stream\` — \`{ mode:"video"|"interaction", offlineContent:"countdown"|"hide"|"block", targetBlockId? }\`.
 - \`donation\` — Donation form.
 - \`donateLink\` — Simple donate button.
