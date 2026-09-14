@@ -21,6 +21,12 @@ async function run() {
     const contentRepos = await RepoManager.getRepos<any>("content");
     await contentRepos.streamingService.advanceRecurringServices();
 
+    console.log("Reminding staff of pending account deletion requests...");
+    const doingRepos = await RepoManager.getRepos<any>("doing");
+    const { AccountDeletionHelper } = await import("../src/modules/doing/helpers/AccountDeletionHelper");
+    const deletionReminders = await AccountDeletionHelper.remindPending(doingRepos);
+    console.log("accountDeletion reminders:", JSON.stringify(deletionReminders));
+
     console.log("Processing daily email notifications...");
     const result = await NotificationHelper.sendEmailNotifications("daily");
     console.log("sendEmailNotifications result:", JSON.stringify(result));
