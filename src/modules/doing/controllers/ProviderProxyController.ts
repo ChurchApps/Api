@@ -18,7 +18,7 @@ interface ProxyRequestBody {
 interface Provider {
   readonly requiresAuth: boolean | (() => boolean);
   browse(path?: string | null, auth?: ContentProviderAuthData | null): Promise<unknown[]>;
-  getPresentations(path: string, auth?: ContentProviderAuthData | null): Promise<{ allFiles?: unknown[] } | null>;
+  getPresentations?(path: string, auth?: ContentProviderAuthData | null): Promise<{ allFiles?: unknown[] } | null>;
   getPlaylist?(path: string, auth?: ContentProviderAuthData | null, resolution?: number): Promise<unknown[] | null>;
   getInstructions?(path: string, auth?: ContentProviderAuthData | null): Promise<unknown | null>;
   getExpandedInstructions?(path: string, auth?: ContentProviderAuthData | null): Promise<unknown | null>;
@@ -104,7 +104,9 @@ export class ProviderProxyController extends DoingBaseController {
   private getProviderOrError(providerId: string): Provider {
     const provider = getProvider(providerId) as unknown as Provider | null;
     if (!provider) {
-      throw new Error(`Unknown provider: ${providerId}`);
+      const err: any = new Error(`Unknown provider: ${providerId}`);
+      err.status = 400;
+      throw err;
     }
     return provider;
   }
@@ -124,6 +126,7 @@ export class ProviderProxyController extends DoingBaseController {
       const auth = providerRequiresAuth(provider)
         ? await this.getAuthForProvider(au.churchId, ministryId, providerId)
         : null;
+      if (providerRequiresAuth(provider) && !auth) return this.json({ error: "Provider not connected" }, 400);
 
       return await provider.browse(path || null, auth);
     });
@@ -141,9 +144,11 @@ export class ProviderProxyController extends DoingBaseController {
       }
 
       const provider = this.getProviderOrError(providerId);
+      if (typeof provider.getPresentations !== "function") return this.json({ error: "Provider does not support presentations" }, 400);
       const auth = providerRequiresAuth(provider)
         ? await this.getAuthForProvider(au.churchId, ministryId, providerId)
         : null;
+      if (providerRequiresAuth(provider) && !auth) return this.json({ error: "Provider not connected" }, 400);
 
       return await provider.getPresentations(path, auth);
     });
@@ -164,12 +169,13 @@ export class ProviderProxyController extends DoingBaseController {
       const auth = providerRequiresAuth(provider)
         ? await this.getAuthForProvider(au.churchId, ministryId, providerId)
         : null;
+      if (providerRequiresAuth(provider) && !auth) return this.json({ error: "Provider not connected" }, 400);
 
       if (provider.getPlaylist) {
         return await provider.getPlaylist(path, auth, resolution);
       }
 
-      // Fallback: get presentations and extract files
+      if (typeof provider.getPresentations !== "function") return this.json({ error: "Provider does not support presentations" }, 400);
       const presentations = await provider.getPresentations(path, auth);
       return presentations?.allFiles || [];
     });
@@ -190,6 +196,7 @@ export class ProviderProxyController extends DoingBaseController {
       const auth = providerRequiresAuth(provider)
         ? await this.getAuthForProvider(au.churchId, ministryId, providerId)
         : null;
+      if (providerRequiresAuth(provider) && !auth) return this.json({ error: "Provider not connected" }, 400);
 
       if (provider.getInstructions) {
         return await provider.getInstructions(path, auth);
@@ -214,6 +221,7 @@ export class ProviderProxyController extends DoingBaseController {
       const auth = providerRequiresAuth(provider)
         ? await this.getAuthForProvider(au.churchId, ministryId, providerId)
         : null;
+      if (providerRequiresAuth(provider) && !auth) return this.json({ error: "Provider not connected" }, 400);
 
       if (provider.getExpandedInstructions) {
         return await provider.getExpandedInstructions(path, auth);

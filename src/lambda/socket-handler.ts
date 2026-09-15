@@ -121,9 +121,11 @@ async function handleMessage(event: APIGatewayProxyEvent, _context: Context): Pr
 
       await apiGwClient.send(command);
       console.log(`Successfully sent socketId response to connection ${connectionId}`);
-    } catch (e) {
-      console.error(`Failed to send socketId response to connection ${connectionId}:`, e);
-      await logMessage(e instanceof Error ? e.message : String(e));
+    } catch (e: any) {
+      if (e?.name !== "GoneException" && e?.$metadata?.httpStatusCode !== 410) {
+        console.error(`Failed to send socketId response to connection ${connectionId}:`, e);
+        await logMessage(e instanceof Error ? e.message : String(e));
+      }
     }
 
     console.log(`Message processed for ${connectionId}`);

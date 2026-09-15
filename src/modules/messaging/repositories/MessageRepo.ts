@@ -3,6 +3,7 @@ import { injectable } from "inversify";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Message } from "../models/index.js";
+import { retryOnDeadlock } from "../../../shared/helpers/retryOnDeadlock.js";
 
 @injectable()
 export class MessageRepo {
@@ -12,7 +13,7 @@ export class MessageRepo {
 
   private async create(model: Message): Promise<Message> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("messages").values({
+    await retryOnDeadlock(() => getDb().insertInto("messages").values({
       id: model.id,
       churchId: model.churchId,
       conversationId: model.conversationId,
@@ -21,7 +22,7 @@ export class MessageRepo {
       messageType: model.messageType,
       content: model.content,
       timeSent: sql`NOW()`
-    }).execute();
+    }).execute());
     return model;
   }
 

@@ -129,14 +129,15 @@ export class DeliveryHelper {
       if (e.name === "GoneException" || e.$metadata?.httpStatusCode === 410) {
         return false;
       }
-      console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, {
-        name: e.name,
-        message: e.message,
-        code: e.code,
-        statusCode: e.$metadata?.httpStatusCode,
-        connectionId: connection.socketId,
-        endpoint: DeliveryHelper.awsEndpoint
-      });
+      if (e.message !== "WebSocket delivery timeout") {
+        console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, {
+          name: e.name,
+          message: e.message,
+          code: e.code,
+          statusCode: e.$metadata?.httpStatusCode,
+          connectionId: connection.socketId
+        });
+      }
       return false;
     }
   };

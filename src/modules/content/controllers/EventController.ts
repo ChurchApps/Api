@@ -25,7 +25,7 @@ export class EventController extends ContentBaseController {
   public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
-      return await this.repos.event.loadTimeline(au.churchId, au.groupIds, eventIds);
+      return await this.repos.event.loadTimeline(au.churchId, au.groupIds || [], eventIds);
     });
   }
 

@@ -949,10 +949,8 @@ export class NotificationHelper {
   };
 
   static sendEmailNotification = async (email: string, notifications: Notification[], senderEmail?: string) => {
-    if (!email || typeof email !== "string" || !email.includes("@")) {
-      console.error("[NotificationHelper.sendEmailNotification] Invalid email address: " + email + ", skipping send");
-      return;
-    }
+    const addresses = (email || "").split(/[;,\s]+/).map((s) => s.trim()).filter((s) => s.includes("@"));
+    if (addresses.length === 0) return;
 
     const notifCount = notifications?.length || 0;
     if (notifCount === 0) return;
@@ -964,7 +962,6 @@ export class NotificationHelper {
 
     if (notifCount === 1) {
       if (firstNotification.contentType === "privateMessage") {
-        // DM digest — the row message already reads "New Message from {name}".
         title = firstNotification.message;
         content = firstNotification.message;
       } else if (firstNotification.message.includes("Volunteer Requests:")) {
@@ -983,13 +980,15 @@ export class NotificationHelper {
       title = notifCount + (allDms ? " New Message" : " New Notification") + "s";
     }
 
+    title = (title || "").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
     const replyTo = senderEmail || undefined;
 
     let emailSuccess = true;
     let emailError: string | undefined;
     try {
-      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html", replyTo);
-      console.log("[NotificationHelper.sendEmailNotification] Email sent successfully to " + email);
+      for (const address of addresses) {
+        await EmailHelper.sendTemplatedEmail("support@churchapps.org", address, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html", replyTo);
+      }
     } catch (error) {
       emailSuccess = false;
       emailError = String(error);

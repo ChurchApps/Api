@@ -287,12 +287,12 @@ export class YouVersionHelper {
       const resp = await axios.get(url, { headers: { "X-YVP-App-Key": Environment.youVersionApiKey } });
       return resp.data;
     } catch (error: any) {
-      if (error.response) {
+      if (error.response?.status) {
+        error.status = error.response.status;
         if (error.response.status === 429) {
           const retryAfter = parseInt(error.response.headers?.["retry-after"], 10) || 300;
           this.blockedUntil = Date.now() + retryAfter * 1000;
         }
-        console.log("YouVersion API error response:", JSON.stringify(error.response.data));
       }
       throw error;
     }

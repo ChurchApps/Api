@@ -68,7 +68,11 @@ export class BibleVerseTextRepo {
   public async loadRange(translationKey: string, startVerseKey: string, endVerseKey: string) {
     const startParts = startVerseKey.split(".");
     const endParts = endVerseKey.split(".");
-    if (startParts.length !== 3 || endParts.length !== 3) throw new Error("Invalid verse key format");
+    if (startParts.length !== 3 || endParts.length !== 3) {
+      const err: any = new Error("Invalid verse key format");
+      err.status = 400;
+      throw err;
+    }
     const startChapter = parseInt(startParts[1], 0);
     const endChapter = parseInt(endParts[1], 0);
     const startVerse = parseInt(startParts[2], 0);

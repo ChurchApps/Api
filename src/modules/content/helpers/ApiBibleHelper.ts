@@ -114,8 +114,10 @@ export class ApiBibleHelper {
     const url = this.baseUrl + "/bibles/" + translationKey + "/verses/" + startVerseKey + "-" + endVerseKey + "?content-type=json&include-titles=false&include-verse-numbers=false";
     const data = await this.getContent(url);
     const result: BibleVerseText[] = [];
-    data.data.content.forEach((c: any) => {
-      c.items.forEach((i: any, idx: number) => {
+    const content = data?.data?.content;
+    if (!Array.isArray(content)) return result;
+    content.forEach((c: any) => {
+      (c.items || []).forEach((i: any, idx: number) => {
         this.parseVerseItem(i, c, idx, result, translationKey);
       });
     });
@@ -154,8 +156,12 @@ export class ApiBibleHelper {
   }
 
   static async getContent(url: string) {
-    const resp = await axios.get(url, { headers: { "api-key": Environment.apiBibleKey } });
-    const json: any = resp.data;
-    return json;
+    try {
+      const resp = await axios.get(url, { headers: { "api-key": Environment.apiBibleKey } });
+      return resp.data;
+    } catch (error: any) {
+      if (error.response?.status) error.status = error.response.status;
+      throw error;
+    }
   }
 }

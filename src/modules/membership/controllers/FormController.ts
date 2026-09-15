@@ -28,7 +28,8 @@ export class FormController extends MembershipBaseController {
   public async getStandAlone(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       // authz-exempt: churchId identifies the embeddable public form's owner church
-      const churchId = req?.query?.churchId.toString();
+      const churchId = req?.query?.churchId?.toString();
+      if (!churchId) return this.json({ error: "churchId is required" }, 400);
       const form = this.repos.form.convertToModel("", await this.repos.form.load(churchId, id));
       if (form.contentType !== "form" || (!au.id && form.restricted)) return this.json({ restricted: true }, 401);
       else return form;

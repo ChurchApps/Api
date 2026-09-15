@@ -123,7 +123,7 @@ export class DomainController extends MembershipBaseController {
         try {
           await CaddyHelper.updateCaddy();
         } catch (e) {
-          console.error("Edge domain sync failed (non-fatal):", e);
+          console.warn("Edge domain sync failed (non-fatal):", e);
         }
         return result;
       }
@@ -138,7 +138,7 @@ export class DomainController extends MembershipBaseController {
       try {
         await CaddyHelper.updateCaddy();
       } catch (e) {
-        console.error("Edge domain sync failed (non-fatal):", e);
+        console.warn("Edge domain sync failed (non-fatal):", e);
       }
       return {};
     });

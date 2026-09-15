@@ -317,7 +317,10 @@ export class StripeHelper {
   static async logEvent(churchId: string, stripeEvent: any, eventData: any, givingRepos: any) {
     const { billing_reason, status, failure_message, outcome, created, customer } = eventData;
     let message = billing_reason + " " + status;
-    if (!billing_reason) message = failure_message ? failure_message + " " + outcome.seller_message : outcome.seller_message;
+    if (!billing_reason) {
+      const sellerMessage = outcome?.seller_message || "";
+      message = failure_message ? (sellerMessage ? `${failure_message} ${sellerMessage}` : failure_message) : (sellerMessage || status || "unknown");
+    }
     const eventLog: EventLog = {
       id: "", // Let the repository create() method generate the ID
       churchId,

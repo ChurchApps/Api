@@ -10,6 +10,7 @@ import bodyParser from "body-parser";
 import fileUpload from "express-fileupload";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
 import { isPublicDiskFilePath } from "./modules/content/helpers/PublicFileAccess.js";
+import { statusFromError } from "./shared/helpers/httpError.js";
 
 export const createApp = async () => {
   const environment = process.env.ENVIRONMENT || "dev";
@@ -136,14 +137,20 @@ export const createApp = async () => {
 
   server.setErrorConfig((app) => {
     app.use((error: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      console.error("Global error handler:", error);
-
-      const statusCode = error.statusCode || error.status || 500;
-      const message = error.message || "Internal Server Error";
+      const statusCode = statusFromError(error);
+      if (statusCode >= 500) {
+        console.error("Unhandled error:", {
+          status: statusCode,
+          message: error?.message || String(error),
+          path: req.path,
+          code: error?.code,
+          stack: error?.stack
+        });
+      }
 
       res.status(statusCode).json({
         error: {
-          message,
+          message: error?.message || "Internal Server Error",
           status: statusCode,
           timestamp: new Date().toISOString(),
           path: req.path
