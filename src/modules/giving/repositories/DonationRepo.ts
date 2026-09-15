@@ -101,10 +101,12 @@ export class DonationRepo {
   }
 
   public async loadByPersonId(churchId: string, personId: string) {
+    // LEFT JOIN, not INNER: a donation whose fund allocation was never written still
+    // belongs in the donor's history. An INNER JOIN silently dropped those rows.
     const result = await sql<any>`
       SELECT d.*, f.id as fundId, IFNULL(f.name, 'Unkown') as fundName, fd.amount as fundAmount
       FROM donations d
-      INNER JOIN fundDonations fd on fd.donationId = d.id
+      LEFT JOIN fundDonations fd on fd.donationId = d.id
       LEFT JOIN funds f on f.id = fd.fundId
       WHERE d.churchId = ${churchId} AND d.personId = ${personId} AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)
       ORDER BY d.donationDate DESC`.execute(getDb());
