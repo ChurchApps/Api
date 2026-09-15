@@ -508,9 +508,7 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
       deliveryLog: { save: jest.fn(async () => ({})) }
     } as any;
     NotificationHelper.init(repos);
-    const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([
-      { id: "PER_B", email: "a@example.com; b@example.com" }
-    ] as any);
+    const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([{ id: "PER_B", email: "a@example.com; b@example.com" }] as any);
 
     await NotificationHelper.sendEmailNotifications("individual");
 
