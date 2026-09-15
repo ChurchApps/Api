@@ -24,7 +24,7 @@ jest.mock("@churchapps/apihelper", () => {
 jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { fileStore: "disk", contentRoot: CONTENT_ROOT, jwtSecret: "test-secret" } }));
 
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
-import { findByBase, idFromFolder, packageDirFrom, packageDirOf, packageFolder, packageKey, packagePath, relativeName, slugify, songPackageDir } from "../helpers/PackageLayout.js";
+import { findByBase, idFromFolder, packageDirFrom, packageDirOf, packageFolder, packageKey, packagePath, packageRole, relativeName, slugify, songPackageDir } from "../helpers/PackageLayout.js";
 import { isPublicDiskFilePath } from "../../content/helpers/PublicFileAccess.js";
 
 const asset = { id: "testasst001", assetType: "song" };
@@ -102,6 +102,17 @@ describe("storage keys", () => {
     expect(ContentLibraryHelper.role("sources/tune.abc")).toBe("abc");
     expect(ContentLibraryHelper.role("masters/song.json")).toBe("song");
     expect(ContentLibraryHelper.role("manifest.json")).toBe("manifest");
+  });
+
+  it("a harvested writer recording named song.mp3 is the demo, not the package record", () => {
+    expect(packageRole("sources/master/song.mp3")).toBe("demoAudio");
+    expect(packageRole("masters/song.json")).toBe("song");
+    const urls = ContentLibraryHelper.fileUrls(asset, [
+      { name: "songs/en/x-testasst001/sources/master/song.mp3" },
+      { name: "songs/en/x-testasst001/masters/song.json" }
+    ]);
+    expect(urls.demoAudio).toMatch(/\/sources\/master\/song\.mp3$/);
+    expect(urls.song).toMatch(/\/masters\/song\.json$/);
   });
 });
 

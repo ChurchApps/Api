@@ -116,6 +116,8 @@ export function baseName(name: string | null | undefined): string {
 /** The role of a live or pending file, whatever folder it sits in. */
 export function packageRole(name: string | null | undefined): string {
   const base = baseName(name);
+  // song.json owns "song"; a harvested writer recording named song.mp3 is the demo, not the package record
+  if (/^song\.(mp3|wav|m4a|ogg|flac)$/i.test(base)) return "demoAudio";
   return PACKAGE_ROLES[base] ?? fileRole(base);
 }
 
