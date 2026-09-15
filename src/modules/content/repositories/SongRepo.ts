@@ -43,7 +43,11 @@ export class SongRepo {
     return getDb().selectFrom("songs").selectAll().where("churchId", "=", churchId).orderBy("name").execute() as any;
   }
 
-  public async search(churchId: string, query: string) {
+  // Song pickers only ever render a short list, so cap the join to keep large
+  // libraries from paying for (and downloading) every matching arrangement key.
+  public static readonly searchLimit = 100;
+
+  public async search(churchId: string, query: string, limit: number = SongRepo.searchLimit) {
     const q = "%" + query.replace(/ /g, "%") + "%";
     return getDb().selectFrom("songs as s")
       .innerJoin("arrangements as a", "a.songId", "s.id")
@@ -56,6 +60,9 @@ export class SongRepo {
         eb(sql`concat(sd.title, ' ', sd.artist)`, "like", q),
         eb(sql`concat(sd.artist, ' ', sd.title)`, "like", q)
       ]))
+      .orderBy("sd.title")
+      .orderBy("sd.artist")
+      .limit(limit)
       .execute() as any;
   }
 
