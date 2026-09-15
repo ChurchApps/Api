@@ -13,6 +13,8 @@ export interface GivingModuleGateway {
   loadDonorPersonIds(churchId: string, fundId: string | null, startDate: Date, endDate: Date): Promise<string[]>;
   // First-time-donor detection: total donation rows for the person (the new one included).
   loadDonationCountForPerson(churchId: string, personId: string): Promise<number>;
+  // Command palette catalog: fund names only, never donation rows.
+  loadPalette(churchId: string): Promise<{ id: string; name: string }[]>;
 }
 
 class GivingModuleGatewayDb implements GivingModuleGateway {
@@ -88,6 +90,15 @@ class GivingModuleGatewayDb implements GivingModuleGateway {
     const ids = new Set<string>();
     (rows || []).forEach((r: any) => { if (r.personId) ids.add(r.personId); });
     return Array.from(ids);
+  }
+
+  public async loadPalette(churchId: string) {
+    const db = KyselyPool.getDb("giving") as any;
+    return db.selectFrom("funds").select(["id", "name"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", false)
+      .orderBy("name")
+      .execute();
   }
 }
 

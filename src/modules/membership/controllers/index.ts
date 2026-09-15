@@ -16,6 +16,7 @@ export { QuestionController } from "./QuestionController.js";
 export { AnswerController } from "./AnswerController.js";
 
 export { MembershipCampusController } from "./CampusController.js";
+export { PaletteController } from "./PaletteController.js";
 export { ChurchController } from "./ChurchController.js";
 export { DomainController } from "./DomainController.js";
 export { SiteController } from "./SiteController.js";

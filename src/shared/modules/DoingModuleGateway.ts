@@ -16,6 +16,8 @@ export interface DoingModuleGateway {
   // Rich serving-reminder email bodies per person (positions, notes, Accept/Decline
   // token buttons) for the messaging reminder engine's immediate-email path.
   buildPlanReminderEmails(churchId: string, planId: string, personIds: string[], customMessage?: string): Promise<Record<string, { subject: string; html: string }>>;
+  // Command palette catalog: names only.
+  loadPalette(churchId: string): Promise<{ id: string; name: string }[]>;
 }
 
 class DoingModuleGatewayDb implements DoingModuleGateway {
@@ -69,6 +71,14 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
     // Dynamic import keeps the doing email/token deps out of this module's load graph.
     const { PlanReminderEmailHelper } = await import("../../modules/doing/helpers/PlanReminderEmailHelper.js");
     return PlanReminderEmailHelper.build(churchId, planId, personIds, customMessage);
+  }
+
+  public async loadPalette(churchId: string) {
+    const { KyselyPool } = await import("../infrastructure/KyselyPool.js");
+    return KyselyPool.getDb<any>("doing").selectFrom("plans").select(["id", "name"])
+      .where("churchId", "=", churchId)
+      .orderBy("serviceDate", "desc")
+      .execute();
   }
 }
 
