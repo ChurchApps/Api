@@ -100,7 +100,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/recent")
   public async getRecent(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
         const data = (await this.repos.person.loadRecent(au.churchId, filterOptedOut)) as any[];
@@ -113,7 +113,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/list")
   public async getList(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         const pageSize = req.query.pageSize ? Math.max(parseInt(req.query.pageSize as string, 10) || 0, 0) : 0;
         const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
@@ -232,7 +232,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/search/phone")
   public async searchPhone(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         const phoneNumber: string = req.query.number.toString();
         const data = (await this.repos.person.searchPhone(au.churchId, phoneNumber)) as any[];
@@ -245,7 +245,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/search/group")
   public async searchGroup(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         let data: any[] = [];
         const members = (await this.repos.groupMember.loadForGroup(au.churchId, req.query.groupId.toString())) as any[];
@@ -263,7 +263,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         let data = null;
         const email: string = req.query.email?.toString();
@@ -298,7 +298,7 @@ export class PersonController extends MembershipBaseController {
   public async getDirectoryPeople(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (au.personId !== id && !au.checkAccess(Permissions.people.view)) {
-        if (!(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+        if (!(await this.canViewDirectory(au))) return this.json({}, 401);
         if (id === "all") {
           const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
           const data = (await this.repos.person.loadMembersByVisibility(au.churchId, directoryVisibility)) as any[];
@@ -326,7 +326,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/ids")
   public async getMultiple(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         const idList = req.query.ids.toString().split(",");
         const ids: string[] = [];
@@ -343,7 +343,7 @@ export class PersonController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const isSelf = au.personId === id;
       const canView = au.checkAccess(Permissions.people.view);
-      if (!isSelf && !canView && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!isSelf && !canView && !(await this.canViewDirectory(au))) return this.json({}, 401);
       const data = await this.repos.person.load(au.churchId, id);
       if (!data) return null;
       if (!isSelf && !canView) {
@@ -360,7 +360,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         let data: any[];
         if (au.checkAccess(Permissions.people.view)) {
@@ -379,7 +379,7 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/search")
   public async searchPost(req: express.Request<{}, {}, { email?: string; term?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         let data = null;
         const email: string = req.body.email?.toString();
@@ -398,7 +398,7 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/duplicates")
   public async duplicates(req: express.Request<{}, {}, { email?: string; phone?: string; firstName?: string; lastName?: string; birthDate?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         const { email, phone, firstName, lastName, birthDate } = req.body || {};
         const data = await this.repos.person.findPossibleDuplicates(au.churchId, { email, phone, firstName, lastName, birthDate: birthDate ? new Date(birthDate) : undefined });
@@ -411,7 +411,7 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/advancedSearch")
   public async advancedSearch(req: express.Request<{}, {}, SearchCondition[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.isMember(au.membershipStatus))) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         let data: any[] = (await this.repos.person.loadAll(au.churchId)) as any[];
         const conditions = req.body ?? [];
@@ -637,9 +637,10 @@ export class PersonController extends MembershipBaseController {
     return enabled;
   }
 
-  private async isMember(membershipStatus: string): Promise<boolean> {
-    // const person = await this.repos.person.load(churchId, personId);
-    if (membershipStatus === "Member" || membershipStatus === "Staff") return true;
-    return false;
+  // The directory gate follows the church's configured directoryVisibility tier
+  // (Staff / Members / Regular Attendees / Everyone), not a fixed Member-or-Staff check.
+  private async canViewDirectory(au: AuthenticatedUser): Promise<boolean> {
+    const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
+    return this.shouldShowInDirectory(au.membershipStatus, directoryVisibility);
   }
 }
