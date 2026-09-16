@@ -39,7 +39,15 @@ export const LANG_CODES: Record<string, string> = {
   Albanian: "sq",
   Hungarian: "hu",
   Zulu: "zu",
-  Swedish: "sv"
+  Swedish: "sv",
+  Dutch: "nl",
+  Italian: "it",
+  Chinese: "zh",
+  Afrikaans: "af",
+  Maltese: "mt",
+  Romanian: "ro",
+  Slovak: "sk",
+  Finnish: "fi"
 };
 
 /** song.json "license" id → the songs/<lang>/<section>/ folder (licenses/licenses.json). */
