@@ -73,7 +73,7 @@ async function main() {
 
     if (update) {
       const SONG_UPDATE = [
-        "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "proAnswer", "certified",
+        "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "ccli", "proAnswer", "certified",
         // package model (2026-09-07): catalog-derived only — the listen-gate columns are never overwritten from the repo
         "confidence", "firstLine", "hasChords", "rights", "form", "singTimeSeconds", "scoreSource", "publishedKeys"
       ] as const;

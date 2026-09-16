@@ -18,6 +18,8 @@ export interface Song {
   licenseVersion?: string;
   /** canonical URL of that exact license — a CC BY 3.0 song must not silently read as 4.0 */
   licenseUrl?: string;
+  /** CCLI song id when the writer listed one. Not a requirement to report. */
+  ccli?: string | null;
   proAnswer?: string;
   certified?: boolean;
   qualityScore?: number;

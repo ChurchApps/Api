@@ -20,14 +20,14 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 // under the commons prefix.
 
 const SONG_COLS = [
-  "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "proAnswer", "certified", "confidence"
+  "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "ccli", "proAnswer", "certified", "confidence"
 ];
 const FILE_COLS = ["artUrl", "midiUrl", "lyricsUrl", "abcUrl", "demoAudioUrl", "sheetPdfUrl", "stemsZipUrl"];
 const DETAIL_COLS = ["year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"];
 // masters/song.json fields the songs/assets rows read, and the column each one fills
 const SONG_JSON_FIELDS: Record<string, string> = {
   title: "title", writer: "writer", year: "year", themes: "themes", key: "songKey", bpm: "bpm", timeSignature: "timeSignature", meter: "meter", language: "language", scripture: "scripture", scriptureText: "scriptureText",
-  license: "license", licenseVersion: "licenseVersion", licenseUrl: "licenseUrl", proAnswer: "proAnswer", certified: "certified", submittedBy: "submittedBy", status: "status", relationLabel: "relationLabel", parentSongId: "parentSongId"
+  license: "license", licenseVersion: "licenseVersion", licenseUrl: "licenseUrl", ccli: "ccli", proAnswer: "proAnswer", certified: "certified", submittedBy: "submittedBy", status: "status", relationLabel: "relationLabel", parentSongId: "parentSongId"
 };
 // served masters registered as live files. song.json is registered so every seeded song has a live file inside
 // its own package (a publish reads the frozen package dir from it — a translation may otherwise only hold files

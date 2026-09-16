@@ -57,7 +57,7 @@ export class RightsHelper {
   static ccliReport(layers: (RightsLayer | null | undefined)[], fallbackLicense?: string): boolean {
     const ids = this.licenses(layers, fallbackLicense);
     if (!ids.length) return true;
-    return !ids.every((l) => FREE.test(l));
+    return !ids.every((l) => FREE.test(l) || l === "larry-holder");
   }
 
   /** The one-line notice printed under a chart when the package has no attribution.txt. */

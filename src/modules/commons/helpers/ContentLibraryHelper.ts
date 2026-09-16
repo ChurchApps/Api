@@ -115,6 +115,7 @@ export class ContentLibraryHelper {
       license: song.license,
       licenseVersion: song.licenseVersion ?? undefined,
       licenseUrl: song.licenseUrl ?? undefined,
+      ccli: song.ccli ?? undefined,
       hymnalCount: song.hymnalCount ?? 0,
       status: SONG_JSON_STATUS[song.status || ""] || "approved",
       submittedBy: song.submittedBy,

@@ -94,6 +94,7 @@ describe("RightsHelper.ccliReport", () => {
     expect(RightsHelper.ccliReport([{ license: "CC0" }, { license: "WC" }])).toBe(false);
     expect(RightsHelper.ccliReport([{ license: "PD" }, { license: "ASCAP" }])).toBe(true);
     expect(RightsHelper.ccliReport([], "CC-BY")).toBe(false);
+    expect(RightsHelper.ccliReport([], "larry-holder")).toBe(false);
     expect(RightsHelper.ccliReport([], "Unknown")).toBe(true);
     expect(RightsHelper.ccliReport([])).toBe(true);
   });
