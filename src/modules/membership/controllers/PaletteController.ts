@@ -9,36 +9,88 @@ import { getGivingModuleGateway } from "../../../shared/modules/GivingModuleGate
 
 export interface PaletteItem { n: string; a?: string[]; t: "do" | "person" | "group" | "plan" | "fund" | "jump"; u: string }
 
-interface Access { people: boolean; peopleEdit: boolean; giving: boolean; attendance: boolean; content: boolean; sermons: boolean; settings: boolean; roles: boolean; forms: boolean; plans: boolean }
+interface Access {
+  people: boolean; peopleEdit: boolean; giving: boolean; givingView: boolean; givingEdit: boolean; attendance: boolean; content: boolean;
+  sermons: boolean; settings: boolean; roles: boolean; forms: boolean; plans: boolean; serverAdmin: boolean
+}
 
-// Same gates as B1Admin Header.tsx: if they cannot open it, it is not in the payload.
+const jump = (n: string, u: string, a?: string[]): PaletteItem => (a ? { n, a, t: "jump", u } : { n, t: "jump", u });
+
+// Same gates as B1Admin Header.tsx / SecondaryMenuHelper.ts: if they cannot open it, it is not in the payload.
 export const staticItems = (c: Access): PaletteItem[] => {
   const items: PaletteItem[] = [];
   if (c.peopleEdit) items.push({ n: "Add a person", a: ["new person", "new household", "create person"], t: "do", u: "#addPerson" });
-  if (c.settings) items.push({ n: "Start check-in", a: ["kiosk"], t: "do", u: "/mobile/checkin" });
-  items.push({ n: "Sunday", a: ["home", "dashboard", "this week", "bulletin"], t: "jump", u: "/" });
-  if (c.people) items.push({ n: "People", a: ["directory", "members", "congregation", "households"], t: "jump", u: "/people" });
-  items.push({ n: "Groups", a: ["classes", "teams", "small groups"], t: "jump", u: "/groups" });
-  if (c.giving) items.push({ n: "Donations", a: ["giving", "gifts", "tithes", "money", "batches"], t: "jump", u: "/donations" });
-  if (c.plans) {
-    items.push({
-      n: "Plans",
-      a: [
-        "serving", "service order", "volunteer scheduling", "rotations", "teams", "schedule", "freeshow", "freeplay"
-      ],
-      t: "jump",
-      u: "/serving/plans"
-    });
+  if (c.settings) items.push({ n: "Start check-in", a: ["kiosk", "b1 check-in", "checkin app"], t: "do", u: "/mobile/checkin" });
+  items.push(jump("Sunday", "/", ["home", "dashboard", "this week", "bulletin"]));
+  if (c.people) {
+    items.push(jump("People", "/people", ["directory", "members", "congregation", "households"]));
+    items.push(jump("Demographics", "/people/demographics", ["people stats", "age", "gender"]));
+    items.push(jump("Print directory", "/people/print-directory", ["directory pdf"]));
   }
-  items.push({ n: "My Work", a: ["tasks", "assignments"], t: "jump", u: "/serving/tasks" });
-  if (c.attendance) items.push({ n: "Attendance", a: ["check-in", "who's here", "rooms"], t: "jump", u: "/attendance" });
-  if (c.content) items.push({ n: "Site", a: ["website", "pages", "web"], t: "jump", u: "/site/pages" });
-  if (c.sermons) items.push({ n: "Sermons", a: ["streaming", "livestream", "video"], t: "jump", u: "/sermons" });
-  if (c.content) items.push({ n: "Calendars", a: ["events", "rooms"], t: "jump", u: "/calendars" });
-  if (c.forms) items.push({ n: "Forms", a: ["registration forms"], t: "jump", u: "/forms" });
-  if (c.settings) items.push({ n: "Settings", a: ["roles", "users", "appearance"], t: "jump", u: "/settings" });
-  else if (c.roles) items.push({ n: "Settings", a: ["roles", "users"], t: "jump", u: "/settings/roles" });
-  if (c.content || c.settings) items.push({ n: "Mobile", a: ["app", "kiosk", "check-in app"], t: "jump", u: "/mobile" });
+  items.push(jump("Groups", "/groups", ["classes", "teams", "small groups"]));
+  items.push(jump("Pending group requests", "/groups/pending", ["join requests", "group requests"]));
+  items.push(jump("Group health", "/groups/health", ["group stats", "group attendance"]));
+  if (c.giving) {
+    items.push(jump("Donations", "/donations", ["giving", "gifts", "tithes", "money", "summary"]));
+    items.push(jump("Batches", "/donations/batches", ["donation batches", "deposits"]));
+    items.push(jump("Funds", "/donations/funds", ["designations"]));
+    items.push(jump("Campaigns", "/donations/campaigns", ["pledges", "fundraising", "goals"]));
+    items.push(jump("Giving statements", "/donations/statements", ["tax statements", "year end", "contribution statements"]));
+  }
+  if (c.givingView) items.push(jump("Failed donations", "/donations/failed", ["declined", "failed payments"]));
+  if (c.givingEdit) items.push(jump("Stripe import", "/donations/stripe-import", ["import donations"]));
+  if (c.plans) {
+    items.push(jump("Plans", "/serving/plans", [
+      "serving", "service order", "volunteer scheduling", "rotations", "teams", "schedule", "freeshow", "freeplay"
+    ]));
+    items.push(jump("Songs", "/serving/songs", ["worship", "music", "arrangements", "praisecharts", "setlist"]));
+    items.push(jump("Serving overview", "/serving/overview", ["positions", "unfilled", "who's serving"]));
+  }
+  items.push(jump("My Work", "/serving/tasks", ["tasks", "assignments"]));
+  items.push(jump("Workflows", "/serving/tasks/workflows", ["automations", "pipelines", "kanban", "boards"]));
+  if (c.attendance) items.push(jump("Attendance", "/attendance", ["check-in", "who's here", "rooms", "services", "service times"]));
+  if (c.content) {
+    items.push(jump("Site", "/site/pages", ["website", "pages", "web"]));
+    items.push(jump("Blog", "/site/blog", ["blogs", "posts", "articles", "news"]));
+    items.push(jump("Blocks", "/site/blocks", ["reusable blocks", "sections", "footer", "header"]));
+    items.push(jump("Appearance", "/site/appearance", ["colors", "fonts", "logo", "theme", "branding"]));
+    items.push(jump("Files", "/site/files", ["uploads", "media", "images", "documents"]));
+    items.push(jump("Calendars", "/calendars", ["events", "rooms"]));
+    items.push(jump("Availability", "/calendars/availability", ["time off", "unavailable", "blackout dates"]));
+    items.push(jump("Rooms & resources", "/calendars/rooms", ["room booking", "equipment", "reservations"]));
+    items.push(jump("Approvals", "/calendars/approvals", ["event approvals", "pending events"]));
+    items.push(jump("Registrations", "/registrations", ["event registration", "sign ups", "rsvp", "tickets"]));
+    items.push(jump("App navigation", "/mobile/navigation", ["mobile menu", "app tabs", "app links"]));
+  }
+  if (c.sermons) {
+    items.push(jump("Sermons", "/sermons", ["streaming", "livestream", "video", "messages"]));
+    items.push(jump("Live stream times", "/sermons/times", ["stream schedule", "service stream"]));
+    items.push(jump("Bulk import sermons", "/sermons/bulk", ["youtube import", "vimeo import"]));
+  }
+  if (c.forms) items.push(jump("Forms", "/forms", ["registration forms", "surveys", "questionnaires"]));
+  if (c.settings) {
+    items.push(jump("Settings", "/settings", ["church settings", "church info", "general"]));
+    items.push(jump("Giving settings", "/settings#giving", ["stripe", "paypal", "payment provider", "processor"]));
+    items.push(jump("Texting settings", "/settings#texting", ["sms", "twilio", "text messages"]));
+    items.push(jump("Storage settings", "/settings#storage", ["s3", "google drive", "byos", "file storage"]));
+    items.push(jump("Domains", "/settings#domains", ["custom domain", "dns", "subdomain"]));
+    items.push(jump("Grade promotion", "/settings#grade-promotion", ["grades", "school year", "promote"]));
+    items.push(jump("Check-in settings", "/settings#check-ins", ["checkin options", "self check-in", "pin"]));
+    items.push(jump("Campuses", "/settings#campuses", ["locations", "sites"]));
+    items.push(jump("Custom fields", "/settings#custom-fields", ["person fields", "extra fields"]));
+    items.push(jump("Developer", "/settings#developer", ["webhooks", "api keys", "oauth", "integrations", "zapier"]));
+    items.push(jump("Email templates", "/settings/email-templates", ["emails", "templates"]));
+    items.push(jump("Audit log", "/settings/audit-log", ["history", "changes", "who changed", "undo"]));
+    items.push(jump("Batch jobs", "/settings/batches", ["bulk edits", "batch history"]));
+    items.push(jump("App theme", "/mobile/theme", ["mobile colors", "app colors", "app logo"]));
+    items.push(jump("B1 Mobile", "/mobile/b1-mobile", ["mobile app", "app store", "play store"]));
+    items.push(jump("Check-in labels", "/mobile/checkin/labels", ["name tags", "nametags", "label printer"]));
+  }
+  if (c.roles || c.settings) items.push(jump("Roles", "/settings/roles", ["users", "permissions", "access", "staff logins"]));
+  if (c.content || c.settings) items.push(jump("Mobile", "/mobile", ["app", "kiosk", "check-in app"]));
+  if (c.serverAdmin) items.push(jump("Server admin", "/admin", ["admin", "all churches", "reports"]));
+  items.push(jump("Profile", "/profile", ["my account", "password", "notifications"]));
+  items.push(jump("Devices", "/profile/devices", ["logged in devices", "sessions", "push"]));
   return items;
 };
 
@@ -77,13 +129,16 @@ export class PaletteController extends MembershipBaseController {
       people: can(Permissions.people.view),
       peopleEdit: can(Permissions.people.edit),
       giving: can(Permissions.donations.viewSummary),
+      givingView: can(Permissions.donations.view),
+      givingEdit: can(Permissions.donations.edit),
       attendance: can(Permissions.attendance.viewSummary),
       content: can(Permissions.content.edit),
       sermons: can(Permissions.streamingServices.edit),
       settings: can(Permissions.settings.edit),
       roles: can(Permissions.roles.view),
       forms: can(Permissions.forms.admin) || can(Permissions.forms.edit),
-      plans
+      plans,
+      serverAdmin: can(Permissions.server.admin)
     };
   }
 
