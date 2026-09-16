@@ -6,6 +6,11 @@ import { Setting } from "../models/index.js";
 @injectable()
 export class SettingRepo {
   public async save(model: Setting) {
+    if (!model.id) {
+      // Settings are one row per church + key; reuse it rather than adding a duplicate.
+      const existing = await getDb().selectFrom("settings").select("id").where("churchId", "=", model.churchId).where("keyName", "=", model.keyName).executeTakeFirst();
+      if (existing) model.id = existing.id;
+    }
     return model.id ? this.update(model) : this.create(model);
   }
 
