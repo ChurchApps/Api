@@ -80,7 +80,7 @@ async function seed(repoDir: string) {
     // `sync push`: assetFiles.name is the catalog key and the public URL is that key under the commons prefix
     for (const dir of ["writers", "songs", "works", "assets", "pending"]) fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
     let mirrored = 0;
-    for (const dir of ["songs", "works", "writers"]) {
+    for (const dir of ["songs", "writers"]) {
       const from = path.join(repoDir, dir);
       if (!fs.existsSync(from)) continue;
       fs.cpSync(from, path.join(CONTENT_DIR, dir), { recursive: true });

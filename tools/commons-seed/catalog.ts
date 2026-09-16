@@ -2,8 +2,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 
-// The content repo (WorshipCommonsContent) is a tree of packages: songs/<lang>/<license>/<slug>-<id>/ and
-// works/<slug>/, each with sources/ (came from somewhere else), masters/ (a person asserted it) and
+// The content repo (WorshipCommonsContent) is a tree of packages: songs/<lang>/<license>/<slug>-<id>/,
+// each with sources/ (came from somewhere else), masters/ (a person asserted it) and
 // derivatives/ (the pipeline built it). catalog.json at its root is THE index of those packages; nothing
 // discovers songs by listing folders.
 //
@@ -15,9 +15,10 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 // sources/video.json, derivatives/duration.json); the catalog row only supplies what the package lacks
 // (id, package paths, confidence, parentSongId, writer bio/portrait). Nothing is copied: the bucket holds
 // exactly the repo's layout under the commons prefix (the content repo's `sync push`), so assetFiles.name is
-// the catalog key itself ("songs/en/public-domain/amazing-grace-YxPfAFYWOaG/sources/tune.mid",
-// "works/amazing-grace/sources/tune.abc" for a file inherited from the work) and the public URL is that key
-// under the commons prefix.
+// the catalog key itself ("songs/en/public-domain/amazing-grace-YxPfAFYWOaG/sources/tune.mid"; a translation's
+// inherited file is keyed under its parent song's package) and the public URL is that key under the commons prefix.
+// The works/<slug>/ package (2026-08 … 2026-09-16) is gone from the repo; readPackage still honours workDir for
+// the fixture and any bucket that has not been resynced.
 
 const SONG_COLS = [
   "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "ccli", "proAnswer", "certified", "confidence"

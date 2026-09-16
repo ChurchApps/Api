@@ -10,7 +10,7 @@ import { AssetFile, SongView } from "../models/index.js";
 import { baseName, findByBase, isPackageKey, packageDirFrom, packageKey, packageRole } from "./PackageLayout.js";
 
 // Storage keys are derived from assetFiles.name, never stored twice. A song file's name is its catalog key
-// (songs/<lang>/<section>/<slug>-<id>/{sources,masters,derivatives}/<file>, or works/… for an inherited file) and
+// (songs/<lang>/<section>/<slug>-<id>/{sources,masters,derivatives}/<file>; an inherited file is keyed under the parent song) and
 // lives at commons/<name> — the same path the content repo holds, so `sync pull` picks it up unchanged. Names
 // without that prefix (rows from before the cut-over, and every non-song asset) still resolve to the id-keyed
 // folder commons/assets/{assetType}/{assetId}/{name}. Proposed objects sit under commons/pending/{submissionId}/
@@ -122,6 +122,9 @@ export class ContentLibraryHelper {
       proAnswer: song.proAnswer,
       certified: true,
       confidence: song.confidence ?? undefined,
+      // a translation names its parent so the content-repo export keeps the family (tools/lib.mjs parentOf)
+      parent: song.parentSongId ? { id: song.parentSongId } : undefined,
+      relationLabel: song.relationLabel ?? undefined,
       rights: parseJson(song.rights),
       form: parseJson(song.form),
       publishedKeys: parseJson(song.publishedKeys),

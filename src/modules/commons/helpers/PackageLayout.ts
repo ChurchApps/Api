@@ -4,7 +4,7 @@ import { fileRole } from "@churchapps/helpers";
 //   songs/<lang>/<license-section>/<slug>-<id>/{sources,masters,derivatives}/<file>
 // The bucket holds exactly the content repo's layout under the commons prefix, so a song's storage key is its
 // repo path. assetFiles.name stores that prefix-relative key ("songs/en/public-domain/amazing-grace-YxPfAFYWOaG/
-// sources/tune.mid", or "works/amazing-grace/sources/tune.abc" for a file inherited from the work). Rows seeded
+// sources/tune.mid"; a translation's inherited file is keyed under its parent song's package). Rows seeded
 // before the cut-over hold a package-relative name ("sources/tune.mid") and keep resolving to the old id-keyed
 // folder — see ContentLibraryHelper.liveKey. Roles are always decided by the basename, so the folder never
 // changes what a file is. Assets that are not songs keep their flat layout. Pure: no storage, no repos.
@@ -82,12 +82,12 @@ export function songPackageDir(asset: { id?: string; name?: string; language?: s
   return `songs/${langCode(asset.language)}/${licenseSection(asset.license)}/${packageFolder(asset.name, asset.id || "")}`;
 }
 
-/** True when `name` is a prefix-relative catalog key (songs/…, works/…, writers/…) rather than a folder-relative name. */
+/** True when `name` is a prefix-relative catalog key (songs/…, writers/…, or a legacy works/…) rather than a folder-relative name. */
 export function isPackageKey(name: string | null | undefined): boolean {
   return PACKAGE_KEY.test(name || "");
 }
 
-/** The song package a key belongs to ("songs/en/public-domain/amazing-grace-YxPfAFYWOaG"); null for works, writers and legacy names. */
+/** The song package a key belongs to ("songs/en/public-domain/amazing-grace-YxPfAFYWOaG"); null for writers and legacy names. */
 export function packageDirOf(name: string | null | undefined): string | null {
   const n = name || "";
   return n.startsWith("songs/") && PACKAGE_TAIL.test(n) ? n.replace(PACKAGE_TAIL, "") : null;
