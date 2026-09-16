@@ -628,8 +628,6 @@ export class DonateController extends GivingBaseController {
 
     const domain = Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
 
-    const title = `${church?.logo ? `<img src="${church.logo}" alt="Logo: " style="width: 100%" /> ` : ""}${church.name}`;
-
     const recurringDonationContent =
       `
       <h3 style="font-size: 20px;">Your recurring donation has been confirmed!</h3>
@@ -694,7 +692,7 @@ export class DonateController extends GivingBaseController {
 
     const contents = donationType === "recurring" ? recurringDonationContent : oneTimeDonationContent;
 
-    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, to, title, church.churchURL as string, "Thank You For Donating", contents, "ChurchEmailTemplate.html");
+    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, to, church.name as string, church.churchURL as string, "Thank You For Donating", contents, "ChurchEmailTemplate.html", undefined, church.logo || undefined);
   };
 
   private logDonation = async (donationData: Donation, fundData: FundDonation[]) => {

@@ -10,8 +10,9 @@ export class TransactionalEmailHelper {
     subject: string,
     contents: string,
     template?: "EmailTemplate.html" | "ChurchEmailTemplate.html",
-    replyTo?: string
+    replyTo?: string,
+    logoUrl?: string
   ): Promise<void> {
-    return EmailHelper.sendTemplatedEmail(from, to, appName, appUrl, subject, contents, template, replyTo);
+    return EmailHelper.sendTemplatedEmail(from, to, appName, appUrl, subject, contents, template, replyTo, logoUrl);
   }
 }
