@@ -13,7 +13,16 @@ import { Repos } from "../repositories/index.js";
 const MAX_LISTENED_KEYS = 12;
 const KEY_RE = /^[A-G][#b]?m?$/;
 
-const REJECT_REASONS = ["quality", "duplicate", "licensing", "ccli", "ai", "offtopic", "incomplete", "other"];
+const REJECT_REASONS = [
+  "quality",
+  "duplicate",
+  "licensing",
+  "ccli",
+  "ai",
+  "offtopic",
+  "incomplete",
+  "other"
+];
 const RESOLUTIONS = ["upheld", "dismissed", "duplicate"];
 const REMOVE_REASONS = ["copyright", "policy"];
 
