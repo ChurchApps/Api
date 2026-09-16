@@ -32,6 +32,8 @@ export class Environment extends EnvironmentBase {
   static worshipCommonsRoot: string;
   /** comma-separated user ids or emails allowed to review WorshipCommons submissions without Server/Admin */
   static commonsMusicEditors: string;
+  /** comma-separated userId:limit overrides of the default 20-song lifetime cap (0 = banned) */
+  static commonsSongLimits: string;
   static hubspotKey: string;
   static mauticUrl: string;
   static mauticUser: string;
@@ -232,6 +234,7 @@ export class Environment extends EnvironmentBase {
     this.b1AppRoot = process.env.B1APP_ROOT || config.b1AppRoot || "https://{subdomain}.b1.church";
     this.worshipCommonsRoot = process.env.WORSHIPCOMMONS_ROOT || config.worshipCommonsRoot || "";
     this.commonsMusicEditors = process.env.COMMONS_MUSIC_EDITORS || config.commonsMusicEditors || "";
+    this.commonsSongLimits = process.env.COMMONS_SONG_LIMITS || config.commonsSongLimits || "";
     this.mailSystem = process.env.MAIL_SYSTEM ?? config.mailSystem ?? "";
     EnvironmentBase.mailSystem = this.mailSystem;
 

@@ -1,12 +1,13 @@
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
+import { Environment } from "../../../shared/helpers/index.js";
 import { ASSET_TYPES } from "./AssetTypes.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { MusicHelper } from "./MusicHelper.js";
 import { findByBase, packageRole } from "./PackageLayout.js";
 import { QualityHelper } from "./QualityHelper.js";
-import { isUploadableName, MAX_PENDING_PER_USER, MAX_SUBMITTED_PER_DAY, normalizeTags, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
+import { isUploadableName, MAX_PENDING_PER_USER, NEW_PACKAGE_TYPES, normalizeTags, songLimitFor, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
 
 export interface Actor { id?: string; churchId?: string; }
 export type Outcome<T> = { ok: true; value: T } | { ok: false; status: number; error: string; errors?: string[] };
@@ -102,11 +103,14 @@ export class SubmissionHelper {
     }
     const userId = sub.submittedBy || "";
     if ((await repos.submission.countByUser(userId, "pending")) >= MAX_PENDING_PER_USER) return fail(429, `you already have ${MAX_PENDING_PER_USER} submissions waiting for review`);
-    if ((await repos.submission.countSubmittedSince(userId, new Date(Date.now() - 86400000))) >= MAX_SUBMITTED_PER_DAY) return fail(429, "daily submission limit reached");
+    if (NEW_PACKAGE_TYPES.includes(type)) {
+      const limit = songLimitFor(userId, Environment.commonsSongLimits || "");
+      if ((await repos.submission.countSongsByUser(userId)) >= limit) return fail(429, `You've reached the ${limit}-song limit. Email ${Environment.supportEmail} to ask for more.`);
+    }
 
     if (payload.tags !== undefined) payload.tags = normalizeTags(payload.tags);
     payload.licenseVersion = payload.licenseVersion || (payload.license === "PD" ? "CC0" : payload.license?.startsWith("CC-") ? "4.0" : "1.0");
-    payload.attestationVersion = payload.attestationVersion || "1.0";
+    payload.attestationVersion = payload.attestationVersion || "1.1";
     payload.attestedAt = payload.attestedAt || new Date().toISOString();
 
     let triageScore: number | null = null;

@@ -11,6 +11,7 @@ const REJECT_REASONS: Record<string, string> = {
   duplicate: "It looks like a duplicate of something already in the library.",
   licensing: "We couldn't confirm the licensing for this work.",
   ccli: 'This appears to be a song in the CCLI catalog, which cannot be released here. If it is licensed through CCLI, churches can find it on SongSelect: <a href="{songselect}">{songselect}</a>',
+  ai: "The words or melody appear to be AI-generated. WorshipCommons only accepts songs written by people; AI-assisted recordings of a human-written song are fine.",
   offtopic: "It isn't a fit for the WorshipCommons library.",
   incomplete: "The submission was missing required information or files.",
   other: "A reviewer decided not to add it at this time."

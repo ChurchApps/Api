@@ -14,7 +14,9 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
 jest.mock("../helpers/QualityHelper", () => ({ QualityHelper: { score: jest.fn(async () => ({ qualityScore: 21, qualityDetail: JSON.stringify({ heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" }) })) } }));
 jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyReceived: jest.fn(async () => {}) } }));
 
+jest.mock("../../../shared/helpers/index", () => ({ Environment: { commonsSongLimits: "", supportEmail: "support@example.com" }, Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } } }));
 import { SubmissionHelper } from "../helpers/SubmissionHelper";
+import { songLimitFor } from "../helpers/SubmitValidation";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
 import { QualityHelper } from "../helpers/QualityHelper";
 import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
@@ -31,7 +33,7 @@ function repos(overrides: any = {}) {
     submission: {
       create: jest.fn(async (s: any) => { s.id = "sub00000001"; s.status = "draft"; return s; }),
       countByUser: jest.fn(async () => 0),
-      countSubmittedSince: jest.fn(async () => 0),
+      countSongsByUser: jest.fn(async () => 0),
       submit: jest.fn(async () => true),
       update: jest.fn(async () => {}),
       loadPendingForAsset: jest.fn(async () => undefined)
@@ -118,7 +120,7 @@ describe("SubmissionHelper.submit", () => {
     const qualityDetail = { heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
     expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ qualityDetail }) }));
     expect(r.submission.submit).toHaveBeenCalledWith("sub00000001", "asset000001", 21);
-    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ licenseVersion: "1.0", attestationVersion: "1.0", attestedAt: expect.any(String) }) }));
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ payload: expect.objectContaining({ licenseVersion: "1.0", attestationVersion: "1.1", attestedAt: expect.any(String) }) }));
     expect(CommonsMailHelper.notifyReceived).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }));
   });
 
@@ -172,9 +174,17 @@ describe("SubmissionHelper.submit", () => {
     expect(result.status).toBe(409);
   });
 
-  it("returns 429 when the user has too many pending or daily submissions", async () => {
+  it("returns 429 when the user has too many pending submissions or has hit the lifetime song cap", async () => {
     expect((await SubmissionHelper.submit(repos({ submission: { countByUser: jest.fn(async () => 5) } }), draft(), asset) as any).status).toBe(429);
-    expect((await SubmissionHelper.submit(repos({ submission: { countSubmittedSince: jest.fn(async () => 20) } }), draft(), asset) as any).status).toBe(429);
+    expect((await SubmissionHelper.submit(repos({ submission: { countSongsByUser: jest.fn(async () => 20) } }), draft(), asset) as any).status).toBe(429);
+    expect((await SubmissionHelper.submit(repos({ submission: { countSongsByUser: jest.fn(async () => 19) } }), draft(), asset) as any).status).not.toBe(429);
+  });
+
+  it("honours COMMONS_SONG_LIMITS per user", async () => {
+    expect(songLimitFor("user0000001", "user0000001:50, other:0")).toBe(50);
+    expect(songLimitFor("other", "user0000001:50, other:0")).toBe(0);
+    expect(songLimitFor("nobody", "user0000001:50")).toBe(20);
+    expect(songLimitFor("user0000001", "user0000001:abc")).toBe(20);
   });
 
   it("returns 409 naming the competing submission when another pending one targets the asset", async () => {

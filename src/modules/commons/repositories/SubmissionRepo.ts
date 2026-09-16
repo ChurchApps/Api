@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Submission } from "../models/index.js";
+import { NEW_PACKAGE_TYPES } from "../helpers/SubmitValidation.js";
 
 export interface QueueFilter {
   status?: string;
@@ -100,8 +101,10 @@ export class SubmissionRepo {
     return Number(row?.n || 0);
   }
 
-  public async countSubmittedSince(userId: string, since: Date): Promise<number> {
-    const row = await getDb().selectFrom("submissions").select(sql<number>`count(*)`.as("n")).where("submittedBy", "=", userId).where("submittedAt", ">=", since).executeTakeFirst();
+  /** New-package submissions the user has ever sent for review — the lifetime song cap counts these. */
+  public async countSongsByUser(userId: string): Promise<number> {
+    const row = await getDb().selectFrom("submissions").select(sql<number>`count(*)`.as("n"))
+      .where("submittedBy", "=", userId).where("status", "!=", "draft").where("type", "in", [...NEW_PACKAGE_TYPES]).executeTakeFirst();
     return Number(row?.n || 0);
   }
 

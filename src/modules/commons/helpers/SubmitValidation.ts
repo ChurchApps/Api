@@ -5,8 +5,18 @@ import { baseName } from "./PackageLayout.js";
 export const INLINE_MAX_BYTES = 1048576;
 export const DEFAULT_MAX_FILE_BYTES = 26214400;
 export const MAX_PENDING_PER_USER = 5;
-export const MAX_SUBMITTED_PER_DAY = 20;
+export const DEFAULT_SONG_LIMIT = 20;
 export const MIN_NOTE_LENGTH = 10;
+
+/** Lifetime new-song cap for a user: COMMONS_SONG_LIMITS override, else the default. Raise by editing the env; 0 bans. */
+export function songLimitFor(userId: string, overrides: string): number {
+  // ponytail: env list, same shape as COMMONS_MUSIC_EDITORS — a per-user table when the list passes ~20 entries
+  for (const entry of overrides.split(",")) {
+    const [id, n] = entry.split(":").map((s) => s.trim());
+    if (id === userId && n !== undefined && /^\d+$/.test(n)) return Number(n);
+  }
+  return DEFAULT_SONG_LIMIT;
+}
 
 export const SUBMISSION_TYPES = ["new", "translation", "arrangement", "correction", "additionalFile", "recording", "removal"] as const;
 export type SubmissionType = (typeof SUBMISSION_TYPES)[number];

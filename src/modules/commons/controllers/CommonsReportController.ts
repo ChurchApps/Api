@@ -3,8 +3,9 @@ import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { CommonsMailHelper, ipHash } from "../helpers/index.js";
 import { Report } from "../models/index.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
-const REASONS = ["copyright", "policy", "quality", "other"];
+const REASONS = ["copyright", "ai", "policy", "quality", "other"];
 const RATE_LIMIT = 3;
 const RATE_WINDOW_MS = 3600000;
 // ponytail: per-process limiter — move to a table if abuse ever shows up across Lambda instances
@@ -27,7 +28,8 @@ export class CommonsReportController extends CommonsBaseController {
       const key = ipHash(req);
       const now = Date.now();
       const hits = (recent.get(key) || []).filter((t) => now - t < RATE_WINDOW_MS);
-      if (hits.length >= RATE_LIMIT) return this.json({ errors: ["Too many reports from this address — try again later"] }, 429);
+      // local dev/e2e runs file more than three reports an hour; the limiter is for the public API
+      if (Environment.currentEnvironment !== "dev" && hits.length >= RATE_LIMIT) return this.json({ errors: ["Too many reports from this address — try again later"] }, 429);
       recent.set(key, [...hits, now]);
       let contentText = b.contentText;
       if (isWriter && !contentText && b.assetId) contentText = (await this.repos.asset.loadById(b.assetId))?.name;
