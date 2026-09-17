@@ -112,7 +112,7 @@ export class SongPackageHelper {
       hasScore: !!fileUrls.score,
       hasSlides: !!fileUrls.slides,
       hasTiming: !!fileUrls.timing,
-      hasAccompaniment: false, // demoAudio is a writer demo, not accompaniment; no rendered accompaniment exists yet
+      hasAccompaniment: !!(fileUrls.instrumental || fileUrls.stemsZip),
       recommendedKey: row.recommendedKey || null,
       singTimeSeconds: row.singTimeSeconds ?? null,
       fileUrls

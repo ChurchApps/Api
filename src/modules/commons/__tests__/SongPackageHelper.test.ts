@@ -85,6 +85,9 @@ describe("SongPackageHelper.summary", () => {
     expect(s).not.toHaveProperty("qualityScore");
     expect(s).not.toHaveProperty("portraitKey");
     expect(SongPackageHelper.summary({ ...row(), confidence: "sunday-ready" }, {})).toMatchObject({ sundayReady: true, hasScore: false, hasSlides: false, hasTiming: false });
+    expect(SongPackageHelper.summary(row(), { ...URLS, instrumental: "u/instrumental.m4a" }).hasAccompaniment).toBe(true);
+    expect(SongPackageHelper.summary(row(), { ...URLS, stemsZip: "u/pack.zip" }).hasAccompaniment).toBe(true);
+    expect(SongPackageHelper.summary(row(), { ...URLS, demoAudio: "u/demo.mp3" }).hasAccompaniment).toBe(false);
   });
 });
 
