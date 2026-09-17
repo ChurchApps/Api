@@ -23,7 +23,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 const SONG_COLS = [
   "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "ccli", "proAnswer", "certified", "confidence"
 ];
-const FILE_COLS = ["artUrl", "midiUrl", "lyricsUrl", "abcUrl", "demoAudioUrl", "sheetPdfUrl", "stemsZipUrl", "compositionZipUrl", "audioZipUrl"];
+const FILE_COLS = ["artUrl", "midiUrl", "lyricsUrl", "abcUrl", "demoAudioUrl", "sheetPdfUrl", "stemsZipUrl", "previewUrl", "instrumentalUrl", "compositionZipUrl", "audioZipUrl"];
 const DETAIL_COLS = ["year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"];
 // masters/song.json fields the songs/assets rows read, and the column each one fills
 const SONG_JSON_FIELDS: Record<string, string> = {

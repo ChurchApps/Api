@@ -114,6 +114,26 @@ describe("storage keys", () => {
     expect(urls.demoAudio).toMatch(/\/sources\/master\/song\.mp3$/);
     expect(urls.song).toMatch(/\/masters\/song\.json$/);
   });
+
+  it("names the pipeline stems pack by folder, not the title-BPM zip filename", () => {
+    const pkg = "songs/en/all-of-my-heart-2FCCvjupEKe";
+    expect(packageRole(`${pkg}/output/audio/All Of My Heart-All Of My Heart-A-99.00bpm.zip`)).toBe("stemsZip");
+    expect(packageRole(`${pkg}/output/audio.zip`)).toBe("audioZip");
+    expect(packageRole("sources/stemsZip.zip")).toBe("stemsZip");
+    const urls = ContentLibraryHelper.fileUrls(asset, [
+      { name: `${pkg}/output/audio/All Of My Heart-All Of My Heart-Eb-99.00bpm.zip` },
+      { name: `${pkg}/output/audio/All Of My Heart-All Of My Heart-A-99.00bpm.zip` },
+      { name: `${pkg}/output/audio/instrumental.m4a` },
+      { name: `${pkg}/output/audio/preview.m4a` },
+      { name: `${pkg}/output/audio.zip` }
+    ]);
+    expect(urls.stemsZip).toMatch(/\/All Of My Heart-All Of My Heart-Eb-99\.00bpm\.zip$/);
+    expect(urls.stemsZip).not.toMatch(/-A-99\.00bpm\.zip$/); // first zip wins when two keys exist
+    expect(urls.instrumental).toMatch(/\/instrumental\.m4a$/);
+    expect(urls.preview).toMatch(/\/preview\.m4a$/);
+    expect(urls.audioZip).toMatch(/\/output\/audio\.zip$/);
+    expect(urls).not.toHaveProperty("All Of My Heart-All Of My Heart-A-99.00bpm");
+  });
 });
 
 describe("package layout keys", () => {
