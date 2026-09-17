@@ -35,7 +35,7 @@ function listenController(overrides: Partial<any> = {}, files: any[] = FULL, adm
     writer: "John Newton",
     songKey: "G",
     hasChords: 1,
-    confidence: "converted-from-abc",
+    confidence: "score",
     scoreSource: "abc",
     publishedKeys: JSON.stringify(["G", "F"]),
     listenedKeys: null,
@@ -74,24 +74,24 @@ describe("POST /commons/admin/songs/:id/listen", () => {
   it("records a partial listen without promoting", async () => {
     const { listen, repos } = listenController();
     const detail: any = await listen(["G"]);
-    expect(repos.song.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ listenedKeys: JSON.stringify(["G"]), confidence: "converted-from-abc" }));
+    expect(repos.song.update).toHaveBeenCalledWith("song0000001", expect.objectContaining({ listenedKeys: JSON.stringify(["G"]), confidence: "score" }));
     expect(detail).toMatchObject({ sundayReady: false, listenedKeys: ["G"], sundayReadyBy: "admin000001" });
   });
 
   it("never promotes a package missing its score, slides or chords", async () => {
     const noSlides = listenController({}, [{ name: "score.musicxml" }]);
-    expect(((await noSlides.listen(["G", "F"])) as any).confidence).toBe("converted-from-abc");
+    expect(((await noSlides.listen(["G", "F"])) as any).confidence).toBe("score");
     const noScore = listenController({ scoreSource: null }, [{ name: "slides.json" }]);
     expect(((await noScore.listen(["G", "F"])) as any).confidence).toBe("chart-only");
     const noChords = listenController({ hasChords: 0 });
-    expect(((await noChords.listen(["G", "F"])) as any).confidence).toBe("converted-from-abc");
+    expect(((await noChords.listen(["G", "F"])) as any).confidence).toBe("score");
   });
 
   it("clears back to the computed tier on an empty list", async () => {
     const { listen, repos } = listenController({ confidence: "sunday-ready", listenedKeys: JSON.stringify(["G", "F"]), sundayReadyBy: "admin000001", sundayReadyAt: new Date() });
     const detail: any = await listen([]);
-    expect(repos.song.update).toHaveBeenCalledWith("song0000001", { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, confidence: "converted-from-abc" });
-    expect(detail).toMatchObject({ confidence: "converted-from-abc", sundayReady: false, listenedKeys: [], sundayReadyBy: null, sundayReadyAt: null });
+    expect(repos.song.update).toHaveBeenCalledWith("song0000001", { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, confidence: "score" });
+    expect(detail).toMatchObject({ confidence: "score", sundayReady: false, listenedKeys: [], sundayReadyBy: null, sundayReadyAt: null });
   });
 
   it("falls back to the song key when nothing was published yet", async () => {

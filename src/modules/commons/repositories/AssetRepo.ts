@@ -24,8 +24,7 @@ export interface AdminAssetSearch {
   pageSize?: number;
 }
 
-// Bayesian prior of 3.0 with weight 3 so a lone 5-star does not outrank a well-rated asset
-const RATING_SORT = sql`(ratingSum + 9) / (ratingCount + 3)`;
+
 
 @injectable()
 export class AssetRepo {
@@ -43,7 +42,7 @@ export class AssetRepo {
     let query = base.selectAll();
     switch (options.sort) {
       case "downloads": query = query.orderBy("downloadCount", "desc"); break;
-      case "rating": query = query.orderBy(RATING_SORT as any, "desc").orderBy("ratingCount", "desc"); break;
+      case "saves": query = query.orderBy("saveCount", "desc").orderBy("downloadCount", "desc"); break;
       case "featured": query = query.orderBy("featured", "desc").orderBy("downloadCount", "desc"); break;
       default: query = query.orderBy("publishedAt", "desc");
     }
@@ -93,6 +92,7 @@ export class AssetRepo {
       publisherChurchId: asset.publisherChurchId,
       status: asset.status || "pending",
       downloadCount: 0,
+      saveCount: 0,
       ratingCount: 0,
       ratingSum: 0,
       featured: false

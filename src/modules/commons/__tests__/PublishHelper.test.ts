@@ -134,7 +134,7 @@ describe("PublishHelper.approve", () => {
     expect(r.assetFile.update).toHaveBeenCalledWith("pf2", { submissionId: null, action: "add", name: `${PKG}/derivatives/cover-thumb.webp` });
     expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ filesChanged: [{ name: `${PKG}/masters/art.png`, action: "add" }, { name: `${PKG}/derivatives/cover-thumb.webp`, action: "replace" }, { name: `${PKG}/sources/score.musicxml`, action: "replace" }] }));
     // the hook sees the placed names and still reads the score by basename
-    expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ scoreSource: "master", confidence: "proofread-score" }));
+    expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ scoreSource: "master", confidence: "score" }));
   });
 
   it("leaves a non-song asset's files flat", async () => {

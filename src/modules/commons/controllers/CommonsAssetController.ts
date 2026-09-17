@@ -6,8 +6,6 @@ import { ContentLibraryHelper, PublishHelper, recordAssetDownload, userNames } f
 import { Asset, AssetFile } from "../models/index.js";
 import { baseName } from "../helpers/PackageLayout.js";
 
-const MIN_RATINGS_SHOWN = 3;
-
 @controller("/commons/assets")
 export class CommonsAssetController extends CommonsBaseController {
   @httpGet("/")
@@ -70,7 +68,6 @@ export class CommonsAssetController extends CommonsBaseController {
       }
       if (au.id) {
         const mine = await this.repos.rating.load(asset.id || "", au.id);
-        view.myRating = mine?.stars ?? null;
         view.mySaved = !!mine?.saved;
       }
       return view;
@@ -122,21 +119,6 @@ export class CommonsAssetController extends CommonsBaseController {
     });
   }
 
-  // authz-exempt: ratings are keyed by au.id, so a signed-in user can only write their own row
-  @httpPut("/:id/rating")
-  public async rate(req: express.Request<{ id: string }, {}, { stars?: number | null }>, res: express.Response): Promise<any> {
-    return this.actionWrapperAuth(req, res, async (au) => {
-      const asset = await this.repos.asset.loadPublished(String(req.params.id));
-      if (!asset) return this.json({}, 404);
-      if (asset.publisherUserId === au.id) return this.json({ errors: ["You cannot rate your own asset"] }, 409);
-      const stars = req.body.stars == null ? null : Number(req.body.stars);
-      if (stars !== null && (!Number.isInteger(stars) || stars < 1 || stars > 5)) return this.json({ errors: ["stars must be 1-5 or null"] }, 400);
-      await this.repos.rating.setStars(asset.id || "", au.id, stars);
-      const fresh = await this.repos.asset.loadById(asset.id || "");
-      return { ratingAverage: this.average(fresh), ratingCount: fresh?.ratingCount || 0, myRating: stars };
-    });
-  }
-
   // authz-exempt: saves are keyed by au.id, so a signed-in user can only write their own row
   @httpPut("/:id/saved")
   public async save(req: express.Request<{ id: string }, {}, { saved?: boolean }>, res: express.Response): Promise<any> {
@@ -172,18 +154,13 @@ export class CommonsAssetController extends CommonsBaseController {
     });
   }
 
-  private average(asset?: Asset): number | null {
-    if (!asset || (asset.ratingCount || 0) < MIN_RATINGS_SHOWN) return null;
-    return Math.round(((asset.ratingSum || 0) / (asset.ratingCount || 1)) * 10) / 10;
-  }
-
-  private async publicViews(assets: Asset[]): Promise<(Asset & { fileUrls: Record<string, string>; files: AssetFile[]; ratingAverage: number | null; publisherName?: string; version?: number; hasPendingSubmission?: boolean; detail?: any; myRating?: number | null; mySaved?: boolean })[]> {
+  private async publicViews(assets: Asset[]): Promise<(Asset & { fileUrls: Record<string, string>; files: AssetFile[]; publisherName?: string; version?: number; hasPendingSubmission?: boolean; detail?: any; mySaved?: boolean })[]> {
     const files = await this.repos.assetFile.loadLiveMany(assets.map((a) => a.id || ""));
     const names = await userNames(assets.map((a) => a.publisherUserId));
     return assets.map((a) => {
-      const { ratingSum: _sum, ...rest } = a;
+      const { ratingSum: _sum, ratingCount: _count, ...rest } = a;
       const live = files[a.id || ""] || [];
-      return { ...rest, publisherName: names[a.publisherUserId || ""], files: live.map((f) => ({ ...f, role: ContentLibraryHelper.role(f.name || "") })), fileUrls: ContentLibraryHelper.fileUrls(a, live), ratingAverage: this.average(a) };
+      return { ...rest, publisherName: names[a.publisherUserId || ""], files: live.map((f) => ({ ...f, role: ContentLibraryHelper.role(f.name || "") })), fileUrls: ContentLibraryHelper.fileUrls(a, live) };
     });
   }
 }

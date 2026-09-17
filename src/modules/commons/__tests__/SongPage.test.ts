@@ -23,8 +23,8 @@ jest.mock("../helpers/index", () => ({
 
 import { CommonsSongController } from "../controllers/CommonsSongController.js";
 
-const base = { language: "English", license: "PD", status: "published", writer: "John Newton", year: 1779, themes: "Grace,Salvation", meter: "CM", scripture: "Eph 2:8", songKey: "G", hasChords: 1, confidence: "converted-from-abc", featured: 0, rank: 50 };
-const SONG: any = { ...base, id: "song0000001", title: "Amazing Grace", parentSongId: null, ratingCount: 4, ratingSum: 18, chordPro: "[G]x", qualityScore: 88, qualityDetail: "{}", proAnswer: "no", submittedBy: "u1", portraitKey: "commons/writers/n.jpg", scoreSource: "abc", publishedKeys: JSON.stringify(["G"]), rights: JSON.stringify({ text: { license: "PD" } }), form: null, listenedKeys: null, contributors: JSON.stringify([{ name: "Ada", what: "correction", submissionId: "sub00000009" }]) };
+const base = { language: "English", license: "PD", status: "published", writer: "John Newton", year: 1779, themes: "Grace,Salvation", meter: "CM", scripture: "Eph 2:8", songKey: "G", hasChords: 1, confidence: "score", featured: 0, rank: 50, saveCount: 3, downloadCount: 12 };
+const SONG: any = { ...base, id: "song0000001", title: "Amazing Grace", parentSongId: null, chordPro: "[G]x", qualityScore: 88, qualityDetail: "{}", proAnswer: "no", submittedBy: "u1", portraitKey: "commons/writers/n.jpg", scoreSource: "abc", publishedKeys: JSON.stringify(["G"]), rights: JSON.stringify({ text: { license: "PD" } }), form: null, listenedKeys: null, contributors: JSON.stringify([{ name: "Ada", what: "correction", submissionId: "sub00000009" }]) };
 const LIBRARY: any[] = [
   { ...base, id: "song0000001", title: "Amazing Grace", parentSongId: null },
   { ...base, id: "song0000002", title: "Amazing Grace (Spanish)", parentSongId: "song0000001", language: "Spanish" },
@@ -40,7 +40,6 @@ const FILES: Record<string, any[]> = {
 function songController(au: any) {
   const repos: any = {
     assetFile: { loadLiveMany: jest.fn(async (ids: string[]) => Object.fromEntries(ids.map((id) => [id, FILES[id] || []]))), loadLive: jest.fn(async (id: string) => FILES[id] || []) },
-    rating: { load: jest.fn(async () => ({ stars: 4 })) },
     song: {
       loadById: jest.fn(async (id: string) => (id === "song0000001" ? SONG : undefined)),
       loadFamily: jest.fn(async (root: string) => LIBRARY.filter((s) => s.id === root || s.parentSongId === root)),
@@ -57,11 +56,11 @@ const signedIn = { id: "user0000001", checkAccess: () => false };
 const anon = { checkAccess: () => false };
 
 describe("GET /commons/songs/:id/page", () => {
-  it("returns song, rating with the caller's stars, history, family and explained similar songs", async () => {
+  it("returns song, history, family and explained similar songs — no ratings", async () => {
     const { controller, repos } = songController(signedIn);
     const page: any = await controller.page({ params: { id: "song0000001" }, query: {} } as any, {} as any);
-    expect(Object.keys(page)).toEqual(["song", "rating", "history", "family", "similar"]);
-    expect(page.rating).toEqual({ average: 4.5, count: 4, mine: 4 });
+    expect(Object.keys(page)).toEqual(["song", "history", "family", "similar"]);
+    expect(page).not.toHaveProperty("rating");
     expect(page.history).toEqual([{ submissionId: "sub00000001", note: "Imported", filesChanged: [], fieldsChanged: [] }]);
     expect(page.family.map((f: any) => f.id)).toEqual(["song0000002", "song0000003"]);
     expect(page.family[0]).toMatchObject({ sundayReady: false, hasScore: false, fileUrls: {} });
@@ -77,7 +76,9 @@ describe("GET /commons/songs/:id/page", () => {
     expect(song).toMatchObject({
       id: "song0000001",
       rank: 50,
-      confidence: "converted-from-abc",
+      confidence: "score",
+      saveCount: 3,
+      downloadCount: 12,
       sundayReady: false,
       featured: false,
       hasChords: true,
@@ -100,11 +101,8 @@ describe("GET /commons/songs/:id/page", () => {
     for (const k of ["qualityScore", "qualityDetail", "proAnswer", "submittedBy", "portraitKey"]) expect(song).not.toHaveProperty(k);
   });
 
-  it("answers rating.mine null for an anonymous caller and 404 for an unknown song", async () => {
-    const { controller, repos } = songController(anon);
-    const page: any = await controller.page({ params: { id: "song0000001" }, query: {} } as any, {} as any);
-    expect(page.rating).toEqual({ average: 4.5, count: 4, mine: null });
-    expect(repos.rating.load).not.toHaveBeenCalled();
+  it("404s an unknown song", async () => {
+    const { controller } = songController(anon);
     expect(await controller.page({ params: { id: "nope" }, query: {} } as any, {} as any)).toEqual({ obj: {}, status: 404 });
   });
 });
@@ -124,7 +122,7 @@ describe("GET /commons/songs query params", () => {
     const { controller } = songController(anon);
     const rows: any[] = await controller.getAll({ query: {} } as any, {} as any);
     const keys = [
-      "confidence", "sundayReady", "featured", "firstLine", "tune", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasTiming", "hasAccompaniment", "recommendedKey", "singTimeSeconds", "fileUrls", "rank"
+      "confidence", "sundayReady", "featured", "firstLine", "tune", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasTiming", "hasAccompaniment", "recommendedKey", "singTimeSeconds", "fileUrls", "rank", "saveCount", "downloadCount"
     ];
     for (const r of rows) for (const k of keys) expect(r).toHaveProperty(k);
     expect(rows[0]).not.toHaveProperty("rights");
