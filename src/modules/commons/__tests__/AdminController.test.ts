@@ -15,7 +15,9 @@ jest.mock("../helpers/index", () => ({
     requestApiBase: () => "http://api",
     signedPendingUrl: jest.fn(async (id: string, name: string) => `signed:${id}/${name}`),
     previewToken: () => "tok",
-    fileUrls: () => ({})
+    fileUrls: () => ({}),
+    packagePrefix: (dir: string) => `commons/${dir}`,
+    listLiveKeys: jest.fn(async () => [])
   },
   ReviewerHelper: jest.requireActual("../helpers/ReviewerHelper").ReviewerHelper,
   PublishHelper: {
@@ -337,13 +339,38 @@ describe("music editor", () => {
       () => controller.republish(req({}, "asset000001"), {} as any),
       () => controller.remove(req({ reason: "policy" }, "asset000001"), {} as any),
       () => controller.feature(req({}, "asset000001"), {} as any),
-      () => controller.scoreMissing(req(), {} as any)
+      () => controller.scoreMissing(req(), {} as any),
+      () => controller.syncAudio(req(), {} as any)
     ]) {
       const out: any = await call();
       expect(out.status).toBe(403);
       expect(out.obj.errors).toEqual(["Server admin required"]);
     }
     expect(PublishHelper.remove).not.toHaveBeenCalled();
+  });
+
+  it("sync-audio registers titled stems zips listed in the package audio folder", async () => {
+    const { ContentLibraryHelper } = require("../helpers/index");
+    ContentLibraryHelper.listLiveKeys.mockResolvedValueOnce(["God's Love Outpoured-God's Love Outpoured-D-112.00bpm.zip"]);
+    const create = jest.fn(async (f: any) => f);
+    const { controller } = adminController({
+      song: { loadPublishedSummaries: jest.fn(async () => [{ id: "0iO4XfQPq7T" }]) },
+      assetFile: {
+        loadLiveMany: jest.fn(async () => ({
+          "0iO4XfQPq7T": [
+            { name: "songs/en/gods-love-outpoured-0iO4XfQPq7T/masters/song.json" },
+            { name: "songs/en/gods-love-outpoured-0iO4XfQPq7T/output/audio.zip" }
+          ]
+        })),
+        create
+      }
+    });
+    expect(await controller.syncAudio(req(), {} as any)).toEqual({ scanned: 1, added: 1 });
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      assetId: "0iO4XfQPq7T",
+      name: "songs/en/gods-love-outpoured-0iO4XfQPq7T/output/audio/God's Love Outpoured-God's Love Outpoured-D-112.00bpm.zip",
+      action: "add"
+    }));
   });
 
   it("server admins are unaffected by the rights check", async () => {

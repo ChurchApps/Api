@@ -24,7 +24,7 @@ jest.mock("@churchapps/apihelper", () => {
 jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { fileStore: "disk", contentRoot: CONTENT_ROOT, jwtSecret: "test-secret" } }));
 
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
-import { findByBase, idFromFolder, packageDirFrom, packageDirOf, packageFolder, packageKey, packagePath, packageRole, relativeName, slugify, songPackageDir } from "../helpers/PackageLayout.js";
+import { audioKeysToAdd, findByBase, idFromFolder, packageDirFrom, packageDirOf, packageFolder, packageKey, packagePath, packageRole, relativeName, slugify, songPackageDir } from "../helpers/PackageLayout.js";
 import { isPublicDiskFilePath } from "../../content/helpers/PublicFileAccess.js";
 
 const asset = { id: "testasst001", assetType: "song" };
@@ -113,6 +113,20 @@ describe("storage keys", () => {
     ]);
     expect(urls.demoAudio).toMatch(/\/sources\/master\/song\.mp3$/);
     expect(urls.song).toMatch(/\/masters\/song\.json$/);
+  });
+
+  it("registers titled stems zips and sidecars from an output/audio listing, skipping ones already live", () => {
+    const dir = "songs/en/gods-love-outpoured-0iO4XfQPq7T";
+    const listed = [
+      `${dir}/output/audio/God's Love Outpoured-God's Love Outpoured-D-112.00bpm.zip`,
+      "instrumental.m4a",
+      "commons/songs/en/gods-love-outpoured-0iO4XfQPq7T/output/audio/preview.m4a",
+      "slides.json"
+    ];
+    expect(audioKeysToAdd(dir, listed, [`${dir}/output/audio/preview.m4a`])).toEqual([
+      `${dir}/output/audio/God's Love Outpoured-God's Love Outpoured-D-112.00bpm.zip`,
+      `${dir}/output/audio/instrumental.m4a`
+    ]);
   });
 
   it("names the pipeline stems pack by folder, not the title-BPM zip filename", () => {
