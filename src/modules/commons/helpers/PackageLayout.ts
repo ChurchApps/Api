@@ -122,6 +122,20 @@ export function baseName(name: string | null | undefined): string {
   return (name || "").split("/").pop() || "";
 }
 
+/** Catalog keys to register from an output/audio listing. `listed` may be full keys or basenames. */
+export function audioKeysToAdd(packageDir: string, listed: string[], existing: string[]): string[] {
+  const have = new Set(existing);
+  const out: string[] = [];
+  for (const key of listed) {
+    const raw = key.replace(/\\/g, "/").replace(/^commons\//, "");
+    const name = raw.includes("/") ? raw : `${packageDir}/output/audio/${raw}`;
+    if (!/\/output\/audio\/[^/]+\.(zip|m4a)$/i.test(name) || have.has(name)) continue;
+    have.add(name);
+    out.push(name);
+  }
+  return out;
+}
+
 /** The role of a live or pending file, whatever folder it sits in. */
 export function packageRole(name: string | null | undefined): string {
   const n = (name || "").replace(/\\/g, "/");

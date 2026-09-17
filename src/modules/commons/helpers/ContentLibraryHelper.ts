@@ -282,6 +282,11 @@ export class ContentLibraryHelper {
     return this.s3;
   }
 
+  /** Keys under a live prefix (`commons/songs/…/output/audio`). */
+  static listLiveKeys(prefix: string): Promise<string[]> {
+    return this.listKeys(prefix);
+  }
+
   // S3 lists every key under the prefix; the disk store only lists one directory, so walk the package folders ourselves
   private static async listKeys(prefix: string): Promise<string[]> {
     const normalized = prefix.replace(/\/$/, "");
