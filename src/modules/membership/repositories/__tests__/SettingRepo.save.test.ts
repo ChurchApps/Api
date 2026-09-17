@@ -46,6 +46,46 @@ describe("SettingRepo.save without an id", () => {
     expect(await repo.loadAll(CHURCH_ID)).toHaveLength(2);
     expect(await repo.loadAll(CHURCH_ID + "b")).toHaveLength(1);
   });
+
+  it("rejects a second row for the same church and key at the database", async () => {
+    await sql`INSERT INTO settings (id, churchId, keyName, value, public) VALUES ('aaaaaaaaaaa', ${CHURCH_ID}, 'directoryVisibility', 'Regular Attendees', 1)`.execute(db);
+    await expect(sql`INSERT INTO settings (id, churchId, keyName, value, public) VALUES ('bbbbbbbbbbb', ${CHURCH_ID}, 'directoryVisibility', 'Members', 1)`.execute(db)).rejects.toThrow(/duplicate entry/i);
+  });
+
+  it("public settings keep the lowest-id duplicate so Regular Attendees is not overwritten by Members", async () => {
+    const repo = new SettingRepo();
+    await sql`INSERT INTO settings (id, churchId, keyName, value, public) VALUES ('aaaaaaaaaaa', ${CHURCH_ID}, 'directoryVisibility', 'Regular Attendees', 1)`.execute(db);
+    try {
+      await sql`INSERT INTO settings (id, churchId, keyName, value, public) VALUES
+        ('bbbbbbbbbbb', ${CHURCH_ID}, 'directoryVisibility', 'Members', 1),
+        ('ccccccccccc', ${CHURCH_ID}, 'directoryVisibility', 'Members', 1)`.execute(db);
+    } catch (err: any) {
+      expect(/duplicate entry/i.test(err?.message || "")).toBe(true);
+      return;
+    }
+
+    const publicRows = await repo.loadPublicSettings(CHURCH_ID);
+    const visibility = publicRows.filter((s: any) => s.keyName === "directoryVisibility");
+    expect(visibility).toHaveLength(1);
+    expect(visibility[0].id).toBe("aaaaaaaaaaa");
+    expect(visibility[0].value).toBe("Regular Attendees");
+
+    await repo.save({ id: "aaaaaaaaaaa", churchId: CHURCH_ID, keyName: "directoryVisibility", value: "Regular Attendees", public: 1 } as any);
+    const remaining = await sql<{ id: string; value: string }>`SELECT id, value FROM settings WHERE churchId = ${CHURCH_ID} AND keyName = 'directoryVisibility'`.execute(db);
+    expect(remaining.rows).toEqual([{ id: "aaaaaaaaaaa", value: "Regular Attendees" }]);
+  });
+
+  it("insert reuses the existing church and key instead of adding a row", async () => {
+    const repo = new SettingRepo();
+    const first = await repo.save({ churchId: CHURCH_ID, keyName: "directoryVisibility", value: "Members", public: 1 } as any);
+    const second = await repo.insert({ churchId: CHURCH_ID, keyName: "directoryVisibility", value: "Regular Attendees", public: 1 } as any);
+
+    const rows = await repo.loadAll(CHURCH_ID);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(first.id);
+    expect(rows[0].value).toBe("Regular Attendees");
+    expect(second.id).toBe(first.id);
+  });
 });
 
 async function cleanup() {
