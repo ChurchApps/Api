@@ -80,6 +80,10 @@ function loadWriterProfiles(repoDir: string): Map<string, any> {
 
 const LINKS_MAX = 5;
 
+export function authorLinksJson(name: string, repoDir: string): string | null {
+  return encodedAuthorLinks(name, loadWriterProfiles(repoDir));
+}
+
 function encodedAuthorLinks(name: string, profiles: Map<string, any>): string | null {
   const hits = new Set<any>();
   const exact = profiles.get(name);
