@@ -17,17 +17,23 @@ function parseLinks(raw?: string): AuthorLink[] {
   }
 }
 
+function publicLink(link: AuthorLink): AuthorLink {
+  return { label: link.label || "", url: link.url || "" };
+}
+
 /** Returns the cleaned links, or a message naming the first thing wrong with them. */
-function cleanLinks(input: unknown): { links: AuthorLink[] } | { error: string } {
+function cleanLinks(input: unknown, kind: "links" | "support"): { links: AuthorLink[] } | { error: string } {
   if (input === undefined || input === null) return { links: [] };
   if (!Array.isArray(input)) return { error: "Links must be a list" };
-  if (input.length > LINKS_MAX) return { error: `No more than ${LINKS_MAX} links` };
+  if (input.length > LINKS_MAX) return { error: `No more than ${LINKS_MAX} ${kind === "support" ? "support links" : "links"}` };
   const links: AuthorLink[] = [];
   for (const raw of input) {
     const url = String((raw as AuthorLink)?.url || "").trim();
     if (!url) continue;
     if (!/^https?:\/\/\S+$/i.test(url)) return { error: `${url} is not an http or https link` };
-    links.push({ label: String((raw as AuthorLink)?.label || "").trim().slice(0, 60), url: url.slice(0, 255) });
+    const row: AuthorLink = { label: String((raw as AuthorLink)?.label || "").trim().slice(0, 60), url: url.slice(0, 255) };
+    if (kind === "support") row.support = true;
+    links.push(row);
   }
   return { links };
 }
@@ -46,16 +52,21 @@ export class CommonsAuthorController extends CommonsBaseController {
 
   // authz-exempt: only the author row already claimed by au.id can be written
   @httpPut("/mine")
-  public async saveMine(req: express.Request<{}, {}, { bio?: string; links?: AuthorLink[] }>, res: express.Response): Promise<any> {
+  public async saveMine(req: express.Request<{}, {}, { bio?: string; links?: AuthorLink[]; supportLinks?: AuthorLink[] }>, res: express.Response): Promise<any> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const author = await this.repos.author.loadByUserId(au.id);
       if (!author) return this.json({ errors: ["You don't have a writer page yet. Publish a song first."] }, 404);
       const bio = typeof req.body?.bio === "string" ? req.body.bio.trim() : "";
       if (bio.length > BIO_MAX) return this.json({ errors: [`Bio is limited to ${BIO_MAX} characters`] }, 400);
-      const cleaned = cleanLinks(req.body?.links);
+      const cleaned = cleanLinks(req.body?.links, "links");
       if ("error" in cleaned) return this.json({ errors: [cleaned.error] }, 400);
-      await this.repos.author.update(author.id || "", { bio: bio || null, links: cleaned.links.length ? JSON.stringify(cleaned.links) : null });
-      return this.profile({ ...author, bio, links: JSON.stringify(cleaned.links) });
+      const support = req.body?.supportLinks === undefined
+        ? { links: parseLinks(author.links).filter((l) => l.support) }
+        : cleanLinks(req.body.supportLinks, "support");
+      if ("error" in support) return this.json({ errors: [support.error] }, 400);
+      const stored = [...cleaned.links, ...support.links];
+      await this.repos.author.update(author.id || "", { bio: bio || null, links: stored.length ? JSON.stringify(stored) : null });
+      return this.profile({ ...author, bio, links: JSON.stringify(stored) });
     });
   }
 
@@ -78,6 +89,14 @@ export class CommonsAuthorController extends CommonsBaseController {
   private profile(author: Author) {
     const portrait = author.portraitUrl || "";
     const portraitUrl = !portrait ? undefined : portrait.startsWith("http") ? portrait : ContentLibraryHelper.publicUrl(portrait);
-    return { id: author.id, name: author.name, bio: author.bio, portraitUrl, links: parseLinks(author.links) };
+    const all = parseLinks(author.links);
+    return {
+      id: author.id,
+      name: author.name,
+      bio: author.bio,
+      portraitUrl,
+      links: all.filter((l) => !l.support).map(publicLink),
+      supportLinks: all.filter((l) => l.support).map(publicLink)
+    };
   }
 }
