@@ -149,12 +149,14 @@ export function buildCatalog(repoDir: string) {
     const addFile = (key: string) => {
       const name = key.replace(/\\/g, "/");
       const base = name.split("/").pop() || "";
-      if (seen.has(base)) return; // one file per basename: the first registered wins (masters before derivatives)
+      // 255 is assetFiles.name after 2026-09-08; the old varchar(100) silently truncated long slugs
+      if (!name || name.length > 255 || seen.has(base)) return; // one file per basename: the first registered wins (masters before derivatives)
       seen.add(base);
       const src = path.join(repoDir, name);
       assetFiles.push({ id: UniqueIdHelper.shortId(), assetId: row.id, submissionId: null, name, action: "add", sizeBytes: fs.existsSync(src) ? fs.statSync(src).size : null, uploadedBy: rec.submittedBy || null });
     };
     for (const c of FILE_COLS) if (row[c]) addFile(row[c]);
+    for (const extra of row.extraUrls || []) if (typeof extra === "string") addFile(extra);
     const served: Record<string, string | null> = {};
     let masterScore = false;
     for (const name of MASTERS) {

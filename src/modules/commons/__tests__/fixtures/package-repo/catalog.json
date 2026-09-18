@@ -7,7 +7,8 @@
       "parentSongId": null, "relationLabel": null, "status": "approved", "submittedBy": null, "proAnswer": null, "certified": true,
       "midiUrl": "songs/en/public-domain/a-child-of-light-fixsong0001/sources/tune.mid", "lyricsUrl": "songs/en/public-domain/a-child-of-light-fixsong0001/derivatives/timing.json",
       "abcUrl": "songs/en/public-domain/a-child-of-light-fixsong0001/sources/tune.abc", "artUrl": "songs/en/public-domain/a-child-of-light-fixsong0001/masters/cover.webp",
-      "videoUrl": null, "demoAudioUrl": null, "sheetPdfUrl": null, "stemsZipUrl": null
+      "videoUrl": null, "demoAudioUrl": null, "sheetPdfUrl": null, "stemsZipUrl": null,
+      "extraUrls": ["songs/en/public-domain/a-child-of-light-fixsong0001/sources/extra/AllOfMyHeart2021_acc.mp3"]
     },
     {
       "id": "fixsong0002", "title": "Bleib bei uns", "writer": "Joshua Stegmann", "year": 1628, "themes": "Grace", "songKey": "F", "bpm": 100, "timeSignature": "4/4", "meter": null,
