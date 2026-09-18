@@ -27,7 +27,9 @@ const DERIVATIVE_FILES = new Set([
 ]);
 // Preferred-first when a varchar(100)-truncated basename is ambiguous (chart. → chordpro, not pdf).
 const FILES_BY_FOLDER: Record<string, string[]> = {
-  derivatives: ["chart.chordpro", "slides.json", "attribution.txt", "duration.json", "cover-thumb.webp", "sources.txt", "timing.json", "score.musicxml", "chart.pdf"],
+  derivatives: [
+    "chart.chordpro", "slides.json", "attribution.txt", "duration.json", "cover-thumb.webp", "sources.txt", "timing.json", "score.musicxml", "chart.pdf"
+  ],
   masters: ["song.json", "cover.webp", "score.musicxml", "lyrics.chordpro"],
   sources: ["tune.mid", "tune.abc", "timing.json", "cover.webp", "sheetPdf.pdf", "score.musicxml"],
   output: ["composition.zip", "audio.zip"]
