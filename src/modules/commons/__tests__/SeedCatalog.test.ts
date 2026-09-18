@@ -37,7 +37,7 @@ describe("buildCatalog seeds the database from the package, with the catalog row
   });
 
   it("falls back to the catalog row for what the package lacks: confidence, parentSongId, a missing song.json field", () => {
-    expect(own).toMatchObject({ confidence: "proofread-score", tune: null, year: 1877, scripture: "Rom 8:14-17" });
+    expect(own).toMatchObject({ confidence: "score", tune: null, year: 1877, scripture: "Rom 8:14-17" });
     expect(inherited).toMatchObject({ confidence: "lyrics-only", parentSongId: "fixsong0001", relationLabel: "German original", firstLine: "Ach bleib mit deiner Gnade", hasChords: false });
   });
 
@@ -95,7 +95,7 @@ describe("buildCatalog seeds the database from the package, with the catalog row
     for (const col of ["midiUrl", "abcUrl", "artUrl", "lyricsUrl"]) expect(namesFor("fixsong0001")).toContain(row[col]);
     expect(own.confidence).toBe(row.confidence);
     expect(inherited.confidence).toBe("lyrics-only");
-    expect(["proofread-score", "converted-from-abc", "generated-from-midi", "chart-only", "lyrics-only"]).toContain(own.confidence);
+    expect(["score", "generated-from-midi", "chart-only", "lyrics-only"]).toContain(own.confidence);
   });
 
   it("keeps the writer portrait as a key under the commons prefix, and none when no row names one", () => {

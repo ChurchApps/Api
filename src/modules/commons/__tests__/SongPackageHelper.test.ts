@@ -32,11 +32,14 @@ describe("SongPackageHelper text readers", () => {
 
 describe("SongPackageHelper.baseConfidence", () => {
   it("follows the score source, then the chords", () => {
-    expect(SongPackageHelper.baseConfidence({ hasScore: true, scoreSource: "master", hasChords: true })).toBe("proofread-score");
-    expect(SongPackageHelper.baseConfidence({ hasScore: true, scoreSource: "abc", hasChords: false })).toBe("converted-from-abc");
+    expect(SongPackageHelper.baseConfidence({ hasScore: true, scoreSource: "master", hasChords: true })).toBe("score");
+    expect(SongPackageHelper.baseConfidence({ hasScore: true, scoreSource: "abc", hasChords: false })).toBe("score");
     expect(SongPackageHelper.baseConfidence({ hasScore: true, scoreSource: "midi", hasChords: false })).toBe("generated-from-midi");
     expect(SongPackageHelper.baseConfidence({ hasScore: false, scoreSource: "abc", hasChords: true })).toBe("chart-only");
     expect(SongPackageHelper.baseConfidence({ hasScore: false, hasChords: false })).toBe("lyrics-only");
+    expect(SongPackageHelper.normalizeConfidence("proofread-score")).toBe("score");
+    expect(SongPackageHelper.normalizeConfidence("converted-from-abc")).toBe("score");
+    expect(SongPackageHelper.normalizeConfidence("sunday-ready")).toBe("sunday-ready");
   });
 });
 
@@ -81,9 +84,11 @@ const URLS = { score: "u/score.musicxml", slides: "u/slides.json", timing: "u/ti
 describe("SongPackageHelper.summary", () => {
   it("adds the contract booleans from the served files and drops the reviewer-only columns", () => {
     const s = SongPackageHelper.summary(row(), URLS);
-    expect(s).toMatchObject({ confidence: "converted-from-abc", sundayReady: false, featured: true, firstLine: "Amazing grace! how sweet the sound,", tune: null, hymnalCount: 1200, hasChords: true, hasScore: true, hasSlides: true, hasTiming: true, hasAccompaniment: false, recommendedKey: null, singTimeSeconds: 150, rank: 70 });
+    expect(s).toMatchObject({ confidence: "score", sundayReady: false, featured: true, firstLine: "Amazing grace! how sweet the sound,", tune: null, hymnalCount: 1200, hasChords: true, hasScore: true, hasSlides: true, hasTiming: true, hasAccompaniment: false, recommendedKey: null, singTimeSeconds: 150, rank: 70 });
     expect(s).not.toHaveProperty("qualityScore");
     expect(s).not.toHaveProperty("portraitKey");
+    expect(s).not.toHaveProperty("ratingCount");
+    expect(s).not.toHaveProperty("ratingSum");
     expect(SongPackageHelper.summary({ ...row(), confidence: "sunday-ready" }, {})).toMatchObject({ sundayReady: true, hasScore: false, hasSlides: false, hasTiming: false });
     expect(SongPackageHelper.summary(row(), { ...URLS, instrumental: "u/instrumental.m4a" }).hasAccompaniment).toBe(true);
     expect(SongPackageHelper.summary(row(), { ...URLS, stemsZip: "u/pack.zip" }).hasAccompaniment).toBe(true);

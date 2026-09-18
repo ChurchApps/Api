@@ -13,8 +13,7 @@ const SPINE_COLS = [
   "assets.status as status",
   "assets.featured as featured",
   "assets.downloadCount as downloadCount",
-  "assets.ratingCount as ratingCount",
-  "assets.ratingSum as ratingSum",
+  "assets.saveCount as saveCount",
   "assets.createdAt as createdAt",
   "assets.publishedAt as publishedAt"
 ] as const;
@@ -49,9 +48,8 @@ const SUMMARY_SONG_COLS = [
   "songs.singTimeSeconds"
 ] as const;
 
-// Popularity dominates, moderation quality is a kicker; unscored songs sit at a neutral 50.
-// Rounded to an opaque integer so the reviewer-only qualityScore cannot be read back out of it.
-const RANK_COL = sql<number>`cast(round(assets.downloadCount / greatest(1, (select max(maxDl.downloadCount) from assets maxDl where maxDl.status = 'published')) * 60 + coalesce(songs.qualityScore, 50) / 100 * 40) as signed)`.as("rank");
+// Downloads dominate, saves are the other public metric; qualityScore stays reviewer-only.
+const RANK_COL = sql<number>`cast(round(assets.downloadCount / greatest(1, (select max(maxDl.downloadCount) from assets maxDl where maxDl.status = 'published')) * 60 + assets.saveCount / greatest(1, (select max(maxSv.saveCount) from assets maxSv where maxSv.status = 'published')) * 40) as signed)`.as("rank");
 
 const SONG_COLS = [
   ...SUMMARY_SONG_COLS,

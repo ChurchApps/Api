@@ -34,19 +34,19 @@ describe("packageFields", () => {
     expect(parse(f.publishedKeys)).toEqual([]);
   });
 
-  it("an uploaded score is a proofread master; a seeded abc conversion keeps its source", () => {
+  it("an uploaded score is a master; a seeded abc conversion keeps its source and the same score tier", () => {
     const uploaded = packageFields({ chordPro: CHART }, undefined, "WC", "W", ["score.musicxml", "tune.abc"], ["score.musicxml"]);
-    expect(uploaded).toMatchObject({ confidence: "proofread-score", scoreSource: "master" });
-    const seeded = packageFields({ chordPro: CHART }, { chordPro: CHART, scoreSource: "abc", confidence: "converted-from-abc" }, "PD", "W", ["score.musicxml", "tune.abc"], []);
-    expect(seeded).toMatchObject({ confidence: "converted-from-abc", scoreSource: "abc" });
+    expect(uploaded).toMatchObject({ confidence: "score", scoreSource: "master" });
+    const seeded = packageFields({ chordPro: CHART }, { chordPro: CHART, scoreSource: "abc", confidence: "score" }, "PD", "W", ["score.musicxml", "tune.abc"], []);
+    expect(seeded).toMatchObject({ confidence: "score", scoreSource: "abc" });
   });
 
   it("reads file names by basename, whatever package folder they sit in", () => {
     const f = packageFields({ chordPro: CHART, songKey: "G" }, undefined, "WC", "Ada", ["derivatives/score.musicxml", "sources/demoAudio.mp3", "masters/art.png", "masters/lyrics.chordpro"], ["sources/score.musicxml"]);
-    expect(f).toMatchObject({ confidence: "proofread-score", scoreSource: "master" });
+    expect(f).toMatchObject({ confidence: "score", scoreSource: "master" });
     expect(parse(f.rights)).toMatchObject({ recording: { license: "WC", holder: "Ada" }, artwork: { license: "WC", holder: "Ada" } });
     const gate = packageFields({ chordPro: CHART }, { chordPro: CHART, confidence: "sunday-ready", scoreSource: "abc" }, "PD", "W", ["derivatives/score.musicxml", "sources/tune.abc"], ["sources/tune.abc"]);
-    expect(gate).toMatchObject({ confidence: "converted-from-abc", listenedKeys: null });
+    expect(gate).toMatchObject({ confidence: "score", listenedKeys: null });
   });
 
   it("keeps sunday-ready, the listen record, an approved form and a key pin when neither lyrics nor score files changed", () => {
@@ -62,10 +62,10 @@ describe("packageFields", () => {
   it("drops sunday-ready and clears the listen record when the lyrics change or a score file changes", () => {
     const existing = { chordPro: CHART, confidence: "sunday-ready", scoreSource: "abc", form: '{"status":"approved","sections":[],"defaultOrder":[]}' };
     const lyrics = packageFields({ chordPro: CHART + "\nmore" }, existing, "PD", "W", ["score.musicxml"], []);
-    expect(lyrics).toMatchObject({ confidence: "converted-from-abc", listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null });
+    expect(lyrics).toMatchObject({ confidence: "score", listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null });
     expect(parse(lyrics.form).status).toBe("draft");
     const score = packageFields({}, existing, "PD", "W", ["score.musicxml", "tune.abc"], ["tune.abc"]);
-    expect(score).toMatchObject({ confidence: "converted-from-abc", listenedKeys: null });
+    expect(score).toMatchObject({ confidence: "score", listenedKeys: null });
     expect(parse(score.form).status).toBe("approved");
   });
 

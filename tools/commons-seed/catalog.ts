@@ -203,6 +203,7 @@ export function buildCatalog(repoDir: string) {
       publishedAt: pending ? null : now,
       publishedSubmissionId: pending ? null : submissionId,
       downloadCount: 0,
+      saveCount: 0,
       ratingCount: 0,
       ratingSum: 0,
       featured: 0
@@ -222,9 +223,10 @@ function packageColumns(repoDir: string, rec: any, pkg: Package, served: Record<
   const pinned = Array.isArray(pkg.song?.pipeline?.publishedKeys) ? pkg.song.pipeline.publishedKeys : null;
   const hasChords = CHORD.test(rec.chordPro || "");
   const scoreSource = masterScore ? "master" : served["score.musicxml"] ? "abc" : null;
-  const computed = masterScore ? "proofread-score" : served["score.musicxml"] ? "converted-from-abc" : hasChords ? "chart-only" : "lyrics-only";
+  const computed = served["score.musicxml"] ? "score" : hasChords ? "chart-only" : "lyrics-only";
+  const stored = rec.confidence ?? computed;
   return {
-    confidence: rec.confidence ?? computed,
+    confidence: stored === "proofread-score" || stored === "converted-from-abc" ? "score" : stored,
     firstLine: firstLine(rec.chordPro || ""),
     hasChords,
     tune: null,
