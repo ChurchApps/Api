@@ -83,6 +83,7 @@ export interface Contributor {
 export interface AuthorLink {
   label?: string;
   url?: string;
+  support?: boolean;
 }
 
 export interface Author {
