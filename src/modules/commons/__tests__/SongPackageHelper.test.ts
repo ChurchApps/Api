@@ -93,6 +93,8 @@ describe("SongPackageHelper.summary", () => {
     expect(SongPackageHelper.summary(row(), { ...URLS, instrumental: "u/instrumental.m4a" }).hasAccompaniment).toBe(true);
     expect(SongPackageHelper.summary(row(), { ...URLS, stemsZip: "u/pack.zip" }).hasAccompaniment).toBe(true);
     expect(SongPackageHelper.summary(row(), { ...URLS, demoAudio: "u/demo.mp3" }).hasAccompaniment).toBe(false);
+    expect(SongPackageHelper.summary(row(), { abc: "u/tune.abc", slides: "u/slides.json" })).toMatchObject({ hasScore: true, hasSlides: true });
+    expect(SongPackageHelper.summary(row(), { midi: "u/tune.mid", slides: "u/slides.json" }).hasScore).toBe(false);
   });
 });
 

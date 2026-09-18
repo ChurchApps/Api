@@ -5,7 +5,7 @@ jest.mock("../../../shared/helpers/index", () => ({
   Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } },
   Environment: { worshipCommonsRoot: "http://localhost:3104" }
 }));
-const ROLES: Record<string, string> = { "score.musicxml": "score", "slides.json": "slides", "timing.json": "timing" };
+const ROLES: Record<string, string> = { "score.musicxml": "score", "slides.json": "slides", "timing.json": "timing", "tune.abc": "abc" };
 jest.mock("../helpers/index", () => ({
   ReviewerHelper: jest.requireActual("../helpers/ReviewerHelper").ReviewerHelper,
   CommonsMailHelper: {},
@@ -85,6 +85,11 @@ describe("POST /commons/admin/songs/:id/listen", () => {
     expect(((await noScore.listen(["G", "F"])) as any).confidence).toBe("chart-only");
     const noChords = listenController({ hasChords: 0 });
     expect(((await noChords.listen(["G", "F"])) as any).confidence).toBe("score");
+  });
+
+  it("treats Open Hymnal ABC as a score when MusicXML was never registered", async () => {
+    const abc = listenController({ scoreSource: "abc" }, [{ name: "tune.abc" }, { name: "slides.json" }, { name: "lyrics.chordpro" }]);
+    expect(((await abc.listen(["G", "F"])) as any).confidence).toBe("sunday-ready");
   });
 
   it("clears back to the computed tier on an empty list", async () => {

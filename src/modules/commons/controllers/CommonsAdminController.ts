@@ -355,7 +355,7 @@ export class CommonsAdminController extends CommonsBaseController {
       if (!song || song.status === "removed") return this.json({}, 404);
       const files = await this.repos.assetFile.loadLive(song.id || "");
       const urls = ContentLibraryHelper.fileUrls({ assetType: "song", id: song.id }, files, song.portraitKey);
-      const hasScore = !!urls.score;
+      const hasScore = !!(urls.score || urls.abc);
       const base = SongPackageHelper.baseConfidence({ hasScore, scoreSource: song.scoreSource, hasChords: !!song.hasChords });
       const published = SongPackageHelper.parseKeys(song.publishedKeys);
       const publishedKeys = published.length ? published : song.songKey ? [song.songKey] : [];
