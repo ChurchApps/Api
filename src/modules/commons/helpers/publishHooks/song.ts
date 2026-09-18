@@ -7,7 +7,7 @@ import { SUBMISSION_TYPE_LABELS, SubmissionType } from "../SubmitValidation.js";
 import type { PublishContext, PublishHook } from "./index.js";
 
 const SONG_FIELDS = [
-  "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"
+  "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer", "ccli"
 ] as const;
 
 // the exact license an upload is released under; WC/PD notices need no URL beyond the site itself

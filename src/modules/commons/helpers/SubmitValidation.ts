@@ -142,6 +142,7 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
   }
   // ponytail: lints the pasted ChordPro only; an uploaded lyrics.cho is linted when a reviewer opens it
   if (typeof detail.chordPro === "string") errors.push(...lintChordProBrackets(detail.chordPro));
+  if (detail.ccli != null && detail.ccli !== "" && !/^\d{4,8}$/.test(String(detail.ccli))) errors.push("CCLI number must be 4–8 digits");
 
   for (const f of proposed) {
     const name = f.name || "";
