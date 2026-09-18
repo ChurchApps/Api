@@ -67,6 +67,7 @@ describe("buildCatalog seeds the database from the package, with the catalog row
       `${OWN}/masters/cover.webp`,
       `${OWN}/masters/score.musicxml`,
       `${OWN}/masters/song.json`,
+      `${OWN}/sources/extra/AllOfMyHeart2021_acc.mp3`,
       `${OWN}/sources/tune.abc`,
       `${OWN}/sources/tune.mid`
     ]);

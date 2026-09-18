@@ -1,5 +1,6 @@
 import { createKysely, ensureEnvironment } from "../kysely-config.js";
 import { buildCatalog } from "../commons-seed/catalog.js";
+import { completedPackageName } from "../../src/modules/commons/helpers/PackageLayout.js";
 
 // Incremental catalog → commons DB. Inserts missing songs/files. Never drops.
 // --update also writes chordPro/metadata on existing songs and re-points live assetFiles rows whose
@@ -26,8 +27,10 @@ async function main() {
     const existingAuthors = await db.selectFrom("authors").select(["id", "name"]).execute();
     const authorIdByName = new Map(existingAuthors.map(a => [a.name as string, a.id as string]));
     const existingFiles = await db.selectFrom("assetFiles").select(["id", "assetId", "name", "sizeBytes"]).where("submissionId", "is", null).execute();
-    // one live file per basename per asset, whichever layout its name is in
+    // one live file per basename per asset, whichever layout its name is in — including names
+    // MySQL truncated at varchar(100) (`attributi` completes to `attribution.txt`)
     const liveByBase = new Map(existingFiles.map(f => [`${f.assetId}/${base(String(f.name))}`, f]));
+    const liveByCompleted = new Map(existingFiles.map(f => [`${f.assetId}/${base(completedPackageName(String(f.name)))}`, f]));
 
     const newAssets = assets.filter(a => !existingIds.has(a.id));
     const newSongs = songs.filter(s => !existingIds.has(s.assetId));
@@ -35,10 +38,16 @@ async function main() {
     const newSubs = submissions.filter(s => !existingIds.has(s.assetId));
     const newFiles: typeof assetFiles = [];
     const rekeyed: { id: string; from: string; to: string; sizeBytes: number | null }[] = [];
+    const claimed = new Set<string>();
     for (const f of assetFiles) {
-      const current = existingIds.has(f.assetId) ? liveByBase.get(`${f.assetId}/${base(f.name)}`) : undefined;
+      const key = `${f.assetId}/${base(f.name)}`;
+      const current = existingIds.has(f.assetId) ? liveByBase.get(key) || liveByCompleted.get(key) : undefined;
+      if (current && claimed.has(String(current.id))) { newFiles.push(f); continue; }
       if (!current) newFiles.push(f);
-      else if (current.name !== f.name) rekeyed.push({ id: String(current.id), from: String(current.name), to: f.name, sizeBytes: f.sizeBytes });
+      else {
+        claimed.add(String(current.id));
+        if (current.name !== f.name) rekeyed.push({ id: String(current.id), from: String(current.name), to: f.name, sizeBytes: f.sizeBytes });
+      }
     }
     const neededAuthorSeedIds = new Set(newSongs.map(s => s.authorId).filter(Boolean));
     const newAuthors = authors.filter(a => neededAuthorSeedIds.has(a.id) && !authorIdByName.has(a.name));
