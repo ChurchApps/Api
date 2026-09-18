@@ -4,7 +4,7 @@ import * as path from "path";
 let n = 0;
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => `seedid${String(++n).padStart(5, "0")}` } }));
 
-import { buildCatalog, chordproBody } from "../../../../tools/commons-seed/catalog";
+import { authorLinksJson, buildCatalog, chordproBody, writerFolderSlugs } from "../../../../tools/commons-seed/catalog";
 
 const REPO = path.join(__dirname, "fixtures", "package-repo");
 const OWN = "songs/en/public-domain/a-child-of-light-fixsong0001";
@@ -102,9 +102,35 @@ describe("buildCatalog seeds the database from the package, with the catalog row
   it("keeps the writer portrait as a key under the commons prefix, and none when no row names one", () => {
     expect(authors.every((a: any) => a.portraitUrl === null)).toBe(true);
   });
+
+  it("copies supportLinks from writers/<slug>/writer.json onto the matching author row", () => {
+    const harriet = authors.find((a: any) => a.name === "Harriet Buell");
+    expect(JSON.parse(harriet.links)).toEqual([{ label: "Site", url: "https://harriet.example", support: true }]);
+    expect(authors.find((a: any) => a.name === "Joshua Stegmann").links).toBeNull();
+  });
+
+  it("merges supportLinks from each named person in a composite credit", () => {
+    expect(JSON.parse(authorLinksJson("Elton Smith", REPO) || "[]")).toEqual([
+      { label: "Songs of Praise", url: "https://songsofpraise.org/", support: true }
+    ]);
+    expect(JSON.parse(authorLinksJson("Harriet Buell / Elton Smith", REPO) || "[]")).toEqual([
+      { label: "Site", url: "https://harriet.example", support: true },
+      { label: "Songs of Praise", url: "https://songsofpraise.org/", support: true }
+    ]);
+  });
 });
 
 describe("package path helpers", () => {
+
+  it("writerFolderSlugs matches the full credit and each named person", () => {
+    expect(writerFolderSlugs("Larry Holder")).toEqual(["larry-holder"]);
+    expect(writerFolderSlugs("Larry Holder / Elton Smith · tr. André Esterhuyse")).toEqual([
+      "larry-holder-elton-smith-tr-andré-esterhuyse",
+      "larry-holder",
+      "elton-smith",
+      "andré-esterhuyse"
+    ]);
+  });
 
   it("chordproBody strips the directive header and the one blank line after it, keeping the body verbatim", () => {
     expect(chordproBody("{title: T}\n{key: G}\n\nVerse 1\n[G]Sing\n")).toBe("Verse 1\n[G]Sing");
