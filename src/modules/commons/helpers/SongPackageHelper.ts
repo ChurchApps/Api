@@ -114,7 +114,8 @@ export class SongPackageHelper {
       tune: row.tune || null,
       hymnalCount: row.hymnalCount || 0,
       hasChords: !!row.hasChords,
-      hasScore: !!fileUrls.score,
+      // Open Hymnal ABC is a typeset SATB score; generated MusicXML is often gitignored and never lands in fileUrls
+      hasScore: !!(fileUrls.score || fileUrls.abc),
       hasSlides: !!fileUrls.slides,
       hasTiming: !!fileUrls.timing,
       hasAccompaniment: !!(fileUrls.instrumental || fileUrls.stemsZip),
