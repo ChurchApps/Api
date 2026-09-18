@@ -110,9 +110,7 @@ describe("buildCatalog seeds the database from the package, with the catalog row
   });
 
   it("merges supportLinks from each named person in a composite credit", () => {
-    expect(JSON.parse(authorLinksJson("Elton Smith", REPO) || "[]")).toEqual([
-      { label: "Songs of Praise", url: "https://songsofpraise.org/", support: true }
-    ]);
+    expect(JSON.parse(authorLinksJson("Elton Smith", REPO) || "[]")).toEqual([{ label: "Songs of Praise", url: "https://songsofpraise.org/", support: true }]);
     expect(JSON.parse(authorLinksJson("Harriet Buell / Elton Smith", REPO) || "[]")).toEqual([
       { label: "Site", url: "https://harriet.example", support: true },
       { label: "Songs of Praise", url: "https://songsofpraise.org/", support: true }
