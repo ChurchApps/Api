@@ -98,7 +98,9 @@ export class FormController extends MembershipBaseController {
       if (!await this.formAccess(au, id)) return this.json({}, 401);
       const form = await this.repos.form.load(au.churchId, id);
       if (!form) return this.json({}, 404);
-      const questions = await this.repos.question.loadForForm(au.churchId, id);
+      // Convert to models first - loadForForm returns raw rows whose choices are still
+      // JSON strings, and re-saving those would encode them a second time.
+      const questions = this.repos.question.convertAllToModel(au.churchId, await this.repos.question.loadForForm(au.churchId, id));
       const savedForm = await this.repos.form.save({ ...form, id: undefined, name: form.name + " (Copy)", archived: false });
       for (const q of questions) {
         await this.repos.question.save({ ...q, id: undefined, formId: savedForm.id });
