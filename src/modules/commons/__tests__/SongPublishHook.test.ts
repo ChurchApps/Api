@@ -98,4 +98,22 @@ describe("songPublishHook.onPublish", () => {
     expect(Object.keys(written).sort()).toEqual(["masters/lyrics.chordpro", "masters/song.json"]);
     expect(JSON.parse(written["masters/song.json"])).toEqual({ id: "asset000001", status: "unpublished" });
   });
+
+  it("copies an optional CCLI number from the payload onto the song row", async () => {
+    const repos: any = {
+      song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
+      author: { findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
+    };
+    await songPublishHook.onPublish({
+      asset: { id: "asset000001", assetType: "song", license: "WC", status: "unpublished" },
+      submission: { id: "sub00000001", submittedBy: "user0000001", payload: {} },
+      detail: { writer: "Ada", chordPro: CHART, songKey: "G", ccli: "22025" },
+      files: [],
+      filesChanged: [],
+      version: 1,
+      repos,
+      writeFile: async () => {}
+    });
+    expect(repos.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ ccli: "22025" }));
+  });
 });

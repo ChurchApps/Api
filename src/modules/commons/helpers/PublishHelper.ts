@@ -163,7 +163,7 @@ export class PublishHelper {
     const payload: SubmissionPayload = { name: asset.name, description: asset.description, tags: asset.tags, language: asset.language, license: asset.license, publisherChurchId: asset.publisherChurchId, detail: {} };
     if (asset.assetType === "song") {
       const s = await repos.song.loadById(asset.id || "");
-      if (s) payload.detail = { writer: s.writer, year: s.year, songKey: s.songKey, bpm: s.bpm, timeSignature: s.timeSignature, scripture: s.scripture, scriptureText: s.scriptureText, chordPro: s.chordPro, videoUrl: s.videoUrl, parentSongId: s.parentSongId, relationLabel: s.relationLabel, proAnswer: s.proAnswer, certified: true };
+      if (s) payload.detail = { writer: s.writer, year: s.year, songKey: s.songKey, bpm: s.bpm, timeSignature: s.timeSignature, scripture: s.scripture, scriptureText: s.scriptureText, chordPro: s.chordPro, videoUrl: s.videoUrl, parentSongId: s.parentSongId, relationLabel: s.relationLabel, proAnswer: s.proAnswer, ccli: s.ccli, certified: true };
     }
     return payload;
   }

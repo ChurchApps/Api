@@ -21,7 +21,8 @@ const SONG_DETAIL_FIELDS: AssetDetailField[] = [
   { key: "translator", label: "Translator", type: "text", maxLength: 120 },
   { key: "arranger", label: "Arranger", type: "text", maxLength: 120 },
   // checked against def.licenses in SubmitValidation once a master file is present: the uploadable set is the registry's
-  { key: "masterLicense", label: "Master recording license", type: "text", maxLength: 16 }
+  { key: "masterLicense", label: "Master recording license", type: "text", maxLength: 16 },
+  { key: "ccli", label: "CCLI number", type: "text", maxLength: 8 }
 ];
 
 // a master is a recording too: the same ownership attestation the demo needs
