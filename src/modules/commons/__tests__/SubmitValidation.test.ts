@@ -170,6 +170,14 @@ describe("ChordPro bracket lint", () => {
     expect(lintChordProBrackets("")).toEqual([]);
     expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, chordPro: "Verse 1\n[G Sing" } }, [], [])).toEqual(["Unmatched bracket on line 2 — every [ needs a closing ]"]);
   });
+
+  it("accepts an optional 4–8 digit CCLI number and rejects anything else", () => {
+    expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, ccli: "22025" } }, [], [])).toEqual([]);
+    expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, ccli: "1156" } }, [], [])).toEqual([]);
+    expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, ccli: "" } }, [], [])).toEqual([]);
+    expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, ccli: "abc" } }, [], [])).toEqual(["CCLI number must be 4–8 digits"]);
+    expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, ccli: "12" } }, [], [])).toEqual(["CCLI number must be 4–8 digits"]);
+  });
 });
 
 describe("new song file roles", () => {

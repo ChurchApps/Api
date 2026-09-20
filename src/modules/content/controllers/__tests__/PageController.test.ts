@@ -4,7 +4,8 @@ jest.mock("../../helpers/TreeHelper", () => ({
   TreeHelper: {
     populateAnswers: () => {},
     buildTree: (sections: any[]) => sections,
-    insertBlocks: async () => {}
+    insertBlocks: async () => {},
+    duplicateSection: jest.fn(async (s: any) => s)
   }
 }));
 jest.mock("../../helpers/index", () => ({
@@ -20,6 +21,7 @@ jest.mock("../ContentBaseController", () => ({
 }));
 
 import { PageController2 } from "../PageController.js";
+import { TreeHelper } from "../../helpers/TreeHelper.js";
 
 const EDIT_PERMISSION = "Content__Edit";
 
@@ -122,5 +124,49 @@ describe("PageController2.getTree visibility gating", () => {
     const { controller } = makeController(membersPage(), null);
     const result = await getTree(controller, { url: "members" });
     expect(result).toEqual({ restricted: true, visibility: "members" });
+  });
+});
+
+describe("PageController2.importTree", () => {
+  const body = () => ({
+    id: "evil",
+    churchId: "other",
+    title: "Home",
+    url: "/home",
+    sections: [{ id: "x", churchId: "other", background: "#fff", elements: [{ id: "y", churchId: "other", elementType: "row", answersJSON: "{}", elements: [{ elementType: "column", answersJSON: "{}" }] }] }]
+  });
+  const run = (au: any, b: any) => {
+    const controller = new PageController2();
+    const save = jest.fn(async (p: any) => ({ ...p, id: "pg9" }));
+    (controller as any).repos = { page: { save } };
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
+    return (controller as any).importTree({ body: b }, {}).then((result: any) => ({ result, save }));
+  };
+
+  it("rejects callers without content edit", async () => {
+    const { result, save } = await run(makeAu("c1", []), body());
+    expect(result.status).toBe(401);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("always inserts under the caller's church, ignoring body ids and churchId", async () => {
+    (TreeHelper.duplicateSection as jest.Mock).mockClear();
+    const { result, save } = await run(makeAu("c1"), body());
+    expect(result.id).toBe("pg9");
+    expect(save.mock.calls[0][0]).toEqual({ churchId: "c1", siteId: "", title: "Home", url: "/home", layout: "headerFooter" });
+    const section = (TreeHelper.duplicateSection as jest.Mock).mock.calls[0][0];
+    expect(section).toMatchObject({ churchId: "c1", pageId: "pg9", sort: 1 });
+    expect(section.id).toBeUndefined();
+    expect(section.elements[0]).toMatchObject({ churchId: "c1", elementType: "row", sort: 1 });
+    expect(section.elements[0].id).toBeUndefined();
+    expect(section.elements[0].elements[0]).toMatchObject({ churchId: "c1", elementType: "column" });
+  });
+
+  it("rejects invalid answersJSON before saving anything", async () => {
+    const b = body();
+    b.sections[0].elements[0].answersJSON = "{nope";
+    const { result, save } = await run(makeAu("c1"), b);
+    expect(result.status).toBe(400);
+    expect(save).not.toHaveBeenCalled();
   });
 });

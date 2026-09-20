@@ -30,7 +30,11 @@ export class RatingRepo {
 
   public async setSaved(assetId: string, userId: string, saved: boolean): Promise<void> {
     const existing = await this.load(assetId, userId);
+    const was = !!existing?.saved;
     await this.write(assetId, userId, { stars: existing?.stars ?? null, saved });
+    if (was === saved) return;
+    const delta = saved ? 1 : -1;
+    await sql`update assets set saveCount = greatest(0, saveCount + ${delta}) where id = ${assetId}`.execute(getDb());
   }
 
   public async loadSavedAssetIds(userId: string): Promise<string[]> {

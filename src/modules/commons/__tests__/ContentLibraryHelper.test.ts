@@ -24,7 +24,7 @@ jest.mock("@churchapps/apihelper", () => {
 jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { fileStore: "disk", contentRoot: CONTENT_ROOT, jwtSecret: "test-secret" } }));
 
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
-import { findByBase, idFromFolder, packageDirFrom, packageDirOf, packageFolder, packageKey, packagePath, packageRole, relativeName, slugify, songPackageDir } from "../helpers/PackageLayout.js";
+import { audioKeysToAdd, completedPackageName, findByBase, idFromFolder, packageDirFrom, packageDirOf, packageFolder, packageKey, packagePath, packageRole, relativeName, slugify, songPackageDir } from "../helpers/PackageLayout.js";
 import { isPublicDiskFilePath } from "../../content/helpers/PublicFileAccess.js";
 
 const asset = { id: "testasst001", assetType: "song" };
@@ -113,6 +113,64 @@ describe("storage keys", () => {
     ]);
     expect(urls.demoAudio).toMatch(/\/sources\/master\/song\.mp3$/);
     expect(urls.song).toMatch(/\/masters\/song\.json$/);
+  });
+
+  it("registers titled stems zips and sidecars from an output/audio listing, skipping ones already live", () => {
+    const dir = "songs/en/gods-love-outpoured-0iO4XfQPq7T";
+    const listed = [
+      `${dir}/output/audio/God's Love Outpoured-God's Love Outpoured-D-112.00bpm.zip`,
+      "instrumental.m4a",
+      "commons/songs/en/gods-love-outpoured-0iO4XfQPq7T/output/audio/preview.m4a",
+      "slides.json"
+    ];
+    expect(audioKeysToAdd(dir, listed, [`${dir}/output/audio/preview.m4a`])).toEqual([
+      `${dir}/output/audio/God's Love Outpoured-God's Love Outpoured-D-112.00bpm.zip`,
+      `${dir}/output/audio/instrumental.m4a`
+    ]);
+  });
+
+  it("completes catalog keys MySQL truncated at varchar(100) so fileUrls roles and URLs are the real files", () => {
+    const dir = "songs/en/public-domain/here-o-my-lord-i-see-thee-face-to-face-5_NL8Xr-icD";
+    expect(completedPackageName(`${dir}/derivatives/attribution.tx`)).toBe(`${dir}/derivatives/attribution.txt`);
+    expect(completedPackageName(`${dir}/derivatives/cover-thumb.we`)).toBe(`${dir}/derivatives/cover-thumb.webp`);
+    expect(packageRole(`${dir}/derivatives/attributi`)).toBe("attribution");
+    expect(packageRole(`${dir}/derivatives/duration.`)).toBe("duration");
+    expect(packageRole(`${dir}/derivatives/sl`)).toBe("slides");
+    expect(packageRole(`${dir}/derivatives/at`)).toBe("attribution");
+    expect(packageRole(`${dir}/derivatives/chart.`)).toBe("chart");
+    expect(packageRole("songs/en/all-of-my-heart-2FCCvjupEKe/sources/extra/AllOfMyHeart2021_acc.mp3")).toBe("AllOfMyHeart2021_acc");
+    expect(completedPackageName("songs/en/x/output/composition/score.mid")).toBe("songs/en/x/output/composition/score.mid");
+    const urls = ContentLibraryHelper.fileUrls(asset, [
+      { name: `${dir}/derivatives/attribution.tx` },
+      { name: `${dir}/derivatives/duration.` },
+      { name: `${dir}/derivatives/sl` },
+      { name: `${dir}/derivatives/chart.` }
+    ]);
+    expect(Object.keys(urls).sort()).toEqual(["attribution", "chart", "duration", "slides"]);
+    expect(urls.attribution).toBe(`${CONTENT_ROOT}/commons/${dir}/derivatives/attribution.txt`);
+    expect(urls.slides).toBe(`${CONTENT_ROOT}/commons/${dir}/derivatives/slides.json`);
+    expect(urls.chart).toBe(`${CONTENT_ROOT}/commons/${dir}/derivatives/chart.chordpro`);
+    expect(findByBase([{ name: `${dir}/derivatives/attributi` }], "song", "attribution.txt")?.name).toBe(`${dir}/derivatives/attributi`);
+  });
+
+  it("names the pipeline stems pack by folder, not the title-BPM zip filename", () => {
+    const pkg = "songs/en/all-of-my-heart-2FCCvjupEKe";
+    expect(packageRole(`${pkg}/output/audio/All Of My Heart-All Of My Heart-A-99.00bpm.zip`)).toBe("stemsZip");
+    expect(packageRole(`${pkg}/output/audio.zip`)).toBe("audioZip");
+    expect(packageRole("sources/stemsZip.zip")).toBe("stemsZip");
+    const urls = ContentLibraryHelper.fileUrls(asset, [
+      { name: `${pkg}/output/audio/All Of My Heart-All Of My Heart-Eb-99.00bpm.zip` },
+      { name: `${pkg}/output/audio/All Of My Heart-All Of My Heart-A-99.00bpm.zip` },
+      { name: `${pkg}/output/audio/instrumental.m4a` },
+      { name: `${pkg}/output/audio/preview.m4a` },
+      { name: `${pkg}/output/audio.zip` }
+    ]);
+    expect(urls.stemsZip).toMatch(/\/All Of My Heart-All Of My Heart-Eb-99\.00bpm\.zip$/);
+    expect(urls.stemsZip).not.toMatch(/-A-99\.00bpm\.zip$/); // first zip wins when two keys exist
+    expect(urls.instrumental).toMatch(/\/instrumental\.m4a$/);
+    expect(urls.preview).toMatch(/\/preview\.m4a$/);
+    expect(urls.audioZip).toMatch(/\/output\/audio\.zip$/);
+    expect(urls).not.toHaveProperty("All Of My Heart-All Of My Heart-A-99.00bpm");
   });
 });
 

@@ -197,6 +197,45 @@ export class PageController2 extends ContentBaseController {
     });
   }
 
+  // Creates a page with its full section/element tree in one call (generated pages). Always inserts: ids and churchId
+  // from the body are ignored, and rows must carry their column children so no auto-created columns are needed.
+  @httpPost("/importTree")
+  public async importTree(req: express.Request<{}, {}, Page>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const { title, url, layout, siteId, sections } = req.body;
+      if (!title || !url || !Array.isArray(sections) || sections.length === 0 || sections.length > 30) return this.json({ errors: ["title, url and 1-30 sections are required"] }, 400);
+
+      let elementCount = 0;
+      const errors: string[] = [];
+      const cleanElements = (elements: Element[]): Element[] => (Array.isArray(elements) ? elements : []).map((e, i) => {
+        elementCount++;
+        try { if (e.answersJSON) JSON.parse(e.answersJSON); } catch { errors.push("element answersJSON is not valid JSON"); }
+        return { churchId: au.churchId, elementType: String(e.elementType || ""), sort: i + 1, answersJSON: e.answersJSON, stylesJSON: e.stylesJSON, animationsJSON: e.animationsJSON, elements: cleanElements(e.elements) };
+      });
+      const cleanSections: Section[] = sections.map((s, i) => ({
+        churchId: au.churchId,
+        zone: s.zone || "main",
+        sort: i + 1,
+        background: s.background,
+        textColor: s.textColor,
+        headingColor: s.headingColor,
+        linkColor: s.linkColor,
+        answersJSON: s.answersJSON,
+        stylesJSON: s.stylesJSON,
+        animationsJSON: s.animationsJSON,
+        elements: cleanElements(s.elements)
+      }));
+      if (elementCount > 500) errors.push("too many elements");
+      if (errors.length > 0) return this.json({ errors }, 400);
+
+      const page = await this.repos.page.save({ churchId: au.churchId, siteId: siteId || "", title, url, layout: layout || "headerFooter" });
+      for (const section of cleanSections) await TreeHelper.duplicateSection({ ...section, pageId: page.id });
+      this.bumpSiteCache(au.churchId);
+      return page;
+    });
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Page[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

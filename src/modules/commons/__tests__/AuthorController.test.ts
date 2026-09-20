@@ -32,6 +32,7 @@ describe("CommonsAuthorController", () => {
       bio: "Hymn writer",
       portraitUrl: "http://cdn/commons/writers/ada.jpg",
       links: [{ label: "Site", url: "https://ada.example" }],
+      supportLinks: [],
       songs: [{ id: "asset000001", title: "Blessed Assurance", year: 1873, language: "English", license: "PD" }]
     });
   });
@@ -43,7 +44,23 @@ describe("CommonsAuthorController", () => {
 
   it("returns an empty links list when the stored JSON is unusable", async () => {
     const { controller } = authorController({ ...ADA, links: "not json" });
-    expect((await controller.get({ params: { id: "author00001" } } as any, {} as any)).links).toEqual([]);
+    const profile: any = await controller.get({ params: { id: "author00001" } } as any, {} as any);
+    expect(profile.links).toEqual([]);
+    expect(profile.supportLinks).toEqual([]);
+  });
+
+  it("splits support links out of the stored JSON", async () => {
+    const { controller } = authorController({
+      ...ADA,
+      links: JSON.stringify([
+        { label: "Site", url: "https://ada.example" },
+        { label: "Bandcamp", url: "https://ada.bandcamp.com", support: true }
+      ])
+    });
+    expect(await controller.get({ params: { id: "author00001" } } as any, {} as any)).toMatchObject({
+      links: [{ label: "Site", url: "https://ada.example" }],
+      supportLinks: [{ label: "Bandcamp", url: "https://ada.bandcamp.com" }]
+    });
   });
 
   it("mine returns the caller's own profile", async () => {
@@ -53,7 +70,8 @@ describe("CommonsAuthorController", () => {
       name: "Ada Crosby",
       bio: "Hymn writer",
       portraitUrl: "http://cdn/commons/writers/ada.jpg",
-      links: [{ label: "Site", url: "https://ada.example" }]
+      links: [{ label: "Site", url: "https://ada.example" }],
+      supportLinks: []
     });
     expect(repos.author.loadByUserId).toHaveBeenCalledWith("user0000001");
   });
@@ -99,6 +117,69 @@ describe("CommonsAuthorController", () => {
   it("rejects a link that is not http or https", async () => {
     const { controller, repos } = authorController();
     const result: any = await controller.saveMine({ body: { links: [{ label: "x", url: "javascript:alert(1)" }] } } as any, {} as any);
+    expect(result.status).toBe(400);
+    expect(result.obj.errors[0]).toContain("javascript:alert(1)");
+    expect(repos.author.update).not.toHaveBeenCalled();
+  });
+
+  it("saves support links beside site links", async () => {
+    const { controller, repos } = authorController();
+    const body = {
+      bio: "Writes hymns.",
+      links: [{ label: "Site", url: "https://ada.example" }],
+      supportLinks: [{ label: "Bandcamp", url: "https://ada.bandcamp.com" }]
+    };
+    const result = await controller.saveMine({ body } as any, {} as any);
+    expect(repos.author.update).toHaveBeenCalledWith("author00001", {
+      bio: "Writes hymns.",
+      links: JSON.stringify([
+        { label: "Site", url: "https://ada.example" },
+        { label: "Bandcamp", url: "https://ada.bandcamp.com", support: true }
+      ])
+    });
+    expect(result).toMatchObject({
+      links: [{ label: "Site", url: "https://ada.example" }],
+      supportLinks: [{ label: "Bandcamp", url: "https://ada.bandcamp.com" }]
+    });
+  });
+
+  it("keeps existing support links when the body omits them", async () => {
+    const { controller, repos } = authorController({
+      ...ADA,
+      links: JSON.stringify([
+        { label: "Site", url: "https://ada.example" },
+        { label: "Bandcamp", url: "https://ada.bandcamp.com", support: true }
+      ])
+    });
+    await controller.saveMine({ body: { bio: "Hi", links: [{ label: "Site", url: "https://ada.example" }] } } as any, {} as any);
+    expect(repos.author.update).toHaveBeenCalledWith("author00001", {
+      bio: "Hi",
+      links: JSON.stringify([
+        { label: "Site", url: "https://ada.example" },
+        { label: "Bandcamp", url: "https://ada.bandcamp.com", support: true }
+      ])
+    });
+  });
+
+  it("clears support links when the body sends an empty list", async () => {
+    const { controller, repos } = authorController({
+      ...ADA,
+      links: JSON.stringify([{ label: "Bandcamp", url: "https://ada.bandcamp.com", support: true }])
+    });
+    await controller.saveMine({ body: { bio: "Hi", links: [], supportLinks: [] } } as any, {} as any);
+    expect(repos.author.update).toHaveBeenCalledWith("author00001", { bio: "Hi", links: null });
+  });
+
+  it("rejects more than five support links", async () => {
+    const { controller, repos } = authorController();
+    const supportLinks = Array.from({ length: 6 }, (_, i) => ({ label: `S${i}`, url: `https://s${i}.example` }));
+    expect(await controller.saveMine({ body: { supportLinks } } as any, {} as any)).toMatchObject({ status: 400 });
+    expect(repos.author.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a support link that is not http or https", async () => {
+    const { controller, repos } = authorController();
+    const result: any = await controller.saveMine({ body: { supportLinks: [{ label: "x", url: "javascript:alert(1)" }] } } as any, {} as any);
     expect(result.status).toBe(400);
     expect(result.obj.errors[0]).toContain("javascript:alert(1)");
     expect(repos.author.update).not.toHaveBeenCalled();

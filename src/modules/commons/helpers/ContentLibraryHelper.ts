@@ -7,7 +7,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AssetFile, SongView } from "../models/index.js";
-import { baseName, findByBase, isPackageKey, packageDirFrom, packageKey, packageRole } from "./PackageLayout.js";
+import { baseName, completedPackageName, findByBase, isPackageKey, packageDirFrom, packageKey, packageRole } from "./PackageLayout.js";
 
 // Storage keys are derived from assetFiles.name, never stored twice. A song file's name is its catalog key
 // (songs/<lang>/<section>/<slug>-<id>/{sources,masters,derivatives}/<file>; an inherited file is keyed under the parent song) and
@@ -45,7 +45,8 @@ export class ContentLibraryHelper {
 
   /** Storage key of a live file: a catalog key sits directly under the commons prefix, anything else under the legacy folder. */
   static liveKey(asset: { assetType?: string; id?: string }, name: string): string {
-    return isPackageKey(name) ? `${ROOT}/${name}` : `${this.livePrefix(asset)}/${name}`;
+    const n = completedPackageName(name);
+    return isPackageKey(n) ? `${ROOT}/${n}` : `${this.livePrefix(asset)}/${n}`;
   }
 
   /** Storage key of the song package's own files: commons/songs/<lang>/<section>/<slug>-<id>. */
@@ -86,8 +87,9 @@ export class ContentLibraryHelper {
     const out: Record<string, string> = {};
     for (const f of files) {
       if (!f.name) continue;
-      const role = this.role(f.name);
-      if (!(role in out) || PREFERRED.has(baseName(f.name))) out[role] = this.publicUrl(this.liveKey(asset, f.name));
+      const name = completedPackageName(f.name);
+      const role = this.role(name);
+      if (!(role in out) || PREFERRED.has(baseName(name))) out[role] = this.publicUrl(this.liveKey(asset, name));
     }
     if (portraitKey) out.portrait = this.publicUrl(portraitKey);
     return out;
@@ -280,6 +282,11 @@ export class ContentLibraryHelper {
       this.s3 = new S3Client(config);
     }
     return this.s3;
+  }
+
+  /** Keys under a live prefix (`commons/songs/…/output/audio`). */
+  static listLiveKeys(prefix: string): Promise<string[]> {
+    return this.listKeys(prefix);
   }
 
   // S3 lists every key under the prefix; the disk store only lists one directory, so walk the package folders ourselves

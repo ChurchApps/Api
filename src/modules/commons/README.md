@@ -2,7 +2,7 @@
 
 A song id is always the current song. There are no release ids: a republish rewrites the same id's files and rows, and the `/assets/:id/history` timeline is the only version record.
 
-**Package layout in the bucket.** A song's live files sit under `commons/assets/song/<id>/` in the three folders of `vision/files.md` section 0; `manifest.json` (the inventory) stays at the package root. `assetFiles.name` stores the package-relative name (`sources/tune.mid`, `masters/lyrics.chordpro`, `derivatives/slides.json`); roles are always decided by the basename (`helpers/PackageLayout.ts`), so `fileUrls` keys are unchanged for consumers and only the URL path carries the folder. Pending uploads stay flat under `commons/pending/<submissionId>/`; `packagePath()` decides the destination folder on approve. Assets that are not songs keep their flat layout.
+**Package layout in the bucket.** A song's live files sit under `commons/assets/song/<id>/` in the three folders of `vision/files.md` section 0; `manifest.json` (the inventory) stays at the package root. `assetFiles.name` stores the package-relative name (`sources/tune.mid`, `masters/lyrics.chordpro`, `derivatives/slides.json`); roles are the basename except a zip in `output/audio/` which is `stemsZip` (`helpers/PackageLayout.ts`), so `fileUrls` keys are unchanged for consumers and only the URL path carries the folder. Pending uploads stay flat under `commons/pending/<submissionId>/`; `packagePath()` decides the destination folder on approve. Assets that are not songs keep their flat layout.
 
 | Folder | What lands there | Written by |
 |---|---|---|

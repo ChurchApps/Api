@@ -1,8 +1,11 @@
 import { createKysely, ensureEnvironment } from "../kysely-config.js";
 import { buildCatalog } from "../commons-seed/catalog.js";
+import { completedPackageName } from "../../src/modules/commons/helpers/PackageLayout.js";
 
 // Incremental catalog → commons DB. Inserts missing songs/files. Never drops.
-// --update also writes chordPro/metadata on existing songs and re-points live assetFiles rows whose
+// Unclaimed authors also receive links/supportLinks from writers/<slug>/writer.json (claimed
+// profiles with userId are left alone). --update also writes chordPro/metadata on existing songs
+// and re-points live assetFiles rows whose
 // basename the catalog now serves from a different key (a pre-cut-over "sources/tune.mid" row becomes
 // "songs/<lang>/<section>/<slug>-<id>/sources/tune.mid"; the old id-keyed object keeps working until then).
 // Bytes are never uploaded here: the bucket holds exactly the content repo's layout under commons/, pushed by
@@ -23,11 +26,14 @@ async function main() {
   const db = createKysely("commons");
   try {
     const existingIds = new Set((await db.selectFrom("assets").select("id").execute()).map(r => r.id));
-    const existingAuthors = await db.selectFrom("authors").select(["id", "name"]).execute();
+    const existingAuthors = await db.selectFrom("authors").select(["id", "name", "userId", "links"]).execute();
     const authorIdByName = new Map(existingAuthors.map(a => [a.name as string, a.id as string]));
+    const existingAuthorByName = new Map(existingAuthors.map(a => [a.name as string, a]));
     const existingFiles = await db.selectFrom("assetFiles").select(["id", "assetId", "name", "sizeBytes"]).where("submissionId", "is", null).execute();
-    // one live file per basename per asset, whichever layout its name is in
+    // one live file per basename per asset, whichever layout its name is in — including names
+    // MySQL truncated at varchar(100) (`attributi` completes to `attribution.txt`)
     const liveByBase = new Map(existingFiles.map(f => [`${f.assetId}/${base(String(f.name))}`, f]));
+    const liveByCompleted = new Map(existingFiles.map(f => [`${f.assetId}/${base(completedPackageName(String(f.name)))}`, f]));
 
     const newAssets = assets.filter(a => !existingIds.has(a.id));
     const newSongs = songs.filter(s => !existingIds.has(s.assetId));
@@ -35,21 +41,33 @@ async function main() {
     const newSubs = submissions.filter(s => !existingIds.has(s.assetId));
     const newFiles: typeof assetFiles = [];
     const rekeyed: { id: string; from: string; to: string; sizeBytes: number | null }[] = [];
+    const claimed = new Set<string>();
     for (const f of assetFiles) {
-      const current = existingIds.has(f.assetId) ? liveByBase.get(`${f.assetId}/${base(f.name)}`) : undefined;
+      const key = `${f.assetId}/${base(f.name)}`;
+      const current = existingIds.has(f.assetId) ? liveByBase.get(key) || liveByCompleted.get(key) : undefined;
+      if (current && claimed.has(String(current.id))) { newFiles.push(f); continue; }
       if (!current) newFiles.push(f);
-      else if (current.name !== f.name) rekeyed.push({ id: String(current.id), from: String(current.name), to: f.name, sizeBytes: f.sizeBytes });
+      else {
+        claimed.add(String(current.id));
+        if (current.name !== f.name) rekeyed.push({ id: String(current.id), from: String(current.name), to: f.name, sizeBytes: f.sizeBytes });
+      }
     }
     const neededAuthorSeedIds = new Set(newSongs.map(s => s.authorId).filter(Boolean));
     const newAuthors = authors.filter(a => neededAuthorSeedIds.has(a.id) && !authorIdByName.has(a.name));
+    const authorLinkPatches = authors.filter(a => {
+      const row = existingAuthorByName.get(a.name);
+      return row && !row.userId && (row.links || null) !== (a.links || null);
+    });
 
     console.log(`catalog ${assets.length} songs; db already has ${existingIds.size}`);
-    console.log(`new authors ${newAuthors.length}, assets ${newAssets.length}, files ${newFiles.length}, files to re-key ${rekeyed.length}${update ? ` (will update ${existingSongs.length} songs and re-key)` : " (re-key needs --update)"}${dry ? " (dry-run)" : ""}`);
+    console.log(`new authors ${newAuthors.length}, author link patches ${authorLinkPatches.length}, assets ${newAssets.length}, files ${newFiles.length}, files to re-key ${rekeyed.length}${update ? ` (will update ${existingSongs.length} songs and re-key)` : " (re-key needs --update)"}${dry ? " (dry-run)" : ""}`);
 
     if (dry) {
       for (const a of newAssets) console.log(`  + ${a.license} ${a.name} (${a.id})`);
       const extraFiles = newFiles.filter(f => existingIds.has(f.assetId));
       console.log(`  extra files on existing songs: ${extraFiles.length}`);
+      for (const a of authorLinkPatches.slice(0, 20)) console.log(`  ~ author ${a.name} links`);
+      if (authorLinkPatches.length > 20) console.log(`  ... ${authorLinkPatches.length - 20} more author links`);
       for (const r of rekeyed.slice(0, 20)) console.log(`  ~ ${r.from} -> ${r.to}`);
       if (rekeyed.length > 20) console.log(`  ... ${rekeyed.length - 20} more`);
       if (update) console.log(`  would update chordPro/metadata on ${existingSongs.length} existing songs`);
@@ -60,6 +78,12 @@ async function main() {
       await db.insertInto("authors").values(a).execute();
       authorIdByName.set(a.name, a.id);
     }
+    for (const a of authorLinkPatches) {
+      const row = existingAuthorByName.get(a.name);
+      if (!row) continue;
+      await db.updateTable("authors").set({ links: a.links } as any).where("id", "=", row.id).execute();
+    }
+    if (authorLinkPatches.length) console.log(`updated links on ${authorLinkPatches.length} unclaimed authors`);
     for (const song of newSongs) {
       if (song.authorId) {
         const src = authors.find(a => a.id === song.authorId);

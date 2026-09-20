@@ -5,7 +5,7 @@ import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { ASSET_TYPES } from "../helpers/AssetTypes.js";
 import { parseContributors } from "../helpers/ContributorsHelper.js";
-import { baseName } from "../helpers/PackageLayout.js";
+import { audioKeysToAdd, baseName, packageDirFrom } from "../helpers/PackageLayout.js";
 import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, ReviewerHelper, userNames, type Reviewer } from "../helpers/index.js";
 import { SongPackageHelper } from "../helpers/SongPackageHelper.js";
 import { Repos } from "../repositories/index.js";
@@ -355,7 +355,7 @@ export class CommonsAdminController extends CommonsBaseController {
       if (!song || song.status === "removed") return this.json({}, 404);
       const files = await this.repos.assetFile.loadLive(song.id || "");
       const urls = ContentLibraryHelper.fileUrls({ assetType: "song", id: song.id }, files, song.portraitKey);
-      const hasScore = !!urls.score;
+      const hasScore = !!(urls.score || urls.abc);
       const base = SongPackageHelper.baseConfidence({ hasScore, scoreSource: song.scoreSource, hasChords: !!song.hasChords });
       const published = SongPackageHelper.parseKeys(song.publishedKeys);
       const publishedKeys = published.length ? published : song.songKey ? [song.songKey] : [];
@@ -366,6 +366,30 @@ export class CommonsAdminController extends CommonsBaseController {
         : { listenedKeys: null, sundayReadyBy: null, sundayReadyAt: null, confidence: base });
       const fresh = await this.repos.song.loadById(song.id || "");
       return await SongPackageHelper.detail(fresh || song, urls, { readText: async (name) => (await ContentLibraryHelper.readKey(ContentLibraryHelper.fileKey({ assetType: "song", id: song.id }, files, name)))?.buffer.toString("utf8") ?? null });
+    });
+  }
+
+  /** Register pipeline audio already in the bucket (titled stems zip, instrumental, preview) that seed skipped. */
+  @httpPost("/sync-audio")
+  public async syncAudio(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
+      const songs = await this.repos.song.loadPublishedSummaries();
+      const filesBy = await this.repos.assetFile.loadLiveMany(songs.map((s) => s.id || "").filter(Boolean));
+      let scanned = 0, added = 0;
+      for (const song of songs) {
+        const files = filesBy[song.id || ""] || [];
+        if (!files.some((f) => /\/output\/audio(\/|\.zip$)/i.test(f.name || ""))) continue;
+        const dir = packageDirFrom(files);
+        if (!dir) continue;
+        scanned++;
+        const listed = await ContentLibraryHelper.listLiveKeys(`${ContentLibraryHelper.packagePrefix(dir)}/output/audio`);
+        for (const name of audioKeysToAdd(dir, listed, files.map((f) => f.name || ""))) {
+          await this.repos.assetFile.create({ assetId: song.id, name, action: "add" });
+          added++;
+        }
+      }
+      return { scanned, added };
     });
   }
 

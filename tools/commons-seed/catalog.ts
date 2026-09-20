@@ -23,7 +23,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 const SONG_COLS = [
   "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "hymnalCount", "chordPro", "videoUrl", "parentSongId", "relationLabel", "licenseVersion", "licenseUrl", "ccli", "proAnswer", "certified", "confidence"
 ];
-const FILE_COLS = ["artUrl", "midiUrl", "lyricsUrl", "abcUrl", "demoAudioUrl", "sheetPdfUrl", "stemsZipUrl", "compositionZipUrl", "audioZipUrl"];
+const FILE_COLS = ["artUrl", "midiUrl", "lyricsUrl", "abcUrl", "demoAudioUrl", "sheetPdfUrl", "stemsZipUrl", "previewUrl", "instrumentalUrl", "compositionZipUrl", "audioZipUrl"];
 const DETAIL_COLS = ["year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer"];
 // masters/song.json fields the songs/assets rows read, and the column each one fills
 const SONG_JSON_FIELDS: Record<string, string> = {
@@ -51,6 +51,68 @@ function readJson(file: string): any {
 
 function readText(file: string): string | null {
   try { return fs.readFileSync(file, "utf8"); } catch { return null; }
+}
+
+/** Same slug rule as WorshipCommonsContent tools/lib.mjs slugify. */
+export function writerFolderSlugs(name: string): string[] {
+  const slug = (s: string) => s.normalize("NFC").toLowerCase()
+    .replace(/['’ʼ]/gu, "")
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  const people = name.split(/\s*[·/&,]|\s+and\s+/i)
+    .map(s => s.replace(/^\s*(tr\.|attr\.?|after|from)\s+/i, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  return [...new Set([slug(name), ...people.map(slug)].filter(Boolean))];
+}
+
+function loadWriterProfiles(repoDir: string): Map<string, any> {
+  const dir = path.join(repoDir, "writers");
+  const map = new Map<string, any>();
+  if (!fs.existsSync(dir)) return map;
+  for (const slug of fs.readdirSync(dir)) {
+    const w = readJson(path.join(dir, slug, "writer.json"));
+    if (!w) continue;
+    map.set(w.slug || slug, w);
+    if (typeof w.name === "string" && w.name.trim()) map.set(w.name.trim(), w);
+  }
+  return map;
+}
+
+const LINKS_MAX = 5;
+
+export function authorLinksJson(name: string, repoDir: string): string | null {
+  return encodedAuthorLinks(name, loadWriterProfiles(repoDir));
+}
+
+function encodedAuthorLinks(name: string, profiles: Map<string, any>): string | null {
+  const hits = new Set<any>();
+  const exact = profiles.get(name);
+  if (exact) hits.add(exact);
+  for (const slug of writerFolderSlugs(name)) {
+    const w = profiles.get(slug);
+    if (w) hits.add(w);
+  }
+  const seen = new Set<string>();
+  const stored: { label: string; url: string; support?: boolean }[] = [];
+  const add = (list: any[] | undefined, support: boolean) => {
+    for (const raw of list || []) {
+      const url = String(raw?.url || "").trim();
+      if (!url || !/^https?:\/\/\S+$/i.test(url)) continue;
+      const kind = support ? stored.filter(l => l.support).length : stored.filter(l => !l.support).length;
+      if (kind >= LINKS_MAX) return;
+      const key = `${support ? "s" : "l"}|${url}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const row: { label: string; url: string; support?: boolean } = { label: String(raw?.label || "").trim().slice(0, 60), url: url.slice(0, 255) };
+      if (support) row.support = true;
+      stored.push(row);
+    }
+  };
+  for (const w of hits) {
+    add(w.links, false);
+    add(w.supportLinks, true);
+  }
+  return stored.length ? JSON.stringify(stored) : null;
 }
 
 // mirrors lib.mjs splitChordpro: directive header lines, one blank line, body verbatim, one trailing \n
@@ -137,6 +199,7 @@ export function buildCatalog(repoDir: string) {
   const assetFiles: any[] = [];
   const submissions: any[] = [];
   const authorIdByKey: Record<string, string> = {};
+  const writerProfiles = loadWriterProfiles(repoDir);
   const now = new Date();
   let packageIndex: Map<string, string> | undefined;
   const index = () => (packageIndex ||= indexPackages(repoDir));
@@ -149,12 +212,14 @@ export function buildCatalog(repoDir: string) {
     const addFile = (key: string) => {
       const name = key.replace(/\\/g, "/");
       const base = name.split("/").pop() || "";
-      if (seen.has(base)) return; // one file per basename: the first registered wins (masters before derivatives)
+      // 255 is assetFiles.name after 2026-09-08; the old varchar(100) silently truncated long slugs
+      if (!name || name.length > 255 || seen.has(base)) return; // one file per basename: the first registered wins (masters before derivatives)
       seen.add(base);
       const src = path.join(repoDir, name);
       assetFiles.push({ id: UniqueIdHelper.shortId(), assetId: row.id, submissionId: null, name, action: "add", sizeBytes: fs.existsSync(src) ? fs.statSync(src).size : null, uploadedBy: rec.submittedBy || null });
     };
     for (const c of FILE_COLS) if (row[c]) addFile(row[c]);
+    for (const extra of row.extraUrls || []) if (typeof extra === "string") addFile(extra);
     const served: Record<string, string | null> = {};
     let masterScore = false;
     for (const name of MASTERS) {
@@ -173,7 +238,7 @@ export function buildCatalog(repoDir: string) {
       if (!authorId) {
         authorId = UniqueIdHelper.shortId();
         authorIdByKey[key] = authorId;
-        authors.push({ id: authorId, name: rec.writer, bio: row.writerBio || null, portraitUrl: row.writerPortraitUrl ? `commons/${row.writerPortraitUrl}` : null });
+        authors.push({ id: authorId, name: rec.writer, bio: row.writerBio || null, portraitUrl: row.writerPortraitUrl ? `commons/${row.writerPortraitUrl}` : null, links: encodedAuthorLinks(rec.writer, writerProfiles) });
       }
     }
 
@@ -203,6 +268,7 @@ export function buildCatalog(repoDir: string) {
       publishedAt: pending ? null : now,
       publishedSubmissionId: pending ? null : submissionId,
       downloadCount: 0,
+      saveCount: 0,
       ratingCount: 0,
       ratingSum: 0,
       featured: 0
@@ -222,9 +288,10 @@ function packageColumns(repoDir: string, rec: any, pkg: Package, served: Record<
   const pinned = Array.isArray(pkg.song?.pipeline?.publishedKeys) ? pkg.song.pipeline.publishedKeys : null;
   const hasChords = CHORD.test(rec.chordPro || "");
   const scoreSource = masterScore ? "master" : served["score.musicxml"] ? "abc" : null;
-  const computed = masterScore ? "proofread-score" : served["score.musicxml"] ? "converted-from-abc" : hasChords ? "chart-only" : "lyrics-only";
+  const computed = served["score.musicxml"] ? "score" : hasChords ? "chart-only" : "lyrics-only";
+  const stored = rec.confidence ?? computed;
   return {
-    confidence: rec.confidence ?? computed,
+    confidence: stored === "proofread-score" || stored === "converted-from-abc" ? "score" : stored,
     firstLine: firstLine(rec.chordPro || ""),
     hasChords,
     tune: null,

@@ -67,13 +67,17 @@ export class SongPackageHelper {
     return { status: "draft", sections: labels.map((label, i) => ({ label, lyric: i + 1 })), defaultOrder: labels };
   }
 
-  /** The tier a package earns from its files alone; "sunday-ready" is only ever granted by the listen gate. */
+  /** Stored rows may still say proofread-score / converted-from-abc until the remap migration runs. */
+  static normalizeConfidence(c?: string | null): Confidence | null {
+    if (!c) return null;
+    if (c === "proofread-score" || c === "converted-from-abc") return "score";
+    return c as Confidence;
+  }
+
+  /** The tier a package earns from its files alone; "sunday-ready" is only ever granted by the listen gate.
+   *  ABC conversion is a typeset score (Open Hymnal SATB), same as an uploaded MusicXML master. MIDI is the sketch. */
   static baseConfidence(p: { hasScore: boolean; scoreSource?: string | null; hasChords: boolean }): Confidence {
-    if (p.hasScore) {
-      if (p.scoreSource === "master") return "proofread-score";
-      if (p.scoreSource === "midi") return "generated-from-midi";
-      return "converted-from-abc";
-    }
+    if (p.hasScore) return p.scoreSource === "midi" ? "generated-from-midi" : "score";
     return p.hasChords ? "chart-only" : "lyrics-only";
   }
 
@@ -99,20 +103,22 @@ export class SongPackageHelper {
 
   /** Summary row: the joined row with the new booleans, reviewer-only fields dropped, has* read off the served files. */
   static summary(row: SongView, fileUrls: Record<string, string>): SongSummary {
-    const { portraitKey: _portraitKey, qualityScore: _qualityScore, ...rest } = row as SongView & { portraitKey?: string };
+    const { portraitKey: _portraitKey, qualityScore: _qualityScore, ratingCount: _ratingCount, ratingSum: _ratingSum, ...rest } = row as SongView & { portraitKey?: string };
+    const confidence = this.normalizeConfidence(row.confidence);
     return {
       ...rest,
-      confidence: (row.confidence as Confidence) || null,
-      sundayReady: row.confidence === "sunday-ready",
+      confidence,
+      sundayReady: confidence === "sunday-ready",
       featured: !!row.featured,
       firstLine: row.firstLine || null,
       tune: row.tune || null,
       hymnalCount: row.hymnalCount || 0,
       hasChords: !!row.hasChords,
-      hasScore: !!fileUrls.score,
+      // Open Hymnal ABC is a typeset SATB score; generated MusicXML is often gitignored and never lands in fileUrls
+      hasScore: !!(fileUrls.score || fileUrls.abc),
       hasSlides: !!fileUrls.slides,
       hasTiming: !!fileUrls.timing,
-      hasAccompaniment: false, // demoAudio is a writer demo, not accompaniment; no rendered accompaniment exists yet
+      hasAccompaniment: !!(fileUrls.instrumental || fileUrls.stemsZip),
       recommendedKey: row.recommendedKey || null,
       singTimeSeconds: row.singTimeSeconds ?? null,
       fileUrls

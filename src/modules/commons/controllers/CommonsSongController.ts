@@ -111,15 +111,13 @@ export class CommonsSongController extends CommonsBaseController {
     });
   }
 
-  // The single fetch the song page needs; `rating.mine` only with a user JWT (actionWrapper tolerates anonymous callers).
+  // The single fetch the song page needs. actionWrapper tolerates anonymous callers.
   @httpGet("/:id/page")
   public async page(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => {
+    return this.actionWrapper(req, res, async (_au) => {
       const row = await this.repos.song.loadById(String(req.params.id));
       if (!row || row.status !== "published") return this.json({}, 404);
       const song = await this.detail(row);
-      const mine = au.id ? (await this.repos.rating.load(song.id || "", au.id))?.stars ?? null : null;
-      const count = row.ratingCount || 0;
       const family = await this.withUrls(SongPackageHelper.family(row, await this.repos.song.loadFamily(row.parentSongId || row.id || "")));
       const familyIds = new Set(family.map((f) => f.id || ""));
       // ponytail: scores every published song of the language in memory (a few hundred rows); index it when the catalog grows past ~10k
@@ -129,7 +127,6 @@ export class CommonsSongController extends CommonsBaseController {
       const similar = withUrls.map((s, i) => ({ ...s, reason: picked[i].reason }));
       return {
         song,
-        rating: { average: count ? Math.round(((row.ratingSum || 0) / count) * 10) / 10 : 0, count, mine },
         history: await PublishHelper.history(this.repos, song.id || ""),
         family,
         similar
