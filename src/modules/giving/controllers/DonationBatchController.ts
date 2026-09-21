@@ -3,6 +3,7 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { DonationBatch } from "../models/index.js";
+import { ExchangeRateHelper } from "../../../shared/helpers/ExchangeRateHelper.js";
 
 @controller("/giving/donationbatches")
 export class DonationBatchController extends GivingBaseController {
@@ -12,7 +13,10 @@ export class DonationBatchController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       const data = await this.repos.donationBatch.load(au.churchId, id);
-      return this.repos.donationBatch.convertToModel(au.churchId, data);
+      if (!data) return this.repos.donationBatch.convertToModel(au.churchId, data);
+      const amounts = await this.repos.donationBatch.loadAmountsByCurrency(au.churchId, id);
+      const { currency, rates } = await this.loadChurchRates(au.churchId);
+      return this.withConvertedTotal(this.repos.donationBatch.convertToModel(au.churchId, data), amounts.get(id) ?? [], currency, rates);
     });
   }
 
@@ -20,15 +24,24 @@ export class DonationBatchController extends GivingBaseController {
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json([], 401);
-      //to display batch total considering different currencies
-      if (req.query?.withCurrency) {
-        const data = await this.repos.donationBatch.loadAllWithCurrency(au.churchId);
-        return data;
-      }
-
       const data = await this.repos.donationBatch.loadAll(au.churchId);
-      return this.repos.donationBatch.convertAllToModel(au.churchId, data);
+      const amounts = await this.repos.donationBatch.loadAmountsByCurrency(au.churchId);
+      const { currency, rates } = await this.loadChurchRates(au.churchId);
+      return data.map((batch) => this.withConvertedTotal(batch, amounts.get(batch.id!) ?? [], currency, rates));
     });
+  }
+
+  // totalAmount is the batch total in the church currency; amountsByCurrency keeps the original subtotals.
+  private withConvertedTotal(batch: DonationBatch, amounts: { currency: string | null; amount: number; donationCount: number }[], currency: string, rates: Record<string, number>) {
+    const converted = ExchangeRateHelper.convertTotals(amounts, currency, rates);
+    return {
+      ...batch,
+      donationCount: amounts.reduce((sum, a) => sum + a.donationCount, 0),
+      totalAmount: converted.totalAmount,
+      currency: converted.currency,
+      isConverted: converted.isConverted,
+      amountsByCurrency: converted.amountsByCurrency
+    };
   }
 
   @httpPost("/")

@@ -3,6 +3,7 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { FundDonation } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { ExchangeRateHelper } from "../../../shared/helpers/ExchangeRateHelper.js";
 
 @controller("/giving/funddonations")
 export class FundDonationController extends GivingBaseController {
@@ -10,6 +11,21 @@ export class FundDonationController extends GivingBaseController {
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       return this.repos.fundDonation.loadByPersonId(au.churchId, au.personId);
+    });
+  }
+
+  // Fund total in the church currency, for the same fundId/startDate/endDate filter as the list below.
+  @httpGet("/totals")
+  public async getTotals(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
+      const fundId = req.query.fundId?.toString() || "";
+      if (!fundId) return this.json({ error: "fundId is required" }, 400);
+      const startDate = req.query.startDate ? new Date(req.query.startDate.toString()) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate.toString()) : undefined;
+      const rows = await this.repos.fundDonation.loadFundTotalsByCurrency(au.churchId, fundId, startDate, endDate);
+      const { currency, rates } = await this.loadChurchRates(au.churchId);
+      return ExchangeRateHelper.convertTotals(rows, currency, rates);
     });
   }
 

@@ -138,29 +138,35 @@ export class DonationRepo {
     return row ? this.rowToModel(row) : null;
   }
 
+  // Amounts come back one row per gift currency so the controller can convert each group into the
+  // church currency before adding them up. Donor and gift counts are currency-agnostic, so they are
+  // counted once across all currencies (a donor giving in two currencies is still one donor).
   public async loadDashboardKpis(churchId: string, startDate: Date, endDate: Date, fundId?: string) {
     const sDate = DateHelper.toMysqlDate(startDate);
     const eDate = DateHelper.toMysqlDate(endDate);
-    if (fundId) {
-      const result = await sql<any>`
-        SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
-        FROM donations d
-        INNER JOIN fundDonations fd on fd.donationId = d.id
-        INNER JOIN funds f on f.id = fd.fundId
-        WHERE d.churchId = ${churchId}
-          AND d.donationDate BETWEEN ${sDate} AND ${eDate}
-          AND fd.fundId = ${fundId}`.execute(getDb());
-      return result.rows[0] ?? null;
-    } else {
-      const result = await sql<any>`
-        SELECT SUM(fd.amount) as totalGiving, AVG(d.amount) as avgGift, COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
-        FROM donations d
-        INNER JOIN fundDonations fd on fd.donationId = d.id
-        INNER JOIN funds f on f.id = fd.fundId
-        WHERE d.churchId = ${churchId}
-          AND d.donationDate BETWEEN ${sDate} AND ${eDate}`.execute(getDb());
-      return result.rows[0] ?? null;
-    }
+    const fundFilter = fundId ? sql`AND fd.fundId = ${fundId}` : sql``;
+    const counts = await sql<any>`
+      SELECT COUNT(DISTINCT d.personId) as donorCount, COUNT(DISTINCT d.id) as donationCount
+      FROM donations d
+      INNER JOIN fundDonations fd on fd.donationId = d.id
+      INNER JOIN funds f on f.id = fd.fundId
+      WHERE d.churchId = ${churchId}
+        AND d.donationDate BETWEEN ${sDate} AND ${eDate}
+        ${fundFilter}`.execute(getDb());
+    const amounts = await sql<any>`
+      SELECT d.currency AS currency, SUM(fd.amount) as totalGiving, SUM(d.amount) as giftSum, COUNT(*) as giftRows
+      FROM donations d
+      INNER JOIN fundDonations fd on fd.donationId = d.id
+      INNER JOIN funds f on f.id = fd.fundId
+      WHERE d.churchId = ${churchId}
+        AND d.donationDate BETWEEN ${sDate} AND ${eDate}
+        ${fundFilter}
+      GROUP BY d.currency`.execute(getDb());
+    return {
+      donorCount: Number(counts.rows[0]?.donorCount || 0),
+      donationCount: Number(counts.rows[0]?.donationCount || 0),
+      amountsByCurrency: amounts.rows as { currency: string | null; totalGiving: number; giftSum: number; giftRows: number }[]
+    };
   }
 
   public async loadSummary(churchId: string, startDate: Date, endDate: Date) {
@@ -168,20 +174,20 @@ export class DonationRepo {
     const eDate = DateHelper.toMysqlDate(endDate);
     const result = await sql<any>`
       SELECT STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W') AS week,
-        SUM(fd.amount) as totalAmount, f.name as fundName
+        SUM(fd.amount) as totalAmount, f.name as fundName, d.currency AS currency
       FROM donations d
       INNER JOIN fundDonations fd on fd.donationId = d.id
       INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1
       WHERE d.churchId = ${churchId}
         AND d.donationDate BETWEEN ${sDate} AND ${eDate}
-      GROUP BY year(d.donationDate), week(d.donationDate, 0), f.name
+      GROUP BY year(d.donationDate), week(d.donationDate, 0), f.name, d.currency
       ORDER BY year(d.donationDate), week(d.donationDate, 0), f.name`.execute(getDb());
     return result.rows;
   }
 
   public async loadPersonBasedSummary(churchId: string, startDate: Date, endDate: Date) {
     const result = await sql<any>`
-      SELECT d.personId, d.amount as donationAmount, fd.fundId, fd.amount as fundAmount, f.name as fundName
+      SELECT d.personId, d.amount as donationAmount, d.currency AS currency, fd.fundId, fd.amount as fundAmount, f.name as fundName
       FROM donations d
       INNER JOIN fundDonations fd on fd.donationId = d.id
       INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1

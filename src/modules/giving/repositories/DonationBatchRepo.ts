@@ -72,41 +72,24 @@ export class DonationBatchRepo {
     return this.convertAllToModel(churchId, result.rows);
   }
 
-  public async loadAllWithCurrency(churchId: string) {
-    const batches = await sql<any>`
-      SELECT db.*,
-        IFNULL(d.donationCount, 0) AS donationCount
-      FROM donationBatches db
-      LEFT JOIN (
-        SELECT batchId, COUNT(*) AS donationCount
-        FROM donations
-        WHERE churchId = ${churchId}
-        GROUP BY batchId
-      ) d ON db.id = d.batchId
-      WHERE db.churchId = ${churchId}
-      ORDER BY db.batchDate DESC`.execute(getDb());
-
+  // One row per batch + gift currency, so batch totals can be converted without reading every donation.
+  // A null currency is left as-is; the caller treats it as the church currency.
+  public async loadAmountsByCurrency(churchId: string, batchId?: string) {
+    const batchFilter = batchId ? sql`AND batchId = ${batchId}` : sql``;
     const amounts = await sql<any>`
-      SELECT batchId,
-        LOWER(IFNULL(currency, 'usd')) AS currency,
-        SUM(amount) AS amount
+      SELECT batchId, currency, COUNT(*) AS donationCount, SUM(amount) AS amount
       FROM donations
       WHERE churchId = ${churchId}
+        ${batchFilter}
       GROUP BY batchId, currency`.execute(getDb());
 
-    // group amounts rows by batchId
-    const amountsByBatch = new Map<string, { currency: string; amount: number }[]>();
+    const amountsByBatch = new Map<string, { currency: string | null; amount: number; donationCount: number }[]>();
     for (const row of amounts.rows) {
       const list = amountsByBatch.get(row.batchId) ?? [];
-      list.push({ currency: row.currency, amount: Number(row.amount) });
+      list.push({ currency: row.currency, amount: Number(row.amount), donationCount: Number(row.donationCount) });
       amountsByBatch.set(row.batchId, list);
     }
-    const result = batches.rows.map((row) => ({
-      ...row,
-      amountsByCurrency: amountsByBatch.get(row.id) ?? []
-    }));
-
-    return result;
+    return amountsByBatch;
   }
 
   private rowToModel(data: any): DonationBatch {
