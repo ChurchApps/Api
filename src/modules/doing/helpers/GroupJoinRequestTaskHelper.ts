@@ -8,7 +8,8 @@ export class GroupJoinRequestTaskHelper {
   public static readonly taskType = "groupJoinRequest";
 
   // One Open task per group leader (or, if the group has no leader, per person with
-  // groupMembers.edit) so they can approve/decline from Serving > Tasks.
+  // groupMembers.edit, or failing that per domain admin) so they can approve/decline
+  // from Serving > Tasks.
   public static async createJoinRequestTask(churchId: string, payload: any): Promise<Task[]> {
     if (!churchId || !payload?.groupId || !payload?.personId) return [];
     const repos = await RepoManager.getRepos<Repos>("doing");
@@ -20,7 +21,17 @@ export class GroupJoinRequestTaskHelper {
       const staffIds = await membership.loadPersonIdsWithPermission(churchId, "Group Members", "Edit");
       assigneeIds = unique(staffIds.filter((id) => id && id !== payload.personId));
     }
-    if (assigneeIds.length === 0) return [];
+    if (assigneeIds.length === 0) {
+      // Self-registered churches only get a "Domain Admins" role holding Domain/Admin.
+      // That expands to every permission in-memory for checkAccess, but no literal
+      // "Group Members"/"Edit" row is ever written, so the lookup above finds nobody.
+      const adminIds = await membership.loadPersonIdsWithPermission(churchId, "Domain", "Admin");
+      assigneeIds = unique(adminIds.filter((id) => id && id !== payload.personId));
+    }
+    if (assigneeIds.length === 0) {
+      console.log(`No group leader, groupMembers.edit staff or domain admin to assign the join request for group ${payload.groupId} in church ${churchId}; no task created.`);
+      return [];
+    }
 
     const [group, people] = await Promise.all([
       membership.loadGroup(churchId, payload.groupId),

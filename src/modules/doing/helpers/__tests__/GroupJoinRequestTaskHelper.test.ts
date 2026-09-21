@@ -61,6 +61,23 @@ describe("GroupJoinRequestTaskHelper", () => {
     expect(save.mock.calls[0][0].assignedToId).toBe("p-admin");
   });
 
+  // Issue #1109: self-registered churches only ever get a "Domain Admins" role holding
+  // {contentType: "Domain", action: "Admin"} - no literal "Group Members"/"Edit" row is
+  // ever written, so the staff fallback above finds nobody and leaderless groups produced
+  // no task at all.
+  it("falls back to domain admins when there is no leader and no groupMembers.edit staff", async () => {
+    loadGroupLeaderPersonIds.mockResolvedValue([]);
+    loadPersonIdsWithPermission.mockImplementation(async (_churchId: string, contentType: string, action: string) => {
+      if (contentType === "Domain" && action === "Admin") return ["p-admin", "p-req"];
+      return [];
+    });
+    const tasks = await GroupJoinRequestTaskHelper.createJoinRequestTask("c1", payload);
+    expect(loadPersonIdsWithPermission).toHaveBeenCalledWith("c1", "Group Members", "Edit");
+    expect(loadPersonIdsWithPermission).toHaveBeenCalledWith("c1", "Domain", "Admin");
+    expect(tasks).toHaveLength(1);
+    expect(save.mock.calls[0][0].assignedToId).toBe("p-admin");
+  });
+
   it("creates nothing when there is nobody to assign", async () => {
     loadGroupLeaderPersonIds.mockResolvedValue([]);
     loadPersonIdsWithPermission.mockResolvedValue([]);
