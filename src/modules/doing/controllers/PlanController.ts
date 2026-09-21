@@ -178,7 +178,7 @@ export class PlanController extends DoingBaseController {
     return planItemIdMap;
   }
 
-  private async copyPlanItemTimes(churchId: string, sourcePlanId: string, planItemIdMap: Map<string, string>, timeIdMap: Map<string, string>): Promise<void> {
+  private async copyPlanItemTimes(churchId: string, sourcePlanId: string, planItemIdMap: Map<string, string>, timeIdMap: Map<string, string>, positionIdMap: Map<string, string>): Promise<void> {
     if (planItemIdMap.size === 0 || timeIdMap.size === 0) return;
     const exclusions: PlanItemTime[] = await this.repos.planItemTime.loadByPlanId(churchId, sourcePlanId) as PlanItemTime[];
     const promises: Promise<any>[] = [];
@@ -190,7 +190,8 @@ export class PlanController extends DoingBaseController {
           churchId,
           planItemId: newPlanItemId,
           timeId: newTimeId,
-          excluded: ex.excluded
+          excluded: ex.excluded,
+          positionId: ex.positionId ? positionIdMap.get(ex.positionId) : undefined
         }));
       }
     }
@@ -279,7 +280,7 @@ export class PlanController extends DoingBaseController {
       }
 
       if (timeIdMap.size > 0 && planItemIdMap.size > 0) {
-        await this.copyPlanItemTimes(au.churchId, id, planItemIdMap, timeIdMap);
+        await this.copyPlanItemTimes(au.churchId, id, planItemIdMap, timeIdMap, positionIdMap);
       }
 
       return plan;

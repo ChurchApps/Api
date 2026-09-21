@@ -4,4 +4,5 @@ export class PlanItemTime {
   public planItemId?: string;
   public timeId?: string;
   public excluded?: boolean;
+  public positionId?: string;
 }
