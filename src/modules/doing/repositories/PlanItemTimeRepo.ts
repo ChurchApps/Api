@@ -11,12 +11,12 @@ export class PlanItemTimeRepo {
 
   private async create(model: PlanItemTime): Promise<PlanItemTime> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("planItemTimes").values({ id: model.id, churchId: model.churchId, planItemId: model.planItemId, timeId: model.timeId, excluded: model.excluded ? 1 : 0 } as any).execute();
+    await getDb().insertInto("planItemTimes").values({ id: model.id, churchId: model.churchId, planItemId: model.planItemId, timeId: model.timeId, excluded: model.excluded ? 1 : 0, positionId: model.positionId || null } as any).execute();
     return model;
   }
 
   private async update(model: PlanItemTime): Promise<PlanItemTime> {
-    await getDb().updateTable("planItemTimes").set({ planItemId: model.planItemId, timeId: model.timeId, excluded: model.excluded ? 1 : 0 } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("planItemTimes").set({ planItemId: model.planItemId, timeId: model.timeId, excluded: model.excluded ? 1 : 0, positionId: model.positionId || null } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -57,7 +57,7 @@ export class PlanItemTimeRepo {
       .innerJoin("planItems", "planItems.id", "planItemTimes.planItemId")
       .where("planItemTimes.churchId", "=", churchId)
       .where("planItems.planId", "=", planId)
-      .select(["planItemTimes.id", "planItemTimes.churchId", "planItemTimes.planItemId", "planItemTimes.timeId", "planItemTimes.excluded"])
+      .select(["planItemTimes.id", "planItemTimes.churchId", "planItemTimes.planItemId", "planItemTimes.timeId", "planItemTimes.excluded", "planItemTimes.positionId"])
       .execute();
   }
 }
