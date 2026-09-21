@@ -10,6 +10,7 @@
     "populateDemo": "tsx tools/initdb.ts --demo-only",
     "reset-demo": "tsx tools/reset-demo.ts",
     "reset-commons": "tsx tools/reset-commons.ts",
+    "commons-up": "tsx tools/commons-up.ts",
     "dev": "tsx watch src/index.ts",
     "clean": "rimraf dist",
     "lint": "eslint --fix src/",

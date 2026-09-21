@@ -1,13 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
 import mysql from "mysql2/promise";
-import { fileURLToPath, pathToFileURL } from "url";
-import { Migrator, type Migration, type MigrationProvider } from "kysely";
 import { DatabaseUrlParser } from "../src/shared/helpers/DatabaseUrlParser.js";
-import { createKysely, ensureEnvironment } from "./kysely-config.js";
-import { buildCatalog } from "./commons-seed/catalog.js";
+import { ensureEnvironment } from "./kysely-config.js";
+import { commonsUp } from "./commons-up.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ALLOWED_HOSTS = ["localhost", "127.0.0.1"] as const;
 const CONTENT_DIR = path.resolve("content", "commons");
 
@@ -17,21 +14,6 @@ function refuse(message: string): never {
   console.error(message);
   console.error("========================================\n");
   process.exit(1);
-}
-
-// Kysely's built-in provider fails on Windows with raw OS paths; we convert to file:// URLs.
-class FileURLMigrationProvider implements MigrationProvider {
-  constructor(private readonly folder: string) {}
-
-  async getMigrations(): Promise<Record<string, Migration>> {
-    const result: Record<string, Migration> = {};
-    for (const fileName of await fs.promises.readdir(this.folder)) {
-      if (!/\.(js|ts|mjs|cjs)$/.test(fileName)) continue;
-      const mod = await import(pathToFileURL(path.resolve(this.folder, fileName)).href);
-      result[fileName.replace(/\.(js|ts|mjs|cjs)$/, "")] = mod as Migration;
-    }
-    return result;
-  }
 }
 
 // Drops tables rather than the schema so a running Api's pooled connections stay valid across a reseed.
@@ -50,53 +32,24 @@ async function recreateDatabase(config: { host: string; port: number; user: stri
   }
 }
 
-async function migrate() {
-  const db = createKysely("commons");
-  try {
-    const migrator = new Migrator({ db, provider: new FileURLMigrationProvider(path.join(__dirname, "migrations", "commons")) });
-    const { error, results } = await migrator.migrateToLatest();
-    results?.forEach((r) => console.log(`  ${r.status === "Success" ? "Applied" : "Failed"}: ${r.migrationName}`));
-    if (error) throw error;
-  } finally {
-    await db.destroy();
+/** The local content dir holds exactly the repo's layout, the way the bucket does after the content repo's `sync push`. */
+function mirrorContent(repoDir: string) {
+  if ((process.env.FILE_STORE || "").toUpperCase() === "S3") return;
+  for (const dir of ["writers", "songs", "works", "assets", "pending"]) fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
+  let mirrored = 0;
+  for (const dir of ["songs", "writers"]) {
+    const from = path.join(repoDir, dir);
+    if (!fs.existsSync(from)) continue;
+    fs.cpSync(from, path.join(CONTENT_DIR, dir), { recursive: true });
+    mirrored++;
   }
-}
-
-async function seed(repoDir: string) {
-  const { assets, songs, authors, assetFiles, submissions } = buildCatalog(repoDir);
-  const db = createKysely("commons");
-  try {
-    for (const row of authors) await db.insertInto("authors").values(row).execute();
-    for (const row of assets) await db.insertInto("assets").values(row).execute();
-    for (const row of songs) await db.insertInto("songs").values(row).execute();
-    for (const row of submissions) await db.insertInto("submissions").values(row).execute();
-    for (const row of assetFiles) await db.insertInto("assetFiles").values(row).execute();
-  } finally {
-    await db.destroy();
-  }
-
-  if ((process.env.FILE_STORE || "").toUpperCase() !== "S3") {
-    // the local content dir holds exactly the repo's layout, the way the bucket does after the content repo's
-    // `sync push`: assetFiles.name is the catalog key and the public URL is that key under the commons prefix
-    for (const dir of ["writers", "songs", "works", "assets", "pending"]) fs.rmSync(path.join(CONTENT_DIR, dir), { recursive: true, force: true });
-    let mirrored = 0;
-    for (const dir of ["songs", "writers"]) {
-      const from = path.join(repoDir, dir);
-      if (!fs.existsSync(from)) continue;
-      fs.cpSync(from, path.join(CONTENT_DIR, dir), { recursive: true });
-      mirrored++;
-    }
-    console.log(`  Mirrored ${mirrored} top-level folders of the package layout into ${CONTENT_DIR}`);
-  }
-  console.log(`Seeded ${songs.length} songs, ${authors.length} authors, ${assetFiles.length} files.`);
+  console.log(`  Mirrored ${mirrored} top-level folders of the package layout into ${CONTENT_DIR}`);
 }
 
 async function main() {
   await ensureEnvironment();
-
   const connString = process.env.COMMONS_CONNECTION_STRING;
   if (!connString) refuse("COMMONS_CONNECTION_STRING is not set. Add it to Api/.env before running reset-commons.");
-
   let config;
   try {
     config = DatabaseUrlParser.parseConnectionString(connString);
@@ -106,17 +59,13 @@ async function main() {
   if (!ALLOWED_HOSTS.includes(config.host)) {
     refuse(`COMMONS_CONNECTION_STRING host "${config.host}" is not one of: ${ALLOWED_HOSTS.join(", ")}.\nreset-commons drops the database, so it only ever runs against a local MySQL.`);
   }
-
   const repoDir = process.env.COMMONS_CONTENT_REPO;
   if (!repoDir) refuse("COMMONS_CONTENT_REPO is not set. Point it at a WorshipCommonsContent checkout (the folder holding catalog.json).");
   if (!fs.existsSync(repoDir)) refuse(`COMMONS_CONTENT_REPO points at "${repoDir}", which does not exist.`);
-
   console.log(`reset-commons: recreating ${config.database} on ${config.host}...`);
   await recreateDatabase(config);
-  console.log("Running commons migrations...");
-  await migrate();
-  console.log(`Seeding from ${repoDir}...`);
-  await seed(repoDir);
+  mirrorContent(repoDir);
+  await commonsUp(repoDir);
   console.log("\nDone.");
 }
 
