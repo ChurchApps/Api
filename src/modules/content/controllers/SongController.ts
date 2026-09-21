@@ -63,7 +63,6 @@ export class SongController extends ContentBaseController {
     });
   }
 
-  // We should do batches of 10 or so.
   @httpPost("/import")
   public async import(req: express.Request<{}, {}, FreeShowSong[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

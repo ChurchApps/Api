@@ -13,13 +13,19 @@ export interface FreeShowSong {
 }
 
 export class SongHelper {
+  // Each importSong can make several DB round trips plus an outbound PraiseCharts
+  // call, so a whole library (a few thousand songs) must not go out at once -
+  // the third party rate limits and the request times out before most finish.
+  private static readonly IMPORT_BATCH_SIZE = 10;
+
   static async importSongs(churchId: string, songs: FreeShowSong[]): Promise<Arrangement[]> {
-    const promises: Promise<Arrangement>[] = [];
-    for (const song of songs) {
-      const promise = this.importSong(churchId, song);
-      promises.push(promise);
+    const results: Arrangement[] = [];
+    for (let i = 0; i < songs.length; i += this.IMPORT_BATCH_SIZE) {
+      const batch = songs.slice(i, i + this.IMPORT_BATCH_SIZE);
+      const imported = await Promise.all(batch.map((song) => this.importSong(churchId, song)));
+      results.push(...imported);
     }
-    return Promise.all(promises);
+    return results;
   }
 
   static async createCustomSong(churchId: string, freeshowSong: FreeShowSong): Promise<Arrangement> {
@@ -97,8 +103,10 @@ export class SongHelper {
 
       // 7. Create new Song and Arrangement
       return await this.createSongAndArrangement(churchId, songDetail, freeshowSong);
-    } catch {
-      // throw new Error(`Error importing song: ${error.message}`);
+    } catch (error) {
+      // A failed song must not take down the rest of the import, but it also
+      // must not disappear without a trace - #1111 was a silent partial sync.
+      console.error(`Error importing song ${freeshowSong.freeShowId} ("${freeshowSong.title || ""}"):`, error);
       return null;
     }
   }
