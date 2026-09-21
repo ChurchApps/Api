@@ -108,6 +108,19 @@ export class FundDonationRepo {
     return result.rows;
   }
 
+  // Fund total grouped by gift currency (one row per currency) so the controller can convert without reading every gift.
+  public async loadFundTotalsByCurrency(churchId: string, fundId: string, startDate?: Date, endDate?: Date) {
+    const dateFilter = startDate && endDate ? sql`AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}` : sql``;
+    const result = await sql<any>`
+      SELECT d.currency AS currency, SUM(fd.amount) AS amount
+      FROM fundDonations fd
+      INNER JOIN donations d ON d.id = fd.donationId
+      WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
+        ${dateFilter}
+      GROUP BY d.currency`.execute(getDb());
+    return result.rows.map((r: any) => ({ currency: r.currency as string | null, amount: Number(r.amount) }));
+  }
+
   public async loadByFundName(churchId: string, fundName: string) {
     const pattern = `%${fundName}%`;
     const result = await sql<any>`
