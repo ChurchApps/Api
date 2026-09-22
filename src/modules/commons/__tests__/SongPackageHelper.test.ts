@@ -81,6 +81,50 @@ const row = (): any => ({
 });
 const URLS = { score: "u/score.musicxml", slides: "u/slides.json", timing: "u/timing.json", attribution: "u/attribution.txt" };
 
+describe("SongPackageHelper.listRow", () => {
+  it("keeps library fields and the media the list plays, and drops package files and the bio", () => {
+    const full = SongPackageHelper.summary({
+      ...row(),
+      writerBio: "A paragraph copied onto every song by this writer.",
+      licenseUrl: "https://example.com/license",
+      timeSignature: "3/4",
+      relationLabel: "Translation"
+    }, {
+      chart: "http://c/chart.chordpro",
+      score: "http://c/score.musicxml",
+      attribution: "http://c/attribution.txt",
+      duration: "http://c/duration.json",
+      slides: "http://c/slides.json",
+      sources: "http://c/sources.txt",
+      song: "http://c/song.json",
+      thumb: "http://c/thumb.webp",
+      cover: "http://c/cover.webp",
+      portrait: "http://c/portrait.jpg",
+      midi: "http://c/tune.mid",
+      demoAudio: "http://c/demo.mp3",
+      stemsZip: "http://c/output/audio/pack.zip",
+      "Amazing Grace-pack": "http://c/output/audio/Amazing-Grace.zip"
+    });
+    const list = SongPackageHelper.listRow(full);
+    expect(list.fileUrls).toEqual({
+      thumb: "http://c/thumb.webp",
+      cover: "http://c/cover.webp",
+      portrait: "http://c/portrait.jpg",
+      midi: "http://c/tune.mid",
+      demoAudio: "http://c/demo.mp3",
+      stemsZip: "http://c/output/audio/pack.zip",
+      "Amazing Grace-pack": "http://c/output/audio/Amazing-Grace.zip"
+    });
+    expect(list).toMatchObject({ title: full.title, firstLine: full.firstLine, hasScore: true, hasSlides: true, confidence: "score", rank: 70 });
+    expect(list).not.toHaveProperty("writerBio");
+    expect(list).not.toHaveProperty("licenseUrl");
+    expect(list).not.toHaveProperty("timeSignature");
+    expect(list).not.toHaveProperty("recommendedKey");
+    expect(list).not.toHaveProperty("singTimeSeconds");
+    expect(list).not.toHaveProperty("tune");
+  });
+});
+
 describe("SongPackageHelper.summary", () => {
   it("adds the contract booleans from the served files and drops the reviewer-only columns", () => {
     const s = SongPackageHelper.summary(row(), URLS);
