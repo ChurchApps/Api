@@ -12,9 +12,7 @@ const RIGHTS_LAYERS = ["text", "translation", "tune", "arrangement", "recording"
 const SIMILAR_LIMIT = 6;
 const LIST_AUDIO = /\.(mp3|m4a|wav|ogg|flac)(\?|#|$)/i;
 const LIST_STEMS_ZIP = /\/output\/audio\/[^/?#]+\.zip(\?|#|$)/i;
-const LIST_FILE_ROLES = new Set([
-  "thumb", "art", "cover", "portrait", "demoAudio", "master", "midi", "stemsZip"
-]);
+const LIST_PACKAGE = /\/commons\/(songs\/[^/]+\/[^/]+)\//;
 const LIST_FIELDS = [
   "id",
   "title",
@@ -59,6 +57,16 @@ export interface SongSummary extends SongView {
   recommendedKey: string | null;
   singTimeSeconds: number | null;
   fileUrls: Record<string, string>;
+  /** List only: commons-relative package directory, when this song has its own files. */
+  packageDir?: string;
+  hasCover?: boolean;
+  hasMidi?: boolean;
+  hasDemo?: boolean;
+  hasStems?: boolean;
+  coverOnParent?: boolean;
+  midiOnParent?: boolean;
+  /** List only: writers/.../portrait.jpg, relative to the content root. */
+  portrait?: string;
 }
 
 export interface SongDetail extends Omit<SongSummary, "rights" | "form" | "publishedKeys" | "listenedKeys" | "sundayReadyAt" | "contributors"> {
@@ -158,25 +166,39 @@ export class SongPackageHelper {
     };
   }
 
-  // GET /songs is one row per published song. The library needs identity, filters,
-  // rank, and a handful of media URLs. Package files (chart, score, attribution, …)
-  // and the writer bio stay on the song page.
+  // GET /songs is one row per published song. Cover, thumbnail, melody, and demo
+  // sit at fixed names inside a package directory. The directory is not always
+  // slug(title), and a translation often uses its parent's. The row carries the
+  // directory plus booleans. Charts, scores, and the stems filename stay on the song page.
   static listRow(row: SongSummary): SongSummary {
     const out: Partial<SongSummary> = {};
     for (const key of LIST_FIELDS) {
       const value = row[key];
       if (value !== undefined && value !== null && value !== "") out[key] = value as never;
     }
-    const files: Record<string, string> = {};
-    for (const [key, url] of Object.entries(row.fileUrls || {})) {
-      if (!url) continue;
-      if (key === "song") {
-        if (LIST_AUDIO.test(url)) files.song = url;
-        continue;
-      }
-      if (LIST_FILE_ROLES.has(key) || LIST_STEMS_ZIP.test(url)) files[key] = url;
+    const files = row.fileUrls || {};
+    const ownId = row.id || "";
+    const dirOf = (url?: string) => (url && url.match(LIST_PACKAGE)?.[1]) || "";
+    const owns = (dir: string) => !!ownId && dir.endsWith(`-${ownId}`);
+    const coverDir = dirOf(files.cover || files.art || files.thumb);
+    const midiDir = dirOf(files.midi);
+    const demoUrl = files.demoAudio || files.master || (LIST_AUDIO.test(files.song || "") ? files.song : "");
+    const demoDir = dirOf(demoUrl);
+    const ownDir = [coverDir, midiDir, demoDir].find(owns) || "";
+    if (ownDir) out.packageDir = ownDir;
+    if (coverDir) {
+      out.hasCover = true;
+      if (!owns(coverDir)) out.coverOnParent = true;
     }
-    out.fileUrls = files;
+    if (midiDir) {
+      out.hasMidi = true;
+      if (!owns(midiDir)) out.midiOnParent = true;
+    }
+    if (demoDir) out.hasDemo = true;
+    if (Object.entries(files).some(([key, url]) => key === "stemsZip" || LIST_STEMS_ZIP.test(url || ""))) out.hasStems = true;
+    const portrait = files.portrait || "";
+    const writersAt = portrait.indexOf("writers/");
+    if (writersAt >= 0) out.portrait = portrait.slice(writersAt);
     return out as SongSummary;
   }
 

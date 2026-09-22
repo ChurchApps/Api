@@ -122,11 +122,12 @@ describe("GET /commons/songs query params", () => {
     const { controller } = songController(anon);
     const rows: any[] = await controller.getAll({ query: {} } as any, {} as any);
     const keys = [
-      "confidence", "sundayReady", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasAccompaniment", "fileUrls", "rank", "saveCount", "downloadCount"
+      "confidence", "sundayReady", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasAccompaniment", "rank", "saveCount", "downloadCount"
     ];
     for (const r of rows) for (const k of keys) expect(r).toHaveProperty(k);
     expect(rows[0].hasScore).toBe(true);
-    expect(rows[0].fileUrls).toEqual({});
+    expect(rows[0]).not.toHaveProperty("fileUrls");
+    expect(rows[0]).not.toHaveProperty("hasCover");
     expect(rows[0]).not.toHaveProperty("writerBio");
     expect(rows[0]).not.toHaveProperty("recommendedKey");
     expect(rows[0]).not.toHaveProperty("singTimeSeconds");

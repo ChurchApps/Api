@@ -81,8 +81,12 @@ const row = (): any => ({
 });
 const URLS = { score: "u/score.musicxml", slides: "u/slides.json", timing: "u/timing.json", attribution: "u/attribution.txt" };
 
+const pack = (id: string, slug: string) => `https://content.churchapps.org/commons/songs/en/${slug}-${id}`;
+
 describe("SongPackageHelper.listRow", () => {
-  it("keeps library fields and the media the list plays, and drops package files and the bio", () => {
+  it("keeps library fields and replaces package URLs with a directory and booleans", () => {
+    const id = "song0000001";
+    const base = pack(id, "amazing-grace");
     const full = SongPackageHelper.summary({
       ...row(),
       writerBio: "A paragraph copied onto every song by this writer.",
@@ -90,38 +94,59 @@ describe("SongPackageHelper.listRow", () => {
       timeSignature: "3/4",
       relationLabel: "Translation"
     }, {
-      chart: "http://c/chart.chordpro",
-      score: "http://c/score.musicxml",
-      attribution: "http://c/attribution.txt",
-      duration: "http://c/duration.json",
-      slides: "http://c/slides.json",
-      sources: "http://c/sources.txt",
-      song: "http://c/song.json",
-      thumb: "http://c/thumb.webp",
-      cover: "http://c/cover.webp",
-      portrait: "http://c/portrait.jpg",
-      midi: "http://c/tune.mid",
-      demoAudio: "http://c/demo.mp3",
-      stemsZip: "http://c/output/audio/pack.zip",
-      "Amazing Grace-pack": "http://c/output/audio/Amazing-Grace.zip"
+      chart: `${base}/output/composition/chart.chordpro`,
+      score: `${base}/output/composition/score.musicxml`,
+      attribution: `${base}/output/composition/attribution.txt`,
+      song: `${base}/song.json`,
+      thumb: `${base}/output/composition/cover-thumb.webp`,
+      cover: `${base}/sources/cover.webp`,
+      portrait: "https://content.churchapps.org/commons/writers/john-newton/portrait.jpg",
+      midi: `${base}/sources/tune.mid`,
+      demoAudio: `${base}/sources/master/song.mp3`,
+      "Amazing Grace-pack": `${base}/output/audio/Amazing-Grace.zip`
     });
     const list = SongPackageHelper.listRow(full);
-    expect(list.fileUrls).toEqual({
-      thumb: "http://c/thumb.webp",
-      cover: "http://c/cover.webp",
-      portrait: "http://c/portrait.jpg",
-      midi: "http://c/tune.mid",
-      demoAudio: "http://c/demo.mp3",
-      stemsZip: "http://c/output/audio/pack.zip",
-      "Amazing Grace-pack": "http://c/output/audio/Amazing-Grace.zip"
+    expect(list).toMatchObject({
+      title: full.title,
+      firstLine: full.firstLine,
+      hasScore: true,
+      confidence: "score",
+      rank: 70,
+      packageDir: "songs/en/amazing-grace-song0000001",
+      hasCover: true,
+      hasMidi: true,
+      hasDemo: true,
+      hasStems: true,
+      portrait: "writers/john-newton/portrait.jpg"
     });
-    expect(list).toMatchObject({ title: full.title, firstLine: full.firstLine, hasScore: true, hasSlides: true, confidence: "score", rank: 70 });
+    expect(list).not.toHaveProperty("fileUrls");
+    expect(list).not.toHaveProperty("coverOnParent");
     expect(list).not.toHaveProperty("writerBio");
     expect(list).not.toHaveProperty("licenseUrl");
     expect(list).not.toHaveProperty("timeSignature");
     expect(list).not.toHaveProperty("recommendedKey");
     expect(list).not.toHaveProperty("singTimeSeconds");
     expect(list).not.toHaveProperty("tune");
+  });
+
+  it("points a borrowed cover at the parent and keeps this song's own melody directory", () => {
+    const child = "child0000001";
+    const parent = "song0000001";
+    const own = pack(child, "cariñoso-salvador");
+    const borrowed = pack(parent, "jesus-lover-of-my-soul");
+    const list = SongPackageHelper.listRow(SongPackageHelper.summary({ ...row(), id: child, parentSongId: parent }, {
+      cover: `${borrowed}/sources/cover.webp`,
+      thumb: `${borrowed}/output/composition/cover-thumb.webp`,
+      midi: `${own}/sources/tune.mid`
+    }));
+    expect(list).toMatchObject({
+      packageDir: "songs/en/cariñoso-salvador-child0000001",
+      hasCover: true,
+      coverOnParent: true,
+      hasMidi: true
+    });
+    expect(list).not.toHaveProperty("midiOnParent");
+    expect(list).not.toHaveProperty("fileUrls");
   });
 });
 
