@@ -118,13 +118,18 @@ describe("GET /commons/songs query params", () => {
     expect(repos.song.loadPublishedSummaries).toHaveBeenLastCalledWith({ sundayReady: false, confidence: undefined, language: undefined, q: undefined });
   });
 
-  it("every list row carries the summary keys of the contract", async () => {
+  it("every list row carries the library fields and not the package files", async () => {
     const { controller } = songController(anon);
     const rows: any[] = await controller.getAll({ query: {} } as any, {} as any);
     const keys = [
-      "confidence", "sundayReady", "featured", "firstLine", "tune", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasTiming", "hasAccompaniment", "recommendedKey", "singTimeSeconds", "fileUrls", "rank", "saveCount", "downloadCount"
+      "confidence", "sundayReady", "hymnalCount", "hasChords", "hasScore", "hasSlides", "hasAccompaniment", "fileUrls", "rank", "saveCount", "downloadCount"
     ];
     for (const r of rows) for (const k of keys) expect(r).toHaveProperty(k);
+    expect(rows[0].hasScore).toBe(true);
+    expect(rows[0].fileUrls).toEqual({});
+    expect(rows[0]).not.toHaveProperty("writerBio");
+    expect(rows[0]).not.toHaveProperty("recommendedKey");
+    expect(rows[0]).not.toHaveProperty("singTimeSeconds");
     expect(rows[0]).not.toHaveProperty("rights");
     expect(rows[0]).not.toHaveProperty("rightsMatrix");
   });

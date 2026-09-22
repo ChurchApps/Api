@@ -10,6 +10,39 @@ import { RightsHelper } from "./RightsHelper.js";
 const CHORD = /\[[A-G][#b]?[^\]]*\]/;
 const RIGHTS_LAYERS = ["text", "translation", "tune", "arrangement", "recording", "artwork"] as const;
 const SIMILAR_LIMIT = 6;
+const LIST_AUDIO = /\.(mp3|m4a|wav|ogg|flac)(\?|#|$)/i;
+const LIST_STEMS_ZIP = /\/output\/audio\/[^/?#]+\.zip(\?|#|$)/i;
+const LIST_FILE_ROLES = new Set([
+  "thumb", "art", "cover", "portrait", "demoAudio", "master", "midi", "stemsZip"
+]);
+const LIST_FIELDS = [
+  "id",
+  "title",
+  "writer",
+  "year",
+  "themes",
+  "language",
+  "license",
+  "downloadCount",
+  "saveCount",
+  "createdAt",
+  "publishedAt",
+  "songKey",
+  "bpm",
+  "meter",
+  "scripture",
+  "hymnalCount",
+  "parentSongId",
+  "firstLine",
+  "tune",
+  "confidence",
+  "sundayReady",
+  "hasChords",
+  "hasScore",
+  "hasSlides",
+  "hasAccompaniment",
+  "rank"
+] as const;
 
 export interface SongSummary extends SongView {
   confidence: Confidence | null;
@@ -123,6 +156,28 @@ export class SongPackageHelper {
       singTimeSeconds: row.singTimeSeconds ?? null,
       fileUrls
     };
+  }
+
+  // GET /songs is one row per published song. The library needs identity, filters,
+  // rank, and a handful of media URLs. Package files (chart, score, attribution, …)
+  // and the writer bio stay on the song page.
+  static listRow(row: SongSummary): SongSummary {
+    const out: Partial<SongSummary> = {};
+    for (const key of LIST_FIELDS) {
+      const value = row[key];
+      if (value !== undefined && value !== null && value !== "") out[key] = value as never;
+    }
+    const files: Record<string, string> = {};
+    for (const [key, url] of Object.entries(row.fileUrls || {})) {
+      if (!url) continue;
+      if (key === "song") {
+        if (LIST_AUDIO.test(url)) files.song = url;
+        continue;
+      }
+      if (LIST_FILE_ROLES.has(key) || LIST_STEMS_ZIP.test(url)) files[key] = url;
+    }
+    out.fileUrls = files;
+    return out as SongSummary;
   }
 
   /** Detail row: summary plus the parsed rights/form/keys, the computed matrix, and the attribution text. */

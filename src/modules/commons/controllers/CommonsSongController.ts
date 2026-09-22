@@ -38,7 +38,8 @@ export class CommonsSongController extends CommonsBaseController {
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const str = (k: string) => String(req.query?.[k] || "").trim().slice(0, MAX_QUERY) || undefined;
-      return await this.withUrls(await this.repos.song.loadPublishedSummaries({ sundayReady: req.query?.sundayReady === "true", confidence: str("confidence"), language: str("language"), q: str("q") }));
+      const rows = await this.withUrls(await this.repos.song.loadPublishedSummaries({ sundayReady: req.query?.sundayReady === "true", confidence: str("confidence"), language: str("language"), q: str("q") }));
+      return rows.map((row) => SongPackageHelper.listRow(row));
     });
   }
 
