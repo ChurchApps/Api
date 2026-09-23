@@ -6,6 +6,7 @@ import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { MusicHelper } from "./MusicHelper.js";
 import { findByBase, packageRole } from "./PackageLayout.js";
+import { PublishHelper } from "./PublishHelper.js";
 import { QualityHelper } from "./QualityHelper.js";
 import { isUploadableName, MAX_PENDING_PER_USER, NEW_PACKAGE_TYPES, normalizeTags, songLimitFor, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
 
@@ -91,6 +92,11 @@ export class SubmissionHelper {
       ctx.parent = parent ? { status: parent.status, language: parent.language } : null;
     }
     if (type === "removal" && asset.publishedSubmissionId) ctx.livePayload = (await repos.submission.loadById(asset.publishedSubmissionId))?.payload;
+    if ((type === "correction" || type === "additionalFile" || type === "recording") && asset.publishedSubmissionId) {
+      // the same snapshot the edit page starts from, so an untouched license compares equal
+      ctx.livePayload = await PublishHelper.editablePayload(repos, asset);
+      ctx.byPublisher = !!sub.submittedBy && sub.submittedBy === asset.publisherUserId;
+    }
     const errors = validateSubmission(def, payload, proposed, live, ctx);
     if (errors.length) return fail(400, errors);
     for (const f of proposed) {

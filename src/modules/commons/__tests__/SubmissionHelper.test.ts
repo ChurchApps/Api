@@ -36,8 +36,10 @@ function repos(overrides: any = {}) {
       countSongsByUser: jest.fn(async () => 0),
       submit: jest.fn(async () => true),
       update: jest.fn(async () => {}),
-      loadPendingForAsset: jest.fn(async () => undefined)
+      loadPendingForAsset: jest.fn(async () => undefined),
+      loadById: jest.fn(async () => undefined)
     },
+    song: { loadById: jest.fn(async () => undefined) },
     assetFile: {
       loadOne: jest.fn(async () => undefined),
       upsert: jest.fn(async (f: any) => ({ ...f, id: "file0000001" })),
