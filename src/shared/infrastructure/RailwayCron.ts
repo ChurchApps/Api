@@ -1,6 +1,3 @@
-import { RepoManager } from "./RepoManager.js";
-import { JobRunHelper } from "../helpers/JobRunHelper.js";
-
 const ONE_MINUTE_MS = 60 * 1000;
 const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -12,59 +9,31 @@ const msUntilNext5amUtc = (): number => {
   return next.getTime() - now.getTime();
 };
 
+const running = new Set<string>();
+
 const safe = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
+  if (running.has(label)) {
+    console.warn(`[cron] ${label} still running, skipping`);
+    return;
+  }
+  running.add(label);
   try {
     console.warn(`[cron] ${label} starting`);
     await fn();
     console.warn(`[cron] ${label} done`);
   } catch (error: unknown) {
     console.error(`[cron] ${label} failed:`, error);
+  } finally {
+    running.delete(label);
   }
 };
 
-const runThirtyMinute = async (): Promise<void> => {
-  const { NotificationHelper } = await import("../../modules/messaging/helpers/NotificationHelper.js");
-  const { scanReminders } = await import("../../modules/messaging/helpers/ReminderBootstrap.js");
-  const { SocketHelper } = await import("../../modules/messaging/helpers/SocketHelper.js");
-  const repos = await RepoManager.getRepos<any>("messaging");
-  NotificationHelper.init(repos);
-  await JobRunHelper.run("escalateDelivery", () => NotificationHelper.escalateDelivery());
-  await JobRunHelper.run("individualEmails", () => NotificationHelper.sendEmailNotifications("individual"));
-  await JobRunHelper.run("scanReminders", () => scanReminders(repos)); // reminder dispatcher — Pattern A, no new timer
-  await JobRunHelper.run("reapStaleConnections", () => SocketHelper.reapStaleConnections(repos));
-};
-
-const runMidnight = async (): Promise<void> => {
-  const { NotificationHelper } = await import("../../modules/messaging/helpers/NotificationHelper.js");
-  const messagingRepos = await RepoManager.getRepos<any>("messaging");
-  NotificationHelper.init(messagingRepos);
-  const contentRepos = await RepoManager.getRepos<any>("content");
-  await JobRunHelper.run("advanceRecurringServices", () => contentRepos.streamingService.advanceRecurringServices());
-  const { expandReminders } = await import("../../modules/messaging/helpers/ReminderBootstrap.js");
-  await JobRunHelper.run("expandReminders", () => expandReminders(messagingRepos)); // reminder expander — Pattern A
-  const { GradePromotionHelper } = await import("../../modules/membership/helpers/GradePromotionHelper.js");
-  await JobRunHelper.run("gradePromotions", () => GradePromotionHelper.checkPromotions());
-  await JobRunHelper.run("purgeJobRuns", async () => {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    return membershipRepos.jobRun.deleteOld(30);
-  });
-  await JobRunHelper.run("dunningEmails", async () => {
-    const { DunningHelper } = await import("../../modules/giving/helpers/DunningHelper.js");
-    return DunningHelper.run();
-  });
-  await JobRunHelper.run("dailyEmails", () => NotificationHelper.sendEmailNotifications("daily"));
-  await JobRunHelper.run("commonsNightly", async () => {
-    const { MaintenanceHelper } = await import("../../modules/commons/helpers/MaintenanceHelper.js");
-    const commonsRepos = await RepoManager.getRepos<any>("commons");
-    return MaintenanceHelper.nightly(commonsRepos);
-  });
-};
-
-const runWebhookDeliveries = async (): Promise<void> => {
-  const { WebhookDeliveryWorker } = await import("../webhooks/index.js");
-  const repos = await RepoManager.getRepos<any>("membership");
-  await JobRunHelper.run("webhookDeliveries", () => WebhookDeliveryWorker.process(repos));
-};
+// Runs the same handlers as the Lambda timers so both schedulers stay in sync.
+const timers = () => import("../../lambda/timer-handler.js");
+const runThirtyMinute = async () => (await timers()).handle30MinTimer(null as any, null as any);
+const runMidnight = async () => (await timers()).handleMidnightTimer(null as any, null as any);
+const runScheduledTasks = async () => (await timers()).handleScheduledTasks(null as any, null as any);
+const runWebhookDeliveries = async () => (await timers()).handleWebhookTimer(null as any, null as any);
 
 export const startRailwayCron = (): void => {
   if (!process.env.RAILWAY_ENVIRONMENT && !process.env.SELF_HOSTED) return;
@@ -82,4 +51,5 @@ export const startRailwayCron = (): void => {
   };
 
   scheduleDaily("midnight timer", runMidnight);
+  scheduleDaily("scheduled tasks", runScheduledTasks);
 };

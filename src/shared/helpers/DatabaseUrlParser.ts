@@ -16,17 +16,17 @@ export class DatabaseUrlParser {
 
     const cleanUrl = url.replace(/^mysql:\/\//, "");
 
-    const urlPattern = /^(?:([^:@]+)(?::([^@]*))?@)?([^:\/]+)(?::(\d+))?\/([^?]+)(?:\?(.*))?$/;
+    const urlPattern = /^(?:([^:@]+)(?::(.*))?@)?([^:\/@]+)(?::(\d+))?\/([^?]+)(?:\?(.*))?$/;
     const match = cleanUrl.match(urlPattern);
 
     if (!match) {
-      throw new Error(`Invalid MySQL connection string format: ${url}. Expected format: mysql://user:password@host:port/database`);
+      throw new Error("Invalid MySQL connection string format. Expected format: mysql://user:password@host:port/database");
     }
 
     const [, user, password, host, portStr, database] = match;
 
     if (!host || !database) {
-      throw new Error(`Missing required components in connection string: ${url}. Host and database are required.`);
+      throw new Error("Missing required components in connection string. Host and database are required.");
     }
 
     const port = portStr ? parseInt(portStr, 10) : 3306;

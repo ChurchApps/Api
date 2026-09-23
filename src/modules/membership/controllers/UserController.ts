@@ -256,7 +256,7 @@ export class UserController extends MembershipBaseController {
         user = { email: userEmail, firstName, lastName };
         user.registrationDate = new Date();
         user.lastLogin = user.registrationDate;
-        const tempPassword = UniqueIdHelper.shortId();
+        const tempPassword = UniqueIdHelper.secret();
         user.password = bcrypt.hashSync(tempPassword, 10);
         user = await this.repos.user.save(user);
 
@@ -287,7 +287,7 @@ export class UserController extends MembershipBaseController {
       if (user) return res.status(400).json({ errors: ["user already exists"] });
       else {
         const regStart = Date.now();
-        const tempPassword = UniqueIdHelper.shortId();
+        const tempPassword = UniqueIdHelper.secret();
         user = { email: register.email, firstName: register.firstName, lastName: register.lastName };
         minted = Environment.isMailConfigured ? null : AuthGuidHelper.mint();
         if (minted) user.authGuid = minted.stored;

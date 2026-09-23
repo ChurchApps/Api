@@ -40,12 +40,10 @@ const startServer = async () => {
         console.warn("Failed to shutdown WebSocket server:", (error as any)?.message || error);
       }
 
-      // Close database connections
-      await KyselyPool.destroyAll();
-
-      // Stop accepting new requests
-      server.close(() => {
+      // Stop accepting new requests, let in-flight ones finish, then close database connections
+      server.close(async () => {
         console.warn("Server closed");
+        await KyselyPool.destroyAll();
         process.exit(0);
       });
 
