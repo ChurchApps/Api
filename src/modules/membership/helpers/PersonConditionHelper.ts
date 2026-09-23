@@ -28,7 +28,7 @@ export class PersonConditionHelper {
       case "phone": {
         const matched = ArrayHelper.getAllOperator(data, "homePhone", c.value, c.operator)
           .concat(ArrayHelper.getAllOperator(data, "workPhone", c.value, c.operator))
-          .concat(ArrayHelper.getAllOperator(data, "cellPhone", c.value, c.operator));
+          .concat(ArrayHelper.getAllOperator(data, "mobilePhone", c.value, c.operator));
         return ArrayHelper.getUnique(matched);
       }
       case "id":

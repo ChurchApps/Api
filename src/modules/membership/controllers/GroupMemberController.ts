@@ -107,9 +107,20 @@ export class GroupMemberController extends MembershipBaseController {
       }
 
       const promises: Promise<GroupMember>[] = [];
-      req.body.forEach((gm) => {
+      const rosters = new Map<string, any[]>();
+      for (const gm of req.body) {
         gm.churchId = au.churchId;
         const isNew = !gm.id;
+        if (isNew && gm.groupId && gm.personId) {
+          if (!rosters.has(gm.groupId)) rosters.set(gm.groupId, (await this.repos.groupMember.loadForGroup(au.churchId, gm.groupId)) as any[]);
+          const roster = rosters.get(gm.groupId);
+          const existing = roster.find((m) => m.personId === gm.personId);
+          if (existing) {
+            promises.push(Promise.resolve(existing));
+            continue;
+          }
+          roster.push(gm);
+        }
         promises.push(
           this.repos.groupMember.save(gm).then(async (saved) => {
             if (isNew) {
@@ -119,7 +130,7 @@ export class GroupMemberController extends MembershipBaseController {
             return saved;
           })
         );
-      });
+      }
       const result = await Promise.all(promises);
 
       // Create userChurch records for members with matching users

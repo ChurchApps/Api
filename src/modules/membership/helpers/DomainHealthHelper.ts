@@ -28,13 +28,13 @@ export class DomainHealthHelper {
     const repos = await RepoManager.getRepos<Repos>("membership");
     const domains: Domain[] = await repos.domain.loadUnchecked();
 
-    for (const domain of domains) {
-      if (!domain.domainName || !domain.id) continue;
+    await Promise.all(domains.map(async (domain) => {
+      if (!domain.domainName || !domain.id) return;
       const isValid = await this.verifyDomain(domain.domainName);
       domain.lastChecked = new Date();
       domain.isStale = !isValid;
       await repos.domain.save(domain);
-    }
+    }));
 
     return domains;
   }

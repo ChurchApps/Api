@@ -12,7 +12,7 @@ export class AnswerController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.forms.admin) || !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else {
         let data: any = null;
-        if (req.query.formSubmissionId !== undefined) data = this.repos.answer.loadForFormSubmission(au.churchId, req.query.formSubmissionId.toString());
+        if (req.query.formSubmissionId !== undefined) data = await this.repos.answer.loadForFormSubmission(au.churchId, req.query.formSubmissionId.toString());
         else data = await this.repos.answer.loadAll(au.churchId);
         return this.repos.answer.convertAllToModel(au.churchId, data);
       }

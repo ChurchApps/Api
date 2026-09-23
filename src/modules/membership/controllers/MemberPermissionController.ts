@@ -58,7 +58,7 @@ export class MemberPermissionController extends MembershipBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const formId = req?.query?.formId.toString();
+      const formId = req?.query?.formId?.toString();
       if (!(await this.formAccess(au, formId))) return this.json({}, 401);
       else {
         await this.repos.memberPermission.delete(au.churchId, id);
@@ -71,7 +71,7 @@ export class MemberPermissionController extends MembershipBaseController {
   @httpDelete("/member/:id")
   public async deleteByMemberId(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const formId = req?.query?.formId.toString();
+      const formId = req?.query?.formId?.toString();
       if (!formId || !(await this.formAccess(au, formId))) return this.json({}, 401);
       else {
         await this.repos.memberPermission.deleteByMemberId(au.churchId, id, formId);

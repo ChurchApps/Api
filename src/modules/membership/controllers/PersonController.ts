@@ -196,7 +196,7 @@ export class PersonController extends MembershipBaseController {
           }
         });
         if (removePromises.length > 0) await Promise.all(removePromises);
-        this.repos.household.deleteUnused(au.churchId);
+        await this.repos.household.deleteUnused(au.churchId);
         return this.repos.person.convertAllToModelWithPermissions(au.churchId, result, au.checkAccess(Permissions.people.edit));
       }
     });
@@ -234,7 +234,7 @@ export class PersonController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
-        const phoneNumber: string = req.query.number.toString();
+        const phoneNumber = req.query.number?.toString() ?? "";
         const data = (await this.repos.person.searchPhone(au.churchId, phoneNumber)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));
         return await this.filterPeople(result, au);
@@ -248,7 +248,7 @@ export class PersonController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         let data: any[] = [];
-        const members = (await this.repos.groupMember.loadForGroup(au.churchId, req.query.groupId.toString())) as any[];
+        const members = (await this.repos.groupMember.loadForGroup(au.churchId, req.query.groupId?.toString() ?? "")) as any[];
         if ((members as any[]).length === 0) {
           return data;
         }
@@ -269,8 +269,7 @@ export class PersonController extends MembershipBaseController {
         const email: string = req.query.email?.toString();
         if (email) data = await this.repos.person.searchEmail(au.churchId, email);
         else {
-          let term: string = req.query.term.toString();
-          if (term === null) term = "";
+          const term = req.query.term?.toString() ?? "";
           const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
           data = await this.repos.person.search(au.churchId, term, filterOptedOut);
         }
@@ -284,7 +283,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/basic")
   public async getBasic(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const idList = req.query.ids.toString().split(",");
+      const idList = (req.query.ids?.toString() ?? "").split(",").filter(Boolean);
       const ids: string[] = [];
       idList.forEach((id) => ids.push(id));
       const data = (await this.repos.person.loadByIds(au.churchId, ids)) as any[];
@@ -328,7 +327,7 @@ export class PersonController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
-        const idList = req.query.ids.toString().split(",");
+        const idList = (req.query.ids?.toString() ?? "").split(",").filter(Boolean);
         const ids: string[] = [];
         idList.forEach((id) => ids.push(id));
         const data = (await this.repos.person.loadByIds(au.churchId, ids)) as any[];
@@ -385,8 +384,7 @@ export class PersonController extends MembershipBaseController {
         const email: string = req.body.email?.toString();
         if (email) data = await this.repos.person.searchEmail(au.churchId, email);
         else {
-          let term: string = req.body.term.toString();
-          if (term === null) term = "";
+          const term = req.body.term?.toString() ?? "";
           data = await this.repos.person.search(au.churchId, term);
         }
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));

@@ -1,7 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
-import { FormSubmission, Answer, Form, Church } from "../models/index.js";
+import { FormSubmission, Answer, Form, Church, Question } from "../models/index.js";
 import { Permissions, Environment, ConversationalFormHelper, UserChurchHelper } from "../helpers/index.js";
 import type { FormContact } from "../helpers/index.js";
 import { MemberPermission, Person } from "../models/index.js";
@@ -42,15 +42,16 @@ export class FormSubmissionController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.formAccess(au, formId, "view"))) return this.json([], 401);
       else {
-        const formSubmissions = await this.repos.formSubmission.convertAllToModel(au.churchId, (await this.repos.formSubmission.loadByFormId(au.churchId, formId)) as any[]);
-        console.log("Form Submissions", formSubmissions.length);
-        const promises: Promise<FormSubmission>[] = [];
-        formSubmissions.forEach((formSubmission: FormSubmission) => {
-          promises.push(this.appendForm(au.churchId, formSubmission));
-          promises.push(this.appendQuestions(au.churchId, formSubmission));
-          promises.push(this.appendAnswers(au.churchId, formSubmission));
+        const formSubmissions: FormSubmission[] = await this.repos.formSubmission.convertAllToModel(au.churchId, (await this.repos.formSubmission.loadByFormId(au.churchId, formId)) as any[]);
+        if (formSubmissions.length === 0) return formSubmissions;
+        const form = this.repos.form.convertToModel(au.churchId, await this.repos.form.load(au.churchId, formId));
+        const questions = this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
+        const answers = this.repos.answer.convertAllToModel(au.churchId, (await this.repos.answer.loadForFormSubmissions(au.churchId, formSubmissions.map((fs) => fs.id))) as any[]);
+        formSubmissions.forEach((formSubmission) => {
+          formSubmission.form = form;
+          formSubmission.questions = questions;
+          formSubmission.answers = answers.filter((a) => a.formSubmissionId === formSubmission.id);
         });
-        await Promise.all(promises);
         return formSubmissions;
       }
     });
@@ -117,7 +118,7 @@ export class FormSubmissionController extends MembershipBaseController {
             await WebhookDispatcher.emit(churchId, "form.submission.created", { ...savedSubmissions, formName: form.name, submitterName });
 
             try {
-              await this.sendEmails(formSubmission, form, churchId);
+              await this.sendEmails(formSubmission, questions, form, churchId);
             } catch (err) {
               console.error("Form submission notifications failed (non-fatal):", err);
             }
@@ -148,7 +149,7 @@ export class FormSubmissionController extends MembershipBaseController {
     await WebhookDispatcher.emit(churchId, "group.member.added", saved);
   }
 
-  private async sendEmails(formSubmission: FormSubmission, form: Form, churchId: string) {
+  private async sendEmails(formSubmission: FormSubmission, questions: Question[], form: Form, churchId: string) {
     // send email to form members that have emailNotification set to true
     const memberPermissions = (await this.repos.memberPermission.loadByEmailNotification(churchId, "form", form.id, true)) as any;
     const church: Church = await this.repos.church.loadById(churchId);
@@ -158,8 +159,8 @@ export class FormSubmissionController extends MembershipBaseController {
         const people = (await this.repos.person.loadByIds(formSubmission.churchId, ids)) as any[];
         if ((people as any[])?.length > 0) {
           const contentRows: any[] = [];
-          formSubmission.questions.forEach((q) => {
-            formSubmission.answers.forEach((a) => {
+          questions.forEach((q) => {
+            (formSubmission.answers || []).forEach((a) => {
               if (q.id === a.questionId) {
                 contentRows.push("<tr><th style=\"font-size: 16px\" width=\"30%\">" + this.escapeHtml(q.title) + "</th><td style=\"font-size: 15px\">" + this.escapeHtml(a.value) + "</td></tr>");
               }

@@ -490,6 +490,7 @@ export class UserController extends MembershipBaseController {
         user.lastName = req.body.lastName;
         user = await this.repos.user.save(user);
       }
+      if (!user) return this.json({}, 404);
       user.password = null;
       return this.json(user, 200);
     });
@@ -517,6 +518,7 @@ export class UserController extends MembershipBaseController {
         } else return this.denyAccess(["Access denied"]);
       }
 
+      if (!user) return this.json({}, 404);
       user.password = null;
       return this.json(user, 200);
     });
