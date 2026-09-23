@@ -3,7 +3,8 @@ import { Environment } from "./index.js";
 const segmentByApp: Record<string, number> = {
   B1Admin: 1,
   B1: 1,
-  "Lessons.church": 2
+  "Lessons.church": 2,
+  WorshipCommons: 54
 };
 
 export class MauticHelper {
