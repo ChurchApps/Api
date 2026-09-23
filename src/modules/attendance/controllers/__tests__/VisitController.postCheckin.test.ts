@@ -87,12 +87,27 @@ describe("postCheckin passthrough", () => {
 
   it("returns the visit's existing securityCode on re-check-in instead of an unsaved fresh one", async () => {
     const { controller, repos } = makeController({ groups: [{ id: "g1", name: "Nursery", capacity: 10, checkinClosed: false }], counts: [] });
+    repos.visit.loadByServiceDatePeopleIds = jest.fn(async () => [{ id: "old1", personId: "p1", securityCode: "ZZZZ" }]);
     const body = memberVisit();
     (body[0] as any).securityCode = "ZZZZ";
     const result: any = await (controller as any).postCheckin(req(body), {});
     expect(result.securityCode).toBe("ZZZZ");
     expect(repos.visit.save.mock.calls[0][0].securityCode).toBe("ZZZZ");
     expect(repos.visit.loadByCodeToday).not.toHaveBeenCalled();
+  });
+
+  it("replaces a client-supplied code nobody in the batch holds today, and never saves client ids", async () => {
+    const { controller, repos } = makeController({ groups: [], counts: [] });
+    const body: any = memberVisit();
+    body[0].id = "otherFamilyVisit";
+    body[0].securityCode = "EVIL";
+    body[0].visitSessions[0].id = "otherFamilyVisitSession";
+    const result: any = await (controller as any).postCheckin(req(body), {});
+    expect(result.securityCode).toBe("ABCD");
+    const saved = repos.visit.save.mock.calls[0][0];
+    expect(saved.securityCode).toBe("ABCD");
+    expect(saved.id).not.toBe("otherFamilyVisit");
+    expect(repos.visitSession.save.mock.calls[0][0].id).toBeNull();
   });
 
   it("legacy check-in with no group config saves normally", async () => {

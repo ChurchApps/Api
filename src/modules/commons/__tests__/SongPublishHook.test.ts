@@ -79,7 +79,7 @@ describe("songPublishHook.onPublish", () => {
   it("upserts the package columns and writes masters/song.json from the asset status, never a literal", async () => {
     const repos: any = {
       song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
-      author: { findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
+      author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
     };
     const written: Record<string, string> = {};
     await songPublishHook.onPublish({
@@ -102,7 +102,7 @@ describe("songPublishHook.onPublish", () => {
   it("copies an optional CCLI number from the payload onto the song row", async () => {
     const repos: any = {
       song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
-      author: { findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
+      author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
     };
     await songPublishHook.onPublish({
       asset: { id: "asset000001", assetType: "song", license: "WC", status: "unpublished" },
@@ -115,5 +115,37 @@ describe("songPublishHook.onPublish", () => {
       writeFile: async () => {}
     });
     expect(repos.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ ccli: "22025" }));
+  });
+
+  describe("author claim", () => {
+    const run = async (opts: { submittedBy: string; existingAuthor?: string }) => {
+      const repos: any = {
+        song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "published", title: "T" })) },
+        author: { loadIdByName: jest.fn(async () => opts.existingAuthor), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
+      };
+      await songPublishHook.onPublish({
+        asset: { id: "asset000001", assetType: "song", license: "WC", status: "published", publisherUserId: "publisher01" },
+        submission: { id: "sub00000001", submittedBy: opts.submittedBy, payload: {} },
+        detail: { writer: "Ada", chordPro: CHART },
+        files: [],
+        filesChanged: [],
+        version: 1,
+        repos,
+        writeFile: async () => {}
+      });
+      return repos.author.update;
+    };
+
+    it("claims a newly created single-writer row for the publisher", async () => {
+      expect(await run({ submittedBy: "publisher01" })).toHaveBeenCalledWith("author00001", { userId: "publisher01" });
+    });
+
+    it("never claims for a third-party submitter", async () => {
+      expect(await run({ submittedBy: "someoneelse" })).not.toHaveBeenCalled();
+    });
+
+    it("never claims a writer already in the library", async () => {
+      expect(await run({ submittedBy: "publisher01", existingAuthor: "author00001" })).not.toHaveBeenCalled();
+    });
   });
 });

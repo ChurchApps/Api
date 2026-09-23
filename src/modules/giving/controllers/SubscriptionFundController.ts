@@ -19,7 +19,7 @@ export class SubscriptionFundController extends GivingBaseController {
       if (req.query.subscriptionId !== undefined) {
         const subscriptionId = req.query.subscriptionId.toString();
         const subscriptionData = await this.repos.subscription.load(au.churchId, subscriptionId);
-        const permission = au.checkAccess(Permissions.donations.view) || (subscriptionData as any)?.personId === au.personId;
+        const permission = au.checkAccess(Permissions.donations.view) || (!!au.personId && (subscriptionData as any)?.personId === au.personId);
         if (!permission) return this.json([], 401);
         else return await this.repos.subscriptionFunds.loadBySubscriptionId(au.churchId, req.query.subscriptionId.toString());
       }
@@ -42,7 +42,7 @@ export class SubscriptionFundController extends GivingBaseController {
   @httpDelete("/subscription/:id")
   public async deleteBySubscriptionId(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const permission = au.checkAccess(Permissions.donations.edit) || ((await this.repos.subscription.load(au.churchId, id)) as any).personId === au.personId;
+      const permission = au.checkAccess(Permissions.donations.edit) || (!!au.personId && ((await this.repos.subscription.load(au.churchId, id)) as any)?.personId === au.personId);
       if (!permission) return this.json(null, 401);
       else {
         await this.repos.subscriptionFunds.deleteBySubscriptionId(au.churchId, id);

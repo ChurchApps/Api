@@ -13,6 +13,10 @@ export class AuthorRepo {
     return await getDb().selectFrom("authors").selectAll().where("userId", "=", userId).executeTakeFirst() as Author | undefined;
   }
 
+  public async loadIdByName(name: string): Promise<string | undefined> {
+    return (await getDb().selectFrom("authors").select("id").where("name", "=", name).executeTakeFirst())?.id;
+  }
+
   public async findOrCreate(name: string): Promise<string> {
     const existing = await getDb().selectFrom("authors").select("id").where("name", "=", name).executeTakeFirst();
     if (existing?.id) return existing.id;
