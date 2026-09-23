@@ -263,7 +263,9 @@ export class StripeGatewayProvider implements IGatewayProvider {
   }
 
   async logEvent(churchId: string, event: any, eventData: any, repos: any): Promise<void> {
-    await StripeHelper.logEvent(churchId, event, eventData, repos);
+    // The webhook route hands over the raw body (kept raw for signature checks); without parsing, providerId/eventType save as NULL.
+    const parsed = Buffer.isBuffer(event) || typeof event === "string" ? JSON.parse(event.toString()) : event;
+    await StripeHelper.logEvent(churchId, parsed, eventData, repos);
   }
 
   async logDonation(config: GatewayConfig, churchId: string, eventData: any, repos: any, status: "pending" | "complete" | "failed" = "complete"): Promise<any> {
@@ -420,7 +422,9 @@ export class StripeGatewayProvider implements IGatewayProvider {
         amount: (eventData.amount || eventData.amount_paid || 0) / 100,
         customerId: eventData.customer || "",
         raw: event,
-        skipReason: event.type === "charge.succeeded" && isSubscriptionEvent ? "Subscription event - handled by invoice.paid" : undefined
+        skipReason: (event.type === "charge.succeeded" && isSubscriptionEvent) || (event.type === "payment_intent.succeeded" && eventData.invoice)
+          ? "Subscription event - handled by invoice.paid"
+          : undefined
       };
     });
   }

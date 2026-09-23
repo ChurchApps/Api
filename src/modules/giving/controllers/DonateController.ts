@@ -351,6 +351,19 @@ export class DonateController extends GivingBaseController {
             continue;
           }
 
+          // ACH settles days after the donation date, so the amount/date match below misses it; the transaction ids don't.
+          const obj = event.raw?.data?.object || {};
+          const txnIds = [obj.id, obj.payment_intent, obj.invoice, obj.latest_charge].filter((v) => typeof v === "string" && v);
+          let txnMatch = null;
+          for (const txnId of txnIds) {
+            txnMatch = await this.repos.donation.loadByTransactionId(au.churchId, txnId);
+            if (txnMatch) break;
+          }
+          if (txnMatch) {
+            results.push({ ...base, status: "already_imported", error: "Matched existing donation by transaction id" });
+            continue;
+          }
+
           // Secondary check: look for matching donation by amount, date, and person
           const customerData = event.customerId ? await this.repos.customer.load(au.churchId, event.customerId) as any : null;
           const personId = customerData?.personId || null;
