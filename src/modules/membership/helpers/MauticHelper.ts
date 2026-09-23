@@ -7,6 +7,14 @@ const segmentByApp: Record<string, number> = {
   WorshipCommons: 54
 };
 
+// Apps whose USER signups (including users joining an existing church) should
+// reach Mautic. Deliberately excludes B1/B1Admin: their user base includes
+// congregation members of other churches, who never opted into our marketing.
+// Only leader/volunteer-facing apps belong here.
+const userSegmentByApp: Record<string, number> = {
+  WorshipCommons: 54
+};
+
 export class MauticHelper {
   private static authHeader = () => "Basic " + Buffer.from(`${Environment.mauticUser}:${Environment.mauticPassword}`).toString("base64");
 
@@ -107,6 +115,34 @@ export class MauticHelper {
     const contacts = Object.values(data.contacts || {}) as any[];
     if (!contacts.length) return;
     await MauticHelper.patch(`/api/contacts/${contacts[0].id}/edit`, fields);
+  };
+
+  // Upserts a contact for a USER signup (new account, possibly joining an
+  // existing church) for apps in userSegmentByApp. Unlike register(), this
+  // fires even when no new church is created. Links the contact to the
+  // existing Mautic company via companychurchid when churchId is provided.
+  static registerUser = async (email: string, firstName: string, lastName: string, appName: string, churchId?: string) => {
+    if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
+    const segmentId = userSegmentByApp[appName];
+    if (!segmentId) return;
+    try {
+      const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
+      const contacts = Object.values(data.contacts || {}) as any[];
+      let contactId = contacts.length ? contacts[0].id : null;
+      if (!contactId) {
+        const created = await MauticHelper.post("/api/contacts/new", { firstname: firstName, lastname: lastName, email });
+        contactId = created?.contact?.id;
+      }
+      if (!contactId) return;
+      await MauticHelper.post(`/api/segments/${segmentId}/contact/${contactId}/add`);
+      if (churchId) {
+        const companies = await MauticHelper.get(`/api/companies?search=${encodeURIComponent("companychurchid:" + churchId)}&limit=1`);
+        const list = Object.values(companies.companies || {}) as any[];
+        if (list.length) await MauticHelper.post(`/api/companies/${list[0].id}/contact/${contactId}/add`);
+      }
+    } catch (err) {
+      console.error(`MauticHelper.registerUser failed for ${appName}`, err);
+    }
   };
 
   // Records a B1 login: bumps b1_login_count and sets b1_last_login on the contact.
