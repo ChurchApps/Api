@@ -4,6 +4,7 @@ import { ContentBaseController } from "./ContentBaseController.js";
 import { BibleSourceFactory } from "../helpers/BibleSourceFactory.js";
 import { Permissions } from "../helpers/index.js";
 import { BibleTranslation, BibleVerseText } from "../models/index.js";
+import { BibleVerseTextRepo } from "../repositories/BibleVerseTextRepo.js";
 
 @controller("/content/bibles")
 export class BibleController extends ContentBaseController {
@@ -126,10 +127,10 @@ export class BibleController extends ContentBaseController {
       const canCache = !this.noCache.includes(sourceKey);
       let result: BibleVerseText[] = [];
       const ipAddress = (req.headers["x-forwarded-for"] || req.socket.remoteAddress).toString().split(",")[0];
-      this.logLookup(ipAddress, sourceKey, startVerseKey, endVerseKey);
+      this.logLookup(ipAddress, sourceKey, startVerseKey, endVerseKey).catch((e) => console.error("Failed to log bible lookup", e));
 
       if (canCache) result = await this.repos.bibleVerseText.loadRange(sourceKey, startVerseKey, endVerseKey);
-      if (result.length === 0) {
+      if (!BibleVerseTextRepo.coversRange(result, startVerseKey, endVerseKey)) {
         result = await BibleSourceFactory.getVerseText(source, sourceKey, startVerseKey, endVerseKey);
         if (canCache) {
           result.forEach((r: BibleVerseText) => {

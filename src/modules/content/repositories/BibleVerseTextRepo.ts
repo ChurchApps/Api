@@ -82,6 +82,26 @@ export class BibleVerseTextRepo {
     return this.filterResults(data, startChapter, startVerse, endChapter, endVerse);
   }
 
+  // Cached rows can be a partial overlap from an earlier, smaller lookup; only a contiguous run from start to end is a hit.
+  public static coversRange(rows: BibleVerseText[], startVerseKey: string, endVerseKey: string): boolean {
+    if (!rows || rows.length === 0) return false;
+    const [, startChapter, startVerse] = startVerseKey.split(".").map((p) => parseInt(p, 10));
+    const [, endChapter, endVerse] = endVerseKey.split(".").map((p) => parseInt(p, 10));
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+    if (first.chapterNumber !== startChapter || first.verseNumber !== startVerse) return false;
+    if (last.chapterNumber !== endChapter || last.verseNumber !== endVerse) return false;
+    for (let i = 1; i < rows.length; i++) {
+      const prev = rows[i - 1];
+      const cur = rows[i];
+      const contiguous = cur.chapterNumber === prev.chapterNumber
+        ? cur.verseNumber === prev.verseNumber + 1
+        : cur.chapterNumber === prev.chapterNumber + 1 && cur.verseNumber === 1;
+      if (!contiguous) return false;
+    }
+    return true;
+  }
+
   public convertToModel(data: any) { return data as BibleVerseText; }
   public convertAllToModel(data: any[]) { return (data || []) as BibleVerseText[]; }
 

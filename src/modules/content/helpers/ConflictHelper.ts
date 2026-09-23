@@ -132,6 +132,11 @@ export class ConflictHelper {
 
   private static findResourceConflicts(proposed: ProposedBooking, occurrences: Occurrence[], ctx: ConflictContext): Conflict[] {
     const result: Conflict[] = [];
+    const bookingWindows = new Map<BookingWithEvent, Occurrence[]>();
+    const windowsOf = (booking: BookingWithEvent) => {
+      if (!bookingWindows.has(booking)) bookingWindows.set(booking, this.windowsFor(booking, ctx));
+      return bookingWindows.get(booking);
+    };
     for (const req of proposed.resources || []) {
       const resource = ctx.resources.find((r) => r.id === req.resourceId);
       const total = resource?.quantity ?? 1;
@@ -141,7 +146,7 @@ export class ConflictHelper {
         for (const booking of ctx.resourceBookings) {
           if (booking.resourceId !== req.resourceId) continue;
           if (proposed.eventId && booking.eventId === proposed.eventId) continue;
-          const otherOccurrences = this.windowsFor(booking, ctx);
+          const otherOccurrences = windowsOf(booking);
           if (otherOccurrences.some((o) => RecurrenceHelper.overlaps(occ.start, occ.end, o.start, o.end))) booked += booking.quantity || 1;
         }
         if (requested + booked > total) {

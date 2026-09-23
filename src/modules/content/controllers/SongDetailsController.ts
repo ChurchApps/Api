@@ -27,8 +27,6 @@ export class SongDetailsController extends ContentBaseController {
           this.repos.songDetail.loadForChurch(au.churchId, limit, offset, search),
           this.repos.songDetail.loadCountForChurch(au.churchId, search)
         ]);
-        console.log(limit, offset, search);
-        console.log({ songDetails, count });
         return { songDetails, count };
       } else {
         return await this.repos.songDetail.loadForChurch(au.churchId);
@@ -48,10 +46,10 @@ export class SongDetailsController extends ContentBaseController {
         const { songDetails, links } = await PraiseChartsHelper.load(sd.praiseChartsId);
         await MusicBrainzHelper.appendDetails(songDetails, links);
         const result = await this.repos.songDetail.save(songDetails);
-        links.forEach(async (link) => {
+        for (const link of links) {
           link.songDetailId = result.id;
           await this.repos.songDetailLink.save(link);
-        });
+        }
         return result;
       } catch {
         return await this.repos.songDetail.save(sd);

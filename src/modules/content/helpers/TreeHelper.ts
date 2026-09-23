@@ -133,23 +133,33 @@ export class TreeHelper {
     if (pageId) existingSections = await repos.section.loadForPage(churchId, pageId);
     else if (blockId) existingSections = await repos.section.loadForBlock(churchId, blockId);
 
+    // Insert the snapshot before deleting the current content so a failed restore never leaves the page empty.
+    const insertedSectionIds: string[] = [];
+    const insertedElementIds: string[] = [];
+    try {
+      for (const sectionData of snapshot.sections || []) {
+        const section: Section = { ...sectionData, id: undefined, churchId };
+        delete (section as any).elements;
+        const savedSection = await repos.section.insert(section);
+        insertedSectionIds.push(savedSection.id);
+        for (const elementData of sectionData.elements || []) {
+          await this.restoreElement(churchId, savedSection.id, elementData, {}, insertedElementIds);
+        }
+      }
+    } catch (e) {
+      for (const id of insertedElementIds) await repos.element.delete(churchId, id);
+      for (const id of insertedSectionIds) await repos.section.delete(churchId, id);
+      throw e;
+    }
+
     for (const section of existingSections) {
       const elements = await repos.element.loadForSection(churchId, section.id);
       for (const element of elements) await repos.element.delete(churchId, element.id);
       await repos.section.delete(churchId, section.id);
     }
-
-    for (const sectionData of snapshot.sections || []) {
-      const section: Section = { ...sectionData, id: undefined, churchId };
-      delete (section as any).elements;
-      const savedSection = await repos.section.insert(section);
-      for (const elementData of sectionData.elements || []) {
-        await this.restoreElement(churchId, savedSection.id, elementData, {});
-      }
-    }
   }
 
-  private static async restoreElement(churchId: string, sectionId: string, elementData: any, idMap: Record<string, string>) {
+  private static async restoreElement(churchId: string, sectionId: string, elementData: any, idMap: Record<string, string>, insertedIds: string[]) {
     const repos = await RepoManager.getRepos<Repos>("content");
     const oldId = elementData.id;
     const element: Element = {
@@ -162,11 +172,12 @@ export class TreeHelper {
     const childElements = element.elements;
     delete element.elements;
     const savedElement = await repos.element.insert(element);
+    insertedIds.push(savedElement.id);
     idMap[oldId] = savedElement.id;
 
     if (childElements && childElements.length > 0) {
       for (const child of childElements) {
-        await this.restoreElement(churchId, sectionId, child, idMap);
+        await this.restoreElement(churchId, sectionId, child, idMap, insertedIds);
       }
     }
   }

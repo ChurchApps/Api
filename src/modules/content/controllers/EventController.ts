@@ -61,6 +61,8 @@ export class EventController extends ContentBaseController {
   @httpGet("/subscribe")
   public async subscribe(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: presence check only for the public ICS feed
+      if (!req.query.churchId) return this.json({ error: "churchId required" }, 400);
       let newEvents: any[] = [];
       if (req.query.groupId) {
         // authz-exempt: public ICS feed; churchId is the published feed identifier
@@ -246,7 +248,8 @@ export class EventController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       if (!req.body.ics || !req.body.groupId) return this.json({ error: "ics and groupId are required" }, 400);
-      const parsed = IcsHelper.parseEvents(req.body.ics).slice(0, 500);
+      const timeZone = (await getMembershipModuleGateway().loadChurch(au.churchId))?.timeZone;
+      const parsed = IcsHelper.parseEvents(req.body.ics, timeZone).slice(0, 500);
       const result: Event[] = [];
       for (const ev of parsed) {
         const event: Event = {
@@ -349,9 +352,10 @@ export class EventController extends ContentBaseController {
   private populateEventsForICS(events: Event[]) {
     const result: any[] = [];
     events.forEach((ev: Event) => {
+      if (!ev.start) return;
       const newEv: any = {};
-      newEv.start = ev.start.getTime();
-      newEv.end = ev.end.getTime();
+      newEv.start = new Date(ev.start).getTime();
+      newEv.end = new Date(ev.end || ev.start).getTime();
       newEv.title = ev.title;
       newEv.description = ev.description || "";
       newEv.recurrenceRule = ev.recurrenceRule || "";

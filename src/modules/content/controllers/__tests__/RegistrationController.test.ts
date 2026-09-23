@@ -179,3 +179,45 @@ describe("edit", () => {
     expect(repos.registration.save).toHaveBeenCalled();
   });
 });
+
+describe("review fixes", () => {
+  it("refuses to take payment for a waitlisted registration", async () => {
+    const { controller } = makeController({ existing: { id: "r1", churchId: "c1", personId: "p1", totalAmount: 100, amountPaid: 0, status: "waitlisted" }, auPersonId: "p1" });
+    const result = await (controller as any).pay("r1", { body: { provider: "stripe", token: "tok" } }, {});
+    expect(result.status).toBe(409);
+    expect(processCharge).not.toHaveBeenCalled();
+  });
+
+  it("confirms a pending registration once the balance is paid", async () => {
+    processCharge.mockResolvedValue({ success: true, transactionId: "tx4", data: { id: "tx4", status: "succeeded" } });
+    const { controller } = makeController({ existing: { id: "r1", churchId: "c1", personId: "p1", totalAmount: 40, amountPaid: 0, status: "pending" }, auPersonId: "p1" });
+    const result = await (controller as any).pay("r1", { body: { provider: "stripe", token: "tok" } }, {});
+    expect(result.status).toBe("confirmed");
+  });
+
+  it("promotes the registration staff clicked", async () => {
+    const { controller, repos } = makeController({ existing: { id: "r7", churchId: "c1", eventId: "e1" }, promoted: { id: "r7", status: "pending" } });
+    await (controller as any).promote("r7", { body: null }, {});
+    expect(repos.registration.promoteFromWaitlist).toHaveBeenCalledWith("c1", "e1", 50, "r7");
+  });
+
+  it("restores the old members when an edit hits a type capacity", async () => {
+    const types = [{ id: "t1", price: "0", capacity: 1, active: true }];
+    const old = [{ id: "m1", churchId: "c1", registrationId: "r1", firstName: "Old", lastName: "Member" }];
+    const { controller, repos } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1" }, types, auPersonId: "p1", savedMembers: old });
+    repos.registrationMember.atomicInsertWithTypeCapacity.mockImplementation(async (_m: any, capacity: number | null) => capacity === null);
+    const result = await (controller as any).edit("r1", { body: { members: [{ firstName: "New", lastName: "Member", registrationTypeId: "t1" }] } }, {});
+    expect(result.status).toBe(409);
+    expect(repos.registrationMember.atomicInsertWithTypeCapacity).toHaveBeenLastCalledWith(old[0], null);
+    expect(repos.registration.save).not.toHaveBeenCalled();
+  });
+
+  it("rolls back when a coupon's max uses were taken concurrently", async () => {
+    const coupon = { id: "cp1", code: "X", discountType: "amount", value: "5", maxUses: 1, active: true };
+    const { controller, repos } = makeController({ coupon, couponUses: 0 });
+    repos.registration.countActiveForCoupon.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
+    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", couponCode: "X", members: [{ firstName: "A", lastName: "B" }] } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.registration.delete).toHaveBeenCalled();
+  });
+});

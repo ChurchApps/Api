@@ -53,9 +53,9 @@ export class LinkController extends ContentBaseController {
   @httpGet("/church/:churchId")
   public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const category = req.query.category.toString();
+      const category = req.query.category?.toString();
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
-      if (category === undefined) return await this.repos.link.loadAll(churchId, siteId);
+      if (!category) return await this.repos.link.loadAll(churchId, siteId);
       else return await this.repos.link.loadByCategory(churchId, category, siteId);
     });
   }

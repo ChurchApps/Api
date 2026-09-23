@@ -62,6 +62,23 @@ describe("IcsHelper.parseEvents", () => {
     expect(result[0].end.getTime() - result[0].start.getTime()).toBe(60 * 60 * 1000);
   });
 
+  it("converts TZID times to the right instant", () => {
+    const ics = wrap("BEGIN:VEVENT\r\nDTSTART;TZID=America/Chicago:20260710T180000\r\nDTEND;TZID=America/Chicago:20260110T200000\r\nSUMMARY:Zoned\r\nEND:VEVENT\r\n");
+    const result = IcsHelper.parseEvents(ics);
+    expect(result[0].start.getTime()).toBe(Date.UTC(2026, 6, 10, 23, 0, 0));
+    expect(result[0].end.getTime()).toBe(Date.UTC(2026, 0, 11, 2, 0, 0));
+  });
+
+  it("uses the church time zone for floating times and unknown TZIDs", () => {
+    const ics = wrap(
+      "BEGIN:VEVENT\r\nDTSTART:20260710T180000\r\nSUMMARY:Floating\r\nEND:VEVENT\r\n" +
+        "BEGIN:VEVENT\r\nDTSTART;TZID=\"Central Standard Time\":20260710T180000\r\nSUMMARY:Windows zone\r\nEND:VEVENT\r\n"
+    );
+    const result = IcsHelper.parseEvents(ics, "America/New_York");
+    expect(result[0].start.getTime()).toBe(Date.UTC(2026, 6, 10, 22, 0, 0));
+    expect(result[1].start.getTime()).toBe(Date.UTC(2026, 6, 10, 22, 0, 0));
+  });
+
   it("returns an empty array for non-ics text", () => {
     expect(IcsHelper.parseEvents("hello world")).toHaveLength(0);
   });

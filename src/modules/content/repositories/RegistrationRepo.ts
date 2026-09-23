@@ -149,20 +149,22 @@ export class RegistrationRepo {
     return false;
   }
 
-  public async promoteFromWaitlist(churchId: string, eventId: string, capacity: number | null): Promise<Registration | null> {
-    const candidate = await getDb().selectFrom("registrations").selectAll()
+  public async promoteFromWaitlist(churchId: string, eventId: string, capacity: number | null, registrationId?: string): Promise<Registration | null> {
+    let query = getDb().selectFrom("registrations").selectAll()
       .where("churchId", "=", churchId)
       .where("eventId", "=", eventId)
-      .where("status", "=", "waitlisted")
-      .orderBy("registeredDate").limit(1).executeTakeFirst() as any;
+      .where("status", "=", "waitlisted");
+    if (registrationId) query = query.where("id", "=", registrationId);
+    const candidate = await query.orderBy("registeredDate").limit(1).executeTakeFirst() as any;
     if (!candidate) return null;
 
     const cap = capacity === null || capacity === undefined ? Number.MAX_SAFE_INTEGER : capacity;
-    const result: any = await sql`UPDATE registrations SET status='pending', waitlistNotifiedDate=NOW()
+    const status = Number(candidate.totalAmount || 0) - Number(candidate.amountPaid || 0) > 0 ? "pending" : "confirmed";
+    const result: any = await sql`UPDATE registrations SET status=${status}, waitlistNotifiedDate=NOW()
       WHERE id=${candidate.id} AND churchId=${churchId} AND status='waitlisted'
       AND (SELECT cnt FROM (SELECT COUNT(*) AS cnt FROM registrations WHERE churchId=${churchId} AND eventId=${eventId} AND status IN ('pending','confirmed')) AS used) < ${cap}`.execute(getDb());
     if (result?.numAffectedRows > 0n || result?.affectedRows > 0) {
-      return { ...candidate, status: "pending", waitlistNotifiedDate: new Date() };
+      return { ...candidate, status, waitlistNotifiedDate: new Date() };
     }
     return null;
   }
