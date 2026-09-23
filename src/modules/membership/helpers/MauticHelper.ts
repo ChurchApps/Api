@@ -134,6 +134,7 @@ export class MauticHelper {
         contactId = created?.contact?.id;
       }
       if (!contactId) return;
+      await MauticHelper.patch(`/api/contacts/${contactId}/edit`, { tags: [`App: ${appName}`] });
       await MauticHelper.post(`/api/segments/${segmentId}/contact/${contactId}/add`);
       if (churchId) {
         const companies = await MauticHelper.get(`/api/companies?search=${encodeURIComponent("companychurchid:" + churchId)}&limit=1`);
@@ -145,17 +146,24 @@ export class MauticHelper {
     }
   };
 
-  // Records a B1 login: bumps b1_login_count and sets b1_last_login on the contact.
-  static trackLogin = async (email: string) => {
+  // Records a login: bumps b1_login_count and sets b1_last_login on the contact.
+  // When appName is a leader-facing app (userSegmentByApp), also tags the
+  // contact with the app and adds it to the app's segment — so an existing
+  // ChurchApps contact who starts using a new app becomes visible for it.
+  static trackLogin = async (email: string, appName?: string) => {
     if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
     const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
     const contacts = Object.values(data.contacts || {}) as any[];
     if (!contacts.length) return;
     const contact = contacts[0];
     const currentCount = parseInt(contact.fields?.all?.b1_login_count || "0", 10) || 0;
-    await MauticHelper.patch(`/api/contacts/${contact.id}/edit`, {
+    const fields: Record<string, any> = {
       b1_last_login: new Date().toISOString(),
       b1_login_count: currentCount + 1
-    });
+    };
+    const appSegment = appName ? userSegmentByApp[appName] : undefined;
+    if (appSegment) fields.tags = [`App: ${appName}`];
+    await MauticHelper.patch(`/api/contacts/${contact.id}/edit`, fields);
+    if (appSegment) await MauticHelper.post(`/api/segments/${appSegment}/contact/${contact.id}/add`);
   };
 }

@@ -113,7 +113,7 @@ export class UserController extends MembershipBaseController {
             user.lastLogin = new Date();
             await this.repos.user.save(user);
             if (!isJwtRefresh) await LoginRateLimiter.clearFailures(this.repos, account);
-            MauticHelper.trackLogin(user.email).catch(() => {});
+            MauticHelper.trackLogin(user.email, req.body.appName).catch(() => {});
             const selectedChurch = userChurches[0];
             if (selectedChurch) {
               AuditLogHelper.logLogin(this.repos, selectedChurch.church.id, user.id, true, ip, { email: user.email });
