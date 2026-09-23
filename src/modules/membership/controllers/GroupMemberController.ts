@@ -58,19 +58,27 @@ export class GroupMemberController extends MembershipBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      let hasAccess = false;
-      if (au.checkAccess(Permissions.groupMembers.view)) hasAccess = true;
-      else if (req.query.groupId && au.groupIds && au.groupIds.includes(req.query.groupId.toString())) hasAccess = true;
-      else if (req.query.personId && au.personId === req.query.personId.toString()) hasAccess = true;
-      if (!hasAccess) return this.json({}, 401);
-      else {
-        let result = null;
-        if (req.query.groupId !== undefined) result = this.filterMinors((await this.repos.groupMember.loadForGroup(au.churchId, req.query.groupId.toString())) as any[], au, req.query.groupId.toString());
-        else if (req.query.groupIds !== undefined) result = await this.repos.groupMember.loadForGroups(au.churchId, req.query.groupIds.toString().split(","));
-        else if (req.query.personId !== undefined) result = await this.repos.groupMember.loadForPerson(au.churchId, req.query.personId.toString());
-        else result = await this.repos.groupMember.loadAll(au.churchId);
-        return this.stripContactInfo(this.repos.groupMember.convertAllToModel(au.churchId, result), au);
+      const canViewAll = au.checkAccess(Permissions.groupMembers.view);
+      const inGroup = (id: string) => canViewAll || !!au.groupIds?.includes(id);
+      let result = null;
+      if (req.query.groupId !== undefined) {
+        const groupId = req.query.groupId.toString();
+        if (!inGroup(groupId)) return this.json({}, 401);
+        result = this.filterMinors((await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[], au, groupId);
+      } else if (req.query.groupIds !== undefined) {
+        const groupIds = req.query.groupIds.toString().split(",").filter(Boolean);
+        if (!groupIds.every(inGroup)) return this.json({}, 401);
+        const rows = (await this.repos.groupMember.loadForGroups(au.churchId, groupIds)) as any[];
+        result = rows.filter((r) => this.filterMinors([r], au, r.groupId).length > 0);
+      } else if (req.query.personId !== undefined) {
+        const personId = req.query.personId.toString();
+        if (!canViewAll && personId !== au.personId) return this.json({}, 401);
+        result = await this.repos.groupMember.loadForPerson(au.churchId, personId);
+      } else {
+        if (!canViewAll) return this.json({}, 401);
+        result = await this.repos.groupMember.loadAll(au.churchId);
       }
+      return this.stripContactInfo(this.repos.groupMember.convertAllToModel(au.churchId, result), au);
     });
   }
 

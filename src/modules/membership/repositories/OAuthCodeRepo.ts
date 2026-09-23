@@ -52,6 +52,11 @@ export class OAuthCodeRepo {
     await getDb().deleteFrom("oAuthCodes").where("id", "=", id).execute();
   }
 
+  public async consume(id: string): Promise<boolean> {
+    const result = await getDb().deleteFrom("oAuthCodes").where("id", "=", id).executeTakeFirst();
+    return Number(result?.numDeletedRows ?? 0) > 0;
+  }
+
   public async deleteByCode(code: string) {
     await getDb().deleteFrom("oAuthCodes").where("code", "=", code).execute();
   }

@@ -34,13 +34,12 @@ export class UserChurchController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, UserChurch, { userId: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const userId = (req.query.userId && au.checkAccess(Permissions.people.edit)) ? req.query.userId : au.id;
+      if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
+      const userId = req.query.userId || au.id;
+      if (!req.body?.personId || !(await this.repos.person.load(au.churchId, req.body.personId))) return this.json({ message: "Person not found" }, 400);
       const record = await this.repos.userChurch.loadByUserId(userId, au.churchId);
       let result: any = {};
-      if (record) {
-        const userChurchRecord = record as UserChurch;
-        if (userChurchRecord.userId !== userId) return this.json({ message: "User already has a linked person record" }, 400);
-      } else {
+      if (!record) {
         const userChurch: UserChurch = {
           userId,
           churchId: au.churchId,
@@ -55,16 +54,18 @@ export class UserChurchController extends MembershipBaseController {
 
   @httpGet("/userid/:userId")
   public async getByUserId(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async ({ churchId }) => {
-      const record = await this.repos.userChurch.loadByUserId(userId, churchId);
-      return this.repos.userChurch.convertToModel(churchId, record);
+    return this.actionWrapper(req, res, async (au) => {
+      if (userId !== au.id && !au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
+      const record = await this.repos.userChurch.loadByUserId(userId, au.churchId);
+      return this.repos.userChurch.convertToModel(au.churchId, record);
     });
   }
 
   @httpGet("/personid/:personId")
   public async getByPersonId(@requestParam("personId") personId: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async ({ churchId }) => {
-      const record = await this.repos.userChurch.loadByPersonId(personId, churchId);
+    return this.actionWrapper(req, res, async (au) => {
+      if (personId !== au.personId && !au.checkAccess(Permissions.people.view)) return this.json({}, 401);
+      const record = await this.repos.userChurch.loadByPersonId(personId, au.churchId);
       if (!record) return null;
       return { email: record.email };
     });

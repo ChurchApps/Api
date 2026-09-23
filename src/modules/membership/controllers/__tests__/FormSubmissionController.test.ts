@@ -21,9 +21,9 @@ function formSubmissionController(opts: any = {}) {
       access: jest.fn(async () => opts.formAccess === undefined ? formRow : opts.formAccess),
       convertToModel: (_c: string, data: any) => data
     },
-    formSubmission: { save: jest.fn(async (s: any) => { if (!s.id) s.id = "sub1"; return s; }) },
-    answer: { save: jest.fn(async (a: any) => a) },
-    question: { loadForForm: jest.fn(async () => []), convertAllToModel: (_c: string, rows: any[]) => rows },
+    formSubmission: { save: jest.fn(async (s: any) => { if (!s.id) s.id = "sub1"; return s; }), load: jest.fn(async () => opts.existingSubmission ?? null) },
+    answer: { save: jest.fn(async (a: any) => a), loadForFormSubmission: jest.fn(async () => opts.existingAnswers ?? []) },
+    question: { loadForForm: jest.fn(async () => opts.questions ?? [{ id: "q1" }]), convertAllToModel: (_c: string, rows: any[]) => rows },
     memberPermission: { loadByEmailNotification: jest.fn(async () => []) },
     church: { loadById: jest.fn(async () => ({ id: "c1", name: "Test" })) },
     person: { loadByIds: jest.fn(async () => []) },
@@ -114,5 +114,42 @@ describe("FormSubmissionController.save group auto-add", () => {
     const { controller, repos } = formSubmissionController();
     await (controller as any).save({ body: [{ formId: "f1" }] }, {});
     expect(repos.groupMember.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("FormSubmissionController.save tampering", () => {
+  it("refuses to overwrite an existing submission for a caller who can't manage the form", async () => {
+    const { controller, repos } = formSubmissionController({ auChurchId: "c1", auId: "u1", existingSubmission: { id: "sub9", formId: "f1" } });
+    const result: any = await (controller as any).save({ body: [{ id: "sub9", formId: "f1", answers: [] }] }, {});
+    expect(repos.formSubmission.save).not.toHaveBeenCalled();
+    expect(result[0].error).toMatch(/not allowed/);
+  });
+
+  it("lets a form manager edit a submission of that form and keeps only its own answer ids", async () => {
+    const { controller, repos } = formSubmissionController({ auChurchId: "c1", auId: "u1", formAccessOk: true, existingSubmission: { id: "sub9", formId: "f1" }, existingAnswers: [{ id: "a1" }] });
+    await (controller as any).save({ body: [{ id: "sub9", formId: "f1", answers: [{ id: "a1", questionId: "q1", value: "x" }, { id: "foreign", questionId: "q1", value: "y" }] }] }, {});
+    expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
+    const ids = repos.answer.save.mock.calls.map((c: any[]) => c[0].id);
+    expect(ids).toEqual(["a1", undefined]);
+  });
+
+  it("drops a new submission's answer ids and answers to other forms' questions", async () => {
+    const { controller, repos } = formSubmissionController({ auChurchId: "c1", auId: "u1" });
+    await (controller as any).save({ body: [{ formId: "f1", answers: [{ id: "victim", questionId: "q1", value: "x" }, { questionId: "otherQ", value: "y" }] }] }, {});
+    expect(repos.answer.save).toHaveBeenCalledTimes(1);
+    expect(repos.answer.save.mock.calls[0][0].id).toBeUndefined();
+  });
+
+  it("won't attach an anonymous submission to an arbitrary person", async () => {
+    const { controller, repos } = formSubmissionController({ au: { checkAccess: () => false } });
+    await (controller as any).save({ body: [{ formId: "f1", contentType: "person", contentId: "victim" }] }, {});
+    expect(repos.formSubmission.save.mock.calls[0][0].contentId).toBeNull();
+  });
+
+  it("rejects submissions after the form's access window closed", async () => {
+    const { controller, repos } = formSubmissionController({ form: { id: "f1", churchId: "c1", name: "Camp", restricted: false, accessEndTime: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000) } });
+    const result: any = await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+    expect(repos.formSubmission.save).not.toHaveBeenCalled();
+    expect(result[0].error).toMatch(/not accepting/);
   });
 });

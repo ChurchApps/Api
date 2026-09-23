@@ -91,7 +91,7 @@ export class MembershipSettingController extends MembershipBaseController {
 
   private async saveImage(setting: Setting) {
     const base64 = setting.value.split(",")[1];
-    const key = "/" + setting.churchId + "/settings/" + setting.keyName + ".png";
+    const key = "/" + setting.churchId + "/settings/" + (setting.keyName || "").replace(/[^A-Za-z0-9_-]/g, "") + ".png";
     await FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64"));
     const photoUpdated = new Date();
     setting.value = Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();

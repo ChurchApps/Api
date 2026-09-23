@@ -5,6 +5,8 @@ import { AuthenticatedUser } from "../auth/index.js";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions } from "../helpers/index.js";
 import { IPermission } from "@churchapps/apihelper";
+import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 @controller("/membership/rolemembers")
 export class RoleMemberController extends MembershipBaseController {
@@ -23,11 +25,9 @@ export class RoleMemberController extends MembershipBaseController {
           if (userIds.length > 0) {
             const users = await this.repos.user.loadByIds(userIds);
             users.forEach((u) => {
-              u.password = null;
-              u.registrationDate = null;
-              u.lastLogin = null;
+              const safeUser = { id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName } as User;
               members.forEach((m) => {
-                if (m.userId === u.id) m.user = u;
+                if (m.userId === u.id) m.user = safeUser;
               });
             });
           }
@@ -49,7 +49,10 @@ export class RoleMemberController extends MembershipBaseController {
         for (const member of members) {
           member.churchId = au.churchId;
           if (member.addedBy === undefined || member.addedBy === null) member.addedBy = au.id;
-          if (member.userId === undefined || member.userId === null || member.userId === "") member.userId = await this.getUserId(member.user);
+          if (member.userId === undefined || member.userId === null || member.userId === "") {
+            if (!member.user?.email) return this.json({ error: "User email required" }, 400);
+            member.userId = await this.getUserId(member.user);
+          }
           promises.push(this.repos.roleMember.save(member));
         }
         members = await Promise.all(promises);
@@ -59,15 +62,15 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   private async getUserId(user: User) {
-    let u: User = await this.repos.user.loadByEmail(user.email);
-    if (u !== null) return u.id;
-    else {
-      user.lastLogin = new Date();
-      user.password = (Math.random() * 9999999999).toString();
-      user.registrationDate = new Date();
-      u = await this.repos.user.save(user);
-      return u.id;
-    }
+    const existing: User = await this.repos.user.loadByEmail(user.email);
+    if (existing !== null) return existing.id;
+    const created = await this.repos.user.save({
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      password: bcrypt.hashSync(crypto.randomBytes(32).toString("hex"), 10)
+    } as User);
+    return created.id;
   }
 
   @httpDelete("/:id")

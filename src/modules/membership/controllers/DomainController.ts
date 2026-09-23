@@ -65,8 +65,10 @@ export class DomainController extends MembershipBaseController {
 
   @httpGet("/lookup/:domainName")
   public async getByName(@requestParam("domainName") domainName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (_au) => {
-      return await this.repos.domain.loadByName(domainName);
+    return this.actionWrapper(req, res, async (au) => {
+      const row = await this.repos.domain.loadByName(domainName) as { churchId?: string } | null;
+      if (row && row.churchId !== au.churchId && !au.checkAccess(Permissions.server.admin)) return null;
+      return row;
     });
   }
 
@@ -112,13 +114,15 @@ export class DomainController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
         const promises: Promise<Domain>[] = [];
-        req.body.forEach((domain) => {
+        for (const domain of req.body) {
           domain.churchId = au.churchId;
           domain.domainName = (domain.domainName || "").toLowerCase().trim();
           domain.siteId = domain.siteId || "";
-          if (!domain.domainName || /\s/.test(domain.domainName) || !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain.domainName)) return;
+          if (!domain.domainName || /\s/.test(domain.domainName) || !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(domain.domainName)) continue;
+          const taken = await this.repos.domain.loadByName(domain.domainName) as { churchId?: string } | null;
+          if (taken && taken.churchId !== au.churchId) return this.json({ errors: ["Domain is already in use by another church"] }, 400);
           promises.push(this.repos.domain.save(domain));
-        });
+        }
         const result = await Promise.all(promises);
         try {
           await CaddyHelper.updateCaddy();

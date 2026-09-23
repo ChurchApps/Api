@@ -109,6 +109,7 @@ export class OAuthController extends MembershipBaseController {
           await this.repos.oAuthCode.delete(authCode.id);
           return this.json({ error: "invalid_grant" }, 400);
         }
+        if (!(await this.repos.oAuthCode.consume(authCode.id))) return this.json({ error: "invalid_grant" }, 400);
 
         const userChurch = (await this.repos.userChurch.load(authCode.userChurchId)) as any;
         const user = userChurch ? ((await this.repos.user.load(userChurch.userId)) as any) : null;
@@ -139,8 +140,6 @@ export class OAuthController extends MembershipBaseController {
         };
         await this.repos.oAuthToken.save(token);
 
-        await this.repos.oAuthCode.delete(authCode.id);
-
         return this.json({
           access_token: token.accessToken,
           token_type: "Bearer",
@@ -154,6 +153,10 @@ export class OAuthController extends MembershipBaseController {
         const oldToken = (await this.repos.oAuthToken.loadByRefreshToken(refresh_token)) as any;
 
         if (!oldToken || oldToken.clientId !== client.clientId) return this.json({ error: "invalid_grant" }, 400);
+        if (oldToken.expiresAt && new Date(oldToken.expiresAt) < new Date()) {
+          await this.repos.oAuthToken.delete(oldToken.id);
+          return this.json({ error: "invalid_grant" }, 400);
+        }
 
         // Fetch user/church data to generate proper JWT
         const userChurch = (await this.repos.userChurch.load(oldToken.userChurchId)) as any;

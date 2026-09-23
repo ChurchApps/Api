@@ -637,16 +637,9 @@ export class UserController extends MembershipBaseController {
       const user = await this.repos.user.loadByEmail(email);
       if (user) {
         isExistingUser = true;
-        const minted = AuthGuidHelper.mint(true);
-        user.authGuid = minted.stored;
-        loginLink = `/login?auth=${minted.raw}`;
-        await Promise.all([
-          this.repos.user.save(user),
-          UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser, inviterEmail)
-        ]);
-      } else {
-        await UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser, inviterEmail);
+        loginLink = "/login";
       }
+      await UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser, inviterEmail);
 
       return this.json({ success: true }, 200);
     });

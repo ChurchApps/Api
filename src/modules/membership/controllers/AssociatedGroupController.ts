@@ -40,6 +40,10 @@ export class AssociatedGroupController extends MembershipBaseController {
         if (item.contentType === "planType") {
           if (!await PlanAuth.canEditPlanType(au, item.contentId)) return this.json({}, 401);
         }
+        if (item.id) {
+          const existing: any = await this.repos.associatedGroup.load(au.churchId, item.id);
+          if (existing?.contentType === "planType" && !await PlanAuth.canEditPlanType(au, existing.contentId)) return this.json({}, 401);
+        }
       }
       const promises: Promise<AssociatedGroup>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.associatedGroup.save(item)); });

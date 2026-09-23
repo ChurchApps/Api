@@ -158,21 +158,19 @@ export class ChurchController extends MembershipBaseController {
     });
   }
 
-  // This is just to get a church's server/domain admin without any permissions.
   @httpGet("/:id/getDomainAdmin")
   public async getDomainAdmin(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (id !== au.churchId && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       const roles = (await this.repos.role.loadByChurchId(id)) as any[];
       const domainRole = ArrayHelper.getOne(roles, "name", "Domain Admins");
-      const members = (await this.repos.roleMember.loadByRoleId(domainRole.id, au.churchId)) as any[];
+      if (!domainRole) return null;
+      const members = (await this.repos.roleMember.loadByRoleId(domainRole.id, id)) as any[];
       let domainAdmin: RoleMember;
       if (members.length > 0) {
         const member: RoleMember = members[0];
         const user: User = (await this.repos.user.load(member.userId)) as User;
-        user.password = null;
-        user.registrationDate = null;
-        user.lastLogin = null;
-        member.user = user;
+        if (user) member.user = { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName } as User;
         domainAdmin = member;
       }
       return domainAdmin;
@@ -268,6 +266,8 @@ export class ChurchController extends MembershipBaseController {
             allErrors.push("Unauthorized access to church data");
             continue;
           }
+          const existing = await this.repos.church.loadById(church.id);
+          church.archivedDate = existing?.archivedDate ?? null;
           const errors = await ChurchController.validateSave(church, this.repos);
           if (errors.length > 0) {
             allErrors.push(...errors);

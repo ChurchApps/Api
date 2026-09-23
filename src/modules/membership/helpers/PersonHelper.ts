@@ -15,9 +15,10 @@ export class PersonHelper extends BasePersonHelper {
     const repos = await this.repos();
     // searchEmail hides removed people, so a caller without allowRestore never even loads a deleted
     // person - it creates a fresh one instead. Only the restoring path looks at removed rows.
-    const data: Person[] = (allowRestore
+    const normalized = (email || "").trim().toLowerCase();
+    const data: Person[] = ((allowRestore
       ? await repos.person.searchEmailIncludingRemoved(churchId, email)
-      : await repos.person.searchEmail(churchId, email)) as Person[];
+      : await repos.person.searchEmail(churchId, email)) as any[]).filter((p) => normalized && (p.email || "").trim().toLowerCase() === normalized);
     if (data.length === 0) {
       const household: Household = { churchId, name: lastName };
       await repos.household.save(household);
@@ -73,7 +74,7 @@ export class PersonHelper extends BasePersonHelper {
   public static async claim(au: AuthenticatedUser, churchId: string) {
     if (au?.email) {
       let person: Person = null;
-      if (au.personId) {
+      if (au.personId && au.churchId === churchId) {
         const repos = await this.repos();
         const d = await repos.person.load(au.churchId, au.personId);
         if (d === null) person = await this.getPerson(churchId, au.email, au.firstName, au.lastName, au.checkAccess(Permissions.people.edit));
