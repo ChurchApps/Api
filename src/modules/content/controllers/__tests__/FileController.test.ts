@@ -180,3 +180,22 @@ describe("FileController arrangement audio guards", () => {
     expect(getUploadUrl).toHaveBeenCalled();
   });
 });
+
+describe("FileController.save group-member authorization", () => {
+  const groupAu = { churchId: "c1", checkAccess: () => false, groupIds: ["g1"] };
+
+  it("rejects when any file in the batch targets a group the caller is not in", async () => {
+    const { controller, repos } = makeController({ au: groupAu });
+    const result: any = await (controller as any).save({ body: [{ contentType: "group", contentId: "g1" }, { contentType: "group", contentId: "g2" }] }, {});
+    expect(result.status).toBe(401);
+    expect(repos.file.save).not.toHaveBeenCalled();
+  });
+
+  it("rejects re-pointing an existing file that belongs to another group", async () => {
+    const { controller, repos } = makeController({ au: groupAu });
+    (repos.file as any).load = jest.fn(async () => ({ id: "f9", churchId: "c1", contentType: "group", contentId: "g2" }));
+    const result: any = await (controller as any).save({ body: [{ id: "f9", contentType: "group", contentId: "g1" }] }, {});
+    expect(result.status).toBe(401);
+    expect(repos.file.save).not.toHaveBeenCalled();
+  });
+});

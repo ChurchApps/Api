@@ -100,9 +100,11 @@ export class EventRepo {
   }
 
   public async loadByTag(churchId: string, tag: string): Promise<Event[]> {
+    const escaped = tag.replace(/[\\%_]/g, (c) => "\\" + c);
     return getDb().selectFrom("events").selectAll()
       .where("churchId", "=", churchId)
-      .where("tags", "like", "%" + tag + "%")
+      .where("visibility", "=", "public")
+      .where("tags", "like", "%" + escaped + "%")
       .orderBy("start").execute() as any;
   }
 

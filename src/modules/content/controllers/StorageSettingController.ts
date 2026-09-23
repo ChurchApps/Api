@@ -14,6 +14,7 @@ export class StorageSettingController extends ContentBaseController {
   @httpGet("/providers")
   public async getProviders(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const rows = await this.repos.storageProvider.loadByChurchId(au.churchId);
       const result = this.repos.storageProvider.convertAllToModel(rows as any[]);
       return result.map((p: StorageProvider) => this.mask(p));

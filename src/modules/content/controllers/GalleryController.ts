@@ -17,7 +17,7 @@ export class GalleryController extends ContentBaseController {
   @httpGet("/stock/:folder")
   public async getStock(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const files = await FileStorageHelper.list("stockPhotos/" + folder);
+      const files = await FileStorageHelper.list("stockPhotos/" + path.basename(folder));
       return { images: files };
     });
   }
@@ -27,7 +27,7 @@ export class GalleryController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
-        const files = await FileStorageHelper.list(au.churchId + "/gallery/" + folder);
+        const files = await FileStorageHelper.list(au.churchId + "/gallery/" + path.basename(folder));
         return { images: files };
       }
     });
@@ -50,7 +50,7 @@ export class GalleryController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        await FileStorageHelper.remove(au.churchId + "/gallery/" + folder + "/" + image);
+        await FileStorageHelper.remove(au.churchId + "/gallery/" + path.basename(folder) + "/" + path.basename(image));
         return this.json({});
       }
     });

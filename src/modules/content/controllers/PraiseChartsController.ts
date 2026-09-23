@@ -2,6 +2,7 @@ import { controller, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import * as path from "path";
 import * as fs from "fs";
+import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Setting } from "../models/index.js";
@@ -64,15 +65,16 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   static async saveLocalFile(fileName: string, fileBuffer: any) {
-    const publicDownloadsDir = path.join(__dirname, "..", "public", "downloads", "praiseCharts");
+    const folder = crypto.randomUUID();
+    const publicDownloadsDir = path.join(__dirname, "..", "public", "downloads", "praiseCharts", folder);
     const filePath = path.join(publicDownloadsDir, fileName);
     fs.mkdirSync(publicDownloadsDir, { recursive: true });
     fs.writeFileSync(filePath, fileBuffer);
-    return `/public/downloads/praiseCharts/${fileName}`;
+    return `/public/downloads/praiseCharts/${folder}/${fileName}`;
   }
 
   static async saveS3File(fileName: string, mimeType: string, fileBuffer: any) {
-    const pathName = `/downloads/praiseCharts/${fileName}`;
+    const pathName = `/downloads/praiseCharts/${crypto.randomUUID()}/${fileName}`;
     await AwsHelper.S3Upload(pathName, mimeType, fileBuffer);
     return pathName;
   }

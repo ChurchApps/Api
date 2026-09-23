@@ -180,7 +180,8 @@ export class SermonController extends ContentBaseController {
 
   @httpGet("/socialSuggestions")
   public async socialSuggestions(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       const youtubeVideoId = req.query?.youtubeVideoId?.toString();
       if (youtubeVideoId && youtubeVideoId !== "") {
         try {
@@ -200,7 +201,7 @@ export class SermonController extends ContentBaseController {
           }
           return { error: null, posts };
         } catch (error) {
-          throw new Error(error);
+          throw error instanceof Error ? error : new Error(String(error));
         }
       }
       return { error: "Invalid or missing YouTube video ID", posts: [] };
@@ -209,7 +210,8 @@ export class SermonController extends ContentBaseController {
 
   @httpGet("/outline")
   public async lessonOutline(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       const url = req.query?.url?.toString();
       const title = req.query?.title?.toString();
       const author = req.query?.author?.toString();
@@ -219,7 +221,7 @@ export class SermonController extends ContentBaseController {
           const result = await OpenAiHelper.generateLessonOutline(url, title, author);
           return result;
         } catch (error) {
-          throw new Error(error);
+          throw error instanceof Error ? error : new Error(String(error));
         }
       }
       return { error: "Invalid or missing URL parameter" };

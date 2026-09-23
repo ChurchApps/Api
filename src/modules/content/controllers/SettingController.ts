@@ -4,6 +4,7 @@ import { Setting } from "../models/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Permissions, Environment } from "../helpers/index.js";
 import { FileStorageHelper } from "@churchapps/apihelper";
+import path from "path";
 
 @controller("/content/settings")
 export class ContentSettingController extends ContentBaseController {
@@ -27,6 +28,11 @@ export class ContentSettingController extends ContentBaseController {
   @httpPost("/my")
   public async postMy(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      for (const setting of req.body) {
+        if (!setting.id) continue;
+        const existing = await this.repos.setting.load(au.churchId, setting.id);
+        if (!existing || existing.userId !== au.id) return this.json({}, 401);
+      }
       const promises: Promise<Setting>[] = [];
       req.body.forEach((setting) => {
         setting.churchId = au.churchId;
@@ -103,7 +109,8 @@ export class ContentSettingController extends ContentBaseController {
 
   private async saveImage(setting: Setting) {
     const base64 = setting.value.split(",")[1];
-    const key = "/" + setting.churchId + "/settings/" + setting.keyName + ".png";
+    const name = path.basename(setting.keyName || "");
+    const key = "/" + setting.churchId + "/settings/" + (setting.userId ? "users/" + setting.userId + "/" : "") + name + ".png";
     await FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64"));
     const photoUpdated = new Date();
     setting.value = Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();

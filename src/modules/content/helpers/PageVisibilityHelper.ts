@@ -21,7 +21,10 @@ export function canViewPage(page: VisibilityGated, au?: PageViewer | null): bool
 
   switch (visibility) {
     case "visitors": return !!au.personId;
-    case "members": return true; // any authenticated user of the church
+    case "members": {
+      const status = au.membershipStatus?.toLowerCase();
+      return status === "member" || status === "staff";
+    }
     case "staff": return au.membershipStatus?.toLowerCase() === "staff";
     case "team": return true; // group tags aren't in the JWT; church auth is the best we can verify
     case "groups": {

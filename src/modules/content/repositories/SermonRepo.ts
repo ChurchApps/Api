@@ -68,7 +68,10 @@ export class SermonRepo {
   }
 
   public async loadPublicAll(churchId: string): Promise<Sermon[]> {
-    return getDb().selectFrom("sermons").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
+    return getDb().selectFrom("sermons").selectAll()
+      .where("churchId", "=", churchId)
+      .where((eb) => eb.or([eb("publishDate", "is", null), eb("publishDate", "<=", sql<Date>`NOW()`)]))
+      .orderBy("publishDate", "desc").execute() as any;
   }
 
   public async loadTimeline(churchId: string, sermonIds: string[]) {

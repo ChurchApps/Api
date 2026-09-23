@@ -19,7 +19,8 @@ export class LinkController extends ContentBaseController {
         : await this.repos.link.loadAll(churchId, siteId);
 
       // Filter links based on visibility (except "team" which needs client-side check)
-      return links.filter((link: Link) => this.isLinkVisible(link, au));
+      const viewer = au.churchId === churchId ? au : {};
+      return links.filter((link: Link) => this.isLinkVisible(link, viewer));
     });
   }
 

@@ -80,7 +80,7 @@ export class FileController extends ContentBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, File[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(req.body[0].contentId) === -1) {
+      if (!au.checkAccess(Permissions.content.edit) && !(await this.canGroupMemberSave(au, req.body))) {
         return this.json({}, 401);
       } else {
         if (req.body[0].contentType === "arrangement") {
@@ -174,6 +174,18 @@ export class FileController extends ContentBaseController {
         return { file: key };
       }
     });
+  }
+
+  private async canGroupMemberSave(au: any, files: File[]): Promise<boolean> {
+    if (!Array.isArray(files) || files.length === 0) return false;
+    for (const file of files) {
+      if (au.groupIds.indexOf(file.contentId) === -1) return false;
+      if (file.id) {
+        const existing = await this.repos.file.load(au.churchId, file.id);
+        if (!existing || au.groupIds.indexOf(existing.contentId) === -1) return false;
+      }
+    }
+    return true;
   }
 
   // Surfaces the provider's own error text (Dropbox error_summary, Google/Microsoft error payloads) to the admin.
