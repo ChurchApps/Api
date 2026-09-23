@@ -9,11 +9,12 @@ import { initializeMessagingModule } from "../modules/messaging/index.js";
 import { RepoManager } from "../shared/infrastructure/RepoManager.js";
 
 let gwManagement: ApiGatewayManagementApiClient;
+let initialized = false;
 
+// lambda.js has usually initialized Environment already, so the module setup can't key off it.
 const initEnv = async () => {
-  if (!Environment.currentEnvironment) {
-    await Environment.init(process.env.ENVIRONMENT || "dev");
-
+  if (!Environment.currentEnvironment) await Environment.init(process.env.ENVIRONMENT || "dev");
+  if (!initialized) {
     gwManagement = new ApiGatewayManagementApiClient({
       apiVersion: "2020-04-16",
       endpoint: Environment.socketUrl || "ws://localhost:8087"
@@ -22,6 +23,7 @@ const initEnv = async () => {
     // Initialize messaging module repositories and helpers
     const repos = await RepoManager.getRepos<any>("messaging");
     initializeMessagingModule(repos);
+    initialized = true;
   }
 };
 

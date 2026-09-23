@@ -91,9 +91,12 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     const capture = await PayPalHelper.captureOrder(config.publicKey, config.privateKey, donationData.id);
     const eventData = capture.purchase_units?.[0]?.payments?.captures?.[0] || capture;
 
+    if (eventData?.status !== "COMPLETED") {
+      return { success: false, transactionId: eventData?.id || "", data: { error: `PayPal capture ${String(eventData?.status || "failed").toLowerCase()}` } };
+    }
     return {
-      success: !!eventData,
-      transactionId: eventData?.id || "",
+      success: true,
+      transactionId: eventData.id || "",
       data: eventData
     };
   }

@@ -59,6 +59,17 @@ export class WebhookDeliveryRepo {
       .execute();
   }
 
+  // Pushes nextAttemptAt forward so an overlapping worker run can't pick up the same delivery.
+  public async claim(id: string, leaseMinutes = 5): Promise<boolean> {
+    const result = await getDb().updateTable("webhookDeliveries")
+      .set({ nextAttemptAt: sql`DATE_ADD(NOW(), INTERVAL ${sql.lit(leaseMinutes)} MINUTE)` as any })
+      .where("id", "=", id)
+      .where("status", "in", ["pending", "failed"])
+      .where("nextAttemptAt", "<=", sql`NOW()` as any)
+      .executeTakeFirst();
+    return Number(result?.numUpdatedRows ?? 0) > 0;
+  }
+
   public convertToModel(_churchId: string, data: any) { return data; }
   public convertAllToModel(_churchId: string, data: any[]) { return data || []; }
 }

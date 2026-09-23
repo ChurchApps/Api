@@ -192,10 +192,16 @@ export class PayPalHelper {
   }
 
   static async getSubscriptionDetails(clientId: string, clientSecret: string, subscriptionId: string): Promise<any> {
-    const client = PayPalHelper.getClient(clientId, clientSecret);
-    const request = new paypal.subscriptions.SubscriptionsGetRequest(subscriptionId);
-    const response = await client.execute(request);
-    return response.result;
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to get PayPal subscription: ${response.status} ${errorText}`);
+    }
+    return response.json();
   }
 
   static async updateSubscription(clientId: string, clientSecret: string, subscriptionData: any): Promise<any> {
@@ -249,7 +255,7 @@ export class PayPalHelper {
       return await PayPalHelper.getSubscriptionDetails(clientId, clientSecret, subscriptionData.id);
     }
 
-    const _response = await fetch(
+    const response = await fetch(
       `${baseUrl}/v1/billing/subscriptions/${subscriptionData.id}`,
       {
         method: "PATCH",
@@ -260,17 +266,26 @@ export class PayPalHelper {
         body: JSON.stringify(patchOps)
       }
     );
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update PayPal subscription: ${response.status} ${errorText}`);
+    }
 
     // After update, fetch and return the updated subscription details
     return await PayPalHelper.getSubscriptionDetails(clientId, clientSecret, subscriptionData.id);
   }
 
   static async cancelSubscription(clientId: string, clientSecret: string, subscriptionId: string, reason?: string): Promise<any> {
-    const client = PayPalHelper.getClient(clientId, clientSecret);
-    const request = new paypal.subscriptions.SubscriptionsCancelRequest(subscriptionId);
-    request.requestBody({ reason: reason || "Customer requested cancellation" });
-    const response = await client.execute(request);
-    return response.result;
+    const accessToken = await PayPalHelper.getAccessToken(clientId, clientSecret);
+    const response = await fetch(`${PayPalHelper.getBaseUrl()}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason || "Customer requested cancellation" })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to cancel PayPal subscription: ${response.status} ${errorText}`);
+    }
   }
 
   static async logEvent(churchId: string, payPalEvent: any, eventData: any, givingRepos: any) {
@@ -292,10 +307,14 @@ export class PayPalHelper {
   }
 
   static async logDonation(_clientId: string, _clientSecret: string, churchId: string, eventData: any, givingRepos: any) {
-    const amount = parseFloat(eventData.amount?.value ?? eventData.purchase_units?.[0]?.amount?.value ?? "0");
+    const amount = typeof eventData.amount === "number" ? eventData.amount : parseFloat(eventData.amount?.value ?? eventData.purchase_units?.[0]?.amount?.value ?? "0");
+    const currency = eventData.amount?.currency_code || eventData.purchase_units?.[0]?.amount?.currency_code || eventData.currency;
     const payerId = eventData.payer?.payer_id || eventData.subscriber?.payer_id || "";
-    const customerData = eventData.anonymous ? null : ((await givingRepos.customer.load(churchId, payerId)) as any);
-    const personId = customerData?.personId;
+    let personId: string | undefined = eventData.anonymous ? undefined : eventData.person?.id || undefined;
+    if (!personId && !eventData.anonymous && payerId) {
+      const customerData = (await givingRepos.customer.load(churchId, payerId)) as any;
+      personId = customerData?.personId;
+    }
     const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
     const donationData: Donation = {
       batchId: batch.id,
@@ -304,16 +323,25 @@ export class PayPalHelper {
       personId,
       method: "PayPal",
       methodDetails: eventData.id,
-      donationDate: new Date(eventData.create_time),
-      notes: eventData.custom_id || ""
+      transactionId: eventData.id || undefined,
+      currency: currency ? String(currency).toLowerCase() : undefined,
+      donationDate: new Date(eventData.create_time || Date.now()),
+      notes: eventData.notes || eventData.custom_id || ""
     };
     const donation = await givingRepos.donation.save(donationData);
-    const funds: FundDonation[] = [];
-    (eventData.custom_id ? JSON.parse(eventData.custom_id) : []).forEach((f: FundDonation) => {
-      funds.push({ churchId, donationId: donation.id, fundId: f.id, amount: f.amount });
-    });
+    let funds: any[] = Array.isArray(eventData.funds) && eventData.funds.length ? eventData.funds : [];
+    if (!funds.length && eventData.custom_id) {
+      try { funds = JSON.parse(eventData.custom_id); } catch { funds = []; }
+    }
+    if (!funds.length) {
+      const general = await givingRepos.fund.getOrCreateGeneral(churchId);
+      if (general?.id) funds = [{ id: general.id, amount }];
+    }
     const promises: Promise<FundDonation>[] = [];
-    funds.forEach((fd) => promises.push(givingRepos.fundDonation.save(fd)));
+    funds.forEach((f: any) => {
+      const fundId = f.fundId || f.id;
+      if (fundId) promises.push(givingRepos.fundDonation.save({ churchId, donationId: donation.id, fundId, amount: Number(f.amount || 0) }));
+    });
     return Promise.all(promises);
   }
 

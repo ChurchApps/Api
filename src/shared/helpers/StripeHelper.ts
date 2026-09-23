@@ -2,10 +2,15 @@ import Stripe from "stripe";
 import express from "express";
 import { Donation, DonationBatch, EventLog, FundDonation, PaymentDetails } from "../../modules/giving/models/index.js";
 
+// Stripe takes and reports these in whole units, not cents
+const STRIPE_ZERO_DECIMAL_CURRENCIES = new Set([
+  "bif", "clp", "djf", "gnf", "jpy", "kmf", "krw", "mga", "pyg", "rwf", "ugx", "vnd", "vuv", "xaf", "xof", "xpf"
+]);
+
 export class StripeHelper {
   static donate = async (secretKey: string, payment: PaymentDetails) => {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    if (payment.currency === "jpy") {
+    if (STRIPE_ZERO_DECIMAL_CURRENCIES.has((payment.currency || "").toLowerCase())) {
       payment.amount = Math.round(payment.amount * 1);
     } else {
       payment.amount = Math.trunc(Math.round(payment.amount * 100));
@@ -22,7 +27,7 @@ export class StripeHelper {
     const { customer, metadata, productId, interval, amount, payment_method_id, type, billing_cycle_anchor, currency } = donationData;
 
     const currencyLower = (currency || "usd").toLowerCase();
-    const unitAmount = currencyLower === "jpy" ? Math.round(amount * 1) : Math.trunc(Math.round(amount * 100));
+    const unitAmount = STRIPE_ZERO_DECIMAL_CURRENCIES.has(currencyLower) ? Math.round(amount * 1) : Math.trunc(Math.round(amount * 100));
 
     const subscriptionData: any = {
       customer,
@@ -282,8 +287,7 @@ export class StripeHelper {
   static async deleteWebhooksByChurchId(secretKey: string, churchId: string) {
     if (churchId.length === 11) {
       const stripe = StripeHelper.getStripeObj(secretKey);
-      const hooks = await stripe.webhookEndpoints.list();
-      for (const h of hooks.data) {
+      for await (const h of stripe.webhookEndpoints.list({ limit: 100 })) {
         if (h.url.indexOf(churchId) > -1) await stripe.webhookEndpoints.del(h.id);
       }
     }
@@ -342,26 +346,7 @@ export class StripeHelper {
     const rawAmount = eventData.amount || eventData.amount_paid || eventData.amount_received || eventData.amount_due;
     const currencyLower = (eventData.currency || "usd").toLowerCase();
 
-    // Zero‑decimal currencies: Stripe reports amounts in whole units already
-    const ZERO_DECIMAL_CURRENCIES = new Set([
-      "bif",
-      "clp",
-      "djf",
-      "gnf",
-      "jpy",
-      "kmf",
-      "krw",
-      "mga",
-      "pyg",
-      "rwf",
-      "ugx",
-      "vnd",
-      "vuv",
-      "xaf",
-      "xof",
-      "xpf"
-    ]);
-    const divisor = ZERO_DECIMAL_CURRENCIES.has(currencyLower) ? 1 : 100;
+    const divisor = STRIPE_ZERO_DECIMAL_CURRENCIES.has(currencyLower) ? 1 : 100;
     const amount = rawAmount / divisor;
 
     const customerData = (await givingRepos.customer.load(churchId, eventData.customer)) as any;

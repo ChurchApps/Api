@@ -14,6 +14,7 @@ export class WebhookDeliveryWorker {
     let failed = 0;
 
     for (const delivery of due) {
+      if (!(await repos.webhookDelivery.claim(delivery.id))) continue;
       const webhook: Webhook = await repos.webhook.load(delivery.churchId, delivery.webhookId);
       if (!webhook || webhook.active === false) {
         delivery.status = "exhausted";

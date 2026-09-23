@@ -20,7 +20,7 @@ jest.mock("../../helpers/index", () => {
     PublicPersonRateLimiter: { allow: jest.fn(() => true) },
     UserHelper: { sendWelcomeEmail: jest.fn(), sendForgotEmail: jest.fn(), sendInviteEmail: jest.fn() },
     UserChurchHelper: { createForNewUser: jest.fn() },
-    UniqueIdHelper: { shortId: () => "tmpPass" },
+    UniqueIdHelper: { shortId: () => "tmpPass", secret: () => "tmpPass" },
     Environment: { currentEnvironment: "test", isMailConfigured: true, emailOnRegistration: false },
     Permissions: { people: { edit: "peopleEdit" }, roles: { edit: "rolesEdit" }, server: { admin: "serverAdmin" } },
     AuditLogHelper: { getClientIp: () => "1.1.1.1", logLogin: jest.fn(), log: jest.fn() },

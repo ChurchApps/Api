@@ -375,6 +375,14 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     return parsed;
   }
 
+  private async nmiQuery(config: GatewayConfig, params: Record<string, string>) {
+    const body = new URLSearchParams({ security_key: config.privateKey || "", ...params });
+    return Axios.post(this.getQueryUrl(), body.toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      timeout: 15000
+    });
+  }
+
   /** NMI: response === "1" means Approved. */
   private isApproved(resp: Record<string, string>): boolean {
     return resp.response === "1";
@@ -859,7 +867,12 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
       const params: Record<string, any> = { recurring: "update_subscription", subscription_id: subscriptionId };
       if (subscriptionData.amount) params.plan_amount = this.formatAmount(subscriptionData.amount);
-      if (subscriptionData.interval) Object.assign(params, this.mapIntervalToNmi(subscriptionData.interval, new Date()));
+      if (subscriptionData.interval) {
+        const existing = await this.getSubscription(config, String(subscriptionId));
+        const m = String(existing?.next_run_date || "").match(/^(\d{4})-?(\d{2})-?(\d{2})/);
+        const anchor = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
+        Object.assign(params, this.mapIntervalToNmi(subscriptionData.interval, anchor));
+      }
 
       const resp = await this.nmiPost(config, params);
       if (!this.isApproved(resp)) {
@@ -1078,10 +1091,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
   // NMI Query API returns XML; use light tag extraction to avoid an XML parser dependency.
   async getSubscription(config: GatewayConfig, subscriptionId: string): Promise<any> {
     try {
-      const resp = await Axios.get(this.getQueryUrl(), {
-        params: { security_key: config.privateKey, report_type: "recurring", subscription_id: subscriptionId },
-        timeout: 15000
-      });
+      const resp = await this.nmiQuery(config, { report_type: "recurring", subscription_id: subscriptionId });
       const subs = parseNmiSubscriptions(typeof resp.data === "string" ? resp.data : "");
       return subs[0] || null;
     } catch (error: any) {
@@ -1092,10 +1102,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
 
   async getCustomerSubscriptions(config: GatewayConfig, customerId: string): Promise<any> {
     try {
-      const resp = await Axios.get(this.getQueryUrl(), {
-        params: { security_key: config.privateKey, report_type: "recurring", customer_vault_id: customerId },
-        timeout: 15000
-      });
+      const resp = await this.nmiQuery(config, { report_type: "recurring", customer_vault_id: customerId });
       return parseNmiSubscriptions(typeof resp.data === "string" ? resp.data : "");
     } catch (error: any) {
       console.error("KingdomFunding(NMI) getCustomerSubscriptions error:", error.message);
@@ -1107,10 +1114,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
     try {
       const customerId = typeof customer === "string" ? customer : customer?.id || customer?.customerId;
       if (!customerId) return [];
-      const resp = await Axios.get(this.getQueryUrl(), {
-        params: { security_key: config.privateKey, report_type: "customer_vault", customer_vault_id: customerId },
-        timeout: 15000
-      });
+      const resp = await this.nmiQuery(config, { report_type: "customer_vault", customer_vault_id: customerId });
       // The persisted method id is the customer_vault_id (one chargeable method per donor
       // vault) — also what we charge by — so key the returned method on the queried vault id,
       // matching the stored gatewayPaymentMethods row rather than the inner billing_id.

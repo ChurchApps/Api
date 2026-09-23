@@ -18,15 +18,6 @@ declare module "@paypal/checkout-server-sdk" {
         requestBody(body: unknown): void;
       }
     }
-    namespace subscriptions {
-      class SubscriptionsGetRequest {
-        constructor(subscriptionId: string);
-      }
-      class SubscriptionsCancelRequest {
-        constructor(subscriptionId: string);
-        requestBody(body: unknown): void;
-      }
-    }
   }
   export = paypal;
 }

@@ -523,7 +523,6 @@ export class GatewayService {
 
     if (options.requiredCapability) {
       gateways = gateways.filter((gateway) => !!this.getProviderCapabilities(gateway)?.[options.requiredCapability!]);
-      if (gateways.length === 1) return { gateway: gateways[0], reason: null };
     }
 
     const matches = gateways.filter((gateway) => {

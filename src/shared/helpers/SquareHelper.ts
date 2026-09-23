@@ -26,6 +26,7 @@ export class SquareHelper {
     name?: { givenName?: string; familyName?: string };
     phoneNumber?: string;
   }): Promise<string> {
+    SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
       // const client = SquareHelper.getClient(accessToken, environment);
@@ -67,6 +68,7 @@ export class SquareHelper {
     billingAddress?: any;
     cardholderName?: string;
   }): Promise<any> {
+    SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
       // const client = SquareHelper.getClient(accessToken, environment);
@@ -131,6 +133,7 @@ export class SquareHelper {
     idempotencyKey: string;
     note?: string;
   }): Promise<any> {
+    SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
       // const client = SquareHelper.getClient(accessToken, environment);
@@ -176,6 +179,7 @@ export class SquareHelper {
     cardId?: string;
     startDate?: string;
   }): Promise<any> {
+    SquareHelper.getClient(_accessToken, _environment);
     try {
       // TODO: Implement with Square SDK
       // const client = SquareHelper.getClient(accessToken, environment);

@@ -150,7 +150,7 @@ export const createApp = async () => {
 
       res.status(statusCode).json({
         error: {
-          message: error?.message || "Internal Server Error",
+          message: statusCode >= 500 ? "Internal Server Error" : error?.message || "Internal Server Error",
           status: statusCode,
           timestamp: new Date().toISOString(),
           path: req.path

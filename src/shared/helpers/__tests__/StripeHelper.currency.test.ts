@@ -103,6 +103,12 @@ describe("StripeHelper currency handling", () => {
       expect(args.currency).toBe("jpy");
       expect(args.amount).toBe(2500);
     });
+
+    it("leaves other zero-decimal currencies (KRW) as whole units", async () => {
+      await StripeHelper.donate("sk_test", { ...basePayment, amount: 50000, currency: "krw" });
+      const args = mockStripe.paymentIntents.create.mock.calls[0][0];
+      expect(args.amount).toBe(50000);
+    });
   });
 
   describe("logDonation", () => {
