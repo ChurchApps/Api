@@ -103,3 +103,27 @@ describe("TaskController.accountDeletionDecision", () => {
     expect(result.status).toBe("Closed");
   });
 });
+
+describe("TaskController member directory updates and reads", () => {
+  let repos: any;
+  beforeEach(() => {
+    repos = { task: { save: jest.fn(async (t: any) => ({ ...t, id: t.id || "new" })), load: jest.fn() } };
+  });
+
+  it("pins a member's directory update to their own person", async () => {
+    await (makeController([], repos) as any).save({ query: { type: "directoryUpdate" }, body: [{ associatedWithType: "person", associatedWithId: "pVictim", status: "Closed", data: "[]" }] }, {});
+    expect(repos.task.save).toHaveBeenCalledWith(expect.objectContaining({ associatedWithId: "p1", createdById: "p1", status: "Open" }));
+  });
+
+  it("401s a member directory update that targets an existing task", async () => {
+    const result = await (makeController([], repos) as any).save({ query: { type: "directoryUpdate" }, body: [{ id: "t9", status: "Closed" }] }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.task.save).not.toHaveBeenCalled();
+  });
+
+  it("401s reading someone else's task without tasks view", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", associatedWithType: "person", associatedWithId: "p2", assignedToType: "group", assignedToId: "g9" });
+    expect(await (makeController([], repos) as any).get("t1", {}, {})).toEqual({ obj: {}, status: 401 });
+    expect(await (makeController(["tasksView"], repos) as any).get("t1", {}, {})).toEqual(expect.objectContaining({ id: "t1" }));
+  });
+});

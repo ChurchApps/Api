@@ -98,6 +98,7 @@ export class ReminderController extends MessagingBaseController {
   public async remove(@requestParam("defId") defId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      if (!(await this.repos.reminderDefinition.load(au.churchId, defId))) return this.json({}, 404);
       await this.repos.reminderOccurrence.cancelPendingForDefinition(defId);
       await this.repos.reminderDefinition.delete(au.churchId, defId);
       return this.json({});

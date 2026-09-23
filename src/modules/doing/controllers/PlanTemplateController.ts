@@ -30,6 +30,8 @@ export class PlanTemplateController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       for (const item of req.body) {
         if (!await PlanAuth.canEditMinistry(au, item.ministryId)) return this.json({}, 401);
+        const existing: any = item.id ? await this.repos.planTemplate.load(au.churchId, item.id) : null;
+        if (existing && !await PlanAuth.canEditMinistry(au, existing.ministryId)) return this.json({}, 401);
       }
       const promises = req.body.map((item) => { item.churchId = au.churchId; return this.repos.planTemplate.save(item); });
       return await Promise.all(promises);

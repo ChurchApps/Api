@@ -201,6 +201,10 @@ export class AssignmentController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       for (const assignment of req.body) {
         if (!await PlanAuth.canEditPosition(au, assignment.positionId)) return this.json({}, 401);
+        if (assignment.id) {
+          const existing = (await this.repos.assignment.load(au.churchId, assignment.id)) as Assignment;
+          if (existing && !await PlanAuth.canEditPosition(au, existing.positionId)) return this.json({}, 401);
+        }
       }
       const promises: Promise<Assignment>[] = [];
       req.body.forEach((assignment) => {

@@ -70,8 +70,8 @@ export class MessagingBaseController extends BaseController {
   protected async canReadConversation(au: any, conv: any): Promise<boolean> {
     if (!conv) return false;
     if (this.isAnonPublicConversation(conv)) return true;
-    if (this.isPersonNote(conv.contentType)) return this.canViewPersonNotes(au, conv.contentType);
     if (!this.isSameChurch(au, conv.churchId)) return false;
+    if (this.isPersonNote(conv.contentType)) return this.canViewPersonNotes(au, conv.contentType);
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
       return !!conv.contentId && (!!au.groupIds?.includes(conv.contentId) || !!au.leaderGroupIds?.includes(conv.contentId));

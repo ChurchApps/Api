@@ -50,7 +50,8 @@ export class PlanItemController extends DoingBaseController {
   public async sort(req: express.Request<{}, {}, PlanItem>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlan(au, req.body.planId)) return this.json({}, 401);
-      await this.repos.planItem.save(req.body);
+      if (!await this.canEditExisting(au, req.body.id)) return this.json({}, 401);
+      await this.repos.planItem.save({ ...req.body, churchId: au.churchId });
 
       const items = (await this.repos.planItem.loadForPlan(au.churchId, req.body.planId || "")) as PlanItem[];
       const filtered = items.filter((i: PlanItem) => i.parentId === req.body.parentId || "");
@@ -63,11 +64,18 @@ export class PlanItemController extends DoingBaseController {
     });
   }
 
+  private async canEditExisting(au: AuthenticatedUser, id?: string): Promise<boolean> {
+    if (!id) return true;
+    const existing = (await this.repos.planItem.load(au.churchId, id)) as PlanItem;
+    return !existing || await PlanAuth.canEditPlan(au, existing.planId);
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, PlanItem[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       for (const planItem of req.body) {
         if (!await PlanAuth.canEditPlan(au, planItem.planId)) return this.json({}, 401);
+        if (!await this.canEditExisting(au, planItem.id)) return this.json({}, 401);
       }
       const promises: Promise<PlanItem>[] = [];
       req.body.forEach((planItem) => {

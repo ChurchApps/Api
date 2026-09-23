@@ -23,8 +23,16 @@ export class PrivateMessageController extends MessagingBaseController {
           return this.json({ errors: ["ageRestricted"] }, 403);
         }
       }
+      for (const conv of req.body) {
+        const existing = await this.repos.privateMessage.loadExisting(au.churchId, au.personId, conv.toPersonId);
+        if (existing) continue;
+        const target = conv.conversationId ? await this.repos.conversation.loadById(au.churchId, conv.conversationId) : null;
+        if (target?.contentType !== "privateMessage" || await this.repos.privateMessage.loadByConversationId(au.churchId, conv.conversationId)) return this.json({}, 401);
+      }
       const promises: Promise<PrivateMessage>[] = [];
       req.body.forEach((conv) => {
+        conv.id = undefined;
+        conv.notifyPersonId = undefined;
         conv.churchId = au.churchId;
         conv.fromPersonId = au.personId;
         // One row per pair: reuse it rather than stacking duplicates. The message that follows carries the notification.

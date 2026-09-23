@@ -12,7 +12,8 @@ export class TaskController extends DoingBaseController {
   public async getTimeline(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const taskIds = typeof req.query.taskIds === "string" ? req.query.taskIds.split(",") : req.query.taskIds ? [String(req.query.taskIds)] : [];
-      return await this.repos.task.loadTimeline(au.churchId, au.personId, taskIds);
+      const rows = (await this.repos.task.loadTimeline(au.churchId, au.personId, taskIds)) as Task[];
+      return rows.filter((t) => this.canViewTask(au, t));
     });
   }
 
@@ -26,6 +27,7 @@ export class TaskController extends DoingBaseController {
   @httpGet("/directoryUpdate/:personId")
   public async getPersonDirectoryUpdate(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (personId !== au.personId && !au.checkAccess(Permissions.tasks.view)) return this.json({}, 401);
       return await this.repos.task.loadForDirectoryUpdate(au.churchId, personId);
     });
   }
@@ -55,8 +57,18 @@ export class TaskController extends DoingBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return await this.repos.task.load(au.churchId, id);
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (task && !this.canViewTask(au, task)) return this.json({}, 401);
+      return task;
     });
+  }
+
+  private canViewTask(au: { personId?: string; groupIds?: string[]; checkAccess: (p: any) => boolean }, task: Task): boolean {
+    if (au.checkAccess(Permissions.tasks.view)) return true;
+    const isMe = (type?: string, id?: string) => type === "person" && !!id && id === au.personId;
+    const isMyGroup = (type?: string, id?: string) => type === "group" && !!id && !!au.groupIds?.includes(id);
+    return isMe(task.associatedWithType, task.associatedWithId) || isMe(task.createdByType, task.createdById) || isMe(task.assignedToType, task.assignedToId)
+      || isMyGroup(task.assignedToType, task.assignedToId) || isMyGroup(task.createdByType, task.createdById);
   }
 
   @httpGet("/")
@@ -96,7 +108,16 @@ export class TaskController extends DoingBaseController {
         return [saved];
       }
       const result: Task[] = [];
+      const memberDirectoryUpdate = type === "directoryUpdate" && !au.checkAccess(Permissions.tasks.edit);
+      if (memberDirectoryUpdate && req.body.some((task) => task.id)) return this.json({}, 401);
       for (const task of req.body) {
+        if (memberDirectoryUpdate) {
+          task.status = "Open";
+          task.associatedWithType = "person";
+          task.associatedWithId = au.personId;
+          task.createdByType = "person";
+          task.createdById = au.personId;
+        }
         if (task.id) {
           const existing = await this.repos.task.load(au.churchId, task.id);
           if (existing?.taskType === AccountDeletionHelper.taskType && existing.status !== "Closed" && task.status === "Closed") {

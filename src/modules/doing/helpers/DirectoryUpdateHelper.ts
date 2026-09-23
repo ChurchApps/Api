@@ -9,9 +9,9 @@ export class DirectoryUpdateHelper {
   private static async savePhoto(churchId: string, base64Str: string, personId: string): Promise<string> {
     const base64Parts = base64Str.split(",");
     const base64 = base64Parts.length > 1 ? base64Parts[1] : "";
-    const key = "/" + churchId + "/membership/people/" + personId + ".png";
-    await FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64"));
     const photoUpdated = new Date();
+    const key = "/" + churchId + "/membership/people/pending/" + personId + "-" + photoUpdated.getTime().toString() + ".png";
+    await FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64"));
     return Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();
   }
 
@@ -28,7 +28,7 @@ export class DirectoryUpdateHelper {
         })()
         : [];
       for (const d of data) {
-        if (d.field === "photo" && d.value !== undefined) {
+        if (d.field === "photo" && typeof d.value === "string" && d.value.startsWith("data:")) {
           d.value = await this.savePhoto(churchId, d.value, task.associatedWithId);
         }
       }

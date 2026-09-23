@@ -41,6 +41,8 @@ export class TimeController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       for (const time of req.body) {
         if (!await PlanAuth.canEditPlan(au, time.planId)) return this.json({}, 401);
+        const existing: any = time.id ? await this.repos.time.load(au.churchId, time.id) : null;
+        if (existing && !await PlanAuth.canEditPlan(au, existing.planId)) return this.json({}, 401);
       }
       const promises: Promise<Time>[] = [];
       req.body.forEach((time) => {

@@ -262,8 +262,10 @@ export class PlanController extends DoingBaseController {
       const copyMode = req.body.copyMode || "all"; // "none" | "positions" | "all"
       const copyServiceOrder = req.body.copyServiceOrder || false;
       const oldPlan = (await this.repos.plan.load(au.churchId, id)) as Plan;
+      if (!oldPlan) return this.json({}, 404);
 
       const p = { ...req.body } as Plan;
+      delete p.id;
       delete (p as any).copyMode;
       delete (p as any).copyServiceOrder;
       p.churchId = au.churchId;
@@ -297,12 +299,9 @@ export class PlanController extends DoingBaseController {
       const plans = Array.isArray(req.body) ? req.body : [req.body];
 
       for (const plan of plans) {
-        let ministryId = plan.ministryId;
-        if (!ministryId && plan.id) {
-          const existing: any = await this.repos.plan.load(au.churchId, plan.id);
-          ministryId = existing?.ministryId;
-        }
-        if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
+        const existing: any = plan.id ? await this.repos.plan.load(au.churchId, plan.id) : null;
+        if (existing && !await PlanAuth.canEditMinistry(au, existing.ministryId)) return this.json({}, 401);
+        if ((plan.ministryId || !existing) && !await PlanAuth.canEditMinistry(au, plan.ministryId)) return this.json({}, 401);
       }
 
       const promises: Promise<Plan>[] = [];
