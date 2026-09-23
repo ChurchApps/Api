@@ -73,6 +73,17 @@ describe("RightsHelper.matrixForLicense — one row of the contract table each",
   });
 });
 
+describe("RightsHelper.matrixForLicense — custom writer grants", () => {
+  it("larry-holder allows every use for non-profit church use; arrangements stay internal", () => {
+    const m = RightsHelper.matrixForLicense("larry-holder");
+    expect(allowed(m)).toEqual({ project: true, print: true, stream: true, arrange: true, record: true });
+    const base = ["Credit the writer and keep the original notices", "Non-profit use only"];
+    expect(m.print.conditions).toEqual(base);
+    expect(m.arrange.conditions).toEqual([...base, "Internal arrangements only. Do not change lyrics or melody. Translation needs the writer."]);
+    expect(RightsHelper.matrixForLicense("LARRY-HOLDER").print.allowed).toBe(false);
+  });
+});
+
 describe("RightsHelper.composeMatrix", () => {
   it("a use is allowed only when every layer allows it; conditions are the deduped union", () => {
     const m = RightsHelper.composeMatrix([{ license: "PD" }, { license: "CC-BY-ND" }, null, { license: "CC-BY-SA" }]);
@@ -105,6 +116,7 @@ describe("RightsHelper.notice", () => {
     expect(RightsHelper.notice("PD")).toBe("Public domain. Free for every use, including commercial.");
     expect(RightsHelper.notice("WC", "1.0")).toContain("WorshipCommons License 1.0");
     expect(RightsHelper.notice("CC-BY-SA", "4.0")).toBe("Creative Commons BY SA 4.0: credit the writer and link the license.");
+    expect(RightsHelper.notice("larry-holder")).toBe("Custom — Larry Holder Music. Non-profit church use; keep the original credits. Full terms: https://larryholdermusic.org/copyright.html");
     expect(RightsHelper.notice("???")).toBe("License not recognised.");
   });
 });
