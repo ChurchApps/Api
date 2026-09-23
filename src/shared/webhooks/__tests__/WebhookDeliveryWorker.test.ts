@@ -1,3 +1,5 @@
+jest.mock("../MailchimpConnector", () => ({ MailchimpConnector: {} }));
+
 import { WebhookDeliveryWorker } from "../WebhookDeliveryWorker";
 
 describe("WebhookDeliveryWorker.process", () => {
