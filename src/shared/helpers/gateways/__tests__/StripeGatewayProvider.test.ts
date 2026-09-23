@@ -61,3 +61,12 @@ describe("StripeGatewayProvider.calculateFees", () => {
     });
   });
 });
+
+describe("StripeGatewayProvider.logEvent", () => {
+  it("records the event id and type when the webhook passes the raw body", async () => {
+    const save = jest.fn();
+    const raw = Buffer.from(JSON.stringify({ id: "evt_1", type: "invoice.paid" }));
+    await new StripeGatewayProvider().logEvent("C1", raw, { billing_reason: "subscription_cycle", status: "paid", created: 1, customer: "cus_1" }, { eventLog: { save } });
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ providerId: "evt_1", eventType: "invoice.paid" }));
+  });
+});
