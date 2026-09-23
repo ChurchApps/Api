@@ -76,6 +76,11 @@ export class ReminderOccurrenceRepo {
       .set({ status: "failed", lastError: lastError.substring(0, 500) }).where("id", "=", id).execute();
   }
 
+  public async markRetry(id: string, lastError: string) {
+    await getDb().updateTable("reminderOccurrences")
+      .set({ status: "pending", lastError: lastError.substring(0, 500) }).where("id", "=", id).execute();
+  }
+
   public async cancelPendingForEntity(churchId: string, entityType: string, entityId: string) {
     await getDb().updateTable("reminderOccurrences").set({ status: "cancelled" })
       .where("churchId", "=", churchId).where("entityType", "=", entityType).where("entityId", "=", entityId)
@@ -85,6 +90,12 @@ export class ReminderOccurrenceRepo {
   public async cancelPendingForDefinition(definitionId: string) {
     await getDb().updateTable("reminderOccurrences").set({ status: "cancelled" })
       .where("definitionId", "=", definitionId).where("status", "=", "pending").execute();
+  }
+
+  public async cancelFuturePendingForDefinition(definitionId: string) {
+    await getDb().updateTable("reminderOccurrences").set({ status: "cancelled" })
+      .where("definitionId", "=", definitionId).where("status", "=", "pending")
+      .where("fireAt", ">", sql`NOW()` as any).execute();
   }
 
   public async loadRecent(churchId: string, limit = 50) {

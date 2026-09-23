@@ -13,7 +13,10 @@ interface TokenPayload {
 }
 
 const b64url = (buf: Buffer | string): string => Buffer.from(buf).toString("base64url");
-const secret = (): string => Environment.jwtSecret || "serving-reminder-fallback-secret";
+const secret = (): string => {
+  if (!Environment.jwtSecret) throw new Error("jwtSecret is not configured");
+  return Environment.jwtSecret;
+};
 
 const sign = (data: string): string => crypto.createHmac("sha256", secret()).update(data).digest("base64url");
 
@@ -25,7 +28,7 @@ export class ReminderTokenHelper {
   }
 
   public static verify(token: string | undefined): { assignmentId: string; churchId: string; action: ReminderAction } | null {
-    if (!token || typeof token !== "string") return null;
+    if (!token || typeof token !== "string" || !Environment.jwtSecret) return null;
     const [body, sig] = token.split(".");
     if (!body || !sig) return null;
 

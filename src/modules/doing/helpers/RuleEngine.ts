@@ -15,7 +15,8 @@ export class RuleEngine {
     for (const rule of rules) {
       try {
         await ExecutionHelper.runScheduledRule(rule, repos);
-      } catch {
+      } catch (err) {
+        console.error(`[RuleEngine] scheduled rule ${rule.id} failed:`, err);
       }
     }
   }

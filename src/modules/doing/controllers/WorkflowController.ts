@@ -83,6 +83,19 @@ export class WorkflowController extends DoingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
+      const [triggers, routes, steps, cards] = (await Promise.all([
+        this.repos.workflowTrigger.loadByWorkflow(au.churchId, id),
+        this.repos.workflowStepRoute.loadForWorkflow(au.churchId, id),
+        this.repos.workflowStep.loadForWorkflow(au.churchId, id),
+        this.repos.task.loadByWorkflow(au.churchId, id, "Open")
+      ])) as any[][];
+      for (const trigger of triggers) await this.repos.workflowTrigger.delete(au.churchId, trigger.id);
+      for (const route of routes) await this.repos.workflowStepRoute.delete(au.churchId, route.id);
+      for (const step of steps) {
+        await this.repos.workflowStepAction.deleteForStep(au.churchId, step.id);
+        await this.repos.workflowStep.delete(au.churchId, step.id);
+      }
+      for (const card of cards) await this.repos.task.save({ ...card, status: "Closed", dateClosed: new Date() });
       await this.repos.workflow.delete(au.churchId, id);
       return {};
     });

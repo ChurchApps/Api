@@ -214,7 +214,7 @@ describe("NotificationHelper.checkShouldNotify privateMessage", () => {
         loadByConversationId: jest.fn(async () => ({ ...privateMessage })),
         save: jest.fn(async (pm) => pm)
       },
-      message: { loadForConversation: jest.fn(async () => []) },
+      message: { loadLatestPerPerson: jest.fn(async () => []) },
       connection: { loadForNotification: jest.fn(async () => opts.connections ?? []) },
       notification: {
         loadNewCounts: jest.fn(async () => ({ notificationCount: 0, pmCount: 1 })),

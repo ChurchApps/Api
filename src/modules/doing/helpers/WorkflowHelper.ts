@@ -27,14 +27,15 @@ export class WorkflowHelper {
     createdBy?: AssignTarget,
     triggerId?: string,
     repositories?: Repos,
-    stepId?: string
+    stepId?: string,
+    depth = 0
   ): Promise<Task | null> {
     const repos = await this.getRepos(repositories);
     const step = stepId
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
     if (!step) return null;
-    return await this.createCard(churchId, workflowId, step, associated, createdBy, triggerId, repos);
+    return await this.createCard(churchId, workflowId, step, associated, createdBy, triggerId, repos, undefined, depth);
   }
 
   public static async addPeopleToWorkflow(
@@ -67,7 +68,8 @@ export class WorkflowHelper {
     createdBy?: AssignTarget,
     triggerId?: string,
     repos?: Repos,
-    sort?: number
+    sort?: number,
+    depth = 0
   ): Promise<Task> {
     const task: Task = {
       churchId,
@@ -86,8 +88,10 @@ export class WorkflowHelper {
       triggerId,
       sort: sort ?? (await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || ""))
     };
-    await this.onStepEnter(task, step, repos, 0);
-    return await repos.task.save(task);
+    // Saved first so step actions (webhooks, history) see the card's id.
+    const saved = await repos.task.save(task);
+    await this.onStepEnter(saved, step, repos, depth);
+    return await repos.task.save(saved);
   }
 
   // suppressRoutes skips onEnter auto-routing so an explicit manual move stays put.
@@ -115,7 +119,7 @@ export class WorkflowHelper {
     if (!step.id || suppressRoutes || depth >= WorkflowHelper.MAX_STEP_DEPTH) return;
 
     // A delay parks the card; processSnoozed resumes the rest on wake.
-    const parked = await StepActionHelper.execute(task, step, repos, 0);
+    const parked = await StepActionHelper.execute(task, step, repos, 0, depth);
     if (parked) return;
 
     await this.applyEntryRoutes(task, step, repos, depth);

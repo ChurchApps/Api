@@ -283,7 +283,7 @@ export class NotificationHelper {
               const success = ticket?.status === "ok";
               const errorMsg = ticket?.status === "error" ? (ticket as any).message : undefined;
               const logPromise = this.logDelivery(churchId, personId, contentType, contentId, "push", success, token, errorMsg);
-              if (!success && ticket?.status === "error") {
+              if (ticket?.status === "error" && (ticket as any).details?.error === "DeviceNotRegistered") {
                 return Promise.all([logPromise, this.deleteInvalidToken(token)]);
               }
               return logPromise;
@@ -446,7 +446,8 @@ export class NotificationHelper {
           notification.message,
           "notification",
           notification.id,
-          { innerType: notification.contentType, innerId: notification.contentId }
+          { innerType: notification.contentType, innerId: notification.contentId },
+          notification.category || undefined
         );
 
       notification.deliveryMethod = newMethod;
@@ -593,7 +594,7 @@ export class NotificationHelper {
         break;
       }
       default: {
-        const allMessages: Message[] = await NotificationHelper.repos.message.loadForConversation(conversation.churchId, conversation.id);
+        const allMessages: Message[] = await NotificationHelper.repos.message.loadLatestPerPerson(conversation.churchId, conversation.id);
         // Subscription model: latest action per person wins (real comment auto-subscribes; subscription marker toggles state). Iterate chronologically.
         const sorted = [...allMessages].sort((a, b) => {
           const ta = a.timeSent ? new Date(a.timeSent).getTime() : 0;
@@ -948,6 +949,10 @@ export class NotificationHelper {
     return people.map((p) => ({ id: p.id, email: p.email }));
   };
 
+  private static escapeHtml(value: unknown): string {
+    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   static sendEmailNotification = async (email: string, notifications: Notification[], senderEmail?: string) => {
     const addresses = (email || "").split(/[;,\s]+/).map((s) => s.trim()).filter((s) => s.includes("@"));
     if (addresses.length === 0) return;
@@ -963,36 +968,38 @@ export class NotificationHelper {
     if (notifCount === 1) {
       if (firstNotification.contentType === "privateMessage") {
         title = firstNotification.message;
-        content = firstNotification.message;
+        content = NotificationHelper.escapeHtml(firstNotification.message);
       } else if (firstNotification.message.includes("Volunteer Requests:")) {
         const match = firstNotification.message.match(/Volunteer Requests:(.*).Please log in and confirm/);
         title = "New Notification: Volunteer Request";
-        content = "<h3>New Notification</h3><h4>Volunteer Request</h4><h4>" + (match ? match[1] : firstNotification.message) + "</h4>" +
+        content = "<h3>New Notification</h3><h4>Volunteer Request</h4><h4>" + NotificationHelper.escapeHtml(match ? match[1] : firstNotification.message) + "</h4>" +
           (firstNotification.link
             ? "<a href='" + firstNotification.link + "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
             : "") +
           "<p>Please log in and confirm</p>";
       } else {
         title = "New Notification: " + firstNotification.message;
-        content = "New Notification: " + firstNotification.message;
+        content = "New Notification: " + NotificationHelper.escapeHtml(firstNotification.message);
       }
     } else {
       title = notifCount + (allDms ? " New Message" : " New Notification") + "s";
+      content = "<h3>" + title + "</h3><ul>" + notifications.map((n) => "<li>" + NotificationHelper.escapeHtml(n.message) + "</li>").join("") + "</ul>";
     }
 
     title = (title || "").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
     const replyTo = senderEmail || undefined;
 
-    let emailSuccess = true;
+    // Delivered once any address got it; retrying the batch would re-send to the ones that succeeded.
+    let emailSuccess = false;
     let emailError: string | undefined;
-    try {
-      for (const address of addresses) {
+    for (const address of addresses) {
+      try {
         await EmailHelper.sendTemplatedEmail("support@churchapps.org", address, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html", replyTo);
+        emailSuccess = true;
+      } catch (error) {
+        emailError = String(error);
+        console.error("[NotificationHelper.sendEmailNotification] Email FAILED to " + address + ":", error);
       }
-    } catch (error) {
-      emailSuccess = false;
-      emailError = String(error);
-      console.error("[NotificationHelper.sendEmailNotification] Email FAILED to " + email + ":", error);
     }
 
     for (const notification of notifications) {

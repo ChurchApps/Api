@@ -64,7 +64,7 @@ export class PlanReminderEmailHelper {
     if (o.customMessage) parts.push(`<p>${esc(o.customMessage)}</p>`);
     if (o.notes) parts.push(`<p><em>${esc(o.notes)}</em></p>`);
 
-    if (o.unconfirmedId) {
+    if (o.unconfirmedId && Environment.jwtSecret) {
       // Token expires the day after the service — valid for the whole reminder window.
       const exp = new Date(o.serviceDate); exp.setDate(exp.getDate() + 1);
       const url = (action: "accept" | "decline") =>

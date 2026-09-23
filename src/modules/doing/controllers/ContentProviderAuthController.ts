@@ -83,7 +83,9 @@ export class ContentProviderAuthController extends DoingBaseController {
       const tokens = await provider.exchangeCodeForTokens(code, codeVerifier, redirectUri);
       if (!tokens?.access_token) return this.json({ error: "Failed to exchange code for tokens" }, 400);
 
+      const existing = await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId);
       const record: ContentProviderAuth = {
+        id: existing?.id,
         churchId: au.churchId,
         ministryId,
         providerId,

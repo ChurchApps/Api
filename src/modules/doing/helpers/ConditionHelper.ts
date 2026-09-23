@@ -12,36 +12,51 @@ export class ConditionHelper {
   private static async getPeopleIdsMatchingCondition(condition: Condition) {
     condition.matchingIds = [];
     switch (condition.field) {
-      case "today": condition.matchingIds = this.evalSimpleCondition(condition) ? ["*"] : []; break;
+      case "today": condition.matchingIds = this.evalSimpleCondition(condition, await this.churchToday(condition.churchId)) ? ["*"] : []; break;
       default: condition.matchingIds = await getMembershipModuleGateway().loadIdsMatchingCondition(condition as any); break;
     }
     return condition;
   }
 
-  private static evalSimpleCondition(condition: Condition) {
+  // Calendar parts of "now" in the church's time zone; the scheduler runs in UTC.
+  private static async churchToday(churchId?: string): Promise<ChurchToday> {
+    let timeZone: string | undefined;
+    try {
+      if (churchId) timeZone = (await getMembershipModuleGateway().loadChurch(churchId))?.timeZone || undefined;
+    } catch { /* fall back to server time */ }
+    let parts: Intl.DateTimeFormatPart[];
+    try {
+      parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).formatToParts(new Date());
+    } catch {
+      parts = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "2-digit", day: "2-digit", weekday: "short" }).formatToParts(new Date());
+    }
+    const get = (type: string) => parts.find((p) => p.type === type)?.value || "";
+    return {
+      iso: `${get("year")}-${get("month")}-${get("day")}`,
+      dayOfMonth: parseInt(get("day"), 10),
+      dayOfWeek: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday")) + 1,
+      month: parseInt(get("month"), 10)
+    };
+  }
+
+  public static evalSimpleCondition(condition: Condition, today: ChurchToday) {
     let result = false;
     const fieldData = condition.fieldData ? JSON.parse(condition.fieldData) : {};
 
     switch (condition.field) {
       case "today":
         switch (fieldData.datePart) {
-          case "dayOfMonth": {
-            const dom = new Date().getDate();
-            result = ConditionHelper.evalNum(dom, condition.operator || "", parseInt(condition.value || "0", 0));
+          case "dayOfMonth":
+            result = ConditionHelper.evalNum(today.dayOfMonth, condition.operator || "", parseInt(condition.value || "0", 10));
             break;
-          }
-          case "dayOfWeek": {
-            const dow = new Date().getDay() + 1;
-            result = ConditionHelper.evalNum(dow, condition.operator || "", parseInt(condition.value || "0", 0));
+          case "dayOfWeek":
+            result = ConditionHelper.evalNum(today.dayOfWeek, condition.operator || "", parseInt(condition.value || "0", 10));
             break;
-          }
-          case "month": {
-            const month = new Date().getMonth() + 1;
-            result = ConditionHelper.evalNum(month, condition.operator || "", parseInt(condition.value || "0", 0));
+          case "month":
+            result = ConditionHelper.evalNum(today.month, condition.operator || "", parseInt(condition.value || "0", 10));
             break;
-          }
           default:
-            result = ConditionHelper.evalDate(new Date(), condition.operator || "", new Date(condition.value || new Date()));
+            result = ConditionHelper.evalDate(today.iso, condition.operator || "", (condition.value || today.iso).substring(0, 10));
             break;
         }
         break;
@@ -62,7 +77,8 @@ export class ConditionHelper {
     return result;
   }
 
-  private static evalDate(val: Date, operator: string, testVal: Date) {
+  // Compares YYYY-MM-DD strings, which sort the same as the dates they name.
+  private static evalDate(val: string, operator: string, testVal: string) {
     let result = false;
     switch (operator) {
       case "<": result = val < testVal; break;
@@ -75,3 +91,5 @@ export class ConditionHelper {
     return result;
   }
 }
+
+interface ChurchToday { iso: string; dayOfMonth: number; dayOfWeek: number; month: number }

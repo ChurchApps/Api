@@ -130,4 +130,22 @@ describe("PlanTemplateHelper", () => {
     expect(dstPositions).toHaveLength(1);
     expect(dstPositions[0].name).toBe("Existing");
   });
+  it("copies a grandchild whose parent is listed after it", async () => {
+    const repos = makeRepos();
+    repos._store.plans.push({ churchId: "ch1", id: "dst" });
+    const data = {
+      items: [
+        { id: "A1", parentId: "S1", sort: 1, label: "Action" },
+        { id: "H1", parentId: null, sort: 1, label: "Header" },
+        { id: "S1", parentId: "H1", sort: 1, label: "Section" }
+      ],
+      positions: []
+    } as any;
+    await PlanTemplateHelper.applyToPlan(repos, "ch1", "dst", data, { serviceOrder: true, positions: false });
+    const dstItems = await repos.planItem.loadForPlan("ch1", "dst");
+    const section = dstItems.find((i: any) => i.label === "Section");
+    const action = dstItems.find((i: any) => i.label === "Action");
+    expect(action).toBeDefined();
+    expect(action.parentId).toBe(section.id);
+  });
 });

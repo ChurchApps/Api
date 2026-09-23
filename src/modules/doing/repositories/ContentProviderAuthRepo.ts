@@ -42,7 +42,7 @@ export class ContentProviderAuthRepo {
   }
 
   public async loadByMinistryAndProvider(churchId: string, ministryId: string, providerId: string) {
-    return (await getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).where("providerId", "=", providerId).executeTakeFirst()) ?? null;
+    return (await getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).where("providerId", "=", providerId).orderBy("expiresAt", "desc").executeTakeFirst()) ?? null;
   }
 
   public convertToModel(_churchId: string, data: any) {

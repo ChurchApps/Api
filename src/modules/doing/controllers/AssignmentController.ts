@@ -51,6 +51,7 @@ export class AssignmentController extends DoingBaseController {
   public async accept(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
+      if (!assignment) return this.json({}, 404);
       if (assignment.personId !== au.personId) throw new Error("Invalid Assignment");
       else {
         assignment.status = "Accepted";
@@ -65,6 +66,7 @@ export class AssignmentController extends DoingBaseController {
   public async decline(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const assignment = (await this.repos.assignment.load(au.churchId, id)) as Assignment;
+      if (!assignment) return this.json({}, 404);
       if (assignment.personId !== au.personId) throw new Error("Invalid Assignment");
       else {
         assignment.status = "Declined";
@@ -81,12 +83,23 @@ export class AssignmentController extends DoingBaseController {
     });
   }
 
-  // Unauthenticated accept/decline from an email link; the signed token is the auth.
+  // Unauthenticated accept/decline from an email link; the signed token is the auth. GET only shows a
+  // confirm button because mail link scanners fetch every URL in a message.
   @httpGet("/public/respond")
-  public async respond(req: express.Request, res: express.Response): Promise<void> {
-    const page = (title: string, msg: string) =>
+  public async respondConfirm(req: express.Request, res: express.Response): Promise<void> {
+    return this.respond(req, res, false);
+  }
+
+  // authz-exempt: the HMAC-signed, expiring token in the query string is the authorization (verified in respond)
+  @httpPost("/public/respond")
+  public async respondSubmit(req: express.Request, res: express.Response): Promise<void> {
+    return this.respond(req, res, true);
+  }
+
+  private async respond(req: express.Request, res: express.Response, apply: boolean): Promise<void> {
+    const page = (title: string, msg: string, extra = "") =>
       `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +
-      `<body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:0 20px;text-align:center;"><h2>${title}</h2><p style="color:#555;">${msg}</p></body></html>`;
+      `<body style="font-family:sans-serif;max-width:480px;margin:60px auto;padding:0 20px;text-align:center;"><h2>${title}</h2><p style="color:#555;">${msg}</p>${extra}</body></html>`;
     try {
       const payload = ReminderTokenHelper.verify(req.query.token as string);
       if (!payload) { res.status(400).send(page("Link expired", "This link is no longer valid. Please open the app to respond.")); return; }
@@ -96,6 +109,12 @@ export class AssignmentController extends DoingBaseController {
       if (!assignment) { res.status(404).send(page("Not found", "We couldn't find that serving request.")); return; }
 
       const target = payload.action === "accept" ? "Accepted" : "Declined";
+      if (!apply && assignment.status !== target) {
+        const label = target === "Accepted" ? "Accept" : "Decline";
+        const button = `<form method="post" action=""><button type="submit" style="background-color:#0288d1;border:0;border-radius:5px;color:white;cursor:pointer;font-size:16px;padding:10px 24px;">${label}</button></form>`;
+        res.status(200).send(page(target === "Accepted" ? "Accept this serving request?" : "Decline this serving request?", "Tap the button below to confirm.", button));
+        return;
+      }
       if (assignment.status !== target) {
         assignment.status = target;
         await repos.assignment.save(assignment);
@@ -130,6 +149,7 @@ export class AssignmentController extends DoingBaseController {
 
       // Check signup deadline
       const plan = (await this.repos.plan.load(au.churchId, position.planId)) as Plan;
+      if (!plan) return this.json({}, 404);
       if (plan.signupDeadlineHours) {
         const deadline = new Date(plan.serviceDate);
         deadline.setHours(deadline.getHours() - plan.signupDeadlineHours);
