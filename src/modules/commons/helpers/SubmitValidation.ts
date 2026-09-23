@@ -117,8 +117,10 @@ export interface ValidationContext {
   isNewAsset?: boolean;
   /** the parent song named by detail.parentSongId; null when it does not exist; undefined when not looked up */
   parent?: { status?: string; language?: string } | null;
-  /** the published snapshot, so a removal can be checked for stray field changes */
+  /** the published snapshot, so a removal can be checked for stray field changes and a proposal for a relicense */
   livePayload?: SubmissionPayload;
+  /** true when the proposer is the song's own publisher — the only one who may change its license */
+  byPublisher?: boolean;
 }
 
 /** Returns every blocking problem with a submission; empty means it is acceptable. */
@@ -199,6 +201,15 @@ function validateProposalType(type: string, payload: SubmissionPayload, proposed
     if (text(ctx.note).length < MIN_NOTE_LENGTH) errors.push(`A note of at least ${MIN_NOTE_LENGTH} characters is required: say what changed and why`);
     if (type === "additionalFile" && !proposed.some((f) => f.action !== "remove")) errors.push("An additionalFile proposal must add a file");
     if (type === "recording" && !proposed.some((f) => f.action !== "remove" && fileRole(f.name || "") === "master")) errors.push("A recording proposal must add a master file");
+    // a grant is the writer's to make: a contributor's proposal carries the song's license through unchanged
+    const live = ctx.livePayload;
+    if (live && !ctx.byPublisher) {
+      if ((payload.license || "") !== (live.license || "")) errors.push("Only the writer can change a song's license");
+      // a recording proposal names the license of the master it adds; it may not replace one already granted
+      const liveMaster = live.detail?.masterLicense;
+      const masterMayChange = type === "recording" && !liveMaster;
+      if (!masterMayChange && (detail.masterLicense || "") !== (liveMaster || "")) errors.push("Only the writer can change the master recording's license");
+    }
   }
   return errors;
 }

@@ -133,6 +133,19 @@ describe("proposal types", () => {
     expect(validateSubmission(song, { ...goodSong, type: "correction" }, [], [], { isNewAsset: true, note: published.note })).toEqual(["a correction proposal changes a published song; this song is not published yet"]);
   });
 
+  it("a contributor's proposal can't relicense the song or replace a master's license; the publisher can", () => {
+    const live = { ...goodSong, license: "PD", detail: { ...goodSong.detail, masterLicense: "WC" } };
+    const same = { ...live, type: "correction" };
+    expect(validateSubmission(song, same, [], [], { ...published, livePayload: live })).toEqual([]);
+    expect(validateSubmission(song, { ...same, license: "WC" }, [], [], { ...published, livePayload: live })).toEqual(["Only the writer can change a song's license"]);
+    expect(validateSubmission(song, { ...same, detail: { ...same.detail, masterLicense: "PD" } }, [], [], { ...published, livePayload: live })).toEqual(["Only the writer can change the master recording's license"]);
+    expect(validateSubmission(song, { ...same, license: "WC" }, [], [], { ...published, livePayload: live, byPublisher: true })).toEqual([]);
+    // a first master on a song that has none names its own license
+    const noMaster = { ...goodSong, license: "PD" };
+    const rec = { ...noMaster, type: "recording", detail: { ...noMaster.detail, masterLicense: "CC-BY", recordingOwned: true } };
+    expect(validateSubmission(song, rec, [file("master.wav")], [], { ...published, livePayload: noMaster })).not.toContain("Only the writer can change the master recording's license");
+  });
+
   it("additionalFile: note plus at least one added file", () => {
     expect(validateSubmission(song, { ...goodSong, type: "additionalFile" }, [file("tune.abc")], [], published)).toEqual([]);
     expect(validateSubmission(song, { ...goodSong, type: "additionalFile" }, [], [], published)).toEqual(["An additionalFile proposal must add a file"]);
