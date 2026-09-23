@@ -233,10 +233,15 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
 
   public async getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo) {
     const repos = await this.repos();
-    const existing = await repos.person.searchEmail(churchId, guestInfo.email);
-    if (existing && existing.length > 0) {
-      return { personId: existing[0].id, householdId: existing[0].householdId, email: existing[0].email };
-    }
+    const email = (guestInfo.email || "").trim();
+    const existing = email
+      ? await this.getDb().selectFrom("people").select(["id", "householdId", "email"])
+        .where("churchId", "=", churchId)
+        .where("email", "=", email)
+        .where("removed", "=", false as any)
+        .executeTakeFirst()
+      : null;
+    if (existing) return { personId: existing.id, householdId: existing.householdId, email: existing.email };
     const household = await repos.household.save({ churchId, name: guestInfo.lastName });
     // PersonRepo.save maps only the nested name/contactInfo shapes to columns.
     const person = await repos.person.save({

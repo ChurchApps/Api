@@ -13,12 +13,7 @@ export class HealthController {
       // Test connection validity (basic check)
       const connectionDetails: Record<string, any> = {};
       for (const [moduleName, config] of allDatabaseConfigs.entries()) {
-        connectionDetails[moduleName] = {
-          host: config?.host || "unknown",
-          database: config?.database || "unknown",
-          port: config?.port || "unknown",
-          configured: !!config
-        };
+        connectionDetails[moduleName] = { configured: !!config };
       }
 
       const isHealthy = connectionStatus.missing.length === 0;
