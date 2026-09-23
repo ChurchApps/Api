@@ -89,3 +89,15 @@ describe("DonateController refund", () => {
     expect(updateStatus).not.toHaveBeenCalled();
   });
 });
+
+describe("DonateController retry", () => {
+  it("refuses a failed donation with no transaction id instead of updating by an undefined id", async () => {
+    (GatewayService as any).supportsRetry = jest.fn(() => true);
+    (GatewayService as any).retryFailedPayment = jest.fn(async () => ({ success: true }));
+    const { controller, updateStatus } = makeController({ id: "DON1", status: "failed" });
+    const result: any = await (controller as any).retry({ params: { donationId: "DON1" } }, {});
+    expect(result.status).toBe(400);
+    expect((GatewayService as any).retryFailedPayment).not.toHaveBeenCalled();
+    expect(updateStatus).not.toHaveBeenCalled();
+  });
+});

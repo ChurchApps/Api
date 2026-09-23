@@ -63,6 +63,7 @@ export class DonationRepo {
   }
 
   public async delete(churchId: string, id: string) {
+    await getDb().deleteFrom("fundDonations").where("churchId", "=", churchId).where("donationId", "=", id).execute();
     await getDb().deleteFrom("donations").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
@@ -80,6 +81,9 @@ export class DonationRepo {
   }
 
   public async deleteByBatchId(churchId: string, batchId: string) {
+    await getDb().deleteFrom("fundDonations").where("churchId", "=", churchId)
+      .where("donationId", "in", getDb().selectFrom("donations").select("id").where("churchId", "=", churchId).where("batchId", "=", batchId))
+      .execute();
     await getDb().deleteFrom("donations").where("churchId", "=", churchId).where("batchId", "=", batchId).execute();
   }
 
@@ -249,7 +253,9 @@ export class DonationRepo {
   public async loadFailedByAge(daysOld: number) {
     const result = await sql<any>`
       SELECT * FROM donations
-      WHERE status = 'failed' AND donationDate = DATE_SUB(CURDATE(), INTERVAL ${daysOld} DAY)`.execute(getDb());
+      WHERE status = 'failed'
+        AND donationDate >= DATE_SUB(CURDATE(), INTERVAL ${daysOld + 2} DAY)
+        AND donationDate < DATE_SUB(CURDATE(), INTERVAL ${daysOld - 1} DAY)`.execute(getDb());
     return result.rows;
   }
 

@@ -13,7 +13,7 @@ export class ReportResultHelper {
 
       report.queries?.forEach((q) => {
         if (q.keyName !== "main" && q.value) {
-          const relatedData = this.findRelatedData(row, q.value, report);
+          const relatedData = this.findRelatedData(combinedRow, q);
           if (relatedData) {
             Object.assign(combinedRow, relatedData);
           }
@@ -26,18 +26,18 @@ export class ReportResultHelper {
     return result;
   }
 
-  private static findRelatedData(_mainRow: any, queryData: any[], _report: Report): any {
+  // Merges the related row the query's joinConditions point at, as "<keyName>.<field>" plus any field the row lacks.
+  private static findRelatedData(row: any, query: Query): any {
+    const conditions = query.joinConditions || [];
+    if (conditions.length === 0) return null;
+    const match = query.value.find((data) => conditions.every((c) => data[c.child] === row[c.parent]));
+    if (!match) return null;
+
     const result: any = {};
-
-    queryData.forEach((data) => {
-      const keys = Object.keys(data);
-      keys.forEach((key) => {
-        if (!result[key]) {
-          result[key] = data[key];
-        }
-      });
+    Object.keys(match).forEach((key) => {
+      result[query.keyName + "." + key] = match[key];
+      if (!(key in row)) result[key] = match[key];
     });
-
     return result;
   }
 }

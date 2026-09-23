@@ -56,7 +56,6 @@ function req(body: any, ack = false) {
 const memberVisit = () => [{ personId: "p1", checkinType: "member", visitSessions: [{ session: { serviceTimeId: "st1", groupId: "g1" } }] }];
 
 beforeEach(() => {
-  (VisitController as any).cachedSessionIds = {};
   gateway.loadGroupsForCheckin.mockReset();
   gateway.loadSetting.mockReset();
   gateway.loadHouseholdPeople.mockReset();

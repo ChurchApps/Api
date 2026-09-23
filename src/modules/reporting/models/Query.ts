@@ -4,4 +4,5 @@ export class Query {
   public sqlLines?: string[];
   public depth?: number;
   public value?: any[];
+  public joinConditions?: { parent: string; child: string }[];
 }

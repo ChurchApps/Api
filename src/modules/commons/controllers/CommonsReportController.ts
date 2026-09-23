@@ -44,7 +44,7 @@ export class CommonsReportController extends CommonsBaseController {
         email: b.email || au.email || undefined,
         signature: b.signature
       });
-      void CommonsMailHelper.notifyReportReceived(report).catch((e) => console.error("[CommonsMailHelper] report received failed:", e));
+      await CommonsMailHelper.notifyReportReceived(report).catch((e) => console.error("[CommonsMailHelper] report received failed:", e));
       return { id: report.id };
     });
   }

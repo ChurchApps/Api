@@ -107,6 +107,7 @@ export class DonationController extends GivingBaseController {
       if (!au.checkAccess(Permissions.donations.view)) return this.json({}, 401);
       else {
         const data = await this.repos.donation.load(au.churchId, id);
+        if (!data) return this.json({}, 404);
         const result = this.repos.donation.convertToModel(au.churchId, data);
         return result;
       }

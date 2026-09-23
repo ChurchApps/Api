@@ -19,6 +19,7 @@ export class VisitSessionController extends AttendanceBaseController {
       const isGroupLeader = session?.groupId && au.leaderGroupIds?.includes(session.groupId);
 
       if (!au.checkAccess(Permissions.attendance.edit) && !isGroupLeader) return this.json({}, 401);
+      else if (!session) return this.json({ error: "Session not found" }, 404);
       else {
         let newVisit = false;
         let visit: Visit = await this.repos.visit.loadForSessionPerson(au.churchId, sessionId, personId);
@@ -34,7 +35,7 @@ export class VisitSessionController extends AttendanceBaseController {
           if (session.serviceTimeId === null) (visit as any).groupId = session.groupId;
           else {
             const st: ServiceTime = await this.repos.serviceTime.load(au.churchId, session.serviceTimeId);
-            (visit as any).serviceId = st.serviceId;
+            (visit as any).serviceId = st?.serviceId;
           }
           visit = await this.repos.visit.save(visit);
           newVisit = true;
@@ -68,7 +69,7 @@ export class VisitSessionController extends AttendanceBaseController {
         const visitSessions: VisitSession[] = ((await this.repos.visitSession.loadForSession(au.churchId, sessionId)) as VisitSession[]) || [];
         const session: Session = await this.repos.session.load(au.churchId, sessionId);
 
-        if (visitSessions.length > 0) {
+        if (visitSessions.length > 0 && session) {
           const url = apiUrl + `/groupmembers/basic/${(session as any).groupId}`;
           const config = { headers: { Authorization: "Bearer " + au.jwt } };
           const groupMembers: any = (await axios.get(url, config)).data;

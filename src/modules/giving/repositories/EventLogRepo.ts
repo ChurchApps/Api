@@ -24,30 +24,22 @@ export class EventLogRepo {
     return this.create(eventLog);
   }
 
+  // A duplicate providerId throws (ER_DUP_ENTRY): the caller that loses the race must not process the event again.
   private async create(model: EventLog): Promise<EventLog> {
     if (!model.id) model.id = UniqueIdHelper.shortId();
-    try {
-      await getDb().insertInto("eventLogs").values({
-        id: model.id,
-        churchId: model.churchId,
-        customerId: model.customerId,
-        provider: model.provider,
-        providerId: model.providerId,
-        eventType: model.eventType,
-        message: model.message,
-        status: model.status,
-        created: model.created,
-        resolved: false
-      } as any).execute();
-      return model;
-    } catch (err) {
-      // Concurrent insert already claimed this provider event (UNIQUE constraint); idempotent success.
-      if (isDuplicateKeyError(err) && model.churchId && model.providerId) {
-        const existing = await this.loadByProviderId(model.churchId as string, model.providerId);
-        if (existing) return existing;
-      }
-      throw err;
-    }
+    await getDb().insertInto("eventLogs").values({
+      id: model.id,
+      churchId: model.churchId,
+      customerId: model.customerId,
+      provider: model.provider,
+      providerId: model.providerId,
+      eventType: model.eventType,
+      message: model.message,
+      status: model.status,
+      created: model.created,
+      resolved: false
+    } as any).execute();
+    return model;
   }
 
   private async update(model: EventLog): Promise<EventLog> {
@@ -74,9 +66,9 @@ export class EventLogRepo {
 
   public async loadByType(churchId: string, status: string) {
     const result = await sql<any>`
-      SELECT eventLogs.*, personId
-      FROM customers
-      LEFT JOIN eventLogs ON customers.id = eventLogs.customerId
+      SELECT eventLogs.*, customers.personId
+      FROM eventLogs
+      LEFT JOIN customers ON customers.id = eventLogs.customerId AND customers.churchId = eventLogs.churchId
       WHERE eventLogs.status = ${status}
         AND eventLogs.churchId = ${churchId}
       ORDER BY eventLogs.created DESC`.execute(getDb());

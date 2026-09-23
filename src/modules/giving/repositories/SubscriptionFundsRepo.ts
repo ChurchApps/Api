@@ -69,30 +69,22 @@ export class SubscriptionFundsRepo {
 
   // If the fund gets deleted for a recurring donation, the donations will go to '(General Fund)'
   public async loadForSubscriptionLog(churchId: string, subscriptionId: string) {
-    let result: any[];
     const queryResult = await sql<any>`
       SELECT subscriptionFunds.*, funds.name, funds.removed
       FROM subscriptionFunds
       LEFT JOIN funds ON subscriptionFunds.fundId = funds.id
       WHERE subscriptionFunds.churchId = ${churchId}
         AND subscriptionFunds.subscriptionId = ${subscriptionId}`.execute(getDb());
-    const subscriptionFund = queryResult.rows;
-
-    if (subscriptionFund && subscriptionFund[0] && subscriptionFund[0].removed === false) {
-      const { removed: _removed, ...sf } = subscriptionFund[0];
-      result = [sf];
-    } else if (subscriptionFund && subscriptionFund[0]) {
-      // Fund was deleted, use general fund instead
-      const generalFund = await this.fundRepository.getOrCreateGeneral(churchId);
-      const { removed: _removed, ...sf } = subscriptionFund[0];
-      sf.fundId = generalFund.id;
-      sf.name = generalFund.name;
-      result = [sf];
-    } else {
-      // No subscription fund found, return empty array
-      result = [];
-    }
-    return result;
+    const subscriptionFunds = queryResult.rows;
+    const generalFund = subscriptionFunds.some((r: any) => r.removed !== false) ? await this.fundRepository.getOrCreateGeneral(churchId) : null;
+    return subscriptionFunds.map((row: any) => {
+      const { removed, ...sf } = row;
+      if (removed !== false) {
+        sf.fundId = generalFund.id;
+        sf.name = generalFund.name;
+      }
+      return sf;
+    });
   }
 
   public convertToModel(churchId: string, data: any) {

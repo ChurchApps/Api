@@ -15,6 +15,7 @@ jest.mock("../helpers/index", () => ({
   ContentLibraryHelper: { fileUrls: () => ({}) },
   parseContributors: jest.requireActual("../helpers/ContributorsHelper").parseContributors,
   recordAssetDownload: jest.fn(async () => 7),
+  PublishHelper: { discardProposed: jest.fn(async () => {}) },
   SubmissionHelper: {
     createDraft: jest.fn(async (_r: any, _au: any, body: any) => ({ ok: true, value: { submission: { id: "sub00000001", status: "draft" }, asset: { id: body.assetId || "asset000001", assetType: "song", name: body.payload?.name } } })),
     storeInline: jest.fn(async () => ({ ok: true, value: {} })),
@@ -23,7 +24,7 @@ jest.mock("../helpers/index", () => ({
 }));
 
 import { CommonsSongController } from "../controllers/CommonsSongController.js";
-import { SubmissionHelper } from "../helpers/index.js";
+import { PublishHelper, SubmissionHelper } from "../helpers/index.js";
 
 function songController(signedIn = true) {
   const repos: any = {
@@ -74,8 +75,16 @@ describe("legacy song shims", () => {
     const { controller, repos } = songController();
     const result: any = await controller.submit({ body: { title: "x", chordPro: "y", certified: true } } as any, {} as any);
     expect(result.status).toBe(400);
-    expect(repos.submission.delete).toHaveBeenCalledWith("sub00000001");
-    expect(repos.asset.delete).toHaveBeenCalledWith("asset000001");
+    expect(PublishHelper.discardProposed).toHaveBeenCalledWith(repos, expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), true);
+  });
+
+  it("POST /songs discards the draft, asset and stored files when an inline file is refused", async () => {
+    (SubmissionHelper.storeInline as jest.Mock).mockResolvedValueOnce({ ok: false, status: 400, error: "sheetPdf.exe is not accepted" });
+    const { controller, repos } = songController();
+    const result: any = await controller.submit({ body: { title: "x", chordPro: "y", certified: true, files: { sheetPdf: { name: "a.exe", base64: "AA==", contentType: "x" } } } } as any, {} as any);
+    expect(result.status).toBe(400);
+    expect(PublishHelper.discardProposed).toHaveBeenCalledWith(repos, expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), true);
+    expect(SubmissionHelper.submit).not.toHaveBeenCalled();
   });
 
   it("POST /songs/:id/abc becomes a modification submission carrying tune.abc", async () => {

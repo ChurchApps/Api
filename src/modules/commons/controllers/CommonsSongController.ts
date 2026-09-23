@@ -179,13 +179,14 @@ export class CommonsSongController extends CommonsBaseController {
         if (!file?.base64) continue;
         const ext = (file.name?.includes(".") ? file.name.split(".").pop() || "" : "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || defaultExt;
         const stored = await SubmissionHelper.storeInline(this.repos, submission, asset, `${field}.${ext}`, file.contentType, Buffer.from(file.base64, "base64"), au.id);
-        if (stored.ok === false) return this.json({ errors: stored.errors || [stored.error] }, stored.status);
+        if (stored.ok === false) {
+          await PublishHelper.discardProposed(this.repos, submission, asset, true);
+          return this.json({ errors: stored.errors || [stored.error] }, stored.status);
+        }
       }
       const result = await SubmissionHelper.submit(this.repos, submission, asset);
       if (result.ok === false) {
-        await this.repos.submission.delete(submission.id || "");
-        await this.repos.assetFile.deleteBySubmission(submission.id || "");
-        await this.repos.asset.delete(asset.id || "");
+        await PublishHelper.discardProposed(this.repos, submission, asset, true);
         const errors = result.errors || [result.error];
         return this.json({ errors }, result.status);
       }

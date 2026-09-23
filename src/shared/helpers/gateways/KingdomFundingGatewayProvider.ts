@@ -1131,6 +1131,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       eventLog.message = JSON.stringify(event);
       await repos.eventLog.save(eventLog);
     } catch (err) {
+      if ((err as any)?.errno === 1062 || (err as any)?.code === "ER_DUP_ENTRY") throw err;
       console.error("KingdomFunding(NMI) logEvent error:", err);
     }
   }
