@@ -157,7 +157,7 @@ export class SubmissionHelper {
       if (pending) return fail(409, `an edit by another contributor is already under review (${pending.id})`);
       return fail(400, "submission is no longer a draft");
     }
-    void CommonsMailHelper.notifyReceived(sub).catch((e) => console.error("[CommonsMailHelper] received failed:", e));
+    await CommonsMailHelper.notifyReceived(sub).catch((e) => console.error("[CommonsMailHelper] received failed:", e));
     return { ok: true, value: { status: "pending" } };
   }
 

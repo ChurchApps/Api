@@ -67,8 +67,9 @@ export class AttendanceRecordController extends AttendanceBaseController {
         const serviceId = req.query.serviceId === undefined ? "" : req.query.serviceId.toString();
         const serviceTimeId = req.query.serviceTimeId === undefined ? "" : req.query.serviceTimeId.toString();
         const groupId = req.query.groupId === undefined ? "" : req.query.groupId.toString();
-        const startDate = req.query.startDate !== undefined && new Date(req.query.startDate.toString());
-        const endDate = req.query.endDate !== undefined && new Date(req.query.endDate.toString());
+        const startDate = new Date(req.query.startDate?.toString() || "");
+        const endDate = new Date(req.query.endDate?.toString() || "");
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return this.json({ error: "startDate and endDate are required" }, 400);
 
         if (campusId !== "") {
           result = await this.repos.attendance.loadByCampusId(au.churchId, campusId, startDate, endDate);

@@ -26,6 +26,15 @@ describe("DonateController donation confirmation email", () => {
     expect(args[8]).toBe("https://content.churchapps.org/logo.png");
   });
 
+  it("escapes fund names and hides a fee row that is only rounding noise", async () => {
+    const controller = new DonateController();
+    await (controller as any).sendEmails("donor@x.com", { name: "Grace Church", subDomain: "grace" }, [{ name: "<a href=x>Win</a>", amount: 0.1 }, { name: "B", amount: 0.2 }], 0.3, undefined, undefined, "one-time", "USD");
+    const contents: string = sendTransactionalMock.mock.calls[0][5];
+    expect(contents).toContain("&lt;a href=x&gt;Win&lt;/a&gt;");
+    expect(contents).not.toContain("<a href=x>");
+    expect(contents).not.toContain("Transaction Fee");
+  });
+
   it("sends no logo when the church has none", async () => {
     const controller = new DonateController();
     await (controller as any).sendEmails("donor@x.com", { name: "Grace Church", subDomain: "grace" }, [{ name: "General", amount: 25 }], 25, undefined, undefined, "one-time", "USD");

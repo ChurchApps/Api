@@ -41,9 +41,11 @@ export class DonationBatchRepo {
     return (await getDb().selectFrom("donationBatches").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
+  // Online and API-logged gifts go to the online batch, never into a staff-entered batch like "Sunday cash".
   public async getOrCreateCurrent(churchId: string) {
     const data = (await getDb().selectFrom("donationBatches").selectAll()
       .where("churchId", "=", churchId)
+      .where("name", "=", "Online Donation")
       .orderBy("batchDate", "desc")
       .limit(1)
       .executeTakeFirst()) ?? null;

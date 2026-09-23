@@ -15,8 +15,8 @@
           " INNER JOIN serviceTimes st on st.id=s.serviceTimeId",
           " INNER JOIN services ser on ser.id=st.serviceId",
           " WHERE v.churchId=:churchId",
-          " AND :serviceId IN (0, ser.id) ",
-          " AND s.sessionDate BETWEEN :week AND DATE_ADD(:week, INTERVAL 7 DAY)",
+          " AND (:serviceId IN ('', '0') OR ser.id = :serviceId) ",
+          " AND s.sessionDate >= :week AND s.sessionDate < DATE_ADD(:week, INTERVAL 7 DAY)",
           " ORDER by ser.name, st.name"
         ]
       },

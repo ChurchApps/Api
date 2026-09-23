@@ -163,7 +163,8 @@ export class ContentLibraryHelper {
   static async promote(fromKey: string, toKey: string): Promise<boolean> {
     const file = await this.readKey(fromKey);
     if (!file) return false;
-    await FileStorageHelper.store(toKey, file.contentType, file.buffer);
+    // The pending type came from the uploader; the public copy is served with the type its extension implies.
+    await FileStorageHelper.store(toKey, this.contentTypeFor(toKey), file.buffer);
     return true;
   }
 

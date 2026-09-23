@@ -30,6 +30,8 @@ export interface DispatchResult {
 }
 
 const MAX_BODY_BYTES = 64 * 1024;
+// Below API Gateway's 29s ceiling, so a handler that never ends the response fails the tool call instead of the Lambda.
+const DISPATCH_TIMEOUT_MS = 25000;
 
 export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
   if (!expressApp) throw new Error("Express app not set — call setExpressApp(app) at startup");
@@ -40,7 +42,9 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
   const req = makeRequest(input.method.toUpperCase(), url, input.body, input.authorization, isLambda);
   const res = makeResponse();
 
+  let timer: NodeJS.Timeout | undefined;
   await new Promise<void>((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`Internal dispatch timed out: ${input.method.toUpperCase()} ${input.path}`)), DISPATCH_TIMEOUT_MS);
     res.on("finish", resolve);
     res.on("error", reject);
     try {
@@ -48,7 +52,7 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
     } catch (err) {
       reject(err);
     }
-  });
+  }).finally(() => clearTimeout(timer));
 
   return {
     status: res.statusCode,

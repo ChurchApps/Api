@@ -19,7 +19,7 @@ export class AttendanceRepo {
   }
 
   public async loadGroups(churchId: string, serviceId: string, week: Date) {
-    const rows = await sql<any>`SELECT ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId FROM visits v INNER JOIN visitSessions vs on vs.churchId=v.churchId AND vs.visitId=v.id INNER JOIN sessions s on s.id=vs.sessionId INNER JOIN serviceTimes st on st.id=s.serviceTimeId INNER JOIN services ser on ser.id=st.serviceId WHERE v.churchId=${churchId} AND ${serviceId} IN (0, ser.id) AND s.sessionDate BETWEEN ${week} AND DATE_ADD(${week}, INTERVAL 7 DAY) ORDER by ser.name, st.name`.execute(getDb());
+    const rows = await sql<any>`SELECT ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId FROM visits v INNER JOIN visitSessions vs on vs.churchId=v.churchId AND vs.visitId=v.id INNER JOIN sessions s on s.id=vs.sessionId INNER JOIN serviceTimes st on st.id=s.serviceTimeId INNER JOIN services ser on ser.id=st.serviceId WHERE v.churchId=${churchId} AND (${serviceId} IN ('', '0') OR ser.id = ${serviceId}) AND s.sessionDate >= ${week} AND s.sessionDate < DATE_ADD(${week}, INTERVAL 7 DAY) ORDER by ser.name, st.name`.execute(getDb());
     return rows.rows;
   }
 

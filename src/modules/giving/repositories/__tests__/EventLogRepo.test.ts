@@ -20,7 +20,7 @@ describe("isDuplicateKeyError", () => {
   });
 });
 
-// Concurrent webhooks must be idempotent; 500 would trigger retry storm.
+// Concurrent webhooks: the duplicate surfaces so DonateController answers 200 without processing twice.
 describe("EventLogRepo.create idempotency under the unique constraint", () => {
   const buildDb = (opts: { insertError?: any; existingRow?: any }) => ({
     insertInto: () => ({ values: () => ({ execute: () => (opts.insertError ? Promise.reject(opts.insertError) : Promise.resolve()) }) }),
@@ -38,12 +38,11 @@ describe("EventLogRepo.create idempotency under the unique constraint", () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it("returns the winning row when a concurrent insert already claimed the event", async () => {
+  it("rethrows the duplicate when a concurrent insert already claimed the event, so the loser skips processing", async () => {
     const existing = { id: "evt_winner", churchId: "C1", providerId: "pi_1", resolved: false };
     mockedGetDb.mockReturnValue(buildDb({ insertError: { errno: 1062 }, existingRow: existing }));
     const repo = new EventLogRepo();
-    const result = await (repo as any).create({ churchId: "C1", providerId: "pi_1", provider: "stripe", eventType: "charge.succeeded" });
-    expect(result.id).toBe("evt_winner");
+    await expect((repo as any).create({ churchId: "C1", providerId: "pi_1", provider: "stripe", eventType: "charge.succeeded" })).rejects.toMatchObject({ errno: 1062 });
   });
 
   it("rethrows non-duplicate insert errors", async () => {

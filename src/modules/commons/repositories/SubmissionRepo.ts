@@ -8,6 +8,7 @@ import { NEW_PACKAGE_TYPES } from "../helpers/SubmitValidation.js";
 export interface QueueFilter {
   status?: string;
   assetType?: string;
+  assetTypes?: string[];
   page?: number;
   pageSize?: number;
 }
@@ -71,6 +72,7 @@ export class SubmissionRepo {
     const page = Math.max(filter.page || 1, 1);
     let q = this.joined().where("submissions.status", "=", filter.status || "pending");
     if (filter.assetType) q = q.where("assets.assetType", "=", filter.assetType);
+    if (filter.assetTypes) q = filter.assetTypes.length ? q.where("assets.assetType", "in", filter.assetTypes) : q.where(sql<boolean>`1 = 0`);
     const rows = await q.orderBy("submissions.triageScore", "desc").orderBy("submissions.submittedAt", "asc").orderBy("submissions.createdAt", "asc").limit(pageSize).offset((page - 1) * pageSize).execute();
     return rows.map((r) => fromRow<QueueRow>(r));
   }

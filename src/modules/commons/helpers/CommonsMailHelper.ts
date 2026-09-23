@@ -24,7 +24,7 @@ const RESOLUTION_TEXT: Record<string, string> = {
 };
 
 function reportedTitle(report: Report): string {
-  return (report.contentText || "").trim() || "the content you reported";
+  return esc((report.contentText || "").trim()) || "the content you reported";
 }
 
 function rawTitle(sub: Submission): string {
@@ -126,14 +126,14 @@ export class CommonsMailHelper {
   static notifyReportResolved(report: Report, resolution: string): Promise<void> {
     const what = RESOLUTION_TEXT[resolution] || RESOLUTION_TEXT.dismissed;
     let body = `<p>Your report about <strong>${reportedTitle(report)}</strong> (reference <strong>${report.id}</strong>) is resolved.</p><p>${what}</p>`;
-    if (report.resolutionNote?.trim()) body += `<p>${report.resolutionNote.trim()}</p>`;
+    if (report.resolutionNote?.trim()) body += `<p>${esc(report.resolutionNote.trim())}</p>`;
     body += `<p>Questions? Email ${Environment.supportEmail}.</p>`;
     return this.mailTo(report.email, `Your report (${report.id}) is resolved`, body);
   }
 
   /** The publisher of a song taken down by a report — reply-to-counter-notice is the appeal path. */
   static notifyTakedown(asset: Asset, report: Report): Promise<void> {
-    const title = (asset.name || "").trim() || "your song";
+    const title = esc((asset.name || "").trim()) || "your song";
     const why = report.reason === "copyright" ? "a copyright report" : "a policy report";
     return this.mailWriter(asset.publisherUserId, `${title} was taken down from WorshipCommons`, `<p><strong>${title}</strong> is no longer available on WorshipCommons after ${why}.</p><p>If you believe this is a mistake, reply to this email with a counter-notice explaining why you have the right to publish it.</p><p>Questions? Email ${Environment.supportEmail}.</p>`);
   }

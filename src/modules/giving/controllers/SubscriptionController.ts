@@ -11,7 +11,7 @@ export class SubscriptionController extends GivingBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
-      else return this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, id));
+      else return await this.repos.subscription.load(au.churchId, id);
     });
   }
 
@@ -19,7 +19,7 @@ export class SubscriptionController extends GivingBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json(null, 401);
-      else return this.repos.customer.convertAllToModel(au.churchId, (await this.repos.customer.loadAll(au.churchId)) as any[]);
+      else return await this.repos.subscription.loadAll(au.churchId);
     });
   }
 

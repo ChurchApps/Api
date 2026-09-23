@@ -81,8 +81,9 @@ export class GatewayController extends GivingBaseController {
 
                 // Create new webhook based on provider capabilities
                 const providerName = encryptedGateway.provider?.toLowerCase();
+                const proto = (req.get("x-forwarded-proto") || req.protocol || "https").split(",")[0].trim();
                 const webHookUrl =
-                  req.get("x-forwarded-proto") +
+                  proto +
                   "://" +
                   req.hostname +
                   `/giving/donate/webhook/${providerName}?churchId=` +

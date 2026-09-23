@@ -143,6 +143,7 @@ export class ReportController extends ReportingBaseController {
       const getGroupMembers = ArrayHelper.getAll(groupMembers, "groupId", g.id);
       getGroupMembers?.forEach((gm: any) => {
         const person = ArrayHelper.getOne(people, "id", gm.personId);
+        if (!person) return;
         const attendanceStatus: any = {};
         serviceArray?.forEach((ser) => {
           const serId = ser?.value.split("//")[0];
