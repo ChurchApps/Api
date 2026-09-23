@@ -154,6 +154,7 @@ export class MessageController extends MessagingBaseController {
         message.churchId = au.churchId;
         if (!message.personId && au?.personId) message.personId = au.personId;
         if (!message.displayName && au?.firstName) message.displayName = au.firstName + " " + au.lastName;
+        const shouldNotify = !message.id && message.messageType !== "subscription";
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
             console.info("[chat-push] message saved", {
@@ -189,7 +190,7 @@ export class MessageController extends MessagingBaseController {
                 action: "conversationActivity",
                 data: { contentType: conv.contentType, contentId: conv.contentId, conversationId: conv.id, kind: "message" }
               }) : Promise.resolve(),
-              NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous")
+              shouldNotify ? NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous") : Promise.resolve()
             ]);
 
             return savedMessage;
@@ -285,6 +286,7 @@ export class MessageController extends MessagingBaseController {
         return this.json({ error: "Unauthorized" }, 401);
       }
       await this.repos.message.delete(au.churchId, id);
+      await this.repos.conversation.updateStats(message.conversationId);
 
       // Send real-time delete notification
       (await DeliveryHelper.sendConversationMessages({

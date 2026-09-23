@@ -18,29 +18,26 @@ export class DeliveryHelper {
 
   static sendConversationMessages = async (payload: PayloadInterface) => {
     const connections = DeliveryHelper.repos.connection.convertAllToModel(await DeliveryHelper.repos.connection.loadForConversation(payload.churchId, payload.conversationId));
-    const deliveryCount = await this.sendMessages(connections, payload);
-    if (deliveryCount !== connections.length) DeliveryHelper.sendAttendance(payload.churchId, payload.conversationId);
+    const results = await Promise.all(connections.map((connection) => DeliveryHelper.deliver(connection, payload)));
+    if (results.includes("gone")) {
+      DeliveryHelper.sendAttendance(payload.churchId, payload.conversationId).catch((e) => console.error("DeliveryHelper.sendAttendance failed:", e));
+    }
   };
 
   static sendMessages = async (connections: Connection[], payload: PayloadInterface) => {
-    const promises: Promise<boolean>[] = [];
-    connections.forEach((connection) => {
-      promises.push(DeliveryHelper.sendMessage(connection, payload));
-    });
-    const results = await Promise.all(promises);
-    let deliveryCount = 0;
-    results.forEach((r) => {
-      if (r) deliveryCount++;
-    });
-    return deliveryCount;
+    const results = await Promise.all(connections.map((connection) => DeliveryHelper.deliver(connection, payload)));
+    return results.filter((r) => r === "ok").length;
   };
 
-  static sendMessage = async (connection: Connection, payload: PayloadInterface) => {
-    let success = true;
-    if (Environment.deliveryProvider === "aws") success = await DeliveryHelper.sendAws(connection, payload);
-    else success = await DeliveryHelper.sendLocal(connection, payload);
-    if (!success) await DeliveryHelper.repos.connection.delete(connection.churchId, connection.id);
-    return success;
+  static sendMessage = async (connection: Connection, payload: PayloadInterface) => (await DeliveryHelper.deliver(connection, payload)) === "ok";
+
+  // Only a gone socket loses its connection row; a slow or erroring one is kept for the next send.
+  private static deliver = async (connection: Connection, payload: PayloadInterface): Promise<"ok" | "gone" | "error"> => {
+    const result = Environment.deliveryProvider === "aws"
+      ? await DeliveryHelper.sendAws(connection, payload)
+      : ((await DeliveryHelper.sendLocal(connection, payload)) ? "ok" : "gone");
+    if (result === "gone") await DeliveryHelper.repos.connection.delete(connection.churchId, connection.id);
+    return result;
   };
 
   static sendAttendance = async (churchId: string, conversationId: string) => {
@@ -107,10 +104,11 @@ export class DeliveryHelper {
     return DeliveryHelper.awsClient;
   }
 
-  static sendAws = async (connection: Connection, payload: PayloadInterface) => {
+  static sendAws = async (connection: Connection, payload: PayloadInterface): Promise<"ok" | "gone" | "error"> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const client = DeliveryHelper.getAwsClient();
-      if (!client) return false;
+      if (!client) return "error";
 
       const command = new PostToConnectionCommand({
         ConnectionId: connection.socketId,
@@ -119,15 +117,15 @@ export class DeliveryHelper {
 
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("WebSocket delivery timeout")), 5000);
+        timer = setTimeout(() => reject(new Error("WebSocket delivery timeout")), 5000);
       });
 
       await Promise.race([client.send(command), timeoutPromise]);
-      return true;
+      return "ok";
     } catch (e: any) {
       // GoneException (410): connection stale, expected.
       if (e.name === "GoneException" || e.$metadata?.httpStatusCode === 410) {
-        return false;
+        return "gone";
       }
       if (e.message !== "WebSocket delivery timeout") {
         console.error(`[${connection.churchId}] DeliveryHelper.sendAws error:`, {
@@ -138,7 +136,9 @@ export class DeliveryHelper {
           connectionId: connection.socketId
         });
       }
-      return false;
+      return "error";
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   };
 

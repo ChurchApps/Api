@@ -140,7 +140,7 @@ describe("ReminderEngine.handleBusEvent (plan/task)", () => {
   function busRepos() {
     return {
       reminderDefinition: { loadForEntity: jest.fn(async () => []), loadForScope: jest.fn(async () => []) },
-      reminderOccurrence: { cancelPendingForDefinition: jest.fn(async () => {}), cancelPendingForEntity: jest.fn(async () => {}), upsert: jest.fn() }
+      reminderOccurrence: { cancelFuturePendingForDefinition: jest.fn(async () => {}), cancelPendingForEntity: jest.fn(async () => {}), upsert: jest.fn() }
     } as any;
   }
 
@@ -194,7 +194,8 @@ describe("ReminderEngine.scan (dispatcher)", () => {
         claim: jest.fn(async () => opts.claim ?? true),
         markSent: jest.fn(async () => {}),
         markCancelled: jest.fn(async () => {}),
-        markFailed: jest.fn(async () => {})
+        markFailed: jest.fn(async () => {}),
+        markRetry: jest.fn(async () => {})
       },
       reminderDefinition: { load: jest.fn(async () => ({ id: "D1", enabled: true, recipientMode: "auto" })) },
       reminderSentLog: {
@@ -234,6 +235,19 @@ describe("ReminderEngine.scan (dispatcher)", () => {
     const result = await ReminderEngine.scan();
     expect(result).toEqual({ processed: 0, sent: 0 });
     expect(createNotificationsMock).not.toHaveBeenCalled();
+  });
+
+  it("puts a failed occurrence back to pending until the attempt cap, then marks it failed", async () => {
+    const repos = buildRepos({});
+    repos.reminderDefinition.load = jest.fn(async () => { throw new Error("db down"); });
+    ReminderEngine.init(repos);
+    await ReminderEngine.scan();
+    expect(repos.reminderOccurrence.markRetry).toHaveBeenCalledWith("O1", "db down");
+    expect(repos.reminderOccurrence.markFailed).not.toHaveBeenCalled();
+
+    repos.reminderOccurrence.loadDue = jest.fn(async () => [{ ...occ, attemptCount: 2 }]);
+    await ReminderEngine.scan();
+    expect(repos.reminderOccurrence.markFailed).toHaveBeenCalledWith("O1", "db down");
   });
 
   it("cancels an occurrence whose definition is gone/disabled", async () => {

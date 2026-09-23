@@ -50,7 +50,9 @@ export class ConversationRepo {
   public async loadByIds(churchId: string, ids: string[]) {
     if (!ids || ids.length === 0) return [];
     return getDb().selectFrom("conversations")
-      .select(["id", "firstPostId", "lastPostId", "postCount"])
+      .select([
+        "id", "churchId", "contentType", "contentId", "visibility", "allowAnonymousPosts", "firstPostId", "lastPostId", "postCount"
+      ])
       .where("churchId", "=", churchId)
       .where("id", "in", ids)
       .execute();

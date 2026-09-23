@@ -35,6 +35,7 @@ export class ExecutionHelper {
   }
 
   public static async attempt(execution: AutomationExecution, trigger: WorkflowTrigger, repos: Repos): Promise<AutomationExecution> {
+    let card: Task | null = null;
     try {
       // A retry may follow a crash after the card was created — don't double-add.
       if ((execution.attemptCount ?? 0) > 0 && (await this.alreadyApplied(execution, trigger, repos))) {
@@ -45,7 +46,7 @@ export class ExecutionHelper {
         const people = await getMembershipModuleGateway().loadPeople(execution.churchId || "", [execution.subjectId]);
         execution.subjectLabel = people[0]?.displayName;
       }
-      const card = await WorkflowHelper.addToWorkflow(
+      card = await WorkflowHelper.addToWorkflow(
         execution.churchId || "",
         trigger.workflowId || "",
         { type: execution.subjectType || "person", id: execution.subjectId, label: execution.subjectLabel },
@@ -60,7 +61,12 @@ export class ExecutionHelper {
     } catch (err) {
       execution.attemptCount = (execution.attemptCount ?? 0) + 1;
       execution.lastError = (err as Error)?.message || String(err);
-      if (execution.attemptCount >= this.MAX_ATTEMPTS) {
+      // The card exists, so a retry would only add a duplicate.
+      if (card) {
+        execution.status = "success";
+        execution.nextAttemptAt = undefined;
+        execution.dateCompleted = new Date();
+      } else if (execution.attemptCount >= this.MAX_ATTEMPTS) {
         execution.status = "failed";
         execution.nextAttemptAt = undefined;
         execution.dateCompleted = new Date();
@@ -180,7 +186,8 @@ export class ExecutionHelper {
         } else {
           await this.attempt(execution, trigger, repos);
         }
-      } catch {
+      } catch (err) {
+        console.error(`[ExecutionHelper] execution ${execution.id} failed:`, err);
       }
     }
     return due.length;

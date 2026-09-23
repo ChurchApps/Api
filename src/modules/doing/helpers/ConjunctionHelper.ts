@@ -71,23 +71,12 @@ export class ConjunctionHelper {
         });
       }
     } else {
-      peopleArrays.forEach((pa) => {
-        let allPeople = true;
-        let noPeople = false;
-        if (pa.length !== 1 || pa[0] !== "*") {
-          allPeople = false;
-          if (pa.length === 0) noPeople = true;
-          if (result.length === 0) result = pa;
-          else {
-            for (let i = result.length - 1; i >= 0; i--) {
-              const id = result[i];
-              if (pa.indexOf(id) === -1) result.splice(i, 1);
-            }
-          }
-        }
-        if (allPeople) result = ["*"];
-        else if (noPeople) result = [];
-      });
+      let intersection: string[] | null = null;
+      for (const pa of peopleArrays) {
+        if (pa.length === 1 && pa[0] === "*") continue;
+        intersection = intersection === null ? [...pa] : intersection.filter((id) => pa.includes(id));
+      }
+      result = intersection ?? (peopleArrays.length > 0 ? ["*"] : []);
     }
     parent.matchingIds = result;
     return result;

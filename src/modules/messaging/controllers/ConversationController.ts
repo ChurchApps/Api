@@ -45,7 +45,7 @@ export class ConversationController extends MessagingBaseController {
   @httpGet("/timeline/ids")
   public async getTimelineByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const ids = req.query.ids.toString().split(",");
+      const ids = (req.query.ids || "").toString().split(",").filter(Boolean);
       let result = (await this.repos.conversation.loadByIds(au.churchId, ids)) as Conversation[];
       if (result && Array.isArray(result)) {
         const readable: Conversation[] = [];
@@ -68,7 +68,7 @@ export class ConversationController extends MessagingBaseController {
       if (!this.canReadContent(au, contentType, contentId)) return this.json([], 401);
       const churchId = au.churchId;
       const pageNumber = parseInt((req.query.page as string) || "1", 10);
-      const pageSize = parseInt((req.query.limit as string) || "20", 10);
+      const pageSize = Math.min(Math.max(parseInt((req.query.limit as string) || "20", 10) || 20, 1), 100);
 
       const conversations = (await this.repos.conversation.loadForContent(
         churchId,

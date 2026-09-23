@@ -9,6 +9,7 @@ import { getMembershipModuleGateway } from "../../../shared/modules/MembershipMo
 const HORIZON_DAYS = 14;
 const MAX_OFFSET_MIN = HORIZON_DAYS * 24 * 60;
 const DEFAULT_TZ = "America/New_York";
+const MAX_SCAN_ATTEMPTS = 3;
 
 // Reminder engine (architecture §5): expander materializes per-occurrence fire rows; dispatcher claims due rows and produces Notifications. Both ride existing timers — no new infra. Preference gate inside NotificationHelper is the single send-time chokepoint.
 export class ReminderEngine {
@@ -167,7 +168,9 @@ export class ReminderEngine {
         }
         await this.repos.reminderOccurrence.markSent(occ.id!, recipients.length);
       } catch (e) {
-        await this.repos.reminderOccurrence.markFailed(occ.id!, String((e as Error)?.message || e)); // lease re-surfaces next tick
+        const error = String((e as Error)?.message || e);
+        if ((Number(occ.attemptCount) || 0) + 1 < MAX_SCAN_ATTEMPTS) await this.repos.reminderOccurrence.markRetry(occ.id!, error);
+        else await this.repos.reminderOccurrence.markFailed(occ.id!, error);
       }
     }
     return { processed, sent };
@@ -182,7 +185,7 @@ export class ReminderEngine {
     this.ensureInit();
     const defs = (await this.repos.reminderDefinition.loadForEntity(churchId, entityType, entityId)) as ReminderDefinition[];
     for (const def of defs) {
-      await this.repos.reminderOccurrence.cancelPendingForDefinition(def.id!); // drop stale rows; expand re-creates current ones
+      await this.repos.reminderOccurrence.cancelFuturePendingForDefinition(def.id!); // drop stale future rows; due ones still dispatch
       await this.expandDefinition(def);
     }
   }
@@ -191,7 +194,7 @@ export class ReminderEngine {
     this.ensureInit();
     const defs = (await this.repos.reminderDefinition.loadForScope(churchId, entityType, scopeId)) as ReminderDefinition[];
     for (const def of defs) {
-      await this.repos.reminderOccurrence.cancelPendingForDefinition(def.id!);
+      await this.repos.reminderOccurrence.cancelFuturePendingForDefinition(def.id!);
       await this.expandDefinition(def);
     }
   }
