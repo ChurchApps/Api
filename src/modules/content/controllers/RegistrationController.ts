@@ -96,8 +96,9 @@ export class RegistrationController extends ContentBaseController {
       let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, members, choices);
 
       let couponId: string = null;
+      let coupon: RegistrationCoupon = null;
       if (data.couponCode) {
-        const coupon = await this.repos.registrationCoupon.loadByCode(churchId, data.eventId, data.couponCode);
+        coupon = await this.repos.registrationCoupon.loadByCode(churchId, data.eventId, data.couponCode);
         const uses = coupon?.id ? await this.repos.registration.countActiveForCoupon(churchId, coupon.id) : 0;
         const validation = RegistrationPricingHelper.validateCoupon(coupon, members.length, uses, now);
         if (!validation.valid) return this.json({ error: "Coupon not valid", reason: validation.reason }, 400);
@@ -126,11 +127,16 @@ export class RegistrationController extends ContentBaseController {
           await this.insertMembers(churchId, registration.id, members, typeMap, true);
           try {
             const church = await getMembershipModuleGateway().loadChurch(churchId);
-            await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, members as any);
+            await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, members as any, church?.timeZone);
           } catch (e) { console.error("Failed to send waitlist email", e); }
           return { ...registration, members, status: "waitlisted" };
         }
         return this.json({ error: "Event is at capacity", status: "full" }, 409);
+      }
+
+      if (coupon?.maxUses != null && Number(await this.repos.registration.countActiveForCoupon(churchId, coupon.id)) > Number(coupon.maxUses)) {
+        await this.deleteCascade(churchId, registration.id);
+        return this.json({ error: "Coupon not valid", reason: "max-uses" }, 400);
       }
 
       // Per-type member inserts with atomic capacity guards
@@ -165,7 +171,7 @@ export class RegistrationController extends ContentBaseController {
 
       try {
         const church = await getMembershipModuleGateway().loadChurch(churchId);
-        await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, memberResult.members);
+        await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, memberResult.members, church?.timeZone);
       } catch (e) {
         console.error("Failed to send registration confirmation email", e);
       }
@@ -372,27 +378,47 @@ export class RegistrationController extends ContentBaseController {
       const activeSelections = selections.filter((s: RegistrationSelection) => s.active !== false);
       const selMap = new Map(activeSelections.map((s: RegistrationSelection) => [s.id, s]));
 
-      // Replace members (with atomic per-type capacity re-check on new type assignments)
-      let members: RegisterMemberInput[] = null;
-      if (Array.isArray(body.members)) {
-        members = body.members;
-        for (const m of members) if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
-        await this.repos.registrationMember.deleteForRegistration(au.churchId, id);
-        const memberResult = await this.insertMembers(au.churchId, id, members, typeMap, false);
-        if (!memberResult.ok) return this.json({ error: "Attendee type is at capacity", status: "type-full", registrationTypeId: memberResult.fullTypeId }, 409);
-      }
-
-      // Replace selection choices (with atomic per-selection quantity re-check)
-      let choices: RegisterSelectionInput[] = null;
-      if (Array.isArray(body.selections)) {
-        choices = body.selections;
+      const members: RegisterMemberInput[] = Array.isArray(body.members) ? body.members : null;
+      const choices: RegisterSelectionInput[] = Array.isArray(body.selections) ? body.selections : null;
+      if (members) for (const m of members) if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
+      if (choices) {
         for (const c of choices) {
           if (!selMap.has(c.selectionId)) return this.json({ error: "Invalid selection" }, 400);
           if (!RegistrationPricingHelper.isValidQuantity(c.quantity)) return this.json({ error: "Invalid quantity" }, 400);
         }
+      }
+
+      const oldMembers = members ? await this.repos.registrationMember.loadForRegistration(au.churchId, id) : [];
+      const oldChoices = choices ? await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id) : [];
+      const restore = async () => {
+        if (members) {
+          await this.repos.registrationMember.deleteForRegistration(au.churchId, id);
+          for (const m of oldMembers) await this.repos.registrationMember.atomicInsertWithTypeCapacity(m, null);
+        }
+        if (choices) {
+          await this.repos.registrationSelectionChoice.deleteForRegistration(au.churchId, id);
+          for (const c of oldChoices) await this.repos.registrationSelectionChoice.atomicInsertWithCapacityCheck(c, null);
+        }
+      };
+
+      // Replace members (with atomic per-type capacity re-check on new type assignments)
+      if (members) {
+        await this.repos.registrationMember.deleteForRegistration(au.churchId, id);
+        const memberResult = await this.insertMembers(au.churchId, id, members, typeMap, false);
+        if (!memberResult.ok) {
+          await restore();
+          return this.json({ error: "Attendee type is at capacity", status: "type-full", registrationTypeId: memberResult.fullTypeId }, 409);
+        }
+      }
+
+      // Replace selection choices (with atomic per-selection quantity re-check)
+      if (choices) {
         await this.repos.registrationSelectionChoice.deleteForRegistration(au.churchId, id);
         const choiceResult = await this.insertChoices(au.churchId, id, choices, selMap);
-        if (!choiceResult.ok) return this.json({ error: "Selection is at capacity", status: "selection-full", selectionId: choiceResult.fullSelectionId }, 409);
+        if (!choiceResult.ok) {
+          await restore();
+          return this.json({ error: "Selection is at capacity", status: "selection-full", selectionId: choiceResult.fullSelectionId }, 409);
+        }
       }
 
       // Recompute totalAmount from the current members/choices; do NOT auto-charge or refund.
@@ -419,6 +445,7 @@ export class RegistrationController extends ContentBaseController {
       if (!registration) return this.json({ error: "Registration not found" }, 404);
       const isSelf = registration.personId === au.personId;
       if (!isSelf && !au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
+      if (registration.status === "waitlisted") return this.json({ error: "Registration is waitlisted" }, 409);
 
       const balance = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.totalAmount) - RegistrationPricingHelper.num(registration.amountPaid));
       if (balance <= 0) return this.json({ error: "No balance due" }, 400);
@@ -435,7 +462,7 @@ export class RegistrationController extends ContentBaseController {
 
       await this.recordPayment(au.churchId, id, charge, balance, req.body?.type, registration.personId);
       registration.amountPaid = RegistrationPricingHelper.round(RegistrationPricingHelper.num(registration.amountPaid) + balance);
-      if (registration.status === "waitlisted") registration.status = "confirmed";
+      if (registration.status === "pending") registration.status = "confirmed";
       await this.repos.registration.save(registration);
       return registration;
     });
@@ -448,7 +475,7 @@ export class RegistrationController extends ContentBaseController {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
       const event = await this.repos.event.load(au.churchId, registration.eventId);
-      const promoted = await this.repos.registration.promoteFromWaitlist(au.churchId, registration.eventId, event?.capacity ?? null);
+      const promoted = await this.repos.registration.promoteFromWaitlist(au.churchId, registration.eventId, event?.capacity ?? null, id);
       if (promoted) await this.notifyPromotion(au.churchId, promoted, event);
       return promoted || this.json({ error: "No spot available to promote" }, 409);
     });

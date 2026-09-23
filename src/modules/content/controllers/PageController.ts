@@ -148,6 +148,7 @@ export class PageController2 extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const page = await this.repos.page.load(au.churchId, id);
+        if (!page) return this.json({}, 404);
         page.id = undefined;
         page.title += " (copy)";
         page.url += "-copy";

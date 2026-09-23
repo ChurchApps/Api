@@ -97,7 +97,7 @@ export class ElementController extends ContentBaseController {
 
   private async checkSlides(elements: Element[]) {
     for (const element of elements) {
-      if (element.elementType === "carousel") {
+      if (element.elementType === "carousel" && element.answersJSON) {
         element.answers = JSON.parse(element.answersJSON);
         const slidesNumber = parseInt(element.answers.slides, 0);
         const slides: number[] = [];
@@ -145,7 +145,7 @@ export class ElementController extends ContentBaseController {
 
   private async checkRows(elements: Element[]) {
     for (const element of elements) {
-      if (element.elementType === "row") {
+      if (element.elementType === "row" && element.answersJSON) {
         element.answers = JSON.parse(element.answersJSON);
         const cols: number[] = this.parseNumberList(element.answers.columns);
         let mobileSizes: number[] = this.parseNumberList(element.answers.mobileSizes);
@@ -168,7 +168,7 @@ export class ElementController extends ContentBaseController {
 
     // Update existing column sizes
     for (let i = 0; i < children.length && i < cols.length; i++) {
-      children[i].answers = JSON.parse(children[i].answersJSON);
+      children[i].answers = JSON.parse(children[i].answersJSON || "{}");
       let shouldSave = false;
       if (children[i].answers.size !== cols[i] || children[i].sort !== i + 1) {
         children[i].answers.size = cols[i];

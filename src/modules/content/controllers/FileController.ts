@@ -49,6 +49,7 @@ export class FileController extends ContentBaseController {
       const storage = await StorageResolver.forFile(this.repos.storageProvider, file);
       const url = storage?.provider.getDownloadUrl ? await storage.provider.getDownloadUrl(file.externalId) : null;
       if (!url) return this.json({}, 404);
+      if (FileController.mintedUrlCache.size > 1000) FileController.mintedUrlCache.clear();
       FileController.mintedUrlCache.set(id, { url, expires: Date.now() + FileController.MINT_CACHE_MS });
       res.redirect(302, url);
     });
@@ -162,6 +163,7 @@ export class FileController extends ContentBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const existingFile = await this.repos.file.load(au.churchId, id);
+      if (!existingFile) return this.json({}, 404);
       if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(existingFile.contentId) === -1) return this.json({}, 401);
       else {
         const storage = await StorageResolver.forFile(this.repos.storageProvider, existingFile);

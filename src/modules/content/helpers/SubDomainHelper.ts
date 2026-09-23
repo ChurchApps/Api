@@ -5,16 +5,24 @@ export class SubDomainHelper {
   static subDomains: any = {};
   static churchIds: any = {};
 
+  private static remember(churchId: string, subDomain: string) {
+    if (Object.keys(this.subDomains).length > 5000) {
+      this.subDomains = {};
+      this.churchIds = {};
+    }
+    this.subDomains[churchId] = subDomain;
+    this.churchIds[subDomain] = churchId;
+  }
+
   public static async get(churchId: string) {
     let result = "";
     if (this.subDomains[churchId] !== undefined) result = this.subDomains[churchId];
     else {
       const apiUrl = Environment.membershipApi;
-      const url = apiUrl + "/churches/lookup/?id=" + churchId.toString();
+      const url = apiUrl + "/churches/lookup/?id=" + encodeURIComponent(churchId.toString());
       const json: any = (await axios.get(url)).data;
       result = json.subDomain;
-      this.subDomains[churchId] = result;
-      this.churchIds[result] = churchId;
+      this.remember(churchId, result);
     }
     return result;
   }
@@ -24,12 +32,11 @@ export class SubDomainHelper {
     if (this.churchIds[subDomain] !== undefined) result = this.churchIds[subDomain];
     else {
       const apiUrl = Environment.membershipApi;
-      const url = apiUrl + "/churches/lookup/?subDomain=" + subDomain;
+      const url = apiUrl + "/churches/lookup/?subDomain=" + encodeURIComponent(subDomain);
       const json: any = (await axios.get(url)).data;
       if (json.id) {
         result = json.id;
-        this.subDomains[result] = subDomain;
-        this.churchIds[subDomain] = result;
+        this.remember(result, subDomain);
       }
     }
     return result;

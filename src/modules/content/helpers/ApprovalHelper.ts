@@ -3,6 +3,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { RegistrationHelper } from "./RegistrationHelper.js";
 
 interface PendingBookingRow {
   id?: string;
@@ -59,10 +60,11 @@ export class ApprovalHelper {
     for (const digest of digests) {
       try {
         const approverIds = await getMembershipModuleGateway().loadGroupMemberPersonIds(digest.churchId, digest.approvalGroupId);
+        const timeZone = (await getMembershipModuleGateway().loadChurch(digest.churchId))?.timeZone;
         for (const personId of approverIds) {
           const person = await getMembershipModuleGateway().loadPerson(digest.churchId, personId);
           if (!person?.email) continue;
-          await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, "B1.church", Environment.b1AdminRoot ?? "", this.getDigestSubject(digest), this.getDigestBody(digest), "ChurchEmailTemplate.html");
+          await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, "B1.church", Environment.b1AdminRoot ?? "", this.getDigestSubject(digest), this.getDigestBody(digest, timeZone), "ChurchEmailTemplate.html");
           emails++;
         }
         await repos.eventBooking.markNotified(digest.bookingIds);
@@ -77,8 +79,8 @@ export class ApprovalHelper {
     return digest.items.length === 1 ? "1 room/resource request awaiting approval" : `${digest.items.length} room/resource requests awaiting approval`;
   }
 
-  private static getDigestBody(digest: ApprovalDigest): string {
-    const rows = digest.items.map((i) => `<li><b>${i.targetName}</b> for "${i.eventTitle}" starting ${new Date(i.eventStart).toLocaleString()}</li>`).join("");
+  public static getDigestBody(digest: ApprovalDigest, timeZone?: string): string {
+    const rows = digest.items.map((i) => `<li><b>${RegistrationHelper.escapeHtml(i.targetName)}</b> for "${RegistrationHelper.escapeHtml(i.eventTitle)}" starting ${new Date(i.eventStart).toLocaleString("en-US", { timeZone: RegistrationHelper.validTimeZone(timeZone), timeZoneName: "short" })}</li>`).join("");
     const link = (Environment.b1AdminRoot ?? "") + "/calendars/approvals";
     return `<h2>Pending Approvals</h2><ul>${rows}</ul><p><a href="${link}">Review requests</a></p>`;
   }

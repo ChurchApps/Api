@@ -102,11 +102,18 @@ describe("RegistrationRepo.promoteFromWaitlist", () => {
   });
 
   it("promotes the oldest waitlisted row via a guarded UPDATE when a spot frees", async () => {
-    (getDb as jest.Mock).mockReturnValue(recordingDb({ executeTakeFirst: { id: "r9", personId: "p9", status: "waitlisted" } }));
+    (getDb as jest.Mock).mockReturnValue(recordingDb({ executeTakeFirst: { id: "r9", personId: "p9", status: "waitlisted", totalAmount: 25, amountPaid: 0 } }));
     sqlResult = { numAffectedRows: 1n };
     const promoted = await new RegistrationRepo().promoteFromWaitlist("c1", "e1", 50);
     expect(promoted).toMatchObject({ id: "r9", status: "pending" });
     expect(sqlCalls[0]).toContain("status='waitlisted'");
+  });
+
+  it("confirms a free registration straight off the waitlist", async () => {
+    (getDb as jest.Mock).mockReturnValue(recordingDb({ executeTakeFirst: { id: "r9", status: "waitlisted", totalAmount: 0, amountPaid: 0 } }));
+    sqlResult = { numAffectedRows: 1n };
+    const promoted = await new RegistrationRepo().promoteFromWaitlist("c1", "e1", 50);
+    expect(promoted).toMatchObject({ id: "r9", status: "confirmed" });
   });
 
   it("returns null when the guarded UPDATE loses the race (0 rows)", async () => {

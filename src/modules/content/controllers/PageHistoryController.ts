@@ -62,7 +62,13 @@ export class PageHistoryController extends ContentBaseController {
       const history = await this.repos.pageHistory.load(au.churchId, id);
       if (!history) return this.json({ error: "History not found" }, 404);
 
-      const snapshot = JSON.parse(history.snapshotJSON);
+      let snapshot: any;
+      try {
+        snapshot = JSON.parse(history.snapshotJSON);
+      } catch {
+        return this.json({ error: "History snapshot is corrupt" }, 422);
+      }
+      if (!snapshot?.sections) return this.json({ error: "History snapshot is corrupt" }, 422);
 
       // Delete existing sections and elements, then restore from snapshot
       await TreeHelper.deleteAndRestoreContent(au.churchId, history.pageId, history.blockId, snapshot);

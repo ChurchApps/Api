@@ -90,6 +90,7 @@ export class SermonController extends ContentBaseController {
   public async getSermonTvFeed(@requestParam("churchId") churchId: string, @requestParam("sermonId") sermonId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const sermon = await this.repos.sermon.loadById(sermonId, churchId);
+      if (!sermon) return this.json({}, 404);
 
       const result: any = {
         id: sermon.id,
@@ -167,10 +168,12 @@ export class SermonController extends ContentBaseController {
   @httpGet("/lookup")
   public async lookup(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      const videoData = req.query.videoData?.toString() || "";
+      if (!/^[A-Za-z0-9_:-]{1,64}$/.test(videoData)) return this.json({ error: "Invalid video id" }, 400);
       if (req.query.videoType === "youtube") {
-        return await YouTubeHelper.getSermon(req.query.videoData as string);
+        return await YouTubeHelper.getSermon(videoData);
       } else {
-        return await VimeoHelper.getSermon(req.query.videoData as string);
+        return await VimeoHelper.getSermon(videoData);
       }
     });
   }

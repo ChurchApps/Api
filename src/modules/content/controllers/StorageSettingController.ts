@@ -6,6 +6,7 @@ import { StorageProvider } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { StorageResolver } from "../helpers/StorageResolver.js";
 import { ByosAuth } from "../helpers/ByosAuth.js";
+import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
 
 @controller("/content/storage")
 export class StorageSettingController extends ContentBaseController {
@@ -23,6 +24,10 @@ export class StorageSettingController extends ContentBaseController {
   public async saveProvider(req: express.Request<{}, {}, StorageProvider[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      for (const provider of req.body) {
+        const endpointError = await this.validateEndpoint(provider.settings);
+        if (endpointError) return this.json({ error: endpointError }, 400);
+      }
       const existingRows = this.repos.storageProvider.convertAllToModel(await this.repos.storageProvider.loadByChurchId(au.churchId) as any[]);
       const saved = await Promise.all(
         req.body.map(async (provider) => {
@@ -101,6 +106,25 @@ export class StorageSettingController extends ContentBaseController {
         return { provider: storage.name, error: "unavailable" };
       }
     });
+  }
+
+  private async validateEndpoint(settings: string): Promise<string | null> {
+    let endpoint: string;
+    try {
+      endpoint = JSON.parse(settings || "{}")?.endpoint;
+    } catch {
+      return "Invalid settings";
+    }
+    if (!endpoint) return null;
+    let parsed: URL;
+    try {
+      parsed = new URL(endpoint);
+    } catch {
+      return "Invalid storage endpoint";
+    }
+    if (parsed.protocol !== "https:") return "Storage endpoint must use https";
+    if (UrlValidator.isBlockedHostname(parsed.hostname) || await UrlValidator.resolvesToPrivate(parsed.hostname)) return "Storage endpoint host is not allowed";
+    return null;
   }
 
   private async disableOthers(churchId: string, keepId: string) {

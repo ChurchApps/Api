@@ -4,13 +4,13 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class VimeoHelper {
   public static async getSermon(videoId: string) {
-    const url = `https://api.vimeo.com/videos/${videoId}`;
+    const url = `https://api.vimeo.com/videos/${encodeURIComponent(videoId)}`;
     const axiosConfig = { headers: { Authorization: "Bearer " + Environment.vimeoToken } };
     const result = { title: "", thumbnail: "", description: "", duration: 0, publishDate: new Date() };
     const json: any = (await axios.get(url, axiosConfig)).data;
     if (json) {
       result.title = json.name;
-      result.thumbnail = json.pictures.base_link || "";
+      result.thumbnail = json.pictures?.base_link || "";
       result.description = json.description;
       result.duration = json.duration;
       result.publishDate = new Date(json.created_time);

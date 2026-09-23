@@ -23,24 +23,25 @@ export class StreamingServiceController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const services = await this.repos.streamingService.loadAll(au.churchId);
       const promises: Promise<any>[] = [];
-      services.forEach((s: StreamingService, index: number, allServices: StreamingService[]) => {
+      const result: StreamingService[] = [];
+      services.forEach((s: StreamingService) => {
         // Update service time
         if (s.serviceTime < DateHelper.subtractHoursFromNow(6)) {
           if (!s.recurring) {
             promises.push(this.repos.streamingService.delete(s.id, s.churchId));
             // remove blocked Ips
             promises.push(axios.post(Environment.messagingApi + "/blockedIps/clear", [{ serviceId: s.id, churchId: s.churchId }]));
-            allServices.splice(index, 1);
-          } else {
-            while (s.serviceTime < DateHelper.subtractHoursFromNow(6)) s.serviceTime.setDate(s.serviceTime.getDate() + 7);
-            promises.push(this.repos.streamingService.save(s));
+            return;
           }
+          while (s.serviceTime < DateHelper.subtractHoursFromNow(6)) s.serviceTime.setDate(s.serviceTime.getDate() + 7);
+          promises.push(this.repos.streamingService.save(s));
         }
         s.serviceTime.setMinutes(s.serviceTime.getMinutes() - s.timezoneOffset);
+        result.push(s);
       });
       await Promise.all(promises);
 
-      return services;
+      return result;
     });
   }
 

@@ -80,6 +80,7 @@ export class PraiseChartsController extends ContentBaseController {
   @httpGet("/download")
   public async download(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!req.query.skus || !req.query.keys) return this.json({ error: "skus and keys are required" }, 400);
       const settings: Setting[] = await this.repos.setting.loadUser(au.churchId, au.id);
       const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
       const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;
@@ -90,7 +91,7 @@ export class PraiseChartsController extends ContentBaseController {
         fileName = path.basename(req.query.file_name.toString()).replace(/\.\.+/g, ".");
       }
       let mimeType = "application/pdf";
-      const fileType = fileName.split(".")[1].toLowerCase();
+      const fileType = path.extname(fileName).substring(1).toLowerCase();
       switch (fileType) {
         case "zip": mimeType = "application/zip"; break;
       }
