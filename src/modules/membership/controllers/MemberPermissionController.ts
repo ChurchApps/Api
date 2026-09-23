@@ -8,7 +8,7 @@ export class MemberPermissionController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.formAccess(au, id, "view")) return this.json({}, 401);
+      if (!(await this.formAccess(au, id, "view"))) return this.json({}, 401);
       else return this.repos.memberPermission.convertToModel(au.churchId, await this.repos.memberPermission.load(au.churchId, id));
     });
   }
@@ -16,7 +16,7 @@ export class MemberPermissionController extends MembershipBaseController {
   @httpGet("/member/:id")
   public async getByMember(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.formAccess(au, id)) return this.json({}, 401);
+      if (id !== au.personId && !(await this.formAccess(au, id))) return this.json({}, 401);
       else return this.repos.memberPermission.convertAllToModel(au.churchId, (await this.repos.memberPermission.loadFormsByPerson(au.churchId, id)) as any[]);
     });
   }
@@ -24,19 +24,17 @@ export class MemberPermissionController extends MembershipBaseController {
   @httpGet("/form/:id")
   public async getByForm(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.formAccess(au, id)) return this.json({}, 401);
+      if (!(await this.formAccess(au, id))) return this.json({}, 401);
       else return this.repos.memberPermission.convertAllToModel(au.churchId, (await this.repos.memberPermission.loadPeopleByForm(au.churchId, id)) as any[]);
     });
   }
 
+  // authz-exempt: returns only the caller's own permission row (scoped to au.churchId + au.personId)
   @httpGet("/form/:id/my")
   public async getMyPermissions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.formAccess(au, id)) return this.json({}, 401);
-      else {
-        const permission = await this.repos.memberPermission.loadMyByForm(au.churchId, id, au.personId);
-        return permission ? this.repos.memberPermission.convertToModel(au.churchId, permission) : null;
-      }
+      const permission = await this.repos.memberPermission.loadMyByForm(au.churchId, id, au.personId);
+      return permission ? this.repos.memberPermission.convertToModel(au.churchId, permission) : null;
     });
   }
 

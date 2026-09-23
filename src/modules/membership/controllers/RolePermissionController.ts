@@ -44,6 +44,7 @@ export class RolePermissionController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
       else {
         let rolePermissions: RolePermission[] = req.body;
+        if (!(await this.rolesInChurch(rolePermissions.map((rp) => rp.roleId), au.churchId))) return this.json({ error: "Invalid role" }, 400);
         const promises: Promise<RolePermission>[] = [];
         rolePermissions.forEach((rolePermission) => {
           rolePermission.churchId = au.churchId;

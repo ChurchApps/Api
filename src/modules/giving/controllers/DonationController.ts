@@ -117,10 +117,11 @@ export class DonationController extends GivingBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const personId = req.query?.personId?.toString() || "";
-      if (!au.checkAccess(Permissions.donations.view) && personId !== au.personId) return this.json({}, 401);
+      const canView = au.checkAccess(Permissions.donations.view);
+      if (!canView && (!personId || personId !== au.personId)) return this.json({}, 401);
       else {
         let result;
-        if (req.query.batchId !== undefined) result = await this.repos.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
+        if (canView && req.query.batchId !== undefined) result = await this.repos.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
         else if (personId) result = await this.repos.donation.loadByPersonId(au.churchId, personId);
         else result = await this.repos.donation.loadAll(au.churchId);
         return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);

@@ -56,17 +56,43 @@ export class UrlValidator {
     if (a === 172 && b >= 16 && b <= 31) return true; // private
     if (a === 192 && b === 168) return true; // private
     if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    if (a === 192 && b === 0 && parts[2] === 0) return true; // IETF protocol assignments
+    if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
     if (a >= 224) return true; // multicast / reserved
     return false;
   }
 
   private static isPrivateIpv6(ip: string): boolean {
-    const addr = ip.toLowerCase();
-    if (addr === "::1" || addr === "::") return true; // loopback, unspecified
-    if (addr.startsWith("fe80")) return true; // link-local
-    if (addr.startsWith("fc") || addr.startsWith("fd")) return true; // unique local
-    const mapped = addr.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return UrlValidator.isPrivateIpv4(mapped[1]);
+    const h = UrlValidator.ipv6Hextets(ip);
+    if (!h) return true;
+    const embeddedV4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+    if (h.slice(0, 7).every((x) => x === 0) && h[7] <= 1) return true; // unspecified, loopback
+    if (h.slice(0, 5).every((x) => x === 0) && (h[5] === 0xffff || h[5] === 0)) return UrlValidator.isPrivateIpv4(embeddedV4(h[6], h[7])); // v4-mapped / v4-compatible
+    if (h[0] === 0x64 && h[1] === 0xff9b) return true; // NAT64 (well-known + local-use)
+    if (h[0] === 0x2002) return UrlValidator.isPrivateIpv4(embeddedV4(h[1], h[2])); // 6to4
+    if ((h[0] & 0xffc0) === 0xfe80 || (h[0] & 0xffc0) === 0xfec0) return true; // link-local, site-local
+    if ((h[0] & 0xfe00) === 0xfc00) return true; // unique local
+    if ((h[0] & 0xff00) === 0xff00) return true; // multicast
     return false;
+  }
+
+  private static ipv6Hextets(ip: string): number[] | null {
+    let addr = ip.toLowerCase().replace(/%.*$/, "");
+    const v4 = addr.match(/(\d+\.\d+\.\d+\.\d+)$/);
+    if (v4) {
+      const p = v4[1].split(".").map((x) => parseInt(x, 10));
+      if (p.length !== 4 || p.some((x) => isNaN(x) || x > 255)) return null;
+      addr = addr.slice(0, -v4[1].length) + ((p[0] << 8) | p[1]).toString(16) + ":" + ((p[2] << 8) | p[3]).toString(16);
+    }
+    const halves = addr.split("::");
+    if (halves.length > 2) return null;
+    const head = halves[0] ? halves[0].split(":") : [];
+    const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+    const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+    if (fill < 0) return null;
+    const parts = [...head, ...Array(fill).fill("0"), ...tail];
+    if (parts.length !== 8) return null;
+    const nums = parts.map((x) => parseInt(x, 16));
+    return nums.some((x) => isNaN(x) || x < 0 || x > 0xffff) ? null : nums;
   }
 }

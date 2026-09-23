@@ -11,6 +11,7 @@ export class RoleController extends MembershipBaseController {
   public async loadByChurchId(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
+      if (churchId !== au.churchId && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       else {
         return this.repos.role.convertAllToModel(churchId, await this.repos.role.loadByChurchId(churchId));
       }
@@ -50,7 +51,8 @@ export class RoleController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const role: Role = await this.repos.role.loadById(au.churchId, id);
       const roles: Role[] = [role];
-      if (!this.checkAccess(roles, Permissions.roles.edit, au)) return this.json({}, 401);
+      if (!role) return this.json({}, 404);
+      if (!(await this.checkAccess(roles, Permissions.roles.edit, au))) return this.json({}, 401);
       else {
         await this.repos.rolePermission.deleteForRole(au.churchId, id);
         await this.repos.roleMember.deleteForRole(au.churchId, id);

@@ -19,6 +19,11 @@ export class RegistrationPricingHelper {
     return Math.round(value * 100) / 100;
   }
 
+  static isValidQuantity(quantity: any): boolean {
+    if (quantity === undefined || quantity === null) return true;
+    return Number.isInteger(quantity) && quantity >= 1;
+  }
+
   static computeTotal(
     types: RegistrationType[],
     selections: RegistrationSelection[],

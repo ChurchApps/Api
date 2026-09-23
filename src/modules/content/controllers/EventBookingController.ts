@@ -48,15 +48,33 @@ export class EventBookingController extends ContentBaseController {
   public async save(req: express.Request<{}, {}, EventBooking[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const requesterGroupIds = await this.loadRequesterGroupIds(au.churchId, au.personId);
+      const isResolver = this.canResolve(au);
       const result: EventBooking[] = [];
       for (const booking of req.body) {
         booking.churchId = au.churchId;
-        if (!booking.id) {
+        const existing = booking.id ? await this.repos.eventBooking.load(au.churchId, booking.id) : null;
+        if (booking.id && !existing) return this.json({}, 404);
+        if (!isResolver) {
+          if (!(await this.leadsEvent(au, booking.eventId))) return this.json({}, 401);
+          if (existing && existing.eventId !== booking.eventId && !(await this.leadsEvent(au, existing.eventId))) return this.json({}, 401);
+        }
+        if (!existing) {
           booking.requestedBy = au.personId;
           booking.requestedDate = new Date();
           booking.quantity = booking.quantity || 1;
           const approvalGroupId = await this.getApprovalGroupId(au.churchId, booking);
           booking.status = ApprovalHelper.determineStatus(approvalGroupId, requesterGroupIds);
+        } else if (!isResolver) {
+          booking.requestedBy = existing.requestedBy;
+          booking.requestedDate = existing.requestedDate;
+          booking.resolvedBy = existing.resolvedBy;
+          booking.resolvedDate = existing.resolvedDate;
+          booking.quantity = booking.quantity || 1;
+          const target = booking.roomId !== existing.roomId || booking.resourceId !== existing.resourceId || Number(booking.quantity) !== Number(existing.quantity || 1);
+          if (target) {
+            const approvalGroupId = await this.getApprovalGroupId(au.churchId, booking);
+            booking.status = ApprovalHelper.determineStatus(approvalGroupId, requesterGroupIds);
+          } else booking.status = existing.status;
         }
         result.push(await this.repos.eventBooking.save(booking));
       }
@@ -103,6 +121,12 @@ export class EventBookingController extends ContentBaseController {
       await this.notifyRequester(au.churchId, booking, status);
       return result;
     });
+  }
+
+  private async leadsEvent(au: any, eventId: string): Promise<boolean> {
+    if (!eventId) return false;
+    const event = await this.repos.event.load(au.churchId, eventId);
+    return !!event?.groupId && !!au.leaderGroupIds?.includes(event.groupId);
   }
 
   private canResolve(au: any): boolean {

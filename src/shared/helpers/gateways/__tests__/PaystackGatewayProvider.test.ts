@@ -67,6 +67,26 @@ describe("PaystackGatewayProvider", () => {
       expect(result.data.error).toBe("Abandoned");
     });
 
+    it("rejects a reference whose paid amount or currency differs from the donation", async () => {
+      mockedRequest.mockResolvedValue(ok({ status: "success", reference: "ref_4", amount: 100, currency: "NGN" }));
+      const cheap = await provider.processCharge(config, { id: "ref_4", amount: 10000, currency: "ngn" });
+      expect(cheap.success).toBe(false);
+      expect(cheap.data.error).toMatch(/amount/);
+      mockedRequest.mockResolvedValue(ok({ status: "success", reference: "ref_5", amount: 1000, currency: "NGN" }));
+      const wrongCurrency = await provider.processCharge(config, { id: "ref_5", amount: 10, currency: "usd" });
+      expect(wrongCurrency.success).toBe(false);
+    });
+
+    it("flags a reference that is already recorded so it isn't logged twice", async () => {
+      const repos = { donation: { loadByTransactionId: jest.fn().mockResolvedValue({ id: "DON1" }) } };
+      const data: any = { id: "ref_6", amount: 10 };
+      await provider.prepareCharge(config, data, repos);
+      expect(repos.donation.loadByTransactionId).toHaveBeenCalledWith("CHU1", "ref_6");
+      mockedRequest.mockResolvedValue(ok({ status: "success", reference: "ref_6", amount: 1000 }));
+      const result = await provider.processCharge(config, data);
+      expect(result.data.alreadyRecorded).toBe(true);
+    });
+
     it("charges a saved authorization in subunits", async () => {
       mockedRequest.mockResolvedValue(ok({ status: "success", reference: "ref_3" }));
       const data: any = { id: "AUTH_abc", amount: 12.5, currency: "ghs", person: { email: "a@b.com" } };
@@ -84,7 +104,7 @@ describe("PaystackGatewayProvider", () => {
   describe("createSubscription", () => {
     it("verifies the first gift, creates a plan and schedules the next charge", async () => {
       mockedRequest
-        .mockResolvedValueOnce(ok({ status: "success", reference: "ref_1", authorization: { authorization_code: "AUTH_1", reusable: true }, customer: { customer_code: "CUS_1" } }))
+        .mockResolvedValueOnce(ok({ status: "success", reference: "ref_1", amount: 2000, authorization: { authorization_code: "AUTH_1", reusable: true }, customer: { customer_code: "CUS_1" } }))
         .mockResolvedValueOnce(ok({ plan_code: "PLN_1" }))
         .mockResolvedValueOnce(ok({ subscription_code: "SUB_1", status: "active" }));
       const result = await provider.createSubscription(config, { id: "ref_1", amount: 20, currency: "ngn", interval: { interval: "month", interval_count: 1 }, billing_cycle_anchor: Date.now() });
@@ -111,7 +131,7 @@ describe("PaystackGatewayProvider", () => {
     });
 
     it("refuses non-reusable (mobile money) authorizations", async () => {
-      mockedRequest.mockResolvedValueOnce(ok({ status: "success", reference: "ref_1", authorization: { authorization_code: "AUTH_1", reusable: false, channel: "mobile_money" }, customer: { customer_code: "CUS_1" } }));
+      mockedRequest.mockResolvedValueOnce(ok({ status: "success", reference: "ref_1", amount: 2000, authorization: { authorization_code: "AUTH_1", reusable: false, channel: "mobile_money" }, customer: { customer_code: "CUS_1" } }));
       const result = await provider.createSubscription(config, { id: "ref_1", amount: 20, interval: { interval: "month", interval_count: 1 } });
       expect(result.success).toBe(false);
       expect(result.data.error).toMatch(/cannot be reused/);
@@ -119,7 +139,7 @@ describe("PaystackGatewayProvider", () => {
     });
 
     it("rejects intervals Paystack has no plan for", async () => {
-      mockedRequest.mockResolvedValueOnce(ok({ status: "success", reference: "ref_1", authorization: { authorization_code: "AUTH_1", reusable: true }, customer: { customer_code: "CUS_1" } }));
+      mockedRequest.mockResolvedValueOnce(ok({ status: "success", reference: "ref_1", amount: 2000, authorization: { authorization_code: "AUTH_1", reusable: true }, customer: { customer_code: "CUS_1" } }));
       const result = await provider.createSubscription(config, { id: "ref_1", amount: 20, interval: { interval: "week", interval_count: 2 } });
       expect(result.success).toBe(false);
       expect(result.data.error).toMatch(/2 week/);

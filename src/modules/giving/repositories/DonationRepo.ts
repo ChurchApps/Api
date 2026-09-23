@@ -73,6 +73,7 @@ export class DonationRepo {
   public async loadAll(churchId: string) {
     const rows = await getDb().selectFrom("donations").selectAll()
       .where("churchId", "=", churchId)
+      .where((eb) => eb.or([eb("status", "is", null), eb("status", "=", "complete")]))
       .orderBy("donationDate", "desc")
       .execute();
     return rows;
@@ -108,7 +109,7 @@ export class DonationRepo {
       FROM donations d
       LEFT JOIN fundDonations fd on fd.donationId = d.id
       LEFT JOIN funds f on f.id = fd.fundId
-      WHERE d.churchId = ${churchId} AND d.personId = ${personId} AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)
+      WHERE d.churchId = ${churchId} AND d.personId = ${personId} AND (d.status IS NULL OR d.status = 'complete') AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL)
       ORDER BY d.donationDate DESC`.execute(getDb());
     return result.rows;
   }
@@ -151,6 +152,7 @@ export class DonationRepo {
       INNER JOIN fundDonations fd on fd.donationId = d.id
       INNER JOIN funds f on f.id = fd.fundId
       WHERE d.churchId = ${churchId}
+        AND (d.status IS NULL OR d.status = 'complete')
         AND d.donationDate BETWEEN ${sDate} AND ${eDate}
         ${fundFilter}`.execute(getDb());
     const amounts = await sql<any>`
@@ -159,6 +161,7 @@ export class DonationRepo {
       INNER JOIN fundDonations fd on fd.donationId = d.id
       INNER JOIN funds f on f.id = fd.fundId
       WHERE d.churchId = ${churchId}
+        AND (d.status IS NULL OR d.status = 'complete')
         AND d.donationDate BETWEEN ${sDate} AND ${eDate}
         ${fundFilter}
       GROUP BY d.currency`.execute(getDb());
@@ -179,6 +182,7 @@ export class DonationRepo {
       INNER JOIN fundDonations fd on fd.donationId = d.id
       INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1
       WHERE d.churchId = ${churchId}
+        AND (d.status IS NULL OR d.status = 'complete')
         AND d.donationDate BETWEEN ${sDate} AND ${eDate}
       GROUP BY year(d.donationDate), week(d.donationDate, 0), f.name, d.currency
       ORDER BY year(d.donationDate), week(d.donationDate, 0), f.name`.execute(getDb());
@@ -192,6 +196,7 @@ export class DonationRepo {
       INNER JOIN fundDonations fd on fd.donationId = d.id
       INNER JOIN funds f on f.id = fd.fundId AND f.taxDeductible = 1
       WHERE d.churchId = ${churchId}
+        AND (d.status IS NULL OR d.status = 'complete')
         AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}`.execute(getDb());
     return result.rows;
   }

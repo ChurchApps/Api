@@ -11,6 +11,13 @@ const PAYSTACK_API = "https://api.paystack.co";
 const toSubunits = (amount: number) => Math.round(Number(amount) * 100);
 const fromSubunits = (amount: number) => Math.round(Number(amount || 0)) / 100;
 
+// A client-supplied reference only proves *a* payment; it must be for the amount and currency being recorded.
+export const paystackTxMismatch = (tx: any, amount: any, currency: any): string | null => {
+  if (Number(tx?.amount) !== toSubunits(amount)) return "Payment amount does not match the donation amount";
+  if (currency && tx?.currency && String(tx.currency).toLowerCase() !== String(currency).toLowerCase()) return "Payment currency does not match the donation currency";
+  return null;
+};
+
 // Local-card defaults per currency; church overrides come from flatRateCC/transFeeCC settings.
 const DEFAULT_FEES: Record<string, { percent: number; fixed: number; cap?: number; waiveBelow?: number }> = {
   ngn: { percent: 0.015, fixed: 100, cap: 2000, waiveBelow: 2500 },
@@ -114,10 +121,12 @@ export class PaystackGatewayProvider implements IGatewayProvider {
       if (tx?.status !== "success") {
         return { success: false, transactionId: "", data: { error: tx?.gateway_response || "Payment was not successful" } };
       }
+      const mismatch = donationData.paymentMethodId ? null : paystackTxMismatch(tx, donationData.amount, donationData.currency);
+      if (mismatch) return { success: false, transactionId: "", data: { error: mismatch } };
       return {
         success: true,
         transactionId: tx.reference,
-        data: { ...tx, status: "succeeded", saveCard: !!donationData.saveCard }
+        data: { ...tx, status: "succeeded", saveCard: !!donationData.saveCard, alreadyRecorded: !!donationData.alreadyRecorded }
       };
     } catch (e: any) {
       console.error("Paystack processCharge error:", this.errorMessage(e));
@@ -126,10 +135,14 @@ export class PaystackGatewayProvider implements IGatewayProvider {
   }
 
   // Saved methods arrive as AUTH_ codes in `id`; move them where processCharge expects them.
-  async prepareCharge(_config: GatewayConfig, donationData: any, _repos: any): Promise<void> {
+  async prepareCharge(config: GatewayConfig, donationData: any, repos: any): Promise<void> {
     if (donationData.id && !donationData.paymentMethodId && this.ownsPaymentMethodId(String(donationData.id))) {
       donationData.paymentMethodId = String(donationData.id);
       delete donationData.id;
+    }
+    // A reference already on file (replay, or the webhook got there first) must not log a second donation
+    if (!donationData.paymentMethodId && donationData.id) {
+      donationData.alreadyRecorded = !!(await repos.donation.loadByTransactionId(config.churchId, String(donationData.id)));
     }
   }
 
@@ -201,6 +214,8 @@ export class PaystackGatewayProvider implements IGatewayProvider {
       } else {
         initialTx = await this.api(config, "get", `/transaction/verify/${encodeURIComponent(subscriptionData.id || "")}`);
         if (initialTx?.status !== "success") return { success: false, subscriptionId: "", data: { error: initialTx?.gateway_response || "Payment was not successful" } };
+        const mismatch = paystackTxMismatch(initialTx, subscriptionData.amount, subscriptionData.currency);
+        if (mismatch) return { success: false, subscriptionId: "", data: { error: mismatch } };
         authorization = initialTx.authorization;
         customerCode = initialTx.customer?.customer_code;
       }
@@ -241,7 +256,7 @@ export class PaystackGatewayProvider implements IGatewayProvider {
       try { await repos.customer.save({ id: customerId, churchId: config.churchId, personId: person.id, provider: this.name }); } catch { /* exists */ }
     }
     const tx = result.data?.initialTx;
-    if (tx?.reference) {
+    if (tx?.reference && !(await repos.donation.loadByTransactionId(config.churchId, String(tx.reference)))) {
       try {
         await this.logDonation(config, config.churchId, { ...tx, person, funds: subscriptionData.funds, amount: subscriptionData.amount, notes: subscriptionData.notes }, repos, "complete");
       } catch (e) {
