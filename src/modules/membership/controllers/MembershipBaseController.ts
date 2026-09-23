@@ -19,4 +19,11 @@ export class MembershipBaseController extends BaseController {
     if (au.checkAccess(Permissions.forms.edit)) return true;
     return false;
   }
+
+  public async rolesInChurch(roleIds: string[], churchId: string): Promise<boolean> {
+    const ids = [...new Set(roleIds.filter((id) => !!id))];
+    if (ids.length === 0) return true;
+    const roles = await this.repos.role.loadByIds(ids);
+    return roles.length === ids.length && roles.every((r: any) => r.churchId === churchId);
+  }
 }

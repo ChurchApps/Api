@@ -89,6 +89,7 @@ export class RegistrationController extends ContentBaseController {
       const choices = data.selections || [];
       for (const c of choices) {
         if (!selMap.has(c.selectionId)) return this.json({ error: "Invalid selection" }, 400);
+        if (!RegistrationPricingHelper.isValidQuantity(c.quantity)) return this.json({ error: "Invalid quantity" }, 400);
       }
 
       // Server-authoritative pricing — client only sends ids/quantities
@@ -385,7 +386,10 @@ export class RegistrationController extends ContentBaseController {
       let choices: RegisterSelectionInput[] = null;
       if (Array.isArray(body.selections)) {
         choices = body.selections;
-        for (const c of choices) if (!selMap.has(c.selectionId)) return this.json({ error: "Invalid selection" }, 400);
+        for (const c of choices) {
+          if (!selMap.has(c.selectionId)) return this.json({ error: "Invalid selection" }, 400);
+          if (!RegistrationPricingHelper.isValidQuantity(c.quantity)) return this.json({ error: "Invalid quantity" }, 400);
+        }
         await this.repos.registrationSelectionChoice.deleteForRegistration(au.churchId, id);
         const choiceResult = await this.insertChoices(au.churchId, id, choices, selMap);
         if (!choiceResult.ok) return this.json({ error: "Selection is at capacity", status: "selection-full", selectionId: choiceResult.fullSelectionId }, 409);

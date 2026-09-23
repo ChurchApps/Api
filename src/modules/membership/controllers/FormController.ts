@@ -39,7 +39,7 @@ export class FormController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.formAccess(au, id, "view")) return this.json({}, 401);
+      if (!(await this.formAccess(au, id, "view"))) return this.json({}, 401);
       else return await this.repos.form.convertToModel(au.churchId, await this.repos.form.load(au.churchId, id));
     });
   }

@@ -8,8 +8,9 @@ export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/up")
   public async moveQuestionUp(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const formId = req?.query?.formId?.toString() || null;
-      if (!this.formAccess(au, formId)) return this.json({}, 401);
+      const question = await this.repos.question.load(au.churchId, id);
+      const formId = (question as any)?.formId || null;
+      if (!(await this.formAccess(au, formId))) return this.json({}, 401);
       return await this.repos.question.moveQuestionUp(au.churchId, id);
     });
   }
@@ -17,8 +18,9 @@ export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/down")
   public async moveQuestionDown(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const formId = req?.query?.formId?.toString() || null;
-      if (!this.formAccess(au, formId)) return this.json({}, 401);
+      const question = await this.repos.question.load(au.churchId, id);
+      const formId = (question as any)?.formId || null;
+      if (!(await this.formAccess(au, formId))) return this.json({}, 401);
       return await this.repos.question.moveQuestionDown(au.churchId, id);
     });
   }
@@ -36,7 +38,7 @@ export class QuestionController extends MembershipBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
-      if (!this.formAccess(au, formId, "view")) return this.json({}, 401);
+      if (!(await this.formAccess(au, formId, "view"))) return this.json({}, 401);
       else return this.repos.question.convertToModel(au.churchId, await this.repos.question.load(au.churchId, id));
     });
   }
@@ -45,7 +47,7 @@ export class QuestionController extends MembershipBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
-      if (!this.formAccess(au, formId, "view")) return this.json({}, 401);
+      if (!(await this.formAccess(au, formId, "view"))) return this.json({}, 401);
       else return this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
     });
   }

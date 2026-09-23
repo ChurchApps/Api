@@ -135,7 +135,7 @@ export class PaymentMethodController extends GivingBaseController {
         provider ? { provider } : { requiredCapability: "supportsVault" },
         this.repos.gateway
       ).catch((): null => null);
-      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || (personId === au.personId && await this.ownsPaymentMethod(au, gateway, paymentMethodId)));
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
       try {
         return await GatewayService.updateCard(gateway, paymentMethodId, cardData);
@@ -298,7 +298,7 @@ export class PaymentMethodController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, personId, bankData, customerId } = req.body;
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
-      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || (personId === au.personId && await this.ownsPaymentMethod(au, gateway, paymentMethodId, customerId)));
       if (!permission) return this.json({}, 401);
       try {
         return await GatewayService.updateBank(gateway, paymentMethodId, bankData, customerId);
@@ -383,6 +383,20 @@ export class PaymentMethodController extends GivingBaseController {
         }, e?.statusCode || 500);
       }
     });
+  }
+
+  private async ownsPaymentMethod(au: any, gateway: any, paymentMethodId: string, customerId?: string): Promise<boolean> {
+    if (!au.personId || !paymentMethodId) return false;
+    try {
+      let customer: any;
+      if (customerId) customer = await this.repos.customer.load(au.churchId, customerId);
+      else customer = (await this.repos.customer.loadByPersonAndProvider(au.churchId, au.personId, gateway.provider)) || (await this.repos.customer.loadByPersonId(au.churchId, au.personId));
+      if (!customer || customer.personId !== au.personId) return false;
+      return await GatewayService.verifyMethodOwnership(gateway, paymentMethodId, customer.id, this.repos);
+    } catch (e) {
+      console.error("Payment method ownership check failed:", e);
+      return false;
+    }
   }
 
 }

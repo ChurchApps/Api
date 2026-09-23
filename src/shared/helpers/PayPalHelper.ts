@@ -4,13 +4,19 @@ import { Donation, DonationBatch, EventLog, FundDonation } from "../../modules/g
 import { Environment } from "./Environment.js";
 
 export class PayPalHelper {
+  // Stages are lowercased serverless stage names ("prod"), not "production"
+  static isLive(): boolean {
+    const env = (Environment.apiEnv || "").toLowerCase();
+    return env === "prod" || env === "production";
+  }
+
   private static getClient(clientId: string, clientSecret: string): paypal.core.PayPalHttpClient {
-    const env = process.env.NODE_ENV === "production" ? new paypal.core.LiveEnvironment(clientId, clientSecret) : new paypal.core.SandboxEnvironment(clientId, clientSecret);
+    const env = PayPalHelper.isLive() ? new paypal.core.LiveEnvironment(clientId, clientSecret) : new paypal.core.SandboxEnvironment(clientId, clientSecret);
     return new paypal.core.PayPalHttpClient(env);
   }
 
   private static getBaseUrl(): string {
-    return Environment.apiEnv === "production" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+    return PayPalHelper.isLive() ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
   }
 
   private static async getAccessToken(clientId: string, clientSecret: string): Promise<string> {

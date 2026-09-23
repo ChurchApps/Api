@@ -12,11 +12,12 @@
         " FROM donations d",
         " INNER JOIN fundDonations fd on fd.donationId = d.id",
         " WHERE d.churchId=:churchId",
+        " AND (d.status IS NULL OR d.status = 'complete')",
         " AND d.personId IS NOT NULL",
         " AND d.donationDate BETWEEN :prevStart AND :prevEnd",
         " AND d.personId NOT IN (",
         "   SELECT d2.personId FROM donations d2",
-        "   WHERE d2.churchId=:churchId AND d2.personId IS NOT NULL AND d2.donationDate BETWEEN :currStart AND :currEnd",
+        "   WHERE d2.churchId=:churchId AND d2.personId IS NOT NULL AND (d2.status IS NULL OR d2.status = 'complete') AND d2.donationDate BETWEEN :currStart AND :currEnd",
         " )",
         " GROUP BY d.personId",
         " ORDER BY previousTotal DESC"

@@ -1,7 +1,7 @@
 import { Webhook, WebhookDelivery } from "../../modules/membership/models/index.js";
 import { WebhookSigner } from "./WebhookSigner.js";
 import { WebhookRetryPolicy } from "./WebhookRetryPolicy.js";
-import { UrlValidator } from "./UrlValidator.js";
+import { SafeHttp } from "./SafeHttp.js";
 import { MailchimpConnector } from "./MailchimpConnector.js";
 
 const REQUEST_TIMEOUT_MS = 10000;
@@ -42,25 +42,18 @@ export class WebhookDeliveryWorker {
         const result = await MailchimpConnector.deliver(webhook, delivery);
         status = result.status;
         responseBody = result.responseBody;
-      } else if (await UrlValidator.resolvesToPrivate(new URL(webhook.url).hostname)) {
-        responseBody = "Blocked: webhook URL resolves to a private address";
       } else {
         const signature = WebhookSigner.sign(webhook.secret, delivery.payload);
-        const res = await fetch(webhook.url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "User-Agent": "B1-Webhooks/1.0",
-            "X-B1-Event": delivery.event,
-            "X-B1-Delivery-Id": delivery.id,
-            "X-B1-Signature": signature,
-            "X-B1-Timestamp": Math.floor(Date.now() / 1000).toString()
-          },
-          body: delivery.payload,
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-        });
+        const res = await SafeHttp.post(webhook.url, {
+          "Content-Type": "application/json",
+          "User-Agent": "B1-Webhooks/1.0",
+          "X-B1-Event": delivery.event,
+          "X-B1-Delivery-Id": delivery.id,
+          "X-B1-Signature": signature,
+          "X-B1-Timestamp": Math.floor(Date.now() / 1000).toString()
+        }, delivery.payload, REQUEST_TIMEOUT_MS, MAX_RESPONSE_BODY);
         status = res.status;
-        responseBody = (await res.text()).slice(0, MAX_RESPONSE_BODY);
+        responseBody = res.body;
       }
     } catch (e: any) {
       responseBody = ("Request failed: " + (e?.message ?? String(e))).slice(0, MAX_RESPONSE_BODY);

@@ -13,6 +13,7 @@
         " INNER JOIN fundDonations fd on fd.donationId = d.id",
         " INNER JOIN funds f on f.id = fd.fundId",
         " WHERE d.churchId=:churchId",
+        " AND (d.status IS NULL OR d.status = 'complete')",
         " AND d.donationDate BETWEEN :startDate AND :endDate",
         " AND (:fundId='' OR fd.fundId = :fundId)",
         " GROUP BY STR_TO_DATE(concat(year(d.donationDate), ' ', week(d.donationDate, 0), ' Sunday'), '%X %V %W'), f.name",

@@ -8,6 +8,7 @@ import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund }
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { DunningHelper } from "../helpers/DunningHelper.js";
+import { DonationRequestGuard } from "../helpers/DonationRequestGuard.js";
 import Axios from "axios";
 import dayjs from "dayjs";
 
@@ -405,6 +406,9 @@ export class DonateController extends GivingBaseController {
 
       // Anonymous is enforced here, not on the client: the email is kept for the receipt, everything identifying is dropped.
       if (donationData.anonymous) donationData.person = { id: "", email: donationData.person?.email || "", name: "" };
+      else if (donationData.person) donationData.person.id = DonationRequestGuard.resolvePersonId(donationData.person.id, au, au.checkAccess(Permissions.donations.edit));
+      const fundError = DonationRequestGuard.validateFunds(donationData.amount, donationData.funds);
+      if (fundError) return this.json({ error: fundError }, 400);
 
       const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
       const normalizedCurrency = rawCurrency.toLowerCase();
@@ -421,7 +425,7 @@ export class DonateController extends GivingBaseController {
         }
 
         // Providers without a webhook confirmation flow log the donation immediately.
-        if (GatewayService.logsDonationsImmediately(gateway)) {
+        if (GatewayService.logsDonationsImmediately(gateway) && !chargeResult.data?.alreadyRecorded) {
           try {
             await GatewayService.logEvent(gateway, churchId, chargeResult.data, chargeResult.data, this.repos);
             const logData = {
@@ -466,6 +470,11 @@ export class DonateController extends GivingBaseController {
       if (!provider && !gatewayId) {
         return this.json({ error: "Either provider or gatewayId is required" }, 400);
       }
+
+      if (!person) return this.json({ error: "person is required" }, 400);
+      person.id = DonationRequestGuard.resolvePersonId(person.id, au, au.checkAccess(Permissions.donations.edit));
+      const fundError = DonationRequestGuard.validateFunds(amount, funds);
+      if (fundError) return this.json({ error: fundError }, 400);
 
       const gateway = await this.getGateway(churchId, provider, gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);

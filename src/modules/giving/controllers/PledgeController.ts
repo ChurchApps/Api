@@ -63,9 +63,10 @@ export class PledgeController extends GivingBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const personId = req.query?.personId?.toString() || "";
-      if (!au.checkAccess(Permissions.donations.view) && personId !== au.personId) return this.json({}, 401);
+      const canView = au.checkAccess(Permissions.donations.view);
+      if (!canView && (!personId || personId !== au.personId)) return this.json({}, 401);
       let result;
-      if (req.query.campaignId !== undefined) result = await this.repos.pledge.loadByCampaignId(au.churchId, req.query.campaignId.toString());
+      if (canView && req.query.campaignId !== undefined) result = await this.repos.pledge.loadByCampaignId(au.churchId, req.query.campaignId.toString());
       else if (personId) result = await this.repos.pledge.loadByPersonId(au.churchId, personId);
       else result = await this.repos.pledge.loadAll(au.churchId);
       return this.repos.pledge.convertAllToModel(au.churchId, result as any[]);

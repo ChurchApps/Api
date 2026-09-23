@@ -11,6 +11,17 @@ const selections = [
   { id: "s2", price: null }
 ] as any[];
 
+describe("RegistrationPricingHelper.isValidQuantity", () => {
+  it("accepts omitted or positive integer quantities", () => {
+    expect(RegistrationPricingHelper.isValidQuantity(undefined)).toBe(true);
+    expect(RegistrationPricingHelper.isValidQuantity(3)).toBe(true);
+  });
+
+  it("rejects zero, negative, fractional and non-numeric quantities", () => {
+    for (const q of [0, -1, 1.5, "2", NaN]) expect(RegistrationPricingHelper.isValidQuantity(q)).toBe(false);
+  });
+});
+
 describe("RegistrationPricingHelper.computeTotal", () => {
   it("sums typed members and quantity-weighted selections (DECIMAL strings coerced)", () => {
     const members = [{ registrationTypeId: "t1" }, { registrationTypeId: "t2" }];

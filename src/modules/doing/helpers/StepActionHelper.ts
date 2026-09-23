@@ -3,6 +3,7 @@ import { Repos } from "../repositories/index.js";
 import { Task, WorkflowStep, WorkflowStepAction } from "../models/index.js";
 import { getMembershipModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
 import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
+import { SafeHttp } from "../../../shared/webhooks/SafeHttp.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
 
 interface HistoryEntry {
@@ -129,17 +130,13 @@ export class StepActionHelper {
       console.warn(`[StepActionHelper] webhook URL rejected (${error}): ${url}`);
       return;
     }
-    await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cardId: task.id,
-        workflowId: task.workflowId,
-        stepId: task.stepId,
-        personId: task.associatedWithId,
-        personName: task.associatedWithLabel
-      })
-    });
+    await SafeHttp.post(url, { "Content-Type": "application/json" }, JSON.stringify({
+      cardId: task.id,
+      workflowId: task.workflowId,
+      stepId: task.stepId,
+      personId: task.associatedWithId,
+      personName: task.associatedWithLabel
+    }), 10000, 0);
     this.appendHistory(task, "Webhook sent");
   }
 

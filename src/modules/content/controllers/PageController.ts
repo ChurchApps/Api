@@ -183,11 +183,14 @@ export class PageController2 extends ContentBaseController {
       else {
         const promises: Promise<Page>[] = [];
         req.body.page.siteId = req.body.page.siteId || "";
+        req.body.page.churchId = au.churchId;
         promises.push(this.repos.page.save(req.body.page));
-        req.body.sections.forEach((section) => {
+        (req.body.sections || []).forEach((section) => {
+          section.churchId = au.churchId;
           promises.push(this.repos.section.save(section));
         });
-        req.body.elements.forEach((element) => {
+        (req.body.elements || []).forEach((element) => {
+          element.churchId = au.churchId;
           promises.push(this.repos.element.save(element));
         });
         const result = await Promise.all(promises);

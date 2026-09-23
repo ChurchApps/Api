@@ -319,7 +319,10 @@ export class ChurchController extends MembershipBaseController {
         return res.status(400).json({ errors: validationErrors.array() });
       }
 
-      let church = req.body;
+      let church = { ...req.body } as any;
+      // A body id would route ChurchRepo.save to update and hand the caller someone else's church
+      delete church.id;
+      delete church.archivedDate;
       const appName = church.appName;
 
       // Idempotency guard: double-submits sail past subdomain validation because selectSubDomain auto-increments (issue #957)

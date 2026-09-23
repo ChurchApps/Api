@@ -13,6 +13,7 @@
         " INNER JOIN fundDonations fd on fd.donationId = d.id",
         " INNER JOIN funds f on f.id = fd.fundId",
         " WHERE d.churchId=:churchId",
+        " AND (d.status IS NULL OR d.status = 'complete')",
         " AND d.donationDate BETWEEN :startDate AND :endDate",
         " AND (:fundId='' OR fd.fundId = :fundId)",
         " GROUP BY MAKEDATE(YEAR(d.donationDate), 1) + INTERVAL (QUARTER(d.donationDate) - 1) * 3 MONTH, f.name",

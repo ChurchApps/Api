@@ -116,6 +116,7 @@ export class FundDonationRepo {
       FROM fundDonations fd
       INNER JOIN donations d ON d.id = fd.donationId
       WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
+        AND (d.status IS NULL OR d.status = 'complete')
         ${dateFilter}
       GROUP BY d.currency`.execute(getDb());
     return result.rows.map((r: any) => ({ currency: r.currency as string | null, amount: Number(r.amount) }));
@@ -151,6 +152,7 @@ export class FundDonationRepo {
       .innerJoin("donations as d", "d.id", "fd.donationId")
       .where("fd.churchId", "=", churchId)
       .where("fd.fundId", "=", fundId)
+      .where((eb: any) => eb.or([eb("d.status", "is", null), eb("d.status", "=", "complete")]))
       .select((eb) => [
         eb.fn.sum("fd.amount").as("totalAmount"),
         eb.fn.count("fd.donationId").distinct().as("donationCount")

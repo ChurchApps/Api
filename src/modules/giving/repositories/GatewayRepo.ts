@@ -13,8 +13,8 @@ export class GatewayRepo {
 
   private async create(gateway: Gateway): Promise<Gateway> {
     gateway.id = UniqueIdHelper.shortId();
-    // Enforce a single record per church (for now)
-    await getDb().deleteFrom("gateways").where("churchId", "=", gateway.churchId).where("id", "<>", gateway.id).execute();
+    // One record per provider per church; other providers' gateways must survive
+    await getDb().deleteFrom("gateways").where("churchId", "=", gateway.churchId).where("provider", "=", gateway.provider).where("id", "<>", gateway.id).execute();
     const settings = gateway.settings ? JSON.stringify(gateway.settings) : null;
     await getDb().insertInto("gateways").values({
       id: gateway.id,
