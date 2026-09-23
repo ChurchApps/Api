@@ -42,6 +42,11 @@ export class AnswerRepo {
     return getDb().selectFrom("answers").selectAll().where("churchId", "=", churchId).where("formSubmissionId", "=", formSubmissionId).execute();
   }
 
+  public async loadForFormSubmissions(churchId: string, formSubmissionIds: string[]) {
+    if (formSubmissionIds.length === 0) return [];
+    return getDb().selectFrom("answers").selectAll().where("churchId", "=", churchId).where("formSubmissionId", "in", formSubmissionIds).execute();
+  }
+
   public async load(churchId: string, id: string) {
     return (await getDb().selectFrom("answers").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }

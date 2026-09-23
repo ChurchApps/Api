@@ -28,14 +28,16 @@ export class GradePromotionHelper {
     const lastRunByChurch = new Map<string, Setting>();
     lastRunSettings.forEach((s) => lastRunByChurch.set(s.churchId, s));
 
-    const now = new Date();
-    const year = String(now.getFullYear());
-    const todayMMDD = `${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+    const churches = (await repos.church.loadByIds([...new Set(dateSettings.map((s) => s.churchId))])) as any[];
+    const timeZoneByChurch = new Map<string, string>();
+    churches.forEach((c) => timeZoneByChurch.set(c.id, c.timeZone));
 
+    const now = new Date();
     let promoted = 0;
     for (const setting of dateSettings) {
       const mmdd = (setting.value || "").trim();
       if (!/^\d{2}-\d{2}$/.test(mmdd)) continue;
+      const { year, todayMMDD } = this.localDate(now, timeZoneByChurch.get(setting.churchId));
       const lastRun = lastRunByChurch.get(setting.churchId);
       if (lastRun?.value === year) continue;
       // >= so a day missed by a downed timer still self-heals on the next run this year.
@@ -55,5 +57,15 @@ export class GradePromotionHelper {
       }
     }
     return { promoted };
+  }
+
+  public static localDate(now: Date, timeZone: string | undefined): { year: string; todayMMDD: string } {
+    try {
+      const parts: Record<string, string> = {};
+      new Intl.DateTimeFormat("en-US", { timeZone: timeZone || "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now).forEach((p) => { parts[p.type] = p.value; });
+      return { year: parts.year, todayMMDD: `${parts.month}-${parts.day}` };
+    } catch {
+      return { year: String(now.getUTCFullYear()), todayMMDD: `${pad2(now.getUTCMonth() + 1)}-${pad2(now.getUTCDate())}` };
+    }
   }
 }

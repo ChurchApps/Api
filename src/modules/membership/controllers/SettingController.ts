@@ -84,7 +84,7 @@ export class MembershipSettingController extends MembershipBaseController {
   }
 
   private async saveSetting(setting: Setting) {
-    if (setting.value.startsWith("data:image/")) setting = await this.saveImage(setting);
+    if (setting.value?.startsWith("data:image/")) setting = await this.saveImage(setting);
     setting = await this.repos.setting.save(setting);
     return setting;
   }

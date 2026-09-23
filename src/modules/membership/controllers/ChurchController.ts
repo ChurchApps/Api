@@ -24,8 +24,7 @@ export class ChurchController extends MembershipBaseController {
   public async loadAll(req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
-      let term: string = req.query.term.toString();
-      if (term === null) term = "";
+      const term = req.query.term?.toString() ?? "";
       const data = await this.repos.church.search(term, true);
       const churches = this.repos.church.convertAllToModel(data);
       return churches;
@@ -248,6 +247,7 @@ export class ChurchController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       else {
         const church = await this.repos.church.loadById(id);
+        if (!church) return this.json({}, 404);
         if (req.body.archived) church.archivedDate = new Date();
         else church.archivedDate = null;
         await this.repos.church.save(church);
@@ -262,44 +262,36 @@ export class ChurchController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       else {
         const allErrors: string[] = [];
-        let churches: Church[] = req.body;
-        const promises: Promise<any>[] = [];
-        churches.forEach((church) => {
+        const churches: Church[] = [];
+        for (const church of req.body) {
           if (church.id !== au.churchId) {
             allErrors.push("Unauthorized access to church data");
-          } else {
-            const p = ChurchController.validateSave(church, this.repos).then((errors) => {
-              if (errors.length === 0) {
-                promises.push(
-                  this.repos.church.save(church).then(async (ch) => {
-                    await GeoHelper.updateChurchAddress(ch);
-                    return ch;
-                  })
-                );
-              } else allErrors.push(...errors);
-            });
-            promises.push(p);
+            continue;
           }
-        });
-        churches = await Promise.all(promises);
+          const errors = await ChurchController.validateSave(church, this.repos);
+          if (errors.length > 0) {
+            allErrors.push(...errors);
+            continue;
+          }
+          const saved = await this.repos.church.save(church);
+          await GeoHelper.updateChurchAddress(saved);
+          churches.push(saved);
+        }
         if (allErrors.length > 0) return this.json({ errors: allErrors }, 401);
         else return this.json(churches, 200);
       }
     });
   }
 
-  async validateRegister(church: Church, au: AuthenticatedUser) {
+  async validateRegister(church: Church, _au: AuthenticatedUser) {
     const result: string[] = [];
     // Verify subdomain isn't taken
     if (church.subDomain) {
       if (/^([a-z0-9]{1,99})$/.test(church.subDomain) === false) result.push("Please enter only lower case letters and numbers for the subdomain.  Example: firstchurch");
       else {
         const c = await this.repos.church.loadBySubDomain(church.subDomain);
-        if (c !== null) {
-          c.subDomain = c.subDomain + "2";
-          // result.push("Subdomain unavailable");
-          this.validateRegister(church, au);
-        } else {
+        if (c !== null) result.push("Subdomain unavailable");
+        else {
           // Site subdomains share the church namespace; selectSubDomain avoids them, this is the backstop.
           const s = await this.repos.site.loadBySubDomain(church.subDomain);
           if (s) result.push("Subdomain unavailable");

@@ -13,9 +13,9 @@ export class GroupController extends MembershipBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const campusId = req.query.campusId.toString();
-      const serviceId = req.query.serviceId.toString();
-      const serviceTimeId = req.query.serviceTimeId.toString();
+      const campusId = req.query.campusId?.toString() ?? "";
+      const serviceId = req.query.serviceId?.toString() ?? "";
+      const serviceTimeId = req.query.serviceTimeId?.toString() ?? "";
       return this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.search(au.churchId, campusId, serviceId, serviceTimeId)) as any[]);
     });
   }
@@ -239,6 +239,7 @@ export class GroupController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.groups.edit)) return this.json({}, 401);
       else {
         const group: Group = await this.repos.group.load(au.churchId, id);
+        if (!group) return this.json({}, 404);
         if ((group.tags || "").indexOf("ministry") > -1) {
           const AllTeams = (await this.repos.group.loadByTag(au.churchId, "team")) as any[];
           const ministryTeams = ArrayHelper.getAll(AllTeams, "categoryName", id);
