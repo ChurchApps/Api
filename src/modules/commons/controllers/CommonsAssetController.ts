@@ -1,4 +1,5 @@
 import { controller, httpGet, httpPost, httpPut } from "inversify-express-utils";
+import { CommonsMauticHelper } from "../helpers/CommonsMauticHelper.js";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
@@ -127,6 +128,7 @@ export class CommonsAssetController extends CommonsBaseController {
       if (!asset) return this.json({}, 404);
       const saved = !!req.body.saved;
       await this.repos.rating.setSaved(asset.id || "", au.id, saved);
+      if (saved) void CommonsMauticHelper.tagUser(au.id, "wc-saved-song");
       return { saved };
     });
   }
