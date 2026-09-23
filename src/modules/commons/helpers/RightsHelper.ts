@@ -13,6 +13,25 @@ const SA_RECORD = "Share alike: a recording carries the same license";
 const NO_DERIVATIVES = "No derivatives: no arrangements, translations, or transposed charts may be distributed";
 const UNKNOWN = "License not recognised";
 const NO_RIGHTS = "No rights recorded";
+const KEEP_NOTICES = "Credit the writer and keep the original notices";
+const NON_PROFIT = "Non-profit use only";
+const INTERNAL_ARRANGE = "Internal arrangements only. Do not change lyrics or melody. Translation needs the writer.";
+
+// Writer-specific grants. Mirrors the custom rows of WorshipCommons/src/licenses.json (same flags, same
+// condition text as src/rights.ts). Ids are case-sensitive, like the song.json values they match.
+// ponytail: a literal table — read licenses.json from the content repo if these outgrow a screen.
+interface CustomGrant { label: string; url: string; attributionRequired: boolean; nonCommercial: boolean; derivativesAllowed: boolean; ccliReport: boolean; notice: string }
+export const CUSTOM_GRANTS: Record<string, CustomGrant> = {
+  "larry-holder": {
+    label: "Custom — Larry Holder Music",
+    url: "https://larryholdermusic.org/copyright.html",
+    attributionRequired: true,
+    nonCommercial: true,
+    derivativesAllowed: false,
+    ccliReport: false,
+    notice: "Non-profit church use; keep the original credits."
+  }
+};
 
 // project/print for these never needs a CCLI report; anything else is assumed to
 const FREE = /^(PD|CC0|WC|CC-BY)/i;
@@ -42,6 +61,15 @@ export class RightsHelper {
       if (up.includes("-ND")) m.arrange = { allowed: false, conditions: [NO_DERIVATIVES] };
       return m;
     }
+    const custom = CUSTOM_GRANTS[id];
+    if (custom) {
+      const cond: string[] = [];
+      if (custom.attributionRequired) cond.push(KEEP_NOTICES);
+      if (custom.nonCommercial) cond.push(NON_PROFIT);
+      const m = all(true, ...cond);
+      if (!custom.derivativesAllowed) m.arrange.conditions.push(INTERNAL_ARRANGE);
+      return m;
+    }
     return all(false, UNKNOWN);
   }
 
@@ -57,7 +85,7 @@ export class RightsHelper {
   static ccliReport(layers: (RightsLayer | null | undefined)[], fallbackLicense?: string): boolean {
     const ids = this.licenses(layers, fallbackLicense);
     if (!ids.length) return true;
-    return !ids.every((l) => FREE.test(l) || l === "larry-holder");
+    return !ids.every((l) => FREE.test(l) || CUSTOM_GRANTS[l]?.ccliReport === false);
   }
 
   /** The one-line notice printed under a chart when the package has no attribution.txt. */
@@ -67,6 +95,8 @@ export class RightsHelper {
     if (up === "CC0") return "Released to the public domain under CC0. Free for every use.";
     if (up === "WC") return `WorshipCommons License${version ? ` ${version}` : ""}: free for worship use; not to be monetized.`;
     if (up.startsWith("CC-BY")) return `Creative Commons ${up.replace(/^CC-/, "").replace(/-/g, " ")}${version ? ` ${version}` : ""}: credit the writer and link the license.`;
+    const custom = CUSTOM_GRANTS[license];
+    if (custom) return `${custom.label}. ${custom.notice} Full terms: ${custom.url}`;
     return "License not recognised.";
   }
 
