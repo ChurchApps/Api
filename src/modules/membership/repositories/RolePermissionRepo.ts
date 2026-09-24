@@ -155,7 +155,7 @@ export class RolePermissionRepo {
   }
 
   public async loadUserPermissionInChurch(userId: string, churchId: string) {
-    const rawResult = await sql`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roleMembers rm INNER JOIN roles r ON r.id=rm.roleId INNER JOIN rolePermissions rp ON (rp.roleId=r.id OR (rp.roleId IS NULL AND rp.churchId=rm.churchId)) LEFT JOIN churches c ON c.id=r.churchId WHERE rm.userId=${userId} AND rm.churchId=${churchId} GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action`.execute(getDb());
+    const rawResult = await sql`SELECT c.name AS churchName, r.churchId, c.subDomain, rp.apiName, rp.contentType, rp.contentId, rp.action, c.archivedDate, c.address1, c.address2, c.city, c.state, c.zip, c.country FROM roleMembers rm INNER JOIN roles r ON r.id=rm.roleId INNER JOIN rolePermissions rp ON (rp.roleId=r.id OR (rp.roleId IS NULL AND rp.churchId=rm.churchId)) LEFT JOIN churches c ON c.id=r.churchId WHERE rm.userId=${userId} AND rm.churchId=${churchId} AND c.archivedDate IS NULL GROUP BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action ORDER BY c.name, r.churchId, rp.apiName, rp.contentType, rp.contentId, rp.action`.execute(getDb());
     const data = rawResult.rows as any[];
 
     let result: LoginUserChurch = null;

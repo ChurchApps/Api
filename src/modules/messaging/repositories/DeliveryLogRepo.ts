@@ -71,6 +71,17 @@ export class DeliveryLogRepo {
       .execute();
   }
 
+  public async countEmailsSince(churchIds: string[], since: Date): Promise<number> {
+    if (churchIds.length === 0) return 0;
+    const row = await getDb().selectFrom("deliveryLogs")
+      .select((eb) => eb.fn.countAll<number>().as("cnt"))
+      .where("churchId", "in", churchIds)
+      .where("deliveryMethod", "=", "email")
+      .where("attemptTime", ">=", DateHelper.toMysqlDate(since) as any)
+      .executeTakeFirst();
+    return Number(row?.cnt ?? 0);
+  }
+
   public async delete(churchId: string, id: string) {
     await getDb().deleteFrom("deliveryLogs").where("id", "=", id).where("churchId", "=", churchId).execute();
   }

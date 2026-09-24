@@ -5,11 +5,9 @@ import { EmailTemplate, DeliveryLog } from "../models/index.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
-
-// Stopgap kill switch for the 2026-09-24 SES spam abuse; removed by the permanent fix
-const SEND_DISABLED = true;
 
 interface GroupMemberEmailDetail {
   personId: string;
@@ -78,7 +76,6 @@ export class EmailTemplateController extends MessagingBaseController {
   @httpPost("/send")
   public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (SEND_DISABLED) return this.json({ error: "Group email sending is temporarily disabled." }, 503);
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const { subject, htmlContent, groupId, personIds } = req.body;
       if (!subject || !htmlContent) return this.json({ error: "subject and htmlContent are required" }, 400);
@@ -101,6 +98,7 @@ export class EmailTemplateController extends MessagingBaseController {
 
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
       if (eligible.length === 0) return this.json({ error: "No eligible recipients with email addresses" }, 400);
+      if (eligible.length > await ChurchEmailLimiter.remaining(au.churchId)) return this.json({ error: "Daily email limit reached for this church. Contact support to raise it." }, 429);
 
       let successCount = 0;
       let failCount = 0;
