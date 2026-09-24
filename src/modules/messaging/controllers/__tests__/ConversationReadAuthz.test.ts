@@ -41,6 +41,7 @@ function repos(opts: any = {}) {
       loadByIds: jest.fn(async () => opts.byIds ?? []),
       loadForContent: jest.fn(async () => opts.forContent ?? []),
       loadCurrent: jest.fn(async () => opts.current ?? null),
+      loadPosts: jest.fn(async () => []),
       save: jest.fn(async (c: any) => ({ ...c, id: c.id || "new1" })),
       updateStats: jest.fn(async () => undefined),
       convertToModel: (c: any) => c,
@@ -189,5 +190,39 @@ describe("ConnectionController.save on the host room", () => {
     const r = repos({ byIdOnly: groupConv });
     expect((await (attach(new ConnectionController(), r, NON_MEMBER) as any).save({ body: [{ conversationId: "grp1", socketId: "s1" }] }, {})).status).toBe(401);
     expect(r.connection.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("cross-church and ownership gates", () => {
+  const otherChurchNote = { id: "note1", churchId: "c2", contentType: "person", contentId: "pv1", allowAnonymousPosts: false, visibility: "hidden" };
+  const NOTES_STAFF = au({ access: ["peopleEdit"] });
+
+  it("401s another church's person-note conversation even with people.edit", async () => {
+    const r = repos({ byId: otherChurchNote });
+    expect((await (attach(new ConversationController(), r, NOTES_STAFF) as any).loadById("c2", "note1", {}, {})).status).toBe(401);
+  });
+
+  it("401s listing another church's person notes by content", async () => {
+    const r = repos({ forContent: [otherChurchNote] });
+    expect((await (attach(new ConversationController(), r, NOTES_STAFF) as any).loadByContent("c2", "person", "pv1", {}, {})).status).toBe(401);
+  });
+
+  it("401s /posts/group for a non-member", async () => {
+    const r = repos();
+    expect((await (attach(new ConversationController(), r, NON_MEMBER) as any).getPostsForGroup("g1", {}, {})).status).toBe(401);
+    expect(r.conversation.loadPosts).not.toHaveBeenCalled();
+  });
+
+  it("401s a member rewriting an existing DM conversation", async () => {
+    const r = repos({ byId: dmConv });
+    const result = await (attach(new ConversationController(), r, MEMBER) as any).save({ body: [{ id: "dm1", contentType: "group", contentId: "g1", groupId: "g1" }] }, {});
+    expect(result.status).toBe(401);
+    expect(r.conversation.save).not.toHaveBeenCalled();
+  });
+
+  it("forces the connection personId to the caller", async () => {
+    const r = repos({ byIdOnly: groupConv });
+    await (attach(new ConnectionController(), r, MEMBER) as any).save({ body: [{ conversationId: "grp1", socketId: "s1", personId: "pVictim" }] }, {});
+    expect(r.connection.save).toHaveBeenCalledWith(expect.objectContaining({ personId: "p1" }));
   });
 });

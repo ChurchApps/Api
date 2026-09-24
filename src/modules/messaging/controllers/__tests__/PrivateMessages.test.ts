@@ -34,6 +34,7 @@ function build(opts: any = {}) {
       loadByPersonId: jest.fn(async () => opts.byPerson ?? []),
       loadExisting: jest.fn(async () => opts.existing ?? null),
       loadById: jest.fn(async () => opts.byId ?? null),
+      loadByConversationId: jest.fn(async () => opts.byConversation ?? null),
       save: jest.fn(async (pm: any) => ({ ...pm, id: pm.id || "pmNew" })),
       markAllRead: jest.fn(async () => undefined)
     },
@@ -41,7 +42,8 @@ function build(opts: any = {}) {
       markPrivateMessageRead: jest.fn(async () => undefined),
       markPrivateMessagesRead: jest.fn(async () => undefined)
     },
-    message: { loadByIds: jest.fn(async () => opts.messages ?? [{ id: "m1", content: "hello" }]) }
+    message: { loadByIds: jest.fn(async () => opts.messages ?? [{ id: "m1", content: "hello" }]) },
+    conversation: { loadById: jest.fn(async () => (opts.conv === undefined ? { id: "cvNew", churchId: "c1", contentType: "privateMessage" } : opts.conv)) }
   };
   const controller: any = new PrivateMessageController();
   controller.repos = repos;
@@ -118,6 +120,28 @@ describe("PrivateMessageController.save", () => {
     expect(repos.privateMessage.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", fromPersonId: "pMe", toPersonId: "pOther", conversationId: "cvNew" }));
     expect(result[0].id).toBe("pmNew");
     expect(notifyUser).not.toHaveBeenCalled();
+  });
+
+  it("ignores a client-supplied id and notifyPersonId", async () => {
+    const { controller, repos } = build({ existing: null });
+    await controller.save({ body: [{ id: "pmVictim", notifyPersonId: "pOther", toPersonId: "pOther", conversationId: "cvNew" }] }, {});
+    const saved = repos.privateMessage.save.mock.calls[0][0];
+    expect(saved.id).not.toBe("pmVictim");
+    expect(saved.notifyPersonId).toBeUndefined();
+  });
+
+  it("401s when the conversation is not a private-message thread", async () => {
+    const { controller, repos } = build({ existing: null, conv: { id: "cvNote", churchId: "c1", contentType: "person" } });
+    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNote" }] }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.privateMessage.save).not.toHaveBeenCalled();
+  });
+
+  it("401s when the conversation already belongs to another pair", async () => {
+    const { controller, repos } = build({ existing: null, byConversation: pmRow({ conversationId: "cvNew" }) });
+    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.privateMessage.save).not.toHaveBeenCalled();
   });
 
   it("403s ageRestricted before touching the repo", async () => {

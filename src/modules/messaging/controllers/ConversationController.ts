@@ -131,7 +131,7 @@ export class ConversationController extends MessagingBaseController {
       if (!this.canReadContent(this.authUser(), contentType, contentId)) return this.json([], 401) as any;
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
       const result = this.repos.conversation.convertAllToModel(data as any[]);
-      if (!this.isPersonNote(contentType) && !this.isSameChurch(this.authUser(), churchId) && result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
+      if (!this.isSameChurch(this.authUser(), churchId) && result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
       return result;
     }) as any;
   }
@@ -152,6 +152,14 @@ export class ConversationController extends MessagingBaseController {
   public async save(req: express.Request<{}, {}, Conversation[]>, res: express.Response): Promise<Conversation[]> {
     return this.actionWrapper(req, res, async (au) => {
       for (const conversation of req.body) {
+        if (conversation.id) {
+          const existing = await this.repos.conversation.loadById(au.churchId, conversation.id);
+          if (!existing) return this.json({}, 401);
+          conversation.contentType = existing.contentType;
+          conversation.contentId = existing.contentId;
+          const isLeader = this.isGroupFeed(existing.contentType) && !!au.leaderGroupIds?.includes(existing.contentId);
+          if (!this.isPersonNote(existing.contentType) && !isLeader && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+        }
         if (this.isPersonNote(conversation.contentType) && !this.canViewPersonNotes(au, conversation.contentType)) return this.json({}, 401);
         // A group feed row is seeded lazily by the first poster, so seeding needs the same rights as posting.
         if (this.isGroupFeed(conversation.contentType) && !(await this.canPostToGroupFeed(au, conversation.contentType, conversation.contentId))) return this.json({}, 401);
@@ -182,6 +190,7 @@ export class ConversationController extends MessagingBaseController {
   @httpGet("/posts/group/:groupId")
   public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!this.canReadContent(au, "group", groupId)) return this.json([], 401);
       const result = await this.repos.conversation.loadPosts(au.churchId, [groupId]);
       if (result && Array.isArray(result)) {
         await this.appendMessages(result, au.churchId);

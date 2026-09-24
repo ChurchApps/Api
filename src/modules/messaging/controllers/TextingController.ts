@@ -28,6 +28,7 @@ export class TextingController extends MessagingBaseController {
   @httpGet("/providers")
   public async getProviders(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send) && !au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const providers = await this.repos.textingProvider.loadByChurchId(au.churchId);
       const result = this.repos.textingProvider.convertAllToModel(providers as any[]);
       // Never return raw credentials to the frontend
@@ -99,6 +100,7 @@ export class TextingController extends MessagingBaseController {
   @httpGet("/preview/:groupId")
   public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const members = await this.getGroupMemberDetails(au.churchId, groupId, au.jwt);
       const { eligible, optedOut, noPhone } = this.categorizeRecipients(members);
       return {
@@ -259,6 +261,7 @@ export class TextingController extends MessagingBaseController {
   @httpGet("/sent")
   public async getSentTexts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const data = await this.repos.sentText.loadByChurchId(au.churchId);
       return this.repos.sentText.convertAllToModel(data as any[]);
     });
@@ -267,10 +270,11 @@ export class TextingController extends MessagingBaseController {
   @httpGet("/sent/:id/details")
   public async getSentTextDetails(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const row = await this.repos.sentText.loadById(au.churchId, id);
       if (!row) return this.json({ error: "Not found" }, 404);
       const sentText = this.repos.sentText.convertToModel(row);
-      const logRows = await this.repos.deliveryLog.loadByContent("sentText", id);
+      const logRows = await this.repos.deliveryLog.loadByContent(au.churchId, "sentText", id);
       const deliveryLogs = this.repos.deliveryLog.convertAllToModel(logRows as any[]);
       return { sentText, deliveryLogs };
     });

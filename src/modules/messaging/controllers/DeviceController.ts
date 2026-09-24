@@ -131,6 +131,7 @@ export class DeviceController extends MessagingBaseController {
   public async loadById(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Device> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.device.loadById(au.churchId, id);
+      if (data?.personId !== au.personId && !au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       return this.repos.device.convertToModel(au.churchId, data);
     }) as any;
   }
@@ -139,10 +140,18 @@ export class DeviceController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Device[]>, res: express.Response): Promise<Device[]> {
     return this.actionWrapper(req, res, async (au) => {
+      const ownerById = new Map<string, string>();
+      for (const device of req.body) {
+        if (!device.id) continue;
+        const existing = await this.repos.device.loadById(au.churchId, device.id);
+        if (!existing) return this.json({}, 401);
+        if (existing.personId !== au.personId && !au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
+        ownerById.set(device.id, existing.personId || au.personId);
+      }
       const promises: Promise<Device>[] = [];
       req.body.forEach((device) => {
         device.churchId = au.churchId;
-        device.personId = au.personId;
+        device.personId = device.id ? ownerById.get(device.id) : au.personId;
         device.lastActiveDate = new Date();
         if (!device.registrationDate) device.registrationDate = new Date();
         promises.push(this.repos.device.save(device));

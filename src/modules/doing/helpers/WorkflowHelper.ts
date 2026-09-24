@@ -155,6 +155,7 @@ export class WorkflowHelper {
     const repos = await this.getRepos(repositories);
     if (routeId) {
       const route = (await repos.workflowStepRoute.load(task.churchId || "", routeId)) as WorkflowStepRoute;
+      if (route && route.stepId !== task.stepId) throw new Error("Route does not belong to this card's step");
       if (route && route.targetWorkflowId && route.targetWorkflowId !== task.workflowId) {
         return await this.handOffToWorkflow(task, route.targetWorkflowId, repos);
       }

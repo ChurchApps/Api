@@ -26,6 +26,9 @@ export class PlanItemTimeController extends DoingBaseController {
       for (const pit of req.body) {
         const planItem: any = await this.repos.planItem.load(au.churchId, pit.planItemId || "");
         if (!planItem || !await PlanAuth.canEditPlan(au, planItem.planId)) return this.json({}, 401);
+        const existing: any = pit.id ? await this.repos.planItemTime.load(au.churchId, pit.id) : null;
+        const existingItem: any = existing ? await this.repos.planItem.load(au.churchId, existing.planItemId || "") : null;
+        if (existingItem && !await PlanAuth.canEditPlan(au, existingItem.planId)) return this.json({}, 401);
       }
       const promises: Promise<PlanItemTime>[] = [];
       req.body.forEach((pit) => {

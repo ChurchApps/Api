@@ -85,10 +85,10 @@ export class DeviceRepo {
       .where("fcmToken", "=", fcmToken).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public async loadByFcmTokenContains(churchId: string, substring: string): Promise<Device | undefined> {
+  public async loadByWebPushEndpointInChurch(churchId: string, endpoint: string): Promise<Device | undefined> {
     return (await getDb().selectFrom("devices").selectAll()
       .where("churchId", "=", churchId)
-      .where("fcmToken", "like", `%${DeviceRepo.escapeLike(substring)}%`)
+      .where("fcmToken", "like", DeviceRepo.webPushEndpointPattern(endpoint))
       .orderBy("lastActiveDate", "desc")
       .executeTakeFirst()) ?? null;
   }
@@ -122,11 +122,15 @@ export class DeviceRepo {
     return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/"/g, "\\\"");
   }
 
-  public async deleteByFcmTokenContainsExceptId(churchId: string, substring: string, keepId: string) {
+  private static webPushEndpointPattern(endpoint: string) {
+    return `webpush:{"endpoint":"${DeviceRepo.escapeLike(endpoint)}","keys"%`;
+  }
+
+  public async deleteByWebPushEndpointExceptId(churchId: string, endpoint: string, keepId: string) {
     await getDb().deleteFrom("devices")
       .where("churchId", "=", churchId)
       .where("id", "!=", keepId)
-      .where("fcmToken", "like", `%${DeviceRepo.escapeLike(substring)}%`)
+      .where("fcmToken", "like", DeviceRepo.webPushEndpointPattern(endpoint))
       .execute();
   }
 

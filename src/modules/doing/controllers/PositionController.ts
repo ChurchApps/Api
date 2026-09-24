@@ -44,6 +44,8 @@ export class PositionController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       for (const item of req.body) {
         if (!await PlanAuth.canEditPlan(au, item.planId)) return this.json({}, 401);
+        const existing: any = item.id ? await this.repos.position.load(au.churchId, item.id) : null;
+        if (existing && !await PlanAuth.canEditPlan(au, existing.planId)) return this.json({}, 401);
       }
       const promises: Promise<Position>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.position.save(item)); });

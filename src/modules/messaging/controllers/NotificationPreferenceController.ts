@@ -24,8 +24,9 @@ export class NotificationPreferenceController extends MessagingBaseController {
       // Legacy shape: an array of NotificationPreference rows. Kept working so
       // current B1App builds are unaffected (architecture §8.2).
       if (Array.isArray(req.body)) {
+        const own = await this.repos.notificationPreference.loadByPersonId(au.churchId, au.personId);
         const promises: Promise<NotificationPreference>[] = [];
-        req.body.forEach((item: NotificationPreference) => { item.churchId = au.churchId; item.personId = au.personId; promises.push(this.repos.notificationPreference.save(item)); });
+        req.body.forEach((item: NotificationPreference) => { item.id = own?.id; item.churchId = au.churchId; item.personId = au.personId; promises.push(this.repos.notificationPreference.save(item)); });
         const result = await Promise.all(promises);
         return this.repos.notificationPreference.convertAllToModel(result);
       }

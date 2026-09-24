@@ -51,7 +51,7 @@ export class ConnectionController extends MessagingBaseController {
         if (!conv) return this.json({}, 401);
         if (!(await this.canReadConversation(au, conv))) return this.json({}, 401);
         connection.churchId = conv.churchId;
-        if (connection.personId === undefined) connection.personId = null;
+        connection.personId = this.isSameChurch(au, conv.churchId) ? au.personId || null : null;
         planned.push({ connection, before: await this.loadOwnedConnection(connection) });
       }
 

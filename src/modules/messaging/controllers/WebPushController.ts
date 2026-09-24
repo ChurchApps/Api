@@ -40,6 +40,11 @@ export class WebPushController extends MessagingBaseController {
           error: "invalid subscription"
         };
       }
+      try {
+        if (new URL(sub.endpoint.trim()).protocol !== "https:") return { success: false, error: "invalid subscription" };
+      } catch {
+        return { success: false, error: "invalid subscription" };
+      }
       const token = WebPushHelper.encodeSubscription(sub);
       const normalizedEndpoint = sub.endpoint.trim();
       const endpointSummary = WebPushHelper.getEndpointSummary(normalizedEndpoint);
@@ -60,7 +65,7 @@ export class WebPushController extends MessagingBaseController {
 
       let device = await this.repos.device.loadByFcmToken(au.churchId, token);
       if (!device) {
-        device = await this.repos.device.loadByFcmTokenContains(au.churchId, normalizedEndpoint);
+        device = await this.repos.device.loadByWebPushEndpointInChurch(au.churchId, normalizedEndpoint);
       }
 
       if (device) {
@@ -84,7 +89,7 @@ export class WebPushController extends MessagingBaseController {
         };
         device = await this.repos.device.save(newDevice);
       }
-      await this.repos.device.deleteByFcmTokenContainsExceptId(au.churchId, normalizedEndpoint, device.id);
+      await this.repos.device.deleteByWebPushEndpointExceptId(au.churchId, normalizedEndpoint, device.id);
 
       console.info("[webpush] subscription saved", {
         ...WebPushHelper.getConfigSummary(),

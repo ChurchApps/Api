@@ -41,8 +41,9 @@ export class DeliveryLogRepo {
       .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public async loadByContent(contentType: string, contentId: string) {
+  public async loadByContent(churchId: string, contentType: string, contentId: string) {
     return getDb().selectFrom("deliveryLogs").selectAll()
+      .where("churchId", "=", churchId)
       .where("contentType", "=", contentType)
       .where("contentId", "=", contentId)
       .orderBy("attemptTime", "desc")
