@@ -9,6 +9,8 @@ import { DeclinedFile } from "./ReviewerHelper.js";
 import { normalizeTags } from "./SubmitValidation.js";
 
 const GENERIC_FIELDS = ["name", "description", "tags", "language", "license", "publisherChurchId"] as const;
+// publisherChurchId is fixed when the asset is created; a proposal can't move it to another church.
+const APPLIED_FIELDS = GENERIC_FIELDS.filter((k) => k !== "publisherChurchId");
 
 // ponytail: no DB transaction — every step is idempotent (copy overwrites, delete is best-effort,
 // the submission only flips to approved last), so a failed approve is simply retried.
@@ -18,7 +20,7 @@ export class PublishHelper {
     if (sub.type === "removal") return await this.approveRemoval(repos, sub, asset, reviewerId, note);
     const payload = sub.payload || {};
     const generic: Partial<Asset> = {};
-    for (const k of GENERIC_FIELDS) if (payload[k] !== undefined) (generic as any)[k] = payload[k];
+    for (const k of APPLIED_FIELDS) if (payload[k] !== undefined) (generic as any)[k] = payload[k];
     if (generic.tags !== undefined) generic.tags = normalizeTags(String(generic.tags));
     await repos.asset.update(asset.id || "", generic);
     Object.assign(asset, generic);
@@ -99,7 +101,9 @@ export class PublishHelper {
     await manifestHook.onPublish(ctx);
 
     const now = new Date();
-    await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null as any, removedReason: null as any });
+    // An unpublished asset stays down; putting it back up is the republish action, not a side effect of an edit.
+    if (asset.status === "unpublished") await repos.asset.update(asset.id || "", { publishedSubmissionId: sub.id });
+    else await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null as any, removedReason: null as any });
     await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged });
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
     await CommonsMailHelper.notifyApproved(sub, asset.id || "", declined).catch((e) => console.error("[CommonsMailHelper] approved failed:", e));

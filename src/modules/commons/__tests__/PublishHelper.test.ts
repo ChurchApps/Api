@@ -62,7 +62,7 @@ function repos(files: any[] = [], liveFiles: any[] = []) {
       deleteByAsset: jest.fn(async () => {})
     },
     song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", hymnalCount: 3, contributors: null })), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "New Name" })) },
-    author: { findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001", name: "Fanny Crosby" })), update: jest.fn(async () => {}) }
+    author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001", name: "Fanny Crosby" })), update: jest.fn(async () => {}) }
   };
   return r;
 }
@@ -203,16 +203,30 @@ describe("PublishHelper.approve", () => {
     expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ authorId: "a1" }));
   });
 
-  it("claims the author row for the submitter when the song credits one writer", async () => {
+  it("claims the author row for the publisher when their song credits one new writer", async () => {
+    const r = repos();
+    await PublishHelper.approve(r, { ...submission(), submittedBy: "owner000001" }, asset(), "admin000001");
+    expect(r.author.update).toHaveBeenCalledWith("author00001", { userId: "owner000001" });
+  });
+
+  it("never lets a third party's approved change claim the author row", async () => {
     const r = repos();
     await PublishHelper.approve(r, submission(), asset(), "admin000001");
-    expect(r.author.update).toHaveBeenCalledWith("author00001", { userId: "stranger0001" });
+    expect(r.author.update).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unpublished asset down and ignores a proposed publisher church", async () => {
+    const r = repos();
+    const sub = { ...submission(), payload: { ...submission().payload, publisherChurchId: "CHUother0001" } };
+    await PublishHelper.approve(r, sub, { ...asset(), status: "unpublished" }, "admin000001");
+    expect(r.asset.update).toHaveBeenLastCalledWith("asset000001", { publishedSubmissionId: "sub00000001" });
+    expect(r.asset.update.mock.calls.some((c: any[]) => "publisherChurchId" in c[1] || c[1].status === "published")).toBe(false);
   });
 
   it("leaves an already claimed author row alone", async () => {
     const r = repos();
     r.author.loadById.mockResolvedValue({ id: "author00001", name: "Fanny Crosby", userId: "someoneelse" });
-    await PublishHelper.approve(r, submission(), asset(), "admin000001");
+    await PublishHelper.approve(r, { ...submission(), submittedBy: "owner000001" }, asset(), "admin000001");
     expect(r.author.update).not.toHaveBeenCalled();
   });
 

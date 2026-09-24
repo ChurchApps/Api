@@ -39,8 +39,13 @@ export class SessionController extends AttendanceBaseController {
     return this.actionWrapper(req, res, async (au) => {
       // Check if user is a leader of any of the groups being saved
       const sessions = req.body;
-      const allGroupIds = sessions.map(s => s.groupId).filter(Boolean);
-      const isGroupLeader = allGroupIds.length > 0 && allGroupIds.every(gid => au.leaderGroupIds?.includes(gid));
+      const leads = (gid?: string) => !!gid && !!au.leaderGroupIds?.includes(gid);
+      let isGroupLeader = sessions.length > 0 && sessions.every(s => leads(s.groupId));
+      for (const s of sessions) {
+        if (!isGroupLeader || !s.id) continue;
+        const existing = await this.repos.session.load(au.churchId, s.id);
+        if (existing && !leads(existing.groupId)) isGroupLeader = false;
+      }
 
       if (!au.checkAccess(Permissions.attendance.edit) && !isGroupLeader) return this.json({}, 401);
       else {

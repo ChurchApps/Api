@@ -42,8 +42,12 @@ export class PaymentMethodController extends GivingBaseController {
   public async addCard(req: express.Request<any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       // authz-exempt: anonymous guest giving has no au.churchId; body churchId is the only source, scoped to the gateway lookup below
-      const { id, personId, customerId, email, name, churchId, provider } = req.body;
+      const { id, email, name, churchId, provider } = req.body;
+      let { personId, customerId } = req.body;
       const cId = au?.churchId || churchId;
+      const canEdit = !!au?.id && au.checkAccess(Permissions.donations.edit);
+      if (au?.id && !canEdit) personId = au.personId;
+      if (customerId && !canEdit && !(au?.id && await this.ownsCustomer(au, customerId))) customerId = undefined;
       // Resolve by requested provider, else any vault-capable gateway.
       const gateway = await GatewayService.getGatewayForChurch(
         cId,
@@ -163,7 +167,8 @@ export class PaymentMethodController extends GivingBaseController {
         return this.json({ error: "Payment gateway not configured" }, 400);
       }
 
-      const permission = au.checkAccess(Permissions.donations.edit) || personId === au.personId;
+      const canEdit = au.checkAccess(Permissions.donations.edit);
+      const permission = canEdit || (personId === au.personId && (!customerId || await this.ownsCustomer(au, customerId)));
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
       if (!GatewayService.supportsACHSetupIntent(gateway)) {
@@ -255,7 +260,7 @@ export class PaymentMethodController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const { id, personId, customerId, email, name } = req.body;
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
-      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || personId === au.personId);
+      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || (personId === au.personId && (!customerId || await this.ownsCustomer(au, customerId))));
       if (!permission) return this.json({ error: "Insufficient permissions" }, 401);
 
       const capabilities = GatewayService.getProviderCapabilities(gateway);
@@ -315,9 +320,7 @@ export class PaymentMethodController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const { paymentMethodId, customerId, amountData } = req.body;
       const gateway = await GatewayService.getGatewayForChurch(au.churchId, { requiredCapability: "supportsACH" }, this.repos.gateway).catch((): null => null);
-      const permission =
-        gateway &&
-        (au.checkAccess(Permissions.donations.edit) || (await this.repos.customer.convertToModel(au.churchId, await this.repos.customer.load(au.churchId, customerId)).personId) === au.personId);
+      const permission = gateway && (au.checkAccess(Permissions.donations.edit) || (!!customerId && await this.ownsPaymentMethod(au, gateway, paymentMethodId, customerId)));
       if (!permission) return this.json({}, 401);
       else {
         try {
@@ -383,6 +386,12 @@ export class PaymentMethodController extends GivingBaseController {
         }, e?.statusCode || 500);
       }
     });
+  }
+
+  private async ownsCustomer(au: any, customerId: string): Promise<boolean> {
+    if (!au.personId) return false;
+    const customer: any = await this.repos.customer.load(au.churchId, customerId);
+    return customer?.personId === au.personId;
   }
 
   private async ownsPaymentMethod(au: any, gateway: any, paymentMethodId: string, customerId?: string): Promise<boolean> {

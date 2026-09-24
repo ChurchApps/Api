@@ -41,7 +41,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
     SELECT fd.*, d.currency
     FROM fundDonations fd
-    INNER JOIN donations d ON d.id = fd.donationId
+    INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
     WHERE fd.id = ${id} AND fd.churchId = ${churchId}
     `.execute(getDb());
     return result.rows[0] ?? null;
@@ -51,7 +51,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       WHERE fd.churchId = ${churchId}`.execute(getDb());
     return result.rows;
   }
@@ -60,7 +60,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       WHERE fd.churchId = ${churchId}
         AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
       ORDER BY d.donationDate DESC`.execute(getDb());
@@ -71,7 +71,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       WHERE fd.churchId = ${churchId} AND fd.donationId = ${donationId}
       `.execute(getDb());
     return result.rows;
@@ -81,7 +81,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       WHERE fd.churchId = ${churchId} AND d.personId = ${personId}
       ORDER BY d.donationDate`.execute(getDb());
     return result.rows;
@@ -91,7 +91,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
       ORDER BY d.donationDate DESC`.execute(getDb());
     return result.rows;
@@ -101,7 +101,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
         AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
       ORDER BY d.donationDate DESC`.execute(getDb());
@@ -114,7 +114,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT d.currency AS currency, SUM(fd.amount) AS amount
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       WHERE fd.churchId = ${churchId} AND fd.fundId = ${fundId}
         AND (d.status IS NULL OR d.status = 'complete')
         ${dateFilter}
@@ -127,7 +127,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       INNER JOIN funds f ON f.id = fd.fundId
       WHERE fd.churchId = ${churchId} AND f.name LIKE ${pattern}
       ORDER BY d.donationDate DESC`.execute(getDb());
@@ -139,7 +139,7 @@ export class FundDonationRepo {
     const result = await sql<any>`
       SELECT fd.*, d.donationDate, d.batchId, d.personId, d.currency
       FROM fundDonations fd
-      INNER JOIN donations d ON d.id = fd.donationId
+      INNER JOIN donations d ON d.id = fd.donationId AND d.churchId = fd.churchId
       INNER JOIN funds f ON f.id = fd.fundId
       WHERE fd.churchId = ${churchId} AND f.name LIKE ${pattern}
         AND d.donationDate BETWEEN ${DateHelper.toMysqlDate(startDate)} AND ${DateHelper.toMysqlDate(endDate)}
@@ -149,7 +149,7 @@ export class FundDonationRepo {
 
   public async getTotalByFundId(churchId: string, fundId: string, startDate?: Date, endDate?: Date) {
     let query = getDb().selectFrom("fundDonations as fd")
-      .innerJoin("donations as d", "d.id", "fd.donationId")
+      .innerJoin("donations as d", (join) => join.onRef("d.id", "=", "fd.donationId").onRef("d.churchId", "=", "fd.churchId"))
       .where("fd.churchId", "=", churchId)
       .where("fd.fundId", "=", fundId)
       .where((eb: any) => eb.or([eb("d.status", "is", null), eb("d.status", "=", "complete")]))

@@ -56,5 +56,15 @@
       ]
     }
   ],
-  "permissions": []
+  "permissions": [
+    {
+      "requireOne": [
+        {
+          "api": "MembershipApi",
+          "contentType": "People",
+          "action": "View"
+        }
+      ]
+    }
+  ]
 }

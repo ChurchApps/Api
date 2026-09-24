@@ -46,14 +46,16 @@ export const songPublishHook: PublishHook = {
     const licenseUrl = LICENSE_URLS[asset.license || ""] || existing?.licenseUrl;
     if (licenseUrl) song.licenseUrl = licenseUrl;
     const writers = writer.split(/\s*(?:,|&| and )\s*/i).map((n) => n.trim()).filter(Boolean);
+    const writerIsNew = writers.length === 1 && !(await repos.author.loadIdByName(writers[0]));
     for (let i = 0; i < writers.length; i++) {
       const id = await repos.author.findOrCreate(writers[i]);
       if (i === 0) song.authorId = id;
     }
-    // A song credited to exactly one writer claims that author row for the submitter, so they can
-    // edit their own bio and links. Co-written songs stay unclaimed — we cannot tell whose row it is.
+    // A publisher's song credited to exactly one writer, whose author row this publish created, claims that row
+    // for them so they can edit their own bio and links. Co-written songs, third-party submissions and writers
+    // already in the library stay unclaimed — we cannot tell whose row it is.
     const submittedBy = ctx.submission.submittedBy;
-    if (writers.length === 1 && submittedBy && song.authorId) {
+    if (writerIsNew && submittedBy && submittedBy === asset.publisherUserId && song.authorId) {
       const author = await repos.author.loadById(song.authorId);
       if (author && !author.userId) await repos.author.update(song.authorId, { userId: submittedBy });
     }

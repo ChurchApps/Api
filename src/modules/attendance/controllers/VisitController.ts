@@ -111,7 +111,9 @@ export class VisitController extends AttendanceBaseController {
 
         const submittedVisits = [...req.body];
         // Re-check-ins keep their existing code; a fresh one would be returned to the client without ever being saved.
-        let securityCode = submittedVisits.find((sv) => sv.securityCode)?.securityCode || "";
+        // Only a code this batch's people already hold today is kept; anything else from the client is replaced.
+        const existingCodes = new Set(existingVisits.map((v) => v.securityCode).filter(Boolean));
+        let securityCode = submittedVisits.find((sv) => sv.securityCode && existingCodes.has(sv.securityCode))?.securityCode || "";
         if (!securityCode) {
           for (let attempt = 0; attempt < 5; attempt++) {
             securityCode = SecurityCodeHelper.generate();
@@ -125,11 +127,14 @@ export class VisitController extends AttendanceBaseController {
           sv.visitDate = currentDate;
           sv.checkinTime = new Date();
           sv.addedBy = au.id;
-          if (!sv.securityCode) sv.securityCode = securityCode;
+          // Today's rows are deleted and re-inserted below, so client-supplied ids could only target other rows.
+          sv.id = null;
+          if (!existingCodes.has(sv.securityCode)) sv.securityCode = securityCode;
           // for..of, not forEach(async): unawaited assignments raced the save and wrote NULL sessionIds on first-session creation
           for (const vs of sv.visitSessions) {
             vs.sessionId = await this.getSessionId(au.churchId, vs.session.serviceTimeId, vs.session.groupId, currentDate);
             vs.churchId = au.churchId;
+            vs.id = null;
           }
         }
 
