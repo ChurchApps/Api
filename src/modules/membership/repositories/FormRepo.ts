@@ -145,7 +145,7 @@ export class FormRepo {
   public async access(id: string) {
     return (await getDb().selectFrom("forms")
       .select([
-        "id", "name", "restricted", "churchId", "autoCreatePerson", "groupId", "followUpSubject", "followUpBody"
+        "id", "name", "restricted", "churchId", "autoCreatePerson", "groupId", "followUpSubject", "followUpBody", "accessStartTime", "accessEndTime"
       ])
       .where("id", "=", id)
       .where("removed", "=", 0 as any)

@@ -23,8 +23,8 @@ function mockRepos(rows: any[] = [], opts: any = {}) {
   return { person, household };
 }
 
-const removedPerson = { id: "p1", churchId: "c1", removed: true, name: {} };
-const livePerson = { id: "p2", churchId: "c1", removed: false, name: {} };
+const removedPerson = { id: "p1", churchId: "c1", email: "a@b.com", removed: true, name: {} };
+const livePerson = { id: "p2", churchId: "c1", email: "A@B.com", removed: false, name: {} };
 
 describe("PersonHelper.getPerson with allowRestore (the claim path)", () => {
   it("restores a removed person rather than duplicating them", async () => {
@@ -73,10 +73,29 @@ describe("PersonHelper.getPerson without allowRestore (the anon path)", () => {
     expect(person.save).not.toHaveBeenCalled();
   });
 
+  it("ignores partial and wildcard email matches", async () => {
+    mockRepos([{ id: "p3", churchId: "c1", email: "bob@x.com", removed: false, name: {} }]);
+    expect((await PersonHelper.getPerson("c1", "b@x.com", "A", "B", false, false)).id).toBe("newP");
+    expect((await PersonHelper.getPerson("c1", "%", "A", "B", false, false)).id).toBe("newP");
+  });
+
   it("creates a new person when no one matches the email", async () => {
     const { person } = mockRepos([]);
     const result = await PersonHelper.getPerson("c1", "a@b.com", "A", "B", false, false);
     expect(result.id).toBe("newP");
     expect(person.restore).not.toHaveBeenCalled();
+  });
+});
+
+describe("PersonHelper.claim", () => {
+  it("does not link another church to the caller's person from their current church", async () => {
+    const { person } = mockRepos([]);
+    const userChurch = { loadByUserId: jest.fn(async () => null), save: jest.fn(async (uc: any) => uc) };
+    (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person, household: { save: jest.fn(async (h: any) => { h.id = "h1"; return h; }) }, userChurch });
+    const au: any = { id: "u1", email: "a@b.com", firstName: "A", lastName: "B", churchId: "churchA", personId: "personA", checkAccess: () => false };
+    const result = await PersonHelper.claim(au, "churchB");
+    expect(person.load).not.toHaveBeenCalledWith("churchA", "personA");
+    expect(result.userChurch.personId).toBe("newP");
+    expect(result.userChurch.churchId).toBe("churchB");
   });
 });

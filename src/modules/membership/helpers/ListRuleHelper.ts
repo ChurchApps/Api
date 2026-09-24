@@ -8,6 +8,7 @@ interface EvalContext {
   repos: Repos;
   peopleRows?: any[];
   visitedListIds: Set<string>;
+  viewerPersonId?: string;
 }
 
 export class ListRuleHelper {
@@ -15,11 +16,11 @@ export class ListRuleHelper {
     if (!list.rules) return [];
     const visited = new Set<string>();
     if (list.id) visited.add(list.id);
-    return this.evaluate(churchId, list.rules, list.householdInclusion, repos, visited);
+    return this.evaluate(churchId, list.rules, list.householdInclusion, repos, visited, list.createdByPersonId);
   }
 
-  public static async evaluate(churchId: string, rules: ListRuleGroup, householdInclusion: string | undefined, repos: Repos, visitedListIds?: Set<string>): Promise<string[]> {
-    const ctx: EvalContext = { churchId, repos, visitedListIds: visitedListIds ?? new Set<string>() };
+  public static async evaluate(churchId: string, rules: ListRuleGroup, householdInclusion: string | undefined, repos: Repos, visitedListIds?: Set<string>, viewerPersonId?: string): Promise<string[]> {
+    const ctx: EvalContext = { churchId, repos, visitedListIds: visitedListIds ?? new Set<string>(), viewerPersonId };
     let ids = await this.evaluateGroup(rules, ctx);
     ids = await this.expandHousehold(ids, householdInclusion, ctx);
     return Array.from(ids);
@@ -131,7 +132,7 @@ export class ListRuleHelper {
     if (!c.entityId || ctx.visitedListIds.has(c.entityId)) return new Set();
     ctx.visitedListIds.add(c.entityId);
     const list = await ctx.repos.list.load(ctx.churchId, c.entityId);
-    if (!list) return new Set();
+    if (!list || (list.scope === "private" && list.createdByPersonId !== ctx.viewerPersonId)) return new Set();
     let ids: Set<string>;
     if (list.rules) {
       ids = await this.evaluateGroup(list.rules, ctx);

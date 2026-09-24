@@ -8,8 +8,10 @@ export class VisibilityPreferenceController extends MembershipBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, VisibilityPreference[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const existing = await this.repos.visibilityPreference.loadForPerson(au.churchId, au.personId);
       const promises: Promise<VisibilityPreference>[] = [];
       req.body.forEach((v) => {
+        v.id = existing?.id;
         v.churchId = au.churchId;
         v.personId = au.personId;
         promises.push(this.repos.visibilityPreference.save(v));

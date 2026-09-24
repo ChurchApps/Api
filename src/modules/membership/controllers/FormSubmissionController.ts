@@ -76,10 +76,31 @@ export class FormSubmissionController extends MembershipBaseController {
             results.push({ error: `You're not allowed to submit ${form.name}` });
           } else {
             formSubmission.churchId = churchId;
+            const canManage = au?.churchId === churchId && (await this.formAccess(au, formId));
+            if (!canManage && !this.isWithinAccessWindow(form)) {
+              results.push({ error: `${form.name} is not accepting submissions` });
+              continue;
+            }
+            let existingAnswerIds: string[] = [];
+            if (formSubmission.id) {
+              const existing = canManage ? await this.repos.formSubmission.load(churchId, formSubmission.id) : null;
+              if (!existing || existing.formId !== formId) {
+                results.push({ error: `You're not allowed to edit this submission` });
+                continue;
+              }
+              existingAnswerIds = ((await this.repos.answer.loadForFormSubmission(churchId, formSubmission.id)) as any[]).map((a) => a.id);
+            }
+            if (!canManage && formSubmission.contentType === "person" && formSubmission.contentId !== au?.personId) {
+              formSubmission.contentType = null;
+              formSubmission.contentId = null;
+            }
 
             const wantsPerson = form.autoCreatePerson === true;
             const wantsFollowUp = !!(form.followUpSubject && form.followUpBody);
             const questions = this.repos.question.convertAllToModel(churchId, (await this.repos.question.loadForForm(churchId, formId)) as any[]);
+            const questionIds = new Set(questions.map((q) => q.id));
+            formSubmission.answers = (formSubmission.answers || []).filter((a) => questionIds.has(a.questionId));
+            formSubmission.answers.forEach((a) => { if (a.id && !existingAnswerIds.includes(a.id)) delete a.id; });
             const contact: FormContact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
             let followUpFirstName: string = contact?.firstName;
             if (wantsPerson && contact?.email && formSubmission.contentType !== "person") {
@@ -138,6 +159,15 @@ export class FormSubmissionController extends MembershipBaseController {
 
       return { error: "Please check body. formsubmissions is required" };
     });
+  }
+
+  private isWithinAccessWindow(form: Form) {
+    const day = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    // A day of slack either side: the window is set as calendar dates in the church's local time.
+    if (form.accessStartTime && now < new Date(form.accessStartTime).getTime() - day) return false;
+    if (form.accessEndTime && now > new Date(form.accessEndTime).getTime() + 2 * day) return false;
+    return true;
   }
 
   private async addToGroup(churchId: string, groupId: string, personId: string) {

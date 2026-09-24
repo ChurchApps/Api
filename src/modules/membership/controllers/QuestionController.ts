@@ -60,6 +60,10 @@ export class QuestionController extends MembershipBaseController {
       const questions = req.body;
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i];
+        if (question.id) {
+          const existing = await this.repos.question.load(au.churchId, question.id);
+          if (!existing || !(await this.formAccess(au, existing.formId))) continue;
+        }
         if (await this.formAccess(au, question.formId)) {
           const availableQuestions = (await this.repos.question.loadForForm(au.churchId, question.formId)) as any[];
           const maxValue = Math.max(...(availableQuestions as any[]).map((q: any) => q.sort));
@@ -79,8 +83,8 @@ export class QuestionController extends MembershipBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const formId = req?.query?.formId?.toString() || null;
-      if (!(await this.formAccess(au, formId))) return this.json({}, 401);
+      const question = await this.repos.question.load(au.churchId, id);
+      if (!question || !(await this.formAccess(au, question.formId))) return this.json({}, 401);
       else {
         await this.repos.question.delete(au.churchId, id);
         return this.json({});

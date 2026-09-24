@@ -83,7 +83,8 @@ export class PersonController extends MembershipBaseController {
       const groupIds: string[] = req.query.groupIds ? req.query.groupIds.toString().split(",") : [];
       if (peopleIds.length > 0) {
         const tmpPeople = (await this.repos.person.loadByIds(au.churchId, peopleIds)) as any[];
-        result.people = this.repos.person.convertAllToModelWithPermissions(au.churchId, tmpPeople, au.checkAccess(Permissions.people.edit));
+        const people = this.repos.person.convertAllToModelWithPermissions(au.churchId, tmpPeople, au.checkAccess(Permissions.people.edit));
+        result.people = au.checkAccess(Permissions.people.view) ? people : await ContactVisibilityHelper.redactAll(au, people.filter((p) => !p.optedOut || p.id === au.personId), this.repos);
       }
       if (groupIds.length > 0) result.groups = (await this.repos.group.loadByIds(au.churchId, groupIds)) as Group[];
       return result;
@@ -435,6 +436,13 @@ export class PersonController extends MembershipBaseController {
         for (const person of req.body) {
           person.churchId = au.churchId;
           if (person.contactInfo === undefined) person.contactInfo = {};
+          if (!canEdit) {
+            const existing = this.repos.person.convertToModel(au.churchId, await this.repos.person.load(au.churchId, person.id));
+            if (!existing) return this.json({}, 401);
+            person.membershipStatus = existing.membershipStatus;
+            person.householdId = existing.householdId;
+            person.householdRole = existing.householdRole;
+          }
           const isNew = !person.id;
           if (isNew && !person.householdId) {
             const household: Household = { churchId: au.churchId, name: person.name?.last || person.name?.display || "" };

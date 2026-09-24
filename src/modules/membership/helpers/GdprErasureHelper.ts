@@ -17,10 +17,14 @@ export class GdprErasureHelper {
     ]);
 
     // Delete user account last (auth records)
+    // The login is global: only this church's links go, and the account itself only when no other church still uses it.
     if (userId) {
-      await membershipRepos.user.delete(userId);
-      await membershipRepos.userChurch.delete(userId);
-      await membershipRepos.roleMember.deleteUser(userId);
+      const db = KyselyPool.getDb<any>("membership");
+      await db.deleteFrom("userChurches").where("userId", "=", userId).where("churchId", "=", churchId).execute();
+      await membershipRepos.roleMember.deleteSelf(churchId, userId);
+      const otherChurch = await db.selectFrom("userChurches").select("id").where("userId", "=", userId).executeTakeFirst();
+      const otherRole = await db.selectFrom("roleMembers").select("id").where("userId", "=", userId).executeTakeFirst();
+      if (!otherChurch && !otherRole) await membershipRepos.user.delete(userId);
     }
   }
 

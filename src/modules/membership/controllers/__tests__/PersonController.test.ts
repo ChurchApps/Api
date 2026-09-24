@@ -27,6 +27,7 @@ function personController(opts: any = {}) {
       save: jest.fn(async (p: any) => { if (!p.id) p.id = "genP"; return p; }),
       convertAllToModelWithPermissions: (_c: string, arr: any[]) => arr,
       convertToModelWithPermissions: (_c: string, data: any) => data,
+      convertToModel: (_c: string, data: any) => data,
       convertToPreferenceModel: (_c: string, data: any) => data,
       load: jest.fn(async () => opts.person ?? null),
       delete: jest.fn(),
@@ -88,9 +89,15 @@ describe("PersonController.save authorization", () => {
   });
 
   it("allows editSelf when body[0].id matches the caller's personId", async () => {
-    const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1" });
+    const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: { id: "p1", membershipStatus: "Guest", householdId: "h1", householdRole: "Head" } });
     await (controller as any).save(saveReq([{ id: "p1" }]), {});
     expect(repos.person.save).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps membershipStatus and household when a member edits themselves", async () => {
+    const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: { id: "p1", membershipStatus: "Guest", householdId: "h1", householdRole: "Head" } });
+    await (controller as any).save(saveReq([{ id: "p1", membershipStatus: "Staff", householdId: "victimHousehold", householdRole: "Spouse" }]), {});
+    expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ membershipStatus: "Guest", householdId: "h1", householdRole: "Head" }));
   });
 
   it("blocks editSelf when body[0].id does not match the caller's personId", async () => {

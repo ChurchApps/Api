@@ -47,8 +47,9 @@ export class QuestionRepo {
   }
 
   public async delete(churchId: string, id: string) {
-    const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).executeTakeFirst()) ?? null;
-    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("formId", "=", question.formId).where("sort", ">", +question.sort as any).execute();
+    const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+    if (!question) return;
+    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("churchId", "=", churchId).where("formId", "=", question.formId).where("sort", ">", +question.sort as any).execute();
     // Previous CONCAT('d', sort) trick failed because sort is INT, not VARCHAR.
     await getDb().updateTable("questions").set({ removed: 1 as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
@@ -71,10 +72,14 @@ export class QuestionRepo {
   }
 
   public async loadForUnrestrictedForm(formId: string) {
-    return getDb().selectFrom("questions").selectAll()
-      .where("formId", "=", formId)
-      .where("removed", "=", false as any)
-      .orderBy("sort")
+    return getDb().selectFrom("questions as q")
+      .innerJoin("forms as f", (join) => join.onRef("f.id", "=", "q.formId").onRef("f.churchId", "=", "q.churchId"))
+      .selectAll("q")
+      .where("q.formId", "=", formId)
+      .where("q.removed", "=", false as any)
+      .where((eb) => eb.or([eb("f.restricted", "=", false as any), eb("f.restricted", "is", null)]))
+      .where("f.removed", "=", false as any)
+      .orderBy("q.sort")
       .execute();
   }
 
