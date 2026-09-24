@@ -151,8 +151,15 @@ export class MauticHelper {
   static trackLogin = async (email: string, appName?: string) => {
     if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
     const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
-    const contacts = Object.values(data.contacts || {}) as any[];
-    if (!contacts.length) return;
+    let contacts = Object.values(data.contacts || {}) as any[];
+    if (!contacts.length) {
+      // No marketing contact yet (e.g. the user predates the Mautic bridge).
+      // For leader-facing apps, create one now so the app connection isn't lost.
+      if (!appName || !userSegmentByApp[appName]) return;
+      const created = await MauticHelper.post("/api/contacts/new", { email });
+      if (!created?.contact?.id) return;
+      contacts = [created.contact];
+    }
     const contact = contacts[0];
     const currentCount = parseInt(contact.fields?.all?.b1_login_count || "0", 10) || 0;
     const fields: Record<string, any> = {
