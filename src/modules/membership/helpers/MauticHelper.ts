@@ -106,6 +106,22 @@ export class MauticHelper {
     }
   };
 
+  /** Creates a contact (if truly absent) and applies a tag. Returns silently on any failure. */
+  static createAndTag = async (email: string, firstName: string | undefined, lastName: string | undefined, tag: string) => {
+    if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
+    try {
+      const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
+      const existing = Object.values(data.contacts || {}) as any[];
+      if (existing.length) {
+        await MauticHelper.patch(`/api/contacts/${existing[0].id}/edit`, { tags: [tag] });
+        return;
+      }
+      await MauticHelper.post("/api/contacts/new", { email, firstname: firstName, lastname: lastName, tags: [tag] });
+    } catch (err) {
+      console.error("MauticHelper.createAndTag failed", err);
+    }
+  };
+
   // Finds a contact by email and patches the supplied field aliases onto it.
   static updateContact = async (email: string, fields: Record<string, any>) => {
     if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
