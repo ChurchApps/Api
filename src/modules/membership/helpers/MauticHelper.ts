@@ -11,9 +11,7 @@ const segmentByApp: Record<string, number> = {
 // reach Mautic. Deliberately excludes B1/B1Admin: their user base includes
 // congregation members of other churches, who never opted into our marketing.
 // Only leader/volunteer-facing apps belong here.
-const userSegmentByApp: Record<string, number> = {
-  WorshipCommons: 54
-};
+const userSegmentByApp: Record<string, number> = { WorshipCommons: 54 };
 
 export class MauticHelper {
   private static authHeader = () => "Basic " + Buffer.from(`${Environment.mauticUser}:${Environment.mauticPassword}`).toString("base64");
