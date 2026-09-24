@@ -1,4 +1,6 @@
 import { controller, httpDelete, httpGet, httpPost, httpPut } from "inversify-express-utils";
+import { CommonsMauticHelper } from "../helpers/CommonsMauticHelper.js";
+import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
 import express from "express";
 import * as fs from "fs";
 import { CommonsBaseController } from "./CommonsBaseController.js";
@@ -132,6 +134,10 @@ export class CommonsSubmissionController extends CommonsBaseController {
       if (result.ok === false) {
         const errors = result.errors || [result.error];
         return this.json({ errors }, result.status);
+      }
+      if (sub.type === "new") {
+        void CommonsMauticHelper.tagUser(au.id, "wc-song-submitted");
+        void CommonsMailHelper.notifySubmittedInternal(asset?.name || "Untitled");
       }
       return result.value;
     });

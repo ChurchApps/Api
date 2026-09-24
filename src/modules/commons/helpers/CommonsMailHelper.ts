@@ -138,6 +138,16 @@ export class CommonsMailHelper {
     return this.mailWriter(asset.publisherUserId, `${title} was taken down from WorshipCommons`, `<p><strong>${title}</strong> is no longer available on WorshipCommons after ${why}.</p><p>If you believe this is a mistake, reply to this email with a counter-notice explaining why you have the right to publish it.</p><p>Questions? Email ${Environment.supportEmail}.</p>`);
   }
 
+  /** Instant internal ping so the team sees each new submission the moment it lands. */
+  static async notifySubmittedInternal(title: string): Promise<void> {
+    try {
+      const safe = title.replace(/</g, "&lt;");
+      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, Environment.supportEmail, APP, Environment.worshipCommonsRoot || "", `New WorshipCommons submission: ${safe}`, `<p><strong>${safe}</strong> was just submitted for review.</p><p>It is waiting in the review queue.</p>`);
+    } catch (e) {
+      console.error("[CommonsMailHelper] internal submission ping failed:", e);
+    }
+  }
+
   private static async mailWriter(userId: string | undefined, subject: string, contents: string): Promise<void> {
     try {
       if (!userId) return;

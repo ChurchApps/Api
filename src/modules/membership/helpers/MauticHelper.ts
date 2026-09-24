@@ -3,8 +3,15 @@ import { Environment } from "./index.js";
 const segmentByApp: Record<string, number> = {
   B1Admin: 1,
   B1: 1,
-  "Lessons.church": 2
+  "Lessons.church": 2,
+  WorshipCommons: 54
 };
+
+// Apps whose USER signups (including users joining an existing church) should
+// reach Mautic. Deliberately excludes B1/B1Admin: their user base includes
+// congregation members of other churches, who never opted into our marketing.
+// Only leader/volunteer-facing apps belong here.
+const userSegmentByApp: Record<string, number> = { WorshipCommons: 54 };
 
 export class MauticHelper {
   private static authHeader = () => "Basic " + Buffer.from(`${Environment.mauticUser}:${Environment.mauticPassword}`).toString("base64");
@@ -108,17 +115,53 @@ export class MauticHelper {
     await MauticHelper.patch(`/api/contacts/${contacts[0].id}/edit`, fields);
   };
 
-  // Records a B1 login: bumps b1_login_count and sets b1_last_login on the contact.
-  static trackLogin = async (email: string) => {
+  // Upserts a contact for a USER signup (new account, possibly joining an
+  // existing church) for apps in userSegmentByApp. Unlike register(), this
+  // fires even when no new church is created. Links the contact to the
+  // existing Mautic company via companychurchid when churchId is provided.
+  static registerUser = async (email: string, firstName: string, lastName: string, appName: string, churchId?: string) => {
+    if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
+    const segmentId = userSegmentByApp[appName];
+    if (!segmentId) return;
+    try {
+      const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
+      const contacts = Object.values(data.contacts || {}) as any[];
+      let contactId = contacts.length ? contacts[0].id : null;
+      if (!contactId) {
+        const created = await MauticHelper.post("/api/contacts/new", { firstname: firstName, lastname: lastName, email });
+        contactId = created?.contact?.id;
+      }
+      if (!contactId) return;
+      await MauticHelper.patch(`/api/contacts/${contactId}/edit`, { tags: [`App: ${appName}`] });
+      await MauticHelper.post(`/api/segments/${segmentId}/contact/${contactId}/add`);
+      if (churchId) {
+        const companies = await MauticHelper.get(`/api/companies?search=${encodeURIComponent("companychurchid:" + churchId)}&limit=1`);
+        const list = Object.values(companies.companies || {}) as any[];
+        if (list.length) await MauticHelper.post(`/api/companies/${list[0].id}/contact/${contactId}/add`);
+      }
+    } catch (err) {
+      console.error(`MauticHelper.registerUser failed for ${appName}`, err);
+    }
+  };
+
+  // Records a login: bumps b1_login_count and sets b1_last_login on the contact.
+  // When appName is a leader-facing app (userSegmentByApp), also tags the
+  // contact with the app and adds it to the app's segment — so an existing
+  // ChurchApps contact who starts using a new app becomes visible for it.
+  static trackLogin = async (email: string, appName?: string) => {
     if (!Environment.mauticUrl || !Environment.mauticUser || !Environment.mauticPassword) return;
     const data = await MauticHelper.get(`/api/contacts?search=${encodeURIComponent(email)}&limit=1`);
     const contacts = Object.values(data.contacts || {}) as any[];
     if (!contacts.length) return;
     const contact = contacts[0];
     const currentCount = parseInt(contact.fields?.all?.b1_login_count || "0", 10) || 0;
-    await MauticHelper.patch(`/api/contacts/${contact.id}/edit`, {
+    const fields: Record<string, any> = {
       b1_last_login: new Date().toISOString(),
       b1_login_count: currentCount + 1
-    });
+    };
+    const appSegment = appName ? userSegmentByApp[appName] : undefined;
+    if (appSegment) fields.tags = [`App: ${appName}`];
+    await MauticHelper.patch(`/api/contacts/${contact.id}/edit`, fields);
+    if (appSegment) await MauticHelper.post(`/api/segments/${appSegment}/contact/${contact.id}/add`);
   };
 }
