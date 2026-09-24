@@ -92,11 +92,6 @@ export class ChurchRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public async loadIdsRegisteredSince(since: Date): Promise<string[]> {
-    const rows = await getDb().selectFrom("churches").select("id").where("registrationDate", ">=", since as any).execute();
-    return rows.map((r) => r.id);
-  }
-
   public async loadById(id: string) {
     return (await getDb().selectFrom("churches").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }

@@ -3,6 +3,7 @@ import { Environment } from "./dist/shared/helpers/Environment.js";
 import { createApp } from "./dist/app.js";
 import { handleSocket } from "./dist/lambda/socket-handler.js";
 import { handle30MinTimer, handleMidnightTimer, handleScheduledTasks, handleWebhookTimer } from "./dist/lambda/timer-handler.js";
+import { handleSesFeedback } from "./dist/lambda/ses-feedback-handler.js";
 
 const initializeEnvironment = async () => {
   if (!Environment.currentEnvironment) {
@@ -163,6 +164,17 @@ export const timerScheduledTasks = async function (event, context) {
     return { statusCode: 200, body: "Scheduled tasks executed successfully" };
   } catch (error) {
     console.error("Error in scheduled tasks timer:", error);
+    throw error;
+  }
+};
+
+export const sesFeedback = async function (event) {
+  try {
+    await initializeEnvironment();
+    await handleSesFeedback(event);
+    return { statusCode: 200, body: "SES feedback processed" };
+  } catch (error) {
+    console.error("Error in SES feedback handler:", error);
     throw error;
   }
 };

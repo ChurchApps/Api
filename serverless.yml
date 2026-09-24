@@ -249,6 +249,21 @@ functions:
           rate: rate(1 minute)
           enabled: true
 
+  # SES identity notifications (Bounce + Complaint) for support@churchapps.org point at this topic; see ChurchEmailLimiter.
+  sesFeedback:
+    handler: lambda.sesFeedback
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
+    memorySize: 256
+    timeout: 60
+    vpc: ${self:custom.vpcSettings.current, ''}
+    environment:
+      MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/messagingApi/connectionString, ''}
+    events:
+      - sns:
+          topicName: ses-feedback-${self:custom.envLower}
+
 plugins:
   - serverless-offline
 

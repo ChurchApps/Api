@@ -98,7 +98,7 @@ export class EmailTemplateController extends MessagingBaseController {
 
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
       if (eligible.length === 0) return this.json({ error: "No eligible recipients with email addresses" }, 400);
-      if (eligible.length > await ChurchEmailLimiter.remaining(au.churchId)) return this.json({ error: "Daily email limit reached for this church. Contact support to raise it." }, 429);
+      if (eligible.length > await ChurchEmailLimiter.remaining(au.churchId)) return this.json({ error: "This church can't send that many emails right now. Sending limits grow as your church builds a sending history. Contact support if you need more." }, 429);
 
       let successCount = 0;
       let failCount = 0;
