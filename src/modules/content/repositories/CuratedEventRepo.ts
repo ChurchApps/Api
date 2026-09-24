@@ -66,7 +66,7 @@ export class CuratedEventRepo {
   public async loadForEvents(curatedCalendarId: string, churchId: string) {
     const result = await getDb().selectFrom("curatedEvents as ce")
       .innerJoin("events as e", (join) =>
-        join.on((eb) =>
+        join.onRef("e.churchId", "=", "ce.churchId").on((eb) =>
           eb.or([
             eb.and([eb("ce.eventId", "is", null), eb("e.groupId", "=", eb.ref("ce.groupId"))]),
             eb.and([eb("ce.eventId", "is not", null), eb("e.id", "=", eb.ref("ce.eventId"))])

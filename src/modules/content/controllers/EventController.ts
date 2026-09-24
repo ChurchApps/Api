@@ -76,7 +76,8 @@ export class EventController extends ContentBaseController {
         const roomEvents = await this.repos.event.loadForRoom(req.query.churchId.toString(), req.query.roomId.toString());
         if (roomEvents && roomEvents.length > 0) {
           await CalendarHelper.addExceptionDates(roomEvents, this.repos);
-          newEvents = this.populateEventsForICS(roomEvents);
+          const masked = roomEvents.map((e: Event) => (e.visibility === "public" ? e : { ...e, title: "Reserved", description: "" }));
+          newEvents = this.populateEventsForICS(masked);
         }
       } else if (req.query.curatedCalendarId) {
         // authz-exempt: public ICS feed; churchId is the published feed identifier
@@ -124,7 +125,11 @@ export class EventController extends ContentBaseController {
   @httpGet("/public/:churchId/:id")
   public async getPublicById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      return await this.repos.event.load(churchId, id);
+      const event = await this.repos.event.load(churchId, id);
+      if (!event) return null;
+      if (event.approvalStatus === "pending" || event.approvalStatus === "rejected") return null;
+      if (event.visibility !== "public" && !event.registrationEnabled) return null;
+      return event;
     });
   }
 

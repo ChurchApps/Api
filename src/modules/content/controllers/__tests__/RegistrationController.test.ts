@@ -10,6 +10,7 @@ jest.mock("../../../../shared/modules/index", () => ({
   getMembershipModuleGateway: () => ({
     loadPerson: jest.fn(async () => ({ householdId: "h1", email: "person@example.com" })),
     loadChurch: jest.fn(async () => ({ name: "Grace" })),
+    loadHouseholdPeople: jest.fn(async () => [{ id: "p1", householdId: "h1" }, { id: "p1kid", householdId: "h1" }]),
     getOrCreateGuestPerson: jest.fn(async () => ({ personId: "guest1", householdId: "gh1", email: "guest@example.com" }))
   })
 }));
@@ -219,5 +220,14 @@ describe("review fixes", () => {
     const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", couponCode: "X", members: [{ firstName: "A", lastName: "B" }] } }, {});
     expect(result.status).toBe(400);
     expect(repos.registration.delete).toHaveBeenCalled();
+  });
+});
+
+describe("attendee person links", () => {
+  it("drops member personIds outside the registrant's household", async () => {
+    const { controller, repos } = makeController({ auPersonId: "p1" });
+    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", members: [{ firstName: "A", lastName: "B", personId: "p1" }, { firstName: "C", lastName: "D", personId: "stranger" }] } }, {});
+    expect(result.members.map((m: any) => m.personId)).toEqual(["p1", null]);
+    expect(repos.registrationMember.atomicInsertWithTypeCapacity).toHaveBeenCalledTimes(2);
   });
 });

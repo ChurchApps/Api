@@ -29,7 +29,8 @@ export class BibleController extends ContentBaseController {
 
   @httpGet("/stats")
   public async getStats(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.actionWrapperAnon(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       if (!req.query.startDate || !req.query.endDate) return this.json({ error: "startDate and endDate are required" }, 400);
       const startDate = new Date(req.query.startDate.toString());
       const endDate = new Date(req.query.endDate.toString());

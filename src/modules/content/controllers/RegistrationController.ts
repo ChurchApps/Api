@@ -78,7 +78,7 @@ export class RegistrationController extends ContentBaseController {
       const types = await this.repos.registrationType.loadForEvent(churchId, data.eventId);
       const activeTypes = types.filter((t: RegistrationType) => t.active !== false);
       const typeMap = new Map(activeTypes.map((t: RegistrationType) => [t.id, t]));
-      const members = data.members || [];
+      const members = await this.limitMemberPeople(churchId, personId, data.members || []);
       for (const m of members) {
         if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
       }
@@ -378,7 +378,9 @@ export class RegistrationController extends ContentBaseController {
       const activeSelections = selections.filter((s: RegistrationSelection) => s.active !== false);
       const selMap = new Map(activeSelections.map((s: RegistrationSelection) => [s.id, s]));
 
-      const members: RegisterMemberInput[] = Array.isArray(body.members) ? body.members : null;
+      const members: RegisterMemberInput[] = Array.isArray(body.members)
+        ? (au.checkAccess(Permissions.registrations.edit) ? body.members : await this.limitMemberPeople(au.churchId, registration.personId, body.members))
+        : null;
       const choices: RegisterSelectionInput[] = Array.isArray(body.selections) ? body.selections : null;
       if (members) for (const m of members) if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
       if (choices) {
@@ -524,6 +526,14 @@ export class RegistrationController extends ContentBaseController {
       }
       return this.json({});
     });
+  }
+
+  // Attendees may only be linked to people in the registrant's household.
+  private async limitMemberPeople(churchId: string, registrantPersonId: string, members: RegisterMemberInput[]): Promise<RegisterMemberInput[]> {
+    if (!members.some((m) => m.personId)) return members;
+    const household = registrantPersonId ? await getMembershipModuleGateway().loadHouseholdPeople(churchId, [registrantPersonId]) : [];
+    const allowed = new Set(household.map((p) => p.id));
+    return members.map((m) => (m.personId && !allowed.has(m.personId) ? { ...m, personId: undefined } : m));
   }
 
   private async insertMembers(churchId: string, registrationId: string, members: RegisterMemberInput[], typeMap: Map<string, RegistrationType>, waitlisted: boolean): Promise<{ ok: boolean; members: RegistrationMember[]; fullTypeId?: string }> {

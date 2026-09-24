@@ -62,7 +62,8 @@ export class SettingRepo {
   public async loadPublicSettings(churchId: string) {
     return getDb().selectFrom("settings").selectAll()
       .where("churchId", "=", churchId)
-      .where("public", "=", 1 as any).execute() as any;
+      .where("public", "=", 1 as any)
+      .where("userId", "is", null).execute() as any;
   }
 
   public async loadAllPublicSettings() {

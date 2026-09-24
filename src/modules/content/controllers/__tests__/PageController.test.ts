@@ -26,7 +26,7 @@ import { TreeHelper } from "../../helpers/TreeHelper.js";
 const EDIT_PERMISSION = "Content__Edit";
 
 function makeAu(churchId: string, permissions: string[] = [EDIT_PERMISSION]) {
-  return { churchId, personId: "p1", permissions, checkAccess: (p: any) => permissions.includes(p.contentType + "__" + p.action) };
+  return { churchId, personId: "p1", membershipStatus: "Member", permissions, checkAccess: (p: any) => permissions.includes(p.contentType + "__" + p.action) };
 }
 
 function makeController(page: any, au: any = null) {

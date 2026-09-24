@@ -14,8 +14,11 @@ describe("canViewPage", () => {
     expect(canViewPage(page("groups", '["G1"]'), null)).toBe(false);
   });
 
-  it("members is viewable by any authenticated user of the same church", () => {
-    expect(canViewPage(page("members"), { churchId: "C1", personId: "P1" })).toBe(true);
+  it("members requires member or staff status in the same church", () => {
+    expect(canViewPage(page("members"), { churchId: "C1", personId: "P1", membershipStatus: "Member" })).toBe(true);
+    expect(canViewPage(page("members"), { churchId: "C1", personId: "P1", membershipStatus: "Staff" })).toBe(true);
+    expect(canViewPage(page("members"), { churchId: "C1", personId: "P1", membershipStatus: "Visitor" })).toBe(false);
+    expect(canViewPage(page("members"), { churchId: "C1", personId: "P1" })).toBe(false);
   });
 
   it("blocks users authenticated into a different church", () => {
