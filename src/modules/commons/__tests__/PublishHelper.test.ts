@@ -499,7 +499,19 @@ describe("PublishHelper.syncOutput", () => {
     expect(r.assetFile.create.mock.calls.map((c: any[]) => c[0].name)).toEqual([`${DIR}/output/composition/slides.json`, `${DIR}/output/composition/score.musicxml`, `${DIR}/output/composition/duration.json`, `${DIR}/output/composition.zip`]);
     expect(r.assetFile.delete).toHaveBeenCalledWith("lf2");
     expect(r.assetFile.delete).toHaveBeenCalledTimes(1);
-    expect(r.song.update).toHaveBeenCalledWith("asset000001", { scoreSource: "abc", confidence: "score", singTimeSeconds: 134 });
+    // no sources/tune.abc: the score was transcribed from the recording
+    expect(r.song.update).toHaveBeenCalledWith("asset000001", { scoreSource: "midi", confidence: "generated-from-midi", singTimeSeconds: 134 });
+  });
+
+  it("calls a score built beside a tune.abc an abc score", async () => {
+    const DIR3 = "songs/en/new-song-asset000001";
+    (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR3}/output/composition/score.musicxml`]);
+    const r: any = {
+      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR3}/song.json` }, { id: "lf2", name: `${DIR3}/sources/tune.abc` }]), create: jest.fn(async (f: any) => f), delete: jest.fn() },
+      song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", confidence: "chart-only", hasChords: true, singTimeSeconds: 90 })), update: jest.fn(async () => {}) }
+    };
+    await PublishHelper.syncOutput(r, "asset000001");
+    expect(r.song.update).toHaveBeenCalledWith("asset000001", { scoreSource: "abc", confidence: "score" });
   });
 
   it("drops no rows when the package's output/ lists empty (a takedown, not a retired build)", async () => {
