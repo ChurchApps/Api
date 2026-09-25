@@ -181,10 +181,12 @@ export class PublishHelper {
     if (song) {
       const names = listed.map(baseName);
       const fields: Partial<Song> = {};
-      // generate.mjs builds score.musicxml only from sources/tune.abc; an uploaded score was already "master" at approve
+      // a built score comes from sources/tune.abc (generate.mjs) or, with no ABC, is transcribed from the master recording
+      // (pack/build.py) — the catalog's generated-from-midi; an uploaded score was already "master" at approve
       if (!song.scoreSource && names.includes("score.musicxml")) {
-        fields.scoreSource = "abc";
-        if (song.confidence !== "sunday-ready") fields.confidence = SongPackageHelper.baseConfidence({ hasScore: true, scoreSource: "abc", hasChords: !!song.hasChords });
+        const scoreSource = files.some((f) => baseName(f.name) === "tune.abc") ? "abc" : "midi";
+        fields.scoreSource = scoreSource;
+        if (song.confidence !== "sunday-ready") fields.confidence = SongPackageHelper.baseConfidence({ hasScore: true, scoreSource, hasChords: !!song.hasChords });
       }
       if (!song.singTimeSeconds && names.includes("duration.json")) {
         const raw = await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id }, `${dir}/output/composition/duration.json`));
