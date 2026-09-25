@@ -350,6 +350,28 @@ describe("PublishHelper.approve — sources manifest", () => {
     });
   });
 
+  it("files an attested master recording's grant under sources/grants/ and points the master's row at it, as tools/pack/build.py requires", async () => {
+    const proposed = [{ id: "pf1", name: "master.wav", action: "add", contentHash: "wavhash", uploadedBy: "stranger0001" }];
+    const r = repos(proposed, []);
+    const sub = submission();
+    sub.payload.detail = { ...sub.payload.detail, masterLicense: "CC-BY", recordingOwned: true };
+    await PublishHelper.approve(r, sub, asset(), "admin000001");
+    const grantCall = (ContentLibraryHelper.store as jest.Mock).mock.calls.find((c) => c[0] === `commons/${PKG}/sources/grants/recording-sub00000001.txt`);
+    expect(grantCall[2].toString()).toContain("This recording is mine (or I have the owner's permission to share it).");
+    expect(grantCall[2].toString()).toContain("Granted by: Stranger Sam (ChurchApps user stranger0001)");
+    const grant = { license: "CC-BY", obtainedVia: "upload-form", evidence: "grants/recording-sub00000001.txt" };
+    expect(manifestWritten().files).toEqual([
+      expect.objectContaining({ file: "master/master.wav", sha256: "wavhash", submittedBy: "stranger0001", layer: "recording", ...grant }),
+      expect.objectContaining({ file: "grants/recording-sub00000001.txt", submittedBy: "stranger0001", layer: "grant", ...grant })
+    ]);
+  });
+
+  it("files no grant for a master without the ownership attestation", async () => {
+    const r = repos([{ id: "pf1", name: "master.wav", action: "add", contentHash: "wavhash", uploadedBy: "stranger0001" }], []);
+    await PublishHelper.approve(r, submission(), asset(), "admin000001");
+    expect(manifestWritten().files).toEqual([expect.not.objectContaining({ evidence: expect.anything() })]);
+  });
+
   it("keeps the frozen package folder, preserves harvested and earlier rows, replaces a re-uploaded file's row, and backfills an upload with no row", async () => {
     const previous = { file: "demoAudio.mp3", url: null, acquired: "2026-01-02", sha256: "oldhash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: "sub00000000", note: "first demo" };
     const harvested = { file: "hymnary.json", url: null, acquired: null, sha256: "h", licenseBasis: "hymnary", original: false, submittedBy: null, note: "Harvested hymnal counts" };

@@ -26,7 +26,7 @@ const SONG_DETAIL_FIELDS: AssetDetailField[] = [
 ];
 
 // a master is a recording too: the same ownership attestation the demo needs
-const MASTER_ATTESTATION = { key: "recordingOwned", label: "This recording is mine (or I have the owner's permission to share it).", requiredWhenRole: "master" };
+export const MASTER_ATTESTATION = { key: "recordingOwned", label: "This recording is mine (or I have the owner's permission to share it).", requiredWhenRole: "master" };
 
 function extendSong(def: AssetTypeDefinition): AssetTypeDefinition {
   const roles = new Set(SONG_FILES.map((f) => f.role));
