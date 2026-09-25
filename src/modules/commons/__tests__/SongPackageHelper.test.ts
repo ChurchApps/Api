@@ -1,4 +1,5 @@
 import { SongPackageHelper } from "../helpers/SongPackageHelper";
+import { sectionLabel } from "../helpers/DuplicateHelper";
 
 const CHART = "{title: Amazing Grace}\n{key: G}\n\nVerse 1\n[G]Amazing   grace! how [C]sweet the [G]sound,\nthat saved a wretch like [D]me!\n\nChorus\nPraise [G]God";
 
@@ -8,6 +9,18 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.firstLine("Verse 1\nAch bleib mit deiner Gnade\nBei uns")).toBe("Ach bleib mit deiner Gnade");
     expect(SongPackageHelper.firstLine("")).toBeNull();
     expect(SongPackageHelper.firstLine(undefined)).toBeNull();
+    // writers chart sections in parentheses; "(Intro)" over a chord line is not the first sung line
+    expect(SongPackageHelper.firstLine("(Intro)\n[A] [D] [A]\n\n(Verse 1)\n[A]We won't go, if You're not with us")).toBe("We won't go, if You're not with us");
+  });
+
+  it("reads parenthesised stanza labels by the text inside and never turns a sung line into a section", () => {
+    expect(sectionLabel("(Chorus x2)")).toBe("Chorus x2");
+    expect(sectionLabel("(Intro/Instrumental)")).toBe("Intro/Instrumental");
+    expect(sectionLabel("Verse 2")).toBe("Verse 2");
+    expect(sectionLabel("[G](Hallelujah)")).toBeNull();
+    expect(sectionLabel("[G]When the [D]music [A]fades")).toBeNull();
+    const byOurSide = "(Verse 1)\n[A]We won't go\n\n(Bridge)\n[G / D / A / Bm]\n\n[G]When the [D]music [A]fades   Still [Bm]by our side\n\n(Chorus x2)\n[G]Your love is constant";
+    expect(SongPackageHelper.draftForm(byOurSide)?.defaultOrder).toEqual(["Verse 1", "Bridge", "Chorus x2"]);
   });
 
   it("hasChords needs a bracketed chord, not any bracket", () => {

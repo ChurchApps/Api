@@ -1,6 +1,6 @@
 import { Confidence, Contributor, FormMap, RightsLayer, RightsMap, RightsMatrix, SongView } from "../models/index.js";
 import { parseContributors } from "./ContributorsHelper.js";
-import { DuplicateHelper } from "./DuplicateHelper.js";
+import { DuplicateHelper, sectionLabel } from "./DuplicateHelper.js";
 import { RightsHelper } from "./RightsHelper.js";
 
 // The package model on the read side: how a songs row plus its served files becomes the summary and
@@ -97,12 +97,16 @@ export class SongPackageHelper {
     return CHORD.test(chordPro || "");
   }
 
-  /** Draft form map from the stanza labels: first line of each blank-line-separated stanza is its label. */
+  /**
+   * Draft form map from the stanza labels: a blank-line-separated stanza counts when its first line is a label
+   * (DuplicateHelper.sectionLabel). One that opens on a sung line adds no section — never a lyric as a section name.
+   */
   static draftForm(chordPro: string | null | undefined): FormMap | null {
     const labels: string[] = [];
     for (const stanza of (chordPro || "").split(/\r?\n\s*\r?\n/)) {
       const first = stanza.split(/\r?\n/).map((l) => l.trim()).find((l) => l && !l.startsWith("{"));
-      if (first) labels.push(first.replace(/\[[^\]]*\]/g, "").trim().slice(0, 40));
+      const label = first && sectionLabel(first);
+      if (label) labels.push(label.slice(0, 40));
     }
     if (!labels.length) return null;
     return { status: "draft", sections: labels.map((label, i) => ({ label, lyric: i + 1 })), defaultOrder: labels };

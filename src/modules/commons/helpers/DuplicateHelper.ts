@@ -1,8 +1,19 @@
 import { SongView } from "../models/index.js";
 
 const LEADING_ARTICLE = /^(the|a|an)\s+/;
-// chordPro: stanzas separated by blank lines, first line of each is its label
 const STANZA_LABEL = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|ending|interlude|coda)\b/i;
+
+/**
+ * A stanza label, or null for a sung line: a known heading ("Verse 2", "Chorus") or, as writers often chart it, any
+ * chord-free line wholly in parentheses ("(Chorus x2)", "(Intro/Instrumental)") — labelled by the text inside.
+ * The content repo's tools/lib.mjs sectionLabelOf and the site's chordpro.ts sectionLabel apply the same rule.
+ */
+export function sectionLabel(line: string): string | null {
+  const plain = line.replace(/\[[^\]]*\]/g, "").trim();
+  const paren = !/\[[^\]]+\]/.test(line) && plain.match(/^\((.+)\)$/);
+  if (paren) return paren[1].trim();
+  return STANZA_LABEL.test(plain) ? plain : null;
+}
 
 export interface DuplicateQuery {
   title?: string;
@@ -33,7 +44,7 @@ export class DuplicateHelper {
   static firstLine(chordPro: string): string {
     for (const raw of (chordPro || "").split(/\r?\n/)) {
       const line = raw.replace(/\[[^\]]*\]/g, "").trim();
-      if (!line || line.startsWith("{") || STANZA_LABEL.test(line)) continue;
+      if (!line || line.startsWith("{") || sectionLabel(raw)) continue;
       return line;
     }
     return "";
