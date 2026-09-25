@@ -7,18 +7,48 @@ const LOW_TRUST_POOL_DAILY = 300;
 
 // Church-authored mail goes out from our SES identity, so allowance is earned by sending history, not church age:
 // a dormant bot-farm church is as untrusted on day 400 as on day 1. Every low-trust church shares one pool.
+export interface EmailReservation {
+  address: string;
+  personId?: string;
+  contentId?: string;
+}
+
 export class ChurchEmailLimiter {
   static async remaining(churchId: string): Promise<number> {
+    return Math.max(0, await this.headroom(churchId));
+  }
+
+  // Rows go in before the send and the allowance is re-checked with them counted, so concurrent
+  // requests can't each pass a stale check; if the recheck overshoots, this request backs out.
+  static async reserve(churchId: string, contentType: string, recipients: EmailReservation[]): Promise<string[] | null> {
+    if (recipients.length === 0) return [];
+    if (recipients.length > await this.remaining(churchId)) return null;
+    const messaging = await RepoManager.getRepos<any>("messaging");
+    const rows = await messaging.deliveryLog.createMany(recipients.map((r) => ({ churchId, personId: r.personId, contentType, contentId: r.contentId, deliveryMethod: "email", deliveryAddress: r.address, success: true })));
+    const ids: string[] = rows.map((r: any) => r.id);
+    if (await this.headroom(churchId) < 0) {
+      await messaging.deliveryLog.deleteIds(churchId, ids);
+      return null;
+    }
+    return ids;
+  }
+
+  static async settle(churchId: string, id: string, success: boolean, errorMessage?: string) {
+    const messaging = await RepoManager.getRepos<any>("messaging");
+    await messaging.deliveryLog.markAttempt(churchId, id, success, errorMessage);
+  }
+
+  private static async headroom(churchId: string): Promise<number> {
     const membership = await RepoManager.getRepos<any>("membership");
     const messaging = await RepoManager.getRepos<any>("messaging");
     const church = await membership.church.loadById(churchId);
-    if (!church || church.archivedDate) return 0;
-    if (await this.isPaused(messaging, churchId)) return 0;
+    if (!church || church.archivedDate) return -1;
+    if (await this.isPaused(messaging, churchId)) return -1;
 
     const dayAgo = new Date(Date.now() - DAY_MS);
     const sent: number = await messaging.deliveryLog.countChurchEmailsSince(churchId, dayAgo);
     const earned = await this.earned(messaging, churchId);
-    if (earned >= STARTER_DAILY) return Math.max(0, Math.min(MAX_DAILY, earned) - sent);
+    if (earned >= STARTER_DAILY) return Math.min(MAX_DAILY, earned) - sent;
 
     let poolSent = sent;
     const today: { churchId: string; cnt: number }[] = await messaging.deliveryLog.countChurchEmailsByChurchSince(dayAgo);
@@ -28,7 +58,7 @@ export class ChurchEmailLimiter {
       if ((await membership.church.loadById(other.churchId))?.archivedDate) continue;
       poolSent += other.cnt;
     }
-    return Math.max(0, Math.min(STARTER_DAILY - sent, LOW_TRUST_POOL_DAILY - poolSent));
+    return Math.min(STARTER_DAILY - sent, LOW_TRUST_POOL_DAILY - poolSent);
   }
 
   static async record(churchId: string, contentType: string, address: string, personId?: string) {

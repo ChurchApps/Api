@@ -9,6 +9,7 @@ jest.mock("../../helpers/index", () => ({
   PersonHelper: { getPerson: jest.fn(), registerGuestHousehold: jest.fn() },
   Environment: { supportEmail: "support@test" },
   AuditLogHelper: { getClientIp: () => "1.2.3.4" },
+  LoginRateLimiter: { getClientIp: () => "1.2.3.4" },
   PublicPersonRateLimiter: { allow: jest.fn(() => true), reset: jest.fn() },
   PublicEmailThrottle: { allow: (...args: any[]) => throttleAllow(...args), record: (...args: any[]) => throttleRecord(...args) },
   PublicChurchContext: { bind: jest.fn(() => ({ churchId: null, mismatch: false })) }
@@ -98,6 +99,13 @@ describe("PersonController.save authorization", () => {
     const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: { id: "p1", membershipStatus: "Guest", householdId: "h1", householdRole: "Head" } });
     await (controller as any).save(saveReq([{ id: "p1", membershipStatus: "Staff", householdId: "victimHousehold", householdRole: "Spouse" }]), {});
     expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ membershipStatus: "Guest", householdId: "h1", householdRole: "Head" }));
+  });
+
+  it("keeps internal fields when a member edits themselves", async () => {
+    const existing = { id: "p1", campusId: "cam1", conversationId: "conv1", donorNumber: "42", importKey: "imp1" };
+    const { controller, repos } = personController({ access: ["peopleEditSelf"], personId: "p1", person: existing });
+    await (controller as any).save(saveReq([{ id: "p1", campusId: "cam2", conversationId: "victimConv", donorNumber: "7", importKey: "x" }]), {});
+    expect(repos.person.save).toHaveBeenCalledWith(expect.objectContaining({ campusId: "cam1", conversationId: "conv1", donorNumber: "42", importKey: "imp1" }));
   });
 
   it("blocks editSelf when body[0].id does not match the caller's personId", async () => {
@@ -255,8 +263,15 @@ describe("PersonController.loadOrCreate", () => {
     const { controller } = personController();
     const result = await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
     expect(PersonHelper.getPerson).toHaveBeenCalledWith("c1", "pat@example.com", "Pat", "Guest", false, false);
-    expect(result).toEqual({ id: "p1", name: { first: "Pat", last: "Guest" } });
+    expect(result).toEqual({ id: "p1", name: { first: "Pat", last: "Guest", display: "Pat Guest" } });
     expect(result.contactInfo).toBeUndefined();
+  });
+
+  it("echoes the submitted name, not an existing member's stored name", async () => {
+    (PersonHelper.getPerson as jest.Mock).mockResolvedValueOnce({ id: "p9", name: { first: "Real", last: "Member", display: "Real Member" } });
+    const { controller } = personController();
+    const result = await (controller as any).loadOrCreate({ body: loadBody, headers: {} }, {});
+    expect(result).toEqual({ id: "p9", name: { first: "Pat", last: "Guest", display: "Pat Guest" } });
   });
 
   it("uses the JWT/site church and skips the anon church lookup", async () => {

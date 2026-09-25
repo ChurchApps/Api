@@ -20,6 +20,7 @@ export interface DispatchInput {
   query?: Record<string, any>;
   body?: any;
   authorization?: string;
+  clientIp?: string;
 }
 
 export interface DispatchResult {
@@ -39,7 +40,7 @@ export async function dispatch(input: DispatchInput): Promise<DispatchResult> {
   const url = buildUrl(input.path, input.query);
   const isLambda = !!(process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV);
 
-  const req = makeRequest(input.method.toUpperCase(), url, input.body, input.authorization, isLambda);
+  const req = makeRequest(input.method.toUpperCase(), url, input.body, input.authorization, isLambda, input.clientIp);
   const res = makeResponse();
 
   let timer: NodeJS.Timeout | undefined;
@@ -73,7 +74,7 @@ function buildUrl(path: string, query?: Record<string, any>): string {
   return u.pathname + u.search;
 }
 
-function makeRequest(method: string, url: string, body: any, authorization: string | undefined, isLambda: boolean): any {
+function makeRequest(method: string, url: string, body: any, authorization: string | undefined, isLambda: boolean, clientIp?: string): any {
   const req: any = new EventEmitter();
   req.method = method;
   req.url = url;
@@ -84,6 +85,8 @@ function makeRequest(method: string, url: string, body: any, authorization: stri
     accept: "application/json"
   };
   if (authorization) req.headers.authorization = authorization;
+  // IP limiters must see the outer caller; without this the dispatched request has no IP at all.
+  if (clientIp) req.headers["x-forwarded-for"] = clientIp;
 
   // Mark body as parsed to skip body-parser (Lambda shim or dev server behavior).
   req.body = body ?? {};

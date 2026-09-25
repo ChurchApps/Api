@@ -21,6 +21,10 @@ const REDIRECT_PROVIDERS = ["googledrive", "dropbox", "onedrive"];
 const ARRANGEMENT_MAX_FILE_BYTES = 26214400;
 const ARRANGEMENT_ALLOWED_MIME_TYPES = ["audio/mpeg", "audio/mp4", "audio/x-m4a", "audio/aac"];
 
+// Group members upload to the public CDN; never let them serve active content from it.
+const ACTIVE_MIME_TYPES = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/(x-)?javascript|application\/ecmascript|text\/ecmascript)/i;
+export const safeMemberMimeType = (mimeType: string) => (!mimeType || ACTIVE_MIME_TYPES.test(mimeType.trim()) ? "application/octet-stream" : mimeType);
+
 @controller("/content/files")
 export class FileController extends ContentBaseController {
   // Minted provider links live >=1h; cache them so page loads don't hammer the provider APIs.
@@ -80,9 +84,11 @@ export class FileController extends ContentBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, File[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit) && !(await this.canGroupMemberSave(au, req.body))) {
+      const isEditor = au.checkAccess(Permissions.content.edit);
+      if (!isEditor && !(await this.canGroupMemberSave(au, req.body))) {
         return this.json({}, 401);
       } else {
+        if (!isEditor) for (const f of req.body) f.fileType = safeMemberMimeType(f.fileType);
         if (req.body[0].contentType === "arrangement") {
           if (!ARRANGEMENT_ALLOWED_MIME_TYPES.includes(req.body[0].fileType || "")) return this.json({ error: "unsupported_audio_format" }, 400);
           if ((req.body[0].size || 0) > ARRANGEMENT_MAX_FILE_BYTES) return this.json({ error: "file_too_large" }, 400);
@@ -94,6 +100,7 @@ export class FileController extends ContentBaseController {
         }
         const decoded = req.body[0].fileContents ? Buffer.byteLength(req.body[0].fileContents.split(",").pop() || "", "base64") : 0;
         if (decoded > 26214400) return this.json({ error: "file_too_large" }, 400);
+        if (req.body[0].fileContents) req.body[0].size = decoded;
         try {
           const promises: Promise<File>[] = [];
           req.body.forEach((file) => {
@@ -127,7 +134,8 @@ export class FileController extends ContentBaseController {
   @httpPost("/postUrl")
   public async getUploadUrl(req: express.Request<{}, {}, { resourceId: string; fileName: string; contentType: string; contentId: string; size?: number; mimeType?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(req.body.contentId) === -1) return this.json({}, 401);
+      const isEditor = au.checkAccess(Permissions.content.edit);
+      if (!isEditor && (au.groupIds.indexOf(req.body.contentId) === -1 || req.body.contentType !== "group")) return this.json({}, 401);
       else {
         let size = req.body.size || 0;
         if (req.body.contentType === "arrangement") {
@@ -144,7 +152,8 @@ export class FileController extends ContentBaseController {
         const key = this.buildKey(au.churchId, req.body.contentType, req.body.contentId, req.body.fileName);
         try {
           // clients like FreeShow omit mimeType; infer from the key so zips presign as their real type
-          const mimeType = req.body.mimeType || inferContentTypeFromKey(key) || "application/octet-stream";
+          const inferred = req.body.mimeType || inferContentTypeFromKey(key) || "application/octet-stream";
+          const mimeType = isEditor ? inferred : safeMemberMimeType(inferred);
           const result = this.isFreeShowSync(req.body) && storage.name === "churchapps"
             ? await this.freeShowPresignedUrl(key, size)
             : await storage.provider.getUploadUrl(key, mimeType, size);
@@ -179,7 +188,7 @@ export class FileController extends ContentBaseController {
   private async canGroupMemberSave(au: any, files: File[]): Promise<boolean> {
     if (!Array.isArray(files) || files.length === 0) return false;
     for (const file of files) {
-      if (au.groupIds.indexOf(file.contentId) === -1) return false;
+      if (au.groupIds.indexOf(file.contentId) === -1 || file.contentType !== "group") return false;
       if (file.id) {
         const existing = await this.repos.file.load(au.churchId, file.id);
         if (!existing || au.groupIds.indexOf(existing.contentId) === -1) return false;

@@ -1,7 +1,14 @@
 import "reflect-metadata";
 jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 const notifyReportReceived = jest.fn(async () => {});
-jest.mock("../helpers/index", () => ({ ipHash: jest.fn(() => "ip-unique"), CommonsMailHelper: { notifyReportReceived } }));
+const hits = new Map<string, number>();
+const consumeRateLimit = jest.fn(async (buckets: { key: string; max: number }[]) => {
+  if (buckets.some((b) => (hits.get(b.key) || 0) >= b.max)) return false;
+  for (const b of buckets) hits.set(b.key, (hits.get(b.key) || 0) + 1);
+  return true;
+});
+jest.mock("../helpers/index", () => ({ ipHash: jest.fn(() => "ip-unique"), clientIp: jest.fn(() => "1.2.3.4"), consumeRateLimit: (...a: any[]) => (consumeRateLimit as any)(...a), CommonsMailHelper: { notifyReportReceived } }));
+jest.mock("../../../shared/helpers/Environment", () => ({ Environment: { currentEnvironment: "prod" } }));
 
 import { CommonsReportController } from "../controllers/CommonsReportController.js";
 import { ipHash } from "../helpers/index.js";
@@ -68,5 +75,13 @@ describe("CommonsReportController.create", () => {
     const result: any = await controller.create({ body: { contentText: "Hymn", details: "stolen", reason: "copyright" } } as any, {} as any);
     expect(result.status).toBe(400);
     expect(repos.report.create).not.toHaveBeenCalled();
+  });
+
+  it("limits reports per recipient email even across addresses", async () => {
+    const { controller } = reportController(false);
+    const body = { contentText: "Hymn", details: "d", reason: "ai", email: "victim@example.com" };
+    for (let i = 0; i < 3; i++) await controller.create({ body } as any, {} as any);
+    const limited: any = await controller.create({ body } as any, {} as any);
+    expect(limited.status).toBe(429);
   });
 });

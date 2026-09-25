@@ -72,3 +72,22 @@ describe("EventController.delete self-cancel guard (CA-1)", () => {
     expect(repos.event.delete).toHaveBeenCalledWith("c1", "e1");
   });
 });
+
+describe("EventController.request hardening (M28)", () => {
+  it("rejects anonymous requests", async () => {
+    const { controller, repos } = makeController({ personId: "" });
+    repos.event.save = jest.fn();
+    const result: any = await (controller as any).request({ body: { title: "x" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.event.save).not.toHaveBeenCalled();
+  });
+
+  it("drops a groupId the requester is not in and caps field lengths", async () => {
+    const { controller, repos } = makeController();
+    repos.event.save = jest.fn(async (e: any) => ({ ...e, id: "e1" }));
+    await (controller as any).request({ body: { title: "t".repeat(400), groupId: "foreign" } }, {});
+    const saved = repos.event.save.mock.calls[0][0];
+    expect(saved.groupId).toBeUndefined();
+    expect(saved.title.length).toBe(255);
+  });
+});

@@ -4,6 +4,7 @@ import { GivingBaseController } from "./GivingBaseController.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayPaymentMethod } from "../models/index.js";
+import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
 
 @controller("/giving/paymentmethods")
 export class PaymentMethodController extends GivingBaseController {
@@ -48,6 +49,10 @@ export class PaymentMethodController extends GivingBaseController {
       const canEdit = !!au?.id && au.checkAccess(Permissions.donations.edit);
       if (au?.id && !canEdit) personId = au.personId;
       if (customerId && !canEdit && !(au?.id && await this.ownsCustomer(au, customerId))) customerId = undefined;
+      const isGuest = !au?.id;
+      if (isGuest && !(await DonationRateLimiter.allow(req, cId))) return this.json({ error: "Too many requests. Please try again later." }, 429);
+      // A guest's personId is client-supplied, so it must never select an existing vault customer.
+      const vaultPersonId = isGuest ? undefined : personId;
       // Resolve by requested provider, else any vault-capable gateway.
       const gateway = await GatewayService.getGatewayForChurch(
         cId,
@@ -66,14 +71,15 @@ export class PaymentMethodController extends GivingBaseController {
 
       const tokenError = GatewayService.validateAttachToken(gateway, id);
       if (tokenError) return this.json({ error: tokenError }, 400);
+      const saveCustomer = (id: string) => isGuest
+        ? this.repos.customer.addGuest({ id, churchId: cId, personId, provider: gateway.provider })
+        : this.repos.customer.save({ id, churchId: cId, personId, provider: gateway.provider });
 
-      let customer = await GatewayService.resolveCustomerForAttach(gateway, personId, customerId, this.repos);
+      let customer = await GatewayService.resolveCustomerForAttach(gateway, vaultPersonId, customerId, this.repos);
       if (!customer) {
         try {
-          customer = await GatewayService.createCustomer(gateway, email, name, { personId });
-          if (customer) {
-            await this.repos.customer.save({ id: customer, churchId: cId, personId, provider: gateway.provider });
-          }
+          customer = await GatewayService.createCustomer(gateway, email, name, { personId: vaultPersonId });
+          if (customer) await saveCustomer(customer);
         } catch (e: any) {
           return this.json({ error: "Failed to create customer", details: e.message }, 500);
         }
@@ -89,7 +95,7 @@ export class PaymentMethodController extends GivingBaseController {
             console.log(`Customer ${customer} not found on ${gateway.provider}, recreating...`);
             const newCustomer = await GatewayService.createCustomer(gateway, email, name);
             if (newCustomer) {
-              await this.repos.customer.save({ id: newCustomer, churchId: cId, personId, provider: gateway.provider });
+              await saveCustomer(newCustomer);
               customer = newCustomer;
               pm = await GatewayService.attachPaymentMethod(gateway, id, GatewayService.buildAttachOptions(gateway, customer, id, req.body));
             } else {
@@ -118,6 +124,7 @@ export class PaymentMethodController extends GivingBaseController {
 
         return { paymentMethod: pm, customerId: customer };
       } catch (e: any) {
+        if (isGuest) await DonationRateLimiter.recordDecline(req);
         const mapped = GatewayService.mapGatewayError(gateway, e);
         if (mapped) return this.json(mapped.body, mapped.status);
 
@@ -225,6 +232,8 @@ export class PaymentMethodController extends GivingBaseController {
       if (!email || !name) {
         return this.json({ error: "Email and name are required" }, 400);
       }
+
+      if (!(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: "Too many requests. Please try again later." }, 429);
 
       const gateway = await GatewayService.getGatewayForChurch(churchId, { gatewayId }, this.repos.gateway).catch((): null => null);
 

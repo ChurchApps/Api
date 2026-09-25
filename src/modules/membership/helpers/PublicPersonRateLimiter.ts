@@ -1,24 +1,22 @@
+import type { Repos } from "../repositories/Repos.js";
+import { LoginRateLimiter } from "./LoginRateLimiter.js";
+
+// DB-backed (loginAttempts table) so the count holds across Lambda containers. Pass an ip from
+// LoginRateLimiter.getClientIp; the first X-Forwarded-For hop is caller-controlled.
 export class PublicPersonRateLimiter {
-  private static hits = new Map<string, number[]>();
-  static windowMs = 10 * 60 * 1000;
+  static windowSeconds = 10 * 60;
   static maxHits = 10;
 
-  static allow(ip: string, churchId: string, bucket: string): boolean {
-    const host = (ip || "").replace(/^::ffff:/i, "").split("%")[0];
-    if (!host || host === "127.0.0.1" || host === "::1" || host === "localhost" || host.startsWith("127.")) return true;
-    const key = bucket + "|" + (ip || "unknown") + "|" + (churchId || "");
-    const now = Date.now();
-    const times = (this.hits.get(key) || []).filter((t) => now - t < this.windowMs);
-    if (times.length >= this.maxHits) {
-      this.hits.set(key, times);
-      return false;
+  static async allow(repos: Repos, ip: string, churchId: string, bucket: string, max: number = this.maxHits, windowSeconds: number = this.windowSeconds): Promise<boolean> {
+    if (LoginRateLimiter.isLoopback(ip)) return true;
+    const key = ("pp|" + bucket + "|" + (churchId || "") + "|" + (ip || "unknown")).slice(0, 191);
+    try {
+      if ((await repos.loginAttempt.loadCount(key, windowSeconds)) >= max) return false;
+      await repos.loginAttempt.increment(key, windowSeconds);
+      return true;
+    } catch (e) {
+      console.error("PublicPersonRateLimiter.allow failed:", e);
+      return true;
     }
-    times.push(now);
-    this.hits.set(key, times);
-    return true;
-  }
-
-  static reset() {
-    this.hits.clear();
   }
 }

@@ -26,6 +26,12 @@ export class CustomerRepo {
     }
   }
 
+  // Guests name their person by a client-supplied id, so their customer is added beside the person's existing one, never replacing it.
+  public async addGuest(model: Customer): Promise<Customer> {
+    if (await this.load(model.churchId!, model.id!)) return model;
+    return await this.create({ ...model, metadata: { ...(model.metadata || {}), guest: true } });
+  }
+
   // Customer ID comes from external system, don't auto-generate
   private async create(model: Customer): Promise<Customer> {
     const provider = model.provider ?? "stripe";
@@ -66,17 +72,20 @@ export class CustomerRepo {
   }
 
   public async loadByPersonId(churchId: string, personId: string) {
-    const row = (await getDb().selectFrom("customers").selectAll().where("personId", "=", personId).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
-    return row ? this.rowToModel(row) : null;
+    return this.pickPrimary(await getDb().selectFrom("customers").selectAll().where("personId", "=", personId).where("churchId", "=", churchId).execute());
   }
 
   public async loadByPersonAndProvider(churchId: string, personId: string, provider: string) {
-    const row = (await getDb().selectFrom("customers").selectAll()
+    return this.pickPrimary(await getDb().selectFrom("customers").selectAll()
       .where("personId", "=", personId)
       .where("churchId", "=", churchId)
       .where("provider", "=", provider)
-      .executeTakeFirst()) ?? null;
-    return row ? this.rowToModel(row) : null;
+      .execute());
+  }
+
+  private pickPrimary(rows: any[]): Customer | null {
+    const models = rows.map(r => this.rowToModel(r));
+    return models.find(m => !m.metadata?.guest) ?? models[0] ?? null;
   }
 
   public convertToModel(_churchId: string, data: any) {

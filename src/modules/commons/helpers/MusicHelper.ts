@@ -57,13 +57,15 @@ export class MusicHelper {
       pos += n;
       return s;
     };
+    // unsigned, capped at the spec's 4 bytes so a crafted file can't produce a negative jump and loop forever
     const readVar = () => {
       let v = 0;
       let b = 0;
+      let n = 0;
       do {
         b = buf[pos++] || 0;
-        v = (v << 7) | (b & 0x7f);
-      } while (b & 0x80);
+        v = v * 128 + (b & 0x7f);
+      } while ((b & 0x80) && ++n < 4);
       return v;
     };
     if (buf.length < 14 || str(4) !== "MThd") return hist;
@@ -76,6 +78,7 @@ export class MusicHelper {
       pos += 4;
       let status = 0;
       while (pos < end) {
+        const start = pos;
         readVar(); // delta time
         let b = buf[pos];
         if (b & 0x80) {
@@ -93,6 +96,7 @@ export class MusicHelper {
           const d2 = kind === 0xc0 || kind === 0xd0 ? 0 : buf[pos++];
           if (kind === 0x90 && d2 > 0) hist[d1 % 12]++;
         }
+        if (pos <= start) break;
       }
       pos = end;
     }

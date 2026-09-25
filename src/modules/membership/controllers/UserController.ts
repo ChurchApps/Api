@@ -45,6 +45,8 @@ const setDisplayNameValidation = [
 
 const updateEmailValidation = [body("userId").optional().isString(), body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address")];
 
+const REGISTER_MAX_PER_IP = 20;
+const CHECK_EMAIL_MAX_PER_IP = 60;
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const VERIFICATION_MAX_ATTEMPTS = 5;
 
@@ -113,7 +115,7 @@ export class UserController extends MembershipBaseController {
           else {
             user.lastLogin = new Date();
             await this.repos.user.save(user);
-            if (!isJwtRefresh) await LoginRateLimiter.clearFailures(this.repos, account);
+            if (!isJwtRefresh) await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
             MauticHelper.trackLogin(user.email, req.body.appName).catch(() => {});
             const selectedChurch = userChurches[0];
             if (selectedChurch) {
@@ -126,7 +128,8 @@ export class UserController extends MembershipBaseController {
         if (Environment.currentEnvironment === "dev") {
           throw e;
         }
-        return this.error([e.toString()]);
+        this.logger.error(e);
+        return this.error(["Unexpected error"]);
       }
     });
   }
@@ -194,7 +197,7 @@ export class UserController extends MembershipBaseController {
           await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
           return this.denyAccess(["Login failed"]);
         }
-        await LoginRateLimiter.clearFailures(this.repos, account);
+        await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
         const userChurches = await this.repos.rolePermission.loadForUser(user.id, false);
         const churchNames = userChurches.map((uc) => uc.church.name);
 
@@ -204,7 +207,7 @@ export class UserController extends MembershipBaseController {
           throw e;
         }
         this.logger.error(e);
-        return this.error([e.toString()]);
+        return this.error(["Unexpected error"]);
       }
     });
   }
@@ -235,10 +238,12 @@ export class UserController extends MembershipBaseController {
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const { userId, userEmail, firstName, lastName } = req.body;
-      const isStaff = !!(au?.id && (au.checkAccess(Permissions.people.edit) || au.checkAccess(Permissions.roles.edit) || au.checkAccess(Permissions.server.admin)));
+      const isServerAdmin = !!(au?.id && au.checkAccess(Permissions.server.admin));
+      const isStaff = isServerAdmin || !!(au?.id && (au.checkAccess(Permissions.people.edit) || au.checkAccess(Permissions.roles.edit)));
 
       if (userId) {
-        if (!isStaff && au?.id !== userId) return this.json({}, 401);
+        const allowed = au?.id === userId || isServerAdmin || (isStaff && (await this.userInChurch(userId, au.churchId)));
+        if (!allowed) return this.json({}, 401);
         const existing = await this.repos.user.load(userId);
         if (!existing) return this.json({}, 404);
         return this.json(this.publicUser(existing), 200);
@@ -247,7 +252,7 @@ export class UserController extends MembershipBaseController {
       const rateLimitIp = LoginRateLimiter.getClientIp(req);
       const account = (userEmail || "").toString().trim().toLowerCase();
       if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
-      if (!isStaff && !PublicPersonRateLimiter.allow(rateLimitIp, "users", "loadOrCreate")) return this.json({ errors: ["Too many requests"] }, 429);
+      if (!isStaff && !(await PublicPersonRateLimiter.allow(this.repos, rateLimitIp, "users", "loadOrCreate"))) return this.json({ errors: ["Too many requests"] }, 429);
 
       let user = await this.repos.user.loadByEmail(userEmail);
       let isNewUser = false;
@@ -266,9 +271,17 @@ export class UserController extends MembershipBaseController {
         await UserChurchHelper.createForNewUser(user.id, user.email);
       }
 
-      if (isStaff) return this.json({ ...this.publicUser(user), isNewUser }, 200);
+      // Church staff only learn an existing user's name once that user is already linked to their church.
+      if (isStaff && (isNewUser || isServerAdmin || (await this.userInChurch(user.id, au.churchId)))) return this.json({ ...this.publicUser(user), isNewUser }, 200);
+      if (isStaff) return this.json({ id: user.id, email: user.email, isNewUser }, 200);
       return this.json({ id: user.id, isNewUser }, 200);
     });
+  }
+
+  private async userInChurch(userId: string, churchId: string): Promise<boolean> {
+    if (!userId || !churchId) return false;
+    if (await this.repos.userChurch.loadByUserId(userId, churchId)) return true;
+    return this.repos.roleMember.existsForUser(churchId, userId);
   }
 
   private publicUser(user: User) {
@@ -280,6 +293,8 @@ export class UserController extends MembershipBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), "", "register", REGISTER_MAX_PER_IP, 60 * 60))) return this.json({ errors: ["Too many requests"] }, 429);
 
       const register: RegisterUserRequest = req.body;
       let user: User = await this.repos.user.loadByEmail(register.email);
@@ -307,13 +322,14 @@ export class UserController extends MembershipBaseController {
             emailPromises.push(UserHelper.sendWelcomeEmail(register.email, code, register.appName, register.appUrl));
 
             if (Environment.emailOnRegistration) {
-              const emailBody = "Name: " + register.firstName + " " + register.lastName + "<br/>Email: " + register.email + "<br/>App: " + register.appName;
-              emailPromises.push(TransactionalEmailHelper.sendTransactional(Environment.supportEmail, Environment.supportEmail, register.appName, register.appUrl, "New User Registration", emailBody));
+              const emailBody = "Name: " + UserHelper.escapeHtml(register.firstName) + " " + UserHelper.escapeHtml(register.lastName) + "<br/>Email: " + UserHelper.escapeHtml(register.email) + "<br/>App: " + UserHelper.escapeHtml(register.appName);
+              emailPromises.push(TransactionalEmailHelper.sendTransactional(Environment.supportEmail, Environment.supportEmail, "B1", Environment.b1AdminRoot, "New User Registration", emailBody));
             }
             await Promise.all(emailPromises);
             console.log("Register: emails", Date.now() - emailStart, "ms");
           } catch (err) {
-            return this.json({ errors: [err.toString()] });
+            this.logger.error(err);
+            return this.json({ errors: ["Unable to send the verification email"] });
           }
         }
 
@@ -361,10 +377,12 @@ export class UserController extends MembershipBaseController {
     });
   }
 
-  @httpPost("/setPasswordGuid")
+  @httpPost("/setPasswordGuid", body("newPassword").isString().isLength({ min: 6 }).withMessage("must be at least 6 chars long"))
   public async setPasswordGuid(req: express.Request<{}, {}, NewPasswordRequest>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
         const user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
         if (user !== null && AuthGuidHelper.canSetPassword(user.authGuid)) {
           user.authGuid = "";
@@ -380,7 +398,7 @@ export class UserController extends MembershipBaseController {
           throw e;
         }
         this.logger.error(e);
-        return this.error([e.toString()]);
+        return this.error(["Unexpected error"]);
       }
     });
   }
@@ -401,7 +419,7 @@ export class UserController extends MembershipBaseController {
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
         // Own bucket so reset requests don't lock out password login; every request counts since each one reissues a code.
         const account = "forgot:" + (req.body.userEmail || "").toString().trim().toLowerCase();
-        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
         await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
 
         const user = await this.repos.user.loadByEmail(req.body.userEmail);
@@ -423,7 +441,7 @@ export class UserController extends MembershipBaseController {
           throw e;
         }
         this.logger.error(e);
-        return this.error([e.toString()]);
+        return this.error(["Unexpected error"]);
       }
     });
   }
@@ -440,7 +458,7 @@ export class UserController extends MembershipBaseController {
         // Per-account bucket that survives code reissue, so /forgot can't reset the guess budget.
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
         const account = "verify:" + (req.body.email || "").toString().trim().toLowerCase();
-        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
 
         const user = await this.repos.user.loadByEmail(req.body.email);
         if (user === null) return this.json({ errors: ["invalid code"] }, 400);
@@ -472,7 +490,7 @@ export class UserController extends MembershipBaseController {
           throw e;
         }
         this.logger.error(e);
-        return this.error([e.toString()]);
+        return this.error(["Unexpected error"]);
       }
     });
   }
@@ -482,6 +500,8 @@ export class UserController extends MembershipBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), "", "checkEmail", CHECK_EMAIL_MAX_PER_IP))) return this.json({ errors: ["Too many requests"] }, 429);
 
       const user = await this.repos.user.loadByEmail(req.body.email);
       return this.json({ exists: !!user, peopleMatches: [] }, 200);
@@ -634,6 +654,7 @@ export class UserController extends MembershipBaseController {
       const targetUser = await this.repos.user.load(req.params.id);
       if (!targetUser) return this.json({}, 404);
 
+      AuditLogHelper.log(this.repos, au.churchId, au.id, "security", "impersonate", "user", targetUser.id, { email: targetUser.email }, AuditLogHelper.getClientIp(req));
       return this.json({ jwt: AuthenticatedUser.getUserJwt(targetUser, "2 hours") }, 200);
     });
   }
@@ -648,8 +669,8 @@ export class UserController extends MembershipBaseController {
       // Only invite people already in this church; otherwise this is an open relay from our SES identity.
       const matches = await this.repos.person.searchEmail(au.churchId, email);
       if (!matches.some((p: Person) => (p.email || "").toLowerCase() === email.toLowerCase())) return res.status(400).json({ errors: ["No person in this church has that email"] });
-      if (await ChurchEmailLimiter.remaining(au.churchId) < 1) return this.json({ errors: ["Daily email limit reached"] }, 429);
-      await ChurchEmailLimiter.record(au.churchId, "invite", email);
+      const reserved = await ChurchEmailLimiter.reserve(au.churchId, "invite", [{ address: email }]);
+      if (!reserved) return this.json({ errors: ["Daily email limit reached"] }, 429);
       const church = await this.repos.church.loadById(au.churchId);
 
       const inviterEmail = au.email || undefined;
@@ -660,7 +681,13 @@ export class UserController extends MembershipBaseController {
         isExistingUser = true;
         loginLink = "/login";
       }
-      await UserHelper.sendInviteEmail(email, (personName || "").slice(0, 100), contextName.slice(0, 100), church?.name || "", loginLink, isExistingUser, inviterEmail);
+      try {
+        await UserHelper.sendInviteEmail(email, (personName || "").slice(0, 100), contextName.slice(0, 100), church?.name || "", loginLink, isExistingUser, inviterEmail);
+        await ChurchEmailLimiter.settle(au.churchId, reserved[0], true);
+      } catch (err: any) {
+        await ChurchEmailLimiter.settle(au.churchId, reserved[0], false, err?.message || "Send failed");
+        throw err;
+      }
 
       return this.json({ success: true }, 200);
     });

@@ -38,7 +38,7 @@ export class ConnectionRepo {
 
   public async loadAttendance(churchId: string, conversationId: string) {
     const data = await getDb().selectFrom("connections")
-      .select(["id", "displayName", "ipAddress"])
+      .select(["id", "displayName"])
       .where("churchId", "=", churchId)
       .where("conversationId", "=", conversationId)
       .orderBy("displayName")

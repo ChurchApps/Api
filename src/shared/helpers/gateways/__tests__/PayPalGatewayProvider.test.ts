@@ -15,14 +15,22 @@ describe("PayPalGatewayProvider", () => {
 
     it("succeeds only for a completed capture", async () => {
       jest.spyOn(PayPalHelper, "captureOrder").mockResolvedValue(captureWith("COMPLETED"));
-      const result = await provider.processCharge(config, { id: "ORDER1" });
+      const result = await provider.processCharge(config, { id: "ORDER1", amount: 25 });
       expect(result.success).toBe(true);
       expect(result.transactionId).toBe("CAP1");
+      expect(result.data.currency).toBe("USD");
+    });
+
+    it("fails when the capture amount differs from the requested amount", async () => {
+      jest.spyOn(PayPalHelper, "captureOrder").mockResolvedValue(captureWith("COMPLETED"));
+      jest.spyOn(console, "error").mockImplementation(() => {});
+      const result = await provider.processCharge(config, { id: "ORDER1", amount: 10000 });
+      expect(result.success).toBe(false);
     });
 
     it.each(["DECLINED", "PENDING", "FAILED"])("fails a %s capture", async (status) => {
       jest.spyOn(PayPalHelper, "captureOrder").mockResolvedValue(captureWith(status));
-      const result = await provider.processCharge(config, { id: "ORDER1" });
+      const result = await provider.processCharge(config, { id: "ORDER1", amount: 25 });
       expect(result.success).toBe(false);
     });
   });

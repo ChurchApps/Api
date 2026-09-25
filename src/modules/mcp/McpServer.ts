@@ -4,7 +4,7 @@ import { describeEndpointSchema, describeEndpointHandler } from "./tools/describ
 import { apiCallSchema, makeApiCallHandler } from "./tools/apiCall.js";
 import { describePageBuilderSchema, describePageBuilderHandler } from "./tools/describePageBuilder.js";
 
-export function buildMcpServer(authorization: string | undefined): McpServer {
+export function buildMcpServer(authorization: string | undefined, clientIp: string = ""): McpServer {
   const server = new McpServer({ name: "churchapps-api", version: "1.0.0" });
 
   server.registerTool(
@@ -43,7 +43,7 @@ export function buildMcpServer(authorization: string | undefined): McpServer {
         openWorldHint: false
       }
     },
-    makeApiCallHandler(() => authorization)
+    makeApiCallHandler(() => authorization, () => clientIp)
   );
 
   server.registerTool(

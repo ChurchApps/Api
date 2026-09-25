@@ -124,3 +124,17 @@ describe("KingdomFundingGatewayProvider.verifyWebhookSignature (NMI)", () => {
     expect(result).toEqual({ success: false, shouldProcess: false });
   });
 });
+
+describe("KingdomFundingGatewayProvider webhook dedup key", () => {
+  it("logs webhook events under the NMI event id the controller dedups on", async () => {
+    const provider = new KingdomFundingGatewayProvider();
+    const secret = "k";
+    const raw = JSON.stringify({ event_id: "evt_9", event_type: "transaction.sale.success", event_body: { transaction: { transaction_id: "555", amount: "5.00" } } });
+    const s = crypto.createHmac("sha256", secret).update(`n.${raw}`, "utf-8").digest("hex");
+    const result = await provider.verifyWebhookSignature({ webhookKey: secret } as GatewayConfig, { "webhook-signature": `t=n,s=${s}` } as any, raw);
+    const save = jest.fn();
+    await provider.logEvent("C1", raw, result.eventData, { eventLog: { save } });
+    expect(result.eventId).toBe("evt_9");
+    expect(save.mock.calls[0][0].providerId).toBe("evt_9");
+  });
+});

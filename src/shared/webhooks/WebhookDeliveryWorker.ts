@@ -45,13 +45,15 @@ export class WebhookDeliveryWorker {
         responseBody = result.responseBody;
       } else {
         const signature = WebhookSigner.sign(webhook.secret, delivery.payload);
+        const timestamp = Math.floor(Date.now() / 1000).toString();
         const res = await SafeHttp.post(webhook.url, {
           "Content-Type": "application/json",
           "User-Agent": "B1-Webhooks/1.0",
           "X-B1-Event": delivery.event,
           "X-B1-Delivery-Id": delivery.id,
           "X-B1-Signature": signature,
-          "X-B1-Timestamp": Math.floor(Date.now() / 1000).toString()
+          "X-B1-Signature-V2": WebhookSigner.signV2(webhook.secret, timestamp, delivery.payload),
+          "X-B1-Timestamp": timestamp
         }, delivery.payload, REQUEST_TIMEOUT_MS, MAX_RESPONSE_BODY);
         status = res.status;
         responseBody = res.body;

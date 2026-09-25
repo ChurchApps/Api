@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import express from "express";
+import fs from "fs";
 import { Container } from "inversify";
 import { InversifyExpressServer } from "inversify-express-utils";
 import { Environment } from "./shared/helpers/Environment.js";
@@ -26,6 +27,11 @@ export const createApp = async () => {
   const server = new InversifyExpressServer(container, null, { rootPath: "" }, null, CustomAuthProvider);
 
   server.setConfig((app) => {
+    app.disable("x-powered-by");
+    app.use((_req, res, next) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      next();
+    });
     app.use(cors());
 
     app.options("*", (_req, res) => {
@@ -89,12 +95,16 @@ export const createApp = async () => {
       app.use(bodyParser.urlencoded({ extended: true, limit: "50mb" }));
     }
 
+    // Only the disk-store commons upload reads req.files; everywhere else multipart would just fill /tmp.
     app.use(
+      "/commons/submissions/:id/upload",
       fileUpload({
-        limits: { fileSize: 50 * 1024 * 1024 },
+        limits: { fileSize: 50 * 1024 * 1024, files: 1 },
+        abortOnLimit: true,
         useTempFiles: true,
         tempFileDir: "/tmp/"
-      })
+      }),
+      removeTempFilesAfterResponse
     );
 
     if (Environment.fileStore !== "S3") {
@@ -199,6 +209,17 @@ export const createApp = async () => {
   }
   return app;
 };
+
+export function removeTempFilesAfterResponse(req: express.Request, res: express.Response, next: express.NextFunction) {
+  res.on("close", () => {
+    const files = (req as any).files as Record<string, { tempFilePath?: string } | { tempFilePath?: string }[]> | undefined;
+    if (!files) return;
+    for (const entry of Object.values(files).flat()) {
+      if (entry?.tempFilePath) fs.promises.unlink(entry.tempFilePath).catch(() => {});
+    }
+  });
+  next();
+}
 
 async function loadModuleBindings(container: Container) {
   try {

@@ -127,3 +127,38 @@ describe("TaskController member directory updates and reads", () => {
     expect(await (makeController(["tasksView"], repos) as any).get("t1", {}, {})).toEqual(expect.objectContaining({ id: "t1" }));
   });
 });
+
+describe("TaskController.save directoryUpdate identity", () => {
+  it("rejects anonymous directory updates", async () => {
+    const repos: any = { task: { save: jest.fn() } };
+    const controller = new TaskController();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "", personId: "", checkAccess: () => false });
+    const result = await (controller as any).save({ query: { type: "directoryUpdate" }, body: [{ title: "x" }] }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.task.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("TaskController.moveStep workflow scoping", () => {
+  function setup(step: any) {
+    const repos: any = {
+      task: { load: jest.fn(async () => ({ id: "t1", churchId: "c1", workflowId: "w1", assignedToType: "person", assignedToId: "p1" })) },
+      workflowStep: { load: jest.fn(async () => step) }
+    };
+    const controller: any = makeController(["tasksEdit"], repos);
+    controller.canEditCard = () => true;
+    controller.json = (obj: any, status: number) => ({ obj, status });
+    return controller;
+  }
+
+  it("rejects moving a card to a step in another workflow", async () => {
+    const result = await (setup({ id: "s9", workflowId: "w2" }) as any).moveStep("t1", { body: { stepId: "s9" } }, {});
+    expect(result.status).toBe(400);
+  });
+
+  it("skips foreign-workflow steps in bulk moves", async () => {
+    const result = await (setup({ id: "s9", workflowId: "w2" }) as any).bulkMoveStep({ body: { ids: ["t1"], stepId: "s9" } }, {});
+    expect(result).toEqual({ updated: [], skipped: ["t1"] });
+  });
+});

@@ -96,6 +96,7 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
       category: "announcements",
       deliveryStartLevel: 2,
       emailImmediate: true,
+      churchAuthored: true,
       emailByPerson: { [personId]: { subject, html: body } }
     });
     return true;

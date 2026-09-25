@@ -8,6 +8,7 @@ import { getProvider, type TextingProviderConfig } from "@churchapps/texting";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { TextingConfigHelper } from "../helpers/TextingConfigHelper.js";
+import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
 interface GroupMemberDetail {
   personId: string;
@@ -213,8 +214,15 @@ export class TextingController extends MessagingBaseController {
   public async sendToPerson(req: express.Request<{}, {}, { personId: string; phoneNumber: string; message: string; personName?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
-      const { personId, phoneNumber, message, personName } = req.body;
-      if (!personId || !phoneNumber || !message) return this.json({ error: "personId, phoneNumber, and message are required" }, 400);
+      const { personId, message, personName } = req.body;
+      if (!personId || !message) return this.json({ error: "personId and message are required" }, 400);
+      // Number comes from the person record, never the request, so this can't text arbitrary phones or opted-out people.
+      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const person = ((await membershipRepos.person.loadByIds(au.churchId, [personId])) as any[])[0];
+      if (!person) return this.json({ error: "Person not found" }, 404);
+      const phoneNumber: string = (person.mobilePhone || "").trim();
+      if (!phoneNumber) return this.json({ error: "Person has no mobile phone" }, 400);
+      if (person.optedOut === true || person.optedOut === 1) return this.json({ error: "Person has opted out of text messages" }, 400);
 
       const config = await this.getProviderConfig(au.churchId);
       if (!config) return this.json({ error: "No texting provider configured" }, 400);

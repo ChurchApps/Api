@@ -4,6 +4,7 @@ import { BaseHttpController, controller, httpPost } from "inversify-express-util
 import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildMcpServer } from "./McpServer.js";
+import { LoginRateLimiter } from "../membership/helpers/LoginRateLimiter.js";
 
 @controller("/mcp")
 export class McpController extends BaseHttpController {
@@ -20,7 +21,7 @@ export class McpController extends BaseHttpController {
       sessionIdGenerator: undefined,
       enableJsonResponse: true
     });
-    const server = buildMcpServer(req.headers.authorization as string | undefined);
+    const server = buildMcpServer(req.headers.authorization as string | undefined, LoginRateLimiter.getClientIp(req));
 
     res.on("close", () => {
       transport.close().catch(() => {});
@@ -31,7 +32,8 @@ export class McpController extends BaseHttpController {
       await server.connect(transport);
       await transport.handleRequest(req, res, req.body);
     } catch (err: any) {
-      if (!res.headersSent) res.status(500).json({ error: "MCP transport error", message: err?.message || String(err) });
+      console.error("MCP transport error:", err);
+      if (!res.headersSent) res.status(500).json({ error: "MCP transport error" });
     }
   }
 }

@@ -110,3 +110,49 @@ describe("Confidential group excluded from public finder / by-id", () => {
     expect(result).toMatchObject({ id: "g1", name: "Care" });
   });
 });
+
+describe("Self-join (/groupmembers/self)", () => {
+  function joinController(group: any, noPerson = false) {
+    const { controller, repos } = gmController({ group });
+    repos.groupMember.loadForPerson = jest.fn(async () => []);
+    repos.groupMember.save = jest.fn(async (m: any) => ({ ...m, id: "gm1" }));
+    repos.groupMember.convertToModel = (_c: string, m: any) => m;
+    repos.groupMemberHistory = { log: jest.fn() };
+    if (noPerson) (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "c1", personId: "", checkAccess: () => false });
+    return { controller, repos };
+  }
+
+  it("refuses to self-join an open confidential group", async () => {
+    const { controller, repos } = joinController({ id: "g1", confidential: true, joinPolicy: "open" });
+    const result: any = await (controller as any).joinSelf({ body: { groupId: "g1" } }, {});
+    expect(result.status).toBe(403);
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
+  });
+
+  it("refuses a confidential group with no joinPolicy set", async () => {
+    const { controller, repos } = joinController({ id: "g1", confidential: true });
+    const result: any = await (controller as any).joinSelf({ body: { groupId: "g1" } }, {});
+    expect(result.status).toBe(403);
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
+  });
+
+  it("routes a confidential request-policy group to the request flow", async () => {
+    const { controller } = joinController({ id: "g1", confidential: true, joinPolicy: "request" });
+    const result: any = await (controller as any).joinSelf({ body: { groupId: "g1" } }, {});
+    expect(result.status).toBe(409);
+    expect(result.obj.redirect).toBe("request");
+  });
+
+  it("still lets a member join an ordinary open group", async () => {
+    const { controller, repos } = joinController({ id: "g1", joinPolicy: "open" });
+    await (controller as any).joinSelf({ body: { groupId: "g1" } }, {});
+    expect(repos.groupMember.save).toHaveBeenCalledWith(expect.objectContaining({ groupId: "g1", personId: "p1" }));
+  });
+
+  it("refuses a caller with no person record", async () => {
+    const { controller, repos } = joinController({ id: "g1", joinPolicy: "open" }, true);
+    const result: any = await (controller as any).joinSelf({ body: { groupId: "g1" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
+  });
+});

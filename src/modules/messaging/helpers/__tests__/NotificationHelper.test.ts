@@ -40,6 +40,7 @@ jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { g
 jest.mock("axios", () => ({ default: { post: jest.fn() }, post: jest.fn() }));
 
 import { NotificationHelper } from "../NotificationHelper.js";
+import { ChurchEmailLimiter } from "../../../../shared/helpers/ChurchEmailLimiter.js";
 
 describe("NotificationHelper.attemptDeliveryWithEscalation", () => {
   beforeEach(() => {
@@ -585,6 +586,26 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
     expect(args[5]).toBe("<p>Custom html</p>");
     expect(repos.deliveryLog.save).toHaveBeenCalledWith(expect.objectContaining({ deliveryMethod: "email", success: true, personId: "PER1" }));
     expect(result[0].deliveryMethod).toBe("complete");
+  });
+
+  it("draws church-authored email from the church's allowance and skips the send when it is exhausted", async () => {
+    const repos = buildRepos();
+    NotificationHelper.init(repos);
+    getEmailDataSpy.mockResolvedValue([{ id: "PER1", email: "per1@example.com" }]);
+    const reserve = jest.spyOn(ChurchEmailLimiter, "reserve").mockResolvedValueOnce(["R1"]).mockResolvedValueOnce(null);
+    const settle = jest.spyOn(ChurchEmailLimiter, "settle").mockResolvedValue(undefined);
+    const opts = { emailImmediate: true, churchAuthored: true, emailByPerson: { PER1: { subject: "S", html: "<p>h</p>" } } };
+
+    await NotificationHelper.createNotifications(["PER1"], "CHU1", "task", "TPL1", "S", undefined, undefined, opts);
+    expect(reserve).toHaveBeenCalledWith("CHU1", "workflowEmail", [expect.objectContaining({ address: "per1@example.com", personId: "PER1" })]);
+    expect(settle).toHaveBeenCalledWith("CHU1", "R1", true);
+    expect(sendTemplatedEmailMock).toHaveBeenCalledTimes(1);
+
+    await NotificationHelper.createNotifications(["PER1"], "CHU1", "task", "TPL1", "S", undefined, undefined, opts);
+    expect(sendTemplatedEmailMock).toHaveBeenCalledTimes(1);
+    expect(repos.deliveryLog.save).toHaveBeenCalledWith(expect.objectContaining({ success: false, errorMessage: "Daily email limit reached" }));
+    reserve.mockRestore();
+    settle.mockRestore();
   });
 
   it("bypasses the unread-dedup guard so an unread earlier row does not swallow an explicit send", async () => {

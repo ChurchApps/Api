@@ -1,5 +1,6 @@
 import express from "express";
 import Axios from "axios";
+import Stripe from "stripe";
 import { StripeHelper } from "../StripeHelper.js";
 import { Environment } from "../Environment.js";
 import { IGatewayProvider, WebhookResult, ChargeResult, SubscriptionResult, GatewayConfig, ProviderCapabilities, WebhookEventClassification, ReplayEvent } from "./IGatewayProvider.js";
@@ -56,7 +57,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
   async verifyWebhookSignature(config: GatewayConfig, headers: express.Request["headers"], body: any): Promise<WebhookResult> {
     try {
       const sig = headers["stripe-signature"]?.toString();
-      if (!sig) {
+      // stripe-node verifies an HMAC keyed with "" too, so an unset secret would accept forged events.
+      if (!sig || !config.webhookKey) {
         return { success: false, shouldProcess: false };
       }
 
@@ -306,6 +308,15 @@ export class StripeGatewayProvider implements IGatewayProvider {
   // Customer management
   async createCustomer(config: GatewayConfig, email: string, name: string): Promise<string> {
     return await StripeHelper.createCustomer(config.privateKey, email, name);
+  }
+
+  async getCustomerCreatedAt(config: GatewayConfig, customerId: string): Promise<Date | null> {
+    try {
+      const customer: any = await new Stripe(config.privateKey, { apiVersion: "2025-02-24.acacia" }).customers.retrieve(customerId);
+      return customer && !customer.deleted && customer.created ? new Date(customer.created * 1000) : null;
+    } catch {
+      return null;
+    }
   }
 
   async getCustomerSubscriptions(config: GatewayConfig, customerId: string): Promise<any> {

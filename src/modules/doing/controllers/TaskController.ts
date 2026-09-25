@@ -93,6 +93,7 @@ export class TaskController extends DoingBaseController {
       // Member directory updates and account deletion requests are self-service; staff task creation requires Edit.
       const selfService = type === "directoryUpdate" || type === AccountDeletionHelper.taskType;
       if (!selfService && !au.checkAccess(Permissions.tasks.edit)) return this.json({}, 401);
+      if (selfService && (!au.churchId || !au.personId) && !au.checkAccess(Permissions.tasks.edit)) return this.json({}, 401);
       // Cards must use the card endpoints (which run routing + per-card permissions).
       if (req.body.some((task) => task.workflowId || task.stepId)) return this.json({ message: "Workflow cards must use the card endpoints" }, 400);
       if (type === AccountDeletionHelper.taskType) {
@@ -162,7 +163,7 @@ export class TaskController extends DoingBaseController {
   // authz-exempt: gated by bulkApply → canEditCard(au, task) per card (tasks.edit or assignee)
   @httpPost("/bulk/moveStep")
   public async bulkMoveStep(req: express.Request<{}, {}, { ids: string[]; stepId: string }>, res: express.Response): Promise<any> {
-    return this.bulkApply(req, res, async (task) => WorkflowHelper.moveToStep(task, req.body.stepId, this.repos, true));
+    return this.bulkApply(req, res, async (task) => ((await this.stepInCardWorkflow(task, req.body.stepId)) ? WorkflowHelper.moveToStep(task, req.body.stepId, this.repos, true) : null));
   }
 
   // authz-exempt: gated by bulkApply → canEditCard(au, task) per card (tasks.edit or assignee)
@@ -185,7 +186,13 @@ export class TaskController extends DoingBaseController {
   }
 
   // Applies op to each editable card, reporting updated vs. skipped (missing/denied) ids.
-  private async bulkApply(req: express.Request<{}, {}, { ids: string[] }>, res: express.Response, op: (task: Task) => Promise<Task>): Promise<any> {
+  private async stepInCardWorkflow(task: Task, stepId: string): Promise<boolean> {
+    if (!stepId || !task.workflowId) return false;
+    const step = await this.repos.workflowStep.load(task.churchId, stepId);
+    return !!step && step.workflowId === task.workflowId;
+  }
+
+  private async bulkApply(req: express.Request<{}, {}, { ids: string[] }>, res: express.Response, op: (task: Task) => Promise<Task | null>): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const ids = req.body.ids || [];
       const tasks = (await Promise.all(ids.map((id) => this.repos.task.load(au.churchId, id)))) as (Task | null)[];
@@ -197,7 +204,10 @@ export class TaskController extends DoingBaseController {
           skipped.push(ids[i]);
           continue;
         }
-        await op(task);
+        if ((await op(task)) === null) {
+          skipped.push(ids[i]);
+          continue;
+        }
         updated.push(ids[i]);
       }
       return { updated, skipped };
@@ -233,7 +243,10 @@ export class TaskController extends DoingBaseController {
   @httpPost("/:id/moveStep")
   public async moveStep(@requestParam("id") id: string, req: express.Request<{}, {}, { stepId: string }>, res: express.Response): Promise<any> {
     // Manual placement: suppress onEnter routing so the card stays where it was dropped.
-    return this.withCard(req, res, id, (task) => WorkflowHelper.moveToStep(task, req.body.stepId, this.repos, true));
+    return this.withCard(req, res, id, async (task) => {
+      if (!(await this.stepInCardWorkflow(task, req.body.stepId))) return this.json({ message: "Step is not in this card's workflow" }, 400);
+      return WorkflowHelper.moveToStep(task, req.body.stepId, this.repos, true);
+    });
   }
 
   // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)

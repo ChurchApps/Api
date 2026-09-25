@@ -9,10 +9,13 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { DunningHelper } from "../helpers/DunningHelper.js";
 import { DonationRequestGuard } from "../helpers/DonationRequestGuard.js";
+import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
 import { isDuplicateKeyError } from "../repositories/EventLogRepo.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import Axios from "axios";
 import dayjs from "dayjs";
+
+const TOO_MANY = "Too many requests. Please try again later.";
 
 @controller("/giving/donate")
 export class DonateController extends GivingBaseController {
@@ -29,26 +32,7 @@ export class DonateController extends GivingBaseController {
 
       const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
 
-      const publicGateways = gateways.map(gateway => {
-        const base: any = {
-          id: gateway.id,
-          provider: gateway.provider,
-          publicKey: gateway.publicKey,
-          productId: gateway.productId,
-          payFees: gateway.payFees,
-          currency: gateway.currency,
-          enabled: gateway.enabled,
-          environment: gateway.environment || null
-        };
-        // Include non-sensitive settings for frontend (e.g. sandbox flag)
-        if (gateway.settings) {
-          try {
-            const settings = typeof gateway.settings === "string" ? JSON.parse(gateway.settings) : gateway.settings;
-            base.settings = { sandbox: settings.sandbox || false };
-          } catch { /* ignore parse errors */ }
-        }
-        return base;
-      });
+      const publicGateways = gateways.map(gateway => GivingBaseController.toPublicGateway(gateway));
 
       return { gateways: publicGateways };
     });
@@ -103,6 +87,7 @@ export class DonateController extends GivingBaseController {
         if (!churchId) return this.json({ error: "Missing churchId" }, 400);
         if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
         if (!amount || amount <= 0 || !/^[A-Z]{3}$/.test(currency)) return this.json({ error: "Invalid amount or currency" }, 400);
+        if (!au.id && !(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: TOO_MANY }, 429);
 
         const gateway = await this.getGateway(churchId, req.body.provider, req.body.gatewayId);
         if (!gateway) return this.json({ error: "Gateway not found" }, 404);
@@ -422,12 +407,15 @@ export class DonateController extends GivingBaseController {
       const gateway = await this.getGateway(churchId, donationData.provider, donationData.gatewayId);
       if (!gateway) return this.json({ error: "Gateway not found" }, 404);
 
+      const canEdit = !!au.id && au.checkAccess(Permissions.donations.edit);
       // Anonymous is enforced here, not on the client: the email is kept for the receipt, everything identifying is dropped.
       if (donationData.anonymous) donationData.person = { id: "", email: donationData.person?.email || "", name: "" };
-      else if (donationData.person) donationData.person.id = DonationRequestGuard.resolvePersonId(donationData.person.id, au, au.checkAccess(Permissions.donations.edit));
-      const fundError = DonationRequestGuard.validateFunds(donationData.amount, donationData.funds);
+      else if (donationData.person) donationData.person.id = DonationRequestGuard.resolvePersonId(donationData.person.id, au, canEdit);
+      const fundError = DonationRequestGuard.validateFunds(donationData.amount, donationData.funds) || await this.validateFundIds(churchId, donationData.funds);
       if (fundError) return this.json({ error: fundError }, 400);
       if (!au.id && !DonationRequestGuard.stripGuestSavedMethod(donationData, gateway.provider)) return this.json({ error: "Saved payment methods require login" }, 401);
+      if (!au.id && !(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: TOO_MANY }, 429);
+      if (!(await this.savedMethodAllowed(donationData, gateway, au, canEdit))) return this.json({ error: "Payment method not found" }, 403);
 
       const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
       const normalizedCurrency = rawCurrency.toLowerCase();
@@ -440,6 +428,7 @@ export class DonateController extends GivingBaseController {
         const chargeResult = await GatewayService.processCharge(gateway, donationData);
 
         if (!chargeResult.success) {
+          if (!au.id) await DonationRateLimiter.recordDecline(req);
           return this.json({ error: chargeResult.data?.error || chargeResult.error || "Charge processing failed" }, 400);
         }
 
@@ -462,7 +451,8 @@ export class DonateController extends GivingBaseController {
         }
 
         try {
-          const receipt = await this.receiptContext(churchId, donationData?.church, donationData.funds);
+          // A replayed reference (already recorded) must not become a way to mail receipts to arbitrary addresses.
+          const receipt = chargeResult.data?.alreadyRecorded ? null : await this.receiptContext(churchId, donationData.funds);
           if (receipt) await this.sendEmails(donationData.person?.email, receipt.church, receipt.funds, donationData?.amount, donationData?.interval, donationData?.billing_cycle_anchor, "one-time", normalizedCurrency);
         } catch (emailErr) {
           console.warn("Charge: Failed to send confirmation email (non-fatal)", emailErr);
@@ -492,8 +482,9 @@ export class DonateController extends GivingBaseController {
       }
 
       if (!person) return this.json({ error: "person is required" }, 400);
-      person.id = DonationRequestGuard.resolvePersonId(person.id, au, au.checkAccess(Permissions.donations.edit));
-      const fundError = DonationRequestGuard.validateFunds(amount, funds);
+      const canEdit = !!au.id && au.checkAccess(Permissions.donations.edit);
+      person.id = DonationRequestGuard.resolvePersonId(person.id, au, canEdit);
+      const fundError = DonationRequestGuard.validateFunds(amount, funds) || await this.validateFundIds(churchId, funds);
       if (fundError) return this.json({ error: fundError }, 400);
 
       const gateway = await this.getGateway(churchId, provider, gatewayId);
@@ -531,12 +522,15 @@ export class DonateController extends GivingBaseController {
         };
 
         if (!au.id && !DonationRequestGuard.stripGuestSavedMethod(subscriptionData, gateway.provider)) return this.json({ error: "Saved payment methods require login" }, 401);
+        if (!au.id && !(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: TOO_MANY }, 429);
+        if (!(await this.savedMethodAllowed(subscriptionData, gateway, au, canEdit))) return this.json({ error: "Payment method not found" }, 403);
         // Provider-specific prep (e.g. reuse the person's existing vault customer). Never for guests: person.id is client-supplied.
         if (au.id) await GatewayService.prepareSubscription(gateway, subscriptionData, person, this.repos);
 
         const subscriptionResult = await GatewayService.createSubscription(gateway, subscriptionData);
 
         if (!subscriptionResult.success) {
+          if (!au.id) await DonationRateLimiter.recordDecline(req);
           return this.json({ error: "Subscription creation failed" }, 400);
         }
 
@@ -547,7 +541,7 @@ export class DonateController extends GivingBaseController {
           id: subscriptionResult.subscriptionId,
           churchId,
           personId: person.id,
-          customerId: providerCustomerId || customerId
+          customerId: providerCustomerId || subscriptionData.customerId
         };
 
         await this.repos.subscription.save(subscription);
@@ -566,7 +560,7 @@ export class DonateController extends GivingBaseController {
         await Promise.all(promises);
 
         try {
-          const receipt = await this.receiptContext(churchId, req.body?.church, funds);
+          const receipt = await this.receiptContext(churchId, funds);
           if (receipt) await this.sendEmails(person.email, receipt.church, receipt.funds, amount, interval, billing_cycle_anchor, "recurring", normalizedCurrency);
         } catch (emailErr) {
           console.warn("Subscribe: Failed to send confirmation email (non-fatal)", emailErr);
@@ -646,7 +640,7 @@ export class DonateController extends GivingBaseController {
       if (donationType === "recurring") {
         const startDate = dayjs(billingCycleAnchor).format("MMM D, YYYY");
         contentRows.push(
-          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${interval!.interval_count} ${interval!.interval}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${DonateController.escapeHtml(fund.name)}</td><td style="font-size: 15px">${formattedFund}</td></tr>`
+          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${DonateController.intervalLabel(interval)}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${DonateController.escapeHtml(fund.name)}</td><td style="font-size: 15px">${formattedFund}</td></tr>`
         );
       } else {
         contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${DonateController.escapeHtml(fund.name)}</td><td style="font-size: 15px">${formattedFund}</td></tr>`);
@@ -726,15 +720,35 @@ export class DonateController extends GivingBaseController {
     await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, to, church.name as string, `https://${domain}`, "Thank You For Donating", contents, "ChurchEmailTemplate.html", undefined, church.logo || undefined);
   };
 
-  // The receipt names the church and funds from our records, never from the request body.
-  private async receiptContext(churchId: string, requestChurch: { logo?: string } | undefined, funds: any[]) {
+  // The receipt names the church, logo and funds from our records, never from the request body.
+  private async receiptContext(churchId: string, funds: any[]) {
     if (!churchId) return null;
     const membershipRepos = await RepoManager.getRepos<any>("membership");
     const church: any = await membershipRepos.church.loadById(churchId);
     if (!church) return null;
     const named = await Promise.all((funds || []).map(async (f: any) => ({ ...f, name: ((await this.repos.fund.load(churchId, f.id)) as any)?.name || "" })));
-    const logo = typeof requestChurch?.logo === "string" && /^https:\/\//i.test(requestChurch.logo) ? requestChurch.logo : undefined;
+    const settings: any[] = await membershipRepos.setting.loadMulipleChurches(["logoLight"], [churchId]).catch((): any[] => []);
+    const storedLogo = settings?.[0]?.value;
+    const logo = typeof storedLogo === "string" && /^https:\/\//i.test(storedLogo) ? storedLogo : undefined;
     return { church: { name: church.name, subDomain: church.subDomain, logo }, funds: named };
+  }
+
+  private static intervalLabel(interval?: { interval_count?: number; interval?: string }): string {
+    const count = Math.max(1, Math.min(365, Math.floor(Number(interval?.interval_count) || 1)));
+    const unit = ["day", "week", "month", "year"].includes(String(interval?.interval)) ? String(interval?.interval) : "";
+    return unit ? `${count} ${unit}` : "";
+  }
+
+  // Funds must exist in this church; hidden funds stay allowed because giving links can target them.
+  private async validateFundIds(churchId: string, funds: any[]): Promise<string | null> {
+    for (const f of funds || []) {
+      if (f?.id && !(await this.repos.fund.load(churchId, String(f.id)))) return "Invalid fund";
+    }
+    return null;
+  }
+
+  private savedMethodAllowed(data: any, gateway: any, au: any, canEdit: boolean): Promise<boolean> {
+    return DonationRequestGuard.savedMethodAllowed(data, gateway, au, canEdit, this.repos, (customerId) => GatewayService.getCustomerCreatedAt(gateway, customerId));
   }
 
   private static escapeHtml(value: unknown): string {

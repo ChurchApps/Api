@@ -2,6 +2,7 @@ import { AwsHelper, FileStorageHelper } from "@churchapps/apihelper";
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import * as path from "path";
+import * as crypto from "crypto";
 import { Environment, Permissions } from "../helpers/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 
@@ -38,7 +39,15 @@ export class GalleryController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
-        const key = au.churchId + "/gallery/" + path.basename(req.body.folder) + "/" + path.basename(req.body.fileName);
+        let fileName = path.basename(req.body.fileName);
+        if (!au.checkAccess(Permissions.content.edit)) {
+          const ext = path.extname(fileName).toLowerCase();
+          if (![".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext)) return this.json({ error: "Unsupported image type" }, 400);
+          if (req.body.contentType && !/^image\/(jpeg|png|webp|gif)$/i.test(req.body.contentType)) return this.json({ error: "Unsupported image type" }, 400);
+          // non-editors get an unguessable key so they can't overwrite existing gallery images
+          fileName = path.basename(fileName, path.extname(fileName)) + "-" + crypto.randomBytes(6).toString("hex") + ext;
+        }
+        const key = au.churchId + "/gallery/" + path.basename(req.body.folder) + "/" + fileName;
         const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key, req.body.contentType, req.body.size) : {};
         return result;
       }

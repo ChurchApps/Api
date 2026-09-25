@@ -207,6 +207,12 @@ export class GatewayService {
     return undefined;
   }
 
+  static async getCustomerCreatedAt(gateway: any, customerId: string): Promise<Date | null> {
+    const provider = this.getProviderFromGateway(gateway);
+    if (!provider.getCustomerCreatedAt) return null;
+    return await provider.getCustomerCreatedAt(this.getGatewayConfig(gateway), customerId);
+  }
+
   static async getCustomerSubscriptions(gateway: any, customerId: string): Promise<any> {
     const provider = this.getProviderFromGateway(gateway);
     if (provider.getCustomerSubscriptions) {

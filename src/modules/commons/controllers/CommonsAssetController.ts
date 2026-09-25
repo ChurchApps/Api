@@ -3,7 +3,7 @@ import { CommonsMauticHelper } from "../helpers/CommonsMauticHelper.js";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
-import { ContentLibraryHelper, PublishHelper, recordAssetDownload, userNames } from "../helpers/index.js";
+import { ContentLibraryHelper, PublishHelper, ReviewerHelper, recordAssetDownload, userNames } from "../helpers/index.js";
 import { Asset, AssetFile } from "../models/index.js";
 import { baseName } from "../helpers/PackageLayout.js";
 
@@ -86,9 +86,10 @@ export class CommonsAssetController extends CommonsBaseController {
 
   @httpGet("/:id/editable")
   public async editable(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapperAuth(req, res, async () => {
+    return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.status === "removed" || asset.status === "pending") return this.json({}, 404);
+      if (asset.status !== "published" && asset.publisherUserId !== au.id && !ReviewerHelper.canReview(au)) return this.json({}, 404);
       return await PublishHelper.editablePayload(this.repos, asset);
     });
   }

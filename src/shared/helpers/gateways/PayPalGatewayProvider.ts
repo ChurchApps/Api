@@ -94,10 +94,16 @@ export class PayPalGatewayProvider implements IGatewayProvider {
     if (eventData?.status !== "COMPLETED") {
       return { success: false, transactionId: eventData?.id || "", data: { error: `PayPal capture ${String(eventData?.status || "failed").toLowerCase()}` } };
     }
+    // The order amount is set client-side at create-order, so the requested amount is only trusted when the capture agrees.
+    const captured = parseFloat(eventData.amount?.value ?? "NaN");
+    if (!Number.isFinite(captured) || Math.round(captured * 100) !== Math.round(Number(donationData.amount) * 100)) {
+      console.error("PayPal capture amount mismatch", { captureId: eventData.id, captured: eventData.amount?.value, requested: donationData.amount });
+      return { success: false, transactionId: eventData.id || "", data: { error: "Captured amount does not match the donation amount" } };
+    }
     return {
       success: true,
       transactionId: eventData.id || "",
-      data: eventData
+      data: { ...eventData, currency: eventData.amount?.currency_code }
     };
   }
 

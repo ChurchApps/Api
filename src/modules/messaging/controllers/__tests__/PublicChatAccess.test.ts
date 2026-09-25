@@ -279,6 +279,12 @@ describe("ConnectionController", () => {
     expect(left).toEqual({ success: true });
   });
 
+  it("lists only id and displayName so socketIds, personIds and IPs stay private", async () => {
+    const repos = connectionRepos({ byId: publicLive, connections: [{ id: "cn1", displayName: "Pat", socketId: "sock1", personId: "p9", ipAddress: "1.2.3.4", churchId: "c1" }] });
+    const controller = attach(new ConnectionController(), repos);
+    expect(await (controller as any).load("c1", "live1", {}, {})).toEqual([{ id: "cn1", displayName: "Pat" }]);
+  });
+
   it("401s anon catchup-style join against a group or DM conversation", async () => {
     for (const conv of [groupConv, dmConv]) {
       const repos = connectionRepos({ byId: conv, byIdOnly: conv });

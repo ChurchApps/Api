@@ -67,8 +67,7 @@ export class SocketHelper {
       sc.socket.on("pong", () => { sc.isAlive = true; });
 
       // Handle incoming messages - send socketId for ANY message
-      sc.socket.on("message", (message) => {
-        console.log(`Received message: ${message.toString()}`);
+      sc.socket.on("message", () => {
         const payload: PayloadInterface = { churchId: "", conversationId: "", action: "socketId", data: sc.id };
         sc.socket.send(JSON.stringify(payload));
       });

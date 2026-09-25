@@ -211,13 +211,19 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   private async sendFollowUp(churchId: string, email: string, firstName: string, subject: string, body: string) {
-    if (await ChurchEmailLimiter.remaining(churchId) < 1) return;
-    await ChurchEmailLimiter.record(churchId, "formFollowUp", email);
+    const reserved = await ChurchEmailLimiter.reserve(churchId, "formFollowUp", [{ address: email }]);
+    if (!reserved) return;
     const church: Church = await this.repos.church.loadById(churchId);
     const tokens = { firstName: this.escapeHtml(firstName), churchName: this.escapeHtml(church?.name) };
     const resolvedSubject = ConversationalFormHelper.applyTokens(subject, tokens);
     const resolvedBody = ConversationalFormHelper.applyTokens(body, tokens);
-    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
+    try {
+      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
+      await ChurchEmailLimiter.settle(churchId, reserved[0], true);
+    } catch (err: any) {
+      await ChurchEmailLimiter.settle(churchId, reserved[0], false, err?.message || "Send failed");
+      throw err;
+    }
   }
 
   private async sendNotifications(churchId: string, form: Form, peopleIds: string[]) {

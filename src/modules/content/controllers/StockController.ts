@@ -9,7 +9,8 @@ export class StockController extends ContentBaseController {
   // authz-exempt: open to any authenticated user — Pexels stock-photo search, no church data touched
   @httpPost("/search")
   public async getUploadUrl(req: express.Request<{}, {}, { term: string }>, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async () => {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({}, 401);
       const key = Environment.pexelsKey;
       const client = Pexels.createClient(key);
       const response: Pexels.PhotosWithTotalResults = (await client.photos.search({

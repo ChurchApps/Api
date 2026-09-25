@@ -95,4 +95,22 @@ describe("Environment.init secret checks", () => {
     process.env.ENCRYPTION_KEY = SAMPLE_ENCRYPTION;
     await expect(Environment.init("docker")).resolves.toBeUndefined();
   });
+
+  it("warns but boots on the docker-compose defaults in docker", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    process.env.JWT_SECRET = "please-change-this-jwt-secret";
+    process.env.ENCRYPTION_KEY = "PleaseChangeThisDockerDefaultKey";
+    await expect(Environment.init("docker")).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("JWT_SECRET"));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("ENCRYPTION_KEY"));
+  });
+
+  it("refuses the docker-compose defaults outside docker", async () => {
+    process.env.JWT_SECRET = "please-change-this-jwt-secret";
+    process.env.ENCRYPTION_KEY = VALID_ENCRYPTION;
+    await expect(Environment.init("railway")).rejects.toThrow(/docker-compose default/);
+    process.env.JWT_SECRET = VALID_JWT;
+    process.env.ENCRYPTION_KEY = "PleaseChangeThisDockerDefaultKey";
+    await expect(Environment.init("staging")).rejects.toThrow(/docker-compose default/);
+  });
 });

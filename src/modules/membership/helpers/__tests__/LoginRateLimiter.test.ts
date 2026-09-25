@@ -14,6 +14,7 @@ function fakeRepos(counts: Record<string, number> = {}) {
 }
 
 const ACCOUNT_KEY = "account|a@b.c";
+const ACCOUNT_IP_KEY = "acctip|a@b.c|1.1.1.1";
 const IP_KEY = "ip|1.1.1.1";
 
 describe("LoginRateLimiter.allow", () => {
@@ -22,9 +23,30 @@ describe("LoginRateLimiter.allow", () => {
     expect(await LoginRateLimiter.allow(repos, "1.1.1.1", "a@b.c")).toBe(true);
   });
 
-  it("blocks once the account bucket hits its limit", async () => {
-    const { repos } = fakeRepos({ [ACCOUNT_KEY]: LoginRateLimiter.maxPerAccount });
+  it("blocks once the account+ip bucket hits its limit", async () => {
+    const { repos } = fakeRepos({ [ACCOUNT_IP_KEY]: LoginRateLimiter.maxPerAccountIp });
     expect(await LoginRateLimiter.allow(repos, "1.1.1.1", "a@b.c")).toBe(false);
+  });
+
+  it("does not lock the account out for a different ip when one attacker ip exhausts its account bucket", async () => {
+    const { repos } = fakeRepos({ [ACCOUNT_IP_KEY]: LoginRateLimiter.maxPerAccountIp, [ACCOUNT_KEY]: LoginRateLimiter.maxPerAccountIp });
+    expect(await LoginRateLimiter.allow(repos, "2.2.2.2", "a@b.c")).toBe(true);
+  });
+
+  it("still blocks a distributed run once the looser pure-account ceiling is hit", async () => {
+    const { repos } = fakeRepos({ [ACCOUNT_KEY]: LoginRateLimiter.maxPerAccount });
+    expect(await LoginRateLimiter.allow(repos, "2.2.2.2", "a@b.c")).toBe(false);
+  });
+
+  it("applies a stricter account ceiling when asked (reset codes)", async () => {
+    const { repos } = fakeRepos({ "account|verify:a@b.c": LoginRateLimiter.maxPerAccountStrict });
+    expect(await LoginRateLimiter.allow(repos, "2.2.2.2", "verify:a@b.c")).toBe(true);
+    expect(await LoginRateLimiter.allow(repos, "2.2.2.2", "verify:a@b.c", LoginRateLimiter.maxPerAccountStrict)).toBe(false);
+  });
+
+  it("treats an empty ip as its own bucket, not loopback", async () => {
+    const { repos } = fakeRepos({ "ip|unknown": LoginRateLimiter.maxPerIp });
+    expect(await LoginRateLimiter.allow(repos, "", "someone@b.c")).toBe(false);
   });
 
   it("blocks a spray across accounts once the ip bucket hits its limit", async () => {
@@ -55,22 +77,22 @@ describe("LoginRateLimiter.allow", () => {
 });
 
 describe("LoginRateLimiter counters", () => {
-  it("records a failure against both buckets", async () => {
+  it("records a failure against every bucket", async () => {
     const { repos, incremented } = fakeRepos();
     await LoginRateLimiter.recordFailure(repos, "1.1.1.1", "a@b.c");
-    expect(incremented).toEqual([ACCOUNT_KEY, IP_KEY]);
+    expect(incremented).toEqual([ACCOUNT_IP_KEY, ACCOUNT_KEY, IP_KEY]);
   });
 
-  it("records a loopback failure against the account bucket only", async () => {
+  it("records a loopback failure against the account buckets only", async () => {
     const { repos, incremented } = fakeRepos();
     await LoginRateLimiter.recordFailure(repos, "127.0.0.1", "a@b.c");
-    expect(incremented).toEqual([ACCOUNT_KEY]);
+    expect(incremented).toEqual(["acctip|a@b.c|127.0.0.1", ACCOUNT_KEY]);
   });
 
-  it("clears the account bucket on success but leaves the ip bucket standing", async () => {
+  it("clears the account buckets on success but leaves the ip bucket standing", async () => {
     const { repos, cleared } = fakeRepos();
-    await LoginRateLimiter.clearFailures(repos, "a@b.c");
-    expect(cleared).toEqual([[ACCOUNT_KEY]]);
+    await LoginRateLimiter.clearFailures(repos, "a@b.c", "1.1.1.1");
+    expect(cleared).toEqual([[ACCOUNT_IP_KEY, ACCOUNT_KEY]]);
   });
 
   it("swallows counter-store errors instead of failing the request", async () => {

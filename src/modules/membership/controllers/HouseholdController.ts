@@ -10,6 +10,10 @@ export class HouseholdController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit)) {
+        const self = au.personId ? await this.repos.person.load(au.churchId, au.personId) : null;
+        if (!self || (self as any).householdId !== id) return this.json({}, 401);
+      }
       const data = await this.repos.household.load(au.churchId, id);
       return this.repos.household.convertToModel(au.churchId, data);
     });
@@ -18,6 +22,7 @@ export class HouseholdController extends MembershipBaseController {
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const data = await this.repos.household.loadAll(au.churchId);
       return this.repos.household.convertAllToModel(au.churchId, data);
     });

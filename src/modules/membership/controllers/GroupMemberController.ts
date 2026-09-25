@@ -211,12 +211,13 @@ export class GroupMemberController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const groupId = req.body?.groupId;
       if (!groupId) return this.json({ error: "groupId required" }, 400);
+      if (!au.personId) return this.json({}, 401);
 
       const group: any = await this.repos.group.load(au.churchId, groupId);
       if (!group || group.archived) return this.json({ error: "Group not found" }, 404);
 
       const policy = group.joinPolicy ?? "open";
-      if (policy === "closed") return this.json({ error: "Group is closed to new members" }, 403);
+      if (policy === "closed" || (group.confidential && policy !== "request")) return this.json({ error: "Group is closed to new members" }, 403);
       if (policy === "request") return this.json({ redirect: "request", error: "This group requires approval" }, 409);
 
       const existing = (await this.repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[];

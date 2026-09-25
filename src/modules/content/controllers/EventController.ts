@@ -228,11 +228,13 @@ export class EventController extends ContentBaseController {
   @httpPost("/request")
   public async request(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.churchId || !au.personId) return this.json({}, 401);
+      const groupId = req.body.groupId && (au.groupIds?.includes(req.body.groupId) || au.checkAccess(Permissions.content.edit)) ? req.body.groupId : undefined;
       const event: Event = {
         churchId: au.churchId,
-        groupId: req.body.groupId,
-        title: req.body.title,
-        description: req.body.description,
+        groupId,
+        title: typeof req.body.title === "string" ? req.body.title.slice(0, 255) : undefined,
+        description: typeof req.body.description === "string" ? req.body.description.slice(0, 10000) : undefined,
         start: req.body.start ? new Date(req.body.start) : undefined,
         end: req.body.end ? new Date(req.body.end) : undefined,
         allDay: req.body.allDay,
@@ -242,7 +244,9 @@ export class EventController extends ContentBaseController {
         requestedBy: au.personId
       };
       const saved = await this.repos.event.save(event);
-      const bookings = await this.saveBookingsForEvent(au, saved.id, req.body.roomIds || [], req.body.resources || []);
+      const roomIds = Array.isArray(req.body.roomIds) ? req.body.roomIds.slice(0, 50) : [];
+      const resources = Array.isArray(req.body.resources) ? req.body.resources.slice(0, 50) : [];
+      const bookings = await this.saveBookingsForEvent(au, saved.id, roomIds, resources);
       return { event: saved, bookings };
     });
   }

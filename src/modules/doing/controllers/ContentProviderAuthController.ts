@@ -7,6 +7,12 @@ import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, C
 
 @controller("/doing/contentProviderAuths")
 export class ContentProviderAuthController extends DoingBaseController {
+  // Refresh tokens never leave the server; clients refresh through POST /refresh.
+  static redact<T>(data: T): T {
+    const strip = (row: any) => (row ? { ...row, refreshToken: undefined } : row);
+    return (Array.isArray(data) ? data.map(strip) : strip(data)) as T;
+  }
+
   @httpGet("/ids")
   public async getByIds(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -14,7 +20,7 @@ export class ContentProviderAuthController extends DoingBaseController {
       const idsString = typeof req.query.ids === "string" ? req.query.ids : req.query.ids ? String(req.query.ids) : "";
       if (!idsString) return this.json({ error: "Missing required parameter: ids" });
       const ids = idsString.split(",");
-      return await this.repos.contentProviderAuth.loadByIds(au.churchId, ids);
+      return ContentProviderAuthController.redact(await this.repos.contentProviderAuth.loadByIds(au.churchId, ids));
     });
   }
 
@@ -22,7 +28,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   public async getByMinistry(@requestParam("ministryId") ministryId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
-      return await this.repos.contentProviderAuth.loadByMinistry(au.churchId, ministryId);
+      return ContentProviderAuthController.redact(await this.repos.contentProviderAuth.loadByMinistry(au.churchId, ministryId));
     });
   }
 
@@ -35,7 +41,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
-      return await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId);
+      return ContentProviderAuthController.redact(await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId));
     });
   }
 
@@ -44,7 +50,7 @@ export class ContentProviderAuthController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.contentProviderAuth.load(au.churchId, id);
-      return this.repos.contentProviderAuth.convertToModel(au.churchId, data);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertToModel(au.churchId, data));
     });
   }
 
@@ -53,7 +59,7 @@ export class ContentProviderAuthController extends DoingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const data = await this.repos.contentProviderAuth.loadAll(au.churchId);
-      return this.repos.contentProviderAuth.convertAllToModel(au.churchId, data);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertAllToModel(au.churchId, data));
     });
   }
 
@@ -64,7 +70,7 @@ export class ContentProviderAuthController extends DoingBaseController {
       const promises: Promise<ContentProviderAuth>[] = [];
       req.body.forEach((item) => { item.churchId = au.churchId; promises.push(this.repos.contentProviderAuth.save(item)); });
       const result = await Promise.all(promises);
-      return this.repos.contentProviderAuth.convertAllToModel(au.churchId, result);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertAllToModel(au.churchId, result));
     });
   }
 
@@ -96,7 +102,7 @@ export class ContentProviderAuthController extends DoingBaseController {
         scope: tokens.scope || ""
       };
       const saved = await this.repos.contentProviderAuth.save(record);
-      return this.repos.contentProviderAuth.convertToModel(au.churchId, saved);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertToModel(au.churchId, saved));
     });
   }
 
@@ -119,7 +125,7 @@ export class ContentProviderAuthController extends DoingBaseController {
         scope: authRecord.scope || ""
       };
       const tokenHelper = new TokenHelper();
-      if (tokenHelper.isAuthValid(auth)) return this.repos.contentProviderAuth.convertToModel(au.churchId, authRecord);
+      if (tokenHelper.isAuthValid(auth)) return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertToModel(au.churchId, authRecord));
       const config = getProviderConfig(providerId) as ContentProviderConfig | null;
       if (!config || !auth.refresh_token) return this.json({ error: "Cannot refresh" }, 400);
       const refreshed = await tokenHelper.refreshToken(config, auth);
@@ -128,7 +134,7 @@ export class ContentProviderAuthController extends DoingBaseController {
       authRecord.refreshToken = refreshed.refresh_token;
       authRecord.expiresAt = new Date((refreshed.created_at + refreshed.expires_in) * 1000);
       const saved = await this.repos.contentProviderAuth.save(authRecord);
-      return this.repos.contentProviderAuth.convertToModel(au.churchId, saved);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertToModel(au.churchId, saved));
     });
   }
 

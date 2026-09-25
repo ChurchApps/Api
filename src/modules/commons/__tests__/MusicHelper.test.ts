@@ -35,6 +35,23 @@ describe("MusicHelper.pitchClasses", () => {
   });
 });
 
+describe("MusicHelper.pitchClasses crafted input", () => {
+  it("terminates on an over-long variable-length meta size", () => {
+    const events = [
+      0x00, 0xff, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f, 0x00, 0x90, 60, 0x40
+    ];
+    const track = Buffer.from(events);
+    const head = Buffer.alloc(14);
+    head.write("MThd", 0, "latin1");
+    head.writeUInt32BE(6, 4);
+    head.writeUInt16BE(1, 10);
+    const chunk = Buffer.alloc(8);
+    chunk.write("MTrk", 0, "latin1");
+    chunk.writeUInt32BE(track.length, 4);
+    expect(MusicHelper.pitchClasses(Buffer.concat([head, chunk, track])).length).toBe(12);
+  });
+});
+
 describe("MusicHelper.midiKeyRoot", () => {
   it("estimates the tonic of a scale", () => {
     expect(MusicHelper.midiKeyRoot(midi(C_MAJOR_SCALE))).toBe("C");

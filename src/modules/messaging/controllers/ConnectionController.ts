@@ -23,8 +23,8 @@ export class ConnectionController extends MessagingBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       if (!(await this.canAccessConnection(churchId, conversationId))) return this.json([], 401);
       const data = await this.repos.connection.loadForConversation(churchId, conversationId);
-      const connections = this.repos.connection.convertAllToModel(data);
-      return connections;
+      // socketId is the only proof of ownership leaveRoom/setName get, so it must never be listed.
+      return this.repos.connection.convertAllToModel(data).map((c: Connection) => ({ id: c.id, displayName: c.displayName }));
     });
   }
 
