@@ -502,6 +502,16 @@ describe("PublishHelper.syncOutput", () => {
     expect(r.song.update).toHaveBeenCalledWith("asset000001", { scoreSource: "abc", confidence: "score", singTimeSeconds: 134 });
   });
 
+  it("drops no rows when the package's output/ lists empty (a takedown, not a retired build)", async () => {
+    const DIR2 = "songs/ru/x-asset000001";
+    const r: any = {
+      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR2}/song.json` }, { id: "lf2", name: `${DIR2}/output/composition.zip` }]), create: jest.fn(), delete: jest.fn() },
+      song: { loadSatellite: jest.fn(async () => undefined) }
+    };
+    expect(await PublishHelper.syncOutput(r, "asset000001")).toEqual({ added: 0, removed: 0 });
+    expect(r.assetFile.delete).not.toHaveBeenCalled();
+  });
+
   it("skips a song with no package of its own or a pre-2026-09 one", async () => {
     const r: any = { assetFile: { loadLive: jest.fn(async () => [{ name: "songs/en/parent-parent00001/song.json" }]) } };
     expect(await PublishHelper.syncOutput(r, "asset000001")).toBeNull();
