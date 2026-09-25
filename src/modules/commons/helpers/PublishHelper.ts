@@ -23,6 +23,7 @@ export class PublishHelper {
     const generic: Partial<Asset> = {};
     for (const k of APPLIED_FIELDS) if (payload[k] !== undefined) (generic as any)[k] = payload[k];
     if (generic.tags !== undefined) generic.tags = normalizeTags(String(generic.tags));
+    if (typeof generic.name === "string") generic.name = generic.name.trim(); // "My Father My Friend " came through
     await repos.asset.update(asset.id || "", generic);
     Object.assign(asset, generic);
 
