@@ -16,6 +16,7 @@ jest.mock("../helpers/ContentLibraryHelper", () => {
       removeKey: jest.fn(async () => {}),
       removePrefix: jest.fn(async () => {}),
       readKey: jest.fn(async () => null),
+      listLiveKeys: jest.fn(async () => []),
       sha256: () => "hash",
       role: (n: string) => n.replace(/\.[^.]+$/, ""),
       songJson: () => ({}),
@@ -31,8 +32,8 @@ import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
 import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
 
 const asset = (): any => ({ id: "asset000001", assetType: "song", name: "Old", language: "English", status: "published", publisherUserId: "owner000001", publishedAt: new Date("2026-01-01"), publishedSubmissionId: "sub00000000" });
-// the package a legacy or brand-new song lands in: the title, language and license at the time of the approve (the payload renames it and sets WC)
-const PKG = "songs/en/wc-license/new-name-asset000001";
+// the package a legacy or brand-new song lands in: the title and language at the time of the approve (the payload renames it)
+const PKG = "songs/en/new-name-asset000001";
 // a song already in the layout keeps its frozen folder whatever its title becomes
 const FROZEN = "songs/en/public-domain/old-asset000001";
 const LEGACY = "commons/assets/song/asset000001";
@@ -96,10 +97,10 @@ describe("PublishHelper.approve", () => {
     expect(r.author.findOrCreate).toHaveBeenCalledWith("Fanny Crosby");
     expect(r.author.findOrCreate).toHaveBeenCalledTimes(1);
     expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", authorId: "author00001", chordPro: "Verse 1\n[G]Sing", bpm: 80, hymnalCount: 3, qualityScore: 30, qualityDetail: JSON.stringify(qualityDetail) }));
-    // the hook's two masters and the sources manifest, in the three-folder layout under the package path
+    // the hook's song.json + lyrics and the sources manifest, in the pipeline layout under the package path
     const written = (ContentLibraryHelper.store as jest.Mock).mock.calls.map((c) => c[0]);
-    expect(written.sort()).toEqual([`commons/${PKG}/masters/lyrics.chordpro`, `commons/${PKG}/masters/song.json`, `commons/${PKG}/sources/manifest.json`]);
-    expect(r.assetFile.upsert).toHaveBeenCalledWith(expect.objectContaining({ name: `${PKG}/masters/song.json`, submissionId: null }));
+    expect(written.sort()).toEqual([`commons/${PKG}/song.json`, `commons/${PKG}/sources/lyrics.chordpro`, `commons/${PKG}/sources/manifest.json`]);
+    expect(r.assetFile.upsert).toHaveBeenCalledWith(expect.objectContaining({ name: `${PKG}/song.json`, submissionId: null }));
     // nothing here was uploaded by a person (no uploadedBy), so the manifest has no rows yet
     expect(manifestWritten()).toEqual({ files: [] });
 
@@ -114,7 +115,7 @@ describe("PublishHelper.approve", () => {
     expect(CommonsMailHelper.notifyApproved).toHaveBeenCalledWith(expect.objectContaining({ id: "sub00000001" }), "asset000001", []);
   });
 
-  it("places art in masters/, renames the browser thumb onto the pipeline thumb, and supersedes a same-named file in another folder", async () => {
+  it("places art in sources/, renames the browser thumb onto the pipeline thumb, and supersedes a same-named file in another folder", async () => {
     const proposed = [
       { id: "pf1", name: "art.png", action: "add" },
       { id: "pf2", name: "art-thumb.webp", action: "add" },
@@ -122,8 +123,8 @@ describe("PublishHelper.approve", () => {
     ];
     const r = repos(proposed, [{ id: "lf1", name: "derivatives/cover-thumb.webp" }, { id: "lf2", name: "derivatives/score.musicxml" }]);
     await PublishHelper.approve(r, submission(), asset(), "admin000001");
-    expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/art.png", `commons/${PKG}/masters/art.png`);
-    expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/art-thumb.webp", `commons/${PKG}/derivatives/cover-thumb.webp`);
+    expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/art.png", `commons/${PKG}/sources/art.png`);
+    expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/art-thumb.webp", `commons/${PKG}/output/composition/cover-thumb.webp`);
     expect(ContentLibraryHelper.promote).toHaveBeenCalledWith("commons/pending/sub00000001/score.musicxml", `commons/${PKG}/sources/score.musicxml`);
     // both legacy files are superseded by the package copies
     expect(ContentLibraryHelper.removeKey).toHaveBeenCalledTimes(2);
@@ -131,8 +132,8 @@ describe("PublishHelper.approve", () => {
     expect(ContentLibraryHelper.removeKey).toHaveBeenCalledWith(`${LEGACY}/derivatives/score.musicxml`);
     expect(r.assetFile.delete).toHaveBeenCalledWith("lf1");
     expect(r.assetFile.delete).toHaveBeenCalledWith("lf2");
-    expect(r.assetFile.update).toHaveBeenCalledWith("pf2", { submissionId: null, action: "add", name: `${PKG}/derivatives/cover-thumb.webp` });
-    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ filesChanged: [{ name: `${PKG}/masters/art.png`, action: "add" }, { name: `${PKG}/derivatives/cover-thumb.webp`, action: "replace" }, { name: `${PKG}/sources/score.musicxml`, action: "replace" }] }));
+    expect(r.assetFile.update).toHaveBeenCalledWith("pf2", { submissionId: null, action: "add", name: `${PKG}/output/composition/cover-thumb.webp` });
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ filesChanged: [{ name: `${PKG}/sources/art.png`, action: "add" }, { name: `${PKG}/output/composition/cover-thumb.webp`, action: "replace" }, { name: `${PKG}/sources/score.musicxml`, action: "replace" }] }));
     // the hook sees the placed names and still reads the score by basename
     expect(r.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ scoreSource: "master", confidence: "score" }));
   });
@@ -349,6 +350,28 @@ describe("PublishHelper.approve — sources manifest", () => {
     });
   });
 
+  it("files an attested master recording's grant under sources/grants/ and points the master's row at it, as tools/pack/build.py requires", async () => {
+    const proposed = [{ id: "pf1", name: "master.wav", action: "add", contentHash: "wavhash", uploadedBy: "stranger0001" }];
+    const r = repos(proposed, []);
+    const sub = submission();
+    sub.payload.detail = { ...sub.payload.detail, masterLicense: "CC-BY", recordingOwned: true };
+    await PublishHelper.approve(r, sub, asset(), "admin000001");
+    const grantCall = (ContentLibraryHelper.store as jest.Mock).mock.calls.find((c) => c[0] === `commons/${PKG}/sources/grants/recording-sub00000001.txt`);
+    expect(grantCall[2].toString()).toContain("This recording is mine (or I have the owner's permission to share it).");
+    expect(grantCall[2].toString()).toContain("Granted by: Stranger Sam (ChurchApps user stranger0001)");
+    const grant = { license: "CC-BY", obtainedVia: "upload-form", evidence: "grants/recording-sub00000001.txt" };
+    expect(manifestWritten().files).toEqual([
+      expect.objectContaining({ file: "master/master.wav", sha256: "wavhash", submittedBy: "stranger0001", layer: "recording", ...grant }),
+      expect.objectContaining({ file: "grants/recording-sub00000001.txt", submittedBy: "stranger0001", layer: "grant", ...grant })
+    ]);
+  });
+
+  it("files no grant for a master without the ownership attestation", async () => {
+    const r = repos([{ id: "pf1", name: "master.wav", action: "add", contentHash: "wavhash", uploadedBy: "stranger0001" }], []);
+    await PublishHelper.approve(r, submission(), asset(), "admin000001");
+    expect(manifestWritten().files).toEqual([expect.not.objectContaining({ evidence: expect.anything() })]);
+  });
+
   it("keeps the frozen package folder, preserves harvested and earlier rows, replaces a re-uploaded file's row, and backfills an upload with no row", async () => {
     const previous = { file: "demoAudio.mp3", url: null, acquired: "2026-01-02", sha256: "oldhash", licenseBasis: "contributor", original: true, submittedBy: "owner000001", submission: "sub00000000", note: "first demo" };
     const harvested = { file: "hymnary.json", url: null, acquired: null, sha256: "h", licenseBasis: "hymnary", original: false, submittedBy: null, note: "Harvested hymnal counts" };
@@ -445,5 +468,45 @@ describe("PublishHelper.approve — removal", () => {
     await PublishHelper.approve(r, { ...submission(), type: "removal" }, { ...asset(), status: "unpublished" }, "admin000001");
     expect(r.asset.update).not.toHaveBeenCalled();
     expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ status: "approved" }));
+  });
+});
+
+describe("PublishHelper.syncOutput", () => {
+  const DIR = "songs/en/new-song-asset000001";
+  beforeEach(() => jest.clearAllMocks());
+
+  it("registers the generated files the job pushed, drops rows for files it no longer builds, and fills the score and sing time", async () => {
+    const live = [
+      { id: "lf1", name: `${DIR}/song.json` },
+      { id: "lf2", name: `${DIR}/output/audio/Old-Title-G-80.00bpm.zip` },
+      // a translation's inherited score sits in the parent's package and is not this song's to prune
+      { id: "lf3", name: "songs/en/parent-parent00001/output/composition/score.mid" }
+    ];
+    (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([
+      `commons/${DIR}/output/composition/slides.json`,
+      `commons/${DIR}/output/composition/score.musicxml`,
+      `commons/${DIR}/output/composition/duration.json`,
+      `commons/${DIR}/output/composition/LICENSE.txt`,
+      `commons/${DIR}/output/composition.zip`
+    ]);
+    (ContentLibraryHelper.readKey as jest.Mock).mockResolvedValueOnce({ buffer: Buffer.from('{"seconds": 133.6}'), contentType: "application/json" });
+    const r: any = {
+      assetFile: { loadLive: jest.fn(async () => live), create: jest.fn(async (f: any) => f), delete: jest.fn(async () => {}) },
+      song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", confidence: "chart-only", hasChords: true })), update: jest.fn(async () => {}) }
+    };
+    expect(await PublishHelper.syncOutput(r, "asset000001")).toEqual({ added: 4, removed: 1 });
+    expect(ContentLibraryHelper.listLiveKeys).toHaveBeenCalledWith(`commons/${DIR}/output`);
+    expect(r.assetFile.create.mock.calls.map((c: any[]) => c[0].name)).toEqual([`${DIR}/output/composition/slides.json`, `${DIR}/output/composition/score.musicxml`, `${DIR}/output/composition/duration.json`, `${DIR}/output/composition.zip`]);
+    expect(r.assetFile.delete).toHaveBeenCalledWith("lf2");
+    expect(r.assetFile.delete).toHaveBeenCalledTimes(1);
+    expect(r.song.update).toHaveBeenCalledWith("asset000001", { scoreSource: "abc", confidence: "score", singTimeSeconds: 134 });
+  });
+
+  it("skips a song with no package of its own or a pre-2026-09 one", async () => {
+    const r: any = { assetFile: { loadLive: jest.fn(async () => [{ name: "songs/en/parent-parent00001/song.json" }]) } };
+    expect(await PublishHelper.syncOutput(r, "asset000001")).toBeNull();
+    r.assetFile.loadLive = jest.fn(async () => [{ name: "songs/en/wc-license/old-asset000001/masters/song.json" }]);
+    expect(await PublishHelper.syncOutput(r, "asset000001")).toBeNull();
+    expect(ContentLibraryHelper.listLiveKeys).not.toHaveBeenCalled();
   });
 });

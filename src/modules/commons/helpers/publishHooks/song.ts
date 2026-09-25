@@ -67,10 +67,10 @@ export const songPublishHook: PublishHook = {
     Object.assign(song, packageFields(song, existing, asset.license || "", writer, ctx.files.map((f) => f.name || ""), (ctx.filesChanged || []).map((f) => f.name), masterLicense));
     await repos.song.upsert(song);
 
-    // the two masters a person is answerable for; the content repo export reads them from the package
+    // the two files a person is answerable for, placed by the package layout; the content repo export reads them
     const view = (await repos.song.loadById(asset.id || "")) as SongView;
-    await ctx.writeFile("masters/song.json", "application/json", Buffer.from(JSON.stringify(ContentLibraryHelper.songJson(view, ctx.files), null, 2) + "\n"));
-    await ctx.writeFile("masters/lyrics.chordpro", "text/plain; charset=utf-8", Buffer.from(ContentLibraryHelper.renderChordpro(view)));
+    await ctx.writeFile("song.json", "application/json", Buffer.from(JSON.stringify(ContentLibraryHelper.songJson(view, ctx.files), null, 2) + "\n"));
+    await ctx.writeFile("lyrics.chordpro", "text/plain; charset=utf-8", Buffer.from(ContentLibraryHelper.renderChordpro(view)));
   }
 };
 

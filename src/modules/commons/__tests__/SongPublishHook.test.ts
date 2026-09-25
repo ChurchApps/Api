@@ -76,7 +76,7 @@ describe("packageFields", () => {
 });
 
 describe("songPublishHook.onPublish", () => {
-  it("upserts the package columns and writes masters/song.json from the asset status, never a literal", async () => {
+  it("upserts the package columns and writes song.json from the asset status, never a literal", async () => {
     const repos: any = {
       song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", status: "unpublished", title: "T" })) },
       author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async () => "author00001"), loadById: jest.fn(async () => ({ id: "author00001" })), update: jest.fn(async () => {}) }
@@ -95,8 +95,8 @@ describe("songPublishHook.onPublish", () => {
     expect(repos.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", confidence: "chart-only", firstLine: "Amazing grace! how sweet the sound", hasChords: true, publishedKeys: '["G"]' }));
     expect(parse(repos.song.upsert.mock.calls[0][0].rights).recording).toEqual({ license: "WC", holder: "Ada" });
     expect(ContentLibraryHelper.songJson).toHaveBeenCalledWith(expect.objectContaining({ status: "unpublished" }), expect.anything());
-    expect(Object.keys(written).sort()).toEqual(["masters/lyrics.chordpro", "masters/song.json"]);
-    expect(JSON.parse(written["masters/song.json"])).toEqual({ id: "asset000001", status: "unpublished" });
+    expect(Object.keys(written).sort()).toEqual(["lyrics.chordpro", "song.json"]);
+    expect(JSON.parse(written["song.json"])).toEqual({ id: "asset000001", status: "unpublished" });
   });
 
   it("copies an optional CCLI number from the payload onto the song row", async () => {

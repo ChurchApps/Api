@@ -1,4 +1,6 @@
 import { Asset, AssetFile, Submission } from "../../models/index.js";
+import { MASTER_ATTESTATION } from "../AssetTypes.js";
+import { ContentLibraryHelper } from "../ContentLibraryHelper.js";
 import { packageRole, relativeName } from "../PackageLayout.js";
 import { Repos } from "../../repositories/Repos.js";
 import { songPublishHook } from "./song.js";
@@ -35,11 +37,16 @@ export interface SourceRow {
   submittedBy: string | null;
   submission?: string | null;
   note: string | null;
+  /** grant fields (content repo .notes/song-pipeline.md §2); tools/pack/build.py needs them on a master's row */
+  layer?: string;
+  license?: string;
+  obtainedVia?: string;
+  evidence?: string;
 }
 
 const isoDate = (d?: Date | string | null) => (d ? new Date(d) : new Date()).toISOString().slice(0, 10);
 
-/** Manifest row name: relative to sources/ ("tune.mid"); an upload placed elsewhere keeps its folder ("masters/art.png"). */
+/** Manifest row name: relative to sources/ ("tune.mid", "master/master.wav"); an upload placed elsewhere keeps its folder ("masters/art.png"). */
 export function sourceFileName(name: string | null | undefined): string {
   return relativeName(name).replace(/^sources\//, "");
 }
@@ -99,7 +106,9 @@ export async function sourceRows(ctx: PublishContext): Promise<SourceRow[]> {
 export const manifestHook: PublishHook = {
   async onPublish(ctx) {
     if (ctx.asset.assetType === "song") {
-      const body = { files: await sourceRows(ctx) };
+      const files = await sourceRows(ctx);
+      await recordRecordingGrant(ctx, files);
+      const body = { files };
       await ctx.writeFile("sources/manifest.json", "application/json", Buffer.from(JSON.stringify(body, null, 2) + "\n"));
       return;
     }
@@ -126,3 +135,37 @@ export const manifestHook: PublishHook = {
 
 // freeshow/*, lesson, b1/* have no entry: the file is the artifact and the manifest hook covers browse metadata
 export const PUBLISH_HOOKS: Record<string, PublishHook> = { song: songPublishHook };
+
+/**
+ * A master recording approved in this submission, with the uploader's ownership attestation, gets the grant record
+ * the content repo's pack builder requires: the attestation filed as sources/grants/recording-<submission>.txt and
+ * the master's manifest row pointing at it with the recording's license. Without it build.py makes no stems pack.
+ */
+async function recordRecordingGrant(ctx: PublishContext, rows: SourceRow[]): Promise<void> {
+  const master = rows.find((r) => r.submission === ctx.submission.id && r.file.startsWith("master/"));
+  if (!master || ctx.detail[MASTER_ATTESTATION.key] !== true) return;
+  const license = typeof ctx.detail.masterLicense === "string" && ctx.detail.masterLicense ? ctx.detail.masterLicense : ctx.asset.license || "";
+  const evidence = `grants/recording-${ctx.submission.id}.txt`;
+  const text = [
+    "Recording grant, made through the WorshipCommons upload form",
+    "",
+    `Song: ${ctx.asset.name} (${ctx.asset.id})`,
+    `File: sources/${master.file} (sha256 ${master.sha256 || "unknown"})`,
+    `License: ${license}`,
+    `Granted by: ${ctx.submitterName || "unknown"} (ChurchApps user ${master.submittedBy || "unknown"})`,
+    `Date: ${master.acquired}`,
+    `Submission: ${ctx.submission.id}`,
+    "",
+    "The uploader confirmed:",
+    `  "${MASTER_ATTESTATION.label}"`,
+    ""
+  ].join("\n");
+  const body = Buffer.from(text);
+  await ctx.writeFile(`sources/${evidence}`, "text/plain; charset=utf-8", body);
+  const grant = { license, obtainedVia: "upload-form", evidence };
+  Object.assign(master, { layer: "recording", ...grant });
+  const row: SourceRow = { file: evidence, url: null, acquired: master.acquired, sha256: ContentLibraryHelper.sha256(body), licenseBasis: "contributor", original: true, submittedBy: master.submittedBy, submission: ctx.submission.id, note: null, layer: "grant", ...grant };
+  const i = rows.findIndex((r) => r.file === evidence);
+  if (i >= 0) rows[i] = row;
+  else rows.push(row);
+}
