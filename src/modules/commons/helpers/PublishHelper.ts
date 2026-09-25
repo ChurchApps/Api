@@ -171,7 +171,9 @@ export class PublishHelper {
     const listed = outputKeys(dir, await ContentLibraryHelper.listLiveKeys(`${ContentLibraryHelper.packagePrefix(dir)}/output`));
     const registered = files.filter((f) => (f.name || "").startsWith(`${dir}/output/`));
     const add = listed.filter((n) => !registered.some((f) => f.name === n));
-    const gone = registered.filter((f) => !listed.includes(f.name || ""));
+    // generate.mjs always writes output/, so an empty listing means the package is not in the bucket (a takedown,
+    // a key the listing cannot see) — never that every generated file was retired. Leave the rows alone.
+    const gone = listed.length ? registered.filter((f) => !listed.includes(f.name || "")) : [];
     for (const name of add) await repos.assetFile.create({ assetId: id, name, action: "add" });
     for (const f of gone) await repos.assetFile.delete(f.id || "");
 

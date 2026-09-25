@@ -97,10 +97,10 @@ export class SubmissionRepo {
     return Number(row?.n || 0);
   }
 
-  /** Songs with an approval in the last `days`: the only ones whose output/ the content repo's publish job may have just pushed. */
+  /** Published songs with an approval in the last `days`: the only ones whose output/ the content repo's publish job may have just pushed. */
   public async loadRecentlyApprovedSongIds(days: number): Promise<string[]> {
     const rows = await getDb().selectFrom("submissions").innerJoin("assets", "assets.id", "submissions.assetId").select("submissions.assetId").distinct()
-      .where("submissions.status", "=", "approved").where("assets.assetType", "=", "song")
+      .where("submissions.status", "=", "approved").where("assets.assetType", "=", "song").where("assets.status", "=", "published")
       .where("submissions.reviewedAt", ">", sql<Date>`date_sub(now(), interval ${days} day)`).execute();
     return rows.map((r) => r.assetId).filter((id): id is string => !!id);
   }
