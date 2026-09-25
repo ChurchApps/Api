@@ -42,6 +42,20 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.writerNames("Johann Bach and Anand Band")).toEqual(["Johann Bach", "Anand Band"]);
   });
 
+  it("turns a chords-over-lyrics chart into inline ChordPro", () => {
+    // monospaced: each chord lands on the word under its column
+    expect(SongPackageHelper.inlineChordLines("    G          C        G\nAmazing grace, how sweet the sound")).toBe("[G]Amazing grace, [C]how [G]sweet the sound");
+    // a proportional-font paste leaves the chord row wider than the words: columns scale, trailing periods drop
+    const pasted = SongPackageHelper.inlineChordLines("                                                              Am.   Gsus   C\nPraise God from whom all  bless-ings flow");
+    expect(pasted).toBe("Praise God from whom all  [Am]bless-ings [Gsus][C]flow");
+    // a progression with bar lines, or a chord row with no words under it, keeps its place and brackets its chords
+    expect(SongPackageHelper.inlineChordLines("Intro\nF  |  Gsus  |  C\nPraise Him")).toBe("Intro\n[F] | [Gsus] | [C]\nPraise Him");
+    expect(SongPackageHelper.inlineChordLines("Intro\nC\n\nVerse 1")).toBe("Intro\n[C]\n\nVerse 1");
+    // lyrics that merely contain chord-like words, and ChordPro already inline, are untouched
+    expect(SongPackageHelper.inlineChordLines("A Mighty Fortress\n[G]Holy, [C]holy")).toBe("A Mighty Fortress\n[G]Holy, [C]holy");
+    expect(SongPackageHelper.firstLine(SongPackageHelper.inlineChordLines("Intro\nC\n\nVerse 1\n   Am   C\nPraise God from whom"))).toBe("Praise God from whom");
+  });
+
   it("drops a first line that only repeats the title", () => {
     expect(SongPackageHelper.dropTitleLine("LORD ON HIGH\n\nVERSE 1:\nWhom have I", "Lord on High")).toBe("VERSE 1:\nWhom have I");
     expect(SongPackageHelper.dropTitleLine("Lord on high You are everlasting", "Lord on High")).toBe("Lord on high You are everlasting");

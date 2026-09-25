@@ -86,6 +86,15 @@ export interface SongDetail extends Omit<SongSummary, "rights" | "form" | "publi
 
 export interface SimilarSong extends SongSummary { reason: string; }
 
+// A chord name as charted: "C", "Am7", "Gsus", "F#m7b5", "D/F#", with a stray trailing period ("Am.") allowed
+const CHORD_TOKEN = /^[A-G](?:#|b)?(?:maj|min|m|dim|aug|sus|add|M)?\d*(?:(?:sus|add|maj|b|#)\d+)*(?:\/[A-G](?:#|b)?)?\.?$/;
+const chordName = (token: string) => token.replace(/\.$/, "");
+/** A row of chord names (and bar lines) with no words: the chords-over-lyrics chart layout. */
+function isChordRow(line: string): boolean {
+  const tokens = line.trim().split(/\s+/).filter(Boolean);
+  return tokens.some((t) => CHORD_TOKEN.test(t)) && tokens.every((t) => t === "|" || CHORD_TOKEN.test(t)) && !/\[/.test(line);
+}
+
 export class SongPackageHelper {
   /** First sung line: past {directives} and stanza labels, [chords] stripped, whitespace collapsed. */
   static firstLine(chordPro: string | null | undefined): string | null {
@@ -111,6 +120,44 @@ export class SongPackageHelper {
     }
     if (!labels.length) return null;
     return { status: "draft", sections: labels.map((label, i) => ({ label, lyric: i + 1 })), defaultOrder: labels };
+  }
+
+  /**
+   * Charts pasted as chords over the words ("Am.   Gsus   C" above a line) become inline ChordPro: each chord moves
+   * into the line below at its column — scaled to the line when the chord row is wider than the words, as a
+   * proportional-font paste leaves it — snapped to the start of a word. A chord row with no words under it (an
+   * intro, a turnaround: "F | Gsus | C") keeps its bars and brackets its chords. Otherwise those rows read as lyrics.
+   */
+  static inlineChordLines(chordPro: string): string {
+    const lines = chordPro.split("\n");
+    const out: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!isChordRow(line)) { out.push(line); continue; }
+      const next = lines[i + 1];
+      // a row with bar lines is a progression to play (an intro, a turnaround), never the chords of the line below
+      if (/(^|\s)\|(\s|$)/.test(line) || next === undefined || !next.trim() || isChordRow(next) || next.trim().startsWith("{") || sectionLabel(next) || /\[[^\]]+\]/.test(next)) {
+        out.push(line.trim().split(/\s+/).map((t) => (t === "|" ? t : `[${chordName(t)}]`)).join(" "));
+        continue;
+      }
+      const words = next.replace(/\s+$/, "");
+      const chords = [...line.matchAll(/\S+/g)].filter((m) => m[0] !== "|").map((m) => ({ col: m.index || 0, name: chordName(m[0]) }));
+      const width = line.replace(/\s+$/, "").length;
+      const scale = width > words.length + 4 ? words.length / width : 1;
+      const starts = [...words.matchAll(/\S+/g)].map((m) => m.index || 0);
+      const inserts = new Map<number, string>();
+      for (const c of chords) {
+        const at = Math.min(Math.round(c.col * scale), words.length);
+        // the word the chord lands in: its start, or the last word's start past the end
+        const pos = [...starts].reverse().find((s) => s <= at) ?? starts[0] ?? 0;
+        inserts.set(pos, (inserts.get(pos) || "") + `[${c.name}]`);
+      }
+      let merged = words;
+      for (const pos of [...inserts.keys()].sort((a, b) => b - a)) merged = merged.slice(0, pos) + inserts.get(pos) + merged.slice(pos);
+      out.push(merged);
+      i++;
+    }
+    return out.join("\n");
   }
 
   /** Pasted lyrics often open with the title again ("LORD ON HIGH"): drop that line, it is not sung. */

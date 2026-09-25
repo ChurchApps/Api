@@ -79,6 +79,7 @@ export async function sourceRows(ctx: PublishContext): Promise<SourceRow[]> {
   for (const p of await previousRows(ctx)) if (!removed.has(p.file)) rows.set(p.file, p);
   for (const f of ctx.files) {
     if (!f.name || !f.uploadedBy) continue; // generated and seeded files have no uploader
+    if (relativeName(f.name).startsWith("output/")) continue; // a browser-made thumbnail lands in output/: not a source
     const file = sourceFileName(f.name);
     const kept = rows.get(file);
     if (!changed.has(file) && kept && kept.sha256 === (f.contentHash || null)) continue;
