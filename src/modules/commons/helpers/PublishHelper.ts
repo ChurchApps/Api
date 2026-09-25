@@ -107,7 +107,10 @@ export class PublishHelper {
     else await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null as any, removedReason: null as any });
     await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged });
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
-    await CommonsMailHelper.notifyApproved(sub, asset.id || "", declined).catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
+    // A song whose package has no output/ yet is not finished until the content repo's publish job builds it; the
+    // writer hears when syncOutput first registers that build, so the link they get shows the finished song.
+    const awaitingBuild = !!packageDir && !isLegacyDir(packageDir) && !ctx.files.some((f) => (f.name || "").startsWith(`${packageDir}/output/`));
+    if (!awaitingBuild) await CommonsMailHelper.notifyApproved(sub, asset.id || "", declined).catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
   }
 
   /** pending → draft with the reviewer's note; proposed files stay put so the submitter can keep working on the draft. */
@@ -178,6 +181,9 @@ export class PublishHelper {
     const gone = listed.length ? registered.filter((f) => !listed.includes(f.name || "")) : [];
     for (const name of add) await repos.assetFile.create({ assetId: id, name, action: "add" });
     for (const f of gone) await repos.assetFile.delete(f.id || "");
+    // the song's first build: approve held the writer's email for this moment
+    const isOutput = (n?: string) => (n || "").startsWith(`${dir}/output/`);
+    if (!registered.some((f) => isOutput(f.name)) && add.some(isOutput)) await this.notifyBuilt(repos, id);
 
     const song = await repos.song.loadSatellite(id);
     if (song) {
@@ -198,6 +204,14 @@ export class PublishHelper {
       if (Object.keys(fields).length) await repos.song.update(id, fields);
     }
     return { added: add.length, removed: gone.length };
+  }
+
+  /** The approval email approve deferred: the latest approved submission, with the files the reviewer declined. */
+  private static async notifyBuilt(repos: Repos, id: string): Promise<void> {
+    const sub = (await repos.submission.loadHistory(id)).pop();
+    if (!sub) return;
+    const declined = (sub.filesChanged || []).filter((f) => f.action === "declined").map((f) => ({ name: f.name, reason: f.reason || "" }));
+    await CommonsMailHelper.notifyApproved(sub, id, declined).catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
   }
 
   /** The editable snapshot: the published submission's payload, or one rebuilt from the row + satellite. */
