@@ -503,6 +503,20 @@ describe("PublishHelper.syncOutput", () => {
     expect(r.song.update).toHaveBeenCalledWith("asset000001", { scoreSource: "midi", confidence: "generated-from-midi", singTimeSeconds: 134 });
   });
 
+  it("registers the lyric timings the job aligned to the recording, so Lead Worship waits out the intro", async () => {
+    const DIR4 = "songs/en/new-song-asset000001";
+    (ContentLibraryHelper.listLiveKeys as jest.Mock)
+      .mockResolvedValueOnce([`commons/${DIR4}/output/composition/slides.json`])
+      .mockResolvedValueOnce([`commons/${DIR4}/sources/timing.json`]);
+    const r: any = {
+      assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR4}/song.json` }]), create: jest.fn(async (f: any) => f), delete: jest.fn() },
+      song: { loadSatellite: jest.fn(async () => undefined) }
+    };
+    expect(await PublishHelper.syncOutput(r, "asset000001")).toEqual({ added: 2, removed: 0 });
+    expect(ContentLibraryHelper.listLiveKeys).toHaveBeenCalledWith(`commons/${DIR4}/sources/timing.json`);
+    expect(r.assetFile.create).toHaveBeenCalledWith({ assetId: "asset000001", name: `${DIR4}/sources/timing.json`, action: "add" });
+  });
+
   it("calls a score built beside a tune.abc an abc score", async () => {
     const DIR3 = "songs/en/new-song-asset000001";
     (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR3}/output/composition/score.musicxml`]);

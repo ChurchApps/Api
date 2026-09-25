@@ -151,10 +151,11 @@ export function completedPackageName(name: string | null | undefined): string {
   return hit ? `${n.slice(0, i)}/${hit}` : n;
 }
 
-// what the content repo's generators write that a consumer reads (the seed registers the same set)
-const OUTPUT_FILE = /^output\/(composition\/(score\.musicxml|score\.mid|slides\.json|chart\.chordpro|chart\.pdf|attribution\.txt|duration\.json|cover-thumb\.webp|sources\.txt)|composition\.zip|audio\.zip|audio\/[^/]+\.(zip|m4a))$/i;
+// what the content repo's generators write that a consumer reads (the seed registers the same set), plus the lyric
+// timings its publish job aligns to the recording — kept in sources/ like every other song's timing.json
+const OUTPUT_FILE = /^(output\/(composition\/(score\.musicxml|score\.mid|slides\.json|chart\.chordpro|chart\.pdf|attribution\.txt|duration\.json|cover-thumb\.webp|sources\.txt)|composition\.zip|audio\.zip|audio\/[^/]+\.(zip|m4a))|sources\/timing\.json)$/i;
 
-/** The registrable catalog keys in a listing of a package's output/ (full storage keys or catalog keys). */
+/** The registrable catalog keys in a listing of a package's generated files (full storage keys or catalog keys). */
 export function outputKeys(packageDir: string, listed: string[]): string[] {
   const prefix = `${packageDir}/`;
   return listed.map((k) => k.replace(/\\/g, "/").replace(/^commons\//, ""))
