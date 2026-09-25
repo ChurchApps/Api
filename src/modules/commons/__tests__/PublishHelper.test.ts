@@ -546,6 +546,22 @@ describe("PublishHelper.syncOutput", () => {
     expect(r.assetFile.create).toHaveBeenCalledWith({ assetId: "asset000001", name: `${DIR4}/sources/timing.json`, action: "add" });
   });
 
+  it("replaces an estimated sing time with the recording's measured length, but never with another estimate", async () => {
+    const DIR6 = "songs/en/new-song-asset000001";
+    const run = async (duration: object, singTimeSeconds: number) => {
+      (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR6}/output/composition/duration.json`]);
+      (ContentLibraryHelper.readKey as jest.Mock).mockResolvedValueOnce({ buffer: Buffer.from(JSON.stringify(duration)), contentType: "application/json" });
+      const r: any = {
+        assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR6}/song.json` }, { id: "lf2", name: `${DIR6}/output/composition/duration.json` }]), create: jest.fn(), delete: jest.fn() },
+        song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", scoreSource: "abc", singTimeSeconds })), update: jest.fn(async () => {}) }
+      };
+      await PublishHelper.syncOutput(r, "asset000001");
+      return r.song.update;
+    };
+    expect(await run({ seconds: 272.064, basis: "timing.json" }, 61)).toHaveBeenCalledWith("asset000001", { singTimeSeconds: 272 });
+    expect(await run({ seconds: 70, basis: "estimate: 28 lines × 4 beats @ 96 bpm" }, 61)).not.toHaveBeenCalled();
+  });
+
   it("calls a score built beside a tune.abc an abc score", async () => {
     const DIR3 = "songs/en/new-song-asset000001";
     (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR3}/output/composition/score.musicxml`]);
