@@ -382,7 +382,7 @@ export class CommonsAdminController extends CommonsBaseController {
       for (const song of songs) {
         const files = filesBy[song.id || ""] || [];
         if (!files.some((f) => /\/output\/audio(\/|\.zip$)/i.test(f.name || ""))) continue;
-        const dir = packageDirFrom(files);
+        const dir = packageDirFrom(files, song.id);
         if (!dir) continue;
         scanned++;
         const listed = await ContentLibraryHelper.listLiveKeys(`${ContentLibraryHelper.packagePrefix(dir)}/output/audio`);
@@ -392,6 +392,20 @@ export class CommonsAdminController extends CommonsBaseController {
         }
       }
       return { scanned, added };
+    });
+  }
+
+  /** The content repo's publish job (tools/publish-approved.mjs) calls this after pushing output/ for these songs. */
+  @httpPost("/sync-output")
+  public async syncOutput(req: express.Request<{}, {}, { ids?: unknown }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String).filter(Boolean) : [];
+      // ponytail: 20 per call fits the 30s Lambda (one S3 listing each); the job sends batches
+      if (!ids.length || ids.length > 20) return this.json({ errors: ["ids: 1 to 20 song ids"] }, 400);
+      const out: Record<string, { added: number; removed: number } | null> = {};
+      for (const id of ids) out[id] = await PublishHelper.syncOutput(this.repos, id);
+      return out;
     });
   }
 

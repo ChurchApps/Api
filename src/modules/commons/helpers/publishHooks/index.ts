@@ -39,7 +39,7 @@ export interface SourceRow {
 
 const isoDate = (d?: Date | string | null) => (d ? new Date(d) : new Date()).toISOString().slice(0, 10);
 
-/** Manifest row name: relative to sources/ ("tune.mid"); an upload placed elsewhere keeps its folder ("masters/art.png"). */
+/** Manifest row name: relative to sources/ ("tune.mid", "master/master.wav"); an upload placed elsewhere keeps its folder ("masters/art.png"). */
 export function sourceFileName(name: string | null | undefined): string {
   return relativeName(name).replace(/^sources\//, "");
 }

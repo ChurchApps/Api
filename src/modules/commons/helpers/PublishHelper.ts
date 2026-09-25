@@ -1,10 +1,11 @@
-import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
+import { Asset, AssetFile, Song, Submission, SubmissionPayload } from "../models/index.js";
 import { Repos } from "../repositories/Repos.js";
 import { CommonsMailHelper } from "./CommonsMailHelper.js";
 import { ContentLibraryHelper } from "./ContentLibraryHelper.js";
 import { manifestHook, PUBLISH_HOOKS, PublishContext } from "./publishHooks/index.js";
 import { userNames } from "./NamesHelper.js";
-import { findByBase, packageDirFrom, packageKey, packageRole, songPackageDir } from "./PackageLayout.js";
+import { baseName, findByBase, isLegacyDir, outputKeys, packageDirFrom, packageKey, packageRole, songPackageDir } from "./PackageLayout.js";
+import { SongPackageHelper } from "./SongPackageHelper.js";
 import { DeclinedFile } from "./ReviewerHelper.js";
 import { normalizeTags } from "./SubmitValidation.js";
 
@@ -30,7 +31,7 @@ export class PublishHelper {
     // A song's files live in its package: the folder any live file already sits in, else the one this title,
     // language and license give a song landing in the layout for the first time (frozen from then on). Files
     // still in the legacy id-keyed folder keep serving until a re-upload supersedes them in the package.
-    const packageDir = asset.assetType === "song" ? packageDirFrom(liveFiles) || songPackageDir(asset) : null;
+    const packageDir = asset.assetType === "song" ? packageDirFrom(liveFiles, asset.id) || songPackageDir(asset) : null;
     const place = (name: string) => packageKey(packageDir, asset.assetType, name);
     // filesChanged names the live file by its stored name (catalog key), which is what history and the manifest describe
     const filesChanged: { name: string; action: string; reason?: string }[] = [];
@@ -54,7 +55,7 @@ export class PublishHelper {
       }
       const copied = await ContentLibraryHelper.promote(ContentLibraryHelper.pendingKey(sub.id || "", name), ContentLibraryHelper.liveKey(asset, liveName));
       if (!copied) throw new Error(`pending file missing: ${name}`);
-      // a live file of the same basename in another folder (a seeded derivatives/score.musicxml under an uploaded
+      // a live file of the same basename in another folder (a seeded output/composition/score.musicxml under an uploaded
       // sources/score.musicxml) is superseded, not kept beside the upload
       if (live) {
         if (live.name !== liveName) await ContentLibraryHelper.removeKey(ContentLibraryHelper.liveKey(asset, live.name || ""));
@@ -148,7 +149,7 @@ export class PublishHelper {
   /** Terminal takedown: files gone, id kept so links 410 with the reason. A work's shared files are never the song's to delete. */
   static async remove(repos: Repos, asset: Asset, reason: string): Promise<void> {
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.livePrefix(asset));
-    const packageDir = packageDirFrom(await repos.assetFile.loadLive(asset.id || ""));
+    const packageDir = packageDirFrom(await repos.assetFile.loadLive(asset.id || ""), asset.id);
     if (packageDir) await ContentLibraryHelper.removePrefix(ContentLibraryHelper.packagePrefix(packageDir));
     for (const sub of await repos.submission.loadByAsset(asset.id || "", ["draft", "pending"])) {
       await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
@@ -156,6 +157,41 @@ export class PublishHelper {
     }
     await repos.assetFile.deleteByAsset(asset.id || "");
     await repos.asset.update(asset.id || "", { status: "removed", removedReason: reason });
+  }
+
+  /**
+   * After the content repo's publish job pushed a song's output/: register every generated file that is there, drop
+   * the rows of any that are gone, and fill what the new files tell the song row (a score built from tune.abc, the
+   * sing time). Returns null when the song has no pipeline package to read.
+   */
+  static async syncOutput(repos: Repos, id: string): Promise<{ added: number; removed: number } | null> {
+    const files = await repos.assetFile.loadLive(id);
+    const dir = packageDirFrom(files, id);
+    if (!dir || isLegacyDir(dir)) return null;
+    const listed = outputKeys(dir, await ContentLibraryHelper.listLiveKeys(`${ContentLibraryHelper.packagePrefix(dir)}/output`));
+    const registered = files.filter((f) => (f.name || "").startsWith(`${dir}/output/`));
+    const add = listed.filter((n) => !registered.some((f) => f.name === n));
+    const gone = registered.filter((f) => !listed.includes(f.name || ""));
+    for (const name of add) await repos.assetFile.create({ assetId: id, name, action: "add" });
+    for (const f of gone) await repos.assetFile.delete(f.id || "");
+
+    const song = await repos.song.loadSatellite(id);
+    if (song) {
+      const names = listed.map(baseName);
+      const fields: Partial<Song> = {};
+      // generate.mjs builds score.musicxml only from sources/tune.abc; an uploaded score was already "master" at approve
+      if (!song.scoreSource && names.includes("score.musicxml")) {
+        fields.scoreSource = "abc";
+        if (song.confidence !== "sunday-ready") fields.confidence = SongPackageHelper.baseConfidence({ hasScore: true, scoreSource: "abc", hasChords: !!song.hasChords });
+      }
+      if (!song.singTimeSeconds && names.includes("duration.json")) {
+        const raw = await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id }, `${dir}/output/composition/duration.json`));
+        const seconds = Number(SongPackageHelper.parseJson<{ seconds?: number }>(raw?.buffer.toString("utf8"))?.seconds);
+        if (seconds > 0) fields.singTimeSeconds = Math.round(seconds);
+      }
+      if (Object.keys(fields).length) await repos.song.update(id, fields);
+    }
+    return { added: add.length, removed: gone.length };
   }
 
   /** The editable snapshot: the published submission's payload, or one rebuilt from the row + satellite. */

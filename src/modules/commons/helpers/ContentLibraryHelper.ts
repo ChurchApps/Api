@@ -10,7 +10,7 @@ import { AssetFile, SongView } from "../models/index.js";
 import { baseName, completedPackageName, findByBase, isPackageKey, packageDirFrom, packageKey, packageRole } from "./PackageLayout.js";
 
 // Storage keys are derived from assetFiles.name, never stored twice. A song file's name is its catalog key
-// (songs/<lang>/<section>/<slug>-<id>/{sources,masters,derivatives}/<file>; an inherited file is keyed under the parent song) and
+// (songs/<lang>/<slug>-<id>/{song.json,sources/…,output/…}, see PackageLayout; an inherited file is keyed under the parent song) and
 // lives at commons/<name> — the same path the content repo holds, so `sync pull` picks it up unchanged. Names
 // without that prefix (rows from before the cut-over, and every non-song asset) still resolve to the id-keyed
 // folder commons/assets/{assetType}/{assetId}/{name}. Proposed objects sit under commons/pending/{submissionId}/
@@ -22,8 +22,8 @@ const PENDING_ROOT = `${ROOT}/pending`;
 const REVIEW_TTL_SEC = 7200;
 const UPLOAD_TTL_SEC = 3600;
 export const UPLOAD_FIELDS = ["demoAudio", "sheetPdf", "stemsZip", "master"] as const;
-// when two files share a role the freshest wins: masters/lyrics.chordpro is rewritten on every publish while
-// derivatives/chart.chordpro waits for the pipeline (an uploaded art-thumb is renamed onto the generated thumb, so no rule)
+// when two files share a role the freshest wins: sources/lyrics.chordpro is rewritten on every publish while
+// output/composition/chart.chordpro waits for the pipeline (an uploaded art-thumb is renamed onto the generated thumb, so no rule)
 const PREFERRED = new Set(["lyrics.chordpro"]);
 // song.json status follows the asset; anything not taken down exports as approved
 const SONG_JSON_STATUS: Record<string, string> = { unpublished: "unpublished", removed: "removed" };
@@ -49,7 +49,7 @@ export class ContentLibraryHelper {
     return isPackageKey(n) ? `${ROOT}/${n}` : `${this.livePrefix(asset)}/${n}`;
   }
 
-  /** Storage key of the song package's own files: commons/songs/<lang>/<section>/<slug>-<id>. */
+  /** Storage key of the song package's own files: commons/songs/<lang>/<slug>-<id>. */
   static packagePrefix(packageDir: string): string {
     return `${ROOT}/${packageDir}`;
   }
@@ -62,7 +62,7 @@ export class ContentLibraryHelper {
   static fileKey(asset: { assetType?: string; id?: string }, files: AssetFile[], name: string): string {
     const live = findByBase(files, asset.assetType, name);
     if (live?.name) return this.liveKey(asset, live.name);
-    return this.liveKey(asset, packageKey(packageDirFrom(files), asset.assetType, name));
+    return this.liveKey(asset, packageKey(packageDirFrom(files, asset.id), asset.assetType, name));
   }
 
   static pendingPrefix(submissionId: string): string {
