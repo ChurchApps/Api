@@ -15,6 +15,21 @@ export class DonationRequestGuard {
     return null;
   }
 
+  // Guests always tokenize a fresh method. Saved KF vaults / Paystack authorizations are keyed by person, which a guest
+  // can claim by id, so they're login-only. Stripe guests legitimately pass the customerId minted by /addcard.
+  // ponytail: Stripe saved-pm ownership is still unchecked for guests — needs server-side customer resolution.
+  static stripGuestSavedMethod(data: any, provider: string): boolean {
+    const p = (provider || "").toLowerCase();
+    delete data.saveCard;
+    delete data.paymentMethodId;
+    if (p === "stripe") return true;
+    delete data.customerId;
+    const id = String(data.id || "");
+    if (p === "kingdomfunding" && /^\d+$/.test(id)) return false;
+    if (p === "paystack" && /^AUTH_/.test(id)) return false;
+    return true;
+  }
+
   static resolvePersonId(requestedPersonId: string | undefined, au: { id?: string; personId?: string }, canEditDonations: boolean): string | undefined {
     if (!au?.id || canEditDonations) return requestedPersonId;
     return au.personId || "";

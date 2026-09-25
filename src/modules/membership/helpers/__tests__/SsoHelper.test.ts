@@ -51,9 +51,16 @@ describe("SsoHelper.validateReturnUrl", () => {
     expect(await SsoHelper.validateReturnUrl("https://b1.church/login")).toBe(true);
   });
 
-  it("accepts localhost on any port", async () => {
+  it("accepts localhost on any port only in dev-like environments", async () => {
+    Environment.currentEnvironment = "prod";
+    expect(await SsoHelper.validateReturnUrl("http://localhost:3101/login")).toBe(false);
+    Environment.currentEnvironment = "dev";
     expect(await SsoHelper.validateReturnUrl("http://localhost:3101/login")).toBe(true);
     expect(await SsoHelper.validateReturnUrl("http://127.0.0.1:8080/x")).toBe(true);
+  });
+
+  it("rejects plain-http b1.church hosts", async () => {
+    expect(await SsoHelper.validateReturnUrl("http://grace.b1.church/login")).toBe(false);
   });
 
   it("accepts a configured SSO_ALLOWED_ORIGINS entry", async () => {

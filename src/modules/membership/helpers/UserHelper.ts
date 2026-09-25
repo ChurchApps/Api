@@ -84,13 +84,17 @@ export class UserHelper {
     const appName = churchName || "ChurchApps";
     const appUrl = Environment.b1AdminRoot;
     const actionLabel = isExistingUser ? "Log In" : "Sign Up";
-    const subject = "You've been added to " + contextName;
+    const subject = "You've been added to " + contextName.replace(/[\r\n]/g, " ");
     const contents =
-      "<h2>Hello " + personName + ",</h2>" +
-      "<p>You have been added to <strong>" + contextName + "</strong> at " + appName + ".</p>" +
+      "<h2>Hello " + this.escapeHtml(personName) + ",</h2>" +
+      "<p>You have been added to <strong>" + this.escapeHtml(contextName) + "</strong> at " + this.escapeHtml(appName) + ".</p>" +
       "<p>Click the button below to " + actionLabel.toLowerCase() + " and get started.</p>" +
       `<p><a href="${appUrl}${loginLink}" class="btn btn-primary">${actionLabel}</a></p>`;
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, subject, contents, "EmailTemplate.html", inviterEmail || undefined);
+  }
+
+  private static escapeHtml(value: string): string {
+    return (value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   static sendForgotEmail(email: string, code: string, _appName: string, _appUrl: string): Promise<any> {

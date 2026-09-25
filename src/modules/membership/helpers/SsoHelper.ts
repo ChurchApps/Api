@@ -73,8 +73,10 @@ export class SsoHelper {
     if (url.protocol !== "http:" && url.protocol !== "https:") return false;
 
     const host = url.hostname.toLowerCase();
-    if (host === "localhost" || host === "127.0.0.1") return true;
-    if (host === "b1.church" || host.endsWith(".b1.church")) return true;
+    if (host === "localhost" || host === "127.0.0.1") return ["dev", "local", "docker"].includes(Environment.currentEnvironment);
+    // ponytail: tenant subdomains run church-authored JS, so a hostile church site can still receive a token here;
+    // select_account in buildAuthorizeUrl blocks the silent redirect. Real fix: church-scoped tokens (see .notes/vulnerabilities.md C2).
+    if ((host === "b1.church" || host.endsWith(".b1.church")) && url.protocol === "https:") return true;
 
     const allowed = (Environment.ssoAllowedOrigins || "")
       .split(",")
@@ -110,7 +112,9 @@ export class SsoHelper {
       redirect_uri: this.redirectUri(cfg.id),
       scope: cfg.scope,
       state,
-      nonce
+      nonce,
+      // Forces a click at the IdP so a link can't silently bounce a signed-in victim's token to an attacker's returnUrl.
+      prompt: "select_account"
     });
     return `${cfg.authorizeUrl}?${params.toString()}`;
   }

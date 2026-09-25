@@ -539,15 +539,27 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
   }
 
   let getEmailDataSpy: jest.SpyInstance;
+  let peopleInChurchSpy: jest.SpyInstance;
 
   beforeEach(() => {
     sendTemplatedEmailMock.mockClear();
     sendTemplatedEmailMock.mockResolvedValue(undefined);
     getEmailDataSpy = jest.spyOn(NotificationHelper, "getEmailData");
+    peopleInChurchSpy = jest.spyOn(NotificationHelper, "peopleInChurch").mockImplementation(async (_churchId: string, ids: string[]) => ids);
   });
 
   afterEach(() => {
     getEmailDataSpy.mockRestore();
+    peopleInChurchSpy.mockRestore();
+  });
+
+  it("drops recipients who are not in the notifying church", async () => {
+    const repos = buildRepos();
+    NotificationHelper.init(repos);
+    peopleInChurchSpy.mockResolvedValue([]);
+    const result = await NotificationHelper.createNotifications(["OTHER_CHURCH_PERSON"], "CHU1", "task", "T1", "hi", undefined, undefined, { emailImmediate: true });
+    expect(result).toEqual([]);
+    expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
   });
 
   it("sends the per-recipient rich email, logs delivery, and marks the row complete when the gate allows", async () => {
