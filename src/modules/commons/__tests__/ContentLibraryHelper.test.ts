@@ -332,6 +332,8 @@ describe("song export artifacts", () => {
     const json: any = ContentLibraryHelper.songJson(song, [{ name: "sources/demoAudio.wav" }, { name: "sources/tune.mid" }]);
     expect(json.uploads).toEqual({ demoAudio: "demoAudio.wav" }); // basename: the content repo looks in sources/<name>
     expect(json.status).toBe("approved");
+    // harvested counts live in sources/hymnary.json; validate.mjs rejects them in song.json
+    expect(json).not.toHaveProperty("hymnalCount");
     expect(ContentLibraryHelper.songJson({ ...song, status: "unpublished" } as any, []).status).toBe("unpublished");
     const pkg: any = ContentLibraryHelper.songJson({ ...song, status: "published", confidence: "chart-only", rights: JSON.stringify({ text: { license: "WC" } }), form: null, publishedKeys: JSON.stringify(["G"]) } as any, []);
     expect(pkg).toMatchObject({ status: "approved", confidence: "chart-only", rights: { text: { license: "WC" } }, publishedKeys: ["G"] });
