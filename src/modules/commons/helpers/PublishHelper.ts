@@ -196,10 +196,13 @@ export class PublishHelper {
         fields.scoreSource = scoreSource;
         if (song.confidence !== "sunday-ready") fields.confidence = SongPackageHelper.baseConfidence({ hasScore: true, scoreSource, hasChords: !!song.hasChords });
       }
-      if (!song.singTimeSeconds && names.includes("duration.json")) {
+      if (names.includes("duration.json")) {
         const raw = await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id }, `${dir}/output/composition/duration.json`));
-        const seconds = Number(SongPackageHelper.parseJson<{ seconds?: number }>(raw?.buffer.toString("utf8"))?.seconds);
-        if (seconds > 0) fields.singTimeSeconds = Math.round(seconds);
+        const duration = SongPackageHelper.parseJson<{ seconds?: number; basis?: string }>(raw?.buffer.toString("utf8"));
+        const seconds = Math.round(Number(duration?.seconds));
+        // an estimate only fills a gap; a measured length (the recording, its timing.json) replaces an earlier estimate
+        const measured = !String(duration?.basis || "").startsWith("estimate");
+        if (seconds > 0 && seconds !== song.singTimeSeconds && (!song.singTimeSeconds || measured)) fields.singTimeSeconds = seconds;
       }
       if (Object.keys(fields).length) await repos.song.update(id, fields);
     }
