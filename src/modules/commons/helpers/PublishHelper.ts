@@ -168,8 +168,10 @@ export class PublishHelper {
     const files = await repos.assetFile.loadLive(id);
     const dir = packageDirFrom(files, id);
     if (!dir || isLegacyDir(dir)) return null;
-    const listed = outputKeys(dir, await ContentLibraryHelper.listLiveKeys(`${ContentLibraryHelper.packagePrefix(dir)}/output`));
-    const registered = files.filter((f) => (f.name || "").startsWith(`${dir}/output/`));
+    const prefix = ContentLibraryHelper.packagePrefix(dir);
+    const timing = `${dir}/sources/timing.json`;
+    const listed = outputKeys(dir, [...await ContentLibraryHelper.listLiveKeys(`${prefix}/output`), ...await ContentLibraryHelper.listLiveKeys(`${prefix}/sources/timing.json`)]);
+    const registered = files.filter((f) => (f.name || "").startsWith(`${dir}/output/`) || f.name === timing);
     const add = listed.filter((n) => !registered.some((f) => f.name === n));
     // generate.mjs always writes output/, so an empty listing means the package is not in the bucket (a takedown,
     // a key the listing cannot see) — never that every generated file was retired. Leave the rows alone.
