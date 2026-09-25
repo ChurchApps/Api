@@ -1,6 +1,6 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
-jest.mock("../helpers/PublishHelper", () => ({ PublishHelper: { discardProposed: jest.fn(async () => {}) } }));
+jest.mock("../helpers/PublishHelper", () => ({ PublishHelper: { discardProposed: jest.fn(async () => {}), syncOutput: jest.fn(async () => null) } }));
 jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyReviewerDigest: jest.fn(async () => {}) } }));
 
 import { MaintenanceHelper } from "../helpers/MaintenanceHelper";
@@ -54,5 +54,17 @@ describe("MaintenanceHelper.nightly", () => {
     expect(PublishHelper.discardProposed).toHaveBeenCalled();
     expect(err).toHaveBeenCalled();
     err.mockRestore();
+  });
+});
+
+describe("MaintenanceHelper.syncRecentOutput", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("syncs output/ for songs approved in the last week and totals what changed, skipping songs with no pipeline package", async () => {
+    const r: any = { submission: { loadRecentlyApprovedSongIds: jest.fn(async () => ["song0000001", "song0000002"]) } };
+    (PublishHelper.syncOutput as jest.Mock).mockResolvedValueOnce({ added: 3, removed: 1 }).mockResolvedValueOnce(null);
+    expect(await MaintenanceHelper.syncRecentOutput(r)).toEqual({ songs: 1, added: 3, removed: 1 });
+    expect(r.submission.loadRecentlyApprovedSongIds).toHaveBeenCalledWith(7);
+    expect(PublishHelper.syncOutput).toHaveBeenCalledWith(r, "song0000002");
   });
 });
