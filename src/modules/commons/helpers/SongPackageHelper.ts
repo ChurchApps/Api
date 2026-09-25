@@ -104,12 +104,29 @@ export class SongPackageHelper {
   static draftForm(chordPro: string | null | undefined): FormMap | null {
     const labels: string[] = [];
     for (const stanza of (chordPro || "").split(/\r?\n\s*\r?\n/)) {
-      const first = stanza.split(/\r?\n/).map((l) => l.trim()).find((l) => l && !l.startsWith("{"));
+      // a {c: Chorus} comment labels its stanza; any other {directive} is skipped
+      const first = stanza.split(/\r?\n/).map((l) => l.trim()).find((l) => l && (!l.startsWith("{") || sectionLabel(l)));
       const label = first && sectionLabel(first);
       if (label) labels.push(label.slice(0, 40));
     }
     if (!labels.length) return null;
     return { status: "draft", sections: labels.map((label, i) => ({ label, lyric: i + 1 })), defaultOrder: labels };
+  }
+
+  /** Pasted lyrics often open with the title again ("LORD ON HIGH"): drop that line, it is not sung. */
+  static dropTitleLine(chordPro: string, title: string | null | undefined): string {
+    const fold = (s: string) => s.replace(/\[[^\]]*\]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+    const lines = chordPro.split("\n");
+    const i = lines.findIndex((l) => l.trim() && !l.trim().startsWith("{"));
+    if (i < 0 || !fold(title || "") || fold(lines[i]) !== fold(title || "")) return chordPro;
+    lines.splice(i, 1);
+    return lines.join("\n").replace(/^\n+/, "");
+  }
+
+  /** "Words by Joy Marquéz • Music by Doug Gregan", "A, B & C", "Ann and Bo": the people a writer credit names. */
+  static writerNames(writer: string): string[] {
+    return writer.replace(/\b(?:(?:words|lyrics|music|text|tune)(?:\s*(?:and|&)\s*(?:words|lyrics|music))?|arranged|arrangement|translated)\s+by\b\s*:?/gi, "|")
+      .split(/\s*(?:[|,&•·/;]|\band\b)\s*/i).map((n) => n.trim()).filter(Boolean);
   }
 
   /** Stored rows may still say proofread-score / converted-from-abc until the remap migration runs. */

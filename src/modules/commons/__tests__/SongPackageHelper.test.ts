@@ -23,6 +23,30 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.draftForm(byOurSide)?.defaultOrder).toEqual(["Verse 1", "Bridge", "Chorus x2"]);
   });
 
+  it("reads {c: …} comments, trailing colons and a number run onto the heading as labels", () => {
+    expect(sectionLabel("{c: Intro}")).toBe("Intro");
+    expect(sectionLabel("{comment: Chorus}")).toBe("Chorus");
+    expect(sectionLabel("{title: Lord on High}")).toBeNull();
+    expect(sectionLabel("Chorus3:")).toBe("Chorus3");
+    expect(sectionLabel("Verse 1:")).toBe("Verse 1");
+    expect(sectionLabel("CHORUS: (2x)")).toBe("CHORUS (2x)");
+    expect(sectionLabel("Versed in love")).toBeNull();
+    expect(SongPackageHelper.firstLine("{c: Intro}\n[F] [C]\n\n{c: Chorus}\nI’m gonna [F]pra[C]ise [F]You,")).toBe("I’m gonna praise You,");
+    expect(SongPackageHelper.draftForm("{c: Intro}\n[F] [C]\n\n{c: Chorus}\nI’m gonna praise\n\nChorus3:\nGod of peace")?.defaultOrder).toEqual(["Intro", "Chorus", "Chorus3"]);
+  });
+
+  it("splits a writer credit into the people it names", () => {
+    expect(SongPackageHelper.writerNames("Words by Joy Marquéz • Music by Doug Gregan")).toEqual(["Joy Marquéz", "Doug Gregan"]);
+    expect(SongPackageHelper.writerNames("Wendell Salumbides, Jessa Bonita & Joycey de Leon")).toEqual(["Wendell Salumbides", "Jessa Bonita", "Joycey de Leon"]);
+    expect(SongPackageHelper.writerNames("Words and music by Ann Lee")).toEqual(["Ann Lee"]);
+    expect(SongPackageHelper.writerNames("Johann Bach and Anand Band")).toEqual(["Johann Bach", "Anand Band"]);
+  });
+
+  it("drops a first line that only repeats the title", () => {
+    expect(SongPackageHelper.dropTitleLine("LORD ON HIGH\n\nVERSE 1:\nWhom have I", "Lord on High")).toBe("VERSE 1:\nWhom have I");
+    expect(SongPackageHelper.dropTitleLine("Lord on high You are everlasting", "Lord on High")).toBe("Lord on high You are everlasting");
+  });
+
   it("hasChords needs a bracketed chord, not any bracket", () => {
     expect(SongPackageHelper.hasChords(CHART)).toBe(true);
     expect(SongPackageHelper.hasChords("Verse 1\nSing [x2] loudly")).toBe(false);

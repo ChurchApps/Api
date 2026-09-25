@@ -1,18 +1,25 @@
 import { SongView } from "../models/index.js";
 
 const LEADING_ARTICLE = /^(the|a|an)\s+/;
-const STANZA_LABEL = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|ending|interlude|coda)\b/i;
+// "Chorus3" counts too: the heading word may run straight into its number
+const STANZA_LABEL = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|ending|interlude|coda)(?=\b|\d)/i;
+const COMMENT_DIRECTIVE = /^\{\s*(?:c|ci|comment|comment_italic)\s*:\s*(.+?)\s*\}$/i;
+// "Verse 1:" and "CHORUS: (2x)" name the same sections as "Verse 1" and "CHORUS (2x)"
+const tidyLabel = (label: string) => label.replace(/:(?=\s|$)/g, "").replace(/\s+/g, " ").trim();
 
 /**
- * A stanza label, or null for a sung line: a known heading ("Verse 2", "Chorus") or, as writers often chart it, any
- * chord-free line wholly in parentheses ("(Chorus x2)", "(Intro/Instrumental)") — labelled by the text inside.
- * The content repo's tools/lib.mjs sectionLabelOf and the site's chordpro.ts sectionLabel apply the same rule.
+ * A stanza label, or null for a sung line: a known heading ("Verse 2", "Chorus3", "Verse 1:"), a ChordPro comment
+ * ("{c: Intro}"), or, as writers often chart it, any chord-free line wholly in parentheses ("(Chorus x2)") — labelled
+ * by the text inside, without a trailing colon. The content repo's tools/lib.mjs sectionLabelOf and the site's
+ * chordpro.ts sectionLabel apply the same rule.
  */
 export function sectionLabel(line: string): string | null {
+  const comment = line.trim().match(COMMENT_DIRECTIVE);
+  if (comment) return tidyLabel(comment[1]) || null;
   const plain = line.replace(/\[[^\]]*\]/g, "").trim();
   const paren = !/\[[^\]]+\]/.test(line) && plain.match(/^\((.+)\)$/);
-  if (paren) return paren[1].trim();
-  return STANZA_LABEL.test(plain) ? plain : null;
+  if (paren) return tidyLabel(paren[1]);
+  return STANZA_LABEL.test(plain) ? tidyLabel(plain) : null;
 }
 
 export interface DuplicateQuery {
