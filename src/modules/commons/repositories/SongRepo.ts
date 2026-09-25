@@ -21,7 +21,8 @@ const SPINE_COLS = [
 const MODERATION_SPINE_COLS = [...SPINE_COLS, "assets.publisherUserId as submittedBy"] as const;
 
 const AUTHOR_COLS = [
-  "authors.name as writer",
+  // a co-written song's full credit; authorId names only its first writer
+  sql<string>`coalesce(songs.writerCredit, authors.name)`.as("writer"),
   "authors.bio as writerBio",
   "authors.portraitUrl as portraitKey"
 ] as const;
@@ -111,7 +112,7 @@ export class SongRepo {
     if (filters.language) q = q.where("assets.language", "=", filters.language);
     if (filters.q) {
       const like = `%${filters.q.toLowerCase()}%`;
-      q = q.where((eb) => eb.or([eb(sql`lower(assets.name)`, "like", like), eb(sql`lower(songs.firstLine)`, "like", like), eb(sql`lower(authors.name)`, "like", like)]));
+      q = q.where((eb) => eb.or([eb(sql`lower(assets.name)`, "like", like), eb(sql`lower(songs.firstLine)`, "like", like), eb(sql`lower(coalesce(songs.writerCredit, authors.name))`, "like", like)]));
     }
     return await q.orderBy(sql.ref("rank"), "desc").orderBy("assets.downloadCount", "desc").orderBy("songs.hymnalCount", "desc").execute() as SongView[];
   }
@@ -126,7 +127,7 @@ export class SongRepo {
   /** id/title/writer plus enough of chordPro to read its first line — the duplicate check's whole corpus. */
   public async loadPublishedForDuplicates(): Promise<SongView[]> {
     return await this.joined()
-      .select(["assets.id as id", "assets.name as title", "authors.name as writer", sql<string>`substring(songs.chordPro, 1, 500)`.as("chordPro")])
+      .select(["assets.id as id", "assets.name as title", sql<string>`coalesce(songs.writerCredit, authors.name)`.as("writer"), sql<string>`substring(songs.chordPro, 1, 500)`.as("chordPro")])
       .where("assets.status", "=", "published").execute() as SongView[];
   }
 

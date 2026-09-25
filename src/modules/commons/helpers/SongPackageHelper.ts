@@ -126,7 +126,7 @@ export class SongPackageHelper {
    * Charts pasted as chords over the words ("Am.   Gsus   C" above a line) become inline ChordPro: each chord moves
    * into the line below at its column — scaled to the line when the chord row is wider than the words, as a
    * proportional-font paste leaves it — snapped to the start of a word. A chord row with no words under it (an
-   * intro, a turnaround: "F | Gsus | C") keeps its bars and brackets its chords. Otherwise those rows read as lyrics.
+   * intro, a turnaround: "F | Gsus | C") brackets its chords and drops the bars. Otherwise those rows read as lyrics.
    */
   static inlineChordLines(chordPro: string): string {
     const lines = chordPro.split("\n");
@@ -137,7 +137,8 @@ export class SongPackageHelper {
       const next = lines[i + 1];
       // a row with bar lines is a progression to play (an intro, a turnaround), never the chords of the line below
       if (/(^|\s)\|(\s|$)/.test(line) || next === undefined || !next.trim() || isChordRow(next) || next.trim().startsWith("{") || sectionLabel(next) || /\[[^\]]+\]/.test(next)) {
-        out.push(line.trim().split(/\s+/).map((t) => (t === "|" ? t : `[${chordName(t)}]`)).join(" "));
+        // bar lines would print as a lyric row under the chords; the chords alone read as the progression
+        out.push(line.trim().split(/\s+/).filter((t) => t !== "|").map((t) => `[${chordName(t)}]`).join(" "));
         continue;
       }
       const words = next.replace(/\s+$/, "");
@@ -150,7 +151,8 @@ export class SongPackageHelper {
         const at = Math.min(Math.round(c.col * scale), words.length);
         // the word the chord lands in: its start, or the last word's start past the end
         const pos = [...starts].reverse().find((s) => s <= at) ?? starts[0] ?? 0;
-        inserts.set(pos, (inserts.get(pos) || "") + `[${c.name}]`);
+        // two chords on one word get a space between them, or they print run together ("GsusC")
+        inserts.set(pos, inserts.has(pos) ? `${inserts.get(pos)} [${c.name}]` : `[${c.name}]`);
       }
       let merged = words;
       for (const pos of [...inserts.keys()].sort((a, b) => b - a)) merged = merged.slice(0, pos) + inserts.get(pos) + merged.slice(pos);

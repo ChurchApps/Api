@@ -47,6 +47,8 @@ export interface Song {
   sundayReadyAt?: Date;
   /** JSON array of Contributor rows, appended on every approve */
   contributors?: string | null;
+  /** the writer credit as submitted when it names several people; null shows the author's name */
+  writerCredit?: string | null;
 }
 
 export type Confidence = "sunday-ready" | "score" | "generated-from-midi" | "chart-only" | "lyrics-only";
