@@ -205,6 +205,13 @@ export class PublishHelper {
         const measured = !String(duration?.basis || "").startsWith("estimate");
         if (seconds > 0 && seconds !== song.singTimeSeconds && (!song.singTimeSeconds || measured)) fields.singTimeSeconds = seconds;
       }
+      // a tempo or key the pack read off the recording (tools/pack/build.py stamps song.json) fills a blank one
+      if (!song.bpm || !song.songKey) {
+        const raw = await ContentLibraryHelper.readKey(ContentLibraryHelper.liveKey({ assetType: "song", id }, `${dir}/song.json`));
+        const pkg = SongPackageHelper.parseJson<{ bpm?: number; key?: string }>(raw?.buffer.toString("utf8"));
+        if (!song.bpm && Number(pkg?.bpm) > 0) fields.bpm = Math.round(Number(pkg?.bpm));
+        if (!song.songKey && pkg?.key) fields.songKey = String(pkg.key);
+      }
       if (Object.keys(fields).length) await repos.song.update(id, fields);
     }
     return { added: add.length, removed: gone.length };

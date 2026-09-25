@@ -562,6 +562,23 @@ describe("PublishHelper.syncOutput", () => {
     expect(await run({ seconds: 70, basis: "estimate: 28 lines × 4 beats @ 96 bpm" }, 61)).not.toHaveBeenCalled();
   });
 
+  it("fills a blank bpm from the tempo the pack read off the recording, and never overwrites one", async () => {
+    const DIR7 = "songs/en/new-song-asset000001";
+    const run = async (bpm: number | null) => {
+      (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR7}/output/composition/slides.json`]);
+      // only read when the row has a blank to fill
+      if (bpm === null) (ContentLibraryHelper.readKey as jest.Mock).mockResolvedValueOnce({ buffer: Buffer.from(JSON.stringify({ bpm: 129, key: "E" })), contentType: "application/json" });
+      const r: any = {
+        assetFile: { loadLive: jest.fn(async () => [{ id: "lf1", name: `${DIR7}/song.json` }, { id: "lf2", name: `${DIR7}/output/composition/slides.json` }]), create: jest.fn(), delete: jest.fn() },
+        song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000001", scoreSource: "abc", singTimeSeconds: 300, bpm, songKey: "E" })), update: jest.fn(async () => {}) }
+      };
+      await PublishHelper.syncOutput(r, "asset000001");
+      return r.song.update;
+    };
+    expect(await run(null)).toHaveBeenCalledWith("asset000001", { bpm: 129 });
+    expect(await run(90)).not.toHaveBeenCalled();
+  });
+
   it("calls a score built beside a tune.abc an abc score", async () => {
     const DIR3 = "songs/en/new-song-asset000001";
     (ContentLibraryHelper.listLiveKeys as jest.Mock).mockResolvedValueOnce([`commons/${DIR3}/output/composition/score.musicxml`]);
