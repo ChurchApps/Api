@@ -8,19 +8,24 @@ import type { Repos } from "../repositories/Repos.js";
  * Lambda, so an in-memory Map is per-container and an attacker spread across warm containers
  * would barely be counted at all.
  *
- * Two buckets are checked:
- *  - account: the email (or authGuid) being attacked. Not attacker-controlled, so this is the
- *    bucket that actually bounds a brute-force run against one account.
+ * Three buckets are checked:
+ *  - account+ip: the tight per-account limit. Keyed on the caller's IP too, so one attacker
+ *    hammering a victim's email only locks themselves out, not the victim.
+ *  - account: a looser ceiling on the account alone, which still bounds a brute-force run
+ *    spread across many IPs.
  *  - ip: broad protection against one source spraying many accounts. Only as trustworthy as
  *    `getClientIp` below, hence the much looser limit.
  *
- * A successful login clears the account bucket so a legitimate user who eventually gets their
+ * A successful login clears the account buckets so a legitimate user who eventually gets their
  * password right is not left throttled. The ip bucket deliberately survives, otherwise anyone
  * holding one valid account could reset it between sprays.
  */
 export class LoginRateLimiter {
   static windowSeconds = 15 * 60;
-  static maxPerAccount = 10;
+  static maxPerAccountIp = 10;
+  static maxPerAccount = 30;
+  // Reset-code buckets stay tight on the account alone; the per-code attempt cap is not enough on its own.
+  static maxPerAccountStrict = 10;
   static maxPerIp = 50;
 
   /**
@@ -45,23 +50,27 @@ export class LoginRateLimiter {
     return req?.socket?.remoteAddress || "";
   }
 
-  /** The buckets that apply to one attempt, each with its own ceiling. */
-  private static isLoopback(ip: string): boolean {
+  public static isLoopback(ip: string): boolean {
     const host = (ip || "").replace(/^::ffff:/i, "").split("%")[0];
-    return !host || host === "127.0.0.1" || host === "::1" || host === "localhost" || host.startsWith("127.");
+    return host === "127.0.0.1" || host === "::1" || host === "localhost" || host.startsWith("127.");
   }
 
-  private static buckets(ip: string, account: string): { key: string; max: number }[] {
+  /** The buckets that apply to one attempt, each with its own ceiling. An unknown ip is its own bucket, never loopback. */
+  private static buckets(ip: string, account: string, accountMax: number = this.maxPerAccount): { key: string; max: number }[] {
     const result: { key: string; max: number }[] = [];
-    if (account) result.push({ key: "account|" + account.slice(0, 150), max: this.maxPerAccount });
-    if (ip && !this.isLoopback(ip)) result.push({ key: "ip|" + ip.slice(0, 150), max: this.maxPerIp });
+    const ipKey = (ip || "unknown").slice(0, 60);
+    if (account) {
+      result.push({ key: "acctip|" + account.slice(0, 120) + "|" + ipKey, max: this.maxPerAccountIp });
+      result.push({ key: "account|" + account.slice(0, 150), max: accountMax });
+    }
+    if (!this.isLoopback(ip)) result.push({ key: "ip|" + ipKey, max: this.maxPerIp });
     return result;
   }
 
-  /** False when either bucket is over its limit. Fails open — a DB outage must not lock everyone out. */
-  public static async allow(repos: Repos, ip: string, account: string): Promise<boolean> {
+  /** False when any bucket is over its limit. Fails open — a DB outage must not lock everyone out. */
+  public static async allow(repos: Repos, ip: string, account: string, accountMax: number = this.maxPerAccount): Promise<boolean> {
     try {
-      for (const bucket of this.buckets(ip, account)) {
+      for (const bucket of this.buckets(ip, account, accountMax)) {
         const count = await repos.loginAttempt.loadCount(bucket.key, this.windowSeconds);
         if (count >= bucket.max) return false;
       }
@@ -80,10 +89,10 @@ export class LoginRateLimiter {
     }
   }
 
-  /** Clears the account bucket only; see the note above on why the ip bucket is left alone. */
-  public static async clearFailures(repos: Repos, account: string): Promise<void> {
+  /** Clears the account buckets only; see the note above on why the ip bucket is left alone. */
+  public static async clearFailures(repos: Repos, account: string, ip: string = ""): Promise<void> {
     try {
-      await repos.loginAttempt.clear(this.buckets("", account).map((bucket) => bucket.key));
+      await repos.loginAttempt.clear(this.buckets(ip, account).filter((bucket) => !bucket.key.startsWith("ip|")).map((bucket) => bucket.key));
     } catch (e) {
       console.error("LoginRateLimiter.clearFailures failed:", e);
     }

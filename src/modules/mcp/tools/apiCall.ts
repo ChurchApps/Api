@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { dispatch } from "../internalDispatch.js";
 
-// Blocked: provider webhooks need raw signed bodies; OAuth manages client credentials.
+// Blocked: provider webhooks need raw signed bodies; OAuth manages client credentials; credential endpoints are never needed by an already-authenticated session.
 const BLOCKLIST: RegExp[] = [
   /^\/giving\/donate\/webhook\//i,
-  /^\/membership\/oauth\/clients/i
+  /^\/membership\/oauth\/clients/i,
+  /^\/membership\/users\/(login|verifyCredentials|forgot|verifyCode|register|checkEmail|setPasswordGuid)\b/i,
+  /^\/mcp\b/i
 ];
 
 export const apiCallSchema = {
@@ -14,7 +16,7 @@ export const apiCallSchema = {
   body: z.any().optional().describe("Optional JSON request body. For most POST endpoints this is an array of model objects.")
 };
 
-export function makeApiCallHandler(getAuthorization: () => string | undefined) {
+export function makeApiCallHandler(getAuthorization: () => string | undefined, getClientIp: () => string = () => "") {
   return async (args: { method: string; path: string; query?: Record<string, any>; body?: any }) => {
     const path = args.path.startsWith("/") ? args.path : "/" + args.path;
     if (BLOCKLIST.some((re) => re.test(path))) {
@@ -38,7 +40,8 @@ export function makeApiCallHandler(getAuthorization: () => string | undefined) {
         path,
         query: args.query,
         body: args.body,
-        authorization: auth
+        authorization: auth,
+        clientIp: getClientIp()
       });
       const text = JSON.stringify(
         {
@@ -54,9 +57,11 @@ export function makeApiCallHandler(getAuthorization: () => string | undefined) {
         content: [{ type: "text" as const, text }]
       };
     } catch (err: any) {
+      console.error("MCP api_call dispatch failed:", err);
+      const timedOut = /timed out/i.test(err?.message || "");
       return {
         isError: true,
-        content: [{ type: "text" as const, text: `Internal dispatch failed: ${err?.message || String(err)}` }]
+        content: [{ type: "text" as const, text: timedOut ? "Internal dispatch timed out." : "Internal dispatch failed." }]
       };
     }
   };

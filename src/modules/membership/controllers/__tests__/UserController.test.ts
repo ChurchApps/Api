@@ -24,7 +24,7 @@ jest.mock("../../helpers/index", () => {
     Environment: { currentEnvironment: "test", isMailConfigured: true, emailOnRegistration: false },
     Permissions: { people: { edit: "peopleEdit" }, roles: { edit: "rolesEdit" }, server: { admin: "serverAdmin" } },
     AuditLogHelper: { getClientIp: () => "1.1.1.1", logLogin: jest.fn(), log: jest.fn() },
-    MauticHelper: { trackLogin: jest.fn(() => Promise.resolve()) },
+    MauticHelper: { trackLogin: jest.fn(() => Promise.resolve()), registerUser: jest.fn(() => Promise.resolve()) },
     ChurchHelper: { appendLogos: jest.fn(async () => {}) }
   };
 });
@@ -324,5 +324,64 @@ describe("UserController.loadOrCreate", () => {
     expect(result.status).toBe(200);
     expect(result.obj.isNewUser).toBe(false);
     expect(UserHelper.sendWelcomeEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("UserController security scoping", () => {
+  function scopedController(user: any, perms: string[], opts: { inChurch?: boolean } = {}) {
+    const { controller, repos } = userController(user);
+    repos.userChurch.loadByUserId.mockResolvedValue(opts.inChurch ? { id: "uc1" } : null);
+    repos.roleMember.existsForUser = jest.fn(async () => false);
+    const au = { id: "staff1", churchId: "c1", checkAccess: (p: string) => perms.includes(p) };
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
+    return { controller, repos };
+  }
+
+  it("blocks church staff from loading a user outside their church by id", async () => {
+    const { controller } = scopedController({ id: "u5", email: "x@y.z", firstName: "X", lastName: "Y" }, ["peopleEdit"]);
+    const result: any = await (controller as any).loadOrCreate({ body: { userId: "u5" }, headers: {} }, {});
+    expect(result.status).toBe(401);
+  });
+
+  it("lets church staff load a user linked to their church by id", async () => {
+    const { controller } = scopedController({ id: "u5", email: "x@y.z", firstName: "X", lastName: "Y" }, ["peopleEdit"], { inChurch: true });
+    const result: any = await (controller as any).loadOrCreate({ body: { userId: "u5" }, headers: {} }, {});
+    expect(result.status).toBe(200);
+    expect(result.obj.firstName).toBe("X");
+  });
+
+  it("hides an existing unlinked user's name from church staff looking up by email", async () => {
+    const { controller } = scopedController({ id: "u5", email: "x@y.z", firstName: "X", lastName: "Y" }, ["peopleEdit"]);
+    const result: any = await (controller as any).loadOrCreate({ body: { userEmail: "x@y.z", firstName: "A", lastName: "B" }, headers: {} }, {});
+    expect(result.status).toBe(200);
+    expect(result.obj).toEqual({ id: "u5", email: "x@y.z", isNewUser: false });
+  });
+
+  it("rate-limits register per ip", async () => {
+    const { PublicPersonRateLimiter } = jest.requireMock("../../helpers/index");
+    PublicPersonRateLimiter.allow.mockResolvedValueOnce(false);
+    const { controller, repos } = scopedController(null, []);
+    const result: any = await (controller as any).register({ body: { email: "n@b.c", firstName: "N", lastName: "B" }, headers: {} }, {});
+    expect(result.status).toBe(429);
+    expect(repos.user.save).not.toHaveBeenCalled();
+    expect(UserHelper.sendWelcomeEmail).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits checkEmail per ip", async () => {
+    const { PublicPersonRateLimiter } = jest.requireMock("../../helpers/index");
+    PublicPersonRateLimiter.allow.mockResolvedValueOnce(false);
+    const { controller, repos } = scopedController(null, []);
+    const result: any = await (controller as any).checkEmail({ body: { email: "n@b.c" }, headers: {} }, {});
+    expect(result.status).toBe(429);
+    expect(repos.user.loadByEmail).not.toHaveBeenCalled();
+  });
+
+  it("audit-logs server-admin impersonation", async () => {
+    (AuditLogHelper.log as jest.Mock).mockClear();
+    (AuthenticatedUser as any).getUserJwt = jest.fn(() => "jwt");
+    const { controller } = scopedController({ id: "u5", email: "x@y.z" }, ["serverAdmin"]);
+    const result: any = await (controller as any).impersonate({ params: { id: "u5" }, headers: {} }, {});
+    expect(result.obj.jwt).toBe("jwt");
+    expect(AuditLogHelper.log).toHaveBeenCalledWith(expect.anything(), "c1", "staff1", "security", "impersonate", "user", "u5", expect.anything(), "1.1.1.1");
   });
 });

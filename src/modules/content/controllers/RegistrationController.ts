@@ -8,6 +8,7 @@ import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
+import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 
 interface RegisterMemberInput { personId?: string; firstName: string; lastName: string; registrationTypeId?: string }
 interface RegisterSelectionInput { selectionId: string; quantity?: number; registrationMemberId?: string }
@@ -50,7 +51,15 @@ export class RegistrationController extends ContentBaseController {
       if (event.registrationCloseDate && new Date(event.registrationCloseDate) < now) return this.json({ error: "Registration has closed" }, 400);
 
       const au = this.authUser();
+      if (!au?.id) {
+        const allowed = await AnonymousRateLimiter.consume([
+          AnonymousRateLimiter.ipBucket(req, "registration", 30),
+          AnonymousRateLimiter.keyBucket("registration", data.guestInfo?.email, 5)
+        ]);
+        if (!allowed) return this.json({ error: "Too many registration attempts. Please try again later." }, 429);
+      }
       let personId = (au?.personId && data.personId === au.personId) ? au.personId : null;
+      const redact = <T extends Registration>(r: T): T => (au?.personId ? r : { ...r, personId: undefined, householdId: undefined });
       let householdId: string = null;
       let email: string = null;
       let name = "";
@@ -78,10 +87,13 @@ export class RegistrationController extends ContentBaseController {
       const types = await this.repos.registrationType.loadForEvent(churchId, data.eventId);
       const activeTypes = types.filter((t: RegistrationType) => t.active !== false);
       const typeMap = new Map(activeTypes.map((t: RegistrationType) => [t.id, t]));
-      const members = await this.limitMemberPeople(churchId, personId, data.members || []);
+      // A guest's email may match an existing person; never let an anonymous caller link that person's household.
+      const requestedMembers = data.guestInfo && !au?.personId ? (data.members || []).map((m) => ({ ...m, personId: undefined as string })) : (data.members || []);
+      const members = await this.limitMemberPeople(churchId, personId, requestedMembers);
       for (const m of members) {
         if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
       }
+      if (RegistrationPricingHelper.membersMissingPaidType(activeTypes, members)) return this.json({ error: "Attendee type required" }, 400);
 
       const selections = await this.repos.registrationSelection.loadForEvent(churchId, data.eventId);
       const activeSelections = selections.filter((s: RegistrationSelection) => s.active !== false);
@@ -129,7 +141,7 @@ export class RegistrationController extends ContentBaseController {
             const church = await getMembershipModuleGateway().loadChurch(churchId);
             await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, members as any, church?.timeZone);
           } catch (e) { console.error("Failed to send waitlist email", e); }
-          return { ...registration, members, status: "waitlisted" };
+          return redact({ ...registration, members, status: "waitlisted" });
         }
         return this.json({ error: "Event is at capacity", status: "full" }, 409);
       }
@@ -160,7 +172,7 @@ export class RegistrationController extends ContentBaseController {
           await this.deleteCascade(churchId, registration.id);
           return this.json({ error: charge.error || "Payment failed" }, 400);
         }
-        if (charge.requiresAction) return { ...registration, members: memberResult.members, payment: charge.data };
+        if (charge.requiresAction) return redact({ ...registration, members: memberResult.members, payment: charge.data });
         await this.recordPayment(churchId, registration.id, charge, total, data.type, personId);
         registration.amountPaid = total;
         registration.status = "confirmed";
@@ -176,7 +188,7 @@ export class RegistrationController extends ContentBaseController {
         console.error("Failed to send registration confirmation email", e);
       }
 
-      return { ...registration, members: memberResult.members };
+      return redact({ ...registration, members: memberResult.members });
     });
   }
 
@@ -260,6 +272,7 @@ export class RegistrationController extends ContentBaseController {
       // authz-exempt: public wizard validates a discount code before checkout
       const churchId = req.body.churchId;
       if (!churchId) return this.json({ error: "churchId required" }, 400);
+      if (!(await AnonymousRateLimiter.consume([AnonymousRateLimiter.ipBucket(req, "coupon", 30)]))) return this.json({ error: "Too many attempts. Please try again later." }, 429);
       const coupon = await this.repos.registrationCoupon.loadByCode(churchId, req.body.eventId, req.body.code);
       const uses = coupon?.id ? await this.repos.registration.countActiveForCoupon(churchId, coupon.id) : 0;
       return RegistrationPricingHelper.validateCoupon(coupon, req.body.memberCount ?? 1, uses);
@@ -383,6 +396,7 @@ export class RegistrationController extends ContentBaseController {
         : null;
       const choices: RegisterSelectionInput[] = Array.isArray(body.selections) ? body.selections : null;
       if (members) for (const m of members) if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
+      if (members && !au.checkAccess(Permissions.registrations.edit) && RegistrationPricingHelper.membersMissingPaidType(activeTypes, members)) return this.json({ error: "Attendee type required" }, 400);
       if (choices) {
         for (const c of choices) {
           if (!selMap.has(c.selectionId)) return this.json({ error: "Invalid selection" }, 400);
@@ -430,7 +444,7 @@ export class RegistrationController extends ContentBaseController {
       let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, currentMembers as any, currentChoices as any);
       if (registration.couponId) {
         const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
-        total = RegistrationPricingHelper.applyDiscount(total, coupon);
+        if (coupon?.minMembers == null || currentMembers.length >= coupon.minMembers) total = RegistrationPricingHelper.applyDiscount(total, coupon);
       }
       registration.totalAmount = total;
       await this.repos.registration.save(registration);

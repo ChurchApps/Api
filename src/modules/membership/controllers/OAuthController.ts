@@ -360,7 +360,7 @@ export class OAuthController extends MembershipBaseController {
 
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(user_code);
 
-      if (!dc) {
+      if (!dc || new Date(dc.expiresAt) < new Date()) {
         return this.json({ error: "invalid_code", message: "Code not found or expired" }, 400);
       }
 
@@ -391,7 +391,7 @@ export class OAuthController extends MembershipBaseController {
 
       const dc = await this.repos.oAuthDeviceCode.loadByUserCode(user_code);
 
-      if (!dc) {
+      if (!dc || new Date(dc.expiresAt) < new Date()) {
         return this.json({ error: "invalid_code" }, 400);
       }
 
@@ -476,7 +476,7 @@ export class OAuthController extends MembershipBaseController {
       }
 
       const session = await this.repos.oAuthRelaySession.loadBySessionCode(sessionCode);
-      if (!session) {
+      if (!session || session.status !== "pending") {
         res.setHeader("Content-Type", "text/html");
         return res.send(this.relayCallbackHtml("Sign-In Link Expired", "This sign-in link has expired. Please start the sign-in again from the app."));
       }

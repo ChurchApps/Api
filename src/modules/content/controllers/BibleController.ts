@@ -19,6 +19,7 @@ export class BibleController extends ContentBaseController {
   @httpGet("/:translationKey/search")
   public async search(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (!BibleController.isSafeKey(translationKey)) return this.json({ error: "Invalid key" }, 400);
       const query = req.query.query as string;
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
@@ -69,6 +70,7 @@ export class BibleController extends ContentBaseController {
   @httpGet("/:translationKey/books")
   public async getBooks(@requestParam("translationKey") translationKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (!BibleController.isSafeKey(translationKey)) return this.json({ error: "Invalid key" }, 400);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
       let result = await this.repos.bibleBook.loadAll(sourceKey);
       if (result.length === 0) {
@@ -83,6 +85,7 @@ export class BibleController extends ContentBaseController {
   @httpGet("/:translationKey/:bookKey/chapters")
   public async getChapters(@requestParam("translationKey") translationKey: string, @requestParam("bookKey") bookKey: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (!BibleController.isSafeKey(translationKey) || !BibleController.isSafeKey(bookKey)) return this.json({ error: "Invalid key" }, 400);
       const resolvedBookKey = await this.resolveBookKey(bookKey);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
 
@@ -104,6 +107,7 @@ export class BibleController extends ContentBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (!BibleController.isSafeKey(translationKey) || !BibleController.isSafeKey(chapterKey)) return this.json({ error: "Invalid key" }, 400);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
       let result = await this.repos.bibleVerse.loadByChapter(sourceKey, chapterKey);
       if (result.length === 0) {
@@ -124,6 +128,7 @@ export class BibleController extends ContentBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      if (![translationKey, startVerseKey, endVerseKey].every((k) => BibleController.isSafeKey(k))) return this.json({ error: "Invalid key" }, 400);
       const { source, sourceKey } = await this.resolveTranslation(translationKey);
       const canCache = !this.noCache.includes(sourceKey);
       let result: BibleVerseText[] = [];
@@ -216,6 +221,11 @@ export class BibleController extends ContentBaseController {
       });
       return result;
     });
+  }
+
+  // Keys are interpolated into upstream URL paths.
+  static isSafeKey(key: string): boolean {
+    return typeof key === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(key) && !key.includes("..");
   }
 
   private async logLookup(ipAddress: string, translationKey: string, startVerseKey: string, endVerseKey: string) {

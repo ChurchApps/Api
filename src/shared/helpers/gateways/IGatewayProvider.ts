@@ -108,6 +108,8 @@ export interface IGatewayProvider {
   // Customer management. options.personId lets providers enrich the record (e.g. billing address).
   createCustomer?(config: GatewayConfig, email: string, name: string, options?: { personId?: string }): Promise<string>;
   getCustomerSubscriptions?(config: GatewayConfig, customerId: string): Promise<any>;
+  // null when the customer doesn't exist on the gateway.
+  getCustomerCreatedAt?(config: GatewayConfig, customerId: string): Promise<Date | null>;
   // Subscriptions in the common UI shape ({ id, status, billing_cycle_anchor, default_payment_method, plan }).
   listNormalizedSubscriptions?(config: GatewayConfig, customerId: string): Promise<any[]>;
   getSubscription?(config: GatewayConfig, subscriptionId: string): Promise<any>;

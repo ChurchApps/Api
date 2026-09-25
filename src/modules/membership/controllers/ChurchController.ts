@@ -346,7 +346,7 @@ export class ChurchController extends MembershipBaseController {
             appName,
             null,
             "New Church Registration",
-            "<h2>" + church.name + "</h2><h3>App: " + (appName || "unknown") + "</h3>"
+            "<h2>" + UserHelper.escapeHtml(church.name) + "</h2><h3>App: " + UserHelper.escapeHtml(appName || "unknown") + "</h3>"
           ));
         }
         if (Environment.hubspotKey) {

@@ -46,6 +46,10 @@ export class BlockoutDateController extends DoingBaseController {
         blockoutDate.churchId = au.churchId;
         if (!blockoutDate.personId) blockoutDate.personId = au.personId;
         if (blockoutDate.personId !== au.personId && !canEditOthers) return this.json({}, 401);
+        if (blockoutDate.id && !canEditOthers) {
+          const existing = (await this.repos.blockoutDate.load(au.churchId, blockoutDate.id)) as BlockoutDate;
+          if (existing && existing.personId !== au.personId) return this.json({}, 401);
+        }
         promises.push(this.repos.blockoutDate.save(blockoutDate));
       }
       const result = await Promise.all(promises);

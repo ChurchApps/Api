@@ -56,3 +56,26 @@ describe("CustomerRepo.save (provider-scoped customer keying)", () => {
     expect(scoped).toHaveBeenCalledWith("C1", "P1", "stripe");
   });
 });
+
+describe("CustomerRepo guest customers", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("adds a guest customer beside the person's existing one instead of replacing it", async () => {
+    const repo = new CustomerRepo();
+    const create = jest.spyOn(repo as any, "create").mockImplementation(async (m: any) => m);
+    const del = jest.spyOn(repo, "delete").mockResolvedValue(undefined);
+    jest.spyOn(repo, "load").mockResolvedValue(null);
+    await repo.addGuest({ id: "cus_new", churchId: "C1", personId: "P1", provider: "stripe" });
+    expect(del).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ id: "cus_new", personId: "P1", metadata: { guest: true } }));
+  });
+
+  it("prefers the person's own customer over guest-added ones", () => {
+    const repo: any = new CustomerRepo();
+    const picked = repo.pickPrimary([
+      { id: "cus_guest", churchId: "C1", personId: "P1", provider: "stripe", metadata: "{\"guest\":true}" },
+      { id: "cus_own", churchId: "C1", personId: "P1", provider: "stripe", metadata: null }
+    ]);
+    expect(picked.id).toBe("cus_own");
+  });
+});

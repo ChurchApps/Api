@@ -30,57 +30,6 @@ let cachedHandler;
 
 export const web = async function (event, context) {
   try {
-    if (event.path === "/test") {
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        },
-        body: JSON.stringify({
-          message: "Lambda is working",
-          path: event.path,
-          method: event.httpMethod,
-          stage: process.env.STAGE,
-          time: new Date().toISOString()
-        })
-      };
-    }
-
-    if (event.path === "/test-post" && event.httpMethod === "POST") {
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        },
-        body: JSON.stringify({
-          message: "POST request received",
-          body: event.body,
-          headers: event.headers,
-          method: event.httpMethod,
-          time: new Date().toISOString()
-        })
-      };
-    }
-
-    if (event.path === "/api/test") {
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*"
-        },
-        body: JSON.stringify({
-          message: "API routing working",
-          path: event.path,
-          method: event.httpMethod,
-          modules: ["membership", "attendance", "content", "giving", "messaging", "doing"],
-          time: new Date().toISOString()
-        })
-      };
-    }
-
     await initializeEnvironment();
 
     if (!cachedHandler) {
@@ -111,8 +60,6 @@ export const web = async function (event, context) {
       },
       body: JSON.stringify({
         error: "Internal server error",
-        message: error.message,
-        stack: process.env.STAGE === "demo" ? error.stack : undefined,
         timestamp: new Date().toISOString()
       })
     };

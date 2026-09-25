@@ -6,7 +6,7 @@ import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
 import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
-import { AuditLogHelper, Environment, Permissions, PersonConditionHelper, PersonHelper, PublicChurchContext, PublicEmailThrottle, PublicPersonRateLimiter, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
+import { Environment, Permissions, PersonConditionHelper, PersonHelper, PublicChurchContext, PublicEmailThrottle, PublicPersonRateLimiter, LoginRateLimiter, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
@@ -31,7 +31,7 @@ export class PersonController extends MembershipBaseController {
       for (const m of members) {
         if (!m.firstName || !m.lastName) return this.json({ error: "firstName and lastName are required for each member" }, 400);
       }
-      if (!PublicPersonRateLimiter.allow(AuditLogHelper.getClientIp(req), churchId, "guest-register")) return this.json({ error: "Too many requests" }, 429);
+      if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), churchId, "guest-register"))) return this.json({ error: "Too many requests" }, 429);
       return PersonHelper.registerGuestHousehold(churchId, members);
     });
   }
@@ -44,14 +44,13 @@ export class PersonController extends MembershipBaseController {
       const personId = req.body.personId;
       const groupId = req.body.groupId;
       if (!churchId || !personId) return this.json({ error: "churchId and personId are required" }, 400);
-      const ipAddress = AuditLogHelper.getClientIp(req);
-      if (!PublicPersonRateLimiter.allow(ipAddress, churchId, "public-email")) return this.json({ error: "Too many requests" }, 429);
+      const ipAddress = LoginRateLimiter.getClientIp(req);
+      if (!(await PublicPersonRateLimiter.allow(this.repos, ipAddress, churchId, "public-email"))) return this.json({ error: "Too many requests" }, 429);
       // The target must lead a publicly visible group - the same people the anonymous
       // /groupmembers/public/leaders roster exposes. When the caller names the group it is
       // contacting, the leadership has to be in that group, not just anywhere in the church.
       if (!(await this.repos.groupMember.isPublicGroupLeader(churchId, personId, groupId))) return this.denyAccess(["Unable to send"]);
-      // Durable per-target cap; the in-memory per-IP guard above is per-process and IP-keyed, so it
-      // does not survive Lambda instances or an attacker rotating/spoofing X-Forwarded-For.
+      // Durable per-target cap; the per-IP guard above can't stop an attacker rotating IPs.
       if (!(await PublicEmailThrottle.allow(this.repos, churchId, personId))) return this.json({ error: "Too many requests" }, 429);
 
       // Escape attacker-supplied subject/body before they're injected raw into the HTML email template (anon endpoint).
@@ -160,12 +159,12 @@ export class PersonController extends MembershipBaseController {
       if (!bind.churchId) {
         const church = await this.repos.church.loadById(churchId);
         if (!church || church.archivedDate) return this.json({ error: "Invalid church" }, 401);
-        if (!PublicPersonRateLimiter.allow(AuditLogHelper.getClientIp(req), churchId, "loadOrCreate")) return this.json({ error: "Too many requests" }, 429);
+        if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), churchId, "loadOrCreate"))) return this.json({ error: "Too many requests" }, 429);
       }
-      // allowRestore false: an anon caller must never resurrect a deleted person. Only id/name is
-      // returned - contactInfo would leak the stored email/phone of an existing member.
+      // allowRestore false: an anon caller must never resurrect a deleted person. The name echoed back is
+      // the one submitted, so an email lookup can't reveal an existing member's stored name or contact info.
       const person: Person = await PersonHelper.getPerson(churchId, email, firstName, lastName, false, false);
-      return { id: person.id, name: person.name };
+      return { id: person.id, name: { first: firstName, last: lastName, display: (firstName + " " + lastName).trim() } };
     });
   }
 
@@ -442,6 +441,10 @@ export class PersonController extends MembershipBaseController {
             person.membershipStatus = existing.membershipStatus;
             person.householdId = existing.householdId;
             person.householdRole = existing.householdRole;
+            person.campusId = existing.campusId;
+            person.conversationId = existing.conversationId;
+            person.donorNumber = existing.donorNumber;
+            person.importKey = existing.importKey;
           }
           const isNew = !person.id;
           if (isNew && !person.householdId) {

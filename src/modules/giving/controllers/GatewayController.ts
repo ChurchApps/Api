@@ -46,7 +46,9 @@ export class GatewayController extends GivingBaseController {
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repos.gateway.convertAllToModel(au.churchId, (await this.repos.gateway.loadAll(au.churchId)) as any[]);
+      const gateways = (await this.repos.gateway.loadAll(au.churchId)) as any[];
+      if (au.checkAccess(Permissions.settings.edit)) return this.repos.gateway.convertAllToModel(au.churchId, gateways);
+      return gateways.map(gateway => GivingBaseController.toPublicGateway(gateway));
     });
   }
 

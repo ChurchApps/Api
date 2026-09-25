@@ -199,3 +199,30 @@ describe("FileController.save group-member authorization", () => {
     expect(repos.file.save).not.toHaveBeenCalled();
   });
 });
+
+describe("FileController group-member upload hardening", () => {
+  const groupAu = { churchId: "c1", checkAccess: () => false, groupIds: ["g1"] };
+
+  it("rejects group members presigning outside the group content type", async () => {
+    const { controller } = makeController({ au: groupAu });
+    const result: any = await (controller as any).getUploadUrl({ body: { contentType: "website", contentId: "g1", fileName: "x.pdf", mimeType: "application/pdf" } }, {});
+    expect(result.status).toBe(401);
+  });
+
+  it("downgrades active MIME types for group members", async () => {
+    const getUploadUrl = jest.fn(async () => ({ url: "https://s3.example/post" }));
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { getUploadUrl } });
+    const { controller } = makeController({ au: groupAu });
+    await (controller as any).getUploadUrl({ body: { contentType: "group", contentId: "g1", fileName: "x.html", mimeType: "text/html", size: 10 } }, {});
+    expect(getUploadUrl).toHaveBeenCalledWith("/c1/files/group/g1/x.html", "application/octet-stream", 10);
+  });
+
+  it("records the decoded size of inline uploads", async () => {
+    const store = jest.fn(async () => "k");
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: { store } });
+    (StorageResolver.publicUrl as jest.Mock).mockReturnValue("https://cdn.test/x");
+    const { controller, repos } = makeController({ au: groupAu });
+    await (controller as any).save({ body: [{ contentType: "group", contentId: "g1", fileName: "a.txt", fileType: "image/svg+xml", size: 1, fileContents: "data:text/plain;base64,QUJDRA==" }] }, {});
+    expect(repos.file.save).toHaveBeenCalledWith(expect.objectContaining({ size: 4, fileType: "application/octet-stream" }));
+  });
+});

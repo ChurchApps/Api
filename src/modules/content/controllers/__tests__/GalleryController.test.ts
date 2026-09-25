@@ -45,7 +45,13 @@ describe("GalleryController.getUploadUrl", () => {
     const { controller } = makeController({ leaderGroupIds: ["g1"] });
     const result: any = await controller.getUploadUrl({ body: { folder: "0", fileName: "1.jpg" } } as any, {} as any);
     expect(result.status).not.toBe(401);
-    expect(result.key).toBe("c1/gallery/0/1.jpg");
+    expect(result.key).toMatch(/^c1\/gallery\/0\/1-[0-9a-f]{12}\.jpg$/);
+  });
+
+  it("rejects non-image uploads from a group leader", async () => {
+    const { controller } = makeController({ leaderGroupIds: ["g1"] });
+    const result: any = await controller.getUploadUrl({ body: { folder: "0", fileName: "x.html" } } as any, {} as any);
+    expect(result.status).toBe(400);
   });
 
   it("rejects a plain member who leads no groups", async () => {

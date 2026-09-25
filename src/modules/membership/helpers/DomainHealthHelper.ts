@@ -14,7 +14,7 @@ export class DomainHealthHelper {
         timeout: 10000,
         validateStatus: () => true
       });
-      const contentType = response.headers["content-type"] || "";
+      const contentType = String(response.headers["content-type"] || "");
       if (contentType.includes("application/json") && response.data && typeof response.data === "object" && "error" in response.data) {
         return true;
       }

@@ -95,7 +95,10 @@ export class VisitController extends AttendanceBaseController {
         peopleIdList.forEach((id) => peopleIds.push(id));
 
         const submittedPersonIds = [...peopleIds, ...req.body.map((v) => v.personId).filter(Boolean)];
-        if (!au.checkAccess(Permissions.attendance.edit) && !au.checkAccess(Permissions.attendance.checkin) && !(await this.inOwnHousehold(au, submittedPersonIds))) return this.json({}, 403);
+        const isStaff = au.checkAccess(Permissions.attendance.edit) || au.checkAccess(Permissions.attendance.checkin);
+        if (!isStaff && !(await this.inOwnHousehold(au, submittedPersonIds))) return this.json({}, 403);
+        // Self check-in can't claim volunteer/guest status (it skews ratio gates) or attribute the check-in to someone else.
+        if (!isStaff) req.body.forEach((v) => { if (v.checkinType !== "member") v.checkinType = undefined; v.checkedInById = au.personId; });
 
         const checkDuplicates = req.query.checkDuplicates === "true";
 

@@ -1,6 +1,9 @@
 import { EnvironmentBase, AwsHelper } from "@churchapps/apihelper";
 import { DatabaseUrlParser } from "./DatabaseUrlParser.js";
 
+const DOCKER_DEFAULT_JWT = "please-change-this-jwt-secret";
+const DOCKER_DEFAULT_ENCRYPTION = "PleaseChangeThisDockerDefaultKey";
+
 export class Environment extends EnvironmentBase {
   // Current environment and server configuration
   static currentEnvironment: string;
@@ -139,9 +142,17 @@ export class Environment extends EnvironmentBase {
   }
 
   private static assertRuntimeSecrets(environment: string) {
-    if (environment === "dev" || environment === "docker" || environment === "local") return;
     const jwt = this.jwtSecret || "";
     const enc = this.encryptionKey || "";
+    // Refusing to boot would break self-hosters who upgrade in place, so docker only warns.
+    if (environment === "docker") {
+      if (!jwt || jwt === DOCKER_DEFAULT_JWT) console.warn("SECURITY WARNING: JWT_SECRET is unset or the public docker-compose default. Anyone can forge admin logins on this server. Set JWT_SECRET in .env to a long random value and restart.");
+      if (!enc || enc === DOCKER_DEFAULT_ENCRYPTION) console.warn("SECURITY WARNING: ENCRYPTION_KEY is unset or the public docker-compose default, so stored payment/storage credentials are readable by anyone with the database. Set ENCRYPTION_KEY in .env (32 characters) before storing credentials; changing it later makes existing encrypted values unreadable.");
+      return;
+    }
+    if (environment === "dev" || environment === "local") return;
+    if (jwt === DOCKER_DEFAULT_JWT) throw new Error("JWT_SECRET is set to the public docker-compose default");
+    if (enc === DOCKER_DEFAULT_ENCRYPTION) throw new Error("ENCRYPTION_KEY is set to the public docker-compose default");
     if (!jwt || jwt.length < 32 || jwt === "jwt-secret-dev") throw new Error("JWT_SECRET is empty, shorter than 32 characters, or set to the development sample");
     if (!enc) throw new Error("ENCRYPTION_KEY is empty");
     // staging still has the committed sample; refusing it leaves the Lambda half-booted

@@ -1,5 +1,6 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
+import crypto from "crypto";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { AutomationExecution, Condition, Conjunction, WorkflowTrigger } from "../models/index.js";
 import { EventTriggerHelper, ExecutionHelper, RuleEngine } from "../helpers/index.js";
@@ -7,12 +8,18 @@ import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/doing/workflowTriggers")
 export class WorkflowTriggerController extends DoingBaseController {
+  static keyMatches(provided: string | undefined, required: string): boolean {
+    const a = crypto.createHash("sha256").update(provided || "").digest();
+    const b = crypto.createHash("sha256").update(required).digest();
+    return !!provided && crypto.timingSafeEqual(a, b);
+  }
+
   // Gated by INTERNAL_API_KEY (fails closed if missing); manual fallback for lambda timer.
   @httpGet("/check")
   public async check(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const requiredKey = process.env.INTERNAL_API_KEY;
-      if (!requiredKey || req.header("x-internal-key") !== requiredKey) return this.json({}, 401);
+      if (!requiredKey || !WorkflowTriggerController.keyMatches(req.header("x-internal-key"), requiredKey)) return this.json({}, 401);
       await RuleEngine.runScheduled();
       return { success: true };
     });

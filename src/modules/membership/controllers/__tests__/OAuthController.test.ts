@@ -113,3 +113,46 @@ describe("OAuthController access token TTL", () => {
     expect(AuthenticatedUser.getCombinedApiJwt).toHaveBeenCalledWith(expect.anything(), expect.anything(), 10, expect.anything());
   });
 });
+
+describe("OAuthController relay + device code hardening", () => {
+  it("does not overwrite an already-completed relay session", async () => {
+    const session = { id: "s1", sessionCode: "abc", status: "completed", authCode: "victim-code" };
+    const { controller, repos } = oauthController({ session });
+    const { res, getBody } = htmlRes();
+    await (controller as any).relayCallback({ query: { code: "attacker-code", state: "abc" } }, res);
+    expect(repos.oAuthRelaySession.save).not.toHaveBeenCalled();
+    expect(getBody()).not.toContain("Success!");
+  });
+
+  function deviceController(dc: any) {
+    const repos: any = {
+      oAuthDeviceCode: { loadByUserCode: jest.fn(async () => dc), save: jest.fn() },
+      userChurch: { loadByUserId: jest.fn(async () => ({ id: "uc1" })) }
+    };
+    const controller = new OAuthController();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ id: "u1", churchId: "c1" });
+    (controller as any).json = (obj: any, status: number) => ({ obj, status });
+    return { controller, repos };
+  }
+
+  it("refuses to approve an expired device code", async () => {
+    const { controller, repos } = deviceController({ id: "d1", status: "pending", expiresAt: new Date(Date.now() - 1000) });
+    const result: any = await (controller as any).approveDevice({ body: { user_code: "ABCD", church_id: "c1" } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.oAuthDeviceCode.save).not.toHaveBeenCalled();
+  });
+
+  it("approves a live device code", async () => {
+    const { controller, repos } = deviceController({ id: "d1", status: "pending", expiresAt: new Date(Date.now() + 60000) });
+    await (controller as any).approveDevice({ body: { user_code: "ABCD", church_id: "c1" } }, {});
+    expect(repos.oAuthDeviceCode.save).toHaveBeenCalledWith(expect.objectContaining({ status: "approved", userChurchId: "uc1" }));
+  });
+
+  it("ignores deny on an expired device code", async () => {
+    const { controller, repos } = deviceController({ id: "d1", status: "pending", expiresAt: new Date(Date.now() - 1000) });
+    const result: any = await (controller as any).denyDevice({ body: { user_code: "ABCD" } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.oAuthDeviceCode.save).not.toHaveBeenCalled();
+  });
+});

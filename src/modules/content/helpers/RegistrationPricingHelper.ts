@@ -24,6 +24,14 @@ export class RegistrationPricingHelper {
     return Number.isInteger(quantity) && quantity >= 1;
   }
 
+  // Omitting attendee types must not turn a paid event into a free one.
+  static membersMissingPaidType(types: RegistrationType[], members: { registrationTypeId?: string }[]): boolean {
+    if (!types.some((t) => this.num(t.price) > 0)) return false;
+    if (!members || members.length === 0) return true;
+    const ids = new Set(types.map((t) => t.id));
+    return members.some((m) => !m.registrationTypeId || !ids.has(m.registrationTypeId));
+  }
+
   static computeTotal(
     types: RegistrationType[],
     selections: RegistrationSelection[],

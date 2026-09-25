@@ -73,11 +73,6 @@ export class HealthController {
     try {
       return res.json({
         environment: Environment.currentEnvironment,
-        nodeVersion: process.version,
-        platform: process.platform,
-        arch: process.arch,
-        awsRegion: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "unknown",
-        lambdaFunction: process.env.AWS_LAMBDA_FUNCTION_NAME || "local",
         stage: process.env.STAGE || process.env.ENVIRONMENT || "unknown",
         timestamp: new Date().toISOString()
       });

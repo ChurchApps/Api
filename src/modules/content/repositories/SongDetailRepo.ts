@@ -80,6 +80,14 @@ export class SongDetailRepo {
       .execute() as any;
   }
 
+  // Global rows may only be changed by a church when no other church's songs point at them.
+  public async isExclusiveTo(churchId: string, id: string): Promise<boolean> {
+    const sd = await this.loadGlobal(id);
+    if (!sd) return false;
+    const other = await getDb().selectFrom("songs").select("id").where("songDetailId", "=", id).where("churchId", "<>", churchId).executeTakeFirst();
+    return !other;
+  }
+
   public async loadByPraiseChartsId(praiseChartsId: string): Promise<SongDetail | null> {
     return (await getDb().selectFrom("songDetails").selectAll().where("praiseChartsId", "=", praiseChartsId).executeTakeFirst()) ?? null as any;
   }

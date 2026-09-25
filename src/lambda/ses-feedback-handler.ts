@@ -8,7 +8,13 @@ const MIN_MS = 60 * 1000;
 export const handleSesFeedback = async (event: SNSEvent): Promise<void> => {
   const repos = await RepoManager.getRepos<any>("messaging");
   for (const record of event.Records || []) {
-    const msg = JSON.parse(record.Sns.Message);
+    let msg: any;
+    try {
+      msg = JSON.parse(record.Sns.Message);
+    } catch {
+      console.warn("[sesFeedback] skipping unparseable record", record.Sns?.MessageId);
+      continue;
+    }
     const feedback = parseFeedback(msg);
     if (!feedback) continue;
     const sentAt = new Date(msg.mail?.timestamp || Date.now());

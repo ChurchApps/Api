@@ -9,6 +9,7 @@ import { PreferenceGateHelper } from "./PreferenceGateHelper.js";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
 
 export interface NotificationDebugStep {
   step: string;
@@ -27,6 +28,7 @@ export interface CreateNotificationOptions {
   category?: string; // preference opt-out axis (architecture §2.6); derived if omitted
   emailByPerson?: Record<string, { subject: string; html: string }>; // pre-rendered per-recipient email; only used when emailImmediate is set
   emailImmediate?: boolean; // send the rich email at creation time instead of the escalation/batch digest
+  churchAuthored?: boolean; // emailByPerson carries church-written content, so it draws on ChurchEmailLimiter
 }
 
 export class NotificationHelper {
@@ -747,13 +749,25 @@ export class NotificationHelper {
     const subject = custom?.subject || options.deliveryTitle || notification.message;
     const html = custom?.html || (NotificationHelper.escapeHtml(notification.message) + (/^https?:\/\//i.test(notification.link || "") ? ` <a href="${NotificationHelper.escapeHtml(notification.link)}">View Details</a>` : ""));
 
+    let reservationId: string | undefined;
+    if (options.churchAuthored) {
+      const reserved = await ChurchEmailLimiter.reserve(notification.churchId, "workflowEmail", [{ address: email, personId: notification.personId, contentId: notification.id }]);
+      if (!reserved) {
+        await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", false, email, "Daily email limit reached");
+        return;
+      }
+      reservationId = reserved[0];
+    }
+
     try {
       await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
-      await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", true, email);
+      if (reservationId) await ChurchEmailLimiter.settle(notification.churchId, reservationId, true);
+      else await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", true, email);
       notification.deliveryMethod = "complete";
       await NotificationHelper.repos.notification.save(notification);
     } catch (e) {
-      await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", false, email, String(e));
+      if (reservationId) await ChurchEmailLimiter.settle(notification.churchId, reservationId, false, String(e));
+      else await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", false, email, String(e));
     }
   };
 

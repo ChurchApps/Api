@@ -7,6 +7,11 @@ export class WebhookSigner {
     return "sha256=" + crypto.createHmac("sha256", secret).update(body, "utf8").digest("hex");
   }
 
+  // V2 binds the timestamp so a captured delivery can't be replayed outside the receiver's freshness window.
+  public static signV2(secret: string, timestamp: string, body: string): string {
+    return WebhookSigner.sign(secret, timestamp + "." + body);
+  }
+
   public static generateSecret(): string {
     return crypto.randomBytes(24).toString("hex");
   }

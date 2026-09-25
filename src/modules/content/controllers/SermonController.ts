@@ -6,6 +6,7 @@ import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { YouTubeHelper, Environment, VimeoHelper, OpenAiHelper } from "../helpers/index.js";
 import { FileStorageHelper } from "@churchapps/apihelper";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 
 @controller("/content/sermons")
 export class SermonController extends ContentBaseController {
@@ -170,6 +171,7 @@ export class SermonController extends ContentBaseController {
     return this.actionWrapperAnon(req, res, async () => {
       const videoData = req.query.videoData?.toString() || "";
       if (!/^[A-Za-z0-9_:-]{1,64}$/.test(videoData)) return this.json({ error: "Invalid video id" }, 400);
+      if (!(await AnonymousRateLimiter.consume([AnonymousRateLimiter.ipBucket(req, "sermonLookup", 100)]))) return this.json({ error: "Too many requests" }, 429);
       if (req.query.videoType === "youtube") {
         return await YouTubeHelper.getSermon(videoData);
       } else {
@@ -231,6 +233,7 @@ export class SermonController extends ContentBaseController {
   @httpGet("/youtubeImport/:channelId")
   public async youtubeImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       return await YouTubeHelper.getVideosFromChannel(au.churchId, channelId);
     });
   }
@@ -238,6 +241,7 @@ export class SermonController extends ContentBaseController {
   @httpGet("/vimeoImport/:channelId")
   public async vimeoImport(@requestParam("channelId") channelId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       return await VimeoHelper.getVideosFromChannel(au.churchId, channelId);
     });
   }

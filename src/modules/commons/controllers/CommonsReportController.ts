@@ -1,15 +1,13 @@
 import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { CommonsMailHelper, ipHash } from "../helpers/index.js";
+import { CommonsMailHelper, clientIp, consumeRateLimit, ipHash } from "../helpers/index.js";
 import { Report } from "../models/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
 const REASONS = ["copyright", "ai", "policy", "quality", "other"];
 const RATE_LIMIT = 3;
-const RATE_WINDOW_MS = 3600000;
-// ponytail: per-process limiter — move to a table if abuse ever shows up across Lambda instances
-const recent = new Map<string, number[]>();
+const RATE_WINDOW_SECONDS = 3600;
 
 @controller("/commons/reports")
 export class CommonsReportController extends CommonsBaseController {
@@ -25,12 +23,13 @@ export class CommonsReportController extends CommonsBaseController {
         if (!b.contentText || !b.details) return this.json({ errors: ["contentText and details are required"] }, 400);
         if (reason === "copyright" && (!b.name || !b.email || !b.signature || !b.reporterRole)) return this.json({ errors: ["name, email, signature and reporterRole are required for copyright reports"] }, 400);
       }
-      const key = ipHash(req);
-      const now = Date.now();
-      const hits = (recent.get(key) || []).filter((t) => now - t < RATE_WINDOW_MS);
       // local dev/e2e runs file more than three reports an hour; the limiter is for the public API
-      if (Environment.currentEnvironment !== "dev" && hits.length >= RATE_LIMIT) return this.json({ errors: ["Too many reports from this address — try again later"] }, 429);
-      recent.set(key, [...hits, now]);
+      if (Environment.currentEnvironment !== "dev") {
+        const email = String(b.email || "").trim().toLowerCase();
+        const buckets = [{ key: "commonsReport:ip|" + ipHash({ headers: { "x-forwarded-for": clientIp(req) } }), max: RATE_LIMIT }];
+        if (email) buckets.push({ key: "commonsReport:email|" + email.slice(0, 120), max: RATE_LIMIT });
+        if (!(await consumeRateLimit(buckets, RATE_WINDOW_SECONDS))) return this.json({ errors: ["Too many reports from this address — try again later"] }, 429);
+      }
       let contentText = b.contentText;
       if (isWriter && !contentText && b.assetId) contentText = (await this.repos.asset.loadById(b.assetId))?.name;
       const report = await this.repos.report.create({

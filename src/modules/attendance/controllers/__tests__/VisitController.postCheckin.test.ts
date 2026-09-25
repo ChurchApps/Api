@@ -190,6 +190,16 @@ describe("self check-in household scoping", () => {
     expect(repos.visit.save).not.toHaveBeenCalled();
   });
 
+  it("strips volunteer status and forces checkedInById on self check-in", async () => {
+    const { controller, repos } = makeController({ groups: [], counts: [] });
+    asMember(controller);
+    const body = [{ personId: "p1", checkinType: "volunteer", checkedInById: "someoneElse", visitSessions: [] }];
+    await (controller as any).postCheckin(req(body), {});
+    const saved = repos.visit.save.mock.calls[0][0];
+    expect(saved.checkinType).toBeUndefined();
+    expect(saved.checkedInById).toBe("p1");
+  });
+
   it("allows getCheckin for the member's own household", async () => {
     const { controller } = makeController();
     asMember(controller);

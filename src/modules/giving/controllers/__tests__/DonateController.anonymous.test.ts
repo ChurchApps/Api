@@ -13,15 +13,18 @@ const gatewayService = {
   processCharge: jest.fn(),
   logsDonationsImmediately: jest.fn(),
   logEvent: jest.fn(),
-  logDonation: jest.fn()
+  logDonation: jest.fn(),
+  getCustomerCreatedAt: jest.fn()
 };
 jest.mock("../../../../shared/helpers/GatewayService.js", () => ({ GatewayService: gatewayService }));
+const rateLimiter = { allow: jest.fn(), recordDecline: jest.fn() };
+jest.mock("../../helpers/DonationRateLimiter.js", () => ({ DonationRateLimiter: rateLimiter }));
 
 import { DonateController } from "../DonateController.js";
 
 function makeController() {
   const controller: any = new DonateController();
-  controller.repos = { gateway: {} };
+  controller.repos = { gateway: {}, fund: { load: jest.fn(async (_c: string, id: string) => (id === "FUN1" ? { id } : null)) }, customer: { load: jest.fn() } };
   controller.actionWrapper = (_req: any, _res: any, action: any) => action({ churchId: "CHU1", checkAccess: () => true });
   controller.json = (obj: any, status: number) => ({ obj, status });
   return controller;
@@ -43,7 +46,10 @@ function chargeBody(extra: any = {}) {
 
 beforeEach(() => {
   Object.values(gatewayService).forEach((fn: any) => fn.mockReset());
-  gatewayService.getGatewayForChurch.mockResolvedValue({ id: "GAT1", provider: "stripe", currency: "usd" });
+  gatewayService.getGatewayForChurch.mockResolvedValue({ id: "GAT1", churchId: "CHU1", provider: "stripe", currency: "usd" });
+  gatewayService.getCustomerCreatedAt.mockResolvedValue(new Date());
+  rateLimiter.allow.mockReset().mockResolvedValue(true);
+  rateLimiter.recordDecline.mockReset();
   gatewayService.processCharge.mockResolvedValue({ success: true, data: { id: "pi_1", status: "succeeded" } });
   gatewayService.logsDonationsImmediately.mockReturnValue(false);
   jest.spyOn(console, "warn").mockImplementation(() => {});
@@ -77,5 +83,71 @@ describe("DonateController.charge anonymous gifts", () => {
     expect(logged.anonymous).toBe(true);
     expect(logged.person.id).toBe("");
     expect(logged.funds).toEqual([{ id: "FUN1", amount: 25 }]);
+  });
+});
+
+describe("DonateController.charge guest safeguards", () => {
+  it("refuses a Stripe customer the guest did not just create", async () => {
+    gatewayService.getCustomerCreatedAt.mockResolvedValue(new Date(Date.now() - 3 * 60 * 60 * 1000));
+    const result = await makeController().charge({ body: chargeBody({ customerId: "cus_victim" }) }, {});
+    expect(result.status).toBe(403);
+    expect(gatewayService.processCharge).not.toHaveBeenCalled();
+  });
+
+  it("accepts the customer minted moments ago by /addcard", async () => {
+    await makeController().charge({ body: chargeBody({ customerId: "cus_new" }) }, {});
+    expect(gatewayService.processCharge).toHaveBeenCalled();
+  });
+
+  it("returns 429 once the guest is rate limited", async () => {
+    rateLimiter.allow.mockResolvedValue(false);
+    const result = await makeController().charge({ body: chargeBody() }, {});
+    expect(result.status).toBe(429);
+    expect(gatewayService.processCharge).not.toHaveBeenCalled();
+  });
+
+  it("counts a declined guest charge", async () => {
+    gatewayService.processCharge.mockResolvedValue({ success: false, data: { error: "declined" } });
+    await makeController().charge({ body: chargeBody() }, {});
+    expect(rateLimiter.recordDecline).toHaveBeenCalled();
+  });
+
+  it("rejects funds that are not in the church", async () => {
+    const result = await makeController().charge({ body: chargeBody({ funds: [{ id: "OTHER", amount: 25 }] }) }, {});
+    expect(result.status).toBe(400);
+  });
+
+  it("sends no receipt for a reference that was already recorded", async () => {
+    gatewayService.processCharge.mockResolvedValue({ success: true, data: { status: "succeeded", alreadyRecorded: true } });
+    const controller = makeController();
+    const receiptContext = jest.spyOn(controller, "receiptContext");
+    await controller.charge({ body: chargeBody({ provider: "paystack", id: "ref_1" }) }, {});
+    expect(receiptContext).not.toHaveBeenCalled();
+  });
+});
+
+describe("DonateController.charge saved methods for signed-in donors", () => {
+  const signedIn = (controller: any) => {
+    controller.actionWrapper = (_req: any, _res: any, action: any) => action({ id: "U1", personId: "PER1", churchId: "CHU1", checkAccess: () => false });
+    return controller;
+  };
+
+  it("refuses a Kingdom Funding vault that belongs to someone else", async () => {
+    gatewayService.getGatewayForChurch.mockResolvedValue({ id: "GAT1", churchId: "CHU1", provider: "kingdomfunding", currency: "usd" });
+    const controller = signedIn(makeController());
+    controller.repos.gatewayPaymentMethod = { loadByExternalId: jest.fn().mockResolvedValue({ customerId: "V1" }) };
+    controller.repos.customer.load.mockResolvedValue({ id: "V1", personId: "VICTIM" });
+    const result = await controller.charge({ body: chargeBody({ provider: "kingdomfunding", id: "123456" }) }, {});
+    expect(result.status).toBe(403);
+    expect(gatewayService.processCharge).not.toHaveBeenCalled();
+  });
+
+  it("charges the donor's own Kingdom Funding vault", async () => {
+    gatewayService.getGatewayForChurch.mockResolvedValue({ id: "GAT1", churchId: "CHU1", provider: "kingdomfunding", currency: "usd" });
+    const controller = signedIn(makeController());
+    controller.repos.gatewayPaymentMethod = { loadByExternalId: jest.fn().mockResolvedValue({ customerId: "V1" }) };
+    controller.repos.customer.load.mockResolvedValue({ id: "V1", personId: "PER1" });
+    await controller.charge({ body: chargeBody({ provider: "kingdomfunding", id: "123456" }) }, {});
+    expect(gatewayService.processCharge).toHaveBeenCalled();
   });
 });

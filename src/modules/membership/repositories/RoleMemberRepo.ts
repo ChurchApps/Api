@@ -68,6 +68,11 @@ export class RoleMemberRepo {
     await getDb().deleteFrom("roleMembers").where("churchId", "=", churchId).where("userId", "=", userId).execute();
   }
 
+  public async existsForUser(churchId: string, userId: string): Promise<boolean> {
+    const row = await getDb().selectFrom("roleMembers").select("id").where("churchId", "=", churchId).where("userId", "=", userId).executeTakeFirst();
+    return !!row;
+  }
+
   public async loadAll(churchId: string) {
     return getDb().selectFrom("roleMembers").selectAll().where("churchId", "=", churchId).execute();
   }

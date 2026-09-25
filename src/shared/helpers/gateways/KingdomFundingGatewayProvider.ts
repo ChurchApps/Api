@@ -541,7 +541,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         check_account: txn.check_account,
         created_at: txn.created_at || payload.event_time,
         eventType: canonicalType,
-        eventCategory: category
+        eventCategory: category,
+        providerEventId: eventId
       }
     };
   }
@@ -1131,7 +1132,8 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       eventLog.churchId = churchId;
       eventLog.eventType = eventData?.eventType || event?.event_type || "unknown";
       eventLog.provider = "kingdomfunding";
-      eventLog.providerId = eventData?.id?.toString() || event?.event_id?.toString() || "";
+      // Webhooks dedup on the NMI event id (DonateController looks it up by eventId); the charge path has only the transaction id.
+      eventLog.providerId = eventData?.providerEventId?.toString() || eventData?.id?.toString() || event?.event_id?.toString() || "";
       eventLog.message = JSON.stringify(event);
       await repos.eventLog.save(eventLog);
     } catch (err) {

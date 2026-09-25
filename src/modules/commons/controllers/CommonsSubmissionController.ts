@@ -5,7 +5,7 @@ import express from "express";
 import * as fs from "fs";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { ASSET_TYPES } from "../helpers/AssetTypes.js";
-import { ContentLibraryHelper, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, notAcceptedMessage, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
+import { ContentLibraryHelper, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, isUploadableName, notAcceptedMessage, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 
 @controller("/commons/submissions")
@@ -71,8 +71,9 @@ export class CommonsSubmissionController extends CommonsBaseController {
       const def = ASSET_TYPES[asset.assetType || ""];
       const name = String(req.body.name || "");
       const spec = def && fileSpec(def, name);
-      if (!spec || spec.generated) return this.json({ errors: [notAcceptedMessage(def, name)] }, 400);
-      const contentType = req.body.contentType || ContentLibraryHelper.contentTypeFor(name);
+      if (!spec || spec.generated || !isUploadableName(def, name)) return this.json({ errors: [notAcceptedMessage(def, name)] }, 400);
+      const requested = req.body.contentType || "";
+      const contentType = !requested || /html|svg|xml|javascript|ecmascript/i.test(requested) ? ContentLibraryHelper.contentTypeFor(name) : requested;
       return await ContentLibraryHelper.presignedUpload(sub.id || "", name, contentType, spec.maxBytes || DEFAULT_MAX_FILE_BYTES, ContentLibraryHelper.requestApiBase(req));
     });
   }

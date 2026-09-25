@@ -42,4 +42,12 @@ describe("DonateController donation confirmation email", () => {
     expect(args[2]).toBe("Grace Church");
     expect(args[8]).toBeUndefined();
   });
+
+  it("renders only a fixed interval label in recurring receipts", async () => {
+    const controller = new DonateController();
+    await (controller as any).sendEmails("donor@x.com", { name: "Grace Church", subDomain: "grace" }, [{ name: "General", amount: 25 }], 25, { interval_count: "<b>2</b>", interval: "<img src=x>" }, Date.now(), "recurring", "USD");
+    const contents: string = sendTransactionalMock.mock.calls[0][5];
+    expect(contents).not.toContain("<img");
+    expect(contents).not.toContain("<b>2</b>");
+  });
 });

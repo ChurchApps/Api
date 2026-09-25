@@ -32,7 +32,7 @@ export class VimeoHelper {
   }
 
   public static async getVideoPage(churchId: string, channelId: string, page: number) {
-    const url = `https://api.vimeo.com/channels/${channelId}/videos?per_page=50&sort=date&page=${page}`;
+    const url = `https://api.vimeo.com/channels/${encodeURIComponent(channelId)}/videos?per_page=50&sort=date&page=${page}`;
     const axiosConfig = { headers: { Authorization: "Bearer " + Environment.vimeoToken } };
     const json: any = (await axios.get(url, axiosConfig)).data;
     const urlParams = new URLSearchParams(json.paging.last);

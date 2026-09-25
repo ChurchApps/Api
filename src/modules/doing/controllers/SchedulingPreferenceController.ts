@@ -38,6 +38,8 @@ export class SchedulingPreferenceController extends DoingBaseController {
         pref.churchId = au.churchId;
         if (!pref.personId) pref.personId = au.personId;
         if (pref.personId !== au.personId && !canEditOthers) return this.json({}, 401);
+        // the repo upserts on personId, so a client-supplied id could only point at someone else's row
+        if (!canEditOthers) delete pref.id;
         promises.push(this.repos.schedulingPreference.save(pref));
       }
       return await Promise.all(promises);

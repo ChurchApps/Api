@@ -17,6 +17,8 @@ jest.mock("../../../../shared/modules/index", () => ({
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../../../shared/infrastructure/RepoManager", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ gateway: {} })) } }));
 jest.mock("../../../../shared/helpers/GatewayService", () => ({ GatewayService: { getGatewayForChurch: jest.fn(async () => ({ provider: "stripe", currency: "USD" })), prepareCharge: jest.fn(), processCharge: jest.fn() } }));
+const consume = jest.fn(async () => true);
+jest.mock("../../helpers/AnonymousRateLimiter", () => ({ AnonymousRateLimiter: { consume: (...args: any[]) => (consume as any)(...args), ipBucket: jest.fn(() => ({ key: "ip", max: 1 })), keyBucket: jest.fn(() => ({ key: "k", max: 1 })) } }));
 jest.mock("../../../../shared/helpers/Environment", () => ({ Environment: { b1AdminRoot: "https://app.test", supportEmail: "s@test" } }));
 
 import { RegistrationController } from "../RegistrationController.js";
@@ -229,5 +231,57 @@ describe("attendee person links", () => {
     const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", members: [{ firstName: "A", lastName: "B", personId: "p1" }, { firstName: "C", lastName: "D", personId: "stranger" }] } }, {});
     expect(result.members.map((m: any) => m.personId)).toEqual(["p1", null]);
     expect(repos.registrationMember.atomicInsertWithTypeCapacity).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("paid attendee types are required", () => {
+  const types = [{ id: "t1", price: "45.00", active: true }];
+
+  it("rejects a register that omits attendee types on a paid event", async () => {
+    const { controller, repos } = makeController({ types });
+    const noType: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "A", lastName: "B" }] } }, {});
+    expect(noType.status).toBe(400);
+    const noMembers: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" } } }, {});
+    expect(noMembers.status).toBe(400);
+    expect(repos.registration.atomicInsertWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("still allows free typed events without a type", async () => {
+    const { controller } = makeController({ types: [{ id: "t1", price: "0", active: true }] });
+    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B" }] } }, {});
+    expect(result.status).toBe("confirmed");
+  });
+
+  it("rejects a self edit that strips paid types", async () => {
+    const { controller } = makeController({ types, checkAccess: false, auPersonId: "p1", existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", totalAmount: 45, amountPaid: 0, status: "pending" } });
+    const result: any = await (controller as any).edit("r1", { body: { members: [{ firstName: "A", lastName: "B" }] } }, {});
+    expect(result.status).toBe(400);
+  });
+});
+
+describe("anonymous rate limit", () => {
+  it("returns 429 when the anonymous limiter is exhausted", async () => {
+    consume.mockResolvedValueOnce(false);
+    const { controller, repos } = makeController();
+    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" } } }, {});
+    expect(result.status).toBe(429);
+    expect(repos.registration.atomicInsertWithCapacityCheck).not.toHaveBeenCalled();
+  });
+
+  it("throttles anonymous coupon validation", async () => {
+    consume.mockResolvedValueOnce(false);
+    const { controller } = makeController();
+    const result: any = await (controller as any).validateCoupon({ body: { churchId: "c1", eventId: "e1", code: "X" } }, {});
+    expect(result.status).toBe(429);
+  });
+});
+
+describe("guest registration privacy (M29)", () => {
+  it("does not link household people or echo person ids to an anonymous guest", async () => {
+    const { controller } = makeController({ auPersonId: "" });
+    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "victim@x.com" }, members: [{ firstName: "Kid", lastName: "H", personId: "p1kid" }] } }, {});
+    expect(result.personId).toBeUndefined();
+    expect(result.householdId).toBeUndefined();
+    expect(result.members[0].personId).toBeNull();
   });
 });

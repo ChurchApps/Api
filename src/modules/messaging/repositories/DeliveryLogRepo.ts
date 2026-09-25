@@ -6,7 +6,7 @@ import { DeliveryLog } from "../models/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 // Mail whose wording the church controls; system notification emails aren't a spam vector.
-const CHURCH_AUTHORED = ["email", "formFollowUp", "invite"];
+const CHURCH_AUTHORED = ["email", "formFollowUp", "invite", "workflowEmail"];
 
 @injectable()
 export class DeliveryLogRepo {
@@ -37,6 +37,35 @@ export class DeliveryLogRepo {
       errorMessage: model.errorMessage
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
+  }
+
+  public async createMany(models: DeliveryLog[]): Promise<DeliveryLog[]> {
+    if (models.length === 0) return models;
+    models.forEach((m) => { m.id = UniqueIdHelper.shortId(); });
+    await getDb().insertInto("deliveryLogs").values(models.map((m) => ({
+      id: m.id,
+      churchId: m.churchId,
+      personId: m.personId,
+      contentType: m.contentType,
+      contentId: m.contentId,
+      deliveryMethod: m.deliveryMethod,
+      success: m.success,
+      errorMessage: m.errorMessage,
+      deliveryAddress: m.deliveryAddress,
+      attemptTime: sql`NOW()`
+    }))).execute();
+    return models;
+  }
+
+  // Reserved rows are inserted before the send; stamping the real attempt time keeps SES feedback matching accurate.
+  public async markAttempt(churchId: string, id: string, success: boolean, errorMessage?: string) {
+    await getDb().updateTable("deliveryLogs").set({ success, errorMessage: errorMessage?.slice(0, 500), attemptTime: sql`NOW()` })
+      .where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
+  public async deleteIds(churchId: string, ids: string[]) {
+    if (ids.length === 0) return;
+    await getDb().deleteFrom("deliveryLogs").where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 
   public async loadById(churchId: string, id: string) {
@@ -97,7 +126,7 @@ export class DeliveryLogRepo {
   }
 
   public async bestChurchEmailDay(churchId: string, from: Date, to: Date): Promise<number> {
-    const result = await sql<{ best: number }>`SELECT MAX(n) AS best FROM (SELECT COUNT(*) AS n FROM deliveryLogs WHERE churchId=${churchId} AND deliveryMethod='email' AND contentType IN (${sql.join(CHURCH_AUTHORED)}) AND attemptTime >= ${DateHelper.toMysqlDate(from)} AND attemptTime < ${DateHelper.toMysqlDate(to)} GROUP BY DATE(attemptTime)) d`.execute(getDb());
+    const result = await sql<{ best: number }>`SELECT MAX(n) AS best FROM (SELECT COUNT(*) AS n FROM deliveryLogs WHERE churchId=${churchId} AND deliveryMethod='email' AND contentType IN (${sql.join(CHURCH_AUTHORED)}) AND success=1 AND attemptTime >= ${DateHelper.toMysqlDate(from)} AND attemptTime < ${DateHelper.toMysqlDate(to)} GROUP BY DATE(attemptTime)) d`.execute(getDb());
     return Number(result.rows[0]?.best ?? 0);
   }
 

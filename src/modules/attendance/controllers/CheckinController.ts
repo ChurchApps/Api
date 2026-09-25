@@ -3,6 +3,9 @@ import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { getMembershipModuleGateway, getMessagingModuleGateway, type HouseholdAdult } from "../../../shared/modules/index.js";
+import { BroadcastRateLimiter } from "../helpers/BroadcastRateLimiter.js";
+
+const MAX_MESSAGE_LENGTH = 480;
 
 @controller("/attendance/checkin")
 export class CheckinController extends AttendanceBaseController {
@@ -22,6 +25,7 @@ export class CheckinController extends AttendanceBaseController {
       if (!au.checkAccess(Permissions.attendance.checkin) && !au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       const { visitId, message } = req.body;
       if (!visitId || !message) return this.json({ error: "visitId and message are required" }, 400);
+      if (String(message).length > MAX_MESSAGE_LENGTH) return this.json({ error: "Message is too long" }, 400);
 
       const visit = this.repos.visit.convertToModel(au.churchId, await this.repos.visit.load(au.churchId, visitId));
       if (!visit?.personId) return this.json({ error: "Visit not found" }, 404);
@@ -37,6 +41,8 @@ export class CheckinController extends AttendanceBaseController {
       if (!au.checkAccess(Permissions.attendance.checkin) && !au.checkAccess(Permissions.attendance.edit)) return this.json({}, 401);
       const { serviceId, message } = req.body;
       if (!serviceId || !message) return this.json({ error: "serviceId and message are required" }, 400);
+      if (String(message).length > MAX_MESSAGE_LENGTH) return this.json({ error: "Message is too long" }, 400);
+      if (!(await BroadcastRateLimiter.consume(au.churchId))) return this.json({ error: "Too many broadcasts. Please try again later." }, 429);
 
       const rows = (await this.repos.visit.loadActiveByServiceToday(au.churchId, serviceId)) as any[];
       const personIds = [...new Set(rows.map((r) => r.personId).filter((id) => !!id))];

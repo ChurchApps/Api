@@ -9,7 +9,7 @@ export { userNames } from "./NamesHelper.js";
 export { PublishHelper } from "./PublishHelper.js";
 export { QualityHelper } from "./QualityHelper.js";
 export { ReviewerHelper, type DeclinedFile, type Reviewer } from "./ReviewerHelper.js";
-export { ipHash } from "./RequestHelper.js";
+export { ipHash, clientIp, consumeRateLimit } from "./RequestHelper.js";
 export { RightsHelper, USES } from "./RightsHelper.js";
 export { SongPackageHelper, type SongSummary, type SongDetail, type SimilarSong } from "./SongPackageHelper.js";
 export { SubmissionHelper, type Actor, type Outcome } from "./SubmissionHelper.js";

@@ -52,6 +52,7 @@ export class SongDetailsController extends ContentBaseController {
         }
         return result;
       } catch {
+        delete sd.id;
         return await this.repos.songDetail.save(sd);
       }
     });
@@ -61,6 +62,14 @@ export class SongDetailsController extends ContentBaseController {
   public async save(req: express.Request<{}, {}, SongDetail[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const isServerAdmin = au.checkAccess(Permissions.server.admin);
+      if (!isServerAdmin) {
+        for (const sd of req.body) {
+          if (!sd.id) { delete sd.praiseChartsId; continue; }
+          if (!(await this.repos.songDetail.isExclusiveTo(au.churchId, sd.id))) return this.json({ error: "Shared song details cannot be edited" }, 403);
+          sd.praiseChartsId = (await this.repos.songDetail.loadGlobal(sd.id))?.praiseChartsId;
+        }
+      }
       const promises: Promise<SongDetail>[] = [];
       req.body.forEach((sd) => {
         promises.push(this.repos.songDetail.save(sd));

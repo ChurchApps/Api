@@ -70,3 +70,10 @@ describe("StripeGatewayProvider.logEvent", () => {
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ providerId: "evt_1", eventType: "invoice.paid" }));
   });
 });
+
+describe("StripeGatewayProvider.verifyWebhookSignature", () => {
+  it("rejects every event when the church has no webhook secret", async () => {
+    const result = await new StripeGatewayProvider().verifyWebhookSignature({ privateKey: "sk_test", webhookKey: "" } as any, { "stripe-signature": "t=1,v1=abc" } as any, "{}");
+    expect(result.success).toBe(false);
+  });
+});

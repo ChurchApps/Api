@@ -15,6 +15,14 @@ export class DirectoryUpdateHelper {
     return Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();
   }
 
+  static maxPhotoBytes = 5 * 1024 * 1024;
+
+  static isAcceptablePhoto(dataUrl: string): boolean {
+    const match = /^data:image\/(png|jpeg|jpg|webp);base64,/i.exec(dataUrl);
+    if (!match) return false;
+    return (dataUrl.length - match[0].length) * 0.75 <= this.maxPhotoBytes;
+  }
+
   // Rewrites any inline photo data URL in an Open directoryUpdate task to a stored file URL.
   public static async handleDirectoryUpdate(churchId: string, task: Task): Promise<void> {
     if (task.status === "Open") {
@@ -27,12 +35,15 @@ export class DirectoryUpdateHelper {
           }
         })()
         : [];
-      for (const d of data) {
-        if (d.field === "photo" && typeof d.value === "string" && d.value.startsWith("data:")) {
+      const kept: any[] = [];
+      for (const d of Array.isArray(data) ? data : []) {
+        if (d?.field === "photo" && typeof d.value === "string" && d.value.startsWith("data:")) {
+          if (!this.isAcceptablePhoto(d.value)) continue;
           d.value = await this.savePhoto(churchId, d.value, task.associatedWithId);
         }
+        kept.push(d);
       }
-      task.data = JSON.stringify(data);
+      task.data = JSON.stringify(kept);
       task.taskType = "directoryUpdate";
     }
   }

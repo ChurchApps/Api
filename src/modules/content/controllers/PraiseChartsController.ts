@@ -82,6 +82,7 @@ export class PraiseChartsController extends ContentBaseController {
   @httpGet("/download")
   public async download(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({}, 401);
       if (!req.query.skus || !req.query.keys) return this.json({ error: "skus and keys are required" }, 400);
       const settings: Setting[] = await this.repos.setting.loadUser(au.churchId, au.id);
       const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
@@ -121,6 +122,7 @@ export class PraiseChartsController extends ContentBaseController {
   @httpGet("/access")
   public async praiseChartsTest(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({}, 401);
       const verifier = req.query.verifier as string;
       const token = req.query.token as string;
       const secret = req.query.secret as string;
@@ -145,6 +147,7 @@ export class PraiseChartsController extends ContentBaseController {
   @httpGet("/library")
   public async praiseChartsCatalog(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({}, 401);
       const settings: Setting[] = await this.repos.setting.loadUser(au.churchId, au.id);
       const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
       const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;

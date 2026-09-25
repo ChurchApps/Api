@@ -2,21 +2,23 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { MemberPermission } from "../models/index.js";
+import { Permissions } from "../helpers/index.js";
 
 @controller("/membership/memberpermissions")
 export class MemberPermissionController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!(await this.formAccess(au, id, "view"))) return this.json({}, 401);
-      else return this.repos.memberPermission.convertToModel(au.churchId, await this.repos.memberPermission.load(au.churchId, id));
+      const permission = await this.repos.memberPermission.load(au.churchId, id);
+      if (!permission || !(await this.formAccess(au, permission.contentId, "view"))) return this.json({}, 401);
+      else return this.repos.memberPermission.convertToModel(au.churchId, permission);
     });
   }
 
   @httpGet("/member/:id")
   public async getByMember(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (id !== au.personId && !(await this.formAccess(au, id))) return this.json({}, 401);
+      if (id !== au.personId && !au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       else return this.repos.memberPermission.convertAllToModel(au.churchId, (await this.repos.memberPermission.loadFormsByPerson(au.churchId, id)) as any[]);
     });
   }

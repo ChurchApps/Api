@@ -1,7 +1,7 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
-import { EmailTemplate, DeliveryLog } from "../models/index.js";
+import { EmailTemplate } from "../models/index.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
@@ -98,14 +98,16 @@ export class EmailTemplateController extends MessagingBaseController {
 
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
       if (eligible.length === 0) return this.json({ error: "No eligible recipients with email addresses" }, 400);
-      if (eligible.length > await ChurchEmailLimiter.remaining(au.churchId)) return this.json({ error: "This church can't send that many emails right now. Sending limits grow as your church builds a sending history. Contact support if you need more." }, 429);
+      const reserved = await ChurchEmailLimiter.reserve(au.churchId, "email", eligible.map((m) => ({ address: m.email, personId: m.personId })));
+      if (!reserved) return this.json({ error: "This church can't send that many emails right now. Sending limits grow as your church builds a sending history. Contact support if you need more." }, 429);
 
       let successCount = 0;
       let failCount = 0;
       const from = Environment.supportEmail;
       const replyTo = au.email || undefined;
 
-      for (const member of eligible) {
+      for (let i = 0; i < eligible.length; i++) {
+        const member = eligible[i];
         const person = { firstName: member.firstName, lastName: member.lastName, displayName: member.displayName, email: member.email };
         const resolvedSubject = MergeFieldHelper.resolve(subject, person, church);
         const resolvedBody = MergeFieldHelper.resolve(htmlContent, person, church);
@@ -113,28 +115,10 @@ export class EmailTemplateController extends MessagingBaseController {
         try {
           await TransactionalEmailHelper.sendTransactional(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
           successCount++;
-
-          const log: DeliveryLog = {
-            churchId: au.churchId,
-            personId: member.personId,
-            contentType: "email",
-            deliveryMethod: "email",
-            deliveryAddress: member.email,
-            success: true
-          };
-          await this.repos.deliveryLog.save(log);
+          await ChurchEmailLimiter.settle(au.churchId, reserved[i], true);
         } catch (err: any) {
           failCount++;
-          const log: DeliveryLog = {
-            churchId: au.churchId,
-            personId: member.personId,
-            contentType: "email",
-            deliveryMethod: "email",
-            deliveryAddress: member.email,
-            success: false,
-            errorMessage: err?.message || "Send failed"
-          };
-          await this.repos.deliveryLog.save(log);
+          await ChurchEmailLimiter.settle(au.churchId, reserved[i], false, err?.message || "Send failed");
         }
       }
 

@@ -93,7 +93,7 @@ export class UserHelper {
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, subject, contents, "EmailTemplate.html", inviterEmail || undefined);
   }
 
-  private static escapeHtml(value: string): string {
+  public static escapeHtml(value: string): string {
     return (value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 

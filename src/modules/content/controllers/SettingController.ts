@@ -11,6 +11,7 @@ export class ContentSettingController extends ContentBaseController {
   @httpGet("/my")
   public async my(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({}, 401);
       return this.repos.setting.convertAllToModel(au.churchId, await this.repos.setting.loadUser(au.churchId, au.id));
     });
   }
@@ -28,6 +29,7 @@ export class ContentSettingController extends ContentBaseController {
   @httpPost("/my")
   public async postMy(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({}, 401);
       for (const setting of req.body) {
         if (!setting.id) continue;
         const existing = await this.repos.setting.load(au.churchId, setting.id);
@@ -96,6 +98,7 @@ export class ContentSettingController extends ContentBaseController {
   @httpDelete("/my/:id")
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au.id) return this.json({}, 401);
       await this.repos.setting.deleteForUser(au.churchId, au.id, id);
       return this.json({ success: true });
     });

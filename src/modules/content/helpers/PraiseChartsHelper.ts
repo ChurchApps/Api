@@ -6,7 +6,8 @@ import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 
 export class PraiseChartsHelper {
-  static async loadUserTokens(au: any) {
+  static async loadUserTokens(au: any): Promise<{ token?: string; secret?: string }> {
+    if (!au?.id) return {};
     const repos = await RepoManager.getRepos<Repos>("content");
     const settings: Setting[] = await repos.setting.loadUser(au.churchId, au.id);
     const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;

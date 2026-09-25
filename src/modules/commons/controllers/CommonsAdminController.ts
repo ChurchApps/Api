@@ -228,6 +228,8 @@ export class CommonsAdminController extends CommonsBaseController {
       return;
     }
     res.setHeader("Content-Type", file.contentType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
     res.setHeader("Cache-Control", "private, max-age=300");
     res.send(file.buffer);
   }
