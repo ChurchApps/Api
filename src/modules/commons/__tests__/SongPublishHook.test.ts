@@ -117,6 +117,19 @@ describe("songPublishHook.onPublish", () => {
     expect(repos.song.upsert).toHaveBeenCalledWith(expect.objectContaining({ ccli: "22025" }));
   });
 
+  it("keeps a credit naming several writers for display; a single writer shows the author's name", async () => {
+    const publish = async (writer: string) => {
+      const repos: any = {
+        song: { loadSatellite: jest.fn(async () => undefined), upsert: jest.fn(async () => {}), loadById: jest.fn(async () => ({ id: "asset000001", title: "T" })) },
+        author: { loadIdByName: jest.fn(async () => undefined), findOrCreate: jest.fn(async (n: string) => "id-" + n), loadById: jest.fn(async () => undefined), update: jest.fn(async () => {}) }
+      };
+      await songPublishHook.onPublish({ asset: { id: "asset000001", assetType: "song", license: "WC" }, submission: { id: "sub00000001", payload: {} }, detail: { writer, chordPro: CHART }, files: [], filesChanged: [], version: 1, repos, writeFile: async () => {} } as any);
+      return repos.song.upsert.mock.calls[0][0];
+    };
+    expect(await publish("Words by Joy Marquéz • Music by Doug Gregan")).toMatchObject({ authorId: "id-Joy Marquéz", writerCredit: "Words by Joy Marquéz • Music by Doug Gregan" });
+    expect(await publish("Isaac Watts")).toMatchObject({ authorId: "id-Isaac Watts", writerCredit: null });
+  });
+
   describe("author claim", () => {
     const run = async (opts: { submittedBy: string; existingAuthor?: string }) => {
       const repos: any = {

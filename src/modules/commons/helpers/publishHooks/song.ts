@@ -51,6 +51,8 @@ export const songPublishHook: PublishHook = {
       const id = await repos.author.findOrCreate(writers[i]);
       if (i === 0) song.authorId = id;
     }
+    // authorId names the first writer only; a credit naming several people is shown as the writer gave it
+    song.writerCredit = writers.length > 1 ? writer.slice(0, 500) : null;
     // A publisher's song credited to exactly one writer, whose author row this publish created, claims that row
     // for them so they can edit their own bio and links. Co-written songs, third-party submissions and writers
     // already in the library stay unclaimed — we cannot tell whose row it is.
