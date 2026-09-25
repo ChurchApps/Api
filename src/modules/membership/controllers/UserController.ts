@@ -9,6 +9,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, LoginRateLimiter, MauticHelper, ChurchHelper, PublicPersonRateLimiter } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
 
 const emailPasswordValidation = [
   body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"),
@@ -398,8 +399,10 @@ export class UserController extends MembershipBaseController {
         }
 
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
-        const account = (req.body.userEmail || "").toString().trim().toLowerCase();
+        // Own bucket so reset requests don't lock out password login; every request counts since each one reissues a code.
+        const account = "forgot:" + (req.body.userEmail || "").toString().trim().toLowerCase();
         if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
+        await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
 
         const user = await this.repos.user.loadByEmail(req.body.userEmail);
         if (user !== null) {
@@ -434,6 +437,11 @@ export class UserController extends MembershipBaseController {
           return res.status(400).json({ errors: errors.array() });
         }
 
+        // Per-account bucket that survives code reissue, so /forgot can't reset the guess budget.
+        const rateLimitIp = LoginRateLimiter.getClientIp(req);
+        const account = "verify:" + (req.body.email || "").toString().trim().toLowerCase();
+        if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) return this.json({ errors: ["Too many requests"] }, 429);
+
         const user = await this.repos.user.loadByEmail(req.body.email);
         if (user === null) return this.json({ errors: ["invalid code"] }, 400);
         if (!user.verificationCode || !user.verificationExpires) return this.json({ errors: ["invalid code"] }, 400);
@@ -448,7 +456,10 @@ export class UserController extends MembershipBaseController {
         }
 
         const match = await bcrypt.compare(req.body.code, user.verificationCode);
-        if (!match) return this.json({ errors: ["invalid code"] }, 400);
+        if (!match) {
+          await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
+          return this.json({ errors: ["invalid code"] }, 400);
+        }
 
         const minted = AuthGuidHelper.mint();
         user.authGuid = minted.stored;
@@ -631,8 +642,15 @@ export class UserController extends MembershipBaseController {
   public async sendInviteEmail(req: express.Request<{}, {}, { email: string; personName: string; contextName: string; churchName: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
-      const { email, personName, contextName, churchName } = req.body;
+      const { email, personName, contextName } = req.body;
       if (!email || !contextName) return res.status(400).json({ errors: ["email and contextName are required"] });
+
+      // Only invite people already in this church; otherwise this is an open relay from our SES identity.
+      const matches = await this.repos.person.searchEmail(au.churchId, email);
+      if (!matches.some((p: Person) => (p.email || "").toLowerCase() === email.toLowerCase())) return res.status(400).json({ errors: ["No person in this church has that email"] });
+      if (await ChurchEmailLimiter.remaining(au.churchId) < 1) return this.json({ errors: ["Daily email limit reached"] }, 429);
+      await ChurchEmailLimiter.record(au.churchId, "invite", email);
+      const church = await this.repos.church.loadById(au.churchId);
 
       const inviterEmail = au.email || undefined;
       let loginLink = "/";
@@ -642,7 +660,7 @@ export class UserController extends MembershipBaseController {
         isExistingUser = true;
         loginLink = "/login";
       }
-      await UserHelper.sendInviteEmail(email, personName || "", contextName, churchName || "", loginLink, isExistingUser, inviterEmail);
+      await UserHelper.sendInviteEmail(email, (personName || "").slice(0, 100), contextName.slice(0, 100), church?.name || "", loginLink, isExistingUser, inviterEmail);
 
       return this.json({ success: true }, 200);
     });

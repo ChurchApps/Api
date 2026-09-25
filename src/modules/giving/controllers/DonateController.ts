@@ -427,6 +427,7 @@ export class DonateController extends GivingBaseController {
       else if (donationData.person) donationData.person.id = DonationRequestGuard.resolvePersonId(donationData.person.id, au, au.checkAccess(Permissions.donations.edit));
       const fundError = DonationRequestGuard.validateFunds(donationData.amount, donationData.funds);
       if (fundError) return this.json({ error: fundError }, 400);
+      if (!au.id && !DonationRequestGuard.stripGuestSavedMethod(donationData, gateway.provider)) return this.json({ error: "Saved payment methods require login" }, 401);
 
       const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
       const normalizedCurrency = rawCurrency.toLowerCase();
@@ -529,8 +530,9 @@ export class DonateController extends GivingBaseController {
           sec_code
         };
 
-        // Provider-specific prep (e.g. reuse the person's existing vault customer).
-        await GatewayService.prepareSubscription(gateway, subscriptionData, person, this.repos);
+        if (!au.id && !DonationRequestGuard.stripGuestSavedMethod(subscriptionData, gateway.provider)) return this.json({ error: "Saved payment methods require login" }, 401);
+        // Provider-specific prep (e.g. reuse the person's existing vault customer). Never for guests: person.id is client-supplied.
+        if (au.id) await GatewayService.prepareSubscription(gateway, subscriptionData, person, this.repos);
 
         const subscriptionResult = await GatewayService.createSubscription(gateway, subscriptionData);
 

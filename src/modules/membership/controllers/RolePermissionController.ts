@@ -45,6 +45,8 @@ export class RolePermissionController extends MembershipBaseController {
       else {
         let rolePermissions: RolePermission[] = req.body;
         if (!(await this.rolesInChurch(rolePermissions.map((rp) => rp.roleId), au.churchId))) return this.json({ error: "Invalid role" }, 400);
+        // Server perms are platform-wide and only granted from the universal church "0".
+        if (au.churchId !== "0" && rolePermissions.some((rp) => rp.contentType === "Server")) return this.json({ error: "Invalid permission" }, 400);
         const promises: Promise<RolePermission>[] = [];
         rolePermissions.forEach((rolePermission) => {
           rolePermission.churchId = au.churchId;

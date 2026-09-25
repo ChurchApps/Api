@@ -6,7 +6,7 @@ import { DeliveryLog } from "../models/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
 // Mail whose wording the church controls; system notification emails aren't a spam vector.
-const CHURCH_AUTHORED = ["email", "formFollowUp"];
+const CHURCH_AUTHORED = ["email", "formFollowUp", "invite"];
 
 @injectable()
 export class DeliveryLogRepo {

@@ -639,7 +639,9 @@ export class NotificationHelper {
     this.ensureInitialized();
     const category = options?.category ?? NotificationCategoryHelper.categoryFor(contentType);
     const notifications: Notification[] = [];
-    peopleIds.forEach((personId: string) => {
+    // Callers pass request-supplied ids; never notify (or email) people outside this church.
+    const inChurch = new Set(await this.peopleInChurch(churchId, peopleIds));
+    peopleIds.filter((personId) => inChurch.has(personId)).forEach((personId: string) => {
       const notification: Notification = {
         churchId,
         personId,
@@ -743,7 +745,7 @@ export class NotificationHelper {
 
     const custom = options.emailByPerson?.[notification.personId];
     const subject = custom?.subject || options.deliveryTitle || notification.message;
-    const html = custom?.html || (notification.message + (notification.link ? ` <a href="${notification.link}">View Details</a>` : ""));
+    const html = custom?.html || (NotificationHelper.escapeHtml(notification.message) + (/^https?:\/\//i.test(notification.link || "") ? ` <a href="${NotificationHelper.escapeHtml(notification.link)}">View Details</a>` : ""));
 
     try {
       await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
@@ -941,6 +943,12 @@ export class NotificationHelper {
     }
   };
 
+  static peopleInChurch = async (churchId: string, peopleIds: string[]): Promise<string[]> => {
+    if (!churchId || !peopleIds.length) return [];
+    const membershipRepos = await RepoManager.getRepos<any>("membership");
+    return ((await membershipRepos.person.loadByIds(churchId, [...new Set(peopleIds)])) as any[]).map((p) => p.id);
+  };
+
   static getEmailData = async (notificationPrefs: NotificationPreference[]) => {
     const peopleIds = ArrayHelper.getIds(notificationPrefs, "personId");
     if (!peopleIds.length) return [];
@@ -973,8 +981,8 @@ export class NotificationHelper {
         const match = firstNotification.message.match(/Volunteer Requests:(.*).Please log in and confirm/);
         title = "New Notification: Volunteer Request";
         content = "<h3>New Notification</h3><h4>Volunteer Request</h4><h4>" + NotificationHelper.escapeHtml(match ? match[1] : firstNotification.message) + "</h4>" +
-          (firstNotification.link
-            ? "<a href='" + firstNotification.link + "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
+          (/^https?:\/\//i.test(firstNotification.link || "")
+            ? "<a href='" + NotificationHelper.escapeHtml(firstNotification.link) + "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
             : "") +
           "<p>Please log in and confirm</p>";
       } else {
