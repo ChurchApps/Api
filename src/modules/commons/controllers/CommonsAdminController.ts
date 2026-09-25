@@ -91,6 +91,7 @@ export class CommonsAdminController extends CommonsBaseController {
         const files = await this.repos.assetFile.loadBySubmission(r.id || "");
         const def = ASSET_TYPES[r.assetType || ""];
         const title = r.payload?.name || r.assetName || "";
+        const detail = r.payload?.detail;
         out.push({
           ...r,
           payload: undefined,
@@ -106,7 +107,8 @@ export class CommonsAdminController extends CommonsBaseController {
           submitterStats: stats[userId],
           isNewAsset: !r.publishedSubmissionId,
           isThirdParty: r.publisherUserId !== r.submittedBy,
-          filesChanged: PublishHelper.fileSummary(files)
+          filesChanged: PublishHelper.fileSummary(files),
+          song: r.assetType === "song" ? { writer: detail?.writer, songKey: detail?.songKey, bpm: detail?.bpm, firstLine: DuplicateHelper.firstLine(detail?.chordPro || "") } : undefined
         });
       }
       return out;
