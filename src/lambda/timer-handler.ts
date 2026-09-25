@@ -51,6 +51,12 @@ export const handle30MinTimer = async (_event: ScheduledEvent, _context: Context
     return scanReminders(messagingRepos);
   });
 
+  await JobRunHelper.run("commonsSyncOutput", async () => {
+    const { MaintenanceHelper } = await import("../modules/commons/helpers/MaintenanceHelper.js");
+    const commonsRepos = await RepoManager.getRepos<any>("commons");
+    return MaintenanceHelper.syncRecentOutput(commonsRepos);
+  });
+
   await JobRunHelper.run("reapStaleConnections", async () => {
     const { SocketHelper } = await import("../modules/messaging/helpers/SocketHelper.js");
     const messagingRepos = await RepoManager.getRepos<any>("messaging");
