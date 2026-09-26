@@ -7,6 +7,8 @@ export const DEFAULT_MAX_FILE_BYTES = 26214400;
 export const MAX_PENDING_PER_USER = 5;
 export const DEFAULT_SONG_LIMIT = 20;
 export const MIN_NOTE_LENGTH = 10;
+export const NO_DERIVATIVES_MESSAGE = "The original's license does not allow translations or arrangements";
+export const NO_COMMUNITY_EDITS_MESSAGE = "This song's license keeps all changes with the writer, so it does not accept proposed edits";
 
 /** Lifetime new-song cap for a user: COMMONS_SONG_LIMITS override, else the default. Raise by editing the env; 0 bans. */
 export function songLimitFor(userId: string, overrides: string): number {
@@ -116,11 +118,13 @@ export interface ValidationContext {
   /** false when the target asset already has a published version */
   isNewAsset?: boolean;
   /** the parent song named by detail.parentSongId; null when it does not exist; undefined when not looked up */
-  parent?: { status?: string; language?: string } | null;
+  parent?: { status?: string; language?: string; derivativesAllowed?: boolean } | null;
   /** the published snapshot, so a removal can be checked for stray field changes and a proposal for a relicense */
   livePayload?: SubmissionPayload;
   /** true when the proposer is the song's own publisher — the only one who may change its license */
   byPublisher?: boolean;
+  /** false when the song's license keeps every change with the writer (RightsHelper.acceptsProposals) */
+  communityEdits?: boolean;
 }
 
 /** Returns every blocking problem with a submission; empty means it is acceptable. */
@@ -194,6 +198,7 @@ function validateProposalType(type: string, payload: SubmissionPayload, proposed
     if (!text(detail.parentSongId)) errors.push(`The original song is required for ${noun}`);
     else if (ctx.parent !== undefined) {
       if (!ctx.parent || ctx.parent.status !== "published") errors.push("The original song is not in the library");
+      else if (ctx.parent.derivativesAllowed === false) errors.push(NO_DERIVATIVES_MESSAGE);
       else if (type === "translation" && ctx.parent.language && (payload.language || "English") === ctx.parent.language) errors.push(`A translation must be in a different language from the original (${ctx.parent.language})`);
     }
   }
@@ -201,6 +206,7 @@ function validateProposalType(type: string, payload: SubmissionPayload, proposed
     if (text(ctx.note).length < MIN_NOTE_LENGTH) errors.push(`A note of at least ${MIN_NOTE_LENGTH} characters is required: say what changed and why`);
     if (type === "additionalFile" && !proposed.some((f) => f.action !== "remove")) errors.push("An additionalFile proposal must add a file");
     if (type === "recording" && !proposed.some((f) => f.action !== "remove" && fileRole(f.name || "") === "master")) errors.push("A recording proposal must add a master file");
+    if (ctx.communityEdits === false && !ctx.byPublisher) errors.push(NO_COMMUNITY_EDITS_MESSAGE);
     // a grant is the writer's to make: a contributor's proposal carries the song's license through unchanged
     const live = ctx.livePayload;
     if (live && !ctx.byPublisher) {

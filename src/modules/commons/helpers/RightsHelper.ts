@@ -20,7 +20,7 @@ const INTERNAL_ARRANGE = "Internal arrangements only. Do not change lyrics or me
 // Writer-specific grants. Mirrors the custom rows of WorshipCommons/src/licenses.json (same flags, same
 // condition text as src/rights.ts). Ids are case-sensitive, like the song.json values they match.
 // ponytail: a literal table — read licenses.json from the content repo if these outgrow a screen.
-interface CustomGrant { label: string; url: string; attributionRequired: boolean; nonCommercial: boolean; derivativesAllowed: boolean; ccliReport: boolean; notice: string }
+interface CustomGrant { label: string; url: string; attributionRequired: boolean; nonCommercial: boolean; derivativesAllowed: boolean; ccliReport: boolean; notice: string; communityEdits?: boolean }
 export const CUSTOM_GRANTS: Record<string, CustomGrant> = {
   "larry-holder": {
     label: "Custom — Larry Holder Music",
@@ -29,6 +29,7 @@ export const CUSTOM_GRANTS: Record<string, CustomGrant> = {
     nonCommercial: true,
     derivativesAllowed: false,
     ccliReport: false,
+    communityEdits: false,
     notice: "Non-profit church use; keep the original credits."
   }
 };
@@ -86,6 +87,16 @@ export class RightsHelper {
     const ids = this.licenses(layers, fallbackLicense);
     if (!ids.length) return true;
     return !ids.every((l) => FREE.test(l) || CUSTOM_GRANTS[l]?.ccliReport === false);
+  }
+
+  /** Mirrors the site's allowsDerivatives: every license (asset + rights layers) must let others distribute a translation or arrangement. */
+  static allowsDerivatives(licenses: (string | null | undefined)[]): boolean {
+    return licenses.filter((l): l is string => !!l).every((l) => !(/^CC-BY/i.test(l) && /-ND/i.test(l)) && CUSTOM_GRANTS[l]?.derivativesAllowed !== false);
+  }
+
+  /** False when the grant keeps every change with the writer (communityEdits: false); mirrors the site's acceptsProposals. */
+  static acceptsProposals(license?: string | null): boolean {
+    return CUSTOM_GRANTS[license || ""]?.communityEdits !== false;
   }
 
   /** The one-line notice printed under a chart when the package has no attribution.txt. */
