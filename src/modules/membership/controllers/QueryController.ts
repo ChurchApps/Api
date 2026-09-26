@@ -2,7 +2,8 @@ import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { ArrayHelper } from "@churchapps/apihelper";
-import { OpenAiHelper, Permissions, PersonHelper } from "../helpers/index.js";
+import { OpenAiHelper, Permissions, PersonConditionHelper, PersonHelper } from "../helpers/index.js";
+import { SearchCondition } from "../models/index.js";
 
 @controller("/membership/query")
 export class QueryController extends MembershipBaseController {
@@ -44,7 +45,10 @@ export class QueryController extends MembershipBaseController {
                 });
                 peopleData = ArrayHelper.getAllOperator(peopleData, "anniversaryMonth", resp.value, resp.operator, "number");
                 break;
-              case "anniversary": peopleData = ArrayHelper.getAllOperator(peopleData, "anniversary", resp.value, resp.operator); break;
+              case "anniversary":
+              case "birthDate":
+                peopleData = PersonConditionHelper.applyOne(peopleData, { field: resp.field, value: resp.value, operator: resp.operator } as SearchCondition);
+                break;
               // case "phone"
               default: peopleData = ArrayHelper.getAllOperator(peopleData, resp.field, resp.value, resp.operator); break;
             }

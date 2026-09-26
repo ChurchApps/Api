@@ -33,8 +33,44 @@ export class PersonConditionHelper {
       }
       case "id":
         return ArrayHelper.getAllOperatorArray(data, c.field, c.value.split(","), c.operator);
+      case "birthDate":
+      case "anniversary":
+        return this.filterByCalendarDate(data, c.field, c.value, c.operator);
       default:
         return ArrayHelper.getAllOperator(data, c.field, c.value, c.operator);
     }
+  }
+
+  // birthDate and anniversary are datetime columns, so rows carry Date objects while the
+  // date picker sends "YYYY-MM-DD". Compare calendar dates, never the raw values.
+  private static filterByCalendarDate(data: any[], field: string, value: string, operator: string) {
+    const wanted = this.toCalendarDate(value);
+    if (!wanted) return [];
+    return data.filter((p) => {
+      const have = this.toCalendarDate(p[field]);
+      if (!have) return false;
+      switch (operator) {
+        case "equals": return have === wanted;
+        case "greaterThan": return have > wanted;
+        case "greaterThanEqual": return have >= wanted;
+        case "lessThan": return have < wanted;
+        case "lessThanEqual": return have <= wanted;
+        default: return false;
+      }
+    });
+  }
+
+  /** "YYYY-MM-DD" for a Date (local calendar parts, as DateHelper.toMysqlDateOnly stores them) or a date string; null when absent or invalid. */
+  private static toCalendarDate(v: unknown): string | null {
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "string") {
+      const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) return m[1];
+    }
+    const d = v instanceof Date ? v : new Date(v as string);
+    if (isNaN(d.getTime())) return null;
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${d.getFullYear()}-${month}-${day}`;
   }
 }
