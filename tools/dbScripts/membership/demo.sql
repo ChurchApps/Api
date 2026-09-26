@@ -787,3 +787,6 @@ BEGIN
     
 END $$
 DELIMITER ;
+
+-- Demo churches can send group email (production churches need a server-admin approval).
+UPDATE churches SET emailApprovedDate = NOW();

@@ -9,19 +9,17 @@ interface Opts {
   sent?: number;
   sentWeek?: number;
   best?: Record<string, number>;
-  today?: { churchId: string; cnt: number }[];
   complaints?: number;
   bounces?: number;
 }
 
 function setup(o: Opts) {
   const repos: any = {
-    church: { loadById: jest.fn(async (id: string) => (id === "archived" ? { id, archivedDate: new Date() } : o.church === undefined ? { id } : o.church)) },
+    church: { loadById: jest.fn(async (id: string) => (id === "archived" ? { id, archivedDate: new Date() } : o.church === undefined ? { id, emailApprovedDate: new Date() } : o.church)) },
     deliveryLog: {
       countChurchEmailsSince: jest.fn(async (_id: string, since: Date) => (Date.now() - since.getTime() > 2 * 86400000 ? (o.sentWeek ?? 0) : (o.sent ?? 0))),
       bestChurchEmailDay: jest.fn(async (id: string) => o.best?.[id] ?? 0),
-      countChurchEmailsByChurchSince: jest.fn(async () => o.today ?? []),
-      countFeedbackSince: jest.fn(async (_id: string, method: string) => (method === "sesComplaint" ? (o.complaints ?? 0) : (o.bounces ?? 0))),
+      countByMethodSince: jest.fn(async (_id: string, method: string) => (method === "sesComplaint" ? (o.complaints ?? 0) : (o.bounces ?? 0))),
       createMany: jest.fn(async (rows: any[]) => rows.map((r, i) => ({ ...r, id: "r" + i }))),
       deleteIds: jest.fn(async () => undefined)
     }
@@ -45,20 +43,22 @@ describe("ChurchEmailLimiter.remaining", () => {
     expect(await ChurchEmailLimiter.remaining("c1")).toBe(2000);
   });
 
-  it("puts churches without history on a starter allowance inside a shared pool", async () => {
+  it("sends nothing until a server admin approves the church", async () => {
+    setup({ church: { id: "c1" } });
+    expect(await ChurchEmailLimiter.status("c1")).toEqual({ approved: false, paused: false, remaining: 0 });
+    expect(await ChurchEmailLimiter.reserve("c1", "email", [{ address: "a@x.com" }])).toBeNull();
+  });
+
+  it("gives an approved church without history the starter allowance", async () => {
     setup({});
-    expect(await ChurchEmailLimiter.remaining("c1")).toBe(150);
-    setup({ today: [{ churchId: "c2", cnt: 100 }, { churchId: "c3", cnt: 120 }] });
-    expect(await ChurchEmailLimiter.remaining("c1")).toBe(80);
-    setup({ today: [{ churchId: "c2", cnt: 100 }, { churchId: "c3", cnt: 120 }], best: { c3: 500 } });
-    expect(await ChurchEmailLimiter.remaining("c1")).toBe(150);
-    setup({ today: [{ churchId: "archived", cnt: 2471 }] });
-    expect(await ChurchEmailLimiter.remaining("c1")).toBe(150);
+    expect(await ChurchEmailLimiter.status("c1")).toEqual({ approved: true, paused: false, remaining: 150 });
+    setup({ best: { c1: 40 }, sent: 30 });
+    expect(await ChurchEmailLimiter.remaining("c1")).toBe(120);
   });
 
   it("pauses a church generating complaints or hard bounces", async () => {
     setup({ best: { c1: 500 }, sentWeek: 400, complaints: 2 });
-    expect(await ChurchEmailLimiter.remaining("c1")).toBe(0);
+    expect(await ChurchEmailLimiter.status("c1")).toEqual({ approved: true, paused: true, remaining: 0 });
     setup({ best: { c1: 500 }, sentWeek: 2000, complaints: 2 });
     expect(await ChurchEmailLimiter.remaining("c1")).toBe(1000);
     setup({ best: { c1: 500 }, sentWeek: 150, bounces: 10 });

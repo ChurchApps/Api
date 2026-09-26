@@ -9,6 +9,8 @@ import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.j
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 interface GroupMemberEmailDetail {
   personId: string;
   firstName: string;
@@ -32,6 +34,35 @@ export class EmailTemplateController extends MessagingBaseController {
   public async getMergeFields(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (_au) => {
       return MergeFieldHelper.availableFields;
+    });
+  }
+
+  @httpGet("/sendStatus")
+  public async sendStatus(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
+      const status = await ChurchEmailLimiter.status(au.churchId);
+      const requested = !status.approved && (await this.repos.deliveryLog.countByMethodSince(au.churchId, "emailApprovalRequest", new Date(Date.now() - 7 * DAY_MS))) > 0;
+      return { ...status, requested };
+    });
+  }
+
+  // Asks the ChurchApps team to approve group email; at most one notice per church per week.
+  @httpPost("/requestApproval")
+  public async requestApproval(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
+      if ((await ChurchEmailLimiter.status(au.churchId)).approved) return { requested: false, approved: true };
+      if ((await this.repos.deliveryLog.countByMethodSince(au.churchId, "emailApprovalRequest", new Date(Date.now() - 7 * DAY_MS))) > 0) return { requested: true };
+      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const church = await membershipRepos.church.loadById(au.churchId);
+      const esc = (v: string) => (v || "").replace(/[&<>"]/g, (c) => "&#" + c.charCodeAt(0) + ";");
+      const body = "<p><strong>" + esc(church?.name) + "</strong> (" + esc(au.churchId) + ") is asking to send group email.</p>"
+        + "<p>Requested by " + esc(au.firstName + " " + au.lastName) + " &lt;" + esc(au.email) + "&gt;. Registered " + esc(String(church?.registrationDate || "")) + ", located in " + esc([church?.city, church?.state, church?.country].filter(Boolean).join(", ")) + ".</p>"
+        + "<p>Approve it under Server Admin &gt; Churches.</p>";
+      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, Environment.supportEmail, "B1.church", Environment.b1AdminRoot ?? "", "Group email approval request: " + (church?.name || au.churchId), body);
+      await this.repos.deliveryLog.save({ churchId: au.churchId, contentType: "emailApproval", deliveryMethod: "emailApprovalRequest", deliveryAddress: au.email, success: true });
+      return { requested: true };
     });
   }
 
@@ -98,6 +129,9 @@ export class EmailTemplateController extends MessagingBaseController {
 
       const eligible = members.filter(m => m.email && m.email.trim() !== "");
       if (eligible.length === 0) return this.json({ error: "No eligible recipients with email addresses" }, 400);
+      const status = await ChurchEmailLimiter.status(au.churchId);
+      if (!status.approved) return this.json({ error: "Group email hasn't been turned on for this church yet.", code: "emailNotApproved" }, 403);
+      if (status.paused) return this.json({ error: "Group email is paused for this church because recent messages bounced or were reported as spam. Contact support.", code: "emailPaused" }, 429);
       const reserved = await ChurchEmailLimiter.reserve(au.churchId, "email", eligible.map((m) => ({ address: m.email, personId: m.personId })));
       if (!reserved) return this.json({ error: "This church can't send that many emails right now. Sending limits grow as your church builds a sending history. Contact support if you need more." }, 429);
 

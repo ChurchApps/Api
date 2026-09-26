@@ -114,23 +114,13 @@ export class DeliveryLogRepo {
     return Number(row?.cnt ?? 0);
   }
 
-  public async countChurchEmailsByChurchSince(since: Date): Promise<{ churchId: string; cnt: number }[]> {
-    const rows = await getDb().selectFrom("deliveryLogs")
-      .select(["churchId", (eb) => eb.fn.countAll<number>().as("cnt")])
-      .where("deliveryMethod", "=", "email")
-      .where("contentType", "in", CHURCH_AUTHORED)
-      .where("attemptTime", ">=", DateHelper.toMysqlDate(since) as any)
-      .groupBy("churchId")
-      .execute();
-    return rows.map((r) => ({ churchId: r.churchId, cnt: Number(r.cnt) }));
-  }
-
+  // Days whose bounces/complaints exceed 2% of sends don't count, so a dirty list can't grow the allowance.
   public async bestChurchEmailDay(churchId: string, from: Date, to: Date): Promise<number> {
-    const result = await sql<{ best: number }>`SELECT MAX(n) AS best FROM (SELECT COUNT(*) AS n FROM deliveryLogs WHERE churchId=${churchId} AND deliveryMethod='email' AND contentType IN (${sql.join(CHURCH_AUTHORED)}) AND success=1 AND attemptTime >= ${DateHelper.toMysqlDate(from)} AND attemptTime < ${DateHelper.toMysqlDate(to)} GROUP BY DATE(attemptTime)) d`.execute(getDb());
+    const result = await sql<{ best: number }>`SELECT MAX(sent) AS best FROM (SELECT SUM(deliveryMethod='email' AND success=1) AS sent, SUM(deliveryMethod IN ('sesBounce','sesComplaint')) AS feedback FROM deliveryLogs WHERE churchId=${churchId} AND contentType IN (${sql.join(CHURCH_AUTHORED)}) AND deliveryMethod IN ('email','sesBounce','sesComplaint') AND attemptTime >= ${DateHelper.toMysqlDate(from)} AND attemptTime < ${DateHelper.toMysqlDate(to)} GROUP BY DATE(attemptTime) HAVING feedback <= sent * 0.02) d`.execute(getDb());
     return Number(result.rows[0]?.best ?? 0);
   }
 
-  public async countFeedbackSince(churchId: string, deliveryMethod: "sesBounce" | "sesComplaint", since: Date): Promise<number> {
+  public async countByMethodSince(churchId: string, deliveryMethod: string, since: Date): Promise<number> {
     const row = await getDb().selectFrom("deliveryLogs")
       .select((eb) => eb.fn.countAll<number>().as("cnt"))
       .where("churchId", "=", churchId)
