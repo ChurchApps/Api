@@ -283,3 +283,17 @@ describe("SongPackageHelper.family and similar", () => {
     expect(SongPackageHelper.similar(rows[0], summaries, new Set(), 1).map((h) => h.id)).toEqual(["meterMate"]);
   });
 });
+
+describe("Nashville charts and short labels", () => {
+  it("spells an all-number chart as letters in the song's key", () => {
+    expect(SongPackageHelper.letterChords("I [4]stand [5]at [1/3]Christ [6m]home [b7sus] [4 - 5]", "Ab")).toBe("I [Db]stand [Eb]at [Ab/C]Christ [Fm]home [Gbsus] [Db - Eb]");
+    expect(SongPackageHelper.letterChords("[4]x [1/3]y", "G")).toBe("[C]x [G/B]y");
+  });
+  it("leaves a lettered or mixed chart, or one with no key, alone", () => {
+    expect(SongPackageHelper.letterChords("[G]x [4]y", "G")).toBe("[G]x [4]y");
+    expect(SongPackageHelper.letterChords("[4]x", "")).toBe("[4]x");
+  });
+  it("reads a bare PRE as the pre-chorus, never a word that starts with pre", () => {
+    expect(["PRE", "Pre 2:", "Precious Lord", "Pre-ordained love"].map(sectionLabel)).toEqual(["PRE", "Pre 2", null, null]);
+  });
+});

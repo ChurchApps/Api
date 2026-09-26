@@ -2,7 +2,8 @@ import { SongView } from "../models/index.js";
 
 const LEADING_ARTICLE = /^(the|a|an)\s+/;
 // "Chorus3" counts too: the heading word may run straight into its number
-const STANZA_LABEL = /^(verse|chorus|refrain|bridge|pre-?chorus|intro|outro|tag|ending|interlude|coda|instrumental|turnaround)(?=\b|\d)/i;
+// a bare "PRE" (or "Pre 2:") is how many charts shorten the pre-chorus; only alone, so "Precious" or "Pre-ordained" stay lyrics
+const STANZA_LABEL = /^(verse|chorus|refrain|bridge|pre-?chorus|pre(?=\s*\d*\s*:?\s*$)|intro|outro|tag|ending|interlude|coda|instrumental|turnaround)(?=\b|\d)/i;
 const COMMENT_DIRECTIVE = /^\{\s*(?:c|ci|comment|comment_italic)\s*:\s*(.+?)\s*\}$/i;
 // "Verse 1:" and "CHORUS: (2x)" name the same sections as "Verse 1" and "CHORUS (2x)"
 const tidyLabel = (label: string) => label.replace(/:(?=\s|$)/g, "").replace(/\s+/g, " ").trim();
