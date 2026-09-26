@@ -73,8 +73,10 @@ export class ContentLibraryHelper {
     return `${this.pendingPrefix(submissionId)}/${name}`;
   }
 
+  // a key may hold "#" ("C#m" in a pack name), "?" or a literal "%XX" (a double-encoded upload name); left raw,
+  // the browser cuts the URL at "#"/"?" or decodes the "%" and asks for another key. Everything else is safe as-is.
   static publicUrl(key: string): string {
-    return `${(Environment.contentRoot || "").replace(/\/$/, "")}/${key}`;
+    return `${(Environment.contentRoot || "").replace(/\/$/, "")}/${key.replace(/[%#?]/g, encodeURIComponent)}`;
   }
 
   /** Role by basename, whatever package folder the file sits in. */
