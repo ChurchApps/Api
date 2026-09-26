@@ -95,6 +95,17 @@ describe("legacy song shims", () => {
     expect(result).toEqual({ id: "sub00000001", status: "pending" });
   });
 
+  it("POST /songs/:id/abc is refused before any draft when the license keeps changes with the writer", async () => {
+    const { controller, repos } = songController();
+    repos.asset.loadPublished.mockResolvedValueOnce({ id: "asset000009", assetType: "song", status: "published", license: "larry-holder", publisherUserId: "writer00001" });
+    const result: any = await controller.submitAbc({ params: { id: "asset000009" }, body: { abc: "X:1\nK:C\nCDEF|" } } as any, {} as any);
+    expect(result).toEqual({ obj: { errors: ["This song's license keeps all changes with the writer, so it does not accept proposed edits"] }, status: 403 });
+    expect(SubmissionHelper.createDraft).not.toHaveBeenCalled();
+    // the writer may still add their own transcription
+    repos.asset.loadPublished.mockResolvedValueOnce({ id: "asset000009", assetType: "song", status: "published", license: "larry-holder", publisherUserId: "user0000001" });
+    expect(await controller.submitAbc({ params: { id: "asset000009" }, body: { abc: "X:1\nK:C\nCDEF|" } } as any, {} as any)).toEqual({ id: "sub00000001", status: "pending" });
+  });
+
   it("library toggles write the saved flag on the caller's rating row", async () => {
     const { controller, repos } = songController();
     expect(await controller.addToLibrary({ params: { id: "asset000009" } } as any, {} as any)).toEqual({ inLibrary: true });

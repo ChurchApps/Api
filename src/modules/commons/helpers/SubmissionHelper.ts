@@ -8,6 +8,8 @@ import { MusicHelper } from "./MusicHelper.js";
 import { findByBase, packageRole } from "./PackageLayout.js";
 import { PublishHelper } from "./PublishHelper.js";
 import { QualityHelper } from "./QualityHelper.js";
+import { RightsHelper } from "./RightsHelper.js";
+import { SongPackageHelper } from "./SongPackageHelper.js";
 import { isUploadableName, MAX_PENDING_PER_USER, NEW_PACKAGE_TYPES, normalizeTags, songLimitFor, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
 
 export interface Actor { id?: string; churchId?: string; }
@@ -89,13 +91,16 @@ export class SubmissionHelper {
     const ctx: ValidationContext = { type, note: sub.note, isNewAsset: !asset.publishedSubmissionId };
     if ((type === "translation" || type === "arrangement") && detail.parentSongId) {
       const parent = await repos.asset.loadById(String(detail.parentSongId));
-      ctx.parent = parent ? { status: parent.status, language: parent.language } : null;
+      // the original's license and every rights layer (a CC ND tune, a writer-held grant) must allow derivatives
+      const layers = parent ? Object.values(SongPackageHelper.normalizeRights((await repos.song.loadSatellite(parent.id || ""))?.rights) || {}) : [];
+      ctx.parent = parent ? { status: parent.status, language: parent.language, derivativesAllowed: RightsHelper.allowsDerivatives([parent.license, ...layers.map((l) => l?.license)]) } : null;
     }
     if (type === "removal" && asset.publishedSubmissionId) ctx.livePayload = (await repos.submission.loadById(asset.publishedSubmissionId))?.payload;
     if ((type === "correction" || type === "additionalFile" || type === "recording") && asset.publishedSubmissionId) {
       // the same snapshot the edit page starts from, so an untouched license compares equal
       ctx.livePayload = await PublishHelper.editablePayload(repos, asset);
       ctx.byPublisher = !!sub.submittedBy && sub.submittedBy === asset.publisherUserId;
+      ctx.communityEdits = RightsHelper.acceptsProposals(asset.license);
     }
     const errors = validateSubmission(def, payload, proposed, live, ctx);
     if (errors.length) return fail(400, errors);

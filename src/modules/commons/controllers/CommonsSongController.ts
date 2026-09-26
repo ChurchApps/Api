@@ -4,6 +4,8 @@ import { CommonsBaseController } from "./CommonsBaseController.js";
 import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
 // imported by path, not through the barrel: pure, and the shim tests mock the barrel
 import { SongPackageHelper, SongDetail, SongSummary } from "../helpers/SongPackageHelper.js";
+import { RightsHelper } from "../helpers/RightsHelper.js";
+import { NO_COMMUNITY_EDITS_MESSAGE } from "../helpers/SubmitValidation.js";
 import { Repos } from "../repositories/index.js";
 import { SongView } from "../models/index.js";
 
@@ -87,6 +89,8 @@ export class CommonsSongController extends CommonsBaseController {
     return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
+      // refuse before a draft exists; SubmissionHelper.submit holds the same line for the edit path
+      if (!RightsHelper.acceptsProposals(asset.license) && asset.publisherUserId !== au.id) return this.json({ errors: [NO_COMMUNITY_EDITS_MESSAGE] }, 403);
       const abc = typeof req.body?.abc === "string" ? req.body.abc.trim() : "";
       if (!abc || abc.length > 100000) return this.json({ errors: ["abc text is required (max 100KB)"] }, 400);
       const payload = { ...(await this.editable(asset.id || "")), type: "additionalFile" };

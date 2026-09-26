@@ -39,7 +39,7 @@ function repos(overrides: any = {}) {
       loadPendingForAsset: jest.fn(async () => undefined),
       loadById: jest.fn(async () => undefined)
     },
-    song: { loadById: jest.fn(async () => undefined) },
+    song: { loadById: jest.fn(async () => undefined), loadSatellite: jest.fn(async () => undefined) },
     assetFile: {
       loadOne: jest.fn(async () => undefined),
       upsert: jest.fn(async (f: any) => ({ ...f, id: "file0000001" })),
@@ -304,6 +304,35 @@ describe("SubmissionHelper proposal types", () => {
     const nameless = draft({ payload: { ...payload, type: "arrangement", detail: { ...payload.detail, parentSongId: "asset000009" } } });
     expect(await SubmissionHelper.submit(r, nameless, newAsset)).toMatchObject({ status: 400, error: "Arranger is required for an arrangement" });
     expect(r.submission.submit).not.toHaveBeenCalled();
+  });
+
+  it("blocks a translation or arrangement when the original's license or any rights layer disallows derivatives", async () => {
+    const msg = "The original's license does not allow translations or arrangements";
+    const translation = draft({ payload: { ...payload, language: "Spanish", detail: { ...payload.detail, translator: "Ana", parentSongId: "asset000009" } } });
+    const custom = repos({ asset: { loadById: jest.fn(async () => ({ id: "asset000009", status: "published", language: "English", license: "larry-holder" })) } });
+    expect(await SubmissionHelper.submit(custom, translation, newAsset)).toMatchObject({ status: 400, error: msg });
+    const ndTune = repos({
+      asset: { loadById: jest.fn(async () => ({ id: "asset000009", status: "published", language: "English", license: "PD" })) },
+      song: { loadSatellite: jest.fn(async () => ({ assetId: "asset000009", rights: JSON.stringify({ text: { license: "PD" }, tune: { license: "CC-BY-ND" } }) })) }
+    });
+    const arrangement = draft({ payload: { ...payload, type: "arrangement", detail: { ...payload.detail, arranger: "Bo", parentSongId: "asset000009" } } });
+    expect(await SubmissionHelper.submit(ndTune, arrangement, newAsset)).toMatchObject({ status: 400, error: msg });
+    expect(ndTune.song.loadSatellite).toHaveBeenCalledWith("asset000009");
+    expect(custom.submission.submit).not.toHaveBeenCalled();
+    expect(ndTune.submission.submit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a public proposal on a song whose license keeps changes with the writer, but not the writer's own", async () => {
+    const msg = "This song's license keeps all changes with the writer, so it does not accept proposed edits";
+    const closed = { ...publishedAsset, license: "larry-holder" };
+    const r = repos();
+    r.assetFile.loadBySubmission.mockResolvedValue([{ name: "tune.abc", sizeBytes: 10, action: "add" }]);
+    const other = draft({ submittedBy: "user0000002", note: "added an ABC transcription", payload: { ...payload, license: "larry-holder", type: "additionalFile" } });
+    const result: any = await SubmissionHelper.submit(r, other, closed);
+    expect(result.status).toBe(400);
+    expect(result.errors).toContain(msg);
+    const own: any = await SubmissionHelper.submit(r, { ...other, submittedBy: "user0000001" }, closed);
+    expect(own.errors || []).not.toContain(msg);
   });
 
   it("blocks a correction without a real note and an unmatched ChordPro bracket", async () => {

@@ -111,6 +111,23 @@ describe("RightsHelper.ccliReport", () => {
   });
 });
 
+describe("RightsHelper.allowsDerivatives / acceptsProposals", () => {
+  it("refuses derivatives when any license is CC ND or a writer-held grant, like the site", () => {
+    expect(RightsHelper.allowsDerivatives(["PD", "CC-BY-SA", "WC", undefined, null])).toBe(true);
+    expect(RightsHelper.allowsDerivatives(["larry-holder"])).toBe(false);
+    expect(RightsHelper.allowsDerivatives(["PD", "CC-BY-ND"])).toBe(false);
+    expect(RightsHelper.allowsDerivatives(["cc-by-nc-nd"])).toBe(false);
+    expect(RightsHelper.allowsDerivatives([])).toBe(true);
+  });
+
+  it("closes public proposals only for a grant with communityEdits false", () => {
+    expect(RightsHelper.acceptsProposals("larry-holder")).toBe(false);
+    expect(RightsHelper.acceptsProposals("CC-BY-ND")).toBe(true);
+    expect(RightsHelper.acceptsProposals("WC")).toBe(true);
+    expect(RightsHelper.acceptsProposals(undefined)).toBe(true);
+  });
+});
+
 describe("RightsHelper.notice", () => {
   it("prints the one-line notice per license", () => {
     expect(RightsHelper.notice("PD")).toBe("Public domain. Free for every use, including commercial.");

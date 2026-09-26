@@ -124,6 +124,13 @@ describe("proposal types", () => {
     expect(validateSubmission(localSong, { ...base, detail: { ...base.detail, arranger: "" } }, [], [], { parent: { status: "published" } })).toEqual(["Arranger is required for an arrangement"]);
     expect(validateSubmission(localSong, { ...base, detail: { ...base.detail, parentSongId: undefined } }, [], [])).toEqual(["The original song is required for an arrangement"]);
     expect(validateSubmission(localSong, base, [], [], { parent: null })).toEqual(["The original song is not in the library"]);
+    expect(validateSubmission(localSong, base, [], [], { parent: { status: "published", derivativesAllowed: false } })).toEqual(["The original's license does not allow translations or arrangements"]);
+  });
+
+  it("translation of an original whose license keeps derivatives with the writer is refused", () => {
+    const base = { ...goodSong, type: "translation", language: "Spanish", detail: { ...goodSong.detail, translator: "Ana", parentSongId: "asset000009" } };
+    expect(validateSubmission(localSong, base, [], [], { parent: { status: "published", language: "English", derivativesAllowed: false } })).toEqual(["The original's license does not allow translations or arrangements"]);
+    expect(validateSubmission(localSong, base, [], [], { parent: { status: "published", language: "English", derivativesAllowed: true } })).toEqual([]);
   });
 
   it("correction: a note of at least 10 characters, on a published asset", () => {
@@ -144,6 +151,15 @@ describe("proposal types", () => {
     const noMaster = { ...goodSong, license: "PD" };
     const rec = { ...noMaster, type: "recording", detail: { ...noMaster.detail, masterLicense: "CC-BY", recordingOwned: true } };
     expect(validateSubmission(song, rec, [file("master.wav")], [], { ...published, livePayload: noMaster })).not.toContain("Only the writer can change the master recording's license");
+  });
+
+  it("a license with communityEdits false takes proposals from the writer only; removal requests stay open", () => {
+    const closed = { ...published, communityEdits: false };
+    const msg = "This song's license keeps all changes with the writer, so it does not accept proposed edits";
+    expect(validateSubmission(song, { ...goodSong, type: "additionalFile" }, [file("tune.abc")], [], closed)).toEqual([msg]);
+    expect(validateSubmission(song, { ...goodSong, type: "correction" }, [], [], closed)).toEqual([msg]);
+    expect(validateSubmission(song, { ...goodSong, type: "correction" }, [], [], { ...closed, byPublisher: true })).toEqual([]);
+    expect(validateSubmission(song, { type: "removal" }, [], [], { ...closed, type: "removal", note: "please take this one down" })).toEqual([]);
   });
 
   it("additionalFile: note plus at least one added file", () => {
