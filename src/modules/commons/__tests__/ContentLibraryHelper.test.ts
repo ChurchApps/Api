@@ -39,6 +39,12 @@ afterEach(() => {
 });
 
 describe("storage keys", () => {
+  it("escapes only the characters that break a URL path in a public URL", () => {
+    expect(ContentLibraryHelper.publicUrl("a/Sun-C#m-144.00bpm.zip")).toBe(`${CONTENT_ROOT}/a/Sun-C%23m-144.00bpm.zip`);
+    expect(ContentLibraryHelper.publicUrl("a/DeToutMonC%C5%93ur_acc.mp3")).toBe(`${CONTENT_ROOT}/a/DeToutMonC%25C5%2593ur_acc.mp3`);
+    expect(ContentLibraryHelper.publicUrl("songs/fr/de-tout-mon-cœur-x/a b.m4a")).toBe(`${CONTENT_ROOT}/songs/fr/de-tout-mon-cœur-x/a b.m4a`);
+  });
+
   it("derives id-keyed live keys with the package folder and flat submission-keyed pending keys", () => {
     expect(liveKey).toBe("commons/assets/song/testasst001/sources/demoAudio.wav");
     expect(ContentLibraryHelper.liveKey({ id: "x", assetType: "freeshow/template" }, "content.fstemplate")).toBe("commons/assets/freeshow/template/x/content.fstemplate");
