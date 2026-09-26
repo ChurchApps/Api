@@ -22,7 +22,7 @@ import { QualityHelper } from "../helpers/QualityHelper";
 import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
 
 const au = { id: "user0000001", churchId: "church00001" };
-const payload = { name: "New Hymn", license: "WC", tags: "Grace", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true } };
+const payload = { name: "New Hymn", license: "WC", tags: "Grace", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true, videoUrl: "https://youtu.be/demo" } };
 
 function repos(overrides: any = {}) {
   const r: any = {

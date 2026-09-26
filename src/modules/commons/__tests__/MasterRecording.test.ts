@@ -9,7 +9,7 @@ import { isUploadableName, validateSubmission } from "../helpers/SubmitValidatio
 import { packageFields } from "../helpers/publishHooks/song";
 
 const song = ASSET_TYPES.song;
-const goodSong = { name: "Hymn", license: "WC", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true } };
+const goodSong = { name: "Hymn", license: "WC", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true, videoUrl: "https://youtu.be/demo" } };
 const withMaster = (masterLicense?: string) => ({ ...goodSong, detail: { ...goodSong.detail, recordingOwned: true, masterLicense } });
 const file = (name: string, sizeBytes = 1000, action = "add") => ({ name, sizeBytes, action });
 const published = { isNewAsset: false, note: "the studio master, mixed in the original key" };
