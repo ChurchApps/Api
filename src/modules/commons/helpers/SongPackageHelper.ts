@@ -90,6 +90,19 @@ export interface SimilarSong extends SongSummary { reason: string; }
 const CHORD_TOKEN = /^[A-G](?:#|b)?(?:maj|min|m|dim|aug|sus|add|M)?\d*(?:(?:sus|add|maj|b|#)\d+)*(?:\/[A-G](?:#|b)?)?\.?$/;
 const chordName = (token: string) => token.replace(/\.$/, "");
 /** A row of chord names (and bar lines) with no words: the chords-over-lyrics chart layout. */
+// "4", "1/3", "6m", "b7sus": a Nashville number chord — a scale degree, then the chord's quality, then an optional bass degree
+const NUMBER_CHORD = /^([b#]?)([1-7])(?![0-9])([^/]*)(?:\/([b#]?)([1-7]))?$/;
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
+const SHARP_NOTES = [
+  "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"
+];
+const FLAT_NOTES = [
+  "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"
+];
+const FLAT_KEYS = [
+  "F", "Bb", "Eb", "Ab", "Db", "Gb", "Dm", "Gm", "Cm", "Fm", "Bbm", "Ebm"
+];
+
 function isChordRow(line: string): boolean {
   const tokens = line.trim().split(/\s+/).filter(Boolean);
   return tokens.some((t) => CHORD_TOKEN.test(t)) && tokens.every((t) => t === "|" || CHORD_TOKEN.test(t)) && !/\[/.test(line);
@@ -177,6 +190,24 @@ export class SongPackageHelper {
       if (!note || note.split(/\s+/).every((t) => t === "|" || CHORD_TOKEN.test(t))) return [line];
       return /^(©|\(c\)|copyright\b)/i.test(note) ? [] : [`{c: ${note}}`];
     }).join("\n");
+  }
+
+  /**
+   * A chart written in Nashville numbers ("[4]stand a[5]mazed [1/3]Christ") spelled out as letter chords in the song's
+   * key, so it transposes, capos and flips back to numbers like every other chart. Only when every chord is a number;
+   * a mixed or lettered chart, or no readable key, is left alone. Degrees count up the major scale from the key's root.
+   */
+  static letterChords(chordPro: string, key: string | null | undefined): string {
+    const m = (key || "").trim().match(/^([A-G])([#b]?)(m(?!aj))?/);
+    const tokens = [...chordPro.matchAll(/\[([^\]]*)\]/g)].flatMap((c) => c[1].split(/[\s|-]+/)).filter(Boolean);
+    if (!m || !tokens.length || !tokens.every((t) => NUMBER_CHORD.test(t))) return chordPro;
+    const tonic = (SHARP_NOTES.indexOf(m[1]) + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + 12) % 12;
+    const names = FLAT_KEYS.includes(m[1] + m[2] + (m[3] || "")) ? FLAT_NOTES : SHARP_NOTES;
+    const note = (acc: string, deg: string) => names[(tonic + MAJOR_STEPS[Number(deg) - 1] + (acc === "#" ? 1 : acc === "b" ? -1 : 0) + 12) % 12];
+    return chordPro.replace(/\[([^\]]*)\]/g, (_, inner: string) => `[${inner.replace(/[^\s|-]+/g, (t) => {
+      const [, acc, deg, quality, bassAcc, bassDeg] = t.match(NUMBER_CHORD) || [];
+      return note(acc, deg) + quality + (bassDeg ? `/${note(bassAcc, bassDeg)}` : "");
+    })}]`);
   }
 
   /** Pasted lyrics often open with the title again ("LORD ON HIGH"): drop that line, it is not sung. */
