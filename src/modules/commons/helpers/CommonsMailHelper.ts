@@ -91,8 +91,7 @@ export class CommonsMailHelper {
       `<p>A reviewer looked at <strong>${what}</strong> and asked for changes before it goes live:</p>`,
       `<p>${esc(note.trim())}</p>`,
       `<p>It is back in your drafts. Open it, make the changes, and send it again:</p>`,
-      `<p><a href="${draft}">${draft}</a></p>`,
-      `<p>Replying to this email doesn't update your song. Files you already uploaded stay attached.</p>`
+      `<p><a href="${draft}">${draft}</a></p>`
     ]);
   }
 

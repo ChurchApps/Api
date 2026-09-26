@@ -75,7 +75,6 @@ describe("CommonsMailHelper writer emails", () => {
     expect(body).toContain("asked for changes");
     expect(body).toContain("back in your drafts");
     expect(body).toContain('<a href="https://worshipcommons.org/upload?draft=sub00000001">');
-    expect(body).toContain("Replying to this email doesn't update your song");
     expect(body).toContain("<p>Bar 12 needs a chord.</p>");
     expect(body).toContain("https://worshipcommons.org/my-songs");
     expect(body).toContain("support@churchapps.org");
