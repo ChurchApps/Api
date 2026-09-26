@@ -39,7 +39,7 @@ export const songPublishHook: PublishHook = {
     const writer = typeof detail.writer === "string" ? detail.writer.trim() : "";
     const song: Song = { assetId: asset.id, hymnalCount: existing?.hymnalCount || 0, certified: true };
     for (const k of SONG_FIELDS) if (detail[k] !== undefined) (song as any)[k] = detail[k] === "" ? null : detail[k];
-    if (song.chordPro) song.chordPro = SongPackageHelper.inlineChordLines(SongPackageHelper.dropTitleLine(String(song.chordPro).replace(/\r\n/g, "\n"), asset.name)); // library files are LF
+    if (song.chordPro) song.chordPro = SongPackageHelper.inlineChordLines(SongPackageHelper.dropTitleLine(SongPackageHelper.tidyPaste(String(song.chordPro).replace(/\r\n/g, "\n")), asset.name)); // library files are LF
     // the notice on the song page, print chart and zip names this exact version and URL
     const licenseVersion = ctx.submission.payload?.licenseVersion || existing?.licenseVersion;
     if (licenseVersion) song.licenseVersion = licenseVersion;

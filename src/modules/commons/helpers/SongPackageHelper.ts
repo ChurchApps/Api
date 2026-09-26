@@ -162,6 +162,23 @@ export class SongPackageHelper {
     return out.join("\n");
   }
 
+  /**
+   * Paste artifacts a chart never means: double-spaced lyrics (a blank line after every line, stanzas split by two
+   * or more) close up to single spacing, or every line is its own stanza and slide; a bracketed note alone on a line
+   * ("[Flute Solo]") becomes a {c:} label and a bracketed copyright line is dropped (the attribution carries it),
+   * or both print as chords.
+   */
+  static tidyPaste(chordPro: string): string {
+    let text = chordPro.replace(/^[ \t]+$/gm, "");
+    const stanzas = text.split(/\n\n+/).map((s) => s.split("\n").filter((l) => l.trim() && !l.trim().startsWith("{")));
+    if (/\n\n\n/.test(text) && stanzas.every((s) => s.length <= 1)) text = text.replace(/\n{3,}/g, "\u0000").replace(/\n\n/g, "\n").replace(/\u0000/g, "\n\n");
+    return text.split("\n").flatMap((line) => {
+      const note = line.trim().match(/^\[([^\]]+)\]$/)?.[1].trim();
+      if (!note || note.split(/\s+/).every((t) => t === "|" || CHORD_TOKEN.test(t))) return [line];
+      return /^(©|\(c\)|copyright\b)/i.test(note) ? [] : [`{c: ${note}}`];
+    }).join("\n");
+  }
+
   /** Pasted lyrics often open with the title again ("LORD ON HIGH"): drop that line, it is not sung. */
   static dropTitleLine(chordPro: string, title: string | null | undefined): string {
     const fold = (s: string) => s.replace(/\[[^\]]*\]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");

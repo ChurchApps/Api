@@ -56,6 +56,13 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.firstLine(SongPackageHelper.inlineChordLines("Intro\nC\n\nVerse 1\n   Am   C\nPraise God from whom"))).toBe("Praise God from whom");
   });
 
+  it("tidies paste artifacts: double spacing, bracketed notes, copyright lines", () => {
+    expect(SongPackageHelper.tidyPaste("Line one\n\nLine two\n \n\n\nChorus one\n\nChorus two")).toBe("Line one\nLine two\n\nChorus one\nChorus two");
+    // normal stanzas keep their spacing
+    expect(SongPackageHelper.tidyPaste("A\nB\n\n\nC")).toBe("A\nB\n\n\nC");
+    expect(SongPackageHelper.tidyPaste("[Bb]all of my [F]heart.\n\n[Flute Solo]\n\n[F]  [C]\n[Eb]\n\n[©1994 LAMPSongs - Words & Music by X]")).toBe("[Bb]all of my [F]heart.\n\n{c: Flute Solo}\n\n[F]  [C]\n[Eb]\n");
+  });
+
   it("drops a first line that only repeats the title", () => {
     expect(SongPackageHelper.dropTitleLine("LORD ON HIGH\n\nVERSE 1:\nWhom have I", "Lord on High")).toBe("VERSE 1:\nWhom have I");
     expect(SongPackageHelper.dropTitleLine("Lord on high You are everlasting", "Lord on High")).toBe("Lord on high You are everlasting");
