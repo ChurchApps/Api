@@ -8,6 +8,9 @@ export const MAX_PENDING_PER_USER = 5;
 export const DEFAULT_SONG_LIMIT = 20;
 export const MIN_NOTE_LENGTH = 10;
 export const NO_DERIVATIVES_MESSAGE = "The original's license does not allow translations or arrangements";
+export const NO_MELODY_MESSAGE = "Add a way to learn the melody: a demo recording, sheet music, a MIDI file or a video link";
+/** Roles that let a church hear or read the tune; chords and words alone don't. */
+const MELODY_ROLES = ["demoAudio", "master", "sheetPdf", "midi", "abc", "stemsZip"];
 export const NO_COMMUNITY_EDITS_MESSAGE = "This song's license keeps all changes with the writer, so it does not accept proposed edits";
 
 /** Lifetime new-song cap for a user: COMMONS_SONG_LIMITS override, else the default. Raise by editing the env; 0 bans. */
@@ -163,6 +166,11 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
   const resulting = resultingFileNames(live, proposed);
   const roles = new Set(resulting.map((n) => fileRole(baseName(n))));
   for (const spec of def.files) if (spec.required && !spec.generated && !roles.has(spec.role)) errors.push(`a ${spec.role} file is required`);
+
+  const videoUrl = typeof detail.videoUrl === "string" ? detail.videoUrl.trim() : "";
+  if (videoUrl && !/^https?:\/\/\S+$/i.test(videoUrl)) errors.push("Video link must be a web address starting with https://");
+  // ponytail: translations and arrangements sing the original's tune, so only a brand-new song must carry one
+  if (def.key === "song" && type === "new" && !videoUrl && !MELODY_ROLES.some((r) => roles.has(r))) errors.push(NO_MELODY_MESSAGE);
 
   const liveSizes = new Map(live.map((f) => [f.name || "", f.sizeBytes || 0]));
   for (const f of proposed) liveSizes.set(f.name || "", f.action === "remove" ? 0 : f.sizeBytes || 0);

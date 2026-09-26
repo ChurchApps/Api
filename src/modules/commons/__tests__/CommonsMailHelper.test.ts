@@ -74,9 +74,15 @@ describe("CommonsMailHelper writer emails", () => {
     expect(subject).toBe("Changes requested: New Hymn");
     expect(body).toContain("asked for changes");
     expect(body).toContain("back in your drafts");
+    expect(body).toContain('<a href="https://worshipcommons.org/upload?draft=sub00000001">');
     expect(body).toContain("<p>Bar 12 needs a chord.</p>");
     expect(body).toContain("https://worshipcommons.org/my-songs");
     expect(body).toContain("support@churchapps.org");
+  });
+
+  it("sends a change to a live song back to its edit page", async () => {
+    await CommonsMailHelper.notifyChangesRequested({ ...sub(), type: "correction", assetId: "asset000001" }, "Fix verse 2");
+    expect((TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][5]).toContain("https://worshipcommons.org/songs/asset000001/edit?draft=sub00000001");
   });
 
   it.each(["notifyReceived", "notifyApproved", "notifyChangesRequested", "notifyRejected"])("%s shares the my-songs link and support footer", async (method) => {

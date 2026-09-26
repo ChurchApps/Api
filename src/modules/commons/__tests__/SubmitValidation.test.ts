@@ -6,7 +6,7 @@ import { isUploadableName, normalizeTags, resultingFileNames, validateSubmission
 
 const song = ASSET_TYPES.song;
 const freeshow = ASSET_TYPES["freeshow/template"];
-const goodSong = { name: "Hymn", license: "WC", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true } };
+const goodSong = { name: "Hymn", license: "WC", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true, videoUrl: "https://youtu.be/demo" } };
 const file = (name: string, sizeBytes = 1000, action = "add") => ({ name, sizeBytes, action });
 
 describe("registry-driven submission validation", () => {
@@ -78,7 +78,7 @@ describe("registry-driven submission validation", () => {
   });
 });
 
-import { changedKeys, lintChordProBrackets, notAcceptedMessage, submissionType } from "../helpers/SubmitValidation";
+import { changedKeys, lintChordProBrackets, NO_MELODY_MESSAGE, notAcceptedMessage, submissionType } from "../helpers/SubmitValidation";
 import { ASSET_TYPES as LOCAL_TYPES } from "../helpers/AssetTypes";
 
 const localSong = LOCAL_TYPES.song;
@@ -240,5 +240,20 @@ describe("new song file roles", () => {
     const roles = localSong.files.map((f: any) => f.role);
     expect(roles.indexOf("lyrics")).toBeLessThan(roles.indexOf("song"));
     expect(roles).toEqual(expect.arrayContaining(["demoAudio", "sheetPdf", "score", "scoreImage", "lyrics", "manifest"]));
+  });
+});
+
+describe("new songs must say how the tune goes", () => {
+  const bare = { ...goodSong, detail: { ...goodSong.detail, videoUrl: undefined } };
+  it("refuses chords and words alone, accepts any melody file or a video link", () => {
+    expect(validateSubmission(song, bare, [], [])).toContain(NO_MELODY_MESSAGE);
+    expect(validateSubmission(song, bare, [file("art.jpg")], [])).toContain(NO_MELODY_MESSAGE);
+    for (const name of ["demoAudio.mp3", "sheetPdf.pdf", "tune.mid"]) expect(validateSubmission(song, { ...bare, detail: { ...bare.detail, recordingOwned: true } }, [file(name)], [])).not.toContain(NO_MELODY_MESSAGE);
+    expect(validateSubmission(song, goodSong, [], [])).toEqual([]);
+    expect(validateSubmission(song, { ...bare, detail: { ...bare.detail, videoUrl: "youtube dot com" } }, [], [])).toContain("Video link must be a web address starting with https://");
+  });
+  it("leaves translations and arrangements to the original's tune", () => {
+    const translation = { ...bare, type: "translation", language: "Spanish", detail: { ...bare.detail, translator: "T", parentSongId: "p1" } };
+    expect(validateSubmission(song, translation, [], [])).not.toContain(NO_MELODY_MESSAGE);
   });
 });

@@ -83,9 +83,15 @@ export class CommonsMailHelper {
 
   static notifyChangesRequested(sub: Submission, note: string): Promise<void> {
     const what = whatOf(sub);
+    const root = siteRoot();
+    const id = encodeURIComponent(sub.id || "");
+    // same place My songs' Continue button goes: new packages reopen in the wizard, changes to a live song on its edit page
+    const draft = TYPE_PHRASES[sub.type || ""] && sub.type !== "translation" && sub.type !== "arrangement" ? `${root}/songs/${encodeURIComponent(sub.assetId || "")}/edit?draft=${id}` : `${root}/upload?draft=${id}`;
     return this.submitterMail(sub, `Changes requested: ${what}`, [
-      `<p>A reviewer looked at <strong>${what}</strong> and asked for changes before it goes live. It is back in your drafts.</p>`,
-      `<p>${esc(note.trim())}</p>`
+      `<p>A reviewer looked at <strong>${what}</strong> and asked for changes before it goes live:</p>`,
+      `<p>${esc(note.trim())}</p>`,
+      `<p>It is back in your drafts. Open it, make the changes, and send it again:</p>`,
+      `<p><a href="${draft}">${draft}</a></p>`
     ]);
   }
 
