@@ -51,6 +51,11 @@ export class ChurchRepo {
     return church;
   }
 
+  // Server-admin only; deliberately outside save() so church admins can never approve themselves.
+  public async setEmailApproved(id: string, approved: boolean) {
+    await getDb().updateTable("churches").set({ emailApprovedDate: approved ? sql`NOW()` as any : null }).where("id", "=", id).execute();
+  }
+
   public async delete(_churchId: string, id: string) {
     await getDb().deleteFrom("churches").where("id", "=", id).execute();
   }
@@ -179,6 +184,7 @@ export class ChurchRepo {
       registrationDate: row.registrationDate,
       subDomain: row.subDomain,
       archivedDate: row.archivedDate,
+      emailApprovedDate: row.emailApprovedDate,
       latitude: row.latitude,
       longitude: row.longitude,
       timeZone: row.timeZone,

@@ -254,6 +254,16 @@ export class ChurchController extends MembershipBaseController {
     });
   }
 
+  @httpPost("/:id/emailApproval")
+  public async emailApproval(@requestParam("id") id: string, req: express.Request<{}, {}, { approved: boolean }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      if (!(await this.repos.church.loadById(id))) return this.json({}, 404);
+      await this.repos.church.setEmailApproved(id, !!req.body.approved);
+      return this.repos.church.convertToModel(await this.repos.church.loadById(id));
+    });
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Church[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

@@ -10,6 +10,7 @@ export class Church {
   public country?: string;
   public registrationDate?: Date;
   public archivedDate?: Date;
+  public emailApprovedDate?: Date;
   public latitude?: number;
   public longitude?: number;
   public timeZone?: string;
