@@ -68,7 +68,7 @@ export class DunningHelper {
       <p style="font-size: 15px;">Your recurring donation of ${amount} to ${church.name} could not be processed on ${attemptedOn}. Your bank or card issuer declined the payment.</p>
       <p style="font-size: 15px;">Updating your payment method takes a minute and your giving picks up where it left off.</p>
       <h4 style="font-size: 14px;">
-        <a href="https://${domain}/member/donate" target="_blank" rel="noreferrer noopener">Update your payment method</a>
+        <a href="https://${domain}/mobile/donate" target="_blank" rel="noreferrer noopener">Update your payment method</a>
       </h4>
     `;
 
