@@ -31,6 +31,7 @@ describe("SongPackageHelper text readers", () => {
     expect(sectionLabel("Verse 1:")).toBe("Verse 1");
     expect(sectionLabel("CHORUS: (2x)")).toBe("CHORUS (2x)");
     expect(sectionLabel("Versed in love")).toBeNull();
+    expect(sectionLabel("Verse 1,")).toBe("Verse 1");
     expect(SongPackageHelper.firstLine("{c: Intro}\n[F] [C]\n\n{c: Chorus}\nI’m gonna [F]pra[C]ise [F]You,")).toBe("I’m gonna praise You,");
     expect(SongPackageHelper.draftForm("{c: Intro}\n[F] [C]\n\n{c: Chorus}\nI’m gonna praise\n\nChorus3:\nGod of peace")?.defaultOrder).toEqual(["Intro", "Chorus", "Chorus3"]);
   });
@@ -61,6 +62,21 @@ describe("SongPackageHelper text readers", () => {
     // normal stanzas keep their spacing
     expect(SongPackageHelper.tidyPaste("A\nB\n\n\nC")).toBe("A\nB\n\n\nC");
     expect(SongPackageHelper.tidyPaste("[Bb]all of my [F]heart.\n\n[Flute Solo]\n\n[F]  [C]\n[Eb]\n\n[©1994 LAMPSongs - Words & Music by X]")).toBe("[Bb]all of my [F]heart.\n\n{c: Flute Solo}\n\n[F]  [C]\n[Eb]\n");
+  });
+
+  it("reads [2x] as a repeat mark and splits a heading with no blank line above it", () => {
+    expect(SongPackageHelper.tidyPaste("[C]The Great I Am [2x]\n[Am] [F] [2x]")).toBe("[C]The Great I Am (2x)\n[Am] [F] (2x)");
+    const run = "Verse 1,\n  [E]You share my grief\n  [E]Companions on the road\nChorus\n  Didn't our hearts\nVerse 2\n  [E]You change my heart";
+    expect(SongPackageHelper.draftForm(SongPackageHelper.tidyPaste(run))?.defaultOrder).toEqual(["Verse 1", "Chorus", "Verse 2"]);
+    // a lyric that opens on a heading word, or a heading right under another, stays where it is
+    expect(SongPackageHelper.tidyPaste("[G]Down by the river\nBridge of sighs we cross\nIntro\nVerse 1\nWords")).toBe("[G]Down by the river\nBridge of sighs we cross\n\nIntro\nVerse 1\nWords");
+  });
+
+  it("spreads a chord row typed inside one bracket over the words after it", () => {
+    expect(SongPackageHelper.inlineChordLines("[C                     Emaj] To live amongst us")).toBe(" [C]To live [Emaj]amongst us");
+    expect(SongPackageHelper.inlineChordLines("[Emaj       Amin]Oh Emmanuel")).toBe("[Emaj]Oh [Amin]Emmanuel");
+    // a single-spaced pair stays one bracket
+    expect(SongPackageHelper.inlineChordLines("[Am7 - C2]Holy")).toBe("[Am7 - C2]Holy");
   });
 
   it("drops a first line that only repeats the title", () => {

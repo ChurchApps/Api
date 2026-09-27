@@ -103,9 +103,43 @@ const FLAT_KEYS = [
   "F", "Bb", "Eb", "Ab", "Db", "Gb", "Dm", "Gm", "Cm", "Fm", "Bbm", "Ebm"
 ];
 
+// a heading alone on its line, only a number after it ("Verse 1,", "Verse II", "Pre-Chorus 2", "Chorus (2x)"), so a
+// lyric that opens on a heading word ("Bridge over the river") never splits its stanza
+const BARE_HEADING = /^\s*\(?[a-z-]+(?:\s+[a-z]+)?\s*(?:\d+|[ivx]+)?\s*(?:\(?(?:x\s*\d+|\d+\s*x)\)?)?\)?[\s:,]*$/i;
+
 function isChordRow(line: string): boolean {
   const tokens = line.trim().split(/\s+/).filter(Boolean);
   return tokens.some((t) => CHORD_TOKEN.test(t)) && tokens.every((t) => t === "|" || CHORD_TOKEN.test(t)) && !/\[/.test(line);
+}
+
+/** Each chord of a chord row placed into the words below at its column, snapped to the start of a word. */
+function placeChords(row: string, next: string): string {
+  const words = next.replace(/\s+$/, "");
+  const chords = [...row.matchAll(/\S+/g)].filter((m) => m[0] !== "|").map((m) => ({ col: m.index || 0, name: chordName(m[0]) }));
+  const width = row.replace(/\s+$/, "").length;
+  const scale = width > words.length + 4 ? words.length / width : 1;
+  const starts = [...words.matchAll(/\S+/g)].map((m) => m.index || 0);
+  const inserts = new Map<number, string>();
+  for (const c of chords) {
+    const at = Math.min(Math.round(c.col * scale), words.length);
+    // the word the chord lands in: its start, or the last word's start past the end
+    const pos = [...starts].reverse().find((s) => s <= at) ?? starts[0] ?? 0;
+    // two chords on one word get a space between them, or they print run together ("GsusC")
+    inserts.set(pos, inserts.has(pos) ? `${inserts.get(pos)} [${c.name}]` : `[${c.name}]`);
+  }
+  let merged = words;
+  for (const pos of [...inserts.keys()].sort((a, b) => b - a)) merged = merged.slice(0, pos) + inserts.get(pos) + merged.slice(pos);
+  return merged;
+}
+
+/**
+ * "[C             Emaj]The Great I Am": a chord row typed inside one bracket, the spaces standing for where the
+ * later chords fall in the words after it. Each chord moves to its column; "[Am7 - C2]" (single spaces) stays a pair.
+ */
+function spreadBracket(line: string): string {
+  const m = line.match(/^(\s*)\[([^\]]*\S {2,}[^\]]*)\](.*)$/);
+  if (!m || !m[3].trim() || !m[2].trim().split(/\s+/).every((t) => CHORD_TOKEN.test(t))) return line;
+  return m[1] + placeChords(m[2], m[3]);
 }
 
 export class SongPackageHelper {
@@ -146,7 +180,7 @@ export class SongPackageHelper {
     const out: string[] = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (!isChordRow(line)) { out.push(line); continue; }
+      if (!isChordRow(line)) { out.push(spreadBracket(line)); continue; }
       const next = lines[i + 1];
       // a row with bar lines is a progression to play (an intro, a turnaround), never the chords of the line below
       if (/(^|\s)\|(\s|$)/.test(line) || next === undefined || !next.trim() || isChordRow(next) || next.trim().startsWith("{") || sectionLabel(next) || /\[[^\]]+\]/.test(next)) {
@@ -154,22 +188,7 @@ export class SongPackageHelper {
         out.push(line.trim().split(/\s+/).filter((t) => t !== "|").map((t) => `[${chordName(t)}]`).join(" "));
         continue;
       }
-      const words = next.replace(/\s+$/, "");
-      const chords = [...line.matchAll(/\S+/g)].filter((m) => m[0] !== "|").map((m) => ({ col: m.index || 0, name: chordName(m[0]) }));
-      const width = line.replace(/\s+$/, "").length;
-      const scale = width > words.length + 4 ? words.length / width : 1;
-      const starts = [...words.matchAll(/\S+/g)].map((m) => m.index || 0);
-      const inserts = new Map<number, string>();
-      for (const c of chords) {
-        const at = Math.min(Math.round(c.col * scale), words.length);
-        // the word the chord lands in: its start, or the last word's start past the end
-        const pos = [...starts].reverse().find((s) => s <= at) ?? starts[0] ?? 0;
-        // two chords on one word get a space between them, or they print run together ("GsusC")
-        inserts.set(pos, inserts.has(pos) ? `${inserts.get(pos)} [${c.name}]` : `[${c.name}]`);
-      }
-      let merged = words;
-      for (const pos of [...inserts.keys()].sort((a, b) => b - a)) merged = merged.slice(0, pos) + inserts.get(pos) + merged.slice(pos);
-      out.push(merged);
+      out.push(placeChords(line, next));
       i++;
     }
     return out.join("\n");
@@ -179,17 +198,26 @@ export class SongPackageHelper {
    * Paste artifacts a chart never means: double-spaced lyrics (a blank line after every line, stanzas split by two
    * or more) close up to single spacing, or every line is its own stanza and slide; a bracketed note alone on a line
    * ("[Flute Solo]") becomes a {c:} label and a bracketed copyright line is dropped (the attribution carries it),
-   * or both print as chords.
+   * or both print as chords; "[2x]" becomes "(2x)"; a heading with no blank line above it starts its own stanza, or
+   * the form map never sees it.
    */
   static tidyPaste(chordPro: string): string {
-    let text = chordPro.replace(/^[ \t]+$/gm, "");
+    // "[2x]" is a repeat mark, not a chord: "(2x)" prints it and slides drop it
+    let text = chordPro.replace(/^[ \t]+$/gm, "").replace(/\[\s*(x\s*\d+|\d+\s*x)\s*\]/gi, "($1)");
     const stanzas = text.split(/\n\n+/).map((s) => s.split("\n").filter((l) => l.trim() && !l.trim().startsWith("{")));
     if (/\n\n\n/.test(text) && stanzas.every((s) => s.length <= 1)) text = text.replace(/\n{3,}/g, "\u0000").replace(/\n\n/g, "\n").replace(/\u0000/g, "\n\n");
     return text.split("\n").flatMap((line) => {
       const note = line.trim().match(/^\[([^\]]+)\]$/)?.[1].trim();
       if (!note || note.split(/\s+/).every((t) => t === "|" || CHORD_TOKEN.test(t))) return [line];
       return /^(©|\(c\)|copyright\b)/i.test(note) ? [] : [`{c: ${note}}`];
-    }).join("\n");
+    }).reduce((out: string[], line) => {
+      // a heading run straight on from the stanza above ("...my load" then "Chorus") starts its own stanza
+      const heading = (l: string) => BARE_HEADING.test(l) && !!sectionLabel(l);
+      const prev = out[out.length - 1];
+      if (prev?.trim() && !prev.trim().startsWith("{") && !heading(prev) && heading(line)) out.push("");
+      out.push(line);
+      return out;
+    }, []).join("\n");
   }
 
   /**
