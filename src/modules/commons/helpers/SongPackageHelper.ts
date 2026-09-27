@@ -191,7 +191,8 @@ export class SongPackageHelper {
       out.push(placeChords(line, next));
       i++;
     }
-    return out.join("\n");
+    // with the chord rows placed, indentation means nothing: a tab or spaces before a line only offsets it
+    return out.join("\n").replace(/^[ \t]+/gm, "");
   }
 
   /**

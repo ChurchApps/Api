@@ -73,10 +73,14 @@ describe("SongPackageHelper text readers", () => {
   });
 
   it("spreads a chord row typed inside one bracket over the words after it", () => {
-    expect(SongPackageHelper.inlineChordLines("[C                     Emaj] To live amongst us")).toBe(" [C]To live [Emaj]amongst us");
+    expect(SongPackageHelper.inlineChordLines("[C                     Emaj] To live amongst us")).toBe("[C]To live [Emaj]amongst us");
     expect(SongPackageHelper.inlineChordLines("[Emaj       Amin]Oh Emmanuel")).toBe("[Emaj]Oh [Amin]Emmanuel");
     // a single-spaced pair stays one bracket
     expect(SongPackageHelper.inlineChordLines("[Am7 - C2]Holy")).toBe("[Am7 - C2]Holy");
+    // indentation goes once chord rows are placed
+    expect(SongPackageHelper.inlineChordLines("Chorus\n\tDidn't [C#m]our hearts\n        [E]You spoke")).toBe("Chorus\nDidn't [C#m]our hearts\n[E]You spoke");
+    // "(2x)" after a chord-only intro is not the first line
+    expect(SongPackageHelper.firstLine("{c: Intro}\n[Am] [F] (2x)\n\n{c: Verse 1}\n[Am]He was conceived")).toBe("He was conceived");
   });
 
   it("drops a first line that only repeats the title", () => {
