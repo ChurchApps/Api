@@ -51,7 +51,8 @@ export class DuplicateHelper {
   /** the first sung line of a chordPro body — {directives}, stanza labels and [chords] dropped */
   static firstLine(chordPro: string): string {
     for (const raw of (chordPro || "").split(/\r?\n/)) {
-      const line = raw.replace(/\[[^\]]*\]/g, "").trim();
+      // "(2x)" after a chord-only intro is a repeat mark, not the first line
+      const line = raw.replace(/\[[^\]]*\]/g, "").replace(/\(\s*(?:x\s*\d+|\d+\s*x)\s*\)/gi, "").trim();
       if (!line || line.startsWith("{") || sectionLabel(raw)) continue;
       return line;
     }
