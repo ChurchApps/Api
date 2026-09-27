@@ -11,6 +11,10 @@ const loadGroupLeaderPersonIds = jest.fn();
 const loadPersonIdsWithPermission = jest.fn();
 const loadGroup = jest.fn();
 const loadPeople = jest.fn();
+const createNotifications = jest.fn();
+jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ NotificationService: { createNotifications: (...args: unknown[]) => createNotifications(...args) } }));
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { b1AdminRoot: "https://admin.example.test/" } }));
+
 jest.mock("../../../../shared/modules/index.js", () => ({ getMembershipModuleGateway: () => ({ loadGroupLeaderPersonIds, loadPersonIdsWithPermission, loadGroup, loadPeople }) }));
 
 import { GroupJoinRequestTaskHelper } from "../GroupJoinRequestTaskHelper.js";
@@ -22,6 +26,7 @@ describe("GroupJoinRequestTaskHelper", () => {
     save.mockClear();
     loadOpenByTaskType.mockReset();
     publish.mockReset();
+    createNotifications.mockReset();
     loadGroupLeaderPersonIds.mockReset();
     loadPersonIdsWithPermission.mockReset();
     loadGroup.mockReset().mockResolvedValue({ id: "g1", name: "Community Service Team" });
@@ -76,6 +81,38 @@ describe("GroupJoinRequestTaskHelper", () => {
     expect(loadPersonIdsWithPermission).toHaveBeenCalledWith("c1", "Domain", "Admin");
     expect(tasks).toHaveLength(1);
     expect(save.mock.calls[0][0].assignedToId).toBe("p-admin");
+  });
+
+  // Issue 1136: the join-request controller only alerts group leaders. When a group has no
+  // leader the task goes to staff/admins, but nobody was sent a notification about it.
+  it("notifies the staff fallback assignees when the group has no leader", async () => {
+    loadGroupLeaderPersonIds.mockResolvedValue([]);
+    loadPersonIdsWithPermission.mockResolvedValue(["p-admin", "p-req"]);
+    await GroupJoinRequestTaskHelper.createJoinRequestTask("c1", payload);
+    expect(createNotifications).toHaveBeenCalledTimes(1);
+    expect(createNotifications).toHaveBeenCalledWith(
+      ["p-admin"],
+      "c1",
+      "groupJoinRequest",
+      "req1",
+      "Rachel Martin requested to join Community Service Team",
+      "https://admin.example.test/serving/tasks/task-p-admin",
+      "p-req"
+    );
+  });
+
+  it("does not notify leaders a second time - the controller already alerts them", async () => {
+    loadGroupLeaderPersonIds.mockResolvedValue(["p-lead"]);
+    await GroupJoinRequestTaskHelper.createJoinRequestTask("c1", payload);
+    expect(createNotifications).not.toHaveBeenCalled();
+  });
+
+  it("still creates the task when the notification fails", async () => {
+    loadGroupLeaderPersonIds.mockResolvedValue([]);
+    loadPersonIdsWithPermission.mockResolvedValue(["p-admin"]);
+    createNotifications.mockRejectedValue(new Error("push down"));
+    const tasks = await GroupJoinRequestTaskHelper.createJoinRequestTask("c1", payload);
+    expect(tasks).toHaveLength(1);
   });
 
   it("creates nothing when there is nobody to assign", async () => {

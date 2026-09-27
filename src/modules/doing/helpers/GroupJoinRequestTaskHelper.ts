@@ -3,6 +3,8 @@ import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { Task } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { NotificationService } from "../../../shared/helpers/NotificationService.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class GroupJoinRequestTaskHelper {
   public static readonly taskType = "groupJoinRequest";
@@ -17,6 +19,9 @@ export class GroupJoinRequestTaskHelper {
 
     const leaderIds = await membership.loadGroupLeaderPersonIds(churchId, payload.groupId);
     let assigneeIds = unique(leaderIds.filter((id) => id && id !== payload.personId));
+    // GroupJoinRequestController already alerts group leaders; fallback assignees get nothing
+    // from it, so they are notified here.
+    const notifyAssignees = assigneeIds.length === 0;
     if (assigneeIds.length === 0) {
       const staffIds = await membership.loadPersonIdsWithPermission(churchId, "Group Members", "Edit");
       assigneeIds = unique(staffIds.filter((id) => id && id !== payload.personId));
@@ -70,8 +75,19 @@ export class GroupJoinRequestTaskHelper {
       const row = await repos.task.save(task);
       await InternalEventBus.publish(churchId, "task.updated", row);
       saved.push(row);
+      if (notifyAssignees) await GroupJoinRequestTaskHelper.notify(churchId, assigneeId, payload, task.title || "", row);
     }
     return saved;
+  }
+
+  private static async notify(churchId: string, personId: string, payload: any, message: string, task: Task): Promise<void> {
+    const root = (Environment.b1AdminRoot || "https://admin.b1.church").replace(/\/$/, "");
+    const link = task.id ? `${root}/serving/tasks/${task.id}` : root;
+    try {
+      await NotificationService.createNotifications([personId], churchId, "groupJoinRequest", payload.id, message, link, payload.personId);
+    } catch (e) {
+      console.error("[GroupJoinRequestTaskHelper] notify failed", e);
+    }
   }
 
   public static async closeJoinRequestTask(churchId: string, payload: any): Promise<void> {
