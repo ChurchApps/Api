@@ -12,7 +12,7 @@ export class QuestionRepo {
 
   private async create(question: Question): Promise<Question> {
     question.id = UniqueIdHelper.shortId();
-    const choices = JSON.stringify(question.choices);
+    const choices = QuestionRepo.serializeChoices(question.choices);
     await getDb().insertInto("questions").values({
       id: question.id,
       churchId: question.churchId,
@@ -31,7 +31,7 @@ export class QuestionRepo {
   }
 
   private async update(question: Question): Promise<Question> {
-    const choices = JSON.stringify(question.choices);
+    const choices = QuestionRepo.serializeChoices(question.choices);
     await getDb().updateTable("questions").set({
       formId: question.formId,
       parentId: question.parentId,
@@ -119,19 +119,34 @@ export class QuestionRepo {
       placeholder: row.placeholder,
       required: row.required,
       sort: row.sort,
-      choices: row.choices || []
+      choices: QuestionRepo.parseChoices(row.choices)
     };
-    if (typeof row.choices === "string") {
+    return result;
+  }
+
+  // A client that sends choices already as a JSON string must not get it encoded twice.
+  private static serializeChoices(choices: any) {
+    if (typeof choices === "string") {
+      try { return JSON.stringify(JSON.parse(choices)); } catch { /* plain text, encode as-is */ }
+    }
+    return JSON.stringify(choices);
+  }
+
+  // Forms copied before the duplicate fix (#1097) hold choices JSON-encoded twice, so one
+  // parse yields a string. Unwrap that, and never hand clients anything but an array.
+  private static parseChoices(raw: any): any {
+    if (raw === null || raw === undefined) return raw;
+    let value = raw;
+    for (let i = 0; i < 2 && typeof value === "string"; i++) {
       try {
-        result.choices = JSON.parse(row.choices);
+        value = JSON.parse(value);
       } catch {
         // Seed data stores raw text in choices, not JSON.
-        result.choices = [] as any;
+        return [];
       }
-    } else {
-      result.choices = row.choices;
     }
-    return result;
+    if (value === null || value === undefined) return value;
+    return Array.isArray(value) ? value : [];
   }
 
   public convertToModel(_churchId: string, data: any) {
