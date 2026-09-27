@@ -285,7 +285,12 @@ export class PlanController extends DoingBaseController {
       }
 
       if (timeIdMap.size > 0 && planItemIdMap.size > 0) {
-        await this.copyPlanItemTimes(au.churchId, id, planItemIdMap, timeIdMap, positionIdMap);
+        // The new plan is already saved; failing here would 500 and invite a duplicate on retry.
+        try {
+          await this.copyPlanItemTimes(au.churchId, id, planItemIdMap, timeIdMap, positionIdMap);
+        } catch (e) {
+          console.error("Failed to copy plan item exclusions for plan " + plan.id, e);
+        }
       }
 
       return plan;
