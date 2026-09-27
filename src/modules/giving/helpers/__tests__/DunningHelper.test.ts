@@ -39,7 +39,8 @@ describe("DunningHelper", () => {
       expect(to).toEqual("donor@test");
       expect(appName).toEqual("Grace Church");
       expect(subject).toContain("Recurring Donation");
-      expect(contents).toContain("https://grace.b1.church/member/donate");
+      expect(contents).toContain("https://grace.b1.church/mobile/donate");
+      expect(contents).not.toContain("/member/donate");
 
       const logged = repos.eventLog.save.mock.calls[0][0];
       expect(logged.provider).toEqual("dunning");

@@ -684,7 +684,7 @@ export class DonateController extends GivingBaseController {
       </table>
       <br />
       <h4 style="font-size: 14px;">
-        <a href="https://${domain}/member/donate" target="_blank" rel="noreferrer noopener">Modify your subscription here!</a>
+        <a href="https://${domain}/mobile/donate" target="_blank" rel="noreferrer noopener">Modify your subscription here!</a>
       </h4>
     `;
     const oneTimeDonationContent =
