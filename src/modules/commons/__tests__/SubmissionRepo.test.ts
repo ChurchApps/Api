@@ -14,6 +14,7 @@ const builder: any = new Proxy({}, {
 jest.mock("../db/index", () => ({ getDb: () => builder }));
 jest.mock("kysely", () => ({ sql: Object.assign(() => ({ as: () => "expr", execute: async () => ({}) }), { ref: () => "ref" }) }));
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "id000000001" } }), { virtual: true });
+jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 
 import { SubmissionRepo } from "../repositories/SubmissionRepo";
 

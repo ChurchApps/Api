@@ -1,5 +1,8 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
+// apihelper's published build is ESM-only, which Jest cannot parse. These helpers import it at load.
+jest.mock("../../membership/helpers/MauticHelper.js", () => ({ MauticHelper: { createAndTag: jest.fn(async () => undefined) } }));
+jest.mock("../helpers/CommonsMailHelper.js", () => ({ CommonsMailHelper: { notifySubmittedInternal: jest.fn() } }));
 jest.mock("../controllers/CommonsBaseController", () => ({
   CommonsBaseController: class {
     json(obj: any, status: number) { return { obj, status }; }
