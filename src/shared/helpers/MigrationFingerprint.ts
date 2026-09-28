@@ -58,11 +58,13 @@ export function detect(names: string[], prints: MigrationFingerprints[string], l
  * Which migrations to record as already applied. Everything up to the last "applied" one,
  * except "missing" ones (they stay pending and run next). "unknown" ones before that point
  * shipped in releases that are clearly live, so they count as applied. Nothing is suggested
- * while any migration is "partial" — a half-applied migration needs a person.
+ * while any migration is "partial" — a half-applied migration needs a person — unless that
+ * person listed it in `rerun`: it is then left pending, like a missing one, to run again.
  */
-export function suggestBaseline(detected: DetectedMigration[]): { names: string[]; blocked?: string } {
-  const partial = detected.filter((d) => d.state === "partial");
+export function suggestBaseline(detected: DetectedMigration[], rerun: string[] = []): { names: string[]; blocked?: string } {
+  const partial = detected.filter((d) => d.state === "partial" && !rerun.includes(d.name));
   if (partial.length) return { names: [], blocked: "Partly applied: " + partial.map((p) => p.name).join(", ") };
+  detected = detected.map((d) => (d.state === "partial" ? { ...d, state: "missing" as const } : d));
   let last = -1;
   detected.forEach((d, i) => { if (d.state === "applied") last = i; });
   return { names: detected.slice(0, last + 1).filter((d) => d.state !== "missing").map((d) => d.name) };

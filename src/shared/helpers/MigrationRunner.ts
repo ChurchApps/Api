@@ -89,13 +89,15 @@ export class MigrationRunner {
   }
 
   /** Which migrations the live schema already reflects, for a module with no history. Read-only. */
-  static async detect(moduleName: string): Promise<ModuleDetection> {
+  static async detect(moduleName: string, rerun: string[] = []): Promise<ModuleDetection> {
     try {
       const prints = this.fingerprints(moduleName);
       if (!prints) return { module: moduleName, migrations: [], suggested: [], error: "No fingerprints for this module in this build" };
       const all = await this.migrator(moduleName).getMigrations();
       const migrations = detect(all.map((m) => m.name), prints, await this.liveSchema(moduleName));
-      const { names, blocked } = suggestBaseline(migrations);
+      // Only partly applied migrations can be sent back to run again.
+      const allowed = rerun.filter((r) => migrations.some((m) => m.name === r && m.state === "partial"));
+      const { names, blocked } = suggestBaseline(migrations, allowed);
       return { module: moduleName, migrations, suggested: names, blocked };
     } catch (e: any) {
       return { module: moduleName, migrations: [], suggested: [], error: e?.message || String(e) };
@@ -106,10 +108,10 @@ export class MigrationRunner {
    * Record migrations as already applied without running them. Only for a module with no
    * history, and only the names detect() suggests right now — never a caller-chosen list.
    */
-  static async baseline(moduleName: string, names: string[]): Promise<{ module: string; recorded: string[]; error?: string }> {
+  static async baseline(moduleName: string, names: string[], rerun: string[] = []): Promise<{ module: string; recorded: string[]; error?: string }> {
     const status = await this.status(moduleName);
     if (!status.noHistory) return { module: moduleName, recorded: [], error: "This module already has migration history" };
-    const found = await this.detect(moduleName);
+    const found = await this.detect(moduleName, rerun);
     if (found.error || found.blocked) return { module: moduleName, recorded: [], error: found.error || found.blocked };
     const same = names.length === found.suggested.length && names.every((n, i) => n === found.suggested[i]);
     if (!same) return { module: moduleName, recorded: [], error: "The schema no longer matches what was reviewed; check again" };

@@ -61,18 +61,23 @@ export class ServerHealthController extends MembershipBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       if (!MigrationRunner.isModule(req.params.module)) return this.json({ error: "Unknown module" }, 400);
-      return await MigrationRunner.detect(req.params.module);
+      const rerun = String(req.query.rerun || "").split(",").map((s) => s.trim()).filter(Boolean);
+      return await MigrationRunner.detect(req.params.module, rerun);
     });
   }
 
-  /** Record the detected migrations as applied without running them. Body: { names } exactly as detect suggested. */
+  /**
+   * Record the detected migrations as applied without running them. Body: { names, rerun? } —
+   * names exactly as detect (with the same rerun list) suggested.
+   */
   @httpPost("/migrations/:module/baseline")
   public async baselineMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       if (!MigrationRunner.isModule(req.params.module)) return this.json({ error: "Unknown module" }, 400);
       const names = Array.isArray(req.body?.names) ? req.body.names.map(String) : [];
-      const result = await MigrationRunner.baseline(req.params.module, names);
+      const rerun = Array.isArray(req.body?.rerun) ? req.body.rerun.map(String) : [];
+      const result = await MigrationRunner.baseline(req.params.module, names, rerun);
       return { ...result, status: await MigrationRunner.status(req.params.module) };
     });
   }
