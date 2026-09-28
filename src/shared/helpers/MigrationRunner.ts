@@ -11,6 +11,8 @@ export interface ModuleMigrationStatus {
   applied: number;
   pending: string[];
   lastApplied?: { name: string; at: string };
+  /** kysely_migration is empty although the module has migrations — nothing may run. */
+  noHistory?: boolean;
   error?: string;
 }
 
@@ -64,7 +66,8 @@ export class MigrationRunner {
         module: moduleName,
         applied: done.length,
         pending: all.filter((m) => !m.executedAt).map((m) => m.name),
-        lastApplied: last ? { name: last.name, at: last.executedAt.toISOString() } : undefined
+        lastApplied: last ? { name: last.name, at: last.executedAt.toISOString() } : undefined,
+        noHistory: all.length > 0 && done.length === 0
       };
     } catch (e: any) {
       return { module: moduleName, applied: 0, pending: [], error: e?.message || String(e) };
@@ -77,8 +80,18 @@ export class MigrationRunner {
     return out;
   }
 
-  /** Apply every pending migration for one module, oldest first. Stops at the first failure. */
+  /**
+   * Apply every pending migration for one module, oldest first. Stops at the first failure.
+   * Refuses a module with no migration history: its tables were built some other way
+   * (demo's nightly refresh truncates kysely_migration), and "pending" would mean replaying
+   * every migration from the initial schema — data migrations included — over live tables.
+   */
   static async run(moduleName: string): Promise<ModuleMigrationRun> {
+    const before = await this.status(moduleName);
+    if (before.error) return { module: moduleName, applied: [], error: before.error };
+    if (before.noHistory) {
+      return { module: moduleName, applied: [], error: "No migration history in this database (kysely_migration is empty), so nothing was run. Record the applied migrations with yarn migrate before running any." };
+    }
     try {
       const { error, results } = await this.migrator(moduleName).migrateToLatest();
       const applied = (results || []).filter((r) => r.status === "Success").map((r) => r.migrationName);
