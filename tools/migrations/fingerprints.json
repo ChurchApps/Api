@@ -1,0 +1,2267 @@
+{
+ "membership": {
+  "2026-04-03_initial_schema": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "accessLogs",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "answers",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "auditLogs",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "campuses",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "churches",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "clientErrors",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "domains",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "formSubmissions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "forms",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "groupMembers",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "groups",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "households",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "memberPermissions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "notes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "oAuthClients",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "oAuthCodes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "oAuthDeviceCodes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "oAuthRelaySessions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "oAuthTokens",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "people",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "questions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "roleMembers",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "rolePermissions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "roles",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "settings",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "usageTrends",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "userChurches",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "users",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "visibilityPreferences",
+     "present": true
+    }
+   ],
+   "schemaChanges": 29
+  },
+  "2026-04-21_verification_code": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "users",
+     "column": "verificationCode",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "users",
+     "column": "verificationExpires",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "users",
+     "column": "verificationAttempts",
+     "present": true
+    }
+   ],
+   "schemaChanges": 3
+  },
+  "2026-05-01_associatedGroups": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "associatedGroups",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-05-07_join_requests": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "groupJoinRequests",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "joinPolicy",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-05-08_oauth_token_widen_access_token": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "oAuthTokens",
+     "column": "accessToken",
+     "type": "text",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-05-14_webhooks": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "webhookDeliveries",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "webhooks",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-05-18_api_keys": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "apiKeys",
+     "present": true
+    },
+    {
+     "kind": "columnType",
+     "table": "oAuthTokens",
+     "column": "scopes",
+     "type": "varchar(500)",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-05-19_webhook_connector_type": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "webhooks",
+     "column": "connectorType",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-06-03_lists": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "lists",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-06-04_campus": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "churchId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "address1",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "address2",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "city",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "state",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "zip",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "timezone",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "website",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "importKey",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "campuses",
+     "column": "removed",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "campusId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "campusId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "campuses",
+     "index": "idx_campuses_churchId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "groups",
+     "index": "idx_groups_campusId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "people",
+     "index": "idx_people_campusId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 15
+  },
+  "2026-06-11_list_rules": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "groupMemberHistory",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "listMembers",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "attendanceReminders",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "lists",
+     "column": "rules",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "lists",
+     "column": "scope",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "lists",
+     "column": "roleId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "lists",
+     "column": "autoRefresh",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "lists",
+     "column": "householdInclusion",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "lists",
+     "column": "notifyOnChange",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "lists",
+     "column": "actions",
+     "present": true
+    }
+   ],
+   "schemaChanges": 10
+  },
+  "2026-06-30_church_timezone": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "churches",
+     "column": "timeZone",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-07-01_group_archived": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "archived",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-07-02_group_roster_conversational_forms": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "forms",
+     "column": "autoCreatePerson",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "forms",
+     "column": "displayMode",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "forms",
+     "column": "followUpBody",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "forms",
+     "column": "followUpSubject",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "publicRoster",
+     "present": true
+    }
+   ],
+   "schemaChanges": 5
+  },
+  "2026-07-02_person_grade_group_age": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "maxAgeMonths",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "maxGrade",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "minAgeMonths",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "minGrade",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "grade",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "school",
+     "present": true
+    }
+   ],
+   "schemaChanges": 6
+  },
+  "2026-07-02_sites": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "sites",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "domains",
+     "column": "siteId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-07-03_groups_parity": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "householdPickupPeople",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "confidential",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "capacity",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "guestCapacity",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "checkinClosed",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "volunteerRatio",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "minVolunteers",
+     "present": true
+    }
+   ],
+   "schemaChanges": 7
+  },
+  "2026-07-03_import_keys": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "importKey",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "importKey",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-07-03_person_fields": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "personFieldValues",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "personFields",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-07-04_audit_universal": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "batches",
+     "present": true
+    },
+    {
+     "kind": "columnType",
+     "table": "auditLogs",
+     "column": "details",
+     "type": "mediumtext",
+     "nullable": true
+    },
+    {
+     "kind": "columnType",
+     "table": "auditLogs",
+     "column": "created",
+     "type": "datetime(3)",
+     "nullable": true
+    },
+    {
+     "kind": "column",
+     "table": "auditLogs",
+     "column": "module",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "auditLogs",
+     "column": "batchId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "auditLogs",
+     "index": "ix_auditLogs_batch",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "auditLogs",
+     "index": "ix_auditLogs_entity",
+     "present": true
+    }
+   ],
+   "schemaChanges": 7
+  },
+  "2026-07-10_job_runs": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "jobRuns",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-07-13_device_code_plan_type": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "oAuthDeviceCodes",
+     "column": "planTypeId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-17_church_first_day_of_week": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "churches",
+     "column": "firstDayOfWeek",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-17_login_attempts": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "loginAttempts",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-18_webhook_connector_config": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "webhooks",
+     "column": "connectorConfig",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-19_oauth_secret_width": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "oAuthCodes",
+     "column": "code",
+     "type": "varchar(64)",
+     "nullable": true
+    },
+    {
+     "kind": "columnType",
+     "table": "oAuthTokens",
+     "column": "refreshToken",
+     "type": "varchar(64)",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-08-24_form_group_link": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "forms",
+     "column": "groupId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-24_oauth_token_plan_type": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "oAuthTokens",
+     "column": "planTypeId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-09-04_group_messaging_toggles": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "discussionsEnabled",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "groups",
+     "column": "announcementsEnabled",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-09-05_form_description": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "forms",
+     "column": "description",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-09-17_settings_unique_church_key": {
+   "checks": [
+    {
+     "kind": "index",
+     "table": "settings",
+     "index": "idx_settings_churchId_keyName",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-09-25_church_email_approval": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "churches",
+     "column": "emailApprovedDate",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  }
+ },
+ "attendance": {
+  "2026-04-03_initial_schema": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "campuses",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "groupServiceTimes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "serviceTimes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "services",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "sessions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "settings",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "visitSessions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "visits",
+     "present": true
+    }
+   ],
+   "schemaChanges": 8
+  },
+  "2026-06-12_labels_checkout": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "labelTemplates",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "visits",
+     "column": "checkedOutBy",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "visits",
+     "column": "checkedOutById",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "visits",
+     "column": "checkoutTime",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "visits",
+     "column": "securityCode",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "visits",
+     "index": "idx_visits_church_date_code",
+     "present": true
+    }
+   ],
+   "schemaChanges": 6
+  },
+  "2026-07-03_checkin_type": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "visits",
+     "column": "checkedInById",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "visits",
+     "column": "checkinType",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "visits",
+     "index": "idx_visits_church_date_type",
+     "present": true
+    }
+   ],
+   "schemaChanges": 3
+  },
+  "2026-09-05_headcounts": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "headcounts",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  }
+ },
+ "content": {
+  "2026-04-03_initial_schema": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "arrangementKeys",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "arrangements",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "bibleBooks",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "bibleChapters",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "bibleLookups",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "bibleTranslations",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "bibleVerseTexts",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "bibleVerses",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "blocks",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "curatedCalendars",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "curatedEvents",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "elements",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "eventExceptions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "events",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "files",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "globalStyles",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "links",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "pageHistory",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "pages",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "playlists",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "registrationMembers",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "registrations",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "sections",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "sermons",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "settings",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "songDetailLinks",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "songDetails",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "songs",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "streamingServices",
+     "present": true
+    }
+   ],
+   "schemaChanges": 29
+  },
+  "2026-04-25_event_registration": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "capacity",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "formId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "registrationCloseDate",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "registrationEnabled",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "registrationOpenDate",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "tags",
+     "present": true
+    }
+   ],
+   "schemaChanges": 6
+  },
+  "2026-05-06_globalStyles_navStyles": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "globalStyles",
+     "column": "navStyles",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-06-10_page_publish": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "pages",
+     "column": "publishedAt",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "pages",
+     "column": "publishedJSON",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-06-11_rooms_resources_approvals": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "calendarBlockouts",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "eventBookings",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "eventTemplates",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "resources",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "rooms",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "approvalStatus",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "requestedBy",
+     "present": true
+    }
+   ],
+   "schemaChanges": 7
+  },
+  "2026-06-21_booking_window": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "eventBookings",
+     "column": "endTime",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "eventBookings",
+     "column": "setupMinutes",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "eventBookings",
+     "column": "startTime",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "eventBookings",
+     "column": "teardownMinutes",
+     "present": true
+    }
+   ],
+   "schemaChanges": 4
+  },
+  "2026-06-25_song_arrangement_parity": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "arrangements",
+     "column": "bpm",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "arrangements",
+     "column": "meter",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "arrangements",
+     "column": "seconds",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "arrangements",
+     "column": "sequence",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "songs",
+     "column": "songDetailId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 5
+  },
+  "2026-07-02_posts_page_visibility_seo_redirects": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "posts",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "redirects",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "pages",
+     "column": "groupIds",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "pages",
+     "column": "metaDescription",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "pages",
+     "column": "visibility",
+     "present": true
+    }
+   ],
+   "schemaChanges": 5
+  },
+  "2026-07-02_site_id": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "blocks",
+     "column": "siteId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "globalStyles",
+     "column": "siteId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "links",
+     "column": "siteId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "pages",
+     "column": "siteId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "links",
+     "index": "idx_links_churchId_siteId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "pages",
+     "index": "idx_pages_churchId_siteId_url",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "pages",
+     "index": "idx_pages_churchId_url",
+     "present": false
+    }
+   ],
+   "schemaChanges": 7
+  },
+  "2026-07-03_registration_commerce_rsvps": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "eventRsvps",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "registrationCoupons",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "registrationPayments",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "registrationSelectionChoices",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "registrationSelections",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "registrationTypes",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "rsvpDisabled",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "waitlistEnabled",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "registrationMembers",
+     "column": "registrationTypeId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "registrations",
+     "column": "amountPaid",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "registrations",
+     "column": "couponId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "registrations",
+     "column": "totalAmount",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "registrations",
+     "column": "waitlistNotifiedDate",
+     "present": true
+    }
+   ],
+   "schemaChanges": 13
+  },
+  "2026-07-10_storage_providers": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "storageProviders",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-07-14_increase_song_details_lengths": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "songDetails",
+     "column": "album",
+     "type": "varchar(255)",
+     "nullable": true
+    },
+    {
+     "kind": "columnType",
+     "table": "songDetails",
+     "column": "artist",
+     "type": "varchar(255)",
+     "nullable": true
+    },
+    {
+     "kind": "columnType",
+     "table": "songDetails",
+     "column": "title",
+     "type": "varchar(255)",
+     "nullable": true
+    },
+    {
+     "kind": "columnType",
+     "table": "songs",
+     "column": "name",
+     "type": "varchar(255)",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 4
+  },
+  "2026-08-05_byos_storage": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "files",
+     "column": "externalId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "files",
+     "column": "provider",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "storageProviders",
+     "column": "accessToken",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "storageProviders",
+     "column": "refreshToken",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "storageProviders",
+     "column": "settings",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "storageProviders",
+     "column": "tokenExpiresAt",
+     "present": true
+    }
+   ],
+   "schemaChanges": 6
+  },
+  "2026-08-07_widen_key_signature": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "songDetails",
+     "column": "keySignature",
+     "type": "varchar(20)",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-11_rename_prayer_icon": {
+   "checks": [],
+   "schemaChanges": 0
+  },
+  "2026-09-06_sermon_audio_url": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "sermons",
+     "column": "audioUrl",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-09-11_bible_lookups_time_index": {
+   "checks": [
+    {
+     "kind": "index",
+     "table": "bibleLookups",
+     "index": "idx_bibleLookups_time_key_ip",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  }
+ },
+ "giving": {
+  "2026-04-03_initial_schema": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "customers",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "donationBatches",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "donations",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "eventLogs",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "fundDonations",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "funds",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "gatewayPaymentMethods",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "gateways",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "settings",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "subscriptionFunds",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "subscriptions",
+     "present": true
+    }
+   ],
+   "schemaChanges": 11
+  },
+  "2026-05-06_phase1_multigateway": {
+   "checks": [],
+   "schemaChanges": 0
+  },
+  "2026-05-06_phase3_subscription_currency": {
+   "checks": [],
+   "schemaChanges": 0
+  },
+  "2026-06-11_pledge_campaigns": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "campaigns",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "pledges",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-06-14_eventlog_unique_providerid": {
+   "checks": [
+    {
+     "kind": "index",
+     "table": "eventLogs",
+     "index": "idx_eventLogs_church_provider",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "eventLogs",
+     "index": "idx_eventLogs_providerId",
+     "present": false
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-07-01_fund_visible": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "funds",
+     "column": "visible",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  }
+ },
+ "messaging": {
+  "2026-04-03_initial_schema": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "blockedIps",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "connections",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "conversations",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "deliveryLogs",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "deviceContents",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "devices",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "emailTemplates",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "messages",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "notificationPreferences",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "notifications",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "privateMessages",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "sentTexts",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "textingProviders",
+     "present": true
+    }
+   ],
+   "schemaChanges": 13
+  },
+  "2026-05-20_webpush_token_storage": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "deliveryLogs",
+     "column": "deliveryAddress",
+     "type": "text",
+     "nullable": true
+    },
+    {
+     "kind": "columnType",
+     "table": "devices",
+     "column": "fcmToken",
+     "type": "text",
+     "nullable": true
+    },
+    {
+     "kind": "index",
+     "table": "devices",
+     "index": "idx_devices_fcmToken",
+     "present": false
+    }
+   ],
+   "schemaChanges": 3
+  },
+  "2026-05-23_fix_webpush_token_storage": {
+   "checks": [],
+   "schemaChanges": 0
+  },
+  "2026-06-30_notification_preferences_spine": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "notificationPreferenceOverrides",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "notificationPreferences",
+     "column": "allowSms",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "notificationPreferences",
+     "column": "masterMute",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "notificationPreferences",
+     "column": "maxPushPerDay",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "notificationPreferences",
+     "column": "quietHoursEnd",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "notificationPreferences",
+     "column": "quietHoursStart",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "notificationPreferences",
+     "column": "timeZone",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "notifications",
+     "column": "category",
+     "present": true
+    }
+   ],
+   "schemaChanges": 8
+  },
+  "2026-06-30_reminder_engine": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "notificationEntityMutes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "reminderDefinitions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "reminderOccurrences",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "reminderSentLog",
+     "present": true
+    }
+   ],
+   "schemaChanges": 4
+  },
+  "2026-07-01_drop_pm_delivery_method": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "privateMessages",
+     "column": "deliveryMethod",
+     "present": false
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-07-03_message_reactions": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "messageReactions",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-09-25_delivery_method_width": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "deliveryLogs",
+     "column": "deliveryMethod",
+     "type": "varchar(30)",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 1
+  }
+ },
+ "doing": {
+  "2026-04-03_initial_schema": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "assignments",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "blockoutDates",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "conditions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "conjunctions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "contentProviderAuths",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "planItems",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "planTypes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "plans",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "positions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "tasks",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "times",
+     "present": true
+    }
+   ],
+   "schemaChanges": 13
+  },
+  "2026-05-06_service_time_type_and_exclusions": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "planItemTimes",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "times",
+     "column": "serviceTimeType",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-06-04_plan_campus": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "plans",
+     "column": "campusId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "plans",
+     "index": "idx_plans_campusId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-06-05_workflows": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "workflowCategories",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "workflowStepRoutes",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "workflowSteps",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "workflows",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "conjunctions",
+     "column": "stepRouteId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "workflowId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "stepId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "dueDate",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "snoozedUntil",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "sort",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "pinnedAssignment",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "conjunctions",
+     "index": "idx_conjunctions_stepRouteId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "tasks",
+     "index": "idx_tasks_churchId_workflowId_stepId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 14
+  },
+  "2026-06-06_workflowTriggers": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "workflowTriggers",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "triggerId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "tasks",
+     "index": "idx_tasks_churchId_triggerId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 3
+  },
+  "2026-06-07_unify_form_triggers": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "formWorkflowTriggers",
+     "present": false
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-06-08_workflow_automations": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "workflowStepActions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "actions",
+     "present": false
+    },
+    {
+     "kind": "table",
+     "table": "automations",
+     "present": false
+    },
+    {
+     "kind": "column",
+     "table": "conjunctions",
+     "column": "triggerId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "workflowTriggers",
+     "column": "triggerKind",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "workflowTriggers",
+     "column": "recurs",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "conjunctions",
+     "column": "automationId",
+     "present": false
+    },
+    {
+     "kind": "index",
+     "table": "conjunctions",
+     "index": "idx_conjunctions_triggerId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 8
+  },
+  "2026-06-11_auto_scheduling": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "automationExecutions",
+     "present": true
+    },
+    {
+     "kind": "table",
+     "table": "schedulingPreferences",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "assignments",
+     "column": "autofillRunId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "plans",
+     "column": "prepared",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "plans",
+     "column": "autoReplaceOnDecline",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "plans",
+     "column": "lastAutofillRunId",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "assignments",
+     "index": "idx_assignments_autofillRunId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 7
+  },
+  "2026-06-24_serving_reminders": {
+   "checks": [],
+   "schemaChanges": 3
+  },
+  "2026-06-25_plan_templates": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "planTemplates",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-06-30_retire_plan_reminders_sent": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "plans",
+     "column": "remindersSent",
+     "present": false
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-07-01_migrate_plan_reminders_to_defs": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "planTypes",
+     "column": "reminderOffsets",
+     "present": false
+    },
+    {
+     "kind": "column",
+     "table": "planTypes",
+     "column": "reminderMessage",
+     "present": false
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-08-07_widen_plan_item_related_id": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "planItems",
+     "column": "relatedId",
+     "type": "varchar(255)",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-20_plan_item_position": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "planItems",
+     "column": "positionId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-21_plan_item_action_type": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "planItems",
+     "column": "actionType",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  },
+  "2026-08-31_widen_plan_item_label_description": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "planItems",
+     "column": "description",
+     "type": "text",
+     "nullable": true
+    },
+    {
+     "kind": "columnType",
+     "table": "planItems",
+     "column": "label",
+     "type": "varchar(255)",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 2
+  },
+  "2026-09-20_plan_item_time_position": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "planItemTimes",
+     "column": "positionId",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
+  }
+ }
+}
