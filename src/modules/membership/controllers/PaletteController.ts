@@ -10,7 +10,7 @@ import { getGivingModuleGateway } from "../../../shared/modules/GivingModuleGate
 export interface PaletteItem { n: string; a?: string[]; t: "do" | "person" | "group" | "plan" | "fund" | "jump"; u: string }
 
 interface Access {
-  people: boolean; peopleEdit: boolean; giving: boolean; givingView: boolean; givingEdit: boolean; attendance: boolean; content: boolean;
+  people: boolean; peopleEdit: boolean; groupsEdit: boolean; giving: boolean; givingView: boolean; givingEdit: boolean; attendance: boolean; content: boolean;
   sermons: boolean; settings: boolean; roles: boolean; forms: boolean; plans: boolean; serverAdmin: boolean
 }
 
@@ -20,6 +20,10 @@ const jump = (n: string, u: string, a?: string[]): PaletteItem => (a ? { n, a, t
 export const staticItems = (c: Access): PaletteItem[] => {
   const items: PaletteItem[] = [];
   if (c.peopleEdit) items.push({ n: "Add a person", a: ["new person", "new household", "create person"], t: "do", u: "#addPerson" });
+  if (c.content) items.push({ n: "Create a page", a: ["new page", "add page", "webpage"], t: "do", u: "#wizard:webpage" });
+  if (c.groupsEdit) items.push({ n: "Create a group", a: ["new group", "add group", "small group"], t: "do", u: "#wizard:group" });
+  if (c.groupsEdit) items.push({ n: "Set up FreeShow", a: ["freeshow", "worship team", "presentation"], t: "do", u: "#wizard:freeshow" });
+  if (c.groupsEdit && c.plans) items.push({ n: "Set up FreePlay", a: ["freeplay", "classroom", "kids lessons"], t: "do", u: "#wizard:freeplay" });
   if (c.settings) items.push({ n: "Start check-in", a: ["kiosk", "b1 check-in", "checkin app"], t: "do", u: "/mobile/checkin" });
   items.push(jump("Sunday", "/", ["home", "dashboard", "this week", "bulletin"]));
   if (c.people) {
@@ -53,7 +57,7 @@ export const staticItems = (c: Access): PaletteItem[] => {
     items.push(jump("Site", "/site/pages", ["website", "pages", "web"]));
     items.push(jump("Blog", "/site/blog", ["blogs", "posts", "articles", "news"]));
     items.push(jump("Blocks", "/site/blocks", ["reusable blocks", "sections", "footer", "header"]));
-    items.push(jump("Appearance", "/site/appearance", ["colors", "fonts", "logo", "theme", "branding"]));
+    items.push(jump("Appearance", "/site/appearance", ["colors", "fonts", "logo", "theme", "branding", "add your logo"]));
     items.push(jump("Files", "/site/files", ["uploads", "media", "images", "documents"]));
     items.push(jump("Calendars", "/calendars", ["events", "rooms"]));
     items.push(jump("Availability", "/calendars/availability", ["time off", "unavailable", "blackout dates"]));
@@ -63,14 +67,14 @@ export const staticItems = (c: Access): PaletteItem[] => {
     items.push(jump("App navigation", "/mobile/navigation", ["mobile menu", "app tabs", "app links"]));
   }
   if (c.sermons) {
-    items.push(jump("Sermons", "/sermons", ["streaming", "livestream", "video", "messages"]));
+    items.push(jump("Sermons", "/sermons", ["streaming", "livestream", "video", "messages", "add a sermon", "upload sermon"]));
     items.push(jump("Live stream times", "/sermons/times", ["stream schedule", "service stream"]));
     items.push(jump("Bulk import sermons", "/sermons/bulk", ["youtube import", "vimeo import"]));
   }
   if (c.forms) items.push(jump("Forms", "/forms", ["registration forms", "surveys", "questionnaires"]));
   if (c.settings) {
     items.push(jump("Settings", "/settings", ["church settings", "church info", "general"]));
-    items.push(jump("Giving settings", "/settings#giving", ["stripe", "paypal", "payment provider", "processor"]));
+    items.push(jump("Giving settings", "/settings#giving", ["stripe", "paypal", "payment provider", "processor", "set up giving", "online giving"]));
     items.push(jump("Texting settings", "/settings#texting", ["sms", "twilio", "text messages"]));
     items.push(jump("Storage settings", "/settings#storage", ["s3", "google drive", "byos", "file storage"]));
     items.push(jump("Domains", "/settings#domains", ["custom domain", "dns", "subdomain"]));
@@ -86,7 +90,7 @@ export const staticItems = (c: Access): PaletteItem[] => {
     items.push(jump("B1 Mobile", "/mobile/b1-mobile", ["mobile app", "app store", "play store"]));
     items.push(jump("Check-in labels", "/mobile/checkin/labels", ["name tags", "nametags", "label printer"]));
   }
-  if (c.roles || c.settings) items.push(jump("Roles", "/settings/roles", ["users", "permissions", "access", "staff logins"]));
+  if (c.roles || c.settings) items.push(jump("Roles", "/settings/roles", ["users", "permissions", "access", "staff logins", "invite staff", "invite team"]));
   if (c.content || c.settings) items.push(jump("Mobile", "/mobile", ["app", "kiosk", "check-in app"]));
   if (c.serverAdmin) items.push(jump("Server admin", "/admin", ["admin", "all churches", "reports"]));
   items.push(jump("Profile", "/profile", ["my account", "password", "notifications"]));
@@ -128,6 +132,7 @@ export class PaletteController extends MembershipBaseController {
     return {
       people: can(Permissions.people.view),
       peopleEdit: can(Permissions.people.edit),
+      groupsEdit: can(Permissions.groups.edit),
       giving: can(Permissions.donations.viewSummary),
       givingView: can(Permissions.donations.view),
       givingEdit: can(Permissions.donations.edit),

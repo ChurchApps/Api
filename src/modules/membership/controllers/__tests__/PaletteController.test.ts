@@ -8,7 +8,11 @@ jest.mock("@churchapps/apihelper", () => ({}));
 
 import { staticItems } from "../PaletteController.js";
 
-const none = { people: false, peopleEdit: false, giving: false, givingView: false, givingEdit: false, attendance: false, content: false, sermons: false, settings: false, roles: false, forms: false, plans: false, serverAdmin: false };
+const keys = [
+  "people", "peopleEdit", "groupsEdit", "giving", "givingView", "givingEdit", "attendance", "content", "sermons", "settings", "roles", "forms", "plans", "serverAdmin"
+] as const;
+const flags = (v: boolean) => Object.fromEntries(keys.map((k) => [k, v])) as Record<typeof keys[number], boolean>;
+const none = flags(false);
 
 describe("palette static items", () => {
   it("volunteer sees no giving, people or settings rows", () => {
@@ -48,7 +52,7 @@ describe("palette static items", () => {
   });
 
   it("urls are unique", () => {
-    const all = { people: true, peopleEdit: true, giving: true, givingView: true, givingEdit: true, attendance: true, content: true, sermons: true, settings: true, roles: true, forms: true, plans: true, serverAdmin: true };
+    const all = flags(true);
     const urls = staticItems(all).map((i) => i.u);
     expect(new Set(urls).size).toBe(urls.length);
   });
@@ -56,5 +60,14 @@ describe("palette static items", () => {
   it("#addPerson needs people.edit", () => {
     expect(staticItems({ ...none, people: true }).some((i) => i.u === "#addPerson")).toBe(false);
     expect(staticItems({ ...none, peopleEdit: true }).some((i) => i.u === "#addPerson")).toBe(true);
+  });
+
+  it("setup wizards follow the permissions the wizard needs", () => {
+    const urls = (c: Partial<typeof none>) => staticItems({ ...none, ...c }).map((i) => i.u);
+    expect(urls({})).not.toContain("#wizard:group");
+    expect(urls({ groupsEdit: true })).toEqual(expect.arrayContaining(["#wizard:group", "#wizard:freeshow"]));
+    expect(urls({ groupsEdit: true })).not.toContain("#wizard:freeplay");
+    expect(urls({ groupsEdit: true, plans: true })).toContain("#wizard:freeplay");
+    expect(urls({ content: true })).toEqual(expect.arrayContaining(["#wizard:webpage"]));
   });
 });
