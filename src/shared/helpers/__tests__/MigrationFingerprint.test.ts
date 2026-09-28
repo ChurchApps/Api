@@ -43,6 +43,20 @@ describe("detect + suggestBaseline", () => {
     expect(suggestBaseline(found)).toEqual({ names: [], blocked: "Partly applied: 01_initial" });
   });
 
+  it("prod giving's shape: a partial migration listed for re-run stays pending instead of blocking", () => {
+    const p: MigrationFingerprints[string] = {
+      "01_initial": { schemaChanges: 1, checks: [{ kind: "table", table: "eventLogs", present: true }] },
+      "02_unique": { schemaChanges: 2, checks: [{ kind: "index", table: "eventLogs", index: "idx_new", present: true }, { kind: "index", table: "eventLogs", index: "idx_old", present: false }] },
+      "03_later": { schemaChanges: 1, checks: [{ kind: "table", table: "funds", present: true }] }
+    };
+    const live = schema({}, ["eventLogs", "funds"]);
+    const found = detect(Object.keys(p), p, live);
+    expect(found[1].state).toBe("partial");
+    expect(suggestBaseline(found).blocked).toBe("Partly applied: 02_unique");
+    expect(suggestBaseline(found, ["02_unique"])).toEqual({ names: ["01_initial", "03_later"] });
+    expect(suggestBaseline(found, ["03_later"]).blocked).toBe("Partly applied: 02_unique");
+  });
+
   it("a column still at its old type counts as missing, not applied", () => {
     const live = schema({ "plans.name": "varchar(100)", "planItemTimes.positionId": "char(11)" });
     expect(detect(names, prints, live)[2].state).toBe("missing");
