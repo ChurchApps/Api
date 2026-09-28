@@ -55,6 +55,28 @@ export class ServerHealthController extends MembershipBaseController {
     });
   }
 
+  /** For a module with no migration history: which migrations its live schema already reflects. Read-only. */
+  @httpGet("/migrations/:module/detect")
+  public async detectMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      if (!MigrationRunner.isModule(req.params.module)) return this.json({ error: "Unknown module" }, 400);
+      return await MigrationRunner.detect(req.params.module);
+    });
+  }
+
+  /** Record the detected migrations as applied without running them. Body: { names } exactly as detect suggested. */
+  @httpPost("/migrations/:module/baseline")
+  public async baselineMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      if (!MigrationRunner.isModule(req.params.module)) return this.json({ error: "Unknown module" }, 400);
+      const names = Array.isArray(req.body?.names) ? req.body.names.map(String) : [];
+      const result = await MigrationRunner.baseline(req.params.module, names);
+      return { ...result, status: await MigrationRunner.status(req.params.module) };
+    });
+  }
+
   @httpGet("/")
   public async getStatus(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
