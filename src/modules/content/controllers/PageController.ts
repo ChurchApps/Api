@@ -119,6 +119,9 @@ export class PageController2 extends ContentBaseController {
   @httpGet("/public/:churchId")
   public async loadPublic(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
+      // A church that disabled its public website exposes no pages to anonymous enumerators (sitemap, etc.).
+      const hideSettings: any[] = await this.repos.setting.loadByKeyNames(churchId, ["hidePublicSite"]);
+      if (hideSettings?.some((s) => s.keyName === "hidePublicSite" && s.value === "true")) return [];
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
       const pages: Page[] = await this.repos.page.loadAll(churchId, siteId);
       return pages

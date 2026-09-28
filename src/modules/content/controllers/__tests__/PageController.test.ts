@@ -170,3 +170,34 @@ describe("PageController2.importTree", () => {
     expect(save).not.toHaveBeenCalled();
   });
 });
+
+describe("PageController2.loadPublic hidePublicSite", () => {
+  function makePublicController(settings: any[]) {
+    const repos = {
+      page: { loadAll: jest.fn(async () => [{ url: "/", title: "Home", visibility: "everyone" }, { url: "/about", title: "About" }]) },
+      setting: { loadByKeyNames: jest.fn(async () => settings) }
+    };
+    const controller = new PageController2();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    return { controller, repos };
+  }
+  const loadPublic = (controller: PageController2) => (controller as any).loadPublic("c1", { query: {} }, {});
+
+  it("lists public pages when the setting is absent", async () => {
+    const { controller } = makePublicController([]);
+    expect(await loadPublic(controller)).toHaveLength(2);
+  });
+
+  it("lists public pages when the setting is false", async () => {
+    const { controller } = makePublicController([{ keyName: "hidePublicSite", value: "false" }]);
+    expect(await loadPublic(controller)).toHaveLength(2);
+  });
+
+  it("returns no pages when the public website is disabled", async () => {
+    const { controller, repos } = makePublicController([{ keyName: "hidePublicSite", value: "true" }]);
+    expect(await loadPublic(controller)).toEqual([]);
+    expect(repos.setting.loadByKeyNames).toHaveBeenCalledWith("c1", ["hidePublicSite"]);
+    expect(repos.page.loadAll).not.toHaveBeenCalled();
+  });
+});
