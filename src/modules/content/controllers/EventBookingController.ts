@@ -1,12 +1,17 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
-import { EventBooking } from "../models/index.js";
+import { CuratedEvent, EventBooking } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { ApprovalHelper } from "../helpers/ApprovalHelper.js";
 import { ConflictHelper } from "../helpers/ConflictHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
+
+interface ApproveBody {
+  publish?: boolean;
+  curatedCalendarId?: string;
+}
 
 @controller("/content/eventBookings")
 export class EventBookingController extends ContentBaseController {
@@ -84,8 +89,8 @@ export class EventBookingController extends ContentBaseController {
 
   // authz-exempt: gated by resolveBooking(...) → canResolve(au)/approval-group membership
   @httpPost("/:id/approve")
-  public async approve(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.resolveBooking(req, res, id, "approved");
+  public async approve(@requestParam("id") id: string, req: express.Request<{}, {}, ApproveBody>, res: express.Response): Promise<any> {
+    return this.resolveBooking(req, res, id, "approved", req.body);
   }
 
   // authz-exempt: gated by resolveBooking(...) → canResolve(au)/approval-group membership
@@ -105,7 +110,7 @@ export class EventBookingController extends ContentBaseController {
     });
   }
 
-  private resolveBooking(req: express.Request, res: express.Response, id: string, status: "approved" | "rejected") {
+  private resolveBooking(req: express.Request, res: express.Response, id: string, status: "approved" | "rejected", body?: ApproveBody) {
     return this.actionWrapper(req, res, async (au) => {
       const booking = await this.repos.eventBooking.load(au.churchId, id);
       if (!booking) return this.json({}, 404);
@@ -114,13 +119,36 @@ export class EventBookingController extends ContentBaseController {
         const groupIds = await this.loadRequesterGroupIds(au.churchId, au.personId);
         if (!approvalGroupId || !groupIds.includes(approvalGroupId)) return this.json({}, 401);
       }
+      // #1116: optionally publish the booking's event while approving, mirroring EventController.resolveEvent.
+      const publish = status === "approved" && !!body?.publish;
+      const curatedCalendarId = publish ? body?.curatedCalendarId : undefined;
+      if (publish && !this.canResolve(au)) return this.json({}, 401);
+      if (curatedCalendarId) {
+        if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+        if (!(await this.repos.curatedCalendar.load(au.churchId, curatedCalendarId))) return this.json({}, 400);
+      }
       booking.status = status;
       booking.resolvedBy = au.personId;
       booking.resolvedDate = new Date();
       const result = await this.repos.eventBooking.save(booking);
+      if (publish) await this.publishEvent(au.churchId, booking.eventId, curatedCalendarId);
       await this.notifyRequester(au.churchId, booking, status);
       return result;
     });
+  }
+
+  // Idempotent: several bookings on one event may each be approved with publish checked.
+  private async publishEvent(churchId: string, eventId: string, curatedCalendarId?: string) {
+    const event = await this.repos.event.load(churchId, eventId);
+    if (!event) return;
+    if (event.visibility !== "public") {
+      event.visibility = "public";
+      await this.repos.event.save(event);
+    }
+    if (!curatedCalendarId) return;
+    const existing: CuratedEvent[] = await this.repos.curatedEvent.loadByCuratedCalendarId(churchId, curatedCalendarId);
+    const alreadyListed = existing.some((ce) => ce.eventId === eventId || (!ce.eventId && ce.groupId === event.groupId));
+    if (!alreadyListed) await this.repos.curatedEvent.save({ churchId, curatedCalendarId, groupId: event.groupId, eventId });
   }
 
   private async leadsEvent(au: any, eventId: string): Promise<boolean> {
