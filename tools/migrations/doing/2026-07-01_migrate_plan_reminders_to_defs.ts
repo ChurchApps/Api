@@ -1,6 +1,6 @@
 import { type Kysely, sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
-import { createKysely } from "../../kysely-config.js";
+import { createKysely } from "../../../src/shared/infrastructure/KyselyConnection.js";
 
 const daysCsvToMinutesCsv = (csv: string | null | undefined): string => {
   if (csv === undefined || csv === null) return "";

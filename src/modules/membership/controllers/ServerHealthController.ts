@@ -1,9 +1,10 @@
-import { controller, httpGet } from "inversify-express-utils";
+import { controller, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions } from "../helpers/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { EnvironmentBase } from "@churchapps/apihelper";
+import { MigrationRunner } from "../../../shared/helpers/MigrationRunner.js";
 
 interface ConfigItem {
   key: string;
@@ -27,6 +28,30 @@ export class ServerHealthController extends MembershipBaseController {
       const latest = await this.repos.jobRun.loadLatest();
       const recentFailures = await this.repos.jobRun.loadRecentFailures(25);
       return { latest, recentFailures };
+    });
+  }
+
+  /** Applied and pending database migrations for every module, read from this environment's databases. */
+  @httpGet("/migrations")
+  public async getMigrations(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      return { environment: Environment.currentEnvironment, modules: await MigrationRunner.statusAll() };
+    });
+  }
+
+  /**
+   * Apply one module's pending migrations. One module per request keeps each call
+   * well inside the API Gateway timeout; the admin page walks the modules in order.
+   */
+  @httpPost("/migrations/:module/run")
+  public async runMigrations(req: express.Request<{ module: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
+      const moduleName = req.params.module;
+      if (!MigrationRunner.isModule(moduleName)) return this.json({ error: "Unknown module" }, 400);
+      const run = await MigrationRunner.run(moduleName);
+      return { ...run, status: await MigrationRunner.status(moduleName) };
     });
   }
 
