@@ -1,0 +1,81 @@
+name: Migrate Prod
+
+# Manual only. Runs tools/migrate.ts against the production databases.
+# Deploy Prod does not run migrations, so a release that adds one needs this
+# run afterwards (e.g. doing/2026-09-20_plan_item_time_position, ChurchAppsSupport#1114).
+# Run "status" first; "up" applies every pending migration for the module.
+on:
+  workflow_dispatch:
+    inputs:
+      module:
+        description: "Module to migrate"
+        required: true
+        type: choice
+        options: [doing, membership, attendance, content, giving, messaging, commons, all]
+      action:
+        description: "status lists pending migrations; up applies them"
+        required: true
+        type: choice
+        default: status
+        options: [status, up]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate-prod
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Migrate Prod (${{ inputs.module }} / ${{ inputs.action }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install Dependencies
+        run: yarn install --immutable
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Load connection strings
+        env:
+          MODULE: ${{ inputs.module }}
+        run: |
+          if [ "$MODULE" = "all" ]; then
+            MODULES="membership attendance content giving messaging doing commons"
+          else
+            MODULES="$MODULE"
+          fi
+          : > .env
+          for M in $MODULES; do
+            if CS=$(aws ssm get-parameter --name "/prod/${M}Api/connectionString" --with-decryption --query "Parameter.Value" --output text 2>/dev/null); then
+              echo "::add-mask::$CS"
+              echo "${M^^}_CONNECTION_STRING=$CS" >> .env
+              echo "$M: connection string loaded"
+            else
+              echo "::error::No /prod/${M}Api/connectionString in SSM"
+              exit 1
+            fi
+          done
+
+      - name: Migrate
+        run: yarn migrate --action=${{ inputs.action }} --module=${{ inputs.module }}
+
+      - name: Remove .env
+        if: always()
+        run: rm -f .env
