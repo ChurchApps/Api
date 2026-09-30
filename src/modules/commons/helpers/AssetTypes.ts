@@ -12,7 +12,9 @@ const SONG_FILES: AssetFileRole[] = [
   // lyrics.chordpro is the chart generated on publish, so ChordPro text uploads travel as lyrics.cho
   { role: "lyrics", namePattern: "lyrics.{ext}", extensions: ["cho", "crd", "txt"], maxBytes: MB },
   // the finished mix: a second rights layer (detail.masterLicense) that unlocks stems and a full mix; demoAudio stays a writer demo
-  { role: "master", namePattern: "master.{ext}", extensions: ["wav", "mp3", "m4a", "flac", "ogg"], maxBytes: 90 * MB }
+  { role: "master", namePattern: "master.{ext}", extensions: ["wav", "mp3", "m4a", "flac", "ogg"], maxBytes: 90 * MB },
+  // a backing track without the lead vocal: granted as-is into sources/extra/, never separated like a master
+  { role: "accompaniment", namePattern: "accompaniment.{ext}", extensions: ["wav", "mp3", "m4a", "flac", "ogg"], maxBytes: 90 * MB }
 ];
 
 const SONG_DETAIL_FIELDS: AssetDetailField[] = [
@@ -27,6 +29,7 @@ const SONG_DETAIL_FIELDS: AssetDetailField[] = [
 
 // a master is a recording too: the same ownership attestation the demo needs
 export const MASTER_ATTESTATION = { key: "recordingOwned", label: "This recording is mine (or I have the owner's permission to share it).", requiredWhenRole: "master" };
+export const ACCOMPANIMENT_ATTESTATION = { ...MASTER_ATTESTATION, requiredWhenRole: "accompaniment" };
 
 function extendSong(def: AssetTypeDefinition): AssetTypeDefinition {
   const roles = new Set(SONG_FILES.map((f) => f.role));
@@ -35,7 +38,8 @@ function extendSong(def: AssetTypeDefinition): AssetTypeDefinition {
   const files = firstGenerated < 0 ? [...kept, ...SONG_FILES] : [...kept.slice(0, firstGenerated), ...SONG_FILES, ...kept.slice(firstGenerated)];
   const keys = new Set(SONG_DETAIL_FIELDS.map((f) => f.key));
   const detailFields = [...(def.detailFields || []).filter((f) => !keys.has(f.key)), ...SONG_DETAIL_FIELDS];
-  const attestations = [...(def.attestations || []).filter((a) => a.requiredWhenRole !== "master"), MASTER_ATTESTATION];
+  const ours = [MASTER_ATTESTATION, ACCOMPANIMENT_ATTESTATION];
+  const attestations = [...(def.attestations || []).filter((a) => !ours.some((o) => o.requiredWhenRole === a.requiredWhenRole)), ...ours];
   return { ...def, files, detailFields, attestations, maxTotalBytes: Math.max(def.maxTotalBytes, 200 * MB) };
 }
 

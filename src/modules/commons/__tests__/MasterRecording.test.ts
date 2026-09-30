@@ -36,6 +36,12 @@ describe("master recording: a second rights layer with its own license", () => {
     expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, masterLicense: "WC" } }, [file("master.wav")], []).join("\n")).toMatch(/recordingOwned/);
   });
 
+  it("an accompaniment track is uploadable, needs the ownership attestation, and no master license", () => {
+    expect(isUploadableName(song, "accompaniment.mp3")).toBe(true);
+    expect(validateSubmission(song, goodSong, [file("accompaniment.mp3")], []).join("\n")).toMatch(/recordingOwned/);
+    expect(validateSubmission(song, { ...goodSong, detail: { ...goodSong.detail, recordingOwned: true } }, [file("accompaniment.mp3")], [])).toEqual([]);
+  });
+
   it("recording proposal: adds a master to a published song, with a note", () => {
     expect(validateSubmission(song, { ...withMaster("WC"), type: "recording" }, [file("master.wav")], [], published)).toEqual([]);
     expect(validateSubmission(song, { ...withMaster("WC"), type: "recording" }, [file("tune.abc")], [], published)).toEqual(["A recording proposal must add a master file"]);

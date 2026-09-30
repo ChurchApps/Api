@@ -8,7 +8,7 @@ export interface Reviewer { id?: string; email?: string; checkAccess: (p: any) =
 export interface DeclinedFile { name: string; reason: string }
 
 /** File roles whose upload is a recording-ownership attestation, so adding one to a live song is a rights change. */
-const RIGHTS_FILE_ROLES = ["demoAudio", "stemsZip", "master"];
+const RIGHTS_FILE_ROLES = ["demoAudio", "stemsZip", "master", "accompaniment"];
 
 const text = (v: unknown) => (v === undefined || v === null ? "" : String(v).trim());
 
