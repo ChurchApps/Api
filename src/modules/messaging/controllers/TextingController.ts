@@ -308,11 +308,18 @@ export class TextingController extends MessagingBaseController {
     const eligible: GroupMemberDetail[] = [];
     const optedOut: GroupMemberDetail[] = [];
     const noPhone: GroupMemberDetail[] = [];
+    const seen = new Set<string>();
 
     for (const m of members) {
       if (!m.mobilePhone || m.mobilePhone.trim() === "") noPhone.push(m);
       else if (m.optedOut) optedOut.push(m);
-      else eligible.push(m);
+      else {
+        // Family members often share a number; text it once. Strip formatting and the US country code so variants match.
+        const key = m.mobilePhone.replace(/\D/g, "").replace(/^1(\d{10})$/, "$1");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        eligible.push(m);
+      }
     }
 
     return { eligible, optedOut, noPhone };
