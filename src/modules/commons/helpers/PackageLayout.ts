@@ -207,6 +207,8 @@ export function packagePath(assetType: string | undefined, name: string, legacy 
   }
   if (n === "song.json") return n;
   if (/^master\.[^./]+$/.test(n)) return `sources/master/${n}`;
+  // granted as-is, never processed: build.py packs sources/extra/* into audio.zip, build-catalog lists it as an extra
+  if (/^accompaniment\.[^./]+$/.test(n)) return `sources/extra/${n}`;
   if (DERIVATIVE_FILES.has(n) && n !== "timing.json") return `output/composition/${n}`;
   return `sources/${n}`;
 }

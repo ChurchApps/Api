@@ -57,6 +57,8 @@ describe("storage keys", () => {
     ]) expect(packagePath("song", upload)).toBe(`sources/${upload}`);
     expect(packagePath("song", "song.json")).toBe("song.json");
     expect(packagePath("song", "master.wav")).toBe("sources/master/master.wav");
+    expect(packagePath("song", "accompaniment.mp3")).toBe("sources/extra/accompaniment.mp3");
+    expect(packageRole("songs/en/x-testasst001/sources/extra/accompaniment.mp3")).toBe("accompaniment");
     for (const derived of ["slides.json", "chart.chordpro", "chart.pdf", "attribution.txt", "duration.json", "cover-thumb.webp", "sources.txt"]) expect(packagePath("song", derived)).toBe(`output/composition/${derived}`);
     expect(packagePath("song", "art-thumb.webp")).toBe("output/composition/cover-thumb.webp");
     expect(packagePath("song", "manifest.json")).toBe("manifest.json");
