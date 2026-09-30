@@ -10,7 +10,7 @@ import { PublishHelper } from "./PublishHelper.js";
 import { QualityHelper } from "./QualityHelper.js";
 import { RightsHelper } from "./RightsHelper.js";
 import { SongPackageHelper } from "./SongPackageHelper.js";
-import { isUploadableName, MAX_PENDING_PER_USER, NEW_PACKAGE_TYPES, normalizeTags, songLimitFor, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
+import { isUploadableName, licensesFor, MAX_PENDING_PER_USER, NEW_PACKAGE_TYPES, normalizeTags, songLimitFor, notAcceptedMessage, resultingFileNames, submissionType, validateSubmission, ValidationContext } from "./SubmitValidation.js";
 
 export interface Actor { id?: string; churchId?: string; }
 export type Outcome<T> = { ok: true; value: T } | { ok: false; status: number; error: string; errors?: string[] };
@@ -39,7 +39,7 @@ export class SubmissionHelper {
         description: payload.description,
         tags: payload.tags,
         language: payload.language || "English",
-        license: def.licenses.includes(payload.license as any) ? payload.license : def.defaultLicense,
+        license: licensesFor(def, au.id, Environment.commonsLicenseGrants || "").includes(payload.license as any) ? payload.license : def.defaultLicense,
         publisherUserId: au.id,
         publisherChurchId: au.churchId,
         status: "pending"
@@ -88,7 +88,7 @@ export class SubmissionHelper {
 
     const proposed = await repos.assetFile.loadBySubmission(sub.id || "");
     const live = await repos.assetFile.loadLive(asset.id || "");
-    const ctx: ValidationContext = { type, note: sub.note, isNewAsset: !asset.publishedSubmissionId };
+    const ctx: ValidationContext = { type, note: sub.note, isNewAsset: !asset.publishedSubmissionId, licenses: licensesFor(def, sub.submittedBy || "", Environment.commonsLicenseGrants || "") };
     if ((type === "translation" || type === "arrangement") && detail.parentSongId) {
       const parent = await repos.asset.loadById(String(detail.parentSongId));
       // the original's license and every rights layer (a CC ND tune, a writer-held grant) must allow derivatives

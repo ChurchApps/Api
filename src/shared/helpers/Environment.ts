@@ -37,6 +37,7 @@ export class Environment extends EnvironmentBase {
   static commonsMusicEditors: string;
   /** comma-separated userId:limit overrides of the default 20-song lifetime cap (0 = banned) */
   static commonsSongLimits: string;
+  static commonsLicenseGrants: string;
   static hubspotKey: string;
   static mauticUrl: string;
   static mauticUser: string;
@@ -246,6 +247,7 @@ export class Environment extends EnvironmentBase {
     this.worshipCommonsRoot = process.env.WORSHIPCOMMONS_ROOT || config.worshipCommonsRoot || "";
     this.commonsMusicEditors = process.env.COMMONS_MUSIC_EDITORS || config.commonsMusicEditors || "";
     this.commonsSongLimits = process.env.COMMONS_SONG_LIMITS || config.commonsSongLimits || "";
+    this.commonsLicenseGrants = process.env.COMMONS_LICENSE_GRANTS || config.commonsLicenseGrants || "";
     this.mailSystem = process.env.MAIL_SYSTEM ?? config.mailSystem ?? "";
     EnvironmentBase.mailSystem = this.mailSystem;
 

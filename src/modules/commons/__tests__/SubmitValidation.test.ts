@@ -2,7 +2,7 @@ import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 
 import { ASSET_TYPES } from "../__mocks__/churchappsHelpers";
-import { isUploadableName, normalizeTags, resultingFileNames, validateSubmission } from "../helpers/SubmitValidation";
+import { isUploadableName, licensesFor, normalizeTags, resultingFileNames, validateSubmission } from "../helpers/SubmitValidation";
 
 const song = ASSET_TYPES.song;
 const freeshow = ASSET_TYPES["freeshow/template"];
@@ -23,6 +23,15 @@ describe("registry-driven submission validation", () => {
   it("songs may be uploaded as WC, PD or CC-BY; the share-alike and non-commercial variants are harvest-only", () => {
     for (const license of ["WC", "PD", "CC-BY"]) expect(validateSubmission(song, { ...goodSong, license }, [], [])).toEqual([]);
     for (const license of ["CC-BY-NC", "CC-BY-SA", "CC-BY-NC-SA", "CC0", "ND"]) expect(validateSubmission(song, { ...goodSong, license }, [], []).join("\n")).toMatch(/license must be one of: WC, PD, CC-BY/);
+  });
+
+  it("lets a granted user, and only that user, pick an extra license", () => {
+    const grants = "elton:larry-holder, other:CC0";
+    expect(licensesFor(song, "elton", grants)).toEqual(["WC", "PD", "CC-BY", "larry-holder"]);
+    expect(licensesFor(song, "someone", grants)).toEqual(["WC", "PD", "CC-BY"]);
+    const lh = { ...goodSong, license: "larry-holder" };
+    expect(validateSubmission(song, lh, [], [], { licenses: licensesFor(song, "elton", grants) })).toEqual([]);
+    expect(validateSubmission(song, lh, [], [], { licenses: licensesFor(song, "someone", grants) }).join("\n")).toMatch(/license must be one of/);
   });
 
   it("returns every blocking problem at once", () => {

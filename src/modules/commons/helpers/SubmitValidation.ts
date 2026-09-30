@@ -23,6 +23,15 @@ export function songLimitFor(userId: string, overrides: string): number {
   return DEFAULT_SONG_LIMIT;
 }
 
+/** Licenses a user may pick beyond the public uploadable set: COMMONS_LICENSE_GRANTS "userId:licenseId,…" (one entry per grant). */
+export function licenseGrantsFor(userId: string, grants: string): string[] {
+  // ponytail: env list, same shape as COMMONS_SONG_LIMITS — a per-user table when grants pass a handful
+  return grants.split(",").map((e) => e.split(":").map((s) => s.trim())).filter(([id, lic]) => id && id === userId && lic).map(([, lic]) => lic);
+}
+
+/** The public uploadable set plus this user's grants. */
+export const licensesFor = (def: AssetTypeDefinition, userId: string, grants: string): string[] => [...def.licenses, ...licenseGrantsFor(userId, grants)];
+
 export const SUBMISSION_TYPES = ["new", "translation", "arrangement", "correction", "additionalFile", "recording", "removal"] as const;
 export type SubmissionType = (typeof SUBMISSION_TYPES)[number];
 /** Types that create a package; the rest change a published one. */
@@ -118,6 +127,8 @@ export function changedKeys(live: SubmissionPayload | undefined, proposed: Submi
 export interface ValidationContext {
   type?: string;
   note?: string;
+  /** licenses this submitter may use (licensesFor); absent = def.licenses */
+  licenses?: string[];
   /** false when the target asset already has a published version */
   isNewAsset?: boolean;
   /** the parent song named by detail.parentSongId; null when it does not exist; undefined when not looked up */
@@ -137,9 +148,10 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
   if (type === "removal") return validateRemoval(payload, proposed, ctx);
 
   const errors: string[] = [];
+  const licenses: string[] = ctx.licenses || def.licenses;
   if (!payload?.name?.trim()) errors.push("name is required");
   else if (payload.name.length > 255) errors.push("name must be 255 characters or fewer");
-  if (!def.licenses.includes(payload.license as any)) errors.push(`license must be one of: ${def.licenses.join(", ")}`);
+  if (!licenses.includes(payload.license as any)) errors.push(`license must be one of: ${licenses.join(", ")}`);
   const detail = payload.detail || {};
   for (const field of def.detailFields || []) {
     const v = detail[field.key];
@@ -179,7 +191,7 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
   if (total > def.maxTotalBytes) errors.push(`all files together exceed the ${Math.round(def.maxTotalBytes / 1048576)}MB limit`);
 
   // a master recording is its own rights layer: it needs a license from the uploadable set, which may differ from the composition's
-  if (roles.has("master") && !def.licenses.includes(detail.masterLicense)) errors.push(`masterLicense must be one of: ${def.licenses.join(", ")}`);
+  if (roles.has("master") && !licenses.includes(detail.masterLicense)) errors.push(`masterLicense must be one of: ${licenses.join(", ")}`);
 
   for (const att of def.attestations || []) {
     const required = !att.requiredWhenRole || proposed.some((f) => f.action !== "remove" && fileRole(f.name || "") === att.requiredWhenRole);

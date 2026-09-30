@@ -7,6 +7,8 @@ import { CommonsBaseController } from "./CommonsBaseController.js";
 import { ASSET_TYPES } from "../helpers/AssetTypes.js";
 import { ContentLibraryHelper, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, isUploadableName, notAcceptedMessage, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
+import { licenseGrantsFor } from "../helpers/SubmitValidation.js";
+import { Environment } from "../../../shared/helpers/index.js";
 
 @controller("/commons/submissions")
 export class CommonsSubmissionController extends CommonsBaseController {
@@ -26,6 +28,12 @@ export class CommonsSubmissionController extends CommonsBaseController {
       const rows = await this.repos.submission.loadMine(au.id, req.query.status?.toString());
       return rows.map((r) => ({ ...r, isNewAsset: !r.publishedSubmissionId || r.publishedSubmissionId === r.id, isThirdParty: r.publisherUserId !== r.submittedBy }));
     });
+  }
+
+  // authz-exempt: only the caller's own grants, resolved from au.id
+  @httpGet("/licenses")
+  public async licenses(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapperAuth(req, res, async (au) => licenseGrantsFor(au.id, Environment.commonsLicenseGrants || ""));
   }
 
   // token-gated rather than JWT-gated: the product preview iframe B1Admin embeds carries no session

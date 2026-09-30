@@ -53,6 +53,8 @@ provider:
     DOING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/doingApi/connectionString, ''}
     REPORTING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/reportingApi/connectionString, ''}
     COMMONS_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/commonsApi/connectionString, ''}
+    # WorshipCommons: extra upload licenses for named users, userId:licenseId,… (kept out of this public repo)
+    COMMONS_LICENSE_GRANTS: ${ssm:/${self:custom.envLower}/commonsLicenseGrants, ''}
 
     # Third-party API keys (non-DB secrets)
     HUBSPOT_KEY: ${ssm:/${self:custom.envLower}/hubspotKey, ''}
