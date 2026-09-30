@@ -225,7 +225,12 @@ export class DonateController extends GivingBaseController {
               if (failed) await DunningHelper.notify(churchId, failed, 0, this.repos);
             }
           } else if (classification.action === "cancel-subscription") {
+            const subscription = await this.repos.subscription.load(churchId, webhookResult.eventData.id);
             await this.repos.subscription.delete(churchId, webhookResult.eventData.id);
+            // Stripe sets this when it gives up after failed retries; donor- or admin-initiated cancels stay silent.
+            if (subscription && webhookResult.eventData.cancellation_details?.reason === "payment_failed") {
+              await DunningHelper.notifyCanceled(churchId, subscription, this.repos);
+            }
           }
         }
       } catch (error) {

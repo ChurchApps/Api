@@ -63,6 +63,25 @@ describe("DunningHelper", () => {
     });
   });
 
+  describe("notifyCanceled", () => {
+    it("emails the donor once when Stripe cancels after failed retries", async () => {
+      const repos = makeGivingRepos();
+      const sub = { id: "sub_1", churchId: "ch1", personId: "per1" };
+      expect(await DunningHelper.notifyCanceled("ch1", sub, repos)).toBe(true);
+
+      const [, to, , , subject, contents] = sendTransactional.mock.calls[0];
+      expect(to).toEqual("donor@test");
+      expect(subject).toContain("Canceled");
+      expect(contents).toContain("https://grace.b1.church/mobile/donate");
+      expect(repos.eventLog.save.mock.calls[0][0].providerId).toEqual("sub_1:canceled");
+
+      repos.eventLog.loadByProviderId.mockResolvedValue({ id: "log1" });
+      expect(await DunningHelper.notifyCanceled("ch1", sub, repos)).toBe(false);
+      expect(await DunningHelper.notifyCanceled("ch1", { id: "sub_2" }, makeGivingRepos())).toBe(false);
+      expect(sendTransactional).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("run", () => {
     it("selects donations that are 3 and 7 days old and emails each once", async () => {
       const givingRepos = makeGivingRepos({ 3: [failedDonation], 7: [{ ...failedDonation, id: "don2" }] });
