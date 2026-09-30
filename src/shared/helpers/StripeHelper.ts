@@ -271,7 +271,7 @@ export class StripeHelper {
     return await stripe.webhookEndpoints.create({ url: webhookUrl, enabled_events: StripeHelper.webhookEvents });
   }
 
-  // Changing this list does not touch existing endpoints; run tools/manual/stripe-webhook-events.ts after.
+  // Changing this list does not touch existing endpoints; see tools/manual/stripe-webhook-events.ts.
   static readonly webhookEvents: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
     "invoice.paid",
     "invoice.payment_failed",
