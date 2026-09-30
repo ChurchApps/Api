@@ -72,6 +72,19 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.tidyPaste("[G]Down by the river\nBridge of sighs we cross\nIntro\nVerse 1\nWords")).toBe("[G]Down by the river\nBridge of sighs we cross\n\nIntro\nVerse 1\nWords");
   });
 
+  it("splits a heading from the chords on its line and capitalises a lowercase slash bass", () => {
+    expect(SongPackageHelper.tidyPaste("Intro: [G] [D] - [C/a] [G]\n\nVerse:\n[C2]Father of [D/G   G]lights")).toBe("{c: Intro}\n[G] [D] [C/A] [G]\n\nVerse:\n[C2]Father of [D/G   G]lights");
+    expect(SongPackageHelper.tidyPaste("TAG OUT: (2x)   E/g#  A  B  E")).toBe("{c: TAG OUT (2x)}\n[E/G#] [A] [B] [E]");
+    expect(SongPackageHelper.tidyPaste("INTRO:  E  B – (C#m) (Bsus/e  E) | A")).toBe("{c: INTRO}\n[E] [B] [C#m] [Bsus/E] [E] [A]");
+    expect(SongPackageHelper.tidyPaste("[C/a]Grace and [Bsus/e E]love")).toBe("[C/A]Grace and [Bsus/E E]love");
+    // run on from a lyric, it still starts its own stanza, and the form map names it
+    const chart = SongPackageHelper.tidyPaste("Bridge:\n[A]Father of life\nSolo: D D/E- E | Bm7 E");
+    expect(chart).toBe("Bridge:\n[A]Father of life\n\n{c: Solo}\n[D] [D/E] [E] [Bm7] [E]");
+    expect(SongPackageHelper.draftForm(chart)?.defaultOrder).toEqual(["Bridge", "Solo"]);
+    // words after the colon are a sung line
+    expect(SongPackageHelper.tidyPaste("Chorus: Amazing grace")).toBe("Chorus: Amazing grace");
+  });
+
   it("spreads a chord row typed inside one bracket over the words after it", () => {
     expect(SongPackageHelper.inlineChordLines("[C                     Emaj] To live amongst us")).toBe("[C]To live [Emaj]amongst us");
     expect(SongPackageHelper.inlineChordLines("[Emaj       Amin]Oh Emmanuel")).toBe("[Emaj]Oh [Amin]Emmanuel");

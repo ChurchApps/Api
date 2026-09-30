@@ -112,6 +112,23 @@ function isChordRow(line: string): boolean {
   return tokens.some((t) => CHORD_TOKEN.test(t)) && tokens.every((t) => t === "|" || CHORD_TOKEN.test(t)) && !/\[/.test(line);
 }
 
+// "C/a", "E/g#": a slash bass typed lowercase is still the bass note, and only a capital one transposes
+const upperBass = (chord: string) => chord.replace(/^([A-G][^/\s]*\/)([a-g])(?=[#b]?$)/, (_, head: string, bass: string) => head + bass.toUpperCase());
+
+/**
+ * "Intro: [G] [D] - [C/a]", "Outro: A  E  Bm", "TAG OUT: (2x) E/g# A B E", "Solo: D D/E- E | Bm7 E": a heading with its
+ * progression on the same line. Read whole it is a label full of chord names, or a sung line; split, it is a {c:}
+ * label (every parser reads one, whatever the heading word) over a bracketed chord line. Bars, dashes and the
+ * parentheses around optional chords drop, as they do from a chord row with no words.
+ */
+function splitHeadingChords(line: string): string[] | null {
+  const m = line.trim().match(/^([a-z][a-z-]*(?: [a-z][a-z-]*){0,2})\s*:\s*(\(\s*(?:x\s*\d+|\d+\s*x)\s*\))?\s*(.+)$/i);
+  if (!m) return null;
+  const chords = m[3].replace(/[[\]()]/g, " ").split(/\s+/).map((t) => upperBass(t.replace(/[-–—|]+$/, ""))).filter(Boolean);
+  if (!chords.length || !chords.every((t) => CHORD_TOKEN.test(t))) return null;
+  return [`{c: ${m[1]}${m[2] ? ` ${m[2]}` : ""}}`, chords.map((t) => `[${chordName(t)}]`).join(" ")];
+}
+
 /** Each chord of a chord row placed into the words below at its column, snapped to the start of a word. */
 function placeChords(row: string, next: string): string {
   const words = next.replace(/\s+$/, "");
@@ -199,21 +216,26 @@ export class SongPackageHelper {
    * Paste artifacts a chart never means: double-spaced lyrics (a blank line after every line, stanzas split by two
    * or more) close up to single spacing, or every line is its own stanza and slide; a bracketed note alone on a line
    * ("[Flute Solo]") becomes a {c:} label and a bracketed copyright line is dropped (the attribution carries it),
-   * or both print as chords; "[2x]" becomes "(2x)"; a heading with no blank line above it starts its own stanza, or
-   * the form map never sees it.
+   * or both print as chords; "[2x]" becomes "(2x)"; a heading with its chords on the same line splits
+   * (splitHeadingChords) and a lowercase slash bass is capitalised; a heading with no blank line above it starts its
+   * own stanza, or the form map never sees it.
    */
   static tidyPaste(chordPro: string): string {
     // "[2x]" is a repeat mark, not a chord: "(2x)" prints it and slides drop it
     let text = chordPro.replace(/^[ \t]+$/gm, "").replace(/\[\s*(x\s*\d+|\d+\s*x)\s*\]/gi, "($1)");
     const stanzas = text.split(/\n\n+/).map((s) => s.split("\n").filter((l) => l.trim() && !l.trim().startsWith("{")));
     if (/\n\n\n/.test(text) && stanzas.every((s) => s.length <= 1)) text = text.replace(/\n{3,}/g, "\u0000").replace(/\n\n/g, "\n").replace(/\u0000/g, "\n\n");
+    const split = new Set<string>();
     return text.split("\n").flatMap((line) => {
+      const parts = splitHeadingChords(line);
+      if (parts) { split.add(parts[0]); return parts; }
+      line = line.replace(/\[([^\]]*)\]/g, (_, inner: string) => `[${inner.split(/(\s+)/).map(upperBass).join("")}]`);
       const note = line.trim().match(/^\[([^\]]+)\]$/)?.[1].trim();
       if (!note || note.split(/\s+/).every((t) => t === "|" || CHORD_TOKEN.test(t))) return [line];
       return /^(©|\(c\)|copyright\b)/i.test(note) ? [] : [`{c: ${note}}`];
     }).reduce((out: string[], line) => {
       // a heading run straight on from the stanza above ("...my load" then "Chorus") starts its own stanza
-      const heading = (l: string) => BARE_HEADING.test(l) && !!sectionLabel(l);
+      const heading = (l: string) => split.has(l) || (BARE_HEADING.test(l) && !!sectionLabel(l));
       const prev = out[out.length - 1];
       if (prev?.trim() && !prev.trim().startsWith("{") && !heading(prev) && heading(line)) out.push("");
       out.push(line);
