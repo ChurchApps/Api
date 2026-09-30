@@ -21,12 +21,17 @@ function formSubmissionController(opts: any = {}) {
       access: jest.fn(async () => opts.formAccess === undefined ? formRow : opts.formAccess),
       convertToModel: (_c: string, data: any) => data
     },
-    formSubmission: { save: jest.fn(async (s: any) => { if (!s.id) s.id = "sub1"; return s; }), load: jest.fn(async () => opts.existingSubmission ?? null) },
+    formSubmission: {
+      save: jest.fn(async (s: any) => { if (!s.id) s.id = "sub1"; return s; }),
+      load: jest.fn(async () => opts.existingSubmission ?? null),
+      setPerson: jest.fn(async () => {}),
+      convertToModel: (_c: string, data: any) => data
+    },
     answer: { save: jest.fn(async (a: any) => a), loadForFormSubmission: jest.fn(async () => opts.existingAnswers ?? []) },
     question: { loadForForm: jest.fn(async () => opts.questions ?? [{ id: "q1" }]), convertAllToModel: (_c: string, rows: any[]) => rows },
     memberPermission: { loadByEmailNotification: jest.fn(async () => []) },
     church: { loadById: jest.fn(async () => ({ id: "c1", name: "Test" })) },
-    person: { loadByIds: jest.fn(async () => []) },
+    person: { loadByIds: jest.fn(async () => []), load: jest.fn(async (_c: string, id: string) => (opts.people ?? {})[id] ?? null) },
     groupMember: {
       loadForGroup: jest.fn(async () => opts.groupMembers ?? []),
       save: jest.fn(async (gm: any) => ({ ...gm, id: "gm1" }))
@@ -151,5 +156,75 @@ describe("FormSubmissionController.save tampering", () => {
     const result: any = await (controller as any).save({ body: [{ formId: "f1" }] }, {});
     expect(repos.formSubmission.save).not.toHaveBeenCalled();
     expect(result[0].error).toMatch(/not accepting/);
+  });
+});
+
+describe("FormSubmissionController.save signed-in submitter", () => {
+  it("links to the signed-in submitter rather than another person sharing their email", async () => {
+    (ConversationalFormHelper.extractContact as jest.Mock).mockReturnValueOnce({ firstName: "Al", email: "shared@example.com" });
+    (ConversationalFormHelper.findOrCreatePerson as jest.Mock).mockClear();
+    const { controller, repos } = formSubmissionController({
+      au: { churchId: "c1", id: "u1", personId: "me", checkAccess: () => false },
+      form: { id: "f1", churchId: "c1", name: "Connect", restricted: false, autoCreatePerson: true }
+    });
+    await (controller as any).save({ body: [{ formId: "f1", contentType: "form", contentId: "f1", answers: [] }] }, {});
+    expect(ConversationalFormHelper.findOrCreatePerson).not.toHaveBeenCalled();
+    const saved = repos.formSubmission.save.mock.calls[0][0];
+    expect(saved.contentType).toBe("person");
+    expect(saved.contentId).toBe("me");
+  });
+
+  it("still matches by email when a form manager enters a submission for someone else", async () => {
+    (ConversationalFormHelper.extractContact as jest.Mock).mockReturnValueOnce({ firstName: "Al", email: "al@example.com" });
+    (ConversationalFormHelper.findOrCreatePerson as jest.Mock).mockResolvedValueOnce({ id: "p1", name: { first: "Al" } });
+    const { controller, repos } = formSubmissionController({
+      au: { churchId: "c1", id: "u1", personId: "staff", checkAccess: () => false },
+      formAccessOk: true,
+      form: { id: "f1", churchId: "c1", name: "Connect", restricted: false, autoCreatePerson: true }
+    });
+    await (controller as any).save({ body: [{ formId: "f1", contentType: "form", contentId: "f1", answers: [] }] }, {});
+    expect(repos.formSubmission.save.mock.calls[0][0].contentId).toBe("p1");
+  });
+});
+
+describe("FormSubmissionController.setPerson", () => {
+  const staff = { churchId: "c1", id: "u1", personId: "staff", checkAccess: () => false };
+  const submission = { id: "sub9", churchId: "c1", formId: "f1", contentType: "person", contentId: "wrong", submittedBy: "wrong" };
+
+  it("relinks a submission to a person in the same church without side effects", async () => {
+    (WebhookDispatcher.emit as jest.Mock).mockClear();
+    const { controller, repos } = formSubmissionController({ au: staff, formAccessOk: true, existingSubmission: submission, people: { p2: { id: "p2", churchId: "c1" } } });
+    await (controller as any).setPerson("sub9", { body: { personId: "p2" } }, {});
+    expect(repos.formSubmission.setPerson).toHaveBeenCalledWith("c1", "sub9", "person", "p2", "wrong", "staff");
+    expect(WebhookDispatcher.emit).not.toHaveBeenCalled();
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
+    expect(repos.formSubmission.save).not.toHaveBeenCalled();
+  });
+
+  it("unlinks a submission back to the form and clears the submitter", async () => {
+    const { controller, repos } = formSubmissionController({ au: staff, formAccessOk: true, existingSubmission: submission });
+    await (controller as any).setPerson("sub9", { body: { personId: null } }, {});
+    expect(repos.formSubmission.setPerson).toHaveBeenCalledWith("c1", "sub9", "form", "f1", null, "staff");
+  });
+
+  it("rejects a person who isn't in the church", async () => {
+    const { controller, repos } = formSubmissionController({ au: staff, formAccessOk: true, existingSubmission: submission, people: {} });
+    const result: any = await (controller as any).setPerson("sub9", { body: { personId: "otherChurchPerson" } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.formSubmission.setPerson).not.toHaveBeenCalled();
+  });
+
+  it("rejects a caller without access to the form", async () => {
+    const { controller, repos } = formSubmissionController({ au: staff, formAccessOk: false, existingSubmission: submission, people: { p2: { id: "p2" } } });
+    const result: any = await (controller as any).setPerson("sub9", { body: { personId: "p2" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.formSubmission.setPerson).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a missing submission", async () => {
+    const { controller, repos } = formSubmissionController({ au: staff, formAccessOk: true });
+    const result: any = await (controller as any).setPerson("nope", { body: { personId: null } }, {});
+    expect(result.status).toBe(404);
+    expect(repos.formSubmission.setPerson).not.toHaveBeenCalled();
   });
 });
