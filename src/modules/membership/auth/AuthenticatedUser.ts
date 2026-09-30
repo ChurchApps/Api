@@ -132,14 +132,31 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     });
   }
 
+  // A signed-in user's token expires after Environment.jwtExpiration, but can still be traded for a
+  // fresh one for this long afterwards, so people who don't open the app for a few days stay signed in.
+  public static readonly REFRESH_WINDOW_SECONDS = 30 * 24 * 60 * 60;
+  // Short-lived tokens (10-minute SSO handoff, 2-hour impersonation) must never outlive their expiry.
+  private static readonly MIN_REFRESHABLE_LIFETIME_SECONDS = 24 * 60 * 60;
+
+  public static verifyRefreshableJwt(token: string): JwtPayload {
+    const decoded = jwt.verify(token, Environment.jwtSecret, { ignoreExpiration: true });
+    if (typeof decoded === "string") throw new Error("Invalid token format");
+    const now = Math.floor(Date.now() / 1000);
+    if (typeof decoded.exp !== "number" || decoded.exp > now) return decoded;
+
+    // Only plain user tokens are refreshable once expired; church and API tokens carry permissions.
+    const isUserToken = decoded.churchId === undefined && decoded.permissions === undefined;
+    const lifetime = decoded.exp - (decoded.iat ?? decoded.exp);
+    const withinWindow = now <= decoded.exp + AuthenticatedUser.REFRESH_WINDOW_SECONDS;
+    if (!isUserToken || lifetime < AuthenticatedUser.MIN_REFRESHABLE_LIFETIME_SECONDS || !withinWindow) throw new Error("Token expired");
+    return decoded;
+  }
+
   public static async loadUserByJwt(token: string, repos: Repos) {
     let result: User = null;
     try {
-      const decoded = jwt.verify(token, Environment.jwtSecret);
-      if (typeof decoded === "string") {
-        throw new Error("Invalid token format");
-      }
-      const principal = new Principal(decoded as JwtPayload);
+      const decoded = AuthenticatedUser.verifyRefreshableJwt(token);
+      const principal = new Principal(decoded);
       const userId: string = principal.details.id;
       result = await repos.user.load(userId);
     } catch {
