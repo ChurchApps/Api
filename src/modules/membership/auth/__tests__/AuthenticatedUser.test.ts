@@ -38,3 +38,39 @@ describe("AuthenticatedUser.getCombinedApiJwt", () => {
     expect(ttlSeconds(AuthenticatedUser.getCombinedApiJwt(user, userChurch, 10))).toBe(10);
   });
 });
+
+describe("AuthenticatedUser.verifyRefreshableJwt", () => {
+  const DAY = 24 * 60 * 60;
+  const now = () => Math.floor(Date.now() / 1000);
+  const sign = (payload: object, iat: number, lifetime: number) => jwt.sign({ ...payload, iat, exp: iat + lifetime }, "test-secret");
+  const userClaims = { id: "u1", email: "a@b.c", firstName: "A", lastName: "B" };
+
+  it("accepts an unexpired user token", () => {
+    expect(AuthenticatedUser.verifyRefreshableJwt(AuthenticatedUser.getUserJwt(user)).id).toBe("u1");
+  });
+
+  it("accepts a user token that expired a few days ago (#1133)", () => {
+    const token = sign(userClaims, now() - 7 * DAY, 2 * DAY);
+    expect(AuthenticatedUser.verifyRefreshableJwt(token).id).toBe("u1");
+  });
+
+  it("rejects a user token past the refresh window", () => {
+    const token = sign(userClaims, now() - 40 * DAY, 2 * DAY);
+    expect(() => AuthenticatedUser.verifyRefreshableJwt(token)).toThrow();
+  });
+
+  it("rejects expired short-lived impersonation and SSO tokens", () => {
+    expect(() => AuthenticatedUser.verifyRefreshableJwt(sign(userClaims, now() - 3 * 60 * 60, 2 * 60 * 60))).toThrow();
+    expect(() => AuthenticatedUser.verifyRefreshableJwt(sign(userClaims, now() - 20 * 60, 10 * 60))).toThrow();
+  });
+
+  it("rejects an expired church token", () => {
+    const token = sign({ ...userClaims, churchId: "c1", permissions: [] }, now() - 3 * DAY, 2 * DAY);
+    expect(() => AuthenticatedUser.verifyRefreshableJwt(token)).toThrow();
+  });
+
+  it("rejects a token signed with another secret", () => {
+    const token = jwt.sign({ ...userClaims, iat: now() - 3 * DAY, exp: now() - DAY }, "other-secret");
+    expect(() => AuthenticatedUser.verifyRefreshableJwt(token)).toThrow();
+  });
+});
