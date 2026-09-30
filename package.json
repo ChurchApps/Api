@@ -63,7 +63,7 @@
     "@churchapps/apihelper": "^1.1.4",
     "@churchapps/content-providers": "^0.9.4",
     "@churchapps/helpers": "^2.3.0",
-    "@churchapps/texting": "^0.4.0",
+    "@churchapps/texting": "^0.5.0",
     "@codegenie/serverless-express": "^4.15.0",
     "@hubspot/api-client": "^13.1.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
