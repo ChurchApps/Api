@@ -1,4 +1,4 @@
-import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { Setting } from "../models/index.js";
 import { Permissions, FileStorageHelper, Environment } from "../helpers/index.js";
@@ -29,6 +29,15 @@ export class MembershipSettingController extends MembershipBaseController {
         const result = await Promise.all(promises);
         return this.repos.setting.convertAllToModel(au.churchId, result);
       }
+    });
+  }
+
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      await this.repos.setting.delete(au.churchId, id);
+      return this.json({});
     });
   }
 
