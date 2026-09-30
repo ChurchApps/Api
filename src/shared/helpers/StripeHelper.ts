@@ -268,21 +268,21 @@ export class StripeHelper {
 
   static async createWebhookEndpoint(secretKey: string, webhookUrl: string) {
     const stripe = StripeHelper.getStripeObj(secretKey);
-    return await stripe.webhookEndpoints.create({
-      url: webhookUrl,
-      enabled_events: [
-        "invoice.paid",
-        "invoice.payment_failed",
-        "payment_intent.processing",  // ACH payments start in processing state
-        "payment_intent.succeeded",
-        "payment_intent.payment_failed",
-        "charge.succeeded",  // Keep for backward compatibility during migration
-        "charge.failed",     // Keep for backward compatibility during migration
-        "charge.refunded",   // Refunds started from the Stripe dashboard reconcile back to the donation
-        "customer.subscription.deleted"
-      ]
-    });
+    return await stripe.webhookEndpoints.create({ url: webhookUrl, enabled_events: StripeHelper.webhookEvents });
   }
+
+  // Changing this list does not touch existing endpoints; run tools/manual/stripe-webhook-events.ts after.
+  static readonly webhookEvents: Stripe.WebhookEndpointCreateParams.EnabledEvent[] = [
+    "invoice.paid",
+    "invoice.payment_failed",
+    "payment_intent.processing",  // ACH payments start in processing state
+    "payment_intent.succeeded",
+    "payment_intent.payment_failed",
+    "charge.succeeded",  // Keep for backward compatibility during migration
+    "charge.failed",     // Keep for backward compatibility during migration
+    "charge.refunded",   // Refunds started from the Stripe dashboard reconcile back to the donation
+    "customer.subscription.deleted"
+  ];
 
   static async deleteWebhooksByChurchId(secretKey: string, churchId: string) {
     if (churchId.length === 11) {
