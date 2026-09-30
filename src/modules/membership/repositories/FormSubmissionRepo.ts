@@ -38,6 +38,16 @@ export class FormSubmissionRepo {
     return formSubmission;
   }
 
+  public async setPerson(churchId: string, id: string, contentType: string, contentId: string, submittedBy: string | null, revisedBy: string) {
+    await getDb().updateTable("formSubmissions").set({
+      contentType,
+      contentId,
+      submittedBy,
+      revisedBy,
+      revisionDate: sql`NOW()` as any
+    }).where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
   public async delete(churchId: string, id: string) {
     await getDb().deleteFrom("formSubmissions").where("id", "=", id).where("churchId", "=", churchId).execute();
   }

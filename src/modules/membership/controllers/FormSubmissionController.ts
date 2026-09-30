@@ -104,6 +104,12 @@ export class FormSubmissionController extends MembershipBaseController {
             formSubmission.answers.forEach((a) => { if (a.id && !existingAnswerIds.includes(a.id)) delete a.id; });
             const contact: FormContact = ConversationalFormHelper.extractContact(questions, formSubmission.answers || []);
             let followUpFirstName: string = contact?.firstName;
+            // A signed-in submitter is the person, even when someone else shares their email.
+            // Managers are excluded: they may be entering a submission on someone's behalf.
+            if (wantsPerson && !canManage && !formSubmission.id && au?.personId && au.churchId === churchId && formSubmission.contentType !== "person") {
+              formSubmission.contentType = "person";
+              formSubmission.contentId = au.personId;
+            }
             if (wantsPerson && contact?.email && formSubmission.contentType !== "person") {
               const person = await ConversationalFormHelper.findOrCreatePerson(this.repos, churchId, contact);
               if (person) {
@@ -159,6 +165,25 @@ export class FormSubmissionController extends MembershipBaseController {
       }
 
       return { error: "Please check body. formsubmissions is required" };
+    });
+  }
+
+  // authz-exempt: gated by this.formAccess(au, submission.formId); submission and person both loaded under au.churchId
+  @httpPost("/:id/person")
+  public async setPerson(@requestParam("id") id: string, req: express.Request<{}, {}, { personId: string | null }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.churchId) return this.json({}, 401);
+      const submission = this.repos.formSubmission.convertToModel(au.churchId, await this.repos.formSubmission.load(au.churchId, id));
+      if (!submission) return this.json({}, 404);
+      if (!(await this.formAccess(au, submission.formId))) return this.json({}, 401);
+      const personId = req.body?.personId || null;
+      if (personId) {
+        if (!(await this.repos.person.load(au.churchId, personId))) return this.json({ error: "Person not found" }, 400);
+        await this.repos.formSubmission.setPerson(au.churchId, id, "person", personId, submission.submittedBy, au.personId);
+      } else {
+        await this.repos.formSubmission.setPerson(au.churchId, id, "form", submission.formId, null, au.personId);
+      }
+      return this.repos.formSubmission.convertToModel(au.churchId, await this.repos.formSubmission.load(au.churchId, id));
     });
   }
 
