@@ -4,7 +4,7 @@ import { KyselyPool } from "./KyselyPool.js";
 import express from "express";
 import { WebhookDispatcher } from "../webhooks/WebhookDispatcher.js";
 
-export interface UndoArgs {
+interface UndoArgs {
   db: any;
   membershipRepos: any;
   churchId: string;

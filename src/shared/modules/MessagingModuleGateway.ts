@@ -26,12 +26,12 @@ export interface MessagingModuleGateway {
   sendBulkText(churchId: string, recipients: BulkTextRecipient[], message: string, context?: string): Promise<BulkTextResult>;
 }
 
-export interface BulkTextRecipient {
+interface BulkTextRecipient {
   personId?: string;
   phoneNumber: string;
 }
 
-export interface BulkTextResult {
+interface BulkTextResult {
   ok: boolean;
   reason?: string;
   sent?: number;

@@ -1,4 +1,4 @@
-export interface RequestBase {
+interface RequestBase {
   // Common request properties
 }
 

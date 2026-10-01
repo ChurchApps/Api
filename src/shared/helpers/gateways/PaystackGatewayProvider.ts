@@ -12,7 +12,7 @@ const toSubunits = (amount: number) => Math.round(Number(amount) * 100);
 const fromSubunits = (amount: number) => Math.round(Number(amount || 0)) / 100;
 
 // A client-supplied reference only proves *a* payment; it must be for the amount and currency being recorded.
-export const paystackTxMismatch = (tx: any, amount: any, currency: any): string | null => {
+const paystackTxMismatch = (tx: any, amount: any, currency: any): string | null => {
   if (Number(tx?.amount) !== toSubunits(amount)) return "Payment amount does not match the donation amount";
   if (currency && tx?.currency && String(tx.currency).toLowerCase() !== String(currency).toLowerCase()) return "Payment currency does not match the donation currency";
   return null;

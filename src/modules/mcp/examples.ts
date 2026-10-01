@@ -3,7 +3,7 @@
 // payloads without an OpenAPI spec. For un-curated routes, describe_endpoint
 // falls back to "call GET first to see the shape".
 
-export interface EndpointGuidance {
+interface EndpointGuidance {
   humanPurpose?: string;
   useWhen?: string[];
   doNotUseWhen?: string[];
@@ -23,7 +23,7 @@ export interface EndpointExample {
   guidance?: EndpointGuidance;
 }
 
-export const EXAMPLES: Record<string, EndpointExample> = {
+const EXAMPLES: Record<string, EndpointExample> = {
   "GET /membership/people": {
     summary: "List people in the current church. Supports ?firstName=, ?lastName=, ?email= filters.",
     responseSample: [{ id: "abc123", firstName: "Jane", lastName: "Doe", contactInfo: { email: "jane@example.com" } }]

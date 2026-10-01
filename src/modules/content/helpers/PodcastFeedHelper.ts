@@ -2,7 +2,7 @@ import axios from "axios";
 import { XMLParser } from "fast-xml-parser";
 import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
 
-export interface PodcastEpisode {
+interface PodcastEpisode {
   guid: string;
   title: string;
   pubDate: string;

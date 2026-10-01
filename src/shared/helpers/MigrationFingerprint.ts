@@ -20,11 +20,11 @@ export interface LiveSchema {
  * partial  — some hold; needs a person
  * unknown  — no checks to go on: data-only, or every change superseded by a later migration
  */
-export type DetectedState = "applied" | "missing" | "partial" | "unknown";
+type DetectedState = "applied" | "missing" | "partial" | "unknown";
 
 export interface DetectedMigration { name: string; state: DetectedState; checks: number; failing: string[] }
 
-export function describeCheck(c: MigrationCheck): string {
+function describeCheck(c: MigrationCheck): string {
   switch (c.kind) {
     case "table": return `${c.present ? "table" : "no table"} ${c.table}`;
     case "column": return `${c.present ? "column" : "no column"} ${c.table}.${c.column}`;
@@ -33,7 +33,7 @@ export function describeCheck(c: MigrationCheck): string {
   }
 }
 
-export function checkHolds(c: MigrationCheck, live: LiveSchema): boolean {
+function checkHolds(c: MigrationCheck, live: LiveSchema): boolean {
   switch (c.kind) {
     case "table": return live.tables.has(c.table) === c.present;
     case "column": return live.columns.has(`${c.table}.${c.column}`) === c.present;

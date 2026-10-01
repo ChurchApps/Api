@@ -21,7 +21,7 @@ export interface GateIncoming {
   nonVolunteers: number;
 }
 
-export interface GateViolation {
+interface GateViolation {
   groupId: string;
   groupName: string;
   reason: "capacity" | "ratio";

@@ -30,7 +30,7 @@ const rolesRead: PermPair[] = [{ contentType: "Roles", action: "View" }];
 const settingsRead: PermPair[] = [{ contentType: "Settings", action: "View" }];
 
 // `write` scopes include matching `read` pairs — connectors need both.
-export const SCOPE_CATALOG: Record<string, PermPair[]> = {
+const SCOPE_CATALOG: Record<string, PermPair[]> = {
   "people:read": peopleRead,
   "people:write": [
     ...peopleRead,

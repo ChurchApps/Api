@@ -23,7 +23,7 @@ const ARRANGEMENT_ALLOWED_MIME_TYPES = ["audio/mpeg", "audio/mp4", "audio/x-m4a"
 
 // Group members upload to the public CDN; never let them serve active content from it.
 const ACTIVE_MIME_TYPES = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/(x-)?javascript|application\/ecmascript|text\/ecmascript)/i;
-export const safeMemberMimeType = (mimeType: string) => (!mimeType || ACTIVE_MIME_TYPES.test(mimeType.trim()) ? "application/octet-stream" : mimeType);
+const safeMemberMimeType = (mimeType: string) => (!mimeType || ACTIVE_MIME_TYPES.test(mimeType.trim()) ? "application/octet-stream" : mimeType);
 
 @controller("/content/files")
 export class FileController extends ContentBaseController {

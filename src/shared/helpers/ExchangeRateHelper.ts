@@ -1,7 +1,7 @@
 import axios from "axios";
 import { CurrencyHelper } from "@churchapps/helpers";
 
-export interface CurrencyAmount {
+interface CurrencyAmount {
   currency: string;
   amount: number;
 }

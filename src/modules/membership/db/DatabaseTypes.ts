@@ -9,7 +9,7 @@ import type {
 } from "../models/index.js";
 
 /** people table flattens name/contact into columns; rowToModel() restores Person shape. */
-export interface PeopleTable {
+interface PeopleTable {
   id?: string;
   churchId?: string;
   displayName?: string;
