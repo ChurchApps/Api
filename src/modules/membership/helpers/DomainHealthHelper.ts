@@ -3,6 +3,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { Repos } from "../repositories/index.js";
 import { Domain } from "../models/index.js";
 import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
+import { SafeHttp } from "../../../shared/webhooks/SafeHttp.js";
 
 export class DomainHealthHelper {
 
@@ -10,8 +11,11 @@ export class DomainHealthHelper {
     const url = "https://" + domainName + "/.well-known/acme-challenge/";
     if (await UrlValidator.validate(url)) return false;
     try {
+      // The domain is church-supplied: don't follow redirects, and re-check the IP actually connected to.
       const response = await axios.get(url, {
         timeout: 10000,
+        maxRedirects: 0,
+        lookup: SafeHttp.guardedLookup as any,
         validateStatus: () => true
       });
       const contentType = String(response.headers["content-type"] || "");
