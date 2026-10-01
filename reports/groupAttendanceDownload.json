@@ -8,7 +8,7 @@
         "keyName": "main",
         "db": "attendance",
         "sqlLines": [
-          "SELECT ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId, ser.id as serviceId, st.id as serviceTimeId",
+          "SELECT DATE_FORMAT(s.sessionDate, '%Y-%m-%d') as sessionDate, ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId, ser.id as serviceId, st.id as serviceTimeId",
           " FROM visits v",
           " INNER JOIN visitSessions vs on vs.churchId=v.churchId AND vs.visitId=v.id",
           " INNER JOIN sessions s on s.id=vs.sessionId",
@@ -16,8 +16,8 @@
           " INNER JOIN services ser on ser.id=st.serviceId",
           " WHERE v.churchId=:churchId",
           " AND (:serviceId IN ('', '0') OR ser.id = :serviceId) ",
-          " AND s.sessionDate >= :week AND s.sessionDate < DATE_ADD(:week, INTERVAL 7 DAY)",
-          " ORDER by ser.name, st.name"
+          " AND s.sessionDate >= :startDate AND s.sessionDate < DATE_ADD(:endDate, INTERVAL 1 DAY)",
+          " ORDER BY s.sessionDate, ser.name, st.name"
         ]
       },
       {
@@ -64,11 +64,18 @@
         "sourceKey": "service"
       },
       {
-        "keyName": "week",
-        "displayName": "Week",
+        "keyName": "startDate",
+        "displayName": "Start Date",
         "source": "date",
-        "sourceKey": "week",
+        "sourceKey": "startDate",
         "defaultValue": "lastSunday"
+      },
+      {
+        "keyName": "endDate",
+        "displayName": "End Date",
+        "source": "date",
+        "sourceKey": "endDate",
+        "defaultValue": "today"
       },
       {
         "keyName": "groupIds",
