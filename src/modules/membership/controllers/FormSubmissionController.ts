@@ -8,7 +8,7 @@ import { MemberPermission, Person } from "../models/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
-import axios from "axios";
+import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 
 @controller("/membership/formsubmissions")
 export class FormSubmissionController extends MembershipBaseController {
@@ -252,16 +252,8 @@ export class FormSubmissionController extends MembershipBaseController {
   }
 
   private async sendNotifications(churchId: string, form: Form, peopleIds: string[]) {
-    const data = {
-      churchId,
-      peopleIds,
-      contentType: "form",
-      contentId: form.id,
-      message: "New Form Submission: " + form.name
-    };
-    // todo add some kind of auth token and check for it. Can't be jwt since submissions can be anonymous.  Need to encrypt something
-    // const config:AxiosRequestConfig = { headers: { "Authorization": "Bearer " + au.jwt } };
-    return axios.post(Environment.messagingApi + "/notifications/ping", data);
+    // In-process: submissions can be anonymous, and /notifications/ping requires messaging admin.
+    return NotificationService.createNotifications(peopleIds, churchId, "form", form.id, "New Form Submission: " + form.name);
   }
 
   @httpDelete("/:id")

@@ -10,7 +10,9 @@ export class ArrangementKeyController extends ContentBaseController {
   public async getForPresenter(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const arrangementKey: ArrangementKey = await this.repos.arrangementKey.load(churchId, id);
+      if (!arrangementKey) return this.json({}, 404);
       const arrangement: Arrangement = await this.repos.arrangement.load(churchId, arrangementKey.arrangementId);
+      if (!arrangement) return this.json({}, 404);
 
       const song: Song = await this.repos.song.load(churchId, arrangement.songId);
       const songDetail: SongDetail = await this.repos.songDetail.loadGlobal(arrangement.songDetailId);

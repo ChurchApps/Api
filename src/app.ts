@@ -12,6 +12,7 @@ import fileUpload from "express-fileupload";
 import { configureModuleRoutes, moduleRoutingLogger } from "./routes.js";
 import { isPublicDiskFilePath } from "./modules/content/helpers/PublicFileAccess.js";
 import { statusFromError } from "./shared/helpers/httpError.js";
+import { slowRequestLogger } from "./shared/helpers/SlowRequestLogger.js";
 
 export const createApp = async () => {
   const environment = process.env.ENVIRONMENT || "dev";
@@ -28,6 +29,7 @@ export const createApp = async () => {
 
   server.setConfig((app) => {
     app.disable("x-powered-by");
+    app.use(slowRequestLogger);
     app.use((_req, res, next) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
       next();
