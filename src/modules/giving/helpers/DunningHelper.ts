@@ -58,7 +58,7 @@ export class DunningHelper {
     const domain = this.domain(church);
     const contents = `
       <h3 style="font-size: 20px;">Your recurring gift has been canceled</h3>
-      <p style="font-size: 15px;">Your recurring donation to ${church.name} was canceled because the payment could not be processed after several attempts. No further charges will be made.</p>
+      <p style="font-size: 15px;">Your recurring donation to ${this.escapeHtml(church.name)} was canceled because the payment could not be processed after several attempts. No further charges will be made.</p>
       <p style="font-size: 15px;">If you'd like to keep giving, you can set up a new recurring gift in a minute.</p>
       <h4 style="font-size: 14px;">
         <a href="https://${domain}/mobile/donate" target="_blank" rel="noreferrer noopener">Set up your gift again</a>
@@ -92,7 +92,7 @@ export class DunningHelper {
     const attemptedOn = dayjs(donation.donationDate).format("MMM D, YYYY");
     const contents = `
       <h3 style="font-size: 20px;">${HEADINGS[day]}</h3>
-      <p style="font-size: 15px;">Your recurring donation of ${amount} to ${church.name} could not be processed on ${attemptedOn}. Your bank or card issuer declined the payment.</p>
+      <p style="font-size: 15px;">Your recurring donation of ${amount} to ${this.escapeHtml(church.name)} could not be processed on ${attemptedOn}. Your bank or card issuer declined the payment.</p>
       <p style="font-size: 15px;">Updating your payment method takes a minute and your giving picks up where it left off.</p>
       <h4 style="font-size: 14px;">
         <a href="https://${domain}/mobile/donate" target="_blank" rel="noreferrer noopener">Update your payment method</a>
@@ -100,6 +100,11 @@ export class DunningHelper {
     `;
 
     await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, to, church.name, `https://${domain}`, "Your Recurring Donation Needs Attention", contents, "ChurchEmailTemplate.html");
+  }
+
+  // Church names are set by the church, so they're escaped before going into the HTML body.
+  private static escapeHtml(value: unknown): string {
+    return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
   private static domain(church: any) {
