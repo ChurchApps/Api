@@ -95,7 +95,7 @@ export class SsoHelper {
   public static verifyState(token: string): StatePayload | null {
     if (!token) return null;
     try {
-      const decoded = jwt.verify(token, Environment.jwtSecret);
+      const decoded = jwt.verify(token, Environment.jwtSecret, { algorithms: ["HS256"] });
       if (typeof decoded === "string") return null;
       const { returnUrl, nonce } = decoded as any;
       if (!returnUrl || !nonce) return null;

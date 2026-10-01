@@ -36,6 +36,7 @@ describe("SsoHelper state JWT", () => {
   });
 
   it("rejects a token signed with the wrong secret", () => {
+    expect(SsoHelper.verifyState(jwt.sign({ returnUrl: "https://church.b1.church/x", nonce: "n" }, Environment.jwtSecret, { algorithm: "HS512" }))).toBeNull();
     const forged = jwt.sign({ returnUrl: "https://church.b1.church/x", nonce: "n" }, "wrong-secret");
     expect(SsoHelper.verifyState(forged)).toBeNull();
   });
