@@ -6,12 +6,13 @@ jest.mock("@churchapps/apihelper", () => ({
 }));
 
 const sendTemplatedEmailMock = jest.fn().mockResolvedValue(true);
+const sendPersonTextMock = jest.fn().mockResolvedValue({ ok: true });
 const addGroupMemberMock = jest.fn().mockResolvedValue(undefined);
 const loadPersonMock = jest.fn().mockResolvedValue({ email: "p@example.com" });
 const loadChurchMock = jest.fn().mockResolvedValue({ name: "Demo Church" });
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({ loadPerson: loadPersonMock, loadChurch: loadChurchMock, addGroupMember: addGroupMemberMock, setPersonField: jest.fn() }),
-  getMessagingModuleGateway: () => ({ sendTemplatedEmail: sendTemplatedEmailMock })
+  getMessagingModuleGateway: () => ({ sendTemplatedEmail: sendTemplatedEmailMock, sendPersonText: sendPersonTextMock })
 }));
 
 jest.mock("../../../../shared/webhooks/UrlValidator.js", () => ({ UrlValidator: { validate: jest.fn().mockResolvedValue(null) } }));
@@ -147,5 +148,68 @@ describe("WorkflowHelper on-enter actions", () => {
 
     expect(addGroupMemberMock).toHaveBeenCalledWith("c1", "g1", "p1");
     expect(task.stepId).toBe("stepACT");
+  });
+});
+
+describe("WorkflowHelper sendText action", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  const steps: FakeStep[] = [
+    { id: "stepA", workflowId: "wf1", sort: 1, name: "A" },
+    { id: "stepACT", workflowId: "wf1", sort: 2, name: "Auto" }
+  ];
+  const textAction = { actionType: "sendText", config: JSON.stringify({ message: "Hi {{firstName}}, welcome to {{churchName}}!" }) };
+  const newTask = (): any => ({ churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" });
+  const historyOf = (task: any): string[] => JSON.parse(task.data || "{}").history?.map((h: any) => h.message) || [];
+
+  it("sends the step's message to the person's mobile phone", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", lastName: "Clark", mobilePhone: " 555-0100 " });
+    const repos = buildRepos(steps, { stepACT: [textAction] });
+    const task = newTask();
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(sendPersonTextMock).toHaveBeenCalledWith(
+      "c1",
+      "p1",
+      { phoneNumber: "555-0100", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark" },
+      "Hi {{firstName}}, welcome to {{churchName}}!",
+      "Demo Church"
+    );
+    expect(historyOf(task)).toContain("Text sent");
+  });
+
+  it("skips a person who opted out of texts", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", mobilePhone: "555-0100", optedOut: 1 });
+    const repos = buildRepos(steps, { stepACT: [textAction] });
+    const task = newTask();
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(sendPersonTextMock).not.toHaveBeenCalled();
+    expect(historyOf(task)).toContain("Text skipped: opted out");
+  });
+
+  it("skips a person with no mobile phone", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", mobilePhone: "" });
+    const repos = buildRepos(steps, { stepACT: [textAction] });
+    const task = newTask();
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(sendPersonTextMock).not.toHaveBeenCalled();
+    expect(historyOf(task)).not.toContain("Text sent");
+  });
+
+  it("records a missing provider on the card and keeps running later actions", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", mobilePhone: "555-0100" });
+    sendPersonTextMock.mockResolvedValueOnce({ ok: false, reason: "no_provider" });
+    const repos = buildRepos(steps, { stepACT: [textAction, { actionType: "addNote", config: JSON.stringify({ note: "after" }) }] });
+    const task = newTask();
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(historyOf(task)).toContain("Action sendText failed: no_provider");
+    expect(historyOf(task)).toContain("Note: after");
   });
 });

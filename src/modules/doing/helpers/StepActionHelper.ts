@@ -46,6 +46,9 @@ export class StepActionHelper {
           case "sendEmail":
             await this.sendEmail(task, config);
             break;
+          case "sendText":
+            await this.sendText(task, config);
+            break;
           case "addToGroup":
             await this.addToGroup(task, config);
             break;
@@ -155,6 +158,24 @@ export class StepActionHelper {
       config.subject
     );
     if (sent) this.appendHistory(task, "Email sent");
+  }
+
+  // Texts the card's person through the church's own provider; failures throw so execute() logs them on the card.
+  private static async sendText(task: Task, config: Record<string, any>): Promise<void> {
+    if (task.associatedWithType !== "person" || !task.associatedWithId || !config.message?.trim()) return;
+    const membership = getMembershipModuleGateway();
+    const person = await membership.loadPerson(task.churchId || "", task.associatedWithId);
+    const phoneNumber = (person?.mobilePhone || "").trim();
+    if (!person || !phoneNumber) return;
+    if (person.optedOut === true || person.optedOut === 1) {
+      this.appendHistory(task, "Text skipped: opted out");
+      return;
+    }
+    const church = await membership.loadChurch(task.churchId || "");
+    const recipient = { phoneNumber, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel };
+    const result = await getMessagingModuleGateway().sendPersonText(task.churchId || "", task.associatedWithId, recipient, config.message, church?.name || "B1");
+    if (!result.ok) throw new Error(result.reason || "send failed");
+    this.appendHistory(task, "Text sent");
   }
 
   private static async addToGroup(task: Task, config: Record<string, any>): Promise<void> {

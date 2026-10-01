@@ -24,6 +24,15 @@ export interface MessagingModuleGateway {
   sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
   // Ad-hoc bulk SMS (pre-filtered recipients, capped at 500); returns { ok: false, reason: "no_provider" } if no provider.
   sendBulkText(churchId: string, recipients: BulkTextRecipient[], message: string, context?: string): Promise<BulkTextResult>;
+  // Automated SMS to one person with merge fields resolved (caller checks opt-out); returns { ok: false, reason } on no_provider, insufficient_credits or provider error.
+  sendPersonText(churchId: string, personId: string, recipient: TextRecipient, message: string, churchName: string): Promise<{ ok: boolean; reason?: string }>;
+}
+
+interface TextRecipient {
+  phoneNumber: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
 }
 
 interface BulkTextRecipient {
@@ -144,6 +153,42 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     await Promise.allSettled(logPromises);
 
     return { ok: true, sent: successCount, failed: failCount };
+  }
+
+  public async sendPersonText(churchId: string, personId: string, recipient: TextRecipient, template: string, churchName: string): Promise<{ ok: boolean; reason?: string }> {
+    const phoneNumber = recipient.phoneNumber;
+    const message = MergeFieldHelper.resolve(template, recipient, { name: churchName }).slice(0, 1600);
+    const repos = await this.repos();
+    const config = await this.getTextingConfig(repos, churchId);
+    if (!config) return { ok: false, reason: "no_provider" };
+
+    const { getProvider } = await import("@churchapps/texting");
+    const provider = getProvider(config.providerName);
+    if (provider.capabilities.addSubscriber) await provider.addSubscriber(config, phoneNumber, { firstName: recipient.firstName || "", lastName: recipient.lastName || "" });
+    const result = await provider.sendMessage(config, phoneNumber, message);
+    if (!result.success && result.error?.includes("insufficient_credits")) return { ok: false, reason: "insufficient_credits" };
+
+    const savedSentText = await repos.sentText.save({
+      churchId,
+      recipientPersonId: personId,
+      senderPersonId: null,
+      message,
+      recipientCount: 1,
+      successCount: result.success ? 1 : 0,
+      failCount: result.success ? 0 : 1
+    });
+    await repos.deliveryLog.save({
+      churchId,
+      personId,
+      contentType: "sentText",
+      contentId: savedSentText.id,
+      deliveryMethod: "sms",
+      deliveryAddress: phoneNumber,
+      success: result.success,
+      errorMessage: result.error
+    });
+
+    return result.success ? { ok: true } : { ok: false, reason: result.error || "send_failed" };
   }
 
   private async getTextingConfig(repos: any, churchId: string): Promise<any | null> {
