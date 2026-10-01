@@ -55,6 +55,7 @@ describe("AuthenticatedUser.verifyRefreshableJwt", () => {
   });
 
   it("rejects a user token past the refresh window", () => {
+    expect(() => AuthenticatedUser.verifyRefreshableJwt(jwt.sign({ ...userClaims }, "test-secret", { algorithm: "HS512" }))).toThrow();
     const token = sign(userClaims, now() - 40 * DAY, 2 * DAY);
     expect(() => AuthenticatedUser.verifyRefreshableJwt(token)).toThrow();
   });

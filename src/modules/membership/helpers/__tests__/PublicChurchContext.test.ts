@@ -18,6 +18,9 @@ describe("PublicChurchContext", () => {
   });
 
   it("ignores a forged JWT", () => {
+    const otherAlg = jwt.sign({ churchId: "c1" }, Environment.jwtSecret, { algorithm: "HS512" });
+    expect(PublicChurchContext.churchIdFromAuth(req({ headers: { authorization: "Bearer " + otherAlg } }))).toBeNull();
+    expect(PublicChurchContext.churchIdFromSiteToken(jwt.sign({ churchId: "c1", purpose: "public-site" }, Environment.jwtSecret, { algorithm: "HS512" }))).toBeNull();
     const token = jwt.sign({ churchId: "c1" }, "wrong-secret");
     expect(PublicChurchContext.churchIdFromAuth(req({ headers: { authorization: "Bearer " + token } }))).toBeNull();
   });

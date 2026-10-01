@@ -139,7 +139,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
   private static readonly MIN_REFRESHABLE_LIFETIME_SECONDS = 24 * 60 * 60;
 
   public static verifyRefreshableJwt(token: string): JwtPayload {
-    const decoded = jwt.verify(token, Environment.jwtSecret, { ignoreExpiration: true });
+    const decoded = jwt.verify(token, Environment.jwtSecret, { algorithms: ["HS256"], ignoreExpiration: true });
     if (typeof decoded === "string") throw new Error("Invalid token format");
     const now = Math.floor(Date.now() / 1000);
     if (typeof decoded.exp !== "number" || decoded.exp > now) return decoded;
