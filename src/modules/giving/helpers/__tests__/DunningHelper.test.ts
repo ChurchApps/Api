@@ -104,4 +104,27 @@ describe("DunningHelper", () => {
       expect(await DunningHelper.run()).toEqual({ sent: 1 });
     });
   });
+
+  describe("church name in the email body", () => {
+    const markupChurch = { id: "ch1", name: "<a href=\"https://x.test\">Grace</a>", subDomain: "grace" };
+    beforeEach(() => {
+      getRepos.mockImplementation(async (name: string) => (name === "membership"
+        ? { ...makeMembershipRepos(), church: { loadById: jest.fn().mockResolvedValue(markupChurch) } }
+        : makeGivingRepos()));
+    });
+
+    it("is escaped in the failed-payment email", async () => {
+      await DunningHelper.notify("ch1", failedDonation, 0, makeGivingRepos());
+      const contents = sendTransactional.mock.calls[0][5];
+      expect(contents).not.toContain("<a href=\"https://x.test\">");
+      expect(contents).toContain("&lt;a href=&quot;https://x.test&quot;&gt;Grace&lt;/a&gt;");
+    });
+
+    it("is escaped in the cancellation email", async () => {
+      await DunningHelper.notifyCanceled("ch1", { id: "sub1", personId: "per1" } as any, makeGivingRepos());
+      const contents = sendTransactional.mock.calls[0][5];
+      expect(contents).not.toContain("<a href=\"https://x.test\">");
+      expect(contents).toContain("&lt;a href=&quot;https://x.test&quot;&gt;Grace&lt;/a&gt;");
+    });
+  });
 });

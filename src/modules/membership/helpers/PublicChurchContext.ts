@@ -17,7 +17,7 @@ export class PublicChurchContext {
     const token = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7).trim() : "";
     if (!token || token.startsWith("cak_")) return null;
     try {
-      const decoded = jwt.verify(token, Environment.jwtSecret);
+      const decoded = jwt.verify(token, Environment.jwtSecret, { algorithms: ["HS256"] });
       if (typeof decoded === "string" || !(decoded as any).churchId) return null;
       return String((decoded as any).churchId);
     } catch {
@@ -32,7 +32,7 @@ export class PublicChurchContext {
   static churchIdFromSiteToken(token: string): string | null {
     if (!token) return null;
     try {
-      const decoded = jwt.verify(token, Environment.jwtSecret);
+      const decoded = jwt.verify(token, Environment.jwtSecret, { algorithms: ["HS256"] });
       if (typeof decoded === "string") return null;
       if ((decoded as any).purpose !== SITE_PURPOSE || !(decoded as any).churchId) return null;
       return String((decoded as any).churchId);
