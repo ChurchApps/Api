@@ -4,8 +4,8 @@ import { ReportingBaseController } from "./ReportingBaseController.js";
 import { Report, ReportResult, Permission } from "../models/index.js";
 import fs from "fs";
 import path from "path";
-import { ArrayHelper, AuthenticatedUser, IPermission } from "@churchapps/apihelper";
-import { ReportResultHelper, RunReportHelper } from "../helpers/index.js";
+import { AuthenticatedUser, IPermission } from "@churchapps/apihelper";
+import { GroupAttendanceDownloadHelper, ReportResultHelper, RunReportHelper } from "../helpers/index.js";
 
 @controller("/reporting/reports")
 export class ReportController extends ReportingBaseController {
@@ -26,7 +26,7 @@ export class ReportController extends ReportingBaseController {
       this.populateRootParameters(report, au, req);
       await RunReportHelper.runAllQueries(report);
 
-      const resultTable = this.combineGroupAttDwnldResult(report);
+      const resultTable = GroupAttendanceDownloadHelper.combine(report);
       return this.json(this.convertToResult(report, resultTable));
     });
   }
@@ -112,60 +112,5 @@ export class ReportController extends ReportingBaseController {
         p.value = req.query[p.keyName]?.toString() || "";
       }
     });
-  }
-
-  private combineGroupAttDwnldResult(report: Report) {
-    const result: any[] = [];
-    const serviceArray: any[] = [];
-    const { value: attendance } = ArrayHelper.getOne(report.queries, "keyName", "main") || {};
-    const { value: groups } = ArrayHelper.getOne(report.queries, "keyName", "groups") || {};
-    const { value: groupMembers } = ArrayHelper.getOne(report.queries, "keyName", "groupMembers") || {};
-    const { value: people } = ArrayHelper.getOne(report.queries, "keyName", "people") || {};
-
-    if (!attendance || !groups || !groupMembers || !people) {
-      return result;
-    }
-
-    const serviceIds = ArrayHelper.getUniqueValues(attendance, "serviceId");
-    serviceIds?.forEach((id) => {
-      const timeIds = ArrayHelper.getAll(attendance, "serviceId", id);
-      const uniqueTimeIds = ArrayHelper.getUniqueValues(timeIds, "serviceTimeId");
-      uniqueTimeIds?.forEach((tId) => {
-        const att = ArrayHelper.getOne(timeIds, "serviceTimeId", tId);
-        serviceArray.push({
-          name: att.serviceName + "-" + att.serviceTimeName,
-          value: att.serviceId + "//" + att.serviceTimeId
-        });
-      });
-    });
-
-    groups?.forEach((g: any) => {
-      const getGroupMembers = ArrayHelper.getAll(groupMembers, "groupId", g.id);
-      getGroupMembers?.forEach((gm: any) => {
-        const person = ArrayHelper.getOne(people, "id", gm.personId);
-        if (!person) return;
-        const attendanceStatus: any = {};
-        serviceArray?.forEach((ser) => {
-          const serId = ser?.value.split("//")[0];
-          const serTimeId = ser?.value.split("//")[1];
-          const getValue = attendance.filter((a: any) => a.groupId === g.id && a.personId === person.id && a.serviceId === serId && a.serviceTimeId === serTimeId);
-          if (getValue.length > 0) {
-            attendanceStatus[ser.name] = "present";
-          } else {
-            attendanceStatus[ser.name] = "absent";
-          }
-        });
-
-        result.push({
-          displayName: person.displayName,
-          personId: person.id,
-          groupName: g.groupName,
-          groupId: g.id,
-          ...attendanceStatus
-        });
-      });
-    });
-
-    return result;
   }
 }
