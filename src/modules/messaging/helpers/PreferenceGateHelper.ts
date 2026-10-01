@@ -2,7 +2,7 @@ import { NotificationPreference, NotificationPreferenceOverride, NotificationEnt
 import { NotificationCategoryHelper } from "./NotificationCategoryHelper.js";
 import { TimezoneHelper } from "./TimezoneHelper.js";
 
-export type GateDecision = "allow" | "suppress" | "defer";
+type GateDecision = "allow" | "suppress" | "defer";
 
 export interface GateResult {
   decision: GateDecision;

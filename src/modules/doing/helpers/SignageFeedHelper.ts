@@ -10,14 +10,14 @@ export interface FeedFile {
   loop?: boolean;
 }
 
-export interface FeedAction {
+interface FeedAction {
   id?: string;
   actionType?: string;
   content?: string;
   files?: FeedFile[];
 }
 
-export interface FeedSection {
+interface FeedSection {
   id?: string;
   name?: string;
   actions?: FeedAction[];

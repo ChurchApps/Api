@@ -48,7 +48,7 @@ export interface MembershipModuleGateway {
   anonymizePerson(churchId: string, personId: string): Promise<void>;
 }
 
-export interface CheckinGroup {
+interface CheckinGroup {
   id: string;
   name: string;
   capacity?: number;

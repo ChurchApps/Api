@@ -4,7 +4,7 @@ import { NotificationService } from "../../../shared/helpers/NotificationService
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Plan, PlanItem, Position, Assignment, BlockoutDate, SchedulingPreference, Time } from "../models/index.js";
 
-export interface TeamCandidates {
+interface TeamCandidates {
   positionId: string;
   personIds: string[];
 }

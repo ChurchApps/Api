@@ -21,7 +21,7 @@ const MEMBERSHIP_STATUS_OPTIONS = [
   { value: "Deceased", label: "Deceased" }
 ];
 
-export interface TriggerFieldDef {
+interface TriggerFieldDef {
   key: string;
   label: string;
   type: "string" | "number" | "date" | "boolean" | "select";
@@ -49,7 +49,7 @@ const GROUP_FIELDS: TriggerFieldDef[] = [
 
 // The triggerable events. Each lists the fields a condition may reference; the
 // resolve() switch below must produce a matching fact for each key.
-export const EVENT_DEFS: TriggerEventDef[] = [
+const EVENT_DEFS: TriggerEventDef[] = [
   { eventType: "person.created", label: "Person · Created", recordType: "person", fields: PERSON_FIELDS },
   { eventType: "person.updated", label: "Person · Updated", recordType: "person", fields: PERSON_FIELDS },
   {

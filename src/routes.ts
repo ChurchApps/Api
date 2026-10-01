@@ -28,7 +28,7 @@ export const MODULE_ROUTES = {
  * Middleware to set up repository context for a specific module
  * This ensures the correct database connection is used for each module's requests
  */
-export const createModuleContextMiddleware = (moduleName: string) => {
+const createModuleContextMiddleware = (moduleName: string) => {
   return (req: express.Request, _res: express.Response, next: express.NextFunction) => {
     // Add module information to request for debugging/logging
     // Database context is no longer needed — repos use Kysely with per-module getDb()
@@ -70,24 +70,9 @@ export const configureModuleRoutes = (app: express.Application) => {
 };
 
 /**
- * Get the route prefix for a specific module
- */
-export const getModuleRoutePrefix = (moduleName: keyof typeof MODULE_ROUTES): string => {
-  return MODULE_ROUTES[moduleName];
-};
-
-/**
- * Check if a request path belongs to a specific module
- */
-export const isModuleRoute = (path: string, moduleName: keyof typeof MODULE_ROUTES): boolean => {
-  const prefix = getModuleRoutePrefix(moduleName);
-  return path.startsWith(prefix);
-};
-
-/**
  * Extract module name from a request path
  */
-export const getModuleFromPath = (path: string): keyof typeof MODULE_ROUTES | null => {
+const getModuleFromPath = (path: string): keyof typeof MODULE_ROUTES | null => {
   for (const [moduleName, routePrefix] of Object.entries(MODULE_ROUTES)) {
     if (path.startsWith(routePrefix)) {
       return moduleName as keyof typeof MODULE_ROUTES;

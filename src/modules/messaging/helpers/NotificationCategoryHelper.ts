@@ -1,6 +1,6 @@
 import { NotificationPreferenceOverride } from "../models/index.js";
 
-export type NotificationChannel = "push" | "email" | "in_app" | "sms";
+type NotificationChannel = "push" | "email" | "in_app" | "sms";
 
 export interface NotificationCategory {
   categoryKey: string;

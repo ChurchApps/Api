@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 
-export type PayloadAction =
+type PayloadAction =
   | "message"
   | "deleteMessage"
   | "callout"

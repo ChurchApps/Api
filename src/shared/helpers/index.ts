@@ -5,7 +5,6 @@ export { Permissions, permissionsList, type IPermission, type ApiName, type Disp
 export { PlanAuth } from "./PlanAuth.js";
 export { UniqueIdHelper } from "./UniqueIdHelper.js";
 export { DateHelper } from "./DateHelper.js";
-export { ValidationHelper } from "./ValidationHelper.js";
 export { StripeHelper } from "./StripeHelper.js";
 export { CollectionHelper } from "./CollectionHelper.js";
 export { MessagingSafetyHelper, type MessagingSafetyPerson } from "./MessagingSafetyHelper.js";
