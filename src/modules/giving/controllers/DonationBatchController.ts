@@ -13,7 +13,7 @@ export class DonationBatchController extends GivingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.donations.viewSummary)) return this.json({}, 401);
       const data = await this.repos.donationBatch.load(au.churchId, id);
-      if (!data) return this.repos.donationBatch.convertToModel(au.churchId, data);
+      if (!data) return this.json({}, 404);
       const amounts = await this.repos.donationBatch.loadAmountsByCurrency(au.churchId, id);
       const { currency, rates } = await this.loadChurchRates(au.churchId);
       return this.withConvertedTotal(this.repos.donationBatch.convertToModel(au.churchId, data), amounts.get(id) ?? [], currency, rates);

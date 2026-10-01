@@ -201,3 +201,42 @@ describe("PageController2.loadPublic hidePublicSite", () => {
     expect(repos.page.loadAll).not.toHaveBeenCalled();
   });
 });
+
+describe("PageController2.save duplicate url", () => {
+  function makeSaveController(existing: any) {
+    const repos: any = {
+      page: {
+        loadByUrl: jest.fn(async () => existing),
+        save: jest.fn(async (p: any) => {
+          if (existing && existing.id !== p.id) throw Object.assign(new Error("Duplicate entry for key 'pages.uq_churchId_url'"), { code: "ER_DUP_ENTRY" });
+          return { ...p, id: p.id || "new1" };
+        })
+      }
+    };
+    const controller = new PageController2();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(makeAu("c1"));
+    return { controller, repos };
+  }
+
+  it("returns 409 when another page on the site already uses the url", async () => {
+    const { controller, repos } = makeSaveController({ id: "pg1", url: "/about-us", siteId: "" });
+    const result: any = await (controller as any).save({ body: [{ url: "/about-us", title: "About" }] }, {});
+    expect(result).toEqual({ obj: { error: "A page with this url already exists" }, status: 409 });
+    expect(repos.page.save).not.toHaveBeenCalled();
+  });
+
+  it("saves a page that keeps its own url", async () => {
+    const { controller, repos } = makeSaveController({ id: "pg1", url: "/about-us", siteId: "" });
+    const result: any = await (controller as any).save({ body: [{ id: "pg1", url: "/about-us", title: "About us" }] }, {});
+    expect(repos.page.save).toHaveBeenCalledTimes(1);
+    expect(result[0].id).toBe("pg1");
+  });
+
+  it("saves a page with a new url", async () => {
+    const { controller, repos } = makeSaveController(null);
+    const result: any = await (controller as any).save({ body: [{ url: "/new", title: "New" }] }, {});
+    expect(repos.page.loadByUrl).toHaveBeenCalledWith("c1", "/new", "");
+    expect(result[0].id).toBe("new1");
+  });
+});

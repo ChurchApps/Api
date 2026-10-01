@@ -9,10 +9,13 @@ jest.mock("../../helpers/index", () => ({
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn() } }));
 jest.mock("axios", () => ({ post: jest.fn() }));
+jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import { FormSubmissionController } from "../FormSubmissionController.js";
 import { WebhookDispatcher } from "../../../../shared/webhooks/index.js";
 import { ConversationalFormHelper } from "../../helpers/index.js";
+import { NotificationService } from "../../../../shared/helpers/NotificationService.js";
+import axios from "axios";
 
 function formSubmissionController(opts: any = {}) {
   const formRow = opts.form ?? { id: "f1", churchId: "c1", name: "Connect", restricted: false };
@@ -226,5 +229,17 @@ describe("FormSubmissionController.setPerson", () => {
     const result: any = await (controller as any).setPerson("nope", { body: { personId: null } }, {});
     expect(result.status).toBe(404);
     expect(repos.formSubmission.setPerson).not.toHaveBeenCalled();
+  });
+});
+
+describe("FormSubmissionController.sendEmails notifications", () => {
+  it("notifies the form's notification members in-process instead of the admin-only ping endpoint", async () => {
+    const { controller, repos } = formSubmissionController();
+    repos.memberPermission.loadByEmailNotification.mockResolvedValue([{ memberId: "p1" }, { memberId: "p2" }]);
+    repos.person.loadByIds.mockResolvedValue([{ id: "p1" }, { id: "p2" }]);
+    const form = { id: "f1", name: "Connect" };
+    await (controller as any).sendEmails({ churchId: "c1", answers: [] }, [], form, "c1");
+    expect(NotificationService.createNotifications).toHaveBeenCalledWith(["p1", "p2"], "c1", "form", "f1", "New Form Submission: Connect");
+    expect((axios as any).post).not.toHaveBeenCalled();
   });
 });
