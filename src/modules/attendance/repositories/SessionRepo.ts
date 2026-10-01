@@ -60,7 +60,7 @@ export class SessionRepo {
   }
 
   public async loadByGroupIdWithNames(churchId: string, groupId: string) {
-    const rows = await sql<any>`select s.id, CASE WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y') ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name) END AS displayName FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId WHERE s.churchId=${churchId} AND s.groupId=${groupId} ORDER by s.sessionDate desc`.execute(getDb());
+    const rows = await sql<any>`select s.id, s.groupId, s.serviceTimeId, s.sessionDate, CASE WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y') ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name) END AS displayName FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId WHERE s.churchId=${churchId} AND s.groupId=${groupId} ORDER by s.sessionDate desc`.execute(getDb());
     return rows.rows;
   }
 
