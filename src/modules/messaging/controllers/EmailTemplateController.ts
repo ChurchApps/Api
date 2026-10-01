@@ -56,12 +56,15 @@ export class EmailTemplateController extends MessagingBaseController {
       if ((await this.repos.deliveryLog.countByMethodSince(au.churchId, "emailApprovalRequest", new Date(Date.now() - 7 * DAY_MS))) > 0) return { requested: true };
       const membershipRepos = await RepoManager.getRepos<any>("membership");
       const church = await membershipRepos.church.loadById(au.churchId);
+      // API-key principals carry no name or email, so look the user up.
+      const viaApiKey = !au.jwt && !!au.id;
+      const requester = (!au.email && au.id) ? (await membershipRepos.user.load(au.id)) || au : au;
       const esc = (v: string) => (v || "").replace(/[&<>"]/g, (c) => "&#" + c.charCodeAt(0) + ";");
       const body = "<p><strong>" + esc(church?.name) + "</strong> (" + esc(au.churchId) + ") is asking to send group email.</p>"
-        + "<p>Requested by " + esc(au.firstName + " " + au.lastName) + " &lt;" + esc(au.email) + "&gt;. Registered " + esc(String(church?.registrationDate || "")) + ", located in " + esc([church?.city, church?.state, church?.country].filter(Boolean).join(", ")) + ".</p>"
+        + "<p>Requested by " + esc(requester.firstName + " " + requester.lastName) + " &lt;" + esc(requester.email) + "&gt;" + (viaApiKey ? " (via API key)" : "") + ". Registered " + esc(String(church?.registrationDate || "")) + ", located in " + esc([church?.city, church?.state, church?.country].filter(Boolean).join(", ")) + ".</p>"
         + "<p>Approve it under Server Admin &gt; Churches.</p>";
       await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, Environment.supportEmail, "B1.church", Environment.b1AdminRoot ?? "", "Group email approval request: " + (church?.name || au.churchId), body);
-      await this.repos.deliveryLog.save({ churchId: au.churchId, contentType: "emailApproval", deliveryMethod: "emailApprovalRequest", deliveryAddress: au.email, success: true });
+      await this.repos.deliveryLog.save({ churchId: au.churchId, contentType: "emailApproval", deliveryMethod: "emailApprovalRequest", deliveryAddress: requester.email, success: true });
       return { requested: true };
     });
   }
