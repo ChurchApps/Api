@@ -248,13 +248,14 @@ export class PageController2 extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
-        const promises: Promise<Page>[] = [];
-        req.body.forEach((page) => {
+        for (const page of req.body) {
           page.churchId = au.churchId;
           page.siteId = page.siteId || "";
-          promises.push(this.repos.page.save(page));
-        });
-        const result = await Promise.all(promises);
+          if (!page.url) continue;
+          const existing = await this.repos.page.loadByUrl(au.churchId, page.url, page.siteId);
+          if (existing && existing.id !== page.id) return this.json({ error: "A page with this url already exists" }, 409);
+        }
+        const result = await Promise.all(req.body.map((page) => this.repos.page.save(page)));
         this.bumpSiteCache(au.churchId);
         return result;
       }
