@@ -57,6 +57,18 @@ export class AttendanceRecordController extends AttendanceBaseController {
     });
   }
 
+  @httpGet("/sessionStatus")
+  public async sessionStatus(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.view)) return this.json({}, 401);
+      const serviceTimeId = req.query.serviceTimeId?.toString() || "";
+      const date = req.query.date?.toString() || "";
+      if (!serviceTimeId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return this.json({ error: "serviceTimeId and date (YYYY-MM-DD) are required" }, 400);
+      const rows = (await this.repos.attendance.loadSessionStatus(au.churchId, serviceTimeId, date)) as any[];
+      return rows.map((r) => ({ groupId: r.groupId, sessionId: r.sessionId || null, attendanceCount: Number(r.attendanceCount) }));
+    });
+  }
+
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
