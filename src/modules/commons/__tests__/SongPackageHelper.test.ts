@@ -84,8 +84,11 @@ describe("SongPackageHelper text readers", () => {
     // words after the colon are a sung line
     expect(SongPackageHelper.tidyPaste("Chorus: Amazing grace")).toBe("Chorus: Amazing grace");
     // the heading in brackets of its own
-    expect(SongPackageHelper.tidyPaste("[Intro:]  [D - D] | [D/G - D/G]\n{c: Verse: (2x)}")).toBe("{c: Intro}\n[D] [D] [D/G] [D/G]\n{c: Verse: (2x)}");
+    expect(SongPackageHelper.tidyPaste("[Intro:]  [D - D] | [D/G - D/G]\n{c: Verse: (2x)}")).toBe("{c: Intro}\n[D] [D] [D/G] [D/G]\n\n{c: Verse: (2x)}");
     expect(SongPackageHelper.tidyPaste("[Solo:] [D - D/G] | [D- D/G]")).toBe("{c: Solo}\n[D] [D/G] [D] [D/G]");
+    // a {c:} label straight under a chord line starts its own stanza, so the form map keeps it
+    const solo = SongPackageHelper.tidyPaste("{c: Bridge:}\n[D]How beautiful\n\n[Solo:] [D - D/G]\n{c: Verse:}\n\nAt Your [Bm]voice");
+    expect(SongPackageHelper.draftForm(solo)?.defaultOrder).toEqual(["Bridge", "Solo", "Verse"]);
   });
 
   it("spreads a chord row typed inside one bracket over the words after it", () => {
