@@ -3,10 +3,54 @@ import { ArrayHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { Setting } from "../models/index.js";
 
+// Sermon auto-import keys legitimately hold several rows per church.
+const MULTI_ROW_KEYS = ["youtubeChannelId", "vimeoChannelId", "autoImportSermons"];
+
+function isSingleChurchKey(model: Setting) {
+  return !model.userId && !!model.churchId && !!model.keyName && !MULTI_ROW_KEYS.includes(model.keyName);
+}
+
 @injectable()
 export class SettingRepo {
   public async save(model: Setting) {
-    return model.id ? this.update(model) : this.create(model);
+    if (!model.id && isSingleChurchKey(model)) {
+      const existing = await this.findIdByKey(model.churchId, model.keyName);
+      if (existing) model.id = existing;
+    }
+    const saved = model.id ? await this.update(model) : await this.create(model);
+    if (isSingleChurchKey(saved)) await this.deleteSiblings(saved);
+    return saved;
+  }
+
+  private async findIdByKey(churchId: string, keyName: string) {
+    const existing = await getDb().selectFrom("settings").select("id")
+      .where("churchId", "=", churchId)
+      .where("keyName", "=", keyName)
+      .where("userId", "is", null)
+      .orderBy("id", "asc").executeTakeFirst();
+    return existing?.id;
+  }
+
+  private async deleteSiblings(model: Setting) {
+    await getDb().deleteFrom("settings")
+      .where("churchId", "=", model.churchId)
+      .where("keyName", "=", model.keyName)
+      .where("userId", "is", null)
+      .where("id", "!=", model.id).execute();
+  }
+
+  // Duplicate church-level (churchId, keyName) rows make public settings last-write-win; keep the lowest id so Admin and the public site agree.
+  private keepOnePerKey(rows: any[]) {
+    if (!rows?.length) return rows || [];
+    const best = new Map<string, any>();
+    const result: any[] = [];
+    for (const row of rows) {
+      if (MULTI_ROW_KEYS.includes(row.keyName)) { result.push(row); continue; }
+      const key = `${row.churchId}\t${row.keyName}`;
+      const existing = best.get(key);
+      if (!existing || String(row.id) < String(existing.id)) best.set(key, row);
+    }
+    return result.concat(Array.from(best.values()));
   }
 
   private async create(model: Setting): Promise<Setting> {
@@ -48,9 +92,9 @@ export class SettingRepo {
   }
 
   public async loadAll(churchId: string) {
-    return getDb().selectFrom("settings").selectAll()
+    return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("churchId", "=", churchId)
-      .where("userId", "is", null).execute() as any;
+      .where("userId", "is", null).execute());
   }
 
   public async loadUser(churchId: string, userId: string) {
@@ -60,25 +104,25 @@ export class SettingRepo {
   }
 
   public async loadPublicSettings(churchId: string) {
-    return getDb().selectFrom("settings").selectAll()
+    return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("churchId", "=", churchId)
       .where("public", "=", 1 as any)
-      .where("userId", "is", null).execute() as any;
+      .where("userId", "is", null).execute());
   }
 
   public async loadAllPublicSettings() {
-    return getDb().selectFrom("settings").selectAll()
+    return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("public", "=", 1 as any)
-      .where("userId", "is", null).execute() as any;
+      .where("userId", "is", null).execute());
   }
 
   public async loadMulipleChurches(keyNames: string[], churchIds: string[]) {
     if (!keyNames || keyNames.length === 0 || !churchIds || churchIds.length === 0) return [];
-    return getDb().selectFrom("settings").selectAll()
+    return this.keepOnePerKey(await getDb().selectFrom("settings").selectAll()
       .where("keyName", "in", keyNames)
       .where("churchId", "in", churchIds)
       .where("public", "=", 1 as any)
-      .where("userId", "is", null).execute() as any;
+      .where("userId", "is", null).execute());
   }
 
   public async loadByKeyNames(churchId: string, keyNames: string[]) {
