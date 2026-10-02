@@ -116,13 +116,14 @@ function isChordRow(line: string): boolean {
 const upperBass = (chord: string) => chord.replace(/^([A-G][^/\s]*\/)([a-g])(?=[#b]?$)/, (_, head: string, bass: string) => head + bass.toUpperCase());
 
 /**
- * "Intro: [G] [D] - [C/a]", "Outro: A  E  Bm", "TAG OUT: (2x) E/g# A B E", "Solo: D D/E- E | Bm7 E": a heading with its
+ * "Intro: [G] [D] - [C/a]", "[Solo:] [D - D/G] | [D]", "Outro: A  E  Bm", "TAG OUT: (2x) E/g# A B E", "Solo: D D/E- E | Bm7 E": a heading with its
  * progression on the same line. Read whole it is a label full of chord names, or a sung line; split, it is a {c:}
  * label (every parser reads one, whatever the heading word) over a bracketed chord line. Bars, dashes and the
  * parentheses around optional chords drop, as they do from a chord row with no words.
  */
 function splitHeadingChords(line: string): string[] | null {
-  const m = line.trim().match(/^([a-z][a-z-]*(?: [a-z][a-z-]*){0,2})\s*:\s*(\(\s*(?:x\s*\d+|\d+\s*x)\s*\))?\s*(.+)$/i);
+  // the heading may sit in brackets of its own ("[Intro:]  [D - D] | [D/G]"), or it prints as a chord named "Intro:"
+  const m = line.trim().match(/^\[?([a-z][a-z-]*(?: [a-z][a-z-]*){0,2})\s*:\s*\]?\s*(\(\s*(?:x\s*\d+|\d+\s*x)\s*\))?\s*(.+)$/i);
   if (!m) return null;
   const chords = m[3].replace(/[[\]()]/g, " ").split(/\s+/).map((t) => upperBass(t.replace(/[-–—|]+$/, ""))).filter(Boolean);
   if (!chords.length || !chords.every((t) => CHORD_TOKEN.test(t))) return null;
@@ -261,12 +262,13 @@ export class SongPackageHelper {
     })}]`);
   }
 
-  /** Pasted lyrics often open with the title again ("LORD ON HIGH"): drop that line, it is not sung. */
+  /** Pasted lyrics often open with the title again ("LORD ON HIGH", "{c: WINGS OF THE WIND}"): drop that line, it is not sung. */
   static dropTitleLine(chordPro: string, title: string | null | undefined): string {
     const fold = (s: string) => s.replace(/\[[^\]]*\]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
     const lines = chordPro.split("\n");
-    const i = lines.findIndex((l) => l.trim() && !l.trim().startsWith("{"));
-    if (i < 0 || !fold(title || "") || fold(lines[i]) !== fold(title || "")) return chordPro;
+    // the first sung line, or a {c: …} label naming the song ("{c: WINGS OF THE WIND}" is no section of it)
+    const i = lines.findIndex((l) => l.trim() && (!l.trim().startsWith("{") || !!sectionLabel(l)));
+    if (i < 0 || !fold(title || "") || fold(sectionLabel(lines[i]) ?? lines[i]) !== fold(title || "")) return chordPro;
     lines.splice(i, 1);
     return lines.join("\n").replace(/^\n+/, "");
   }

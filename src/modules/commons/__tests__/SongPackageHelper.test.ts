@@ -83,6 +83,9 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.draftForm(chart)?.defaultOrder).toEqual(["Bridge", "Solo"]);
     // words after the colon are a sung line
     expect(SongPackageHelper.tidyPaste("Chorus: Amazing grace")).toBe("Chorus: Amazing grace");
+    // the heading in brackets of its own
+    expect(SongPackageHelper.tidyPaste("[Intro:]  [D - D] | [D/G - D/G]\n{c: Verse: (2x)}")).toBe("{c: Intro}\n[D] [D] [D/G] [D/G]\n{c: Verse: (2x)}");
+    expect(SongPackageHelper.tidyPaste("[Solo:] [D - D/G] | [D- D/G]")).toBe("{c: Solo}\n[D] [D/G] [D] [D/G]");
   });
 
   it("spreads a chord row typed inside one bracket over the words after it", () => {
@@ -99,6 +102,8 @@ describe("SongPackageHelper text readers", () => {
   it("drops a first line that only repeats the title", () => {
     expect(SongPackageHelper.dropTitleLine("LORD ON HIGH\n\nVERSE 1:\nWhom have I", "Lord on High")).toBe("VERSE 1:\nWhom have I");
     expect(SongPackageHelper.dropTitleLine("Lord on high You are everlasting", "Lord on High")).toBe("Lord on high You are everlasting");
+    expect(SongPackageHelper.dropTitleLine("{c: WINGS OF THE WIND}\n\n{c: Verse}\n[D]Oh Lord my God", "Wings of the Wind")).toBe("{c: Verse}\n[D]Oh Lord my God");
+    expect(SongPackageHelper.dropTitleLine("{c: Chorus}\n[D]Wings of the wind", "Wings of the Wind")).toBe("{c: Chorus}\n[D]Wings of the wind");
   });
 
   it("hasChords needs a bracketed chord, not any bracket", () => {
