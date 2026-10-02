@@ -28,6 +28,12 @@ export class AttendanceRepo {
     return rows.rows;
   }
 
+  // Every group assigned to the service time, with its session (if any) on that date and how many were marked present.
+  public async loadSessionStatus(churchId: string, serviceTimeId: string, date: string) {
+    const rows = await sql<any>`SELECT gst.groupId, MAX(s.id) AS sessionId, COUNT(vs.id) AS attendanceCount FROM groupServiceTimes gst LEFT JOIN sessions s ON s.churchId=gst.churchId AND s.groupId=gst.groupId AND s.serviceTimeId=gst.serviceTimeId AND DATE(s.sessionDate)=${date} LEFT JOIN visitSessions vs ON vs.sessionId=s.id AND vs.churchId=gst.churchId WHERE gst.churchId=${churchId} AND gst.serviceTimeId=${serviceTimeId} GROUP BY gst.groupId`.execute(getDb());
+    return rows.rows;
+  }
+
   public async loadForPerson(churchId: string, personId: string) {
     const rows = await sql<any>`SELECT v.visitDate, v.checkinTime, c.id as campusId, c.name as campusName, ser.id as serviceId, ser.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName, s.groupId FROM visits v INNER JOIN visitSessions vs on vs.visitId = v.id INNER JOIN sessions s on s.id = vs.sessionId LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId LEFT OUTER JOIN services ser on ser.Id = st.serviceId LEFT OUTER JOIN campuses c on c.id = ser.campusId WHERE v.churchId=${churchId} AND v.PersonId = ${personId} ORDER BY v.visitDate desc, c.name, ser.name, st.name`.execute(getDb());
     return rows.rows;
