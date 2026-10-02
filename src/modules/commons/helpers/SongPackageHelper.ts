@@ -235,8 +235,9 @@ export class SongPackageHelper {
       if (!note || note.split(/\s+/).every((t) => t === "|" || CHORD_TOKEN.test(t))) return [line];
       return /^(©|\(c\)|copyright\b)/i.test(note) ? [] : [`{c: ${note}}`];
     }).reduce((out: string[], line) => {
-      // a heading run straight on from the stanza above ("...my load" then "Chorus") starts its own stanza
-      const heading = (l: string) => split.has(l) || (BARE_HEADING.test(l) && !!sectionLabel(l));
+      // a heading run straight on from the stanza above ("...my load" then "Chorus", a chord line then "{c: Verse:}")
+      // starts its own stanza, as the site's chart reads it
+      const heading = (l: string) => split.has(l) || ((BARE_HEADING.test(l) || l.trim().startsWith("{")) && !!sectionLabel(l));
       const prev = out[out.length - 1];
       if (prev?.trim() && !prev.trim().startsWith("{") && !heading(prev) && heading(line)) out.push("");
       out.push(line);
