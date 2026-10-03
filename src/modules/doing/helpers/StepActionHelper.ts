@@ -153,7 +153,7 @@ export class StepActionHelper {
       task.churchId || "",
       task.associatedWithId,
       config.templateId,
-      { email: person.email, displayName: task.associatedWithLabel },
+      { email: person.email, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel },
       church?.name || "B1",
       config.subject
     );

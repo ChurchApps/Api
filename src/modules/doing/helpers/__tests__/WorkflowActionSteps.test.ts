@@ -213,3 +213,29 @@ describe("WorkflowHelper sendText action", () => {
     expect(historyOf(task)).toContain("Note: after");
   });
 });
+
+describe("WorkflowHelper sendEmail action", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  const steps: FakeStep[] = [
+    { id: "stepA", workflowId: "wf1", sort: 1, name: "A" },
+    { id: "stepACT", workflowId: "wf1", sort: 2, name: "Auto" }
+  ];
+
+  it("passes the person's first and last name so {{firstName}} resolves", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", email: "donald@example.com", firstName: "Donald", lastName: "Clark" });
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "sendEmail", config: JSON.stringify({ templateId: "t1" }) }] });
+    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(sendTemplatedEmailMock).toHaveBeenCalledWith(
+      "c1",
+      "p1",
+      "t1",
+      { email: "donald@example.com", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark" },
+      "Demo Church",
+      undefined
+    );
+  });
+});
