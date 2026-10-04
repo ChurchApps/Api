@@ -8,11 +8,14 @@ import { getProvider, type TextingProviderConfig } from "@churchapps/texting";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { TextingConfigHelper } from "../helpers/TextingConfigHelper.js";
+import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
 interface GroupMemberDetail {
   personId: string;
   displayName: string;
+  firstName: string;
+  lastName: string;
   mobilePhone: string;
   optedOut: boolean;
 }
@@ -136,18 +139,18 @@ export class TextingController extends MessagingBaseController {
       // Auto-subscribe eligible numbers if provider supports it
       if (provider.capabilities.addSubscriber) {
         await Promise.allSettled(
-          eligible.map(m => {
-            const parts = m.displayName.split(" ");
-            const firstName = parts[0] || "";
-            const lastName = parts.slice(1).join(" ") || "";
-            return provider.addSubscriber(config, m.mobilePhone, { firstName, lastName });
-          })
+          eligible.map(m => provider.addSubscriber(config, m.mobilePhone, { firstName: m.firstName, lastName: m.lastName }))
         );
       }
 
-      // Send to eligible recipients
-      const phones = eligible.map(m => m.mobilePhone);
-      const results = await provider.sendBulk(config, phones, message);
+      // Send to eligible recipients. Placeholders need one resolved text per person; otherwise a single bulk send.
+      let results: { success: boolean; error?: string }[];
+      if (message.includes("{{")) {
+        const church = { name: await this.loadChurchName(au.churchId) };
+        results = await Promise.all(eligible.map(m => provider.sendMessage(config, m.mobilePhone, MergeFieldHelper.resolve(message, m, church).slice(0, 1600))));
+      } else {
+        results = await provider.sendBulk(config, eligible.map(m => m.mobilePhone), message);
+      }
 
       const successCount = results.filter(r => r.success).length;
       const failCount = results.filter(r => !r.success).length;
@@ -232,7 +235,10 @@ export class TextingController extends MessagingBaseController {
         const parts = (personName || "").split(" ");
         await provider.addSubscriber(config, phoneNumber, { firstName: parts[0] || "", lastName: parts.slice(1).join(" ") || "" });
       }
-      const result = await provider.sendMessage(config, phoneNumber, message);
+      const resolved = message.includes("{{")
+        ? MergeFieldHelper.resolve(message, { firstName: person.firstName, lastName: person.lastName, displayName: person.displayName }, { name: await this.loadChurchName(au.churchId) }).slice(0, 1600)
+        : message;
+      const result = await provider.sendMessage(config, phoneNumber, resolved);
       if (!result.success && result.error?.includes("insufficient_credits")) {
         return this.json({ error: "insufficient_credits" }, 400);
       }
@@ -242,7 +248,7 @@ export class TextingController extends MessagingBaseController {
         churchId: au.churchId,
         recipientPersonId: personId,
         senderPersonId: au.personId,
-        message,
+        message: resolved,
         recipientCount: 1,
         successCount: result.success ? 1 : 0,
         failCount: result.success ? 0 : 1
@@ -292,16 +298,32 @@ export class TextingController extends MessagingBaseController {
     return TextingConfigHelper.load(this.repos.textingProvider, churchId);
   }
 
+  private async loadChurchName(churchId: string): Promise<string> {
+    try {
+      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const churchRow = await membershipRepos.church.load(churchId, churchId);
+      return churchRow?.name || "";
+    } catch {
+      return "";
+    }
+  }
+
   private async getGroupMemberDetails(_churchId: string, groupId: string, jwt: string): Promise<GroupMemberDetail[]> {
     const url = Environment.membershipApi + "/groupmembers?groupId=" + groupId;
     const resp = await axios.get(url, { headers: { Authorization: "Bearer " + jwt } });
     const members: any[] = resp.data || [];
-    return members.map((m: any) => ({
-      personId: m.personId,
-      displayName: m.person?.name?.display || "",
-      mobilePhone: m.person?.contactInfo?.mobilePhone || "",
-      optedOut: m.person?.optedOut === true || m.person?.optedOut === 1
-    }));
+    return members.map((m: any) => {
+      const displayName: string = m.person?.name?.display || "";
+      const parts = displayName.split(" ");
+      return {
+        personId: m.personId,
+        displayName,
+        firstName: m.person?.name?.first || parts[0] || "",
+        lastName: m.person?.name?.last || parts.slice(1).join(" ") || "",
+        mobilePhone: m.person?.contactInfo?.mobilePhone || "",
+        optedOut: m.person?.optedOut === true || m.person?.optedOut === 1
+      };
+    });
   }
 
   private categorizeRecipients(members: GroupMemberDetail[]): CategorizedRecipients {
