@@ -86,3 +86,22 @@ describe("SongDetailLinkController (global rows)", () => {
     expect(repos.songDetailLink.delete).toHaveBeenCalledWith("l1");
   });
 });
+
+// Production log: POST /content/songDetailLinks returned 500 "Error fetching data from MusicBrainz: Bad Request"
+// after saving a MusicBrainz link whose key was not a recording id.
+describe("SongDetailLinkController MusicBrainz key", () => {
+  it("rejects a key that is not a MusicBrainz recording id with 400 before saving", async () => {
+    const { controller, repos } = setup(SongDetailLinkController, { exclusive: true });
+    const result = await controller.save({ body: [{ songDetailId: "sd1", service: "MusicBrainz", serviceKey: "amazing-grace" }] }, {});
+    expect(result.status).toBe(400);
+    expect(repos.songDetailLink.save).not.toHaveBeenCalled();
+  });
+
+  it("saves a real recording id", async () => {
+    const { controller, repos } = setup(SongDetailLinkController, { exclusive: true });
+    const key = "b1a9c0e9-d987-4042-ae91-78d6a3267d69";
+    const result = await controller.save({ body: [{ songDetailId: "sd1", service: "MusicBrainz", serviceKey: key }] }, {});
+    expect(result[0].url).toBe("https://musicbrainz.org/recording/" + key);
+    expect(repos.songDetailLink.save).toHaveBeenCalled();
+  });
+});

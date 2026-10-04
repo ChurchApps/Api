@@ -20,7 +20,7 @@ jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ Tra
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: () => null, getIds: () => [] } }));
 
 import { ChurchController } from "../ChurchController.js";
-import { UserHelper, PersonHelper } from "../../helpers/index.js";
+import { UserHelper, PersonHelper, ChurchHelper } from "../../helpers/index.js";
 import { AuthenticatedUser } from "../../auth/index.js";
 
 function churchController(opts: any = {}) {
@@ -221,5 +221,35 @@ describe("ChurchController.lookup", () => {
     const result: any = await (controller as any).getBySubDomain({ query: { id: "c1" } }, {});
     expect(result.status).toBe(200);
     expect(result.obj).toEqual({ id: "c1", name: "Test Church", subDomain: "testchurch" });
+  });
+});
+
+// Production log: GET/POST /membership/churches/search returned 500 when the typed name held a quote
+// (JSON.parse of the wrapped name) or a bare "%" (decodeURIComponent).
+describe("ChurchController.search name decoding", () => {
+  beforeEach(() => { (ChurchHelper as any).appendLogos = jest.fn(async () => {}); });
+
+  const searchedFor = (repos: any) => repos.church.search.mock.calls[0][0];
+
+  it.each([
+    ["St. John's \"Main\" Campus", "St. John's \"Main\" Campus"],
+    ["100% Grace", "100% Grace"],
+    ["back\\slash", "back\\slash"],
+    ["First%20Baptist", "First Baptist"],
+    ["Igreja %u00C9den", "Igreja Éden"]
+  ])("GET searches for %j as %j", async (name, expected) => {
+    const { controller, repos } = churchController();
+    repos.church.search = jest.fn(async () => []);
+    const result: any = await controller.search({ query: { name } } as any, {} as any);
+    expect(result.status).toBe(200);
+    expect(searchedFor(repos)).toBe(expected);
+  });
+
+  it("POST accepts a name with a quote", async () => {
+    const { controller, repos } = churchController();
+    repos.church.search = jest.fn(async () => []);
+    const result: any = await controller.searchPost({ body: { name: "Grace \"Downtown\"" }, query: {} } as any, {} as any);
+    expect(result.status).toBe(200);
+    expect(searchedFor(repos)).toBe("Grace \"Downtown\"");
   });
 });

@@ -122,12 +122,21 @@ export class ConversationRepo {
     // churchId=c.churchId lets the subqueries use idx_messages_churchId_conversationId; on conversationId
     // alone they walked every message in the table while holding the conversation row lock.
     try {
-      await retryOnDeadlock(() => sql`
-        UPDATE conversations c SET
-          c.firstPostId = (SELECT id FROM messages WHERE churchId=c.churchId AND conversationId=c.id ORDER BY timeSent ASC, id ASC LIMIT 1),
-          c.lastPostId = (SELECT id FROM messages WHERE churchId=c.churchId AND conversationId=c.id ORDER BY timeSent DESC, id DESC LIMIT 1),
-          c.postCount = (SELECT COUNT(*) FROM messages WHERE churchId=c.churchId AND conversationId=c.id)
+      // Read the stats with a plain SELECT: as subqueries of the UPDATE they took shared locks on
+      // messages and deadlocked with concurrent message inserts.
+      const stats = await sql<{ firstPostId: string | null; lastPostId: string | null; postCount: number }>`
+        SELECT
+          (SELECT id FROM messages WHERE churchId=c.churchId AND conversationId=c.id ORDER BY timeSent ASC, id ASC LIMIT 1) AS firstPostId,
+          (SELECT id FROM messages WHERE churchId=c.churchId AND conversationId=c.id ORDER BY timeSent DESC, id DESC LIMIT 1) AS lastPostId,
+          (SELECT COUNT(*) FROM messages WHERE churchId=c.churchId AND conversationId=c.id) AS postCount
+        FROM conversations c
         WHERE c.id=${conversationId}
+      `.execute(getDb());
+      if (!stats.rows[0]) return;
+      const { firstPostId, lastPostId, postCount } = stats.rows[0];
+      await retryOnDeadlock(() => sql`
+        UPDATE conversations SET firstPostId=${firstPostId}, lastPostId=${lastPostId}, postCount=${postCount}
+        WHERE id=${conversationId}
       `.execute(getDb()));
     } catch (e) {
       console.error("Failed to update conversation stats", conversationId, e);

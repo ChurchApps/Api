@@ -7,6 +7,8 @@ import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper.js";
 
 @controller("/content/songDetailLinks")
 export class SongDetailLinkController extends ContentBaseController {
+  private static readonly MUSICBRAINZ_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {
@@ -27,6 +29,8 @@ export class SongDetailLinkController extends ContentBaseController {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const isServerAdmin = au.checkAccess(Permissions.server.admin);
       for (const link of req.body) {
+        // MusicBrainz links are looked up by recording id (a UUID) right after saving.
+        if (link.service === "MusicBrainz" && !SongDetailLinkController.MUSICBRAINZ_ID.test((link.serviceKey || "").trim())) return this.json({ error: "Invalid MusicBrainz recording id" }, 400);
         if (isServerAdmin) continue;
         if (link.id) {
           const existing = await this.repos.songDetailLink.load(link.id);

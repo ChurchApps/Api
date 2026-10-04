@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { Group } from "../models/index.js";
+import { getAttendanceModuleGateway } from "../../../shared/modules/AttendanceModuleGateway.js";
 
 @injectable()
 export class GroupRepo {
@@ -201,18 +202,19 @@ export class GroupRepo {
   }
 
   public async search(churchId: string, campusId: string, serviceId: string, serviceTimeId: string) {
-    let query = (getDb() as any).selectFrom("groups as g")
-      .leftJoin("groupServiceTimes as gst", "gst.groupId", "g.id")
-      .leftJoin("serviceTimes as st", "st.id", "gst.serviceTimeId")
-      .leftJoin("services as s", "s.id", "st.serviceId")
-      .select(["g.id", "g.categoryName", "g.name"])
-      .where("g.churchId", "=", churchId)
-      .where("g.removed", "=", false as any)
-      .where((eb: any) => eb.or([eb("g.archived", "is", null), eb("g.archived", "=", false as any)]));
-    if (serviceTimeId !== "0") query = query.where("gst.serviceTimeId", "=", serviceTimeId);
-    if (serviceId !== "0") query = query.where("st.serviceId", "=", serviceId);
-    if (campusId !== "0") query = query.where("s.campusId", "=", campusId);
-    return query.groupBy(["g.id", "g.categoryName", "g.name"]).orderBy("g.name").execute();
+    // Service times live in the attendance database, so resolve that filter there first.
+    let groupIds: string[] | null = null;
+    if (campusId !== "0" || serviceId !== "0" || serviceTimeId !== "0") {
+      groupIds = await getAttendanceModuleGateway().loadGroupIdsForServiceTimes(churchId, campusId, serviceId, serviceTimeId);
+      if (groupIds.length === 0) return [];
+    }
+    let query = getDb().selectFrom("groups")
+      .select(["id", "categoryName", "name"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", false as any)
+      .where((eb) => eb.or([eb("archived", "is", null), eb("archived", "=", false as any)]));
+    if (groupIds) query = query.where("id", "in", groupIds);
+    return query.orderBy("name").execute();
   }
 
   public convertFromModel(group: Group) {

@@ -3,6 +3,18 @@
 // and dodges the supply-chain cooldown). "day before at 9am" never lands in a DST
 // gap, so the simple two-pass offset resolution below is correct for reminders.
 export class TimezoneHelper {
+  // The trimmed zone when Intl knows it, else undefined (stored values are free text).
+  static usable(tz?: string | null): string | undefined {
+    const trimmed = tz?.trim();
+    if (!trimmed) return undefined;
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: trimmed });
+      return trimmed;
+    } catch {
+      return undefined;
+    }
+  }
+
   private static offsetMs(tz: string, instantMs: number): number {
     const dtf = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,

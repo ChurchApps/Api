@@ -12,6 +12,8 @@ export interface AttendanceModuleGateway {
   loadAttendeePersonIds(churchId: string, scope: { campusId?: string; serviceId?: string; serviceTimeId?: string; groupId?: string }, startDate: Date, endDate: Date): Promise<string[]>;
   // The groups the given check-in sessions belong to (check-in trigger facts).
   loadSessionGroupIds(churchId: string, sessionIds: string[]): Promise<string[]>;
+  // Groups that meet at a matching service time. Each id of "0" means "any".
+  loadGroupIdsForServiceTimes(churchId: string, campusId: string, serviceId: string, serviceTimeId: string): Promise<string[]>;
 }
 
 class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
@@ -35,6 +37,20 @@ class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
       .where("churchId", "=", churchId)
       .where("id", "in", sessionIds)
       .execute()) as { groupId: string }[];
+    return [...new Set(rows.map((r) => r.groupId).filter((id: string) => !!id))];
+  }
+
+  public async loadGroupIdsForServiceTimes(churchId: string, campusId: string, serviceId: string, serviceTimeId: string): Promise<string[]> {
+    const db = KyselyPool.getDb("attendance") as any;
+    let query = db.selectFrom("groupServiceTimes as gst")
+      .innerJoin("serviceTimes as st", "st.id", "gst.serviceTimeId")
+      .innerJoin("services as s", "s.id", "st.serviceId")
+      .select("gst.groupId")
+      .where("gst.churchId", "=", churchId);
+    if (serviceTimeId !== "0") query = query.where("gst.serviceTimeId", "=", serviceTimeId);
+    if (serviceId !== "0") query = query.where("st.serviceId", "=", serviceId);
+    if (campusId !== "0") query = query.where("s.campusId", "=", campusId);
+    const rows = (await query.execute()) as { groupId: string }[];
     return [...new Set(rows.map((r) => r.groupId).filter((id: string) => !!id))];
   }
 
