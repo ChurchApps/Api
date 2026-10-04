@@ -31,6 +31,18 @@ export class ChurchController extends MembershipBaseController {
     });
   }
 
+  // Clients send escape()-style names: %XX and %uXXXX. Anything that is not a valid escape stays as typed.
+  private static decodeSearchName(name: string) {
+    const unicode = name.replace(/%u([0-9a-fA-F]{4})/g, (_m, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    return unicode.replace(/(%[0-9a-fA-F]{2})+/g, (seq) => {
+      try {
+        return decodeURIComponent(seq);
+      } catch {
+        return seq;
+      }
+    });
+  }
+
   @httpPost("/search")
   public async searchPost(req: express.Request<{}, {}, { name: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
@@ -38,19 +50,7 @@ export class ChurchController extends MembershipBaseController {
         let result: Church[] = [];
         if (req.body.name !== undefined) {
           const data = await this.repos.church.search(
-            // decode URI encoded character e.g. replace %20 with ' '
-            decodeURIComponent(
-              // decode unicode characters '\uXXXX'
-
-              JSON.parse(
-                "\"" +
-                  req.body.name
-                    .toString()
-                    // prepare unicode characters '\uXXXX' for decoding
-                    .replace(/%u/g, "\\u") +
-                  "\""
-              )
-            ),
+            ChurchController.decodeSearchName(req.body.name.toString()),
             false
           );
           result = this.repos.church.convertAllToModel(data);
@@ -73,18 +73,7 @@ export class ChurchController extends MembershipBaseController {
         if (req.query.name !== undefined) {
           const _app = req.query.app === undefined ? "" : req.query.app.toString();
           const data = await this.repos.church.search(
-            // decode URI encoded character e.g. replace %20 with ' '
-            decodeURIComponent(
-              // decode unicode characters '\uXXXX'
-              JSON.parse(
-                "\"" +
-                  req.query.name
-                    .toString()
-                    // prepare unicode characters '\uXXXX' for decoding
-                    .replace(/%u/g, "\\u") +
-                  "\""
-              )
-            ),
+            ChurchController.decodeSearchName(req.query.name.toString()),
             false
           );
           result = this.repos.church.convertAllToModel(data);
