@@ -118,3 +118,24 @@ describe("PreferenceGateHelper.evaluate quiet-hours deferUntil across DST", () =
     expect(r.deferUntil?.toISOString()).toBe("2026-11-01T13:00:00.000Z");
   });
 });
+
+// Production log: POST /messaging/messages returned 500 "Invalid time zone specified" when a stored
+// time zone was not an IANA name (e.g. a made-up region with a trailing space).
+describe("PreferenceGateHelper.evaluate with an unusable time zone", () => {
+  const pref = { allowPush: true, quietHoursStart: "22:00:00", quietHoursEnd: "07:00:00" };
+
+  it("falls back to the church time zone when the member's is not a real zone", () => {
+    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "announcements", "push", { pref: { ...pref, timeZone: "Nowhere/Atlantis " }, churchTimeZone: "UTC", now: NIGHT });
+    expect(r.decision).toBe("defer");
+  });
+
+  it("accepts a valid zone with stray whitespace", () => {
+    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "announcements", "push", { pref: { ...pref, timeZone: " UTC " }, now: NIGHT });
+    expect(r.decision).toBe("defer");
+  });
+
+  it("skips quiet hours instead of throwing when no zone is usable", () => {
+    const r = PreferenceGateHelper.evaluate(CHURCH, PERSON, "announcements", "push", { pref: { ...pref, timeZone: "Nowhere/Atlantis" }, churchTimeZone: "", now: NIGHT });
+    expect(r.allow).toBe(true);
+  });
+});

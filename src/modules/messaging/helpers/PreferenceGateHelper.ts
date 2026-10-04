@@ -40,7 +40,7 @@ export class PreferenceGateHelper {
     if (channel === "email" && pref?.emailFrequency === "never") return suppress("channel_off");
 
     if ((channel === "push" || channel === "sms") && pref?.quietHoursStart && pref?.quietHoursEnd) {
-      const tz = ctx.timeZone ?? pref.timeZone ?? ctx.churchTimeZone;
+      const tz = TimezoneHelper.usable(ctx.timeZone) ?? TimezoneHelper.usable(pref.timeZone) ?? TimezoneHelper.usable(ctx.churchTimeZone);
       if (tz && this.nowInQuietHours(now, tz, pref.quietHoursStart, pref.quietHoursEnd)) {
         if (NotificationCategoryHelper.isTransactional(category)) return ALLOW;
         // Reminder dispatcher reschedules to deferUntil; direct-push path treats DEFER as suppress (§4.4.1).
