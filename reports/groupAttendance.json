@@ -8,7 +8,7 @@
       "keyName": "main",
       "db": "attendance",
       "sqlLines": [
-        "SELECT DATE_FORMAT(s.sessionDate, '%Y-%m-%d') as sessionDate, ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId",
+        "SELECT DATE_FORMAT(s.sessionDate, '%Y-%m-%d') as sessionDate, ser.name as serviceName, st.name as serviceTimeName, s.groupId, v.personId, v.checkinTime",
         " FROM visits v",
         " INNER JOIN visitSessions vs on vs.churchId=v.churchId AND vs.visitId=v.id",
         " INNER JOIN sessions s on s.id=vs.sessionId",
@@ -25,7 +25,7 @@
       "keyName": "people",
       "db": "membership",
       "sqlLines": [
-        "SELECT id, displayName from people where churchId=:churchId and id in (:peopleIds)"
+        "SELECT id, displayName, membershipStatus from people where churchId=:churchId and id in (:peopleIds)"
       ],
       "joinConditions": [
         {
@@ -114,6 +114,16 @@
         {
           "header": "Person",
           "value": "people.displayName",
+          "formatter": "string"
+        },
+        {
+          "header": "Checked In",
+          "value": "checkinTime",
+          "formatter": "time"
+        },
+        {
+          "header": "Membership Status",
+          "value": "people.membershipStatus",
           "formatter": "string"
         }
       ]
