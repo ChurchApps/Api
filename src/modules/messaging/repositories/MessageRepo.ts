@@ -72,20 +72,27 @@ export class MessageRepo {
     return result.rows as Message[];
   }
 
-  public async loadForConversationPaginated(
+  // One round trip for the same page of several conversations: each UNION ALL part is that
+  // conversation's own page (newest first). Rows come back keyed by conversationId, newest first.
+  public async loadForConversationsPaginated(
     churchId: string,
-    conversationId: string,
+    conversationIds: string[],
     page: number = 1,
     limit: number = 20
-  ) {
+  ): Promise<Map<string, any[]>> {
+    const result = new Map<string, any[]>();
+    if (conversationIds.length === 0) return result;
     const offset = (page - 1) * limit;
-    return getDb().selectFrom("messages").selectAll()
-      .where("churchId", "=", churchId)
-      .where("conversationId", "=", conversationId)
-      .orderBy("timeSent", "desc")
-      .limit(limit)
-      .offset(offset)
-      .execute();
+    const parts = conversationIds.map((conversationId) => sql`(SELECT * FROM messages WHERE churchId=${churchId} AND conversationId=${conversationId} ORDER BY timeSent DESC LIMIT ${limit} OFFSET ${offset})`);
+    const rows = (await sql<any>`${sql.join(parts, sql` UNION ALL `)}`.execute(getDb())).rows;
+    for (const row of rows) {
+      const list = result.get(row.conversationId);
+      if (list) list.push(row);
+      else result.set(row.conversationId, [row]);
+    }
+    const time = (row: any) => (row.timeSent ? new Date(row.timeSent).getTime() : 0);
+    result.forEach((list) => list.sort((a, b) => time(b) - time(a)));
+    return result;
   }
 
   public async delete(churchId: string, id: string) {
