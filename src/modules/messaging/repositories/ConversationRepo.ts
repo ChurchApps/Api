@@ -120,12 +120,18 @@ export class ConversationRepo {
     // Was `CALL updateConversationStats(...)`, a procedure that exists in no environment, so lastPostId
     // never moved off whatever the seed data set and every conversation preview came back empty.
     try {
+      // Read the stats with a plain SELECT: as subqueries of the UPDATE they took shared locks on
+      // messages and deadlocked with concurrent message inserts.
+      const stats = await sql<{ firstPostId: string | null; lastPostId: string | null; postCount: number }>`
+        SELECT
+          (SELECT id FROM messages WHERE conversationId=${conversationId} ORDER BY timeSent ASC, id ASC LIMIT 1) AS firstPostId,
+          (SELECT id FROM messages WHERE conversationId=${conversationId} ORDER BY timeSent DESC, id DESC LIMIT 1) AS lastPostId,
+          (SELECT COUNT(*) FROM messages WHERE conversationId=${conversationId}) AS postCount
+      `.execute(getDb());
+      const { firstPostId, lastPostId, postCount } = stats.rows[0];
       await retryOnDeadlock(() => sql`
-        UPDATE conversations c SET
-          c.firstPostId = (SELECT id FROM messages WHERE conversationId=c.id ORDER BY timeSent ASC, id ASC LIMIT 1),
-          c.lastPostId = (SELECT id FROM messages WHERE conversationId=c.id ORDER BY timeSent DESC, id DESC LIMIT 1),
-          c.postCount = (SELECT COUNT(*) FROM messages WHERE conversationId=c.id)
-        WHERE c.id=${conversationId}
+        UPDATE conversations SET firstPostId=${firstPostId}, lastPostId=${lastPostId}, postCount=${postCount}
+        WHERE id=${conversationId}
       `.execute(getDb()));
     } catch (e) {
       console.error("Failed to update conversation stats", conversationId, e);
