@@ -76,15 +76,14 @@ export class ConversationController extends MessagingBaseController {
         contentId
       )) as Conversation[];
 
+      const messagesByConversation = await this.repos.message.loadForConversationsPaginated(
+        churchId,
+        conversations.map((c) => c.id),
+        pageNumber,
+        pageSize
+      );
       for (const conversation of conversations) {
-        const paginatedMessages = await this.repos.message.loadForConversationPaginated(
-          churchId,
-          conversation.id,
-          pageNumber,
-          pageSize
-        );
-
-        conversation.messages = paginatedMessages || [];
+        conversation.messages = messagesByConversation.get(conversation.id) || [];
       }
 
       for (let i = conversations.length - 1; i >= 0; i--) {

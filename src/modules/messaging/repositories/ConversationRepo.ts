@@ -119,12 +119,14 @@ export class ConversationRepo {
   public async updateStats(conversationId: string) {
     // Was `CALL updateConversationStats(...)`, a procedure that exists in no environment, so lastPostId
     // never moved off whatever the seed data set and every conversation preview came back empty.
+    // churchId=c.churchId lets the subqueries use idx_messages_churchId_conversationId; on conversationId
+    // alone they walked every message in the table while holding the conversation row lock.
     try {
       await retryOnDeadlock(() => sql`
         UPDATE conversations c SET
-          c.firstPostId = (SELECT id FROM messages WHERE conversationId=c.id ORDER BY timeSent ASC, id ASC LIMIT 1),
-          c.lastPostId = (SELECT id FROM messages WHERE conversationId=c.id ORDER BY timeSent DESC, id DESC LIMIT 1),
-          c.postCount = (SELECT COUNT(*) FROM messages WHERE conversationId=c.id)
+          c.firstPostId = (SELECT id FROM messages WHERE churchId=c.churchId AND conversationId=c.id ORDER BY timeSent ASC, id ASC LIMIT 1),
+          c.lastPostId = (SELECT id FROM messages WHERE churchId=c.churchId AND conversationId=c.id ORDER BY timeSent DESC, id DESC LIMIT 1),
+          c.postCount = (SELECT COUNT(*) FROM messages WHERE churchId=c.churchId AND conversationId=c.id)
         WHERE c.id=${conversationId}
       `.execute(getDb()));
     } catch (e) {
