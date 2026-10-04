@@ -49,7 +49,7 @@ function repos(opts: any = {}) {
     },
     message: {
       loadForConversation: jest.fn(async () => opts.messages ?? [{ id: "m1" }]),
-      loadForConversationPaginated: jest.fn(async () => opts.messages ?? [{ id: "m1" }]),
+      loadForConversationsPaginated: jest.fn(async (_churchId: string, ids: string[]) => new Map(ids.map((id) => [id, opts.messages ?? [{ id: "m1" }]]))),
       loadByIds: jest.fn(async () => []),
       convertToModel: (m: any) => m,
       convertAllToModel: (rows: any[]) => rows
@@ -224,5 +224,46 @@ describe("cross-church and ownership gates", () => {
     const r = repos({ byIdOnly: groupConv });
     await (attach(new ConnectionController(), r, MEMBER) as any).save({ body: [{ conversationId: "grp1", socketId: "s1", personId: "pVictim" }] }, {});
     expect(r.connection.save).toHaveBeenCalledWith(expect.objectContaining({ personId: "p1" }));
+  });
+});
+
+// forContent used to await one messages query per conversation in turn; a busy group feed paid that N times.
+describe("ConversationController.forContent message loading", () => {
+  const convs = [
+    { id: "cv1", churchId: "c1", contentType: "group", contentId: "g1" },
+    { id: "cv2", churchId: "c1", contentType: "group", contentId: "g1" },
+    { id: "cv3", churchId: "c1", contentType: "group", contentId: "g1" }
+  ];
+  const pages: Record<string, any[]> = {
+    cv1: [{ id: "m12", conversationId: "cv1" }, { id: "m11", conversationId: "cv1" }],
+    cv3: [{ id: "m31", conversationId: "cv3" }]
+  };
+  const setup = () => {
+    const r: any = repos({ forContent: convs.map((c) => ({ ...c })) });
+    r.message.loadForConversationsPaginated = jest.fn(async (_churchId: string, ids: string[]) => new Map(ids.filter((id) => pages[id]).map((id) => [id, pages[id]])));
+    r.messageReaction.loadForMessages = jest.fn(async () => [{ messageId: "m11", emoji: "👍", personId: "p1" }]);
+    const c = attach(new ConversationController(), r, MEMBER);
+    return { r, run: () => (c as any).forContent("group", "g1", { query: { page: "2", limit: "5" } }, {}) };
+  };
+
+  it("loads every conversation's page in one repo call with the caller's church, page and limit", async () => {
+    const { r, run } = setup();
+    await run();
+    expect(r.message.loadForConversationsPaginated).toHaveBeenCalledTimes(1);
+    expect(r.message.loadForConversationsPaginated).toHaveBeenCalledWith("c1", ["cv1", "cv2", "cv3"], 2, 5);
+  });
+
+  it("returns the same shape as before: conversations in order, their messages, empty ones dropped, reactions attached", async () => {
+    const { run } = setup();
+    expect(await run()).toEqual([
+      {
+        ...convs[0],
+        messages: [
+          { id: "m12", conversationId: "cv1", reactions: [] },
+          { id: "m11", conversationId: "cv1", reactions: [{ emoji: "👍", count: 1, mine: true }] }
+        ]
+      },
+      { ...convs[2], messages: [{ id: "m31", conversationId: "cv3", reactions: [] }] }
+    ]);
   });
 });
