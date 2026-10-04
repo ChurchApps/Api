@@ -16,7 +16,7 @@
       "keyName": "main",
       "db": "attendance",
       "sqlLines": [
-        "SELECT STR_TO_DATE(concat(year(v.visitDate), ' ', week(v.visitDate, 0), ' Sunday'), '%X %V %W') AS week, count(distinct(v.id)) as visits",
+        "SELECT STR_TO_DATE(concat(year(v.visitDate), ' ', week(v.visitDate, 0), ' Sunday'), '%X %V %W') AS week, count(distinct(v.id)) as visits, GROUP_CONCAT(DISTINCT DATE_FORMAT(v.visitDate, '%c/%e') ORDER BY DATE_FORMAT(v.visitDate, '%Y-%m-%d') SEPARATOR ', ') AS sessionDates",
         "FROM visits v",
         "LEFT JOIN visitSessions vs on vs.visitId=v.id",
         "LEFT JOIN sessions s on s.id = vs.sessionId",
@@ -28,6 +28,7 @@
         "AND (:serviceTimeId='' OR st.id = :serviceTimeId)",
         "AND (:serviceId='' OR ser.id = :serviceId)",
         "AND (:campusId='' OR ser.campusId = :campusId)",
+        "AND v.visitDate >= :startDate AND v.visitDate < DATE_ADD(:endDate, INTERVAL 1 DAY)",
         "GROUP BY year(v.visitDate), week(v.visitDate, 0), STR_TO_DATE(concat(year(v.visitDate), ' ', week(v.visitDate, 0), ' Sunday'), '%X %V %W')",
         "ORDER BY year(v.visitDate), week(v.visitDate, 0);"
       ]
@@ -64,6 +65,20 @@
       "sourceKey": "group"
     },
     {
+      "keyName": "startDate",
+      "displayName": "Start Date",
+      "source": "date",
+      "sourceKey": "startDate",
+      "defaultValue": "lastYear"
+    },
+    {
+      "keyName": "endDate",
+      "displayName": "End Date",
+      "source": "date",
+      "sourceKey": "endDate",
+      "defaultValue": "today"
+    },
+    {
       "keyName": "groupIds",
       "source": "query",
       "sourceKey": "groups.id"
@@ -97,6 +112,11 @@
           "header": "Visits",
           "value": "visits",
           "formatter": "number"
+        },
+        {
+          "header": "Session Dates",
+          "value": "sessionDates",
+          "formatter": "string"
         }
       ]
     }
