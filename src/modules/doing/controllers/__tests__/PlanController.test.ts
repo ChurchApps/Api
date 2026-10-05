@@ -43,4 +43,18 @@ describe("PlanController.copy", () => {
     expect(repos.plan.save).toHaveBeenCalledTimes(1);
     expect(repos.planItem.save).toHaveBeenCalledWith(expect.objectContaining({ label: "Opening Hymn", planId: "new1" }));
   });
+
+  it("carries the previous plan's notes and signup deadline over when the request omits them", async () => {
+    repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), notes: "Bring extra chairs", signupDeadlineHours: 48 }));
+    const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", copyMode: "none", copyServiceOrder: true };
+    await (makeController(repos) as any).copy("old", { body }, {});
+    expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ notes: "Bring extra chairs", signupDeadlineHours: 48 }));
+  });
+
+  it("keeps notes and signup deadline from the request when it supplies them", async () => {
+    repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), notes: "Old notes", signupDeadlineHours: 48 }));
+    const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", notes: "New notes", signupDeadlineHours: 24, copyMode: "none", copyServiceOrder: true };
+    await (makeController(repos) as any).copy("old", { body }, {});
+    expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ notes: "New notes", signupDeadlineHours: 24 }));
+  });
 });
