@@ -48,12 +48,14 @@ export class SongController extends ContentBaseController {
     }*/
 
   @httpPost("/")
-  public async post(req: express.Request<{}, {}, Song[]>, res: express.Response): Promise<any> {
+  public async post(req: express.Request<{}, {}, Song[] | Song>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
+        const songs = Array.isArray(req.body) ? req.body : [req.body];
+        if (songs.some((song) => !song || (!song.id && !song.songDetailId))) return this.json({ error: "songDetailId is required. To import songs by title, artist, and CCLI number, use POST /content/songs/import." }, 400);
         const promises: Promise<Song>[] = [];
-        req.body.forEach((song) => {
+        songs.forEach((song) => {
           song.churchId = au.churchId;
           promises.push(this.repos.song.save(song));
         });
