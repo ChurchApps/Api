@@ -270,6 +270,8 @@ export class PlanController extends DoingBaseController {
       delete (p as any).copyServiceOrder;
       p.churchId = au.churchId;
       p.serviceDate = new Date(req.body.serviceDate || new Date());
+      p.notes ??= oldPlan.notes;
+      p.signupDeadlineHours ??= oldPlan.signupDeadlineHours;
       const plan = await this.repos.plan.save(p);
 
       let timeIdMap = new Map<string, string>();
