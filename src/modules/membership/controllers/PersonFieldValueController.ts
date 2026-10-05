@@ -16,6 +16,15 @@ export class PersonFieldValueController extends MembershipBaseController {
     });
   }
 
+  @httpGet("/field/:fieldId")
+  public async getForField(@requestParam("fieldId") fieldId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.view)) return this.json({}, 401);
+      const data = await this.repos.personFieldValue.loadForField(au.churchId, fieldId);
+      return this.repos.personFieldValue.convertAllToModel(au.churchId, data);
+    });
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, PersonFieldValue[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
