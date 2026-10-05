@@ -44,8 +44,6 @@ describe("PlanController.copy", () => {
     expect(repos.planItem.save).toHaveBeenCalledWith(expect.objectContaining({ label: "Opening Hymn", planId: "new1" }));
   });
 
-  // Issue #1183: copying a plan dropped its notes and signup deadline because the new plan was
-  // saved from the request body alone, and the form never sends the old plan's values.
   it("carries the previous plan's notes and signup deadline over when the request omits them", async () => {
     repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), notes: "Bring extra chairs", signupDeadlineHours: 48 }));
     const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", copyMode: "none", copyServiceOrder: true };
