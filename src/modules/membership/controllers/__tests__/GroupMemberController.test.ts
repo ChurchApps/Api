@@ -84,3 +84,32 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
     expect(repos.groupMember.loadForGroup).not.toHaveBeenCalled();
   });
 });
+
+describe("GroupMemberController.save body shape (#1194)", () => {
+  function saveController() {
+    const { controller, repos } = gmController({ access: ["gmEdit"] });
+    repos.groupMember.save = jest.fn(async (gm: any) => ({ ...gm, id: "new-" + gm.personId }));
+    repos.groupMemberHistory = { log: jest.fn() };
+    return { controller, repos };
+  }
+
+  it("accepts a single object instead of an array", async () => {
+    const { controller, repos } = saveController();
+    const result = await (controller as any).save({ body: { churchId: "other", groupId: "g1", personId: "p2" } }, {});
+    expect(result).toEqual([expect.objectContaining({ id: "new-p2", churchId: "c1", groupId: "g1", personId: "p2" })]);
+    expect(repos.groupMember.save).toHaveBeenCalledTimes(1);
+  });
+
+  it("still accepts an array", async () => {
+    const { controller } = saveController();
+    const result = await (controller as any).save({ body: [{ groupId: "g1", personId: "p2" }, { groupId: "g1", personId: "p3" }] }, {});
+    expect(result).toHaveLength(2);
+  });
+
+  it("returns 400 when a new member is missing groupId or personId", async () => {
+    const { controller, repos } = saveController();
+    const result = await (controller as any).save({ body: { groupId: "g1" } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
+  });
+});

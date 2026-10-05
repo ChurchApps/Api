@@ -30,11 +30,11 @@ export class RoleController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Role[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Role[] | Role>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
       else {
-        let roles: Role[] = req.body;
+        let roles: Role[] = Array.isArray(req.body) ? req.body : [req.body];
         const promises: Promise<Role>[] = [];
         roles.forEach((role) => {
           role.churchId = au.churchId;

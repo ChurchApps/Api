@@ -38,9 +38,9 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, RoleMember[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, RoleMember[] | RoleMember>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      let members: RoleMember[] = req.body;
+      let members: RoleMember[] = Array.isArray(req.body) ? req.body : [req.body];
       const hasAccess = await this.checkAccess(members, Permissions.roles.edit, au);
       if (!hasAccess) return this.json({}, 401);
       else {

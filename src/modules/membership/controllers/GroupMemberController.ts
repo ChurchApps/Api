@@ -108,15 +108,18 @@ export class GroupMemberController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, GroupMember[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, GroupMember[] | GroupMember>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) {
         return this.json({ error: "Unauthorized" }, 401);
       }
 
+      const members = Array.isArray(req.body) ? req.body : [req.body];
+      if (members.some((gm) => !gm || (!gm.id && (!gm.groupId || !gm.personId)))) return this.json({ error: "groupId and personId are required" }, 400);
+
       const promises: Promise<GroupMember>[] = [];
       const rosters = new Map<string, any[]>();
-      for (const gm of req.body) {
+      for (const gm of members) {
         gm.churchId = au.churchId;
         const isNew = !gm.id;
         if (isNew && gm.groupId && gm.personId) {
