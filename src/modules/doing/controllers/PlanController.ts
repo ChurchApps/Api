@@ -92,6 +92,24 @@ export class PlanController extends DoingBaseController {
     });
   }
 
+  // Names stay off the anonymous signup endpoint; only signed-in members of the church see them.
+  @httpGet("/signup/:planId/volunteers")
+  public async getSignupVolunteers(@requestParam("planId") planId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const plan = (await this.repos.plan.load(au.churchId, planId)) as Plan;
+      if (!plan?.showVolunteerNames) return [];
+      const positions = ((await this.repos.position.loadByPlanId(au.churchId, planId)) as Position[]).filter(p => p.allowSelfSignup);
+      const assignments = ((await this.repos.assignment.loadByPlanId(au.churchId, planId)) as Assignment[])
+        .filter(a => a.status === "Accepted" || a.status === "Unconfirmed");
+      const personIds = [...new Set(assignments.filter(a => positions.some(p => p.id === a.positionId)).map(a => a.personId).filter(Boolean) as string[])];
+      const people = personIds.length > 0 ? await getMembershipModuleGateway().loadPeople(au.churchId, personIds) : [];
+      return positions.map(p => ({
+        positionId: p.id,
+        names: assignments.filter(a => a.positionId === p.id).map(a => people.find(person => person.id === a.personId)?.displayName).filter(Boolean)
+      }));
+    });
+  }
+
   private adjustTime(time: Date, serviceDate: Date, oldServiceDate: Date) {
     // Use absolute day diff — getDate() alone is day-of-month, which silently flips negative
     // across month boundaries (e.g. Mar 30 → Apr 6 would yield 6 - 30 = -24).
