@@ -54,6 +54,8 @@ export class DuplicateHelper {
       // "(2x)" after a chord-only intro is a repeat mark, not the first line
       const line = raw.replace(/\[[^\]]*\]/g, "").replace(/\(\s*(?:x\s*\d+|\d+\s*x)\s*\)/gi, "").trim();
       if (!line || line.startsWith("{") || sectionLabel(raw)) continue;
+      // "Ooh, ooh" over the intro is sung but names nothing: the first line is the first one with words
+      if (/^(?:(?:o+h*|a+h+|m+|hm+|la|na|yeah|whoa|woah)[\s,.!-]*)+$/i.test(line)) continue;
       return line;
     }
     return "";

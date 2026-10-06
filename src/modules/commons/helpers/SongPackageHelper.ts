@@ -122,8 +122,10 @@ const upperBass = (chord: string) => chord.replace(/^([A-G][^/\s]*\/)([a-g])(?=[
  * parentheses around optional chords drop, as they do from a chord row with no words.
  */
 function splitHeadingChords(line: string): string[] | null {
-  // the heading may sit in brackets of its own ("[Intro:]  [D - D] | [D/G]"), or it prints as a chord named "Intro:"
-  const m = line.trim().match(/^\[?([a-z][a-z-]*(?: [a-z][a-z-]*){0,2})\s*:\s*\]?\s*(\(\s*(?:x\s*\d+|\d+\s*x)\s*\))?\s*(.+)$/i);
+  // the heading may sit in brackets of its own ("[Intro:]  [D - D] | [D/G]"), or it prints as a chord named "Intro:";
+  // an instrumental heading needs no colon ("Intro  E  E4  E  E4"): no lyric opens on one of those words then chords
+  const m = line.trim().match(/^\[?([a-z][a-z-]*(?: [a-z][a-z-]*){0,2})\s*:\s*\]?\s*(\(\s*(?:x\s*\d+|\d+\s*x)\s*\))?\s*(.+)$/i)
+    || line.trim().match(/^((?:intro|outro|solo|instrumental|interlude|turnaround|tag|ending|coda)(?:\s+\d+)?)\s*(\(\s*(?:x\s*\d+|\d+\s*x)\s*\))?\s+(.+)$/i);
   if (!m) return null;
   const chords = m[3].replace(/[[\]()]/g, " ").split(/\s+/).map((t) => upperBass(t.replace(/[-–—|]+$/, ""))).filter(Boolean);
   if (!chords.length || !chords.every((t) => CHORD_TOKEN.test(t))) return null;
@@ -225,12 +227,31 @@ export class SongPackageHelper {
     // "[2x]" is a repeat mark, not a chord: "(2x)" prints it and slides drop it
     let text = chordPro.replace(/^[ \t]+$/gm, "").replace(/\[\s*(x\s*\d+|\d+\s*x)\s*\]/gi, "($1)");
     const stanzas = text.split(/\n\n+/).map((s) => s.split("\n").filter((l) => l.trim() && !l.trim().startsWith("{")));
-    if (/\n\n\n/.test(text) && stanzas.every((s) => s.length <= 1)) text = text.replace(/\n{3,}/g, "\u0000").replace(/\n\n/g, "\n").replace(/\u0000/g, "\n\n");
+    const label = (l: string) => l.trim().startsWith("{") && !!sectionLabel(l);
+    if (text.split("\n").some(label)) {
+      // {c:} labels mark the real stanzas whatever the gaps are (one blank line here, two there, none in the outro):
+      // a labelled section whose every line stands alone closes up; any other section is left as typed
+      const sections: string[][] = [[]];
+      for (const l of text.split("\n")) (label(l) ? sections.push([l]) : sections[sections.length - 1].push(l));
+      const end = text.match(/\n*$/)?.[0] || "";
+      text = sections.filter((s) => s.length).map((s) => {
+        const chunks = s.slice(label(s[0]) ? 1 : 0).join("\n").split(/\n\s*\n/).map((c) => c.trim()).filter(Boolean);
+        if (!label(s[0]) || !chunks.length || chunks.some((c) => c.includes("\n"))) return s.join("\n");
+        return `${s[0]}\n${chunks.join("\n")}\n`;
+      }).join("\n").replace(/\n*$/, end);
+    } else if (/\n\n\n/.test(text) && stanzas.every((s) => s.length <= 1)) {
+      text = text.replace(/\n{3,}/g, "\u0000").replace(/\n\n/g, "\n").replace(/\u0000/g, "\n\n");
+    }
     const split = new Set<string>();
     return text.split("\n").flatMap((line) => {
       const parts = splitHeadingChords(line);
       if (parts) { split.add(parts[0]); return parts; }
-      line = line.replace(/\[([^\]]*)\]/g, (_, inner: string) => `[${inner.split(/(\s+)/).map(upperBass).join("")}]`);
+      // "[ A7sus2]", "[F ]": spaces at a bracket's edges are typing, not chart
+      line = line.replace(/\[([^\]]*)\]/g, (_, inner: string) => `[${inner.trim().split(/(\s+)/).map(upperBass).join("")}]`);
+      // "...with [A] song [Ends on A Major]": a note in brackets after the words is a direction, not a chord; on its own
+      // line in parentheses, as the catalog writes them ("(Repeat Verse as Led)"), it is never sung or timed
+      const tail = line.match(/^(.*\S)\s*\[([^\]]+)\]\s*$/);
+      if (tail && /[a-z]/i.test(tail[1].replace(/\[[^\]]*\]/g, "")) && tail[2].split(/\s+/).some((t) => /[a-z]{2,}/.test(t) && !CHORD_TOKEN.test(t))) return [tail[1], `(${tail[2].trim()})`];
       const note = line.trim().match(/^\[([^\]]+)\]$/)?.[1].trim();
       if (!note || note.split(/\s+/).every((t) => t === "|" || CHORD_TOKEN.test(t))) return [line];
       return /^(©|\(c\)|copyright\b)/i.test(note) ? [] : [`{c: ${note}}`];
@@ -261,6 +282,27 @@ export class SongPackageHelper {
       const [, acc, deg, quality, bassAcc, bassDeg] = t.match(NUMBER_CHORD) || [];
       return note(acc, deg) + quality + (bassDeg ? `/${note(bassAcc, bassDeg)}` : "");
     })}]`);
+  }
+
+  /**
+   * Lines a writer pastes above the song that are not sung: a credit naming them ("By Amy Denson", "(Matt Burmeister,
+   * Braylen Burmeister 2026)"), "Scripture reference: Psalm 69" or the reference alone, a copyright notice. The song
+   * page shows each from its own field. Only from the top, and only those: the first other line is the song.
+   */
+  static dropPreamble(chordPro: string, writer: string | null | undefined, scripture: string | null | undefined): string {
+    const fold = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+    const names = SongPackageHelper.writerNames(writer || "").map(fold).filter((n) => n.length >= 5);
+    const ref = fold(scripture || "");
+    const lines = chordPro.split("\n");
+    let i = 0;
+    for (; i < lines.length; i++) {
+      const line = lines[i].trim(), f = fold(line);
+      if (!line) continue;
+      if (/\[[^\]]+\]/.test(line) || line.startsWith("{")) break;
+      const credit = names.some((n) => f.includes(n)) || /^(©|\(c\)|copyright\b)/i.test(line);
+      if (!credit && !/^scripture\b[^:]*:/i.test(line) && !(ref && f === ref)) break;
+    }
+    return i ? lines.slice(i).join("\n").replace(/^\n+/, "") : chordPro;
   }
 
   /** Pasted lyrics often open with the title again ("LORD ON HIGH", "{c: WINGS OF THE WIND}"): drop that line, it is not sung. */
