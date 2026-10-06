@@ -109,6 +109,37 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.dropTitleLine("{c: Chorus}\n[D]Wings of the wind", "Wings of the Wind")).toBe("{c: Chorus}\n[D]Wings of the wind");
   });
 
+  it("drops a credit and scripture preamble, and only that, from the top", () => {
+    const ref = "2 Cor. 3; Col. 1";
+    expect(SongPackageHelper.dropPreamble("By Amy Denson\nScripture references: \n2 Cor. 3; Col. 1\n\n{c: Verse 1}\n\n[D]Father", "Amy Denson", ref)).toBe("{c: Verse 1}\n\n[D]Father");
+    expect(SongPackageHelper.dropPreamble("(Matt Burmeister, Braylen Burmeister 2026)\n\nIntro  E  E4\n\nVerse 1", "Matt Burmeister", null)).toBe("Intro  E  E4\n\nVerse 1");
+    expect(SongPackageHelper.dropPreamble("By Amy Denson\n\nScripture Reference: Psalm 69\n\n\n{c: Verse 1}", "Amy Denson", "Psalm 69")).toBe("{c: Verse 1}");
+    // a sung first line stays, and so does anything after it
+    expect(SongPackageHelper.dropPreamble("By the waters of Babylon\nBy Amy Denson", "Amy Denson", null)).toBe("By the waters of Babylon\nBy Amy Denson");
+  });
+
+  it("closes up a double-spaced chart that {c:} labels, whatever its gaps", () => {
+    const chart = "{c: Verse 1}\n\n\nMay [C]Your salvation\n\n\nFor [C]You have heard\n\n\n\n{c: Chorus}\n\nYou who seek\n\n\nAnd praise the name\n\n\n{c: Verse 2}\n\n\nFor [C]God will save";
+    expect(SongPackageHelper.tidyPaste(chart)).toBe("{c: Verse 1}\nMay [C]Your salvation\nFor [C]You have heard\n\n{c: Chorus}\nYou who seek\nAnd praise the name\n\n{c: Verse 2}\nFor [C]God will save");
+    // an outro typed single-spaced, and a section of real stanzas, stay as typed
+    const mixed = "{c: Verse 1}\n\n[D]Father look down\n\n[D]May we find favor\n\n\n{c: Chorus}\nOne\nTwo\n\nThree\nFour\n\n{c: Outro}\n\nAdonai, reign\nOh Adonai\n";
+    expect(SongPackageHelper.tidyPaste(mixed)).toBe("{c: Verse 1}\n[D]Father look down\n[D]May we find favor\n\n{c: Chorus}\nOne\nTwo\n\nThree\nFour\n\n{c: Outro}\n\nAdonai, reign\nOh Adonai\n");
+  });
+
+  it("takes the first line with words, past vocalise over the intro", () => {
+    expect(SongPackageHelper.firstLine("INTRO\n[Cmaj7]  Ooh,  [A7sus2]    ooh\n\nVERSE 1\n[Cmaj7] Restore my soul")).toBe("Restore my soul");
+    expect(SongPackageHelper.firstLine("Oh Lord my God")).toBe("Oh Lord my God");
+  });
+
+  it("reads a colon-less instrumental heading, bracket-edge spaces, and a cue in brackets after the words", () => {
+    expect(SongPackageHelper.tidyPaste("Intro  E  E4  E  E4")).toBe("{c: Intro}\n[E] [E4] [E] [E4]");
+    expect(SongPackageHelper.tidyPaste("Verse 1")).toBe("Verse 1");
+    expect(SongPackageHelper.tidyPaste("[ A7sus2] And take control\n[F ]  Ooh")).toBe("[A7sus2] And take control\n[F]  Ooh");
+    expect(SongPackageHelper.tidyPaste("And praise the name of [G] Jesus with [A] song [Ends on A Major]")).toBe("And praise the name of [G] Jesus with [A] song\n(Ends on A Major)");
+    // chord pairs and odd chord spellings at a line's end stay chords
+    expect(SongPackageHelper.tidyPaste("within our [Es4 E] hearts [G - D/F# - G/E]")).toBe("within our [Es4 E] hearts [G - D/F# - G/E]");
+  });
+
   it("hasChords needs a bracketed chord, not any bracket", () => {
     expect(SongPackageHelper.hasChords(CHART)).toBe(true);
     expect(SongPackageHelper.hasChords("Verse 1\nSing [x2] loudly")).toBe(false);
