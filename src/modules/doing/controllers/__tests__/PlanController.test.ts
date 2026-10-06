@@ -58,3 +58,52 @@ describe("PlanController.copy", () => {
     expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ notes: "New notes", signupDeadlineHours: 24 }));
   });
 });
+
+// Issue #1201: "Show volunteer names on signup page" was saved on the plan but the
+// signup page had no way to learn who already signed up for each position.
+describe("PlanController.getSignupVolunteers", () => {
+  const { getMembershipModuleGateway } = jest.requireMock("../../../../shared/modules/index");
+  let repos: any;
+  let loadPeople: jest.Mock;
+
+  beforeEach(() => {
+    loadPeople = jest.fn(async () => [{ id: "per1", displayName: "Emily Davis" }, { id: "per2", displayName: "Donald Clark" }]);
+    getMembershipModuleGateway.mockReturnValue({ loadPeople });
+    repos = {
+      plan: { load: jest.fn(async () => ({ id: "pla1", showVolunteerNames: true })) },
+      position: {
+        loadByPlanId: jest.fn(async () => [
+          { id: "pos1", planId: "pla1", name: "Coffee Host", allowSelfSignup: true },
+          { id: "pos2", planId: "pla1", name: "Greeter", allowSelfSignup: true },
+          { id: "pos3", planId: "pla1", name: "Worship Leader", allowSelfSignup: false }
+        ])
+      },
+      assignment: {
+        loadByPlanId: jest.fn(async () => [
+          { id: "a1", positionId: "pos1", personId: "per1", status: "Accepted" },
+          { id: "a2", positionId: "pos2", personId: "per2", status: "Declined" },
+          { id: "a3", positionId: "pos3", personId: "per2", status: "Accepted" }
+        ])
+      }
+    };
+  });
+
+  it("returns signed-up names per self-signup position when the plan opts in", async () => {
+    const result = await (makeController(repos) as any).getSignupVolunteers("pla1", {}, {});
+    expect(repos.plan.load).toHaveBeenCalledWith("c1", "pla1");
+    expect(result).toEqual([{ positionId: "pos1", names: ["Emily Davis"] }, { positionId: "pos2", names: [] }]);
+  });
+
+  it("returns nothing when the plan has volunteer names turned off", async () => {
+    repos.plan.load = jest.fn(async () => ({ id: "pla1", showVolunteerNames: false }));
+    const result = await (makeController(repos) as any).getSignupVolunteers("pla1", {}, {});
+    expect(result).toEqual([]);
+    expect(loadPeople).not.toHaveBeenCalled();
+  });
+
+  it("returns nothing for a plan outside the caller's church", async () => {
+    repos.plan.load = jest.fn(async () => null);
+    const result = await (makeController(repos) as any).getSignupVolunteers("pla1", {}, {});
+    expect(result).toEqual([]);
+  });
+});
