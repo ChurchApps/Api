@@ -12,7 +12,7 @@ export class CuratedEventController extends ContentBaseController {
       if (req.query?.withoutEvents) {
         return await this.repos.curatedEvent.loadByCuratedCalendarId(au.churchId, curatedCalendarId);
       }
-      const result = await this.repos.curatedEvent.loadForEvents(curatedCalendarId, au.churchId);
+      const result = await this.repos.curatedEvent.loadForEvents(curatedCalendarId, au.churchId, au.checkAccess(Permissions.content.edit));
       await CalendarHelper.addExceptionDates(result, this.repos);
       return result;
     });
