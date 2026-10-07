@@ -2,7 +2,7 @@ import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
 jest.mock("../helpers/ContentLibraryHelper", () => ({ ContentLibraryHelper: { songJson: jest.fn((view: any) => ({ id: view.id, status: view.status })), renderChordpro: () => "{title: x}\n" } }));
 
-import { packageFields, songPublishHook } from "../helpers/publishHooks/song";
+import { licenseUrlFor, packageFields, songPublishHook } from "../helpers/publishHooks/song";
 import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
 
 const CHART = "Verse 1\n[G]Amazing grace! how [C]sweet the sound\n\nChorus\nPraise God";
@@ -160,5 +160,19 @@ describe("songPublishHook.onPublish", () => {
     it("never claims a writer already in the library", async () => {
       expect(await run({ submittedBy: "publisher01", existingAuthor: "author00001" })).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("licenseUrlFor", () => {
+  it("names the license URL for every attribution-required license, so validate does not block the publish", () => {
+    expect(licenseUrlFor("larry-holder")).toBe("https://larryholdermusic.org/copyright.html");
+    expect(licenseUrlFor("CC-BY")).toBe("https://creativecommons.org/licenses/by/4.0/");
+    expect(licenseUrlFor("CC-BY-NC-SA")).toBe("https://creativecommons.org/licenses/by-nc-sa/4.0/");
+  });
+
+  it("needs no URL for WC or PD, and keeps an existing URL for anything else", () => {
+    expect(licenseUrlFor("WC")).toBeUndefined();
+    expect(licenseUrlFor("PD")).toBeUndefined();
+    expect(licenseUrlFor("WC", "https://example.com/l")).toBe("https://example.com/l");
   });
 });
