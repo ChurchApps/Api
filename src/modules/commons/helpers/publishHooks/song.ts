@@ -10,8 +10,17 @@ const SONG_FIELDS = [
   "year", "songKey", "bpm", "timeSignature", "meter", "scripture", "scriptureText", "chordPro", "videoUrl", "parentSongId", "relationLabel", "proAnswer", "ccli"
 ] as const;
 
-// the exact license an upload is released under; WC/PD notices need no URL beyond the site itself
-const LICENSE_URLS: Record<string, string> = { "CC-BY": "https://creativecommons.org/licenses/by/4.0/" };
+// the exact license an upload is released under; WC/PD notices need no URL beyond the site itself.
+// Every license the content repo marks attributionRequired (licenses/licenses.json) needs one, or validate.mjs blocks the publish.
+const LICENSE_URLS: Record<string, string> = {
+  "CC-BY": "https://creativecommons.org/licenses/by/4.0/",
+  "CC-BY-SA": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "CC-BY-NC": "https://creativecommons.org/licenses/by-nc/4.0/",
+  "CC-BY-NC-SA": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "larry-holder": "https://larryholdermusic.org/copyright.html"
+};
+
+export const licenseUrlFor = (license: string | undefined, existing?: string | null) => LICENSE_URLS[license || ""] || existing || undefined;
 
 // a change to any of these invalidates the listen gate: what was heard is no longer what is served
 const SCORE_FILES = /^(score\.musicxml|tune\.abc|tune\.mid|sheetPdf\.(xml|musicxml))$/;
@@ -43,7 +52,7 @@ export const songPublishHook: PublishHook = {
     // the notice on the song page, print chart and zip names this exact version and URL
     const licenseVersion = ctx.submission.payload?.licenseVersion || existing?.licenseVersion;
     if (licenseVersion) song.licenseVersion = licenseVersion;
-    const licenseUrl = LICENSE_URLS[asset.license || ""] || existing?.licenseUrl;
+    const licenseUrl = licenseUrlFor(asset.license, existing?.licenseUrl);
     if (licenseUrl) song.licenseUrl = licenseUrl;
     const writers = SongPackageHelper.writerNames(writer);
     const writerIsNew = writers.length === 1 && !(await repos.author.loadIdByName(writers[0]));
