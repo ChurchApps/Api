@@ -63,8 +63,8 @@ export class CuratedEventRepo {
       .where("curatedCalendarId", "=", curatedCalendarId).execute() as any;
   }
 
-  public async loadForEvents(curatedCalendarId: string, churchId: string) {
-    const result = await getDb().selectFrom("curatedEvents as ce")
+  public async loadForEvents(curatedCalendarId: string, churchId: string, includePrivate = false) {
+    let query = getDb().selectFrom("curatedEvents as ce")
       .innerJoin("events as e", (join) =>
         join.onRef("e.churchId", "=", "ce.churchId").on((eb) =>
           eb.or([
@@ -88,10 +88,9 @@ export class CuratedEventRepo {
         "e.visibility"
       ])
       .where("ce.curatedCalendarId", "=", curatedCalendarId)
-      .where("ce.churchId", "=", churchId)
-      .where("e.visibility", "=", "public")
-      .execute();
-    return result;
+      .where("ce.churchId", "=", churchId);
+    if (!includePrivate) query = query.where("e.visibility", "=", "public");
+    return query.execute();
   }
 
   public convertToModel(_churchId: string, data: any) { return data as CuratedEvent; }
