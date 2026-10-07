@@ -75,7 +75,10 @@ export class ChurchRepo {
 
   public async search(name: string, includeArchived: boolean) {
     let query = getDb().selectFrom("churches").selectAll()
-      .where("name", "like", "%" + name.replace(" ", "%") + "%");
+      .where((eb) => eb.or([
+        eb("name", "like", "%" + name.trim().replace(/\s+/g, "%") + "%"),
+        eb("id", "=", name.trim())
+      ]));
     if (!includeArchived) query = query.where("archivedDate", "is", null);
     query = query.orderBy("name");
     if (name) query = query.limit(50);
