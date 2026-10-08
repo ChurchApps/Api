@@ -17,6 +17,9 @@ describe("SongPackageHelper text readers", () => {
     expect(sectionLabel("(Chorus x2)")).toBe("Chorus x2");
     expect(sectionLabel("(Intro/Instrumental)")).toBe("Intro/Instrumental");
     expect(sectionLabel("Verse 2")).toBe("Verse 2");
+    expect(sectionLabel("Repeat Chorus")).toBe("Repeat Chorus");
+    expect(sectionLabel("REPEAT CHORUS 1")).toBe("REPEAT CHORUS 1");
+    expect(sectionLabel("Repeat after me")).toBeNull();
     expect(sectionLabel("[G](Hallelujah)")).toBeNull();
     expect(sectionLabel("[G]When the [D]music [A]fades")).toBeNull();
     const byOurSide = "(Verse 1)\n[A]We won't go\n\n(Bridge)\n[G / D / A / Bm]\n\n[G]When the [D]music [A]fades   Still [Bm]by our side\n\n(Chorus x2)\n[G]Your love is constant";
