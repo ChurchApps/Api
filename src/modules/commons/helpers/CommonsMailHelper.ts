@@ -154,6 +154,16 @@ export class CommonsMailHelper {
     }
   }
 
+  /** Support hears about writer activity that usually means a fake account or gamed numbers. */
+  static async notifyWriterFlag(email: string, name: string, what: string): Promise<void> {
+    try {
+      const who = esc(name ? `${name} (${email})` : email);
+      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, Environment.supportEmail, APP, Environment.worshipCommonsRoot || "", `WorshipCommons writer flagged: ${who}`, `<p><strong>${who}</strong> had ${esc(what)}.</p><p>This often means a fake account or gamed numbers. Their milestone emails are on hold until the Mautic flag tag is removed.</p>`);
+    } catch (e) {
+      console.error("[CommonsMailHelper] writer flag ping failed:", e);
+    }
+  }
+
   private static async mailWriter(userId: string | undefined, subject: string, contents: string): Promise<void> {
     try {
       if (!userId) return;

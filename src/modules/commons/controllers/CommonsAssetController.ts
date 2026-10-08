@@ -130,6 +130,7 @@ export class CommonsAssetController extends CommonsBaseController {
       const saved = !!req.body.saved;
       await this.repos.rating.setSaved(asset.id || "", au.id, saved);
       if (saved) void CommonsMauticHelper.tagUser(au.id, "wc-saved-song");
+      void CommonsMauticHelper.afterSave(this.repos, asset, au.id, saved);
       return { saved };
     });
   }
