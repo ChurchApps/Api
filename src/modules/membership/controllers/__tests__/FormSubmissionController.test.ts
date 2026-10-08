@@ -242,4 +242,18 @@ describe("FormSubmissionController.sendEmails notifications", () => {
     expect(NotificationService.createNotifications).toHaveBeenCalledWith(["p1", "p2"], "c1", "form", "f1", "New Form Submission: Connect");
     expect((axios as any).post).not.toHaveBeenCalled();
   });
+
+  it("skips removed people who still have a notification member row", async () => {
+    const { controller, repos } = formSubmissionController();
+    const { TransactionalEmailHelper } = await import("../../../../shared/helpers/TransactionalEmailHelper.js");
+    (TransactionalEmailHelper.sendTransactional as jest.Mock).mockClear();
+    (NotificationService.createNotifications as jest.Mock).mockClear();
+    repos.memberPermission.loadByEmailNotification.mockResolvedValue([{ memberId: "p1" }, { memberId: "p2" }]);
+    repos.person.loadByIds.mockResolvedValue([{ id: "p1", email: "michael@test.org" }, { id: "p2", email: "terry@test.org", removed: true }]);
+    const form = { id: "f1", name: "Contact Form" };
+    await (controller as any).sendEmails({ churchId: "c1", answers: [] }, [], form, "c1");
+    expect(TransactionalEmailHelper.sendTransactional).toHaveBeenCalledTimes(1);
+    expect((TransactionalEmailHelper.sendTransactional as jest.Mock).mock.calls[0][1]).toBe("michael@test.org");
+    expect(NotificationService.createNotifications).toHaveBeenCalledWith(["p1"], "c1", "form", "f1", "New Form Submission: Contact Form");
+  });
 });

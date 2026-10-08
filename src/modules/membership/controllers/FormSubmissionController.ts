@@ -212,7 +212,8 @@ export class FormSubmissionController extends MembershipBaseController {
     if ((memberPermissions as any[])?.length > 0) {
       const ids = (memberPermissions as any[]).map((mp: MemberPermission) => mp.memberId);
       if (ids?.length > 0) {
-        const people = (await this.repos.person.loadByIds(formSubmission.churchId, ids)) as any[];
+        // Removed people keep their memberPermissions row but no longer show in the form's Members list.
+        const people = ((await this.repos.person.loadByIds(formSubmission.churchId, ids)) as any[]).filter((p) => !p.removed);
         if ((people as any[])?.length > 0) {
           const contentRows: any[] = [];
           questions.forEach((q) => {
@@ -228,7 +229,7 @@ export class FormSubmissionController extends MembershipBaseController {
           (people as any[]).forEach((p: Person) => {
             if (p.email) promises.push(TransactionalEmailHelper.sendTransactional(Environment.supportEmail, p.email, church.name, Environment.b1AdminRoot, "New Submissions for " + form.name, contents));
           });
-          promises.push(this.sendNotifications(churchId, form, ids));
+          promises.push(this.sendNotifications(churchId, form, people.map((p: Person) => p.id)));
           await Promise.all(promises);
         }
       }
