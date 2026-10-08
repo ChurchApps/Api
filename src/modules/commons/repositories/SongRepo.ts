@@ -185,7 +185,9 @@ export class SongRepo {
       certified: song.certified,
       qualityScore: song.qualityScore,
       qualityDetail: song.qualityDetail,
-      contributors: song.contributors
+      contributors: song.contributors,
+      // a co-written song's full credit as the writer gave it (authorId names only the first writer)
+      writerCredit: song.writerCredit
     };
     for (const c of PACKAGE_COLS) if (song[c] !== undefined) row[c] = song[c];
     await getDb().insertInto("songs").values(row as any).execute();
