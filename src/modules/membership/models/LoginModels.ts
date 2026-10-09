@@ -85,6 +85,8 @@ export interface RegisterUserRequest {
   churchId?: string;
   appName?: string;
   appUrl?: string;
+  website?: string;
+  fillMs?: number;
 }
 
 export interface RegistrationRequest {

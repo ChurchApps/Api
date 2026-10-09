@@ -46,6 +46,7 @@ const setDisplayNameValidation = [
 const updateEmailValidation = [body("userId").optional().isString(), body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address")];
 
 const REGISTER_MAX_PER_IP = 20;
+const REGISTER_MIN_FILL_MS = 2000;
 const CHECK_EMAIL_MAX_PER_IP = 60;
 const VERIFICATION_CODE_TTL_MS = 15 * 60 * 1000;
 const VERIFICATION_MAX_ATTEMPTS = 5;
@@ -297,6 +298,11 @@ export class UserController extends MembershipBaseController {
       if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), "", "register", REGISTER_MAX_PER_IP, 60 * 60))) return this.json({ errors: ["Too many requests"] }, 429);
 
       const register: RegisterUserRequest = req.body;
+      // Bot traps fake success so bots don't adapt; both fields are optional so older clients (B1Mobile) still register.
+      if (register.website || (typeof register.fillMs === "number" && register.fillMs < REGISTER_MIN_FILL_MS)) {
+        console.log("Register: bot rejected", register.email, register.website ? "honeypot" : "fillMs=" + register.fillMs);
+        return this.json({ email: register.email, firstName: register.firstName, lastName: register.lastName, mailConfigured: true }, 200);
+      }
       let user: User = await this.repos.user.loadByEmail(register.email);
       let minted: { raw: string; stored: string } | null = null;
 
