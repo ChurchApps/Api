@@ -1,5 +1,6 @@
 import "reflect-metadata";
 jest.mock("@churchapps/helpers", () => require("../__mocks__/churchappsHelpers"), { virtual: true });
+jest.mock("../helpers/CommonsMauticHelper.js", () => ({ CommonsMauticHelper: { tagUser: jest.fn(async () => {}), afterSave: jest.fn(async () => {}), afterSubmit: jest.fn(async () => {}), syncWriter: jest.fn(async () => {}) } }));
 jest.mock("../controllers/CommonsBaseController", () => ({ CommonsBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 jest.mock("../../../shared/helpers/index", () => ({
   Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } },

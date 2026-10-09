@@ -118,6 +118,14 @@ export class SubmissionRepo {
     return Number(row?.n || 0);
   }
 
+  /** New songs the user sent for review in the last few hours — a burst here usually means a fake account. */
+  public async countNewSongsSubmittedSince(userId: string, hours: number): Promise<number> {
+    const row = await getDb().selectFrom("submissions").select(sql<number>`count(*)`.as("n"))
+      .where("submittedBy", "=", userId).where("type", "=", "new").where("status", "!=", "draft")
+      .where("submittedAt", ">=", sql<Date>`date_sub(now(), interval ${hours} hour)`).executeTakeFirst();
+    return Number(row?.n || 0);
+  }
+
   public async countSubmitterStats(userId: string): Promise<{ total: number; approved: number }> {
     const row = await getDb().selectFrom("submissions")
       .select([sql<number>`count(*)`.as("total"), sql<number>`sum(status = 'approved')`.as("approved")])

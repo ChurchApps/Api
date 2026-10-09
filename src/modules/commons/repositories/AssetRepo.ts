@@ -74,6 +74,20 @@ export class AssetRepo {
     return await getDb().selectFrom("assets").selectAll().where("id", "in", ids).execute() as Asset[];
   }
 
+  /** Songs a writer has live in the library — the "songs released" milestone count. */
+  public async countPublishedSongs(userId: string): Promise<number> {
+    const row = await getDb().selectFrom("assets").select(sql<number>`count(*)`.as("n"))
+      .where("publisherUserId", "=", userId).where("assetType", "=", "song").where("status", "=", "published").executeTakeFirst();
+    return Number(row?.n || 0);
+  }
+
+  /** Everyone who has published a song, live or not, so a nightly resync also lowers counts after a takedown. */
+  public async loadSongPublisherIds(): Promise<string[]> {
+    const rows = await getDb().selectFrom("assets").select("publisherUserId").distinct()
+      .where("assetType", "=", "song").where("publisherUserId", "is not", null).execute();
+    return rows.map((r) => r.publisherUserId as string);
+  }
+
   public async loadByPublisher(userId: string): Promise<Asset[]> {
     return await getDb().selectFrom("assets").selectAll().where("publisherUserId", "=", userId).orderBy("createdAt", "desc").execute() as Asset[];
   }

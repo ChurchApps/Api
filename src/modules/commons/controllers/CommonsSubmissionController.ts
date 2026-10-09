@@ -146,6 +146,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
       }
       if (sub.type === "new") {
         void CommonsMauticHelper.tagUser(au.id, "wc-song-submitted");
+        void CommonsMauticHelper.afterSubmit(this.repos, au.id);
         void CommonsMailHelper.notifySubmittedInternal(asset?.name || "Untitled");
       }
       return result.value;

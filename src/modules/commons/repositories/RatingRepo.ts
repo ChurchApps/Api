@@ -37,6 +37,20 @@ export class RatingRepo {
     await sql`update assets set saveCount = greatest(0, saveCount + ${delta}) where id = ${assetId}`.execute(getDb());
   }
 
+  /**
+   * Saves of a writer's live songs by other people: one per person per song, the writer's own saves left out.
+   * withinHours limits it to saves made recently (a re-save after an unsave counts as recent).
+   */
+  public async countSavesOfPublisher(userId: string, withinHours?: number): Promise<number> {
+    let q = getDb().selectFrom("assetRatings").innerJoin("assets", "assets.id", "assetRatings.assetId")
+      .select(sql<number>`count(*)`.as("n"))
+      .where("assets.publisherUserId", "=", userId).where("assets.assetType", "=", "song").where("assets.status", "=", "published")
+      .where("assetRatings.saved", "=", true as any).where("assetRatings.userId", "!=", userId);
+    if (withinHours) q = q.where("assetRatings.modifiedAt", ">=", sql<Date>`date_sub(now(), interval ${withinHours} hour)`);
+    const row = await q.executeTakeFirst();
+    return Number(row?.n || 0);
+  }
+
   public async loadSavedAssetIds(userId: string): Promise<string[]> {
     const rows = await getDb().selectFrom("assetRatings").select("assetId").where("userId", "=", userId).where("saved", "=", true as any).orderBy("modifiedAt", "desc").execute();
     return rows.map((r) => r.assetId as string);

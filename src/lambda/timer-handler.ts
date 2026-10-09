@@ -132,6 +132,11 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
     const commonsRepos = await RepoManager.getRepos<any>("commons");
     return MaintenanceHelper.nightly(commonsRepos);
   });
+  await JobRunHelper.run("commonsWriterStats", async () => {
+    const { CommonsMauticHelper } = await import("../modules/commons/helpers/CommonsMauticHelper.js");
+    const commonsRepos = await RepoManager.getRepos<any>("commons");
+    return CommonsMauticHelper.syncAllWriters(commonsRepos);
+  });
 
 
   console.log("[handleMidnightTimer] ========== TIMER COMPLETE ==========");

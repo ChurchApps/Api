@@ -8,6 +8,7 @@ import { parseContributors } from "../helpers/ContributorsHelper.js";
 import { audioKeysToAdd, baseName, packageDirFrom } from "../helpers/PackageLayout.js";
 import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, ReviewerHelper, userNames, type Reviewer } from "../helpers/index.js";
 import { SongPackageHelper } from "../helpers/SongPackageHelper.js";
+import { CommonsMauticHelper } from "../helpers/CommonsMauticHelper.js";
 import { Repos } from "../repositories/index.js";
 
 const MAX_LISTENED_KEYS = 12;
@@ -174,6 +175,7 @@ export class CommonsAdminController extends CommonsBaseController {
       const { declined, error } = ReviewerHelper.parseDeclined(req.body?.declineFiles, proposed, liveNames, requiredRoles);
       if (error) return this.json({ errors: [error] }, 400);
       await PublishHelper.approve(this.repos, sub, asset, au.id, req.body?.note?.slice(0, 500), declined);
+      if (asset.assetType === "song") void CommonsMauticHelper.syncWriter(this.repos, asset.publisherUserId);
       return { status: "approved", assetId: asset.id, declined: declined.map((d) => d.name) };
     });
   }
