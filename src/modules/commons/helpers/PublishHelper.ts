@@ -225,15 +225,25 @@ export class PublishHelper {
     await CommonsMailHelper.notifyApproved(sub, id, declined).catch((e) => console.error("[CommonsMailHelper] approved failed:", e));
   }
 
-  /** The editable snapshot: the published submission's payload, or one rebuilt from the row + satellite. */
+  /** A catalog seed's "Imported" record: written once at import (some with mojibake) and never rewritten, while commons-up keeps the rows current. */
+  static isImportRecord(sub: Submission | undefined): boolean {
+    return !!sub && sub.note === "Imported" && !sub.reviewedBy;
+  }
+
+  /**
+   * The editable snapshot: the published submission's payload, or one rebuilt from the row + satellite.
+   * A catalog song still on its import record is rebuilt from the rows, the copy churches actually see.
+   */
   static async editablePayload(repos: Repos, asset: Asset): Promise<SubmissionPayload> {
     if (asset.publishedSubmissionId) {
       const published = await repos.submission.loadById(asset.publishedSubmissionId);
-      if (published?.payload) return published.payload;
+      if (published?.payload && !this.isImportRecord(published)) return published.payload;
     }
     const payload: SubmissionPayload = { name: asset.name, description: asset.description, tags: asset.tags, language: asset.language, license: asset.license, publisherChurchId: asset.publisherChurchId, detail: {} };
     if (asset.assetType === "song") {
       const s = await repos.song.loadById(asset.id || "");
+      // licenseVersion carried, or submit stamps a default over the song's own (a writer grant's "permissions")
+      if (s?.licenseVersion) payload.licenseVersion = s.licenseVersion;
       if (s) payload.detail = { writer: s.writer, year: s.year, songKey: s.songKey, bpm: s.bpm, timeSignature: s.timeSignature, scripture: s.scripture, scriptureText: s.scriptureText, chordPro: s.chordPro, videoUrl: s.videoUrl, parentSongId: s.parentSongId, relationLabel: s.relationLabel, proAnswer: s.proAnswer, ccli: s.ccli, certified: true };
     }
     return payload;

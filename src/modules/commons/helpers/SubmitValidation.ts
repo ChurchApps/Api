@@ -137,6 +137,8 @@ export interface ValidationContext {
   livePayload?: SubmissionPayload;
   /** true when the proposer is the song's own publisher — the only one who may change its license */
   byPublisher?: boolean;
+  /** true when the proposer is a reviewer (ReviewerHelper.canReview): passes the communityEdits block, never the license rule */
+  byReviewer?: boolean;
   /** false when the song's license keeps every change with the writer (RightsHelper.acceptsProposals) */
   communityEdits?: boolean;
 }
@@ -151,7 +153,10 @@ export function validateSubmission(def: AssetTypeDefinition, payload: Submission
   const licenses: string[] = ctx.licenses || def.licenses;
   if (!payload?.name?.trim()) errors.push("name is required");
   else if (payload.name.length > 255) errors.push("name must be 255 characters or fewer");
-  if (!licenses.includes(payload.license as any)) errors.push(`license must be one of: ${licenses.join(", ")}`);
+  // a change to a published song carries its license through, even one this submitter could not pick for an upload
+  // (a writer's grant); changing it is the writer's alone, checked in validateProposalType
+  const carriedLicense = !!ctx.livePayload && !NEW_PACKAGE_TYPES.includes(type) && (payload.license || "") === (ctx.livePayload.license || "");
+  if (!carriedLicense && !licenses.includes(payload.license as any)) errors.push(`license must be one of: ${licenses.join(", ")}`);
   const detail = payload.detail || {};
   for (const field of def.detailFields || []) {
     const v = detail[field.key];
@@ -226,7 +231,8 @@ function validateProposalType(type: string, payload: SubmissionPayload, proposed
     if (text(ctx.note).length < MIN_NOTE_LENGTH) errors.push(`A note of at least ${MIN_NOTE_LENGTH} characters is required: say what changed and why`);
     if (type === "additionalFile" && !proposed.some((f) => f.action !== "remove")) errors.push("An additionalFile proposal must add a file");
     if (type === "recording" && !proposed.some((f) => f.action !== "remove" && fileRole(f.name || "") === "master")) errors.push("A recording proposal must add a master file");
-    if (ctx.communityEdits === false && !ctx.byPublisher) errors.push(NO_COMMUNITY_EDITS_MESSAGE);
+    // a writer's grant may close the song to the public; a reviewer can still fix it (and then reviews it like any edit)
+    if (ctx.communityEdits === false && !ctx.byPublisher && !ctx.byReviewer) errors.push(NO_COMMUNITY_EDITS_MESSAGE);
     // a grant is the writer's to make: a contributor's proposal carries the song's license through unchanged
     const live = ctx.livePayload;
     if (live && !ctx.byPublisher) {

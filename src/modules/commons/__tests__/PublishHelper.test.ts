@@ -609,3 +609,47 @@ describe("PublishHelper.syncOutput", () => {
     expect(ContentLibraryHelper.listLiveKeys).not.toHaveBeenCalled();
   });
 });
+
+describe("PublishHelper — a reviewer's correction to a catalog import", () => {
+  beforeEach(() => jest.clearAllMocks());
+  // seeded from the content repo: no publisher, published on its "Imported" record, under a writer's grant
+  const imported = (): any => ({ id: "asset000001", assetType: "song", name: "God Cares For You", tags: "Praise", language: "English", license: "larry-holder", status: "published", publishedAt: new Date("2026-09-15"), publishedSubmissionId: "subimport01" });
+  const importRecord = { id: "subimport01", note: "Imported", status: "approved", submittedBy: "seed", payload: { name: "God Cares For You", tags: "Praise", license: "larry-holder", detail: { writer: "Larry Holder", chordPro: "GodÂ’s care (stale import)" } } };
+  const row = { id: "asset000001", title: "God Cares For You", writer: "Larry Holder", licenseVersion: "permissions", chordPro: "Verse 1\nA Musical For Young Voices", scripture: "Matthew 6:25-34", bpm: 80, timeSignature: "4/4", year: 1997, proAnswer: "no" };
+
+  it("edits from the live rows, not the seed's import record", async () => {
+    const r = repos();
+    r.submission.loadById.mockResolvedValueOnce(importRecord);
+    r.song.loadById.mockResolvedValueOnce(row);
+    const base = await PublishHelper.editablePayload(r, imported());
+    expect(base).toMatchObject({ name: "God Cares For You", tags: "Praise", license: "larry-holder", licenseVersion: "permissions", detail: { writer: "Larry Holder", chordPro: "Verse 1\nA Musical For Young Voices", scripture: "Matthew 6:25-34", bpm: 80, year: 1997 } });
+    expect(JSON.stringify(base)).not.toContain("stale import");
+    // a reviewed submission is a person's version of the song and stays the base
+    const reviewed = { ...importRecord, note: "fixed the chorus", reviewedBy: "admin000001", payload: { name: "Reviewed", license: "WC" } };
+    r.submission.loadById.mockResolvedValueOnce(reviewed);
+    expect(await PublishHelper.editablePayload(r, imported())).toEqual(reviewed.payload);
+  });
+
+  it("approving keeps the writer's credit, applies the new themes and credits the reviewer only as an editor", async () => {
+    const r = repos();
+    r.author.loadIdByName.mockResolvedValue("author00001");
+    const { userNames } = jest.requireMock("../helpers/NamesHelper");
+    userNames.mockResolvedValueOnce({ admin000001: "Michael Reviewer" });
+    const payload = { name: "God Cares For You", tags: "praise, provision ,  trust", license: "larry-holder", licenseVersion: "permissions", detail: { writer: "Larry Holder", chordPro: "Verse 1\n[G]God cares for you", certified: true } };
+    const sub = { id: "sub00000001", assetId: "asset000001", submittedBy: "admin000001", status: "pending", type: "correction", note: "real lyrics and chords", payload };
+    // the reviewer approves their own submission
+    await PublishHelper.approve(r, sub, imported(), "admin000001", "ok");
+
+    expect(r.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ tags: "Praise, Provision, Trust", license: "larry-holder" }));
+    expect(r.author.findOrCreate).toHaveBeenCalledWith("Larry Holder");
+    expect(r.author.findOrCreate).toHaveBeenCalledTimes(1);
+    expect(r.author.update).not.toHaveBeenCalled(); // the writer's author row is never claimed by the reviewer
+    const song = r.song.upsert.mock.calls[0][0];
+    expect(song).toMatchObject({ authorId: "author00001", writerCredit: null, licenseVersion: "permissions", chordPro: "Verse 1\n[G]God cares for you" });
+    expect(JSON.parse(song.rights).text).toMatchObject({ license: "larry-holder", holder: "Larry Holder" });
+    expect(JSON.parse(song.contributors)).toEqual([expect.objectContaining({ name: "Michael Reviewer", what: "correction" })]);
+    expect(r.submission.update).toHaveBeenCalledWith("sub00000001", expect.objectContaining({ status: "approved", reviewedBy: "admin000001" }));
+    // nothing on the asset names the reviewer as its publisher
+    for (const [, fields] of r.asset.update.mock.calls) expect(fields).not.toHaveProperty("publisherUserId");
+  });
+});

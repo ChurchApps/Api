@@ -5,7 +5,7 @@ export { DuplicateHelper, type DuplicateMatch, type DuplicateQuery } from "./Dup
 export { recordAssetDownload } from "./DownloadHelper.js";
 export { MaintenanceHelper } from "./MaintenanceHelper.js";
 export { MusicHelper } from "./MusicHelper.js";
-export { userNames } from "./NamesHelper.js";
+export { isServerAdmin, userNames } from "./NamesHelper.js";
 export { PublishHelper } from "./PublishHelper.js";
 export { QualityHelper } from "./QualityHelper.js";
 export { ReviewerHelper, type DeclinedFile, type Reviewer } from "./ReviewerHelper.js";

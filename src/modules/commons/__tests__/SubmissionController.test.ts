@@ -17,6 +17,7 @@ jest.mock("../helpers/index", () => ({
   ReviewerHelper: jest.requireActual("../helpers/ReviewerHelper").ReviewerHelper,
   SubmissionHelper: { createDraft: jest.fn(), storeInline: jest.fn(), recordFile: jest.fn(), removeFile: jest.fn(), submit: jest.fn(), typeOf: (p: any, a: any) => p?.type || (a?.publishedSubmissionId ? "correction" : "new") },
   userNames: jest.fn(async () => ({})),
+  isServerAdmin: jest.fn(async () => false),
   fileSpec: () => undefined,
   notAcceptedMessage: (_d: any, n: string) => `${n} is not an accepted file`,
   INLINE_MAX_BYTES: 1,
@@ -24,7 +25,7 @@ jest.mock("../helpers/index", () => ({
 }));
 
 import { CommonsSubmissionController } from "../controllers/CommonsSubmissionController.js";
-import { PublishHelper } from "../helpers/index.js";
+import { isServerAdmin, PublishHelper, SubmissionHelper } from "../helpers/index.js";
 
 function controller(status = "pending", au: any = { id: "user0000001", checkAccess: () => false }) {
   const repos: any = {
@@ -100,5 +101,28 @@ describe("CommonsSubmissionController proposal type", () => {
     repos.asset.loadById.mockResolvedValueOnce({ id: "asset000001", assetType: "song", status: "published", publishedSubmissionId: "sub00000000" });
     await c.update({ params: { id: "sub00000001" }, body: { payload: { name: "x" } } } as any, {} as any);
     expect(repos.submission.update).toHaveBeenLastCalledWith("sub00000001", expect.objectContaining({ type: "correction" }));
+  });
+});
+
+describe("CommonsSubmissionController.submit — reviewer bypass", () => {
+  beforeEach(() => jest.clearAllMocks());
+  const req = { params: { id: "sub00000001" } } as any;
+
+  it("marks a reviewer's own draft, looking a server admin up when the site token carries no permissions", async () => {
+    (SubmissionHelper.submit as jest.Mock).mockResolvedValue({ ok: true, value: { status: "pending" } });
+    const { controller: c } = controller("draft");
+    await c.submit(req, {} as any);
+    expect(SubmissionHelper.submit).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.anything(), { byReviewer: false });
+    (isServerAdmin as jest.Mock).mockResolvedValueOnce(true);
+    await c.submit(req, {} as any);
+    expect(isServerAdmin).toHaveBeenCalledWith("user0000001");
+    expect(SubmissionHelper.submit).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.anything(), { byReviewer: true });
+  });
+
+  it("never passes the bypass to a contributor's draft that a reviewer submits", async () => {
+    (SubmissionHelper.submit as jest.Mock).mockResolvedValue({ ok: true, value: { status: "pending" } });
+    const { controller: c } = controller("draft", { id: "admin000001", checkAccess: () => true });
+    await c.submit(req, {} as any);
+    expect(SubmissionHelper.submit).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.anything(), { byReviewer: false });
   });
 });

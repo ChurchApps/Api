@@ -5,7 +5,7 @@ import express from "express";
 import * as fs from "fs";
 import { CommonsBaseController } from "./CommonsBaseController.js";
 import { ASSET_TYPES } from "../helpers/AssetTypes.js";
-import { ContentLibraryHelper, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, isUploadableName, notAcceptedMessage, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
+import { ContentLibraryHelper, isServerAdmin, PublishHelper, ReviewerHelper, SubmissionHelper, userNames, fileSpec, isUploadableName, notAcceptedMessage, INLINE_MAX_BYTES, DEFAULT_MAX_FILE_BYTES, type Outcome, type Reviewer } from "../helpers/index.js";
 import { Asset, AssetFile, Submission, SubmissionPayload } from "../models/index.js";
 import { licenseGrantsFor } from "../helpers/SubmitValidation.js";
 import { Environment } from "../../../shared/helpers/index.js";
@@ -139,7 +139,8 @@ export class CommonsSubmissionController extends CommonsBaseController {
     return this.actionWrapper(req, res, async (au) => {
       const { sub, asset, error } = await this.own(au, String(req.params.id), "draft");
       if (error) return error;
-      const result = await SubmissionHelper.submit(this.repos, sub, asset);
+      // the reviewer bypass is for a reviewer's own edit, not a contributor's draft a reviewer happens to submit
+      const result = await SubmissionHelper.submit(this.repos, sub, asset, { byReviewer: sub.submittedBy === au.id && (ReviewerHelper.canReview(au) || await isServerAdmin(au.id)) });
       if (result.ok === false) {
         const errors = result.errors || [result.error];
         return this.json({ errors }, result.status);

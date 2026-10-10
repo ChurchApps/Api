@@ -1,7 +1,7 @@
 import { controller, httpDelete, httpGet, httpPost } from "inversify-express-utils";
 import express from "express";
 import { CommonsBaseController } from "./CommonsBaseController.js";
-import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, recordAssetDownload, SubmissionHelper } from "../helpers/index.js";
+import { ChordProHelper, ContentLibraryHelper, DuplicateHelper, isServerAdmin, PublishHelper, recordAssetDownload, ReviewerHelper, SubmissionHelper } from "../helpers/index.js";
 // imported by path, not through the barrel: pure, and the shim tests mock the barrel
 import { SongPackageHelper, SongDetail, SongSummary } from "../helpers/SongPackageHelper.js";
 import { RightsHelper } from "../helpers/RightsHelper.js";
@@ -90,7 +90,8 @@ export class CommonsSongController extends CommonsBaseController {
       const asset = await this.repos.asset.loadPublished(String(req.params.id));
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
       // refuse before a draft exists; SubmissionHelper.submit holds the same line for the edit path
-      if (!RightsHelper.acceptsProposals(asset.license) && asset.publisherUserId !== au.id) return this.json({ errors: [NO_COMMUNITY_EDITS_MESSAGE] }, 403);
+      const byReviewer = ReviewerHelper.canReview(au) || await isServerAdmin(au.id);
+      if (!RightsHelper.acceptsProposals(asset.license) && asset.publisherUserId !== au.id && !byReviewer) return this.json({ errors: [NO_COMMUNITY_EDITS_MESSAGE] }, 403);
       const abc = typeof req.body?.abc === "string" ? req.body.abc.trim() : "";
       if (!abc || abc.length > 100000) return this.json({ errors: ["abc text is required (max 100KB)"] }, 400);
       const payload = { ...(await this.editable(asset.id || "")), type: "additionalFile" };
@@ -98,7 +99,7 @@ export class CommonsSongController extends CommonsBaseController {
       if (draft.ok === false) return this.json({ errors: draft.errors || [draft.error] }, draft.status);
       const stored = await SubmissionHelper.storeInline(this.repos, draft.value.submission, asset, "tune.abc", "text/plain; charset=utf-8", Buffer.from(abc), au.id);
       if (stored.ok === false) return this.json({ errors: stored.errors || [stored.error] }, stored.status);
-      const result = await SubmissionHelper.submit(this.repos, draft.value.submission, asset);
+      const result = await SubmissionHelper.submit(this.repos, draft.value.submission, asset, { byReviewer });
       if (result.ok === false) {
         const errors = result.errors || [result.error];
         return this.json({ errors }, result.status);
@@ -209,7 +210,8 @@ export class CommonsSongController extends CommonsBaseController {
 
   private async editable(assetId: string) {
     const s = await this.repos.song.loadById(assetId);
-    return { name: s?.title, tags: s?.themes, language: s?.language, license: s?.license, detail: { writer: s?.writer, year: s?.year, songKey: s?.songKey, bpm: s?.bpm, timeSignature: s?.timeSignature, scripture: s?.scripture, chordPro: s?.chordPro, certified: true } };
+    // licenseVersion carried, or submit stamps a default over the song's own (a writer grant's "permissions")
+    return { name: s?.title, tags: s?.themes, language: s?.language, license: s?.license, licenseVersion: s?.licenseVersion, detail: { writer: s?.writer, year: s?.year, songKey: s?.songKey, bpm: s?.bpm, timeSignature: s?.timeSignature, scripture: s?.scripture, chordPro: s?.chordPro, certified: true } };
   }
 
   // one files query for the whole list; has* flags and fileUrls come from it. qualityScore is reviewer-only and never leaves here.
