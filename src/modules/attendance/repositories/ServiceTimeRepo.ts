@@ -17,6 +17,7 @@ export class ServiceTimeRepo {
       churchId: model.churchId,
       serviceId: model.serviceId,
       name: model.name,
+      ...this.scheduleColumns(model),
       removed: false
     }).execute();
     return model;
@@ -25,11 +26,29 @@ export class ServiceTimeRepo {
   private async update(model: ServiceTime): Promise<ServiceTime> {
     await getDb().updateTable("serviceTimes").set({
       serviceId: model.serviceId,
-      name: model.name
+      name: model.name,
+      // Clients that predate schedules don't send dayOfWeek; leave an existing schedule alone for them.
+      ...(model.dayOfWeek !== undefined ? this.scheduleColumns(model) : {})
     }).where("id", "=", model.id)
       .where("churchId", "=", model.churchId)
       .execute();
     return model;
+  }
+
+  // A schedule needs both a day and a start time; anything partial is stored as no schedule.
+  private scheduleColumns(model: ServiceTime) {
+    const toInt = (v: any) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Math.round(Number(v)));
+    const toTime = (v: any) => (typeof v === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(v) ? v : null);
+    const dayOfWeek = toInt(model.dayOfWeek);
+    const startTime = toTime(model.startTime);
+    const scheduled = dayOfWeek !== null && dayOfWeek >= 0 && dayOfWeek <= 6 && startTime !== null;
+    return {
+      dayOfWeek: scheduled ? dayOfWeek : null,
+      startTime: scheduled ? startTime : null,
+      endTime: scheduled ? toTime(model.endTime) : null,
+      checkinOpenMinutes: scheduled ? toInt(model.checkinOpenMinutes) : null,
+      checkinCloseMinutes: scheduled ? toInt(model.checkinCloseMinutes) : null
+    };
   }
 
   public async delete(churchId: string, id: string) {
@@ -38,6 +57,11 @@ export class ServiceTimeRepo {
 
   public async load(churchId: string, id: string) {
     return (await getDb().selectFrom("serviceTimes").selectAll().where("id", "=", id).where("churchId", "=", churchId).where("removed", "=", false).executeTakeFirst()) ?? null;
+  }
+
+  public async loadByIds(churchId: string, ids: string[]) {
+    if (ids.length === 0) return [];
+    return getDb().selectFrom("serviceTimes").selectAll().where("churchId", "=", churchId).where("id", "in", ids).execute();
   }
 
   public async loadAll(churchId: string) {
@@ -96,7 +120,24 @@ export class ServiceTimeRepo {
   }
 
   protected rowToModel(data: any): ServiceTime {
-    const result: ServiceTime = { id: data.id, serviceId: data.serviceId, name: data.name, longName: data.longName };
+    const result: ServiceTime = {
+      id: data.id,
+      serviceId: data.serviceId,
+      name: data.name,
+      longName: data.longName,
+      dayOfWeek: data.dayOfWeek ?? null,
+      startTime: this.formatTime(data.startTime),
+      endTime: this.formatTime(data.endTime),
+      checkinOpenMinutes: data.checkinOpenMinutes ?? null,
+      checkinCloseMinutes: data.checkinCloseMinutes ?? null
+    };
     return result;
+  }
+
+  // MySQL TIME comes back as "HH:mm:ss"; clients use "HH:mm".
+  private formatTime(value: any): string | null {
+    if (typeof value !== "string") return null;
+    const m = value.match(/^(\d{1,2}):(\d{2})/);
+    return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null;
   }
 }

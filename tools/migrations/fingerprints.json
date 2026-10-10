@@ -925,6 +925,41 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-10_service_time_schedule": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "serviceTimes",
+     "column": "checkinCloseMinutes",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "serviceTimes",
+     "column": "checkinOpenMinutes",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "serviceTimes",
+     "column": "dayOfWeek",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "serviceTimes",
+     "column": "endTime",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "serviceTimes",
+     "column": "startTime",
+     "present": true
+    }
+   ],
+   "schemaChanges": 5
   }
  },
  "content": {

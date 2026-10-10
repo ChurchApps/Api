@@ -8,7 +8,7 @@ jest.mock("../../helpers/index", () => ({
   CheckinGateHelper: jest.requireActual("../../helpers/CheckinGateHelper").CheckinGateHelper
 }));
 
-const gateway = { loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn(), loadHouseholdPeople: jest.fn() };
+const gateway = { loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn(), loadHouseholdPeople: jest.fn(), loadChurch: jest.fn() };
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => gateway }));
 
 import { VisitController } from "../VisitController.js";
@@ -32,6 +32,7 @@ function makeController(opts: any = {}) {
       save: jest.fn(async (v: any) => v),
       delete: jest.fn()
     },
+    serviceTime: { loadByIds: jest.fn(async () => opts.serviceTimes ?? []) },
     session: {
       loadByGroupServiceTimeDate: jest.fn(async () => ({ id: "sess1" })),
       save: jest.fn(async (s: any) => { s.id = "sess1"; return s; })
@@ -40,6 +41,7 @@ function makeController(opts: any = {}) {
   gateway.loadGroupsForCheckin.mockResolvedValue(opts.groups ?? []);
   gateway.loadSetting.mockResolvedValue(opts.ratioSetting ?? null);
   gateway.loadHouseholdPeople.mockResolvedValue(opts.household ?? [{ id: "p1" }]);
+  gateway.loadChurch.mockResolvedValue({ id: "c1", timeZone: "America/Chicago" });
 
   const au = { churchId: "c1", id: "u1", checkAccess: () => true };
   const controller = new VisitController();
@@ -59,6 +61,7 @@ beforeEach(() => {
   gateway.loadGroupsForCheckin.mockReset();
   gateway.loadSetting.mockReset();
   gateway.loadHouseholdPeople.mockReset();
+  gateway.loadChurch.mockReset();
 });
 
 describe("postCheckin capacity gate", () => {
@@ -73,6 +76,30 @@ describe("postCheckin capacity gate", () => {
     expect(result.obj.groups[0].groupId).toBe("g1");
     expect(repos.visit.save).not.toHaveBeenCalled();
     expect(repos.visitSession.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("postCheckin service time window", () => {
+  afterEach(() => jest.useRealTimers());
+  // Sunday 9:00 AM service; check-in opens 30 min before and closes 15 min after the 10:15 end.
+  const sunday9 = { id: "st1", dayOfWeek: 0, startTime: "09:00:00", endTime: "10:15:00", checkinOpenMinutes: 30, checkinCloseMinutes: 15 };
+  const groups = [{ id: "g1", name: "Nursery", checkinClosed: false }];
+
+  it("returns 409 notOpen and saves NOTHING outside the check-in window", async () => {
+    jest.useFakeTimers({ now: new Date("2026-10-13T09:00:00-05:00"), doNotFake: ["setTimeout", "nextTick", "setImmediate"] });
+    const { controller, repos } = makeController({ groups, counts: [], serviceTimes: [sunday9] });
+    const result: any = await (controller as any).postCheckin(req(memberVisit()), {});
+    expect(result.status).toBe(409);
+    expect(result.obj.error).toBe("notOpen");
+    expect(result.obj.groups[0]).toEqual({ groupId: "g1", groupName: "Nursery", reason: "notOpen" });
+    expect(repos.visit.save).not.toHaveBeenCalled();
+  });
+
+  it("saves inside the check-in window", async () => {
+    jest.useFakeTimers({ now: new Date("2026-10-11T08:45:00-05:00"), doNotFake: ["setTimeout", "nextTick", "setImmediate"] });
+    const { controller, repos } = makeController({ groups, counts: [], serviceTimes: [sunday9] });
+    await (controller as any).postCheckin(req(memberVisit()), {});
+    expect(repos.visit.save).toHaveBeenCalled();
   });
 });
 
