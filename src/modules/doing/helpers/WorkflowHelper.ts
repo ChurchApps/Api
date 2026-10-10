@@ -134,7 +134,12 @@ export class WorkflowHelper {
       let matched = false;
       if (route.kind === "always") matched = true;
       else if (route.kind === "personMatch" && task.associatedWithType === "person" && task.associatedWithId) {
-        matched = await ConjunctionHelper.personMatchesStepRoute(task.churchId || "", route.id || "", task.associatedWithId, repos);
+        // A bad condition must not strand a half-saved card; treat the route as not matched.
+        try {
+          matched = await ConjunctionHelper.personMatchesStepRoute(task.churchId || "", route.id || "", task.associatedWithId, repos);
+        } catch (e) {
+          console.error(`[WorkflowHelper] route ${route.id} condition check failed for card ${task.id || "?"}:`, e);
+        }
       }
       if (!matched) continue;
       if (route.targetStepId && route.targetStepId !== task.stepId) {
