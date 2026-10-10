@@ -83,6 +83,29 @@ describe("WorkflowHelper on-enter actions", () => {
     expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("Note: passing through");
   });
 
+  it("notifies the step's default assignee once when a card lands on them", async () => {
+    const withDefault = steps.map((s) => (s.id === "stepACT" ? { ...s, defaultAssignToType: "person", defaultAssignToId: "p9", defaultAssignToLabel: "Donald Clark" } : s));
+    const repos = buildRepos(withDefault as any, {});
+    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", title: "Pat", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(task.assignedToId).toBe("p9");
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith(["p9"], "c1", "task", "t1", "You have been assigned a card: Pat");
+  });
+
+  it("does not re-notify when the card already has an assignee", async () => {
+    const withDefault = steps.map((s) => (s.id === "stepACT" ? { ...s, defaultAssignToType: "person", defaultAssignToId: "p9" } : s));
+    const repos = buildRepos(withDefault as any, {});
+    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", assignedToType: "person", assignedToId: "p5" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(task.assignedToId).toBe("p5");
+    expect(notifyMock).not.toHaveBeenCalled();
+  });
+
   it("treats a route whose condition check throws as not matched and keeps routing", async () => {
     const { ConjunctionHelper } = jest.requireMock("../ConjunctionHelper.js");
     ConjunctionHelper.personMatchesStepRoute.mockRejectedValueOnce(new Error("Invalid condition operator: contains"));

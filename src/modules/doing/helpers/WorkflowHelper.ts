@@ -114,6 +114,7 @@ export class WorkflowHelper {
       task.assignedToType = step.defaultAssignToType;
       task.assignedToId = step.defaultAssignToId;
       task.assignedToLabel = step.defaultAssignToLabel;
+      await this.notifyAssignee(task, `You have been assigned a card: ${task.title || task.associatedWithLabel || ""}`);
     }
 
     if (!step.id || suppressRoutes || depth >= WorkflowHelper.MAX_STEP_DEPTH) return;
