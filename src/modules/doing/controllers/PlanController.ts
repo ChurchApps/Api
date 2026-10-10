@@ -3,9 +3,10 @@ import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversi
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { MatrixEmailHelper } from "../helpers/MatrixEmailHelper.js";
+import { MatrixTextHelper } from "../helpers/MatrixTextHelper.js";
 import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { PlanAuth } from "../../../shared/helpers/index.js";
+import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 
@@ -37,6 +38,18 @@ export class PlanController extends DoingBaseController {
       if (!idsString) return this.json({ error: "Missing required parameter: ids" });
       const ids = idsString.split(",");
       return await this.repos.plan.loadByIds(au.churchId, ids);
+    });
+  }
+
+  // Declared before "/:id" so the id route does not swallow it.
+  @httpGet("/textRange")
+  public async textRangePreview(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { startDate, endDate, ministryId, planTypeId } = req.query as Record<string, string | undefined>;
+      if (!startDate || !endDate || !ministryId) return this.json({ error: "Missing required parameters: startDate, endDate, ministryId" }, 400);
+      if (!au.checkAccess(Permissions.texting.send) || !await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
+      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
+      return await MatrixTextHelper.preview(au.churchId, rows);
     });
   }
 
@@ -270,6 +283,18 @@ export class PlanController extends DoingBaseController {
       if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
       const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
       return await MatrixEmailHelper.sendConsolidated(au.churchId, rows, ministryId);
+    });
+  }
+
+  @httpPost("/textRange")
+  public async textRange(req: express.Request<{}, {}, { startDate?: string; endDate?: string; ministryId?: string; planTypeId?: string; message?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const { startDate, endDate, ministryId, planTypeId, message } = req.body || {};
+      if (!startDate || !endDate || !ministryId) return this.json({ error: "Missing required parameters: startDate, endDate, ministryId" }, 400);
+      if (!message?.trim()) return this.json({ error: "message is required" }, 400);
+      if (!au.checkAccess(Permissions.texting.send) || !await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
+      const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
+      return await MatrixTextHelper.send(au.churchId, rows, message.slice(0, 1600));
     });
   }
 

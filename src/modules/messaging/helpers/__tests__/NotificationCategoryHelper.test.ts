@@ -45,9 +45,10 @@ describe("NotificationCategoryHelper.effectiveOptIn (absence-means-default)", ()
   it("tier-1 defaults to its default channel set when no override exists", () => {
     expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "push", [])).toBe(true);
     expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "email", [])).toBe(true);
-    // in_app is in default channels; sms is not
+    // in_app is in default channels; sms is default only for reminder categories (still behind allowSms)
     expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "in_app", [])).toBe(true);
-    expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "sms", [])).toBe(false);
+    expect(NotificationCategoryHelper.effectiveOptIn("event_reminders", "sms", [])).toBe(true);
+    expect(NotificationCategoryHelper.effectiveOptIn("announcements", "sms", [])).toBe(false);
   });
 
   it("an override wins over the default", () => {
