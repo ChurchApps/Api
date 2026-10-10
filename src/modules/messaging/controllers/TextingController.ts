@@ -9,6 +9,7 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { TextingConfigHelper } from "../helpers/TextingConfigHelper.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
+import { SmsOptOutHelper } from "../helpers/SmsOptOutHelper.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
 interface GroupMemberDetail {
@@ -37,6 +38,36 @@ export class TextingController extends MessagingBaseController {
       const result = this.repos.textingProvider.convertAllToModel(providers as any[]);
       // Never return raw credentials to the frontend
       return result.map((p: TextingProvider) => ({ ...p, apiKey: p.apiKey ? "********" : "", apiSecret: p.apiSecret ? "********" : "" }));
+    });
+  }
+
+  // Any signed-in church user: lets reminder editors and member settings show "Text" only when the church can send texts.
+  @httpGet("/status")
+  public async getStatus(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.churchId) return this.json({}, 401);
+      const providers = this.repos.textingProvider.convertAllToModel((await this.repos.textingProvider.loadByChurchId(au.churchId)) as any[]);
+      return { enabled: !!providers[0]?.enabled }; // TextingConfigHelper.load uses only the first row, so match it without decrypting credentials
+    });
+  }
+
+  // Webhook URL the church pastes into its provider so STOP replies opt people out here too.
+  @httpGet("/inboundUrl")
+  public async getInboundUrl(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send) && !au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      return { url: SmsOptOutHelper.inboundUrl(au.churchId) };
+    });
+  }
+
+  // Unauthenticated provider webhook; the HMAC token in the path ties it to one church. Non-STOP replies are acknowledged and ignored.
+  @httpPost("/inbound/:churchId/:token")
+  public async inbound(@requestParam("churchId") churchId: string, @requestParam("token") token: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      if (!SmsOptOutHelper.verify(churchId, token)) return this.json({}, 401);
+      const { from, text } = SmsOptOutHelper.parse(req.body);
+      if (!from || !SmsOptOutHelper.isStop(text)) return { optedOut: 0 };
+      return { optedOut: await SmsOptOutHelper.optOut(churchId, from) };
     });
   }
 

@@ -275,6 +275,19 @@ export class PersonRepo {
       .execute() as any;
   }
 
+  // Inbound STOP lookup: any live person in the church whose mobile matches, with or without the US country code.
+  public async loadIdsByMobileDigits(churchId: string, digits: string): Promise<string[]> {
+    const local = digits.replace(/^1(\d{10})$/, "$1");
+    const variants = [...new Set([digits, local, "1" + local])].filter((d) => d.length >= 7);
+    if (!variants.length) return [];
+    const rows = await getDb().selectFrom("people").select(["id"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", false as any)
+      .where(this.phoneDigitsSql("MobilePhone"), "in", variants)
+      .execute();
+    return rows.map((r: any) => r.id);
+  }
+
   // Digits-only compare so "(555) 123-4567" matches "555-123-4567".
   private phoneDigitsSql(column: string) {
     return sql`REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${sql.ref(column)},'-',''),' ',''),'(',''),')',''),'+','')`;

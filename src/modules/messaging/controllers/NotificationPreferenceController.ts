@@ -5,6 +5,10 @@ import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { NotificationCategoryHelper } from "../helpers/NotificationCategoryHelper.js";
 import { NotificationPreference } from "../models/index.js";
 
+const PREF_FIELDS = [
+  "allowPush", "allowSms", "emailFrequency", "masterMute", "quietHoursStart", "quietHoursEnd", "timeZone", "maxPushPerDay"
+];
+
 @controller("/messaging/notificationpreferences")
 export class NotificationPreferenceController extends MessagingBaseController {
 
@@ -35,17 +39,15 @@ export class NotificationPreferenceController extends MessagingBaseController {
       const body = req.body || {};
       let pref = await this.repos.notificationPreference.loadByPersonId(au.churchId, au.personId);
       if (!pref) pref = await NotificationHelper.createNotificationPref(au.churchId, au.personId);
-      for (const f of ["allowPush", "emailFrequency", "masterMute", "quietHoursStart", "quietHoursEnd", "timeZone", "maxPushPerDay"]) {
+      for (const f of PREF_FIELDS) {
         if (body[f] !== undefined) (pref as any)[f] = body[f];
       }
-      pref.allowSms = false; // SMS toggles rejected until Phase 3 (no transport / STOP handler yet)
       await this.repos.notificationPreference.save(pref);
 
       if (Array.isArray(body.overrides)) {
         for (const o of body.overrides) {
           if (!o?.categoryKey || !o?.channel) continue;
           if (NotificationCategoryHelper.isLocked(o.categoryKey)) continue; // locked categories can't be opted out of
-          if (o.channel === "sms") continue; // Phase 3
           await this.repos.notificationPreferenceOverride.save({ churchId: au.churchId, personId: au.personId, categoryKey: o.categoryKey, channel: o.channel, optedIn: !!o.optedIn });
         }
       }

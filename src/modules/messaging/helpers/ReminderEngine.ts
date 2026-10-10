@@ -4,12 +4,16 @@ import { ReminderDefinition, ReminderOccurrence } from "../models/index.js";
 import { ReminderAdapterRegistry } from "./ReminderAdapter.js";
 import { TimezoneHelper } from "./TimezoneHelper.js";
 import { NotificationHelper, CreateNotificationOptions } from "./NotificationHelper.js";
+import { PreferenceGateHelper } from "./PreferenceGateHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/MembershipModuleGateway.js";
+import { getMessagingModuleGateway } from "../../../shared/modules/MessagingModuleGateway.js";
 
 const HORIZON_DAYS = 14;
 const MAX_OFFSET_MIN = HORIZON_DAYS * 24 * 60;
 const DEFAULT_TZ = "America/New_York";
 const MAX_SCAN_ATTEMPTS = 3;
+const SMS_MAX = 160;
+const SMS_OPT_OUT = " Reply STOP to opt out.";
 
 // Reminder engine (architecture §5): expander materializes per-occurrence fire rows; dispatcher claims due rows and produces Notifications. Both ride existing timers — no new infra. Preference gate inside NotificationHelper is the single send-time chokepoint.
 export class ReminderEngine {
@@ -136,7 +140,8 @@ export class ReminderEngine {
           const message = adapter.renderMessage ? adapter.renderMessage(entity, occ.occLocalISO!, occ.message || undefined) : (occ.message || "You have a reminder");
           const link = adapter.link(entity, occ.occLocalISO!) || undefined;
           const options: CreateNotificationOptions = { category: occ.category, deliveryStartLevel: 1 };
-          if ((def as any).channels?.split(",").map((c: string) => c.trim()).includes("email")) {
+          const channels: string[] = ((def as any).channels || "").split(",").map((c: string) => c.trim());
+          if (channels.includes("email")) {
             options.emailImmediate = true;
             const emailByPerson = adapter.buildEmails ? await adapter.buildEmails(entity, occ.occLocalISO!, fresh, occ.message || undefined) : null;
             if (emailByPerson) options.emailByPerson = emailByPerson;
@@ -165,6 +170,7 @@ export class ReminderEngine {
             idempotencyKey: crypto.createHash("sha256").update(`${occ.entityType}:${occ.id}:${r.personId}`).digest("hex")
           })));
           sent += fresh.length;
+          if (channels.includes("sms")) await this.sendSms(occ, fresh.map((r) => r.personId), message);
         }
         await this.repos.reminderOccurrence.markSent(occ.id!, recipients.length);
       } catch (e) {
@@ -174,6 +180,63 @@ export class ReminderEngine {
       }
     }
     return { processed, sent };
+  }
+
+  // "Church: message Reply STOP to opt out." trimmed to one 160-char segment.
+  static smsBody(churchName: string, message: string): string {
+    const prefix = churchName ? `${churchName}: ` : "";
+    const room = SMS_MAX - prefix.length - SMS_OPT_OUT.length;
+    const text = message.replace(/\s+/g, " ").trim();
+    const body = text.length > room ? text.slice(0, Math.max(room - 1, 0)).trimEnd() + "…" : text;
+    return prefix + body + SMS_OPT_OUT;
+  }
+
+  // Opt-in texts through the church's own provider: allowSms + category gate, then skip opted-out people and missing numbers. Each recipient gets its own ledger row so a text failure never re-sends the push/email.
+  private static async sendSms(occ: ReminderOccurrence, personIds: string[], message: string): Promise<void> {
+    const churchId = occ.churchId!;
+    const membership = getMembershipModuleGateway();
+    const church = await membership.loadChurch(churchId);
+    const prefs = ((await this.repos.notificationPreference.loadByPersonIds(personIds)) as any[] || []).filter((p) => p.churchId === churchId);
+    const overrides = ((await this.repos.notificationPreferenceOverride.loadByPersonIds(personIds)) as any[] || []).filter((o) => o.churchId === churchId);
+    const body = this.smsBody(church?.name || "", message);
+    let noProvider = false;
+    for (const personId of personIds) {
+      let status = "sent";
+      let reason: string | undefined;
+      try {
+        const pref = prefs.find((p) => p.personId === personId);
+        const gate = PreferenceGateHelper.evaluate(churchId, personId, occ.category || "", "sms", { pref, overrides: overrides.filter((o) => o.personId === personId), churchTimeZone: church?.timeZone });
+        const person = gate.allow && !noProvider ? await membership.loadPerson(churchId, personId) : null;
+        const phoneNumber = (person?.mobilePhone || "").trim();
+        const optedOut = person?.optedOut === true || person?.optedOut === 1;
+        reason = !gate.allow ? gate.reason : noProvider ? "no_provider" : !phoneNumber ? "no_phone" : optedOut ? "opted_out" : undefined;
+        if (reason) status = "suppressed";
+        else {
+          const recipient = { phoneNumber, firstName: person?.firstName, lastName: person?.lastName, displayName: person?.displayName };
+          const result = await getMessagingModuleGateway().sendPersonText(churchId, personId, recipient, body, church?.name || "");
+          if (!result.ok) {
+            noProvider = result.reason === "no_provider";
+            status = noProvider ? "suppressed" : "failed";
+            reason = result.reason;
+          }
+        }
+      } catch {
+        status = "failed";
+        reason = "send_error";
+      }
+      await this.repos.reminderSentLog.insertIgnore({
+        churchId,
+        occurrenceId: occ.id,
+        entityType: occ.entityType,
+        entityId: occ.entityId,
+        personId,
+        channel: "sms",
+        category: occ.category,
+        status,
+        reason: reason?.slice(0, 40),
+        idempotencyKey: crypto.createHash("sha256").update(`${occ.entityType}:${occ.id}:${personId}:sms`).digest("hex")
+      });
+    }
   }
 
   static async cancelEntity(churchId: string, entityType: string, entityId: string): Promise<void> {

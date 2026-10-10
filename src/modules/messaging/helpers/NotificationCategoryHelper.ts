@@ -13,11 +13,12 @@ export interface NotificationCategory {
   sortOrder: number;
 }
 
+// sms is a default channel only where reminders text; it still needs the member's allowSms opt-in.
 const CATEGORIES: NotificationCategory[] = [
   { categoryKey: "direct_messages", displayName: "Direct Messages", tier: 1, mandatory: false, transactional: true, defaultChannels: ["push", "email", "in_app"], allowedChannels: ["push", "email", "in_app"], sortOrder: 0 },
-  { categoryKey: "event_reminders", displayName: "Event Reminders", tier: 1, mandatory: false, transactional: true, defaultChannels: ["push", "email", "in_app"], allowedChannels: ["push", "email", "in_app", "sms"], sortOrder: 1 },
-  { categoryKey: "serving_schedule", displayName: "Serving & Schedule", tier: 1, mandatory: false, transactional: true, defaultChannels: ["push", "email", "in_app"], allowedChannels: ["push", "email", "in_app", "sms"], sortOrder: 2 },
-  { categoryKey: "tasks", displayName: "Tasks & Follow-Ups", tier: 1, mandatory: false, transactional: true, defaultChannels: ["push", "email", "in_app"], allowedChannels: ["push", "email", "in_app"], sortOrder: 3 },
+  { categoryKey: "event_reminders", displayName: "Event Reminders", tier: 1, mandatory: false, transactional: true, defaultChannels: ["push", "email", "in_app", "sms"], allowedChannels: ["push", "email", "in_app", "sms"], sortOrder: 1 },
+  { categoryKey: "serving_schedule", displayName: "Serving & Schedule", tier: 1, mandatory: false, transactional: true, defaultChannels: ["push", "email", "in_app", "sms"], allowedChannels: ["push", "email", "in_app", "sms"], sortOrder: 2 },
+  { categoryKey: "tasks", displayName: "Tasks & Follow-Ups", tier: 1, mandatory: false, transactional: true, defaultChannels: ["push", "email", "in_app", "sms"], allowedChannels: ["push", "email", "in_app", "sms"], sortOrder: 3 },
   { categoryKey: "group_messages", displayName: "Group Chat", tier: 1, mandatory: false, transactional: false, defaultChannels: ["push", "email", "in_app"], allowedChannels: ["push", "email", "in_app"], sortOrder: 4 },
   { categoryKey: "announcements", displayName: "Church Announcements", tier: 1, mandatory: false, transactional: false, defaultChannels: ["push", "email", "in_app"], allowedChannels: ["push", "email", "in_app", "sms"], sortOrder: 5 },
   { categoryKey: "group_activity", displayName: "Group Activity", tier: 1, mandatory: false, transactional: false, defaultChannels: ["push", "email", "in_app"], allowedChannels: ["push", "email", "in_app"], sortOrder: 6 }
