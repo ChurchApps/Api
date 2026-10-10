@@ -15,7 +15,10 @@ function makeRepos() {
   };
   return {
     _store: { planItems, positions, planItemTimes, assignments, plans },
-    plan: { load: async (c: string, id: string) => plans.find((p) => p.churchId === c && p.id === id) || null },
+    plan: {
+      load: async (c: string, id: string) => plans.find((p) => p.churchId === c && p.id === id) || null,
+      updateNotes: async (c: string, id: string, notes: string) => { const p = plans.find((x) => x.churchId === c && x.id === id); if (p) p.notes = notes; }
+    },
     planItem: {
       loadForPlan: async (c: string, planId: string) => planItems.filter((i) => i.churchId === c && i.planId === planId).sort((a, b) => (a.sort || 0) - (b.sort || 0)),
       save: async (m: any) => { if (!m.id) m.id = nextId(); planItems.push(m); return m; },
@@ -147,5 +150,20 @@ describe("PlanTemplateHelper", () => {
     const action = dstItems.find((i: any) => i.label === "Action");
     expect(action).toBeDefined();
     expect(action.parentId).toBe(section.id);
+  });
+
+  // Issue #1183: template notes were captured but never applied.
+  it("applies the template's notes to the plan", async () => {
+    const repos = makeRepos();
+    repos._store.plans.push({ churchId: "ch1", id: "dst", notes: "" });
+    await PlanTemplateHelper.applyToPlan(repos, "ch1", "dst", { notes: "Welcome friends", items: [], positions: [] }, { serviceOrder: false, positions: false });
+    expect((await repos.plan.load("ch1", "dst")).notes).toBe("Welcome friends");
+  });
+
+  it("keeps the plan's notes when the template has none", async () => {
+    const repos = makeRepos();
+    repos._store.plans.push({ churchId: "ch1", id: "dst", notes: "Keep me" });
+    await PlanTemplateHelper.applyToPlan(repos, "ch1", "dst", { notes: "", items: [], positions: [] }, { serviceOrder: false, positions: false });
+    expect((await repos.plan.load("ch1", "dst")).notes).toBe("Keep me");
   });
 });

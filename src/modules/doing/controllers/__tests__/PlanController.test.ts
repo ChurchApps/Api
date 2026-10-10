@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../../../shared/helpers/index", () => ({ PlanAuth: { canEditMinistry: jest.fn(async () => true) } }));
+jest.mock("../../../../shared/helpers/index", () => ({ PlanAuth: { canEditMinistry: jest.fn(async () => true), canEditPlan: jest.fn(async () => true) } }));
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: jest.fn() }));
 jest.mock("../../../../shared/events/InternalEventBus", () => ({ InternalEventBus: { publish: jest.fn() } }));
 jest.mock("../../helpers/PlanHelper", () => ({ PlanHelper: {} }));
@@ -9,6 +9,7 @@ jest.mock("../../helpers/MatrixEmailHelper", () => ({ MatrixEmailHelper: {} }));
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: {} }));
 
 import { PlanController } from "../PlanController.js";
+import { PlanAuth } from "../../../../shared/helpers/index";
 
 function makeController(repos: any) {
   const controller = new PlanController();
@@ -56,6 +57,43 @@ describe("PlanController.copy", () => {
     const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", notes: "New notes", signupDeadlineHours: 24, copyMode: "none", copyServiceOrder: true };
     await (makeController(repos) as any).copy("old", { body }, {});
     expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ notes: "New notes", signupDeadlineHours: 24 }));
+  });
+
+  // Issue #1183: copying a plan should keep its volunteer settings too.
+  it("carries the previous plan's volunteer settings over when the request omits them", async () => {
+    repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), showVolunteerNames: false, autoReplaceOnDecline: true }));
+    const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", copyMode: "none" };
+    await (makeController(repos) as any).copy("old", { body }, {});
+    expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ showVolunteerNames: false, autoReplaceOnDecline: true }));
+  });
+
+  // Issue #1183: "copy from previous" inside an open plan must fill that plan, not insert a duplicate.
+  it("copies into an existing plan when targetPlanId is set", async () => {
+    repos.plan.load = jest.fn(async (_c: string, planId: string) => planId === "target"
+      ? { id: "target", name: "This Sunday", ministryId: "m1", serviceDate: new Date("2026-09-27") }
+      : { id: "old", serviceDate: new Date("2026-09-20") });
+    const body = { ministryId: "m1", serviceDate: "2026-09-27", copyMode: "positions", targetPlanId: "target" };
+    const result = await (makeController(repos) as any).copy("old", { body }, {});
+    expect(repos.plan.save).not.toHaveBeenCalled();
+    expect(repos.position.save).toHaveBeenCalledWith(expect.objectContaining({ name: "Worship Leader", planId: "target" }));
+    expect(result).toMatchObject({ id: "target", name: "This Sunday" });
+  });
+
+  it("rejects copying into a target plan the user cannot edit", async () => {
+    (PlanAuth.canEditPlan as jest.Mock).mockResolvedValueOnce(false);
+    repos.plan.load = jest.fn(async (_c: string, planId: string) => ({ id: planId, ministryId: "m1", serviceDate: new Date("2026-09-27") }));
+    const body = { ministryId: "m1", serviceDate: "2026-09-27", copyMode: "positions", targetPlanId: "target" };
+    const result = await (makeController(repos) as any).copy("old", { body }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.position.save).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the target plan does not exist", async () => {
+    repos.plan.load = jest.fn(async (_c: string, planId: string) => planId === "target" ? null : { id: "old", serviceDate: new Date("2026-09-20") });
+    const body = { ministryId: "m1", serviceDate: "2026-09-27", copyMode: "positions", targetPlanId: "target" };
+    const result = await (makeController(repos) as any).copy("old", { body }, {});
+    expect(result).toEqual({ obj: {}, status: 404 });
+    expect(repos.plan.save).not.toHaveBeenCalled();
   });
 });
 

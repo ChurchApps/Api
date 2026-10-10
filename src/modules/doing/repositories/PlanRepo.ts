@@ -68,6 +68,10 @@ export class PlanRepo {
     await getDb().updateTable("plans").set({ lastAutofillRunId: runId }).where("id", "=", planId).where("churchId", "=", churchId).execute();
   }
 
+  public async updateNotes(churchId: string, planId: string, notes: string) {
+    await getDb().updateTable("plans").set({ notes }).where("id", "=", planId).where("churchId", "=", churchId).execute();
+  }
+
   // Scope expansion source: plans of a planType with serviceDate inside the reminder horizon.
   public async loadByPlanTypeIdInRange(churchId: string, planTypeId: string, from: Date, to: Date) {
     return getDb().selectFrom("plans").selectAll()
