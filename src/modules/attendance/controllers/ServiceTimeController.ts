@@ -4,6 +4,8 @@ import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { ServiceTime, GroupServiceTime } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { CheckinGateHelper } from "../helpers/index.js";
 
 @controller("/attendance/servicetimes")
 export class ServiceTimeController extends AttendanceBaseController {
@@ -52,6 +54,7 @@ export class ServiceTimeController extends AttendanceBaseController {
       if (req.query.serviceId !== undefined) data = await this.repos.serviceTime.loadNamesByServiceId(au.churchId, req.query.serviceId.toString());
       else data = await this.repos.serviceTime.loadNamesWithCampusService(au.churchId);
       const result: ServiceTime[] = this.repos.serviceTime.convertAllToModel(au.churchId, data as any);
+      await this.appendCheckinOpen(au.churchId, result);
       if (result.length > 0 && this.include(req, "groups")) await this.appendGroups(au.churchId, result);
       return result;
     });
@@ -75,6 +78,14 @@ export class ServiceTimeController extends AttendanceBaseController {
       await this.repos.serviceTime.delete(au.churchId, id);
       return {};
     });
+  }
+
+  // checkinOpen lets check-in clients hide service times whose scheduled window is closed right now.
+  private async appendCheckinOpen(churchId: string, times: ServiceTime[]) {
+    const scheduled = times.filter((t) => CheckinGateHelper.hasSchedule(t));
+    const timeZone = scheduled.length > 0 ? (await getMembershipModuleGateway().loadChurch(churchId))?.timeZone : undefined;
+    const now = new Date();
+    times.forEach((t) => (t.checkinOpen = CheckinGateHelper.isServiceTimeOpen(t, now, timeZone)));
   }
 
   private async appendGroups(churchId: string, times: ServiceTime[]) {

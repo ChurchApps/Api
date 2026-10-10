@@ -5,7 +5,7 @@ import { Visit, VisitSession, Session } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { SecurityCodeHelper, CheckinGateHelper } from "../helpers/index.js";
-import type { GateGroup, GateCount, GateIncoming } from "../helpers/CheckinGateHelper.js";
+import type { GateGroup, GateCount, GateIncoming, GateServiceTime } from "../helpers/CheckinGateHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 @controller("/attendance/visits")
@@ -287,6 +287,7 @@ export class VisitController extends AttendanceBaseController {
   private async evaluateGates(churchId: string, submittedVisits: Visit[], batchPersonIds: string[], acknowledgeWarnings: boolean): Promise<{ body: any; status: number } | null> {
     const incoming: Record<string, GateIncoming> = {};
     const targetGroupIds = new Set<string>();
+    const serviceTimeGroups: Record<string, Set<string>> = {};
     submittedVisits.forEach((sv) => {
       const isVolunteer = sv.checkinType === "volunteer";
       const isGuest = sv.checkinType === "guest";
@@ -294,6 +295,8 @@ export class VisitController extends AttendanceBaseController {
         const gid = vs.session?.groupId;
         if (!gid) return;
         targetGroupIds.add(gid);
+        const stId = vs.session?.serviceTimeId;
+        if (stId) (serviceTimeGroups[stId] ?? (serviceTimeGroups[stId] = new Set())).add(gid);
         const e = incoming[gid] ?? (incoming[gid] = { total: 0, volunteers: 0, guests: 0, nonVolunteers: 0 });
         e.total++;
         if (isVolunteer) e.volunteers++;
@@ -313,6 +316,10 @@ export class VisitController extends AttendanceBaseController {
 
     const groups: Record<string, GateGroup> = {};
     groupList.forEach((g) => (groups[g.id] = g));
+
+    const notOpen = await this.findClosedServiceTimeGroups(churchId, serviceTimeGroups, groups);
+    if (notOpen.length > 0) return { body: { error: "notOpen", groups: notOpen }, status: 409 };
+
     const current: Record<string, GateCount> = {};
     countRows.forEach((r) => (current[r.groupId] = { total: r.total, volunteers: r.volunteers, guests: r.guests }));
     const ratioEnforcement = ratioSetting === "block" ? "block" : "warn";
@@ -326,6 +333,23 @@ export class VisitController extends AttendanceBaseController {
       return { body: { warning: true, error: "ratio", groups: warnings }, status: 409 };
     }
     return null;
+  }
+
+  // Groups being checked into a service time whose scheduled check-in window is not open right now.
+  private async findClosedServiceTimeGroups(churchId: string, serviceTimeGroups: Record<string, Set<string>>, groups: Record<string, GateGroup>) {
+    const serviceTimes = (await this.repos.serviceTime.loadByIds(churchId, Object.keys(serviceTimeGroups))) as (GateServiceTime & { id: string })[];
+    const scheduled = serviceTimes.filter((st) => CheckinGateHelper.hasSchedule(st));
+    if (scheduled.length === 0) return [];
+    const timeZone = (await getMembershipModuleGateway().loadChurch(churchId))?.timeZone;
+    const now = new Date();
+    const result: { groupId: string; groupName: string; reason: "notOpen" }[] = [];
+    scheduled.forEach((st) => {
+      if (CheckinGateHelper.isServiceTimeOpen(st, now, timeZone)) return;
+      serviceTimeGroups[st.id].forEach((groupId) => {
+        if (!result.some((r) => r.groupId === groupId)) result.push({ groupId, groupName: groups[groupId]?.name ?? "", reason: "notOpen" });
+      });
+    });
+    return result;
   }
 
   private populateDeleteIds(existingVisits: Visit[], _submittedVisits: Visit[], visitSessions: VisitSession[], deleteVisitIds: string[], deleteVisitSessionIds: string[]) {
