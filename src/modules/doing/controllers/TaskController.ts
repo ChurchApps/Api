@@ -280,6 +280,20 @@ export class TaskController extends DoingBaseController {
   }
 
   // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)
+  @httpPost("/:id/conversation")
+  public async setConversation(@requestParam("id") id: string, req: express.Request<{}, {}, { conversationId: string }>, res: express.Response): Promise<any> {
+    // First conversation wins so two editors never split a card's notes.
+    return this.withCard(req, res, id, async (task) => {
+      if (task.conversationId) return task;
+      if (!req.body?.conversationId) return this.json({ message: "conversationId required" }, 400);
+      task.conversationId = req.body.conversationId;
+      const saved = await this.repos.task.save(task);
+      await InternalEventBus.publish(task.churchId, "task.updated", saved);
+      return saved;
+    });
+  }
+
+  // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)
   @httpPost("/:id/snooze")
   public async snooze(@requestParam("id") id: string, req: express.Request<{}, {}, { days: number }>, res: express.Response): Promise<any> {
     return this.withCard(req, res, id, (task) => WorkflowHelper.snooze(task, req.body.days, this.repos));

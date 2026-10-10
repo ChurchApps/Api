@@ -162,3 +162,34 @@ describe("TaskController.moveStep workflow scoping", () => {
     expect(result).toEqual({ updated: [], skipped: ["t1"] });
   });
 });
+
+describe("TaskController.setConversation", () => {
+  function setup(task: any, canEdit = true) {
+    const repos: any = { task: { load: jest.fn(async () => task), save: jest.fn(async (t: any) => ({ ...t })) } };
+    const controller: any = makeController([], repos);
+    controller.canEditCard = () => canEdit;
+    controller.json = (obj: any, status: number) => ({ obj, status });
+    return { controller, repos };
+  }
+
+  it("links a new conversation to a workflow card", async () => {
+    const { controller, repos } = setup({ id: "t1", churchId: "c1", workflowId: "w1", stepId: "s1" });
+    const result = await controller.setConversation("t1", { body: { conversationId: "conv1" } }, {});
+    expect(repos.task.save).toHaveBeenCalledWith(expect.objectContaining({ id: "t1", conversationId: "conv1" }));
+    expect(result.conversationId).toBe("conv1");
+  });
+
+  it("keeps the card's existing conversation", async () => {
+    const { controller, repos } = setup({ id: "t1", churchId: "c1", workflowId: "w1", stepId: "s1", conversationId: "conv0" });
+    const result = await controller.setConversation("t1", { body: { conversationId: "conv1" } }, {});
+    expect(repos.task.save).not.toHaveBeenCalled();
+    expect(result.conversationId).toBe("conv0");
+  });
+
+  it("401s someone who cannot edit the card", async () => {
+    const { controller, repos } = setup({ id: "t1", churchId: "c1", workflowId: "w1", stepId: "s1" }, false);
+    const result = await controller.setConversation("t1", { body: { conversationId: "conv1" } }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.task.save).not.toHaveBeenCalled();
+  });
+});
