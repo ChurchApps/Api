@@ -74,8 +74,11 @@ export class SubmissionHelper {
     await ContentLibraryHelper.removeKey(ContentLibraryHelper.pendingKey(sub.id || "", name));
   }
 
-  /** draft → pending: registry + proposal-type validation, upload presence, duplicate hash, rate limits, triage score, 409 on a competing pending submission. */
-  static async submit(repos: Repos, sub: Submission, asset: Asset): Promise<Outcome<{ status: string }>> {
+  /**
+   * draft → pending: registry + proposal-type validation, upload presence, duplicate hash, rate limits, triage score, 409 on a competing pending submission.
+   * byReviewer: the submitter is a reviewer submitting their own draft, so a song closed to community edits still takes it.
+   */
+  static async submit(repos: Repos, sub: Submission, asset: Asset, opts: { byReviewer?: boolean } = {}): Promise<Outcome<{ status: string }>> {
     if (sub.status !== "draft") return fail(400, "only drafts can be submitted");
     const def = ASSET_TYPES[asset.assetType || ""];
     if (!def) return fail(400, "unknown asset type");
@@ -101,6 +104,7 @@ export class SubmissionHelper {
       ctx.livePayload = await PublishHelper.editablePayload(repos, asset);
       ctx.byPublisher = !!sub.submittedBy && sub.submittedBy === asset.publisherUserId;
       ctx.communityEdits = RightsHelper.acceptsProposals(asset.license);
+      ctx.byReviewer = !!opts.byReviewer;
     }
     const errors = validateSubmission(def, payload, proposed, live, ctx);
     if (errors.length) return fail(400, errors);

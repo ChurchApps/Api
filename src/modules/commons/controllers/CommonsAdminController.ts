@@ -6,7 +6,7 @@ import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { ASSET_TYPES } from "../helpers/AssetTypes.js";
 import { parseContributors } from "../helpers/ContributorsHelper.js";
 import { audioKeysToAdd, baseName, packageDirFrom } from "../helpers/PackageLayout.js";
-import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, PublishHelper, QualityHelper, ReviewerHelper, userNames, type Reviewer } from "../helpers/index.js";
+import { CommonsMailHelper, ContentLibraryHelper, DuplicateHelper, isServerAdmin, PublishHelper, QualityHelper, ReviewerHelper, userNames, type Reviewer } from "../helpers/index.js";
 import { SongPackageHelper } from "../helpers/SongPackageHelper.js";
 import { CommonsMauticHelper } from "../helpers/CommonsMauticHelper.js";
 import { Repos } from "../repositories/index.js";
@@ -50,7 +50,8 @@ export class CommonsAdminController extends CommonsBaseController {
   @httpGet("/status")
   public async status(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const admin = !!au.id && au.checkAccess(Permissions.server.admin);
+      // the WorshipCommons site's user-level token has no church permissions, so a server admin is looked up there
+      const admin = !!au.id && (au.checkAccess(Permissions.server.admin) || await isServerAdmin(au.id));
       const musicEditor = ReviewerHelper.isMusicEditor(au);
       if (!admin && !musicEditor) return { admin: false, musicEditor: false };
       return { admin, musicEditor, pendingCount: await this.repos.submission.countByStatus("pending") };

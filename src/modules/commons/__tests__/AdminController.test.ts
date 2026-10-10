@@ -31,11 +31,12 @@ jest.mock("../helpers/index", () => ({
     fileSummary: (files: any[]) => files.map((f) => ({ name: f.name, action: f.action, role: f.name }))
   },
   QualityHelper: { score: jest.fn(async () => ({})) },
-  userNames: jest.fn(async () => ({ user0000001: "Sub Mitter", owner000001: "Ow Ner" }))
+  userNames: jest.fn(async () => ({ user0000001: "Sub Mitter", owner000001: "Ow Ner" })),
+  isServerAdmin: jest.fn(async () => false)
 }));
 
 import { CommonsAdminController } from "../controllers/CommonsAdminController.js";
-import { PublishHelper } from "../helpers/index.js";
+import { isServerAdmin, PublishHelper } from "../helpers/index.js";
 
 const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "user0000001", status: "pending", type: "correction", payload: { name: "Proposed" } });
 
@@ -77,6 +78,13 @@ describe("admin submissions", () => {
     expect(await visitor.status(req(), {} as any)).toEqual({ admin: false, musicEditor: false });
   });
 
+  it("finds a server admin on /status whose token has no church permissions (the WorshipCommons site's)", async () => {
+    (isServerAdmin as jest.Mock).mockResolvedValueOnce(true);
+    const { controller } = adminController({}, false);
+    expect(await controller.status(req(), {} as any)).toEqual({ admin: true, musicEditor: false, pendingCount: 4 });
+    expect(isServerAdmin).toHaveBeenCalledWith("admin000001");
+  });
+
   it("gates everything on Server/Admin", async () => {
     const { controller } = adminController({}, false);
     expect(await controller.submissions(req(), {} as any)).toEqual({ obj: {}, status: 401 });
@@ -88,6 +96,12 @@ describe("admin submissions", () => {
     const { controller } = adminController();
     expect(await controller.approve(req({ note: "ok" }), {} as any)).toEqual({ status: "approved", assetId: "asset000001", declined: [] });
     expect(PublishHelper.approve).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "sub00000001" }), expect.objectContaining({ id: "asset000001" }), "admin000001", "ok", []);
+  });
+
+  it("lets a reviewer approve their own submission", async () => {
+    const { controller } = adminController({ submission: { loadById: jest.fn(async () => ({ ...pending(), submittedBy: "admin000001" })) } });
+    expect(await controller.approve(req(), {} as any)).toEqual({ status: "approved", assetId: "asset000001", declined: [] });
+    expect(PublishHelper.approve).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ submittedBy: "admin000001" }), expect.anything(), "admin000001", undefined, []);
   });
 
   it("refuses to approve anything not pending or whose asset was removed", async () => {

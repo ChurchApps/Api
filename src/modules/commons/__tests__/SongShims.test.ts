@@ -16,6 +16,9 @@ jest.mock("../helpers/index", () => ({
   parseContributors: jest.requireActual("../helpers/ContributorsHelper").parseContributors,
   recordAssetDownload: jest.fn(async () => 7),
   PublishHelper: { discardProposed: jest.fn(async () => {}) },
+  // the real one reads Environment; here a reviewer is whoever passes the server-admin check
+  ReviewerHelper: { canReview: (au: any) => !!au?.id && au.checkAccess() },
+  isServerAdmin: jest.fn(async () => false),
   SubmissionHelper: {
     createDraft: jest.fn(async (_r: any, _au: any, body: any) => ({ ok: true, value: { submission: { id: "sub00000001", status: "draft" }, asset: { id: body.assetId || "asset000001", assetType: "song", name: body.payload?.name } } })),
     storeInline: jest.fn(async () => ({ ok: true, value: {} })),
@@ -104,6 +107,16 @@ describe("legacy song shims", () => {
     // the writer may still add their own transcription
     repos.asset.loadPublished.mockResolvedValueOnce({ id: "asset000009", assetType: "song", status: "published", license: "larry-holder", publisherUserId: "user0000001" });
     expect(await controller.submitAbc({ params: { id: "asset000009" }, body: { abc: "X:1\nK:C\nCDEF|" } } as any, {} as any)).toEqual({ id: "sub00000001", status: "pending" });
+  });
+
+  it("POST /songs/:id/abc takes a reviewer's transcription on a song closed to community edits, carrying the license version", async () => {
+    const { controller, repos } = songController();
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ id: "admin000001", checkAccess: () => true });
+    repos.asset.loadPublished.mockResolvedValueOnce({ id: "asset000009", assetType: "song", status: "published", license: "larry-holder", publisherUserId: null });
+    repos.song.loadById.mockResolvedValueOnce({ id: "asset000009", title: "God Cares For You", writer: "Larry Holder", license: "larry-holder", licenseVersion: "permissions", status: "published" });
+    expect(await controller.submitAbc({ params: { id: "asset000009" }, body: { abc: "X:1" } } as any, {} as any)).toEqual({ id: "sub00000001", status: "pending" });
+    expect(SubmissionHelper.createDraft).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ payload: expect.objectContaining({ license: "larry-holder", licenseVersion: "permissions" }) }));
+    expect(SubmissionHelper.submit).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), { byReviewer: true });
   });
 
   it("library toggles write the saved flag on the caller's rating row", async () => {

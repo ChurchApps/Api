@@ -366,3 +366,46 @@ describe("SubmissionHelper proposal types", () => {
     expect((await SubmissionHelper.storeInline(r, draft(), newAsset, "score.musicxml", "application/xml", Buffer.from("<score/>"), "user0000001") as any).ok).toBe(true);
   });
 });
+
+describe("SubmissionHelper reviewer edits on a song closed to community edits", () => {
+  beforeEach(() => jest.clearAllMocks());
+  const msg = "This song's license keeps all changes with the writer, so it does not accept proposed edits";
+  // a catalog import: no publisher, still on its seed "Imported" record, under a writer grant nobody here holds
+  const imported: any = { id: "4iReiC4JRP8", assetType: "song", name: "God Cares For You", tags: "Praise", language: "English", license: "larry-holder", status: "published", publishedSubmissionId: "subimport01" };
+  const importRecord = { id: "subimport01", note: "Imported", status: "approved", submittedBy: "seed", payload: { name: "God Cares For You", license: "larry-holder", detail: { writer: "Larry Holder", chordPro: "GodÂ’s care" } } };
+  const live = { id: "4iReiC4JRP8", title: "God Cares For You", writer: "Larry Holder", licenseVersion: "permissions", chordPro: "Verse 1\nA Musical For Young Voices" };
+  const fixed = { writer: "Larry Holder", chordPro: "Verse 1\n[G]God cares for you", certified: true };
+  const correction = (extra: any = {}) => ({ name: "God Cares For You", tags: "Praise, Provision", language: "English", license: "larry-holder", licenseVersion: "permissions", type: "correction", detail: fixed, ...extra });
+  const sub = (payload: any): any => ({ id: "sub00000001", assetId: imported.id, status: "draft", submittedBy: "admin000001", note: "replaced the scraped page with the real lyrics", payload });
+  const reposFor = () => repos({ submission: { loadById: jest.fn(async () => importRecord) }, song: { loadById: jest.fn(async () => live) } });
+
+  it("takes a reviewer's correction though the reviewer holds no grant for the song's license", async () => {
+    const r = reposFor();
+    expect(await SubmissionHelper.submit(r, sub(correction()), imported, { byReviewer: true })).toEqual({ ok: true, value: { status: "pending" } });
+    // the writer grant's own version survives: submit fills a default only when the payload has none
+    expect(r.submission.update.mock.calls[0][1].payload).toMatchObject({ license: "larry-holder", licenseVersion: "permissions", tags: "Praise, Provision" });
+  });
+
+  it("still refuses the same edit from anyone else", async () => {
+    const result: any = await SubmissionHelper.submit(reposFor(), sub(correction()), imported);
+    expect(result.status).toBe(400);
+    expect(result.errors).toContain(msg);
+  });
+
+  it("never lets a reviewer change the song's license or a master's license", async () => {
+    const relicensed: any = await SubmissionHelper.submit(reposFor(), sub(correction({ license: "CC-BY" })), imported, { byReviewer: true });
+    expect(relicensed.errors).toContain("Only the writer can change a song's license");
+    expect(relicensed.errors).not.toContain(msg);
+    const r = reposFor();
+    r.assetFile.loadBySubmission.mockResolvedValue([{ name: "demoAudio.mp3", sizeBytes: 100, action: "add" }]);
+    const master: any = await SubmissionHelper.submit(r, sub(correction({ type: "additionalFile", detail: { writer: "Larry Holder", certified: true, recordingOwned: true, masterLicense: "CC-BY" } })), imported, { byReviewer: true });
+    expect(master.errors).toContain("Only the writer can change the master recording's license");
+  });
+
+  it("takes a reviewer's demo recording as an additional file", async () => {
+    const r = reposFor();
+    r.assetFile.loadBySubmission.mockResolvedValue([{ name: "demoAudio.mp3", sizeBytes: 100, action: "add" }]);
+    const files = correction({ type: "additionalFile", tags: "Praise", detail: { ...fixed, recordingOwned: true } });
+    expect(await SubmissionHelper.submit(r, sub(files), imported, { byReviewer: true })).toEqual({ ok: true, value: { status: "pending" } });
+  });
+});
