@@ -21,8 +21,10 @@ export class ConjunctionHelper {
   public static async getPeopleIdsForStepRoute(churchId: string, stepRouteId: string, repositories?: Repos) {
     const repos = repositories || (await RepoManager.getRepos<Repos>("doing"));
     const conjunctions = (await repos.conjunction.loadForStepRoute(churchId, stepRouteId)) as Conjunction[];
-    if (!conjunctions || conjunctions.length === 0) return [];
+    // A route with no conditions matches everyone, as B1Admin tells the user.
+    if (!conjunctions || conjunctions.length === 0) return ["*"];
     let conditions = (await repos.condition.loadForStepRoute(churchId, stepRouteId)) as Condition[];
+    if (!conditions || conditions.length === 0) return ["*"];
     conditions = await ConditionHelper.getPeopleIdsMatchingConditions(conditions);
     const tree = this.buildTree(conjunctions, conditions);
     if (!tree) return [];

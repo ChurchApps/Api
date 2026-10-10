@@ -106,6 +106,23 @@ describe("WorkflowHelper on-enter actions", () => {
     expect(notifyMock).not.toHaveBeenCalled();
   });
 
+  it("treats a route whose condition check throws as not matched and keeps routing", async () => {
+    const { ConjunctionHelper } = jest.requireMock("../ConjunctionHelper.js");
+    ConjunctionHelper.personMatchesStepRoute.mockRejectedValueOnce(new Error("Invalid condition operator: contains"));
+    const repos = buildRepos(steps, {}, {
+      stepACT: [
+        { id: "r1", trigger: "onEnter", kind: "personMatch", targetStepId: "stepA" },
+        { id: "r2", trigger: "onEnter", kind: "always", targetStepId: "stepB" }
+      ]
+    });
+    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(task.stepId).toBe("stepB");
+    expect(repos.task.save).toHaveBeenCalled();
+  });
+
   it("does NOT run on-enter actions on a manual (suppressed) move", async () => {
     const repos = buildRepos(steps, { stepACT: [{ actionType: "addNote", config: JSON.stringify({ note: "should not run" }) }] });
     const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };

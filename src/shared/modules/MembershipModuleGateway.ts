@@ -89,6 +89,12 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
     "maritalStatus"
   ]);
   private static readonly ALLOWED_OPERATORS = new Set(["=", "!=", ">", "<", ">=", "<=", "LIKE"]);
+  // Text operators offered by the B1Admin condition editor, mapped to LIKE patterns.
+  private static readonly TEXT_OPERATORS = new Map<string, (v: string) => string>([
+    ["contains", (v) => `%${v}%`],
+    ["startsWith", (v) => `${v}%`],
+    ["endsWith", (v) => `%${v}`]
+  ]);
 
   private getDb() {
     return KyselyPool.getDb("membership") as any;
@@ -130,17 +136,23 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
   }
 
   public async loadIdsMatchingCondition(condition: ConditionInput): Promise<string[]> {
-    if (!MembershipModuleGatewayDb.ALLOWED_OPERATORS.has(condition.operator)) {
+    const likePattern = MembershipModuleGatewayDb.TEXT_OPERATORS.get(condition.operator);
+    if (!likePattern && !MembershipModuleGatewayDb.ALLOWED_OPERATORS.has(condition.operator)) {
       throw new Error(`Invalid condition operator: ${condition.operator}`);
     }
     const dbField = this.getDBField(condition);
-    const dbValue = this.getDBValue(condition);
+    let dbValue = this.getDBValue(condition);
+    let operator = condition.operator;
+    if (likePattern) {
+      operator = "LIKE";
+      dbValue = likePattern((dbValue || "").replace(/[\\%_]/g, "\\$&"));
+    }
 
     const rows = (await this.getDb().selectFrom("people")
       .select("id")
       .where("churchId", "=", condition.churchId)
       .where("removed", "=", 0)
-      .where(sql`${sql.raw(dbField)} ${sql.raw(condition.operator)} ${dbValue}`)
+      .where(sql`${sql.raw(dbField)} ${sql.raw(operator)} ${dbValue}`)
       .execute()) as { id: string }[];
 
     return rows.map((r) => r.id);

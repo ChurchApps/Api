@@ -274,23 +274,36 @@ export class PlanController extends DoingBaseController {
   }
 
   @httpPost("/copy/:id")
-  public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan & { copyMode?: string; copyServiceOrder?: boolean }>, res: express.Response): Promise<any> {
+  public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan & { copyMode?: string; copyServiceOrder?: boolean; targetPlanId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditMinistry(au, req.body.ministryId)) return this.json({}, 401);
       const copyMode = req.body.copyMode || "all"; // "none" | "positions" | "all"
       const copyServiceOrder = req.body.copyServiceOrder || false;
+      const targetPlanId = req.body.targetPlanId;
       const oldPlan = (await this.repos.plan.load(au.churchId, id)) as Plan;
       if (!oldPlan) return this.json({}, 404);
 
-      const p = { ...req.body } as Plan;
-      delete p.id;
-      delete (p as any).copyMode;
-      delete (p as any).copyServiceOrder;
-      p.churchId = au.churchId;
-      p.serviceDate = new Date(req.body.serviceDate || new Date());
-      p.notes ??= oldPlan.notes;
-      p.signupDeadlineHours ??= oldPlan.signupDeadlineHours;
-      const plan = await this.repos.plan.save(p);
+      let plan: Plan;
+      if (targetPlanId) {
+        // Copy into an existing plan instead of creating a new one.
+        const target = (await this.repos.plan.load(au.churchId, targetPlanId)) as Plan;
+        if (!target) return this.json({}, 404);
+        if (!await PlanAuth.canEditPlan(au, targetPlanId)) return this.json({}, 401);
+        plan = target;
+      } else {
+        const p = { ...req.body } as Plan;
+        delete p.id;
+        delete (p as any).copyMode;
+        delete (p as any).copyServiceOrder;
+        delete (p as any).targetPlanId;
+        p.churchId = au.churchId;
+        p.serviceDate = new Date(req.body.serviceDate || new Date());
+        p.notes ??= oldPlan.notes;
+        p.signupDeadlineHours ??= oldPlan.signupDeadlineHours;
+        p.showVolunteerNames ??= oldPlan.showVolunteerNames;
+        p.autoReplaceOnDecline ??= oldPlan.autoReplaceOnDecline;
+        plan = await this.repos.plan.save(p);
+      }
 
       let timeIdMap = new Map<string, string>();
       let positionIdMap = new Map<string, string>();

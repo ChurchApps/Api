@@ -40,6 +40,7 @@ export class PlanTemplateHelper {
   }
 
   public static async applyToPlan(repos: any, churchId: string, planId: string, data: PlanTemplateData, opts: { serviceOrder: boolean; positions: boolean }): Promise<void> {
+    if (data.notes) await repos.plan.updateNotes(churchId, planId, data.notes);
     if (opts.serviceOrder) {
       await repos.planItemTime.deleteByPlanId(churchId, planId);
       await repos.planItem.deleteByPlanId(churchId, planId);
