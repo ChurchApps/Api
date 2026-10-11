@@ -31,6 +31,7 @@ jest.mock("../../helpers/index", () => {
 jest.mock("../../auth/index", () => ({ AuthenticatedUser: { login: jest.fn(), loadUserByJwt: jest.fn() } }));
 jest.mock("../../models/index", () => ({}));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn() } }));
+jest.mock("../../../../shared/helpers/ChurchEmailLimiter.js", () => ({ ChurchEmailLimiter: { reserve: jest.fn(async () => ["r1"]), settle: jest.fn(async () => {}) } }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: (arr: any[], k: string, v: any) => (arr || []).find((x: any) => x[k] === v) } }));
 
 import bcrypt from "bcryptjs";
@@ -402,5 +403,47 @@ describe("UserController security scoping", () => {
     const result: any = await (controller as any).impersonate({ params: { id: "u5" }, headers: {} }, {});
     expect(result.obj.jwt).toBe("jwt");
     expect(AuditLogHelper.log).toHaveBeenCalledWith(expect.anything(), "c1", "staff1", "security", "impersonate", "user", "u5", expect.anything(), "1.1.1.1");
+  });
+});
+
+describe("UserController.sendInviteEmail", () => {
+  const send = UserHelper.sendInviteEmail as jest.Mock;
+  beforeEach(() => send.mockClear());
+
+  async function invite(user: any) {
+    const { controller, repos, row } = userController(user);
+    repos.person.searchEmail.mockResolvedValue([{ email: "new@b.c" }]);
+    repos.church = { loadById: jest.fn(async () => ({ name: "Grace" })) };
+    const result: any = await (controller as any).sendInviteEmail({ body: { email: "new@b.c", personName: "New", contextName: "Staff" }, headers: {} }, {});
+    return { result, repos, row };
+  }
+
+  // loadOrCreate gives a brand-new user a random password, so the invite must let them set one.
+  it("sends a never-logged-in user a 7-day set-password link", async () => {
+    const created = new Date("2026-10-01T00:00:00Z");
+    const { result, row } = await invite({ id: "u9", email: "new@b.c", registrationDate: created, lastLogin: created });
+    expect(result.status).toBe(200);
+    const [, , , , link, label] = send.mock.calls[0];
+    expect(label).toBe("Set Your Password");
+    const raw = link.match(/^\/login\?auth=([0-9a-f-]{36})$/)[1];
+    const parsed = AuthGuidHelper.parse(row.authGuid);
+    expect(parsed.hash).toBe(AuthGuidHelper.hash(raw));
+    expect(parsed.expires).toBeGreaterThan(Date.now() + 6.9 * 24 * 60 * 60 * 1000);
+    expect(parsed.expires).toBeLessThanOrEqual(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  });
+
+  it("sends a user who has logged in a plain login link", async () => {
+    const { row } = await invite({ id: "u9", email: "new@b.c", registrationDate: new Date("2026-10-01T00:00:00Z"), lastLogin: new Date("2026-10-05T00:00:00Z") });
+    const [, , , , link, label] = send.mock.calls[0];
+    expect(link).toBe("/login");
+    expect(label).toBe("Log In");
+    expect(row.authGuid).toBeUndefined();
+  });
+
+  it("sends someone without an account to the register view", async () => {
+    await invite(null);
+    const [, , , , link, label] = send.mock.calls[0];
+    expect(link).toBe("/login?action=register");
+    expect(label).toBe("Sign Up");
   });
 });

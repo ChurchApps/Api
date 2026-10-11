@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { v4 } from "uuid";
 
 const AUTH_GUID_TTL_MS = 15 * 60 * 1000;
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class AuthGuidHelper {
   public static readonly ttlMs = AUTH_GUID_TTL_MS;
@@ -14,6 +15,12 @@ export class AuthGuidHelper {
   public static mint(neverExpires = false): { raw: string; stored: string } {
     const raw = v4();
     return { raw, stored: `${this.hash(raw)}:${neverExpires ? 0 : Date.now() + AUTH_GUID_TTL_MS}` };
+  }
+
+  // Emailed invites are opened days later, so they get a longer window than a typed-in code.
+  public static mintInvite(): { raw: string; stored: string } {
+    const raw = v4();
+    return { raw, stored: `${this.hash(raw)}:${Date.now() + INVITE_TTL_MS}` };
   }
 
   public static parse(stored: string | null | undefined): { hash: string; expires: number; loginUsed: boolean } | null {

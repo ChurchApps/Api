@@ -680,15 +680,24 @@ export class UserController extends MembershipBaseController {
       const church = await this.repos.church.loadById(au.churchId);
 
       const inviterEmail = au.email || undefined;
-      let loginLink = "/";
-      let isExistingUser = false;
+      let loginLink = "/login?action=register";
+      let actionLabel = "Sign Up";
       const user = await this.repos.user.loadByEmail(email);
       if (user) {
-        isExistingUser = true;
         loginLink = "/login";
+        actionLabel = "Log In";
+        // loadOrCreate gives new users a random password and lastLogin = registrationDate; they need to set their own.
+        const neverLoggedIn = user.lastLogin && user.registrationDate && new Date(user.lastLogin).getTime() === new Date(user.registrationDate).getTime();
+        if (neverLoggedIn) {
+          const minted = AuthGuidHelper.mintInvite();
+          user.authGuid = minted.stored;
+          await this.repos.user.save(user);
+          loginLink = "/login?auth=" + minted.raw;
+          actionLabel = "Set Your Password";
+        }
       }
       try {
-        await UserHelper.sendInviteEmail(email, (personName || "").slice(0, 100), contextName.slice(0, 100), church?.name || "", loginLink, isExistingUser, inviterEmail);
+        await UserHelper.sendInviteEmail(email, (personName || "").slice(0, 100), contextName.slice(0, 100), church?.name || "", loginLink, actionLabel, inviterEmail);
         await ChurchEmailLimiter.settle(au.churchId, reserved[0], true);
       } catch (err: any) {
         await ChurchEmailLimiter.settle(au.churchId, reserved[0], false, err?.message || "Send failed");
