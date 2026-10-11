@@ -3,6 +3,7 @@ export { statusFromError } from "./httpError.js";
 export { retryOnDeadlock } from "./retryOnDeadlock.js";
 export { Permissions, permissionsList, type IPermission, type ApiName, type DisplaySection, type ContentType, type Actions } from "./Permissions.js";
 export { PlanAuth } from "./PlanAuth.js";
+export { TaskAuth } from "./TaskAuth.js";
 export { UniqueIdHelper } from "./UniqueIdHelper.js";
 export { DateHelper } from "./DateHelper.js";
 export { StripeHelper } from "./StripeHelper.js";

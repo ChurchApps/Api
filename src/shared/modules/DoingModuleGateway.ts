@@ -5,6 +5,8 @@ export interface DoingModuleGateway {
   loadAssignmentsByPerson(churchId: string, personId: string): Promise<any[]>;
   // Tasks the person is assigned or created, any status.
   loadTasksByPerson(churchId: string, personId: string): Promise<any[]>;
+  // Single card, for gating card notes in messaging.
+  loadTask(churchId: string, taskId: string): Promise<any | null>;
   loadBlockoutDatesByPerson(churchId: string, personId: string): Promise<any[]>;
   loadUnconfirmedAssignments(): Promise<any[]>;
   loadPosition(churchId: string, positionId: string): Promise<any | null>;
@@ -36,6 +38,10 @@ class DoingModuleGatewayDb implements DoingModuleGateway {
       .where("churchId", "=", churchId)
       .where((eb: any) => eb.or([eb("assignedToId", "=", personId), eb("createdById", "=", personId)]))
       .execute();
+  }
+
+  public async loadTask(churchId: string, taskId: string) {
+    return (await (await this.repos()).task.load(churchId, taskId)) ?? null;
   }
 
   public async loadBlockoutDatesByPerson(churchId: string, personId: string) {

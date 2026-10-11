@@ -1,7 +1,11 @@
 import "reflect-metadata";
 
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { tasks: { edit: "tasksEdit", view: "tasksView" }, people: { edit: "peopleEdit" } } }));
+jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { tasks: { edit: "tasksEdit", view: "tasksView" }, people: { edit: "peopleEdit" } } }));
+jest.mock("../../../../shared/helpers/index", () => ({
+  Permissions: { tasks: { edit: "tasksEdit", view: "tasksView" }, people: { edit: "peopleEdit" } },
+  TaskAuth: jest.requireActual("../../../../shared/helpers/TaskAuth").TaskAuth
+}));
 jest.mock("../../../../shared/events/InternalEventBus", () => ({ InternalEventBus: { publish: jest.fn() } }));
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: jest.fn() }));
 const prepareRequest = jest.fn();

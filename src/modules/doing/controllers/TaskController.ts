@@ -3,7 +3,7 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Task } from "../models/index.js";
 import { WorkflowHelper, DirectoryUpdateHelper, AccountDeletionHelper } from "../helpers/index.js";
-import { Permissions } from "../../../shared/helpers/index.js";
+import { Permissions, TaskAuth } from "../../../shared/helpers/index.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
@@ -79,11 +79,7 @@ export class TaskController extends DoingBaseController {
   }
 
   private canViewTask(au: { personId?: string; groupIds?: string[]; checkAccess: (p: any) => boolean }, task: Task): boolean {
-    if (au.checkAccess(Permissions.tasks.view)) return true;
-    const isMe = (type?: string, id?: string) => type === "person" && !!id && id === au.personId;
-    const isMyGroup = (type?: string, id?: string) => type === "group" && !!id && !!au.groupIds?.includes(id);
-    return isMe(task.associatedWithType, task.associatedWithId) || isMe(task.createdByType, task.createdById) || isMe(task.assignedToType, task.assignedToId)
-      || isMyGroup(task.assignedToType, task.assignedToId) || isMyGroup(task.createdByType, task.createdById);
+    return TaskAuth.canViewTask(au, task);
   }
 
   @httpGet("/")
