@@ -80,16 +80,16 @@ export class UserHelper {
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, "Welcome to " + appName + ".", contents);
   }
 
-  static sendInviteEmail(email: string, personName: string, contextName: string, churchName: string, loginLink: string, isExistingUser: boolean, inviterEmail?: string): Promise<any> {
+  static sendInviteEmail(email: string, personName: string, contextName: string, churchName: string, loginLink: string, actionLabel: string, inviterEmail?: string): Promise<any> {
     const appName = churchName || "ChurchApps";
     const appUrl = Environment.b1AdminRoot;
-    const actionLabel = isExistingUser ? "Log In" : "Sign Up";
     const subject = "You've been added to " + contextName.replace(/[\r\n]/g, " ");
     const contents =
       "<h2>Hello " + this.escapeHtml(personName) + ",</h2>" +
       "<p>You have been added to <strong>" + this.escapeHtml(contextName) + "</strong> at " + this.escapeHtml(appName) + ".</p>" +
       "<p>Click the button below to " + actionLabel.toLowerCase() + " and get started.</p>" +
-      `<p><a href="${appUrl}${loginLink}" class="btn btn-primary">${actionLabel}</a></p>`;
+      `<p><a href="${appUrl}${loginLink}" class="btn btn-primary">${actionLabel}</a></p>` +
+      (actionLabel === "Set Your Password" ? "<p style=\"color: #6b7280; font-size: 14px;\">This link expires in 7 days.</p>" : "");
     return TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, appName, appUrl, subject, contents, "EmailTemplate.html", inviterEmail || undefined);
   }
 
