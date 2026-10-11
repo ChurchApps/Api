@@ -5,6 +5,7 @@ import { Task } from "../models/index.js";
 import { WorkflowHelper, DirectoryUpdateHelper, AccountDeletionHelper } from "../helpers/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 @controller("/doing/tasks")
 export class TaskController extends DoingBaseController {
@@ -60,6 +61,20 @@ export class TaskController extends DoingBaseController {
       const task = (await this.repos.task.load(au.churchId, id)) as Task;
       if (task && !this.canViewTask(au, task)) return this.json({}, 401);
       return task;
+    });
+  }
+
+  // Contact info for the person a card is about, scoped to anyone who can view the card (e.g. the assigned caller without People access).
+  @httpGet("/:id/contact")
+  public async getContact(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (!task) return {};
+      if (!this.canViewTask(au, task)) return this.json({}, 401);
+      if (task.associatedWithType !== "person" || !task.associatedWithId) return {};
+      const person = await getMembershipModuleGateway().loadPerson(au.churchId, task.associatedWithId);
+      if (!person) return {};
+      return { personId: person.id, displayName: person.displayName, mobilePhone: person.mobilePhone, email: person.email };
     });
   }
 
