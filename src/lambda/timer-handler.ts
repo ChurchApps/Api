@@ -63,6 +63,11 @@ export const handle30MinTimer = async (_event: ScheduledEvent, _context: Context
     return SocketHelper.reapStaleConnections(messagingRepos);
   });
 
+  await JobRunHelper.run("conversationCleanup", async () => {
+    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    return messagingRepos.conversation.cleanup();
+  });
+
   console.log("[handle30MinTimer] ========== TIMER COMPLETE ==========");
   console.log("[handle30MinTimer] Total execution time:", Date.now() - startTime, "ms");
 };
