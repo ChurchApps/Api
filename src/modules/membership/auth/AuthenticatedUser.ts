@@ -11,8 +11,6 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     const userChurches = [...allUserChurches];
     if (userChurches.length > 1 && userChurches[0].church.id === "") userChurches.splice(0, 1);
 
-    // if (churches.length === 0) return null;
-    // else {
     AuthenticatedUser.setJwt(userChurches, user);
     const result: LoginResponse = {
       user: {
@@ -25,7 +23,6 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
       userChurches: userChurches
     };
     return result;
-    // }
   }
 
   public static getApiJwt(api: Api, user: User, userChurch: LoginUserChurch) {

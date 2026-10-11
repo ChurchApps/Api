@@ -110,34 +110,7 @@ export class OpenAiHelper {
         Notes: ${notes}
         `.trim();
 
-    /*
-    const prompt =
-      `You are a church social media manager. Based on the notes below, generate 3 engaging and inspiring social media content ideas.
-
-        For each idea, return an object with the following format:
-        {
-            postIdea: string,
-            visual: string,
-            caption: string
-        }
-
-        Return the response as a JSON array of 3 objects.
-
-        Notes: ${notes}
-        `.trim();*/
-
     if (!notes || notes.length === 0) {
-      // prompt = `You are a church social media manager. Generate 3 engaging and inspiring social media content ideas for church's socials.
-
-      // For each idea, return an object with the following format:
-      // {
-      //     postIdea: string,
-      //     visual: string,
-      //     caption: string
-      // }
-
-      // Return the response as a JSON array of 3 objects.
-      // `.trim();
       throw new Error("No notes provided");
     }
     const completion = await this.getCompletion(prompt);

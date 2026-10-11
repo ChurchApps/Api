@@ -1,4 +1,3 @@
-// import { Person } from "./index.js";
 import { VisitSession } from "./index.js";
 
 export class Visit {
@@ -16,7 +15,5 @@ export class Visit {
   public checkedOutById?: string;
   public checkinType?: string;
   public checkedInById?: string;
-
-  // public person?: Person;
   public visitSessions?: VisitSession[];
 }

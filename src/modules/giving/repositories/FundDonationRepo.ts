@@ -37,7 +37,6 @@ export class FundDonationRepo {
   }
 
   public async load(churchId: string, id: string) {
-    // return (await getDb().selectFrom("fundDonations").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
     const result = await sql<any>`
     SELECT fd.*, d.currency
     FROM fundDonations fd

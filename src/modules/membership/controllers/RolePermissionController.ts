@@ -60,15 +60,6 @@ export class RolePermissionController extends MembershipBaseController {
 
   private async checkAccess(_permissions: RolePermission[], permission: IPermission, au: AuthenticatedUser) {
     const hasAccess = au.checkAccess(permission);
-    /*
-    if (hasAccess) {
-        const roleIds: string[] = [];
-        permissions.forEach(p => { if (roleIds.indexOf(p.roleId) === -1) roleIds.push(p.roleId); })
-        if (roleIds.length > 0) {
-            const roles = await this.repos.role.loadByIds(roleIds);
-            roles.forEach(r => { if (r.appName !== au.appName) hasAccess = false; })
-        }
-    }*/
     return hasAccess;
   }
 }
