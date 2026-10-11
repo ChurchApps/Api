@@ -83,6 +83,48 @@ describe("ConversationRepo.updateStats", () => {
 });
 
 // A Kysely that compiles real MySQL but never connects; every statement it runs is recorded.
+// Production: a burst of ~100 POST /messaging/conversations finished one after another, up to 18 s each.
+// save() ran the global CALL cleanup() before every insert, and the saves queued behind it.
+// Cleanup now runs from the 30-minute timer, so a save is just its own INSERT or UPDATE.
+describe("ConversationRepo.save", () => {
+  const { getDb } = jest.requireMock("../../db/index");
+
+  it("creates a conversation with one INSERT and no cleanup call", async () => {
+    const { db, queries } = capturingDb();
+    getDb.mockReturnValue(db);
+    const input = { churchId: "C1", contentType: "group", contentId: "G1", title: "Chat", groupId: "G1", visibility: "public", allowAnonymousPosts: false };
+    const result = await new ConversationRepo().save({ ...input });
+    expect(result).toEqual({ ...input, id: "cvs_generated" });
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toMatch(/^\s*insert into `conversations`/i);
+    expect(queries.some((q) => /CALL\s+cleanup/i.test(q.sql))).toBe(false);
+  });
+
+  it("updates a conversation with one UPDATE and no cleanup call", async () => {
+    const { db, queries } = capturingDb();
+    getDb.mockReturnValue(db);
+    const input = { id: "CVS1", churchId: "C1", title: "Chat", groupId: "G1", visibility: "hidden", allowAnonymousPosts: true };
+    const result = await new ConversationRepo().save({ ...input });
+    expect(result).toEqual(input);
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toMatch(/^\s*update `conversations`/i);
+    expect(queries[0].parameters).toEqual(["Chat", "G1", "hidden", true, "CVS1", "C1"]);
+  });
+
+  it("cleanup() still calls the stored procedure", async () => {
+    const { db, queries } = capturingDb();
+    getDb.mockReturnValue(db);
+    await new ConversationRepo().cleanup();
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toMatch(/^CALL cleanup\(\)$/);
+  });
+
+  it("cleanup() ignores a missing stored procedure", async () => {
+    getDb.mockReturnValue({ getExecutor: () => { throw new Error("PROCEDURE cleanup does not exist"); } });
+    await expect(new ConversationRepo().cleanup()).resolves.toBeUndefined();
+  });
+});
+
 function capturingDb(rows: any[] = []) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();

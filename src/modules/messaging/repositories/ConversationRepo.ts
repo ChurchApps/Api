@@ -8,11 +8,6 @@ import { Conversation } from "../models/index.js";
 @injectable()
 export class ConversationRepo {
   public async save(conversation: Conversation) {
-    try {
-      await this.cleanup();
-    } catch {
-      // Stored procedure may not exist in every environment.
-    }
     return conversation.id ? this.update(conversation) : this.create(conversation);
   }
 
@@ -43,8 +38,14 @@ export class ConversationRepo {
     return model;
   }
 
-  private async cleanup() {
-    await sql`CALL cleanup()`.execute(getDb());
+  // Runs from the 30-minute timer. It used to run before every save, and a burst of new conversations
+  // queued behind it for up to 18 s.
+  public async cleanup() {
+    try {
+      await sql`CALL cleanup()`.execute(getDb());
+    } catch {
+      // Stored procedure may not exist in every environment.
+    }
   }
 
   public async loadByIds(churchId: string, ids: string[]) {

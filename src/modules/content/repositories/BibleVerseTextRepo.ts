@@ -40,9 +40,12 @@ export class BibleVerseTextRepo {
     return (await getDb().selectFrom("bibleVerseTexts").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
+  // The only index is (translationKey, verseKey). Without a verseKey bound MySQL read every cached verse of the
+  // translation; verseKey is "<bookKey>.<chapter>.<verse>", so the prefix keeps the read to one book.
   private async loadChapters(translationKey: string, bookKey: string, startChapter: number, endChapter: number) {
     return getDb().selectFrom("bibleVerseTexts").selectAll()
       .where("translationKey", "=", translationKey)
+      .where("verseKey", "like", bookKey.replace(/[\\%_]/g, "\\$&") + ".%")
       .where("bookKey", "=", bookKey)
       .where("chapterNumber", ">=", startChapter)
       .where("chapterNumber", "<=", endChapter)
