@@ -6,8 +6,12 @@ jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: jest.fn() }, EncryptionHelper: { decrypt: jest.fn((s: string) => "decrypted:" + s) } }));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn(), sendAttendance: jest.fn(), sendBlockedIps: jest.fn() } }));
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
-jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
+jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, tasks: { view: "tasksView" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch: jest.fn(async () => ({ id: "c1" })) }) }));
+
+// workflowCard notes check the card through the doing gateway (lazy import in the controller).
+const mockLoadTask = jest.fn(async () => null as any);
+jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ loadTask: (...args: any[]) => mockLoadTask(...(args as [])) }) }));
 
 import { ConversationController } from "../ConversationController.js";
 import { MessageController } from "../MessageController.js";
@@ -265,5 +269,31 @@ describe("ConversationController.forContent message loading", () => {
       },
       { ...convs[2], messages: [{ id: "m31", conversationId: "cv3", reactions: [] }] }
     ]);
+  });
+});
+
+describe("workflowCard notes are readable only by people who can open the card", () => {
+  const cardConv = { id: "card1", churchId: "c1", contentType: "workflowCard", contentId: "t1", allowAnonymousPosts: false, visibility: "hidden" };
+  const ASSIGNEE = au({ personId: "p9" });
+  const TASK_VIEWER = au({ access: ["tasksView"] });
+  beforeEach(() => mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "p9" })));
+
+  const readers: [string, (principal: any) => Promise<any>][] = [
+    ["messages/conversation/:id", (p) => (attach(new MessageController(), repos({ byId: cardConv }), p) as any).loadByConversation("card1", {}, {})],
+    ["messages/catchup/:churchId/:id", (p) => (attach(new MessageController(), repos({ byId: cardConv }), p) as any).catchup("c1", "card1", {}, {})],
+    ["conversations/messages/workflowCard/:taskId", (p) => (attach(new ConversationController(), repos({ forContent: [cardConv] }), p) as any).forContent("workflowCard", "t1", { query: {} }, {})],
+    ["conversations/:churchId/workflowCard/:taskId", (p) => (attach(new ConversationController(), repos({ forContent: [cardConv] }), p) as any).loadByContent("c1", "workflowCard", "t1", {}, {})],
+    ["conversations/current/:churchId/workflowCard/:taskId", (p) => (attach(new ConversationController(), repos({ current: cardConv }), p) as any).current("c1", "workflowCard", "t1", {}, {})]
+  ];
+
+  it.each(readers)("%s refuses a church member with no tie to the card", async (_name, read) => {
+    expect((await read(MEMBER)).status).toBe(401);
+  });
+
+  it.each(readers)("%s still serves the assignee and tasks.view staff", async (_name, read) => {
+    for (const principal of [ASSIGNEE, TASK_VIEWER]) {
+      const result = await read(principal);
+      expect(result?.status).not.toBe(401);
+    }
   });
 });

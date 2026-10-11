@@ -5,7 +5,6 @@ import { Message } from "../models/index.js";
 import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
 import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
-import { TaskAuth } from "../../../shared/helpers/TaskAuth.js";
 
 const contentRoom = (contentType?: string, contentId?: string) =>
   contentType && contentId ? `content-${contentType}-${contentId}` : null;
@@ -264,14 +263,6 @@ export class MessageController extends MessagingBaseController {
     }
     if (conv.contentType === "workflowCard") return this.canUseWorkflowCard(au, conv.contentId);
     return false;
-  }
-
-  // Card notes: anyone who can open the card (tasks.view, or tied to it as person or group) can write on it.
-  private async canUseWorkflowCard(au: any, taskId: string): Promise<boolean> {
-    if (!taskId) return false;
-    const { getDoingModuleGateway } = await import("../../../shared/modules/DoingModuleGateway.js");
-    const task = await getDoingModuleGateway().loadTask(au.churchId, taskId);
-    return !!task && TaskAuth.canViewTask(au, task);
   }
 
   // Staff with content.edit moderate anywhere; group leaders moderate their own group's
