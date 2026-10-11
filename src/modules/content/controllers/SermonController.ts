@@ -10,21 +10,6 @@ import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 
 @controller("/content/sermons")
 export class SermonController extends ContentBaseController {
-  // @httpGet("/subtitles/:id")
-  // public async getSubtitles(
-  //   @requestParam("id") id: string,
-  //   req: express.Request<{}, {}, null>,
-  //   res: express.Response
-  // ): Promise<any> {
-  //   return this.actionWrapper(req, res, async (au) => {
-  //     const sermon = await this.repos.sermon.loadById(id, au.churchId);
-  //     if (sermon.videoType === "youtube") {
-  //       return await TranscriptAPI.getTranscript(sermon.videoData);
-  //     }
-  //     return [];
-  //   });
-  // }
-
   @httpGet("/public/freeshowSample")
   public async getFreeShow(@requestParam("churchId") _churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async () => {

@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import axios from "axios";
 import { Environment } from "../../../shared/helpers/index.js";
-// import MEMBERS_API_SCHEMA from "../../tools/schemas/apiSchema.js";
 
 export class OpenAiHelper {
   private static openai: OpenAI | null = null;
@@ -121,14 +120,6 @@ export class OpenAiHelper {
         { "field": "age", "value": "30", "operator": "greaterThan" }
     ]
     `;
-    // User Query: "${query}"
-    // Respond ONLY with a JSON object containing:
-    // {
-    //     "endpoint": "/people",
-    //     "params": {
-    //         //extracted parameters
-    //     }
-    // }
   }
 
   private static parseAIResponse(responseText: string) {

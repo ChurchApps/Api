@@ -5,7 +5,6 @@ export class AttendanceRecord {
   public service?: Service;
   public serviceTime?: ServiceTime;
   public groupId?: string;
-  // public group?: Group;
   public visitDate?: Date;
   public checkinTime?: Date;
   public week?: number;

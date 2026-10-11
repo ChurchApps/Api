@@ -21,11 +21,6 @@ export class RoleHelper {
       this.createAllMembersRole(),
       this.createEveryoneRole()
     ]);
-    // await this.createChumsRole()
-    // await this.createB1Role()
-    // await this.createLessonsRole()
-    // await this.createStreamingHostRole()
-    // await this.createWebsiteAdminRole()
   }
 
   private async createRole(name: string, permissions: RolePermission[]): Promise<string> {
@@ -53,17 +48,6 @@ export class RoleHelper {
   }
 
   private async createDomainAdminRole() {
-    /*
-    const roleId: string = await this.createRole("Domain Admins", [
-      { apiName: "MembershipApi", contentType: "Roles", action: "View" },
-      { apiName: "MembershipApi", contentType: "Roles", action: "Edit" },
-      { apiName: "MembershipApi", contentType: "Settings", action: "Edit" },
-      { apiName: "MembershipApi", contentType: "People", action: "View" },
-      { apiName: "MembershipApi", contentType: "People", action: "Edit" },
-      { apiName: "MembershipApi", contentType: "Households", action: "Edit" },
-      { apiName: "MembershipApi", contentType: "Forms", action: "Admin" }
-    ]);*/
-
     const roleId: string = await this.createRole("Domain Admins", [{ apiName: "MembershipApi", contentType: "Domain", action: "Admin" }]);
 
     await this.createRoleMember(roleId);

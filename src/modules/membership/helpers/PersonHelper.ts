@@ -98,8 +98,6 @@ export class PersonHelper extends BasePersonHelper {
           existing.personId = person.id;
           await repos.userChurch.save(existing);
         }
-
-        // return existing;
       }
       // Apply any SSO photo stashed before this person existed (never overwrites an existing photo).
       await SsoHelper.applyStashedPhoto(au.id, churchId, person, repos);

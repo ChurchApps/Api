@@ -118,26 +118,4 @@ export class MusicBrainzHelper {
     const url = `https://coverartarchive.org/release/${releaseMbId}/front-250.jpg`;
     return url;
   }
-
-  /*
-  static async search(query: string) {
-    const url = `https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(query)}&fmt=json`;
-    const userAgent = "ChurchApps https://churchapps.org/"
-    const response = await fetch(url, { headers: { "User-Agent": userAgent } });
-    if (response.ok) {
-      const data = await response.json();
-      return this.convertRecordingsToSongDetails(data.recordings);
-    } else {
-      throw new Error(`Error fetching data from MusicBrainz: ${response.statusText}`);
-    }
-  }
-
-  private static convertRecordingsToSongDetails(recordings: any[]) {
-    return recordings.map(recording => {
-      return this.convertRecordingToSongDetail(recording);
-    });
-  }
-
-
-*/
 }

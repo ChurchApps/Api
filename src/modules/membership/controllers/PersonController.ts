@@ -454,7 +454,6 @@ export class PersonController extends MembershipBaseController {
           }
           promises.push(
             this.repos.person.save(person).then(async (p) => {
-              // const r = this.repos.person.convertToModel(au.churchId, p);
               p.churchId = au.churchId;
               if (p.photo !== undefined && p.photo.startsWith("data:image/png;base64,")) await this.savePhoto(au.churchId, p);
               // Create userChurch record if email matches a user and person is in groups
