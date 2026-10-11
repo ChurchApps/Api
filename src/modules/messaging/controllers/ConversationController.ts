@@ -65,7 +65,7 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.canReadContent(au, contentType, contentId)) return this.json([], 401);
+      if (!(await this.canReadContent(au, contentType, contentId))) return this.json([], 401);
       const churchId = au.churchId;
       const pageNumber = parseInt((req.query.page as string) || "1", 10);
       const pageSize = Math.min(Math.max(parseInt((req.query.limit as string) || "20", 10) || 20, 1), 100);
@@ -127,7 +127,7 @@ export class ConversationController extends MessagingBaseController {
       res: express.Response
   ): Promise<Conversation[]> {
     return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
-      if (!this.canReadContent(this.authUser(), contentType, contentId)) return this.json([], 401) as any;
+      if (!(await this.canReadContent(this.authUser(), contentType, contentId))) return this.json([], 401) as any;
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
       const result = this.repos.conversation.convertAllToModel(data as any[]);
       if (!this.isSameChurch(this.authUser(), churchId) && result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
@@ -189,7 +189,7 @@ export class ConversationController extends MessagingBaseController {
   @httpGet("/posts/group/:groupId")
   public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!this.canReadContent(au, "group", groupId)) return this.json([], 401);
+      if (!(await this.canReadContent(au, "group", groupId))) return this.json([], 401);
       const result = await this.repos.conversation.loadPosts(au.churchId, [groupId]);
       if (result && Array.isArray(result)) {
         await this.appendMessages(result, au.churchId);
@@ -267,7 +267,7 @@ export class ConversationController extends MessagingBaseController {
     if (contentType !== "streamingLive") {
       return this.actionWrapper(req, res, async (au) => {
         if (!this.isSameChurch(au, churchId)) return this.json({}, 401);
-        if (!this.canReadContent(au, contentType, contentId)) return this.json({}, 401);
+        if (!(await this.canReadContent(au, contentType, contentId))) return this.json({}, 401);
         const conversation = await this.getOrCreate(churchId, contentType, contentId, "public", false, true);
         if (contentType === "streamingLiveHost" && conversation?.contentId) await this.getOrCreate(churchId, "streamingLive", conversation.contentId, "public", true, false);
         return conversation;
@@ -303,13 +303,14 @@ export class ConversationController extends MessagingBaseController {
 
   // Content-type level gate for routes that authorize before the conversation row exists (or before it
   // is loaded). Mirrors canReadConversation minus the row-level checks.
-  private canReadContent(au: any, contentType: string, contentId: string): boolean {
+  private async canReadContent(au: any, contentType: string, contentId: string): Promise<boolean> {
     if (this.isPersonNote(contentType)) return this.canViewPersonNotes(au, contentType);
     if (au?.checkAccess(Permissions.content.edit)) return true;
     if (contentType === "group" || contentType === "groupAnnouncement") {
       return !!contentId && (!!au?.groupIds?.includes(contentId) || !!au?.leaderGroupIds?.includes(contentId));
     }
     if (contentType === "streamingLiveHost") return !!au?.checkAccess(Permissions.chat.host);
+    if (contentType === "workflowCard") return this.canUseWorkflowCard(au, contentId);
     return true;
   }
 
