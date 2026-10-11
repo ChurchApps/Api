@@ -47,11 +47,12 @@ export class GlobalStyleController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, GlobalStyle[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, GlobalStyle[] | GlobalStyle>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<GlobalStyle>[] = [];
-      req.body.forEach((item) => { (item as any).churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.globalStyle.save(item)); });
+      const items = Array.isArray(req.body) ? req.body : [req.body];
+      items.forEach((item) => { (item as any).churchId = au.churchId; item.siteId = item.siteId || ""; promises.push(this.repos.globalStyle.save(item)); });
       const result = await Promise.all(promises);
       this.bumpSiteCache(au.churchId);
       return this.repos.globalStyle.convertAllToModel(au.churchId, result);
