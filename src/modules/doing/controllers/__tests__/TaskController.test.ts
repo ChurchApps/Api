@@ -3,6 +3,7 @@ import "reflect-metadata";
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { tasks: { edit: "tasksEdit", view: "tasksView" }, people: { edit: "peopleEdit" } } }));
 jest.mock("../../../../shared/events/InternalEventBus", () => ({ InternalEventBus: { publish: jest.fn() } }));
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: jest.fn() }));
 const prepareRequest = jest.fn();
 const completeDecision = jest.fn();
 const notifyReviewers = jest.fn();
@@ -191,5 +192,46 @@ describe("TaskController.setConversation", () => {
     const result = await controller.setConversation("t1", { body: { conversationId: "conv1" } }, {});
     expect(result).toEqual({ obj: {}, status: 401 });
     expect(repos.task.save).not.toHaveBeenCalled();
+  });
+});
+
+// Issue #1227: the person assigned a workflow card needs the phone and email of the
+// person the card is about, even without People access.
+describe("TaskController.getContact", () => {
+  const { getMembershipModuleGateway } = jest.requireMock("../../../../shared/modules/index");
+  let repos: any;
+  let loadPerson: jest.Mock;
+  const card = { id: "t1", associatedWithType: "person", associatedWithId: "per9", assignedToType: "person", assignedToId: "p1", createdByType: "person", createdById: "p5" };
+
+  beforeEach(() => {
+    loadPerson = jest.fn(async () => ({ id: "per9", householdId: "h1", displayName: "Isaac Turner", firstName: "Isaac", mobilePhone: "555-0101", email: "isaac@example.com", birthDate: new Date("1990-01-01"), membershipStatus: "Guest" }));
+    getMembershipModuleGateway.mockReturnValue({ loadPerson });
+    repos = { task: { load: jest.fn(async () => card) } };
+  });
+
+  it("returns only the contact fields to the assignee without tasks view", async () => {
+    const result = await (makeController([], repos) as any).getContact("t1", {}, {});
+    expect(loadPerson).toHaveBeenCalledWith("c1", "per9");
+    expect(result).toEqual({ personId: "per9", displayName: "Isaac Turner", mobilePhone: "555-0101", email: "isaac@example.com" });
+  });
+
+  it("rejects an unrelated user without tasks view", async () => {
+    repos.task.load.mockResolvedValue({ ...card, assignedToId: "p7" });
+    const result = await (makeController([], repos) as any).getContact("t1", {}, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(loadPerson).not.toHaveBeenCalled();
+  });
+
+  it("returns nothing for a card that is not about a person", async () => {
+    repos.task.load.mockResolvedValue({ ...card, associatedWithType: "group", associatedWithId: "g1" });
+    const result = await (makeController([], repos) as any).getContact("t1", {}, {});
+    expect(result).toEqual({});
+    expect(loadPerson).not.toHaveBeenCalled();
+  });
+
+  it("returns the contact to a tasks view user", async () => {
+    repos.task.load.mockResolvedValue({ ...card, assignedToId: "p7" });
+    const result = await (makeController(["tasksView"], repos) as any).getContact("t1", {}, {});
+    expect(result).toEqual({ personId: "per9", displayName: "Isaac Turner", mobilePhone: "555-0101", email: "isaac@example.com" });
   });
 });
