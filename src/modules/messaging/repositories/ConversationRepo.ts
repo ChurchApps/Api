@@ -165,7 +165,7 @@ export class ConversationRepo {
   }
 
   public convertToModel(data: any) {
-    return this.rowToModel(data);
+    return data ? this.rowToModel(data) : null;
   }
 
   public convertAllToModel(data: any[]) {
