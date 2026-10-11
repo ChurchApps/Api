@@ -7,10 +7,13 @@ jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: jest.fn() }, EncryptionHelper: { decrypt: jest.fn() } }));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn(), sendAttendance: jest.fn(), sendBlockedIps: jest.fn() } }));
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
-jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
+jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, tasks: { view: "tasksView" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
 // The post gate reads the group's per-feed toggles through the membership gateway (lazy import in the controller).
 const mockLoadGroup = jest.fn(async () => ({ id: "g1" }) as any);
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadGroup: (...args: any[]) => mockLoadGroup(...(args as [])) }) }));
+// workflowCard notes check the card through the doing gateway (lazy import in the controller).
+const mockLoadTask = jest.fn(async () => null as any);
+jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ loadTask: (...args: any[]) => mockLoadTask(...(args as [])) }) }));
 
 import { MessageController } from "../MessageController.js";
 import { ConversationController } from "../ConversationController.js";
@@ -66,6 +69,7 @@ beforeEach(() => {
   sendMock.mockReset();
   mockLoadGroup.mockReset();
   mockLoadGroup.mockImplementation(async () => ({ id: "g1" }) as any);
+  mockLoadTask.mockReset();
 });
 
 describe("MessageController.save participation gate", () => {
@@ -253,5 +257,44 @@ describe("ConversationController seeding group feeds", () => {
     await start(leader.controller, "groupAnnouncement");
     expect(leader.repos.conversation.save).toHaveBeenCalledWith(expect.objectContaining({ contentType: "groupAnnouncement" }));
     expect(leader.repos.message.save).toHaveBeenCalled();
+  });
+});
+
+describe("MessageController.save workflowCard notes", () => {
+  const cardConv = { id: "card1", churchId: "c1", contentType: "workflowCard", contentId: "t1", allowAnonymousPosts: false, visibility: "hidden" };
+
+  it("lets the person the card is assigned to post without content.edit", async () => {
+    mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "p1" }));
+    const { controller, repos } = makeController({ conversation: cardConv });
+    await post(controller, "card1");
+    expect(repos.message.save).toHaveBeenCalled();
+    expect(mockLoadTask).toHaveBeenCalledWith("c1", "t1");
+  });
+
+  it("lets a member of the assigned group post", async () => {
+    mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "group", assignedToId: "g9" }));
+    const { controller, repos } = makeController({ conversation: cardConv, groupIds: ["g9"] });
+    await post(controller, "card1");
+    expect(repos.message.save).toHaveBeenCalled();
+  });
+
+  it("lets tasks.view staff post", async () => {
+    mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "pX" }));
+    const { controller, repos } = makeController({ conversation: cardConv, access: ["tasksView"] });
+    await post(controller, "card1");
+    expect(repos.message.save).toHaveBeenCalled();
+  });
+
+  it("401s an unrelated user", async () => {
+    mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "pX", createdByType: "person", createdById: "pY" }));
+    const { controller, repos } = makeController({ conversation: cardConv, groupIds: ["g1"] });
+    expect((await post(controller, "card1")).status).toBe(401);
+    expect(repos.message.save).not.toHaveBeenCalled();
+  });
+
+  it("401s when the card is missing", async () => {
+    const { controller, repos } = makeController({ conversation: cardConv, access: ["tasksView"] });
+    expect((await post(controller, "card1")).status).toBe(401);
+    expect(repos.message.save).not.toHaveBeenCalled();
   });
 });
