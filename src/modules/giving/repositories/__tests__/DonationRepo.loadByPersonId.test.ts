@@ -35,6 +35,10 @@ describe("DonationRepo.loadByPersonId", () => {
     // Same person, but the fund allocation row is missing (e.g. batch entry where
     // the follow-up POST /funddonations never landed).
     await db.insertInto("donations" as never).values({ id: "tst1087db", churchId: CHURCH_ID, personId: PERSON_ID, donationDate: "2026-09-02", amount: 75, method: "Cash", entryTime: "2026-09-02 10:00:00", status: "complete" } as never).execute();
+    // Issue #1248: a batch check to a non-tax-deductible (test) fund.
+    await db.insertInto("funds" as never).values({ id: "tst1248f", churchId: CHURCH_ID, name: "Test Fund", taxDeductible: false } as never).execute();
+    await db.insertInto("donations" as never).values({ id: "tst1248d", churchId: CHURCH_ID, personId: PERSON_ID, donationDate: "2026-09-20", amount: 2, method: "Check", entryTime: "2026-09-20 10:00:00" } as never).execute();
+    await db.insertInto("fundDonations" as never).values({ id: "tst1248fd", churchId: CHURCH_ID, donationId: "tst1248d", fundId: "tst1248f", amount: 2 } as never).execute();
   });
 
   afterAll(async () => {
@@ -50,6 +54,16 @@ describe("DonationRepo.loadByPersonId", () => {
   it("returns donations with no fund allocation row", async () => {
     const rows = await new DonationRepo().loadByPersonId(CHURCH_ID, PERSON_ID);
     expect(rows.map((r: any) => r.id)).toContain("tst1087db");
+  });
+
+  it("leaves out gifts to non-deductible funds by default (giving statements)", async () => {
+    const rows = await new DonationRepo().loadByPersonId(CHURCH_ID, PERSON_ID);
+    expect(rows.map((r: any) => r.id)).not.toContain("tst1248d");
+  });
+
+  it("returns gifts to non-deductible funds when asked (person record)", async () => {
+    const rows = await new DonationRepo().loadByPersonId(CHURCH_ID, PERSON_ID, true);
+    expect(rows.map((r: any) => r.id)).toEqual(expect.arrayContaining(["tst1087da", "tst1087db", "tst1248d"]));
   });
 
   it("stays scoped to the church", async () => {
