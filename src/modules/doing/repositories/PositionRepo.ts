@@ -47,7 +47,7 @@ export class PositionRepo {
 
   public async loadByPlanIds(churchId: string, planIds: string[]) {
     if (planIds.length === 0) return [];
-    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "in", planIds).execute();
+    return getDb().selectFrom("positions").selectAll().where("churchId", "=", churchId).where("planId", "in", planIds).orderBy("categoryName").orderBy("name").execute();
   }
 
   public async loadSignupByPlanId(churchId: string, planId: string) {
