@@ -84,8 +84,19 @@ export class PlanController extends DoingBaseController {
   @httpGet("/public/signup/:churchId")
   public async getSignupPlans(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const plans: Plan[] = (await this.repos.plan.loadSignupPlans(churchId)) as Plan[];
+      let plans: Plan[] = (await this.repos.plan.loadSignupPlans(churchId)) as Plan[];
       if (plans.length === 0) return [];
+
+      // Church setting: show only the next week of each plan type. Plans are already soonest-first.
+      if (await getMembershipModuleGateway().loadSetting(churchId, "volunteerSignupNextOnly") === "true") {
+        const seen = new Set<string>();
+        plans = plans.filter(p => {
+          const key = p.planTypeId || p.ministryId || p.id;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
 
       const planIds = plans.map(p => p.id);
       const allPositions: Position[] = (await this.repos.position.loadByPlanIds(churchId, planIds)) as Position[];

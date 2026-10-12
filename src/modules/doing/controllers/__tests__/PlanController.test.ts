@@ -145,3 +145,46 @@ describe("PlanController.getSignupVolunteers", () => {
     expect(result).toEqual([]);
   });
 });
+
+// Issue #1241: a church can limit the volunteer signup list to the next week of each plan type.
+describe("PlanController.getSignupPlans", () => {
+  const { getMembershipModuleGateway } = jest.requireMock("../../../../shared/modules/index");
+  let repos: any;
+  let loadSetting: jest.Mock;
+
+  function makeAnonController() {
+    const controller = makeController(repos);
+    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    return controller;
+  }
+
+  beforeEach(() => {
+    repos = {
+      plan: {
+        loadSignupPlans: jest.fn(async () => [
+          { id: "a1", planTypeId: "typeA", ministryId: "m1", serviceDate: new Date("2026-10-18") },
+          { id: "b1", planTypeId: "typeB", ministryId: "m2", serviceDate: new Date("2026-10-19") },
+          { id: "a2", planTypeId: "typeA", ministryId: "m1", serviceDate: new Date("2026-10-25") }
+        ])
+      },
+      position: { loadByPlanIds: jest.fn(async () => [{ id: "pos1", planId: "a1", allowSelfSignup: true }]) },
+      assignment: { loadByPlanIds: jest.fn(async () => []) },
+      time: { loadByPlanIds: jest.fn(async () => []) }
+    };
+    loadSetting = jest.fn(async (): Promise<string | null> => null);
+    getMembershipModuleGateway.mockReturnValue({ loadSetting });
+  });
+
+  it("returns every upcoming plan when the setting is off", async () => {
+    const result = await (makeAnonController() as any).getSignupPlans("c1", {}, {});
+    expect(result.map((r: any) => r.plan.id)).toEqual(["a1", "b1", "a2"]);
+  });
+
+  it("keeps only the earliest plan of each plan type when volunteerSignupNextOnly is on", async () => {
+    loadSetting.mockResolvedValue("true");
+    const result = await (makeAnonController() as any).getSignupPlans("c1", {}, {});
+    expect(loadSetting).toHaveBeenCalledWith("c1", "volunteerSignupNextOnly");
+    expect(result.map((r: any) => r.plan.id)).toEqual(["a1", "b1"]);
+    expect(repos.position.loadByPlanIds).toHaveBeenCalledWith("c1", ["a1", "b1"]);
+  });
+});
