@@ -123,7 +123,7 @@ export class DonationController extends GivingBaseController {
       else {
         let result;
         if (canView && req.query.batchId !== undefined) result = await this.repos.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
-        else if (personId) result = await this.repos.donation.loadByPersonId(au.churchId, personId);
+        else if (personId) result = await this.repos.donation.loadByPersonId(au.churchId, personId, canView && req.query.includeNonDeductible === "1");
         else result = await this.repos.donation.loadAll(au.churchId);
         return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);
       }
