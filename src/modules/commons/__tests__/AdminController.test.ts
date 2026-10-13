@@ -452,4 +452,13 @@ describe("admin reports and assets", () => {
     expect(await controller.remove(req({ reason: "policy" }, "asset000001"), {} as any)).toEqual({ status: "removed" });
     expect(PublishHelper.remove).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: "asset000001" }), "policy");
   });
+  it("never flags an edit to an already-published asset as a duplicate", async () => {
+    const { controller } = adminController({
+      submission: { loadQueue: jest.fn(async () => [{ ...pending(), publishedSubmissionId: "sub000000009", assetType: "song", assetName: "Old Rugged Cross", payload: { name: "Old Rugged Cross" } }]) },
+      song: { loadPublishedForDuplicates: jest.fn(async () => [{ id: "song00000001", title: "Old Rugged Cross", writer: "George Bennard", chordPro: "" }]) }
+    });
+    const rows: any = await controller.submissions(req(), {} as any);
+    expect(rows[0].isNewAsset).toBe(false);
+    expect(rows[0].possibleDuplicate).toBe(false);
+  });
 });

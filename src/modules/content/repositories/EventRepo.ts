@@ -141,9 +141,16 @@ export class EventRepo {
       .orderBy("start").execute() as any;
   }
 
-  public async loadTimelineGroup(churchId: string, groupId: string, eventIds: string[]) {
+  private timelineAccess(groupIds: string[]) {
+    const ids = groupIds || [];
+    return ids.length > 0
+      ? sql`(visibility='public' OR groupId IN (${sql.join(ids.map(id => sql`${id}`), sql`,`)}))`
+      : sql`visibility='public'`;
+  }
+
+  public async loadTimelineGroup(churchId: string, groupId: string, groupIds: string[], eventIds: string[]) {
     let query = sql`select *, 'event' as postType, id as postId from events
-      where churchId=${churchId} AND ((
+      where churchId=${churchId} AND ${this.timelineAccess(groupIds)} AND ((
         groupId = ${groupId}
         and (end>curdate() or recurrenceRule IS NOT NULL)
       )`;
@@ -161,7 +168,7 @@ export class EventRepo {
       ? sql`groupId IN (${sql.join(ids.map(id => sql`${id}`), sql`,`)})`
       : sql`0=1`;
     let query = sql`select *, 'event' as postType, id as postId from events
-      where churchId=${churchId} AND ((
+      where churchId=${churchId} AND ${this.timelineAccess(ids)} AND ((
         (
           ${groupFilter}
           OR groupId IN (SELECT groupId FROM curatedEvents WHERE churchId=${churchId} AND eventId IS NULL)

@@ -99,8 +99,8 @@ export class CommonsAdminController extends CommonsBaseController {
           payload: undefined,
           qualityDetail: parseQualityDetail(r.payload?.qualityDetail),
           rightsFlag: RIGHTS_RE.test(String(r.payload?.detail?.proAnswer || "")),
-          possibleDuplicate: titles[userId].some((t) => t.assetId !== (r.assetId || "") && DuplicateHelper.similarName(title, t.name))
-            || (r.assetType === "song" && DuplicateHelper.matches({ title, writer: r.payload?.detail?.writer, firstLine: DuplicateHelper.firstLine(r.payload?.detail?.chordPro || "") }, library.filter((s) => s.id !== (r.assetId || "")), 1).length > 0),
+          possibleDuplicate: !r.publishedSubmissionId && (titles[userId].some((t) => t.assetId !== (r.assetId || "") && DuplicateHelper.similarName(title, t.name))
+            || (r.assetType === "song" && DuplicateHelper.matches({ title, writer: r.payload?.detail?.writer, firstLine: DuplicateHelper.firstLine(r.payload?.detail?.chordPro || "") }, library.filter((s) => s.id !== (r.assetId || "")), 1).length > 0)),
           typeLabel: def?.label || r.assetType,
           product: def?.product,
           productLabel: def ? COMMONS_PRODUCT_LABELS[def.product] : undefined,
