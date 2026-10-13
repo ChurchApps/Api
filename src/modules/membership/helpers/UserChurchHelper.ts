@@ -43,12 +43,13 @@ export class UserChurchHelper {
     `.execute(getDb());
     const matches = result.rows;
 
-    // Pick one person per church (first match) and save userChurch records
-    const seenChurches = new Set<string>();
+    // Link only when the email identifies exactly one person in the church. When several people
+    // share it, don't guess - the caller (e.g. B1Admin adding a person to a role) links the right one.
+    const matchCounts = new Map<string, number>();
+    for (const match of matches) matchCounts.set(match.churchId, (matchCounts.get(match.churchId) || 0) + 1);
     const savePromises: Promise<any>[] = [];
     for (const match of matches) {
-      if (seenChurches.has(match.churchId)) continue;
-      seenChurches.add(match.churchId);
+      if (matchCounts.get(match.churchId) !== 1) continue;
       savePromises.push(repos.userChurch.save({ userId, churchId: match.churchId, personId: match.personId }));
     }
     if (savePromises.length > 0) await Promise.all(savePromises);
