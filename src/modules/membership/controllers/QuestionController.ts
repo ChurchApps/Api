@@ -11,7 +11,8 @@ export class QuestionController extends MembershipBaseController {
       const question = await this.repos.question.load(au.churchId, id);
       const formId = (question as any)?.formId || null;
       if (!(await this.formAccess(au, formId))) return this.json({}, 401);
-      return await this.repos.question.moveQuestionUp(au.churchId, id);
+      await this.repos.question.moveQuestionUp(au.churchId, id);
+      return this.json({});
     });
   }
 
@@ -21,7 +22,8 @@ export class QuestionController extends MembershipBaseController {
       const question = await this.repos.question.load(au.churchId, id);
       const formId = (question as any)?.formId || null;
       if (!(await this.formAccess(au, formId))) return this.json({}, 401);
-      return await this.repos.question.moveQuestionDown(au.churchId, id);
+      await this.repos.question.moveQuestionDown(au.churchId, id);
+      return this.json({});
     });
   }
 
