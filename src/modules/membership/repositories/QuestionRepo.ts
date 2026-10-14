@@ -84,17 +84,27 @@ export class QuestionRepo {
   }
 
   public async moveQuestionUp(churchId: string, id: string) {
-    const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
-    if (!question) return;
-    await getDb().updateTable("questions").set({ sort: sql`sort+1` as any }).where("churchId", "=", churchId).where("formId", "=", question.formId).where("sort", "=", +question.sort - 1 as any).execute();
-    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
+    await this.moveQuestion(churchId, id, -1);
   }
 
   public async moveQuestionDown(churchId: string, id: string) {
+    await this.moveQuestion(churchId, id, 1);
+  }
+
+  // Swap with the neighbor by position and renumber 1..n, so gaps or duplicate sort values
+  // left by save and delete cannot turn a move into a no-op.
+  private async moveQuestion(churchId: string, id: string, offset: number) {
     const question = (await getDb().selectFrom("questions").select(["formId", "sort"]).where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
     if (!question) return;
-    await getDb().updateTable("questions").set({ sort: sql`sort-1` as any }).where("churchId", "=", churchId).where("formId", "=", question.formId).where("sort", "=", +question.sort + 1 as any).execute();
-    await getDb().updateTable("questions").set({ sort: sql`sort+1` as any }).where("id", "=", id).where("churchId", "=", churchId).execute();
+    const questions = await this.loadForForm(churchId, question.formId);
+    const index = questions.findIndex((q) => q.id === id);
+    const target = index + offset;
+    if (index === -1 || target < 0 || target >= questions.length) return;
+    [questions[index], questions[target]] = [questions[target], questions[index]];
+    for (let i = 0; i < questions.length; i++) {
+      if (+questions[i].sort === i + 1) continue;
+      await getDb().updateTable("questions").set({ sort: (i + 1) as any }).where("id", "=", questions[i].id).where("churchId", "=", churchId).execute();
+    }
   }
 
   public saveAll(models: Question[]) {
