@@ -433,7 +433,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
         amount: (eventData.amount || eventData.amount_paid || 0) / 100,
         customerId: eventData.customer || "",
         raw: event,
-        skipReason: (event.type === "charge.succeeded" && isSubscriptionEvent) || (event.type === "payment_intent.succeeded" && eventData.invoice)
+        // Basil-era API versions dropped PaymentIntent.invoice, so the description is the only subscription marker left on a PI.
+        skipReason: (event.type === "charge.succeeded" && isSubscriptionEvent) || (event.type === "payment_intent.succeeded" && (eventData.invoice || isSubscriptionEvent))
           ? "Subscription event - handled by invoice.paid"
           : undefined
       };
@@ -489,8 +490,8 @@ export class StripeGatewayProvider implements IGatewayProvider {
   }
 
   // ACH SetupIntent for Financial Connections
-  async createACHSetupIntent(config: GatewayConfig, customerId: string): Promise<any> {
-    return await StripeHelper.createACHSetupIntent(config.privateKey, customerId, config.currency);
+  async createACHSetupIntent(config: GatewayConfig, customerId: string, instantOnly = false): Promise<any> {
+    return await StripeHelper.createACHSetupIntent(config.privateKey, customerId, config.currency, instantOnly);
   }
 
   async createPaymentMethod(config: GatewayConfig, paymentMethodData: any): Promise<any> {

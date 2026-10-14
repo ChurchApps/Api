@@ -3,6 +3,7 @@
 jest.mock("../../Environment", () => ({ Environment: { membershipApi: "http://test" } }));
 
 import { StripeGatewayProvider } from "../StripeGatewayProvider";
+import { StripeHelper } from "../../StripeHelper";
 
 describe("StripeGatewayProvider.calculateFees", () => {
   const provider = new StripeGatewayProvider();
@@ -75,5 +76,16 @@ describe("StripeGatewayProvider.verifyWebhookSignature", () => {
   it("rejects every event when the church has no webhook secret", async () => {
     const result = await new StripeGatewayProvider().verifyWebhookSignature({ privateKey: "sk_test", webhookKey: "" } as any, { "stripe-signature": "t=1,v1=abc" } as any, "{}");
     expect(result.success).toBe(false);
+  });
+});
+
+describe("StripeGatewayProvider.listReplayEvents", () => {
+  it("skips subscription payment intents that carry no invoice field", async () => {
+    const pi = { id: "evt_pi", type: "payment_intent.succeeded", created: 1, data: { object: { id: "pi_1", amount: 20000, customer: "cus_1", description: "Subscription update" } } };
+    const oneTime = { id: "evt_pi2", type: "payment_intent.succeeded", created: 1, data: { object: { id: "pi_2", amount: 5000, customer: "cus_1" } } };
+    jest.spyOn(StripeHelper, "listEvents").mockResolvedValue([pi, oneTime] as any);
+    const [sub, gift] = await new StripeGatewayProvider().listReplayEvents({ privateKey: "sk_test" } as any, 0, 1);
+    expect(sub.skipReason).toBeTruthy();
+    expect(gift.skipReason).toBeUndefined();
   });
 });

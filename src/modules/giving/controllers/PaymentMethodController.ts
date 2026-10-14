@@ -248,7 +248,7 @@ export class PaymentMethodController extends GivingBaseController {
       try {
         const gatewayCustomerId = await GatewayService.createCustomer(gateway, email, name);
 
-        const setupIntent = await GatewayService.createACHSetupIntent(gateway, gatewayCustomerId);
+        const setupIntent = await GatewayService.createACHSetupIntent(gateway, gatewayCustomerId, true);
         return {
           clientSecret: setupIntent.client_secret,
           setupIntentId: setupIntent.id,

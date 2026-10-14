@@ -423,12 +423,12 @@ export class GatewayService {
     return !!this.getProviderFromGateway(gateway).createACHSetupIntent;
   }
 
-  static async createACHSetupIntent(gateway: any, customerId: string): Promise<any> {
+  static async createACHSetupIntent(gateway: any, customerId: string, instantOnly = false): Promise<any> {
     // Stripe picks us_bank_account (ACH) or acss_debit (Canadian PAD) from config.currency
     const provider = this.getProviderFromGateway(gateway);
     if (provider.createACHSetupIntent) {
       const config = this.getGatewayConfig(gateway);
-      return await provider.createACHSetupIntent(config, customerId);
+      return await provider.createACHSetupIntent(config, customerId, instantOnly);
     }
     throw new Error(`${gateway.provider} does not support ACH SetupIntent`);
   }

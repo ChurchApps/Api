@@ -146,20 +146,22 @@ export class StripeHelper {
     return currency?.toLowerCase() === "cad" ? "acss_debit" : "us_bank_account";
   }
 
-  static async createACHSetupIntent(secretKey: string, customerId: string, currency?: string) {
+  // instantOnly: a guest has no saved account to come back to, so a microdeposit verification days later can never finish their gift.
+  static async createACHSetupIntent(secretKey: string, customerId: string, currency?: string, instantOnly = false) {
     const stripe = StripeHelper.getStripeObj(secretKey);
+    const verification = instantOnly ? { verification_method: "instant" as const } : {};
     if (StripeHelper.bankMethodType(currency) === "acss_debit") {
       return await stripe.setupIntents.create({
         customer: customerId,
         payment_method_types: ["acss_debit"],
         // default_for makes the mandate cover subscriptions/invoices automatically; one-off PaymentIntents pass the mandate id (see findAcssMandate)
-        payment_method_options: { acss_debit: { currency: "cad", mandate_options: { default_for: ["invoice", "subscription"] } } }
+        payment_method_options: { acss_debit: { currency: "cad", mandate_options: { default_for: ["invoice", "subscription"] }, ...verification } }
       });
     }
     return await stripe.setupIntents.create({
       customer: customerId,
       payment_method_types: ["us_bank_account"],
-      payment_method_options: { us_bank_account: { financial_connections: { permissions: ["payment_method"] } } }
+      payment_method_options: { us_bank_account: { financial_connections: { permissions: ["payment_method"] }, ...verification } }
     });
   }
 

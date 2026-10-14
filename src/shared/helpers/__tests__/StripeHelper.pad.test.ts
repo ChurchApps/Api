@@ -36,4 +36,11 @@ describe("StripeHelper Canadian PAD (acss_debit)", () => {
     await StripeHelper.createACHSetupIntent("sk_test", "cus_1", "usd");
     expect(create.mock.calls[0][0].payment_method_types).toEqual(["us_bank_account"]);
   });
+
+  it("restricts guest setups to instant verification so microdeposits can't strand the gift", async () => {
+    await StripeHelper.createACHSetupIntent("sk_test", "cus_1", "usd", true);
+    expect(create.mock.calls[0][0].payment_method_options.us_bank_account.verification_method).toBe("instant");
+    await StripeHelper.createACHSetupIntent("sk_test", "cus_1", "usd");
+    expect(create.mock.calls[1][0].payment_method_options.us_bank_account.verification_method).toBeUndefined();
+  });
 });
