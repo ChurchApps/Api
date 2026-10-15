@@ -73,12 +73,12 @@ export class SongHelper {
 
       // 2. Try to find existing song by CCLI
       const existingSong = await this.findExistingSongByCCLI(churchId, freeshowSong.ccliNumber);
-      if (existingSong) return existingSong;
+      if (existingSong) return this.linkFreeShowId(churchId, existingSong, freeshowSong);
 
       // 3. Try to find existing song by Genius ID
       if (freeshowSong.geniusId) {
         const existingByGenius = await this.findExistingSongByGeniusId(churchId, freeshowSong.geniusId);
-        if (existingByGenius) return existingByGenius;
+        if (existingByGenius) return this.linkFreeShowId(churchId, existingByGenius, freeshowSong);
       }
 
       // 4. Look up song on PraiseCharts
@@ -92,14 +92,7 @@ export class SongHelper {
 
       // 6. Check if arrangement exists for this church
       const existingArrangement = await repos.arrangement.loadBySongDetailId(churchId, songDetail.id);
-      if (existingArrangement.length > 0) {
-        // If arrangement exists, update it with freeshow details
-        if (!existingArrangement[0].freeShowId && freeshowSong.freeShowId) {
-          existingArrangement[0].freeShowId = freeshowSong.freeShowId;
-          await repos.arrangement.save(existingArrangement[0]);
-        }
-        return existingArrangement[0];
-      }
+      if (existingArrangement.length > 0) return this.linkFreeShowId(churchId, existingArrangement[0], freeshowSong);
 
       // 7. Create new Song and Arrangement
       return await this.createSongAndArrangement(churchId, songDetail, freeshowSong);
@@ -109,6 +102,30 @@ export class SongHelper {
       console.error(`Error importing song ${freeshowSong.freeShowId} ("${freeshowSong.title || ""}"):`, error);
       return null;
     }
+  }
+
+  // A match on an existing song must still record this show's id, or /freeShow/missing
+  // reports it on every sync and B1 never shows it. A second show for the same song
+  // becomes its own arrangement instead of being folded into the first.
+  private static async linkFreeShowId(churchId: string, existing: Arrangement, freeshowSong: FreeShowSong): Promise<Arrangement> {
+    if (!freeshowSong.freeShowId || existing.freeShowId === freeshowSong.freeShowId) return existing;
+    const repos = await RepoManager.getRepos<Repos>("content");
+    if (!existing.freeShowId) {
+      existing.freeShowId = freeshowSong.freeShowId;
+      return await repos.arrangement.save(existing);
+    }
+    const arrangement: Arrangement = {
+      churchId,
+      songId: existing.songId,
+      songDetailId: existing.songDetailId,
+      name: freeshowSong.title || "FreeShow",
+      lyrics: freeshowSong.lyrics || "",
+      freeShowId: freeshowSong.freeShowId
+    };
+    const result = await repos.arrangement.save(arrangement);
+    const arrangementKey: ArrangementKey = { churchId, arrangementId: result.id, keySignature: "", shortDescription: arrangement.name };
+    await repos.arrangementKey.save(arrangementKey);
+    return result;
   }
 
   private static async findExistingSongByCCLI(churchId: string, ccliNumber?: string): Promise<Arrangement | null> {

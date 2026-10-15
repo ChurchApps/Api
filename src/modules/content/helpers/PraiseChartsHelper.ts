@@ -286,9 +286,13 @@ export class PraiseChartsHelper {
         if (response.ok) {
           const data = await response.json();
           if (data.arrangements.items.length > 0) {
-            if (artist) return this.getArtistBestMatch(data.arrangements.items, artist);
-            else if (lyrics) return this.getLyricsBestMatch(data.arrangements.items, lyrics);
-            else return this.convertItemToSongDetail(data.arrangements.items[0]);
+            let match: SongDetail;
+            if (artist) match = this.getArtistBestMatch(data.arrangements.items, artist);
+            else if (lyrics) match = this.getLyricsBestMatch(data.arrangements.items, lyrics);
+            else match = this.convertItemToSongDetail(data.arrangements.items[0]);
+            // the search is fuzzy and always returns something; a weak title match is a different song
+            if (title && this.calculateMatchScore(title, match.title || "") < 50) return null;
+            return match;
           }
         }
       }
