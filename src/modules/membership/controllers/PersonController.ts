@@ -293,6 +293,26 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
+  // Names and photos for ids the caller already holds. Any permission on this church is enough,
+  // so a donation or attendance role can label people without View People. No directory filter.
+  @httpGet("/names")
+  public async getNames(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!this.canLookupNames(au)) return this.json({}, 401);
+      const ids = (req.query.ids?.toString() ?? "").split(",");
+      return this.lookupNames(au, ids);
+    });
+  }
+
+  @httpPost("/names")
+  public async postNames(req: express.Request<{}, {}, { ids?: string[]; peopleIds?: string[] }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!this.canLookupNames(au)) return this.json({}, 401);
+      const raw = req.body?.peopleIds ?? req.body?.ids ?? [];
+      return this.lookupNames(au, Array.isArray(raw) ? raw : []);
+    });
+  }
+
   @httpGet("/directory/:id")
   public async getDirectoryPeople(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -583,6 +603,23 @@ export class PersonController extends MembershipBaseController {
         if (s.form !== undefined) person.formSubmissions.push(s);
       });
     }
+  }
+
+  private canLookupNames(au: AuthenticatedUser) {
+    return !!au?.id && Array.isArray(au.permissions) && au.permissions.length > 0;
+  }
+
+  private async lookupNames(au: AuthenticatedUser, ids: string[]) {
+    if (!this.canLookupNames(au)) return this.json({}, 401);
+    const unique: string[] = [];
+    ids.forEach((id) => {
+      const trimmed = typeof id === "string" ? id.trim() : "";
+      if (trimmed && unique.indexOf(trimmed) === -1) unique.push(trimmed);
+    });
+    if (unique.length === 0) return [];
+    const data = (await this.repos.person.loadByIds(au.churchId, unique)) as any[];
+    const basic = this.repos.person.convertAllToBasicModel(au.churchId, data) as Person[];
+    return basic.map((p) => ({ id: p.id, name: { display: p.name?.display || "" }, photo: p.photo || "" }));
   }
 
   private async filterPeople(people: Person[], au: AuthenticatedUser) {
