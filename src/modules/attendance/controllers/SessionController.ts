@@ -21,8 +21,9 @@ export class SessionController extends AttendanceBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const groupId = req.query.groupId?.toString();
-      const isGroupLeader = groupId && au.leaderGroupIds?.includes(groupId);
-      if (!au.checkAccess(Permissions.attendance.view) && !isGroupLeader) return this.json({}, 401);
+      // Members read their own group's meetings (date, notes, present count) on the group page.
+      const isGroupMember = groupId && (au.leaderGroupIds?.includes(groupId) || au.groupIds?.includes(groupId));
+      if (!au.checkAccess(Permissions.attendance.view) && !isGroupMember) return this.json({}, 401);
       else {
         let result;
         if (groupId === undefined) result = await this.repos.session.loadAll(au.churchId);

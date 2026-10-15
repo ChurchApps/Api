@@ -11,7 +11,7 @@ export interface AttendanceDatabase {
   labelTemplates: LabelTemplate;
   services: Omit<Service, "campus"> & SoftDelete;
   serviceTimes: Omit<ServiceTime, "longName" | "checkinOpen"> & SoftDelete;
-  sessions: Omit<Session, "displayName">;
+  sessions: Omit<Session, "displayName" | "visitCount">;
   visits: Omit<Visit, "visitSessions">;
   visitSessions: Omit<VisitSession, "visit" | "session">;
 }

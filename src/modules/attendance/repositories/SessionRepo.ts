@@ -19,7 +19,8 @@ export class SessionRepo {
       churchId: session.churchId,
       groupId: session.groupId,
       serviceTimeId: session.serviceTimeId,
-      sessionDate: sessionDate as any
+      sessionDate: sessionDate as any,
+      notes: session.notes
     }).execute();
     return session;
   }
@@ -29,7 +30,8 @@ export class SessionRepo {
     await getDb().updateTable("sessions").set({
       groupId: session.groupId,
       serviceTimeId: session.serviceTimeId,
-      sessionDate: sessionDate as any
+      sessionDate: sessionDate as any,
+      notes: session.notes
     }).where("id", "=", session.id)
       .where("churchId", "=", session.churchId)
       .execute();
@@ -60,7 +62,7 @@ export class SessionRepo {
   }
 
   public async loadByGroupIdWithNames(churchId: string, groupId: string) {
-    const rows = await sql<any>`select s.id, s.groupId, s.serviceTimeId, s.sessionDate, CASE WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y') ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name) END AS displayName FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId WHERE s.churchId=${churchId} AND s.groupId=${groupId} ORDER by s.sessionDate desc`.execute(getDb());
+    const rows = await sql<any>`select s.id, s.groupId, s.serviceTimeId, s.sessionDate, s.notes, (SELECT COUNT(*) FROM visitSessions vs WHERE vs.churchId=s.churchId AND vs.sessionId=s.id) AS visitCount, CASE WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y') ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name) END AS displayName FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId WHERE s.churchId=${churchId} AND s.groupId=${groupId} ORDER by s.sessionDate desc`.execute(getDb());
     return rows.rows;
   }
 
@@ -78,7 +80,9 @@ export class SessionRepo {
       groupId: data.groupId,
       serviceTimeId: data.serviceTimeId,
       sessionDate: data.sessionDate,
-      displayName: data.displayName
+      notes: data.notes,
+      displayName: data.displayName,
+      visitCount: data.visitCount === undefined ? undefined : Number(data.visitCount)
     };
     return result;
   }

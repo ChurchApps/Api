@@ -960,6 +960,17 @@
     }
    ],
    "schemaChanges": 5
+  },
+  "2026-10-15_session_notes": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "sessions",
+     "column": "notes",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "content": {

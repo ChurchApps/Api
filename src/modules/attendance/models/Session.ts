@@ -4,6 +4,8 @@ export class Session {
   public groupId?: string;
   public serviceTimeId?: string;
   public sessionDate?: Date;
+  public notes?: string;
 
   public displayName?: string;
+  public visitCount?: number;
 }
