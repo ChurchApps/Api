@@ -33,7 +33,17 @@ function personController(opts: any = {}) {
       load: jest.fn(async () => opts.person ?? null),
       delete: jest.fn(),
       deleteByIds: jest.fn(),
-      findPossibleDuplicates: jest.fn(async () => opts.duplicates ?? [])
+      findPossibleDuplicates: jest.fn(async () => opts.duplicates ?? []),
+      loadByIds: jest.fn(async () => opts.rowsByIds ?? []),
+      convertAllToBasicModel: (_c: string, rows: any[]) => rows.map((r) => ({
+        id: r.id,
+        name: { display: r.displayName ?? r.name?.display ?? "" },
+        photo: r.photo,
+        contactInfo: r.contactInfo ?? {},
+        membershipStatus: r.membershipStatus,
+        birthDate: r.birthDate,
+        anniversary: r.anniversary
+      }))
     },
     groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async () => []) },
     auditLog: { loadCount: jest.fn(async () => 0), create: jest.fn() },
@@ -46,7 +56,7 @@ function personController(opts: any = {}) {
       convertAllToModel: (_c: string, rows: any[]) => rows
     }
   };
-  const au = { churchId: "c1", id: "u1", personId: opts.personId ?? "p1", membershipStatus: opts.membershipStatus ?? "Guest", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
+  const au = { churchId: opts.churchId ?? "c1", id: opts.userId === undefined ? "u1" : opts.userId, personId: opts.personId ?? "p1", permissions: opts.permissions ?? [], membershipStatus: opts.membershipStatus ?? "Guest", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
   const controller = new PersonController();
   (controller as any).repos = repos;
   (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
@@ -512,5 +522,55 @@ describe("PersonController directory visibility gate", () => {
     const result: any = await (controller as any).getList({ query: {} }, {});
     expect(result.status).toBe(401);
     expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();
+  });
+});
+
+const nameRows = [
+  { id: "p1", displayName: "Ada Lovelace", photo: "a.png", birthDate: "1815-12-10", anniversary: "1835-01-01", contactInfo: { email: "ada@x.org", mobilePhone: "555" }, membershipStatus: "Visitor" },
+  { id: "p2", displayName: "Ben Clark", photo: "b.png", birthDate: "1980-02-02", contactInfo: { email: "ben@x.org" }, membershipStatus: "Member" }
+];
+
+describe("PersonController names lookup", () => {
+  it("returns name and photo for every supplied id in one call when the caller has any church permission", async () => {
+    const { controller, repos } = personController({ permissions: ["GivingApi_Donations__Edit"], rowsByIds: nameRows });
+    const result = await (controller as any).postNames({ body: { peopleIds: ["p1", " p1 ", "p2"] } }, {});
+    expect(repos.person.loadByIds).toHaveBeenCalledTimes(1);
+    expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["p1", "p2"]);
+    expect(result).toEqual([
+      { id: "p1", name: { display: "Ada Lovelace" }, photo: "a.png" },
+      { id: "p2", name: { display: "Ben Clark" }, photo: "b.png" }
+    ]);
+    expect(JSON.stringify(result)).not.toMatch(/email|birthDate|anniversary|membershipStatus|mobilePhone|contactInfo/);
+  });
+
+  it("accepts the same id list on the query string", async () => {
+    const { controller, repos } = personController({ permissions: ["AttendanceApi_Attendance__View"], rowsByIds: nameRows });
+    const result = await (controller as any).getNames({ query: { ids: "p1,p2" } }, {});
+    expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["p1", "p2"]);
+    expect(result).toEqual([
+      { id: "p1", name: { display: "Ada Lovelace" }, photo: "a.png" },
+      { id: "p2", name: { display: "Ben Clark" }, photo: "b.png" }
+    ]);
+  });
+
+  it("returns 401 for a signed-in caller with no permissions and does not load people", async () => {
+    const { controller, repos } = personController({ permissions: [], rowsByIds: nameRows });
+    const result: any = await (controller as any).postNames({ body: { peopleIds: ["p1"] } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.loadByIds).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when the caller is not signed in", async () => {
+    const { controller, repos } = personController({ userId: "", permissions: ["GivingApi_Donations__View"], rowsByIds: nameRows });
+    const result: any = await (controller as any).postNames({ body: { peopleIds: ["p1"] } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.loadByIds).not.toHaveBeenCalled();
+  });
+
+  it("returns [] for an empty list without querying", async () => {
+    const { controller, repos } = personController({ permissions: ["GivingApi_Donations__Edit"] });
+    const result = await (controller as any).postNames({ body: { peopleIds: [] } }, {});
+    expect(result).toEqual([]);
+    expect(repos.person.loadByIds).not.toHaveBeenCalled();
   });
 });
