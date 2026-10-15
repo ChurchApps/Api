@@ -306,6 +306,19 @@ describe("SubmissionHelper proposal types", () => {
     expect(r.submission.submit).not.toHaveBeenCalled();
   });
 
+  it("lets the uploader translate a song whose license keeps derivatives with the writer, and still refuses everyone else and every arrangement", async () => {
+    const msg = "The original's license does not allow translations or arrangements";
+    const parent = { id: "asset000009", status: "published", language: "English", license: "larry-holder", publisherUserId: "user0000001" };
+    const r = repos({ asset: { loadById: jest.fn(async () => parent) } });
+    const translation = draft({ payload: { ...payload, language: "Spanish", detail: { ...payload.detail, translator: "Ana", parentSongId: "asset000009" } } });
+    expect(await SubmissionHelper.submit(r, translation, newAsset)).toEqual({ ok: true, value: { status: "pending" } });
+    const other = draft({ submittedBy: "user0000002", payload: translation.payload });
+    expect(await SubmissionHelper.submit(r, other, newAsset)).toMatchObject({ status: 400, error: msg });
+    const arrangement = draft({ payload: { ...payload, type: "arrangement", detail: { ...payload.detail, arranger: "Bo", parentSongId: "asset000009" } } });
+    expect(await SubmissionHelper.submit(r, arrangement, newAsset)).toMatchObject({ status: 400, error: msg });
+    expect(r.submission.submit).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks a translation or arrangement when the original's license or any rights layer disallows derivatives", async () => {
     const msg = "The original's license does not allow translations or arrangements";
     const translation = draft({ payload: { ...payload, language: "Spanish", detail: { ...payload.detail, translator: "Ana", parentSongId: "asset000009" } } });

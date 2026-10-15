@@ -40,7 +40,7 @@ function dedupeAuthors(authors: Row[]) {
 // publishedAt) which are right for a brand-new row and wrong for one that has been in front of
 // churches for a month, so they are written on insert and left alone on update.
 const PRESERVE: Record<string, string[]> = {
-  assets: ["downloadCount", "saveCount", "ratingCount", "ratingSum", "featured", "publisherUserId", "publishedAt", "publishedSubmissionId"],
+  assets: ["downloadCount", "saveCount", "ratingCount", "ratingSum", "featured", "publishedAt", "publishedSubmissionId"],
   // singTimeSeconds only because the content pipeline currently writes a naive duration.json
   // ("estimate: N lines x 4 beats @ 120 bpm", median 36s) that is worse than what prod already holds for
   // 314 songs. A new song still gets the estimate. Drop this entry once the pipeline measures real length.
@@ -51,8 +51,11 @@ const PRESERVE: Record<string, string[]> = {
 // Written only where the live row has nothing. bio, portrait and links are editable from /profile, so a
 // writer's own words outrank the repo's copy — but a column the writer never filled should still get the
 // repo's value rather than stay blank forever.
+// publisherUserId stays with whoever already published the song. A blank one is filled from song.json
+// submittedBy, so a catalog import can name its uploader without taking the song from someone else.
 const FILL_IF_EMPTY: Record<string, string[]> = {
-  authors: ["bio", "portraitUrl", "links"]
+  authors: ["bio", "portraitUrl", "links"],
+  assets: ["publisherUserId"]
 };
 
 type Row = Record<string, unknown>;
@@ -74,6 +77,7 @@ function same(a: unknown, b: unknown) {
 async function diff(db: any, table: string, key: string, rows: Row[]) {
   if (!rows.length) return;
   const preserve = new Set(PRESERVE[table] || []);
+  const fill = new Set(FILL_IF_EMPTY[table] || []);
   const cols = Object.keys(rows[0]).filter((c) => c !== key && !preserve.has(c));
   const live = new Map<string, Row>();
   for (const part of chunk(rows.map((r) => String(r[key])), 500)) {
@@ -85,7 +89,7 @@ async function diff(db: any, table: string, key: string, rows: Row[]) {
   for (const row of rows) {
     const cur = live.get(String(row[key]));
     if (!cur) { added++; continue; }
-    const fields = cols.filter((c) => !same(cur[c], row[c]));
+    const fields = cols.filter((c) => !same(cur[c], row[c]) && !(fill.has(c) && cur[c]));
     if (fields.length) changed.push(`${row[key]}: ${fields.slice(0, 6).join(", ")}`);
   }
   console.log(`  ${table}: ${added} to insert, ${changed.length} to update`);

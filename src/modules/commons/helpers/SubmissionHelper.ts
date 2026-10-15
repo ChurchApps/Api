@@ -96,7 +96,10 @@ export class SubmissionHelper {
       const parent = await repos.asset.loadById(String(detail.parentSongId));
       // the original's license and every rights layer (a CC ND tune, a writer-held grant) must allow derivatives
       const layers = parent ? Object.values(SongPackageHelper.normalizeRights((await repos.song.loadSatellite(parent.id || ""))?.rights) || {}) : [];
-      ctx.parent = parent ? { status: parent.status, language: parent.language, derivativesAllowed: RightsHelper.allowsDerivatives([parent.license, ...layers.map((l) => l?.license)]) } : null;
+      // the license still blocks everyone else; the account that published the original may translate it
+      const licenseAllows = RightsHelper.allowsDerivatives([parent?.license, ...layers.map((l) => l?.license)]);
+      const byUploader = type === "translation" && !!sub.submittedBy && sub.submittedBy === parent?.publisherUserId;
+      ctx.parent = parent ? { status: parent.status, language: parent.language, derivativesAllowed: licenseAllows || byUploader } : null;
     }
     if (type === "removal" && asset.publishedSubmissionId) ctx.livePayload = (await repos.submission.loadById(asset.publishedSubmissionId))?.payload;
     if ((type === "correction" || type === "additionalFile" || type === "recording") && asset.publishedSubmissionId) {
