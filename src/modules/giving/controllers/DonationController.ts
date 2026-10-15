@@ -90,6 +90,17 @@ export class DonationController extends GivingBaseController {
     });
   }
 
+  @httpGet("/my/summary")
+  public async getMySummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const year = parseInt(req.query.year?.toString() || "", 10) || new Date().getFullYear();
+      const rows = await this.repos.donation.loadPersonYearTotals(au.churchId, au.personId, year);
+      const { currency, rates } = await this.loadChurchRates(au.churchId);
+      const converted = ExchangeRateHelper.convertTotals(rows.map((r) => ({ currency: r.currency, amount: Number(r.amount || 0) })), currency, rates);
+      return { year, total: converted.totalAmount, count: rows.reduce((sum, r) => sum + Number(r.donationCount || 0), 0), currency, isConverted: converted.isConverted };
+    });
+  }
+
   @httpGet("/failed")
   public async getFailed(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

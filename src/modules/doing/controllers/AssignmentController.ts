@@ -15,6 +15,13 @@ export class AssignmentController extends DoingBaseController {
     });
   }
 
+  @httpGet("/my/upcoming")
+  public async getMyUpcoming(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      return await this.repos.assignment.loadUpcomingByPersonId(au.churchId, au.personId);
+    });
+  }
+
   @httpGet("/monthCounts")
   public async getMonthCounts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
