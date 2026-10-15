@@ -120,6 +120,19 @@ export class DonationRepo {
     return result.rows;
   }
 
+  // Same rows as loadByPersonId (complete gifts to deductible funds), grouped by currency for one calendar year.
+  public async loadPersonYearTotals(churchId: string, personId: string, year: number) {
+    const result = await sql<{ currency: string | null; amount: number; donationCount: number }>`
+      SELECT d.currency, SUM(IFNULL(fd.amount, d.amount)) as amount, COUNT(DISTINCT d.id) as donationCount
+      FROM donations d
+      LEFT JOIN fundDonations fd on fd.donationId = d.id
+      LEFT JOIN funds f on f.id = fd.fundId
+      WHERE d.churchId = ${churchId} AND d.personId = ${personId} AND (d.status IS NULL OR d.status = 'complete')
+        AND (f.taxDeductible = 1 OR f.taxDeductible IS NULL) AND YEAR(d.donationDate) = ${year}
+      GROUP BY d.currency`.execute(getDb());
+    return result.rows;
+  }
+
   public async findMatchingDonation(churchId: string, amount: number, donationDate: Date, personId?: string | null): Promise<Donation | null> {
     const startOfDay = new Date(donationDate);
     startOfDay.setHours(0, 0, 0, 0);

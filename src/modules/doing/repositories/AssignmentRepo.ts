@@ -100,6 +100,21 @@ export class AssignmentRepo {
       .execute();
   }
 
+  // A day back so a plan later today in the member's timezone isn't dropped; the client trims to its own today.
+  public async loadUpcomingByPersonId(churchId: string, personId: string) {
+    return getDb().selectFrom("assignments as a")
+      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("plans as pl", "pl.id", "p.planId")
+      .select(["a.id as assignmentId", "a.status", "p.name as positionName", "pl.id as planId", "pl.name as planName", "pl.serviceDate"])
+      .where("a.churchId", "=", churchId)
+      .where("a.personId", "=", personId)
+      .where("pl.serviceDate", ">=", sql<Date>`DATE_SUB(CURDATE(), INTERVAL 1 DAY)`)
+      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
+      .orderBy("pl.serviceDate")
+      .limit(20)
+      .execute();
+  }
+
   // Non-declined assignments per person for plans in the calendar month of the given date.
   public async loadMonthServeCounts(churchId: string, serviceDate: Date): Promise<{ personId: string; count: number }[]> {
     const rows = await getDb().selectFrom("assignments as a")
