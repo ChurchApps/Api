@@ -12,6 +12,10 @@ interface EmailRecipient {
 // Gateway: the only seam through which other modules read/write messaging data.
 export interface MessagingModuleGateway {
   loadDevicesByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadDevicesByApp(churchId: string, appName: string): Promise<any[]>;
+  // Raw row including the device secret; callers must never return it to clients.
+  loadDeviceByDeviceId(deviceId: string): Promise<any | null>;
+  saveDeviceStatus(churchId: string, id: string, status: unknown): Promise<void>;
   loadNotificationsByPerson(churchId: string, personId: string): Promise<any[]>;
   loadNotificationPreferencesByPerson(churchId: string, personId: string): Promise<any[]>;
   loadPrivateMessagesByPerson(churchId: string, personId: string): Promise<any[]>;
@@ -54,6 +58,19 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
 
   public async loadDevicesByPerson(churchId: string, personId: string) {
     return (await this.repos()).device.loadByPersonId(churchId, personId);
+  }
+
+  public async loadDevicesByApp(churchId: string, appName: string) {
+    const repos = await this.repos();
+    return repos.device.convertAllToModel(churchId, await repos.device.loadByAppName(churchId, appName));
+  }
+
+  public async loadDeviceByDeviceId(deviceId: string) {
+    return (await this.repos()).device.loadByDeviceId(deviceId);
+  }
+
+  public async saveDeviceStatus(churchId: string, id: string, status: unknown) {
+    await (await this.repos()).device.saveStatus(churchId, id, status);
   }
 
   public async loadNotificationsByPerson(churchId: string, personId: string) {

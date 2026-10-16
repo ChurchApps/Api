@@ -10,8 +10,11 @@ import {
   PlanItemTimeRepo,
   PlanTemplateRepo,
   PlanTypeRepo,
+  PlaylistRepo,
   PositionRepo,
+  ScheduleEntryRepo,
   SchedulingPreferenceRepo,
+  ScreenGroupRepo,
   TaskRepo,
   TimeRepo,
   WorkflowRepo,
@@ -34,8 +37,11 @@ export class Repos {
   public planItemTime: PlanItemTimeRepo;
   public planTemplate: PlanTemplateRepo;
   public planType: PlanTypeRepo;
+  public playlist: PlaylistRepo;
   public position: PositionRepo;
+  public scheduleEntry: ScheduleEntryRepo;
   public schedulingPreference: SchedulingPreferenceRepo;
+  public screenGroup: ScreenGroupRepo;
   public task: TaskRepo;
   public time: TimeRepo;
   public workflow: WorkflowRepo;
@@ -63,8 +69,11 @@ export class Repos {
     this.planItemTime = new PlanItemTimeRepo();
     this.planTemplate = new PlanTemplateRepo();
     this.planType = new PlanTypeRepo();
+    this.playlist = new PlaylistRepo();
     this.position = new PositionRepo();
+    this.scheduleEntry = new ScheduleEntryRepo();
     this.schedulingPreference = new SchedulingPreferenceRepo();
+    this.screenGroup = new ScreenGroupRepo();
     this.task = new TaskRepo();
     this.time = new TimeRepo();
     this.workflow = new WorkflowRepo();

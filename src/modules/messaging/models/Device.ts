@@ -14,4 +14,6 @@ export class Device {
   public ipAddress?: string;
   public contentType?: string;
   public contentId?: string;
+  public secret?: string;
+  public status?: any;
 }

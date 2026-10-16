@@ -131,6 +131,25 @@ export class SignageFeedHelper {
     return messages;
   }
 
+  static buildTree(planItems: PlanItem[], parentId: string | null): PlanItem[] {
+    const result: PlanItem[] = [];
+    planItems.forEach((pi) => {
+      if (pi.parentId === parentId) {
+        pi.children = this.buildTree(planItems, pi.id || "");
+        result.push(pi);
+      }
+    });
+    return result;
+  }
+
+  static async buildPlanFeed(plan: Plan, planItems: PlanItem[]): Promise<{ messages: SignageMessage[]; venueFeed: FeedVenue | null }> {
+    const venueId = this.getVenueId(plan, planItems);
+    const venueFeed = venueId ? await this.fetchVenueFeed(venueId) : null;
+    const tree = this.buildTree(planItems, null);
+    const messages = tree.length > 0 ? this.buildMessages(tree, venueFeed) : this.buildDefaultMessages(venueFeed);
+    return { messages, venueFeed };
+  }
+
   static getVenueId(plan: Plan, planItems: PlanItem[]): string | null {
     const primaryLessonItem = planItems.find((pi) => pi.providerId && pi.providerPath);
     if (primaryLessonItem) {

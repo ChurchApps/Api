@@ -45,6 +45,45 @@ export class ContentProviderAuthController extends DoingBaseController {
     });
   }
 
+  @httpGet("/church")
+  public async getChurchLevel(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertAllToModel(au.churchId, await this.repos.contentProviderAuth.loadChurchLevel(au.churchId)));
+    });
+  }
+
+  @httpGet("/church/:providerId")
+  public async getChurchLevelByProvider(@requestParam("providerId") providerId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
+      const data = await this.repos.contentProviderAuth.loadChurchLevelByProvider(au.churchId, providerId);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertToModel(au.churchId, data));
+    });
+  }
+
+  @httpPost("/church/:providerId")
+  public async saveChurchLevel(@requestParam("providerId") providerId: string, req: express.Request<{}, {}, ContentProviderAuth>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
+      if (!req.body?.accessToken) return this.json({ error: "Missing required parameter: accessToken" }, 400);
+      const existing = await this.repos.contentProviderAuth.loadChurchLevelByProvider(au.churchId, providerId);
+      const record: ContentProviderAuth = {
+        id: existing?.id,
+        churchId: au.churchId,
+        ministryId: null,
+        providerId,
+        accessToken: req.body.accessToken,
+        refreshToken: req.body.refreshToken ?? existing?.refreshToken ?? "",
+        tokenType: req.body.tokenType || "Bearer",
+        expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : undefined,
+        scope: req.body.scope || ""
+      };
+      const saved = await this.repos.contentProviderAuth.save(record);
+      return ContentProviderAuthController.redact(this.repos.contentProviderAuth.convertToModel(au.churchId, saved));
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -74,14 +113,14 @@ export class ContentProviderAuthController extends DoingBaseController {
     });
   }
 
-  // Runs the PKCE token exchange server-side: the client_secret lives here (setProviderSecret in ProviderProxyController)
+  // Runs the PKCE token exchange server-side: the client_secret lives here (setProviderSecret in ProviderAuthHelper)
   // and the token endpoint sends no CORS headers, so the browser can't do this itself.
   @httpPost("/exchange")
-  public async exchange(req: express.Request<{}, {}, { ministryId: string; providerId: string; code: string; codeVerifier: string; redirectUri: string }>, res: express.Response): Promise<any> {
+  public async exchange(req: express.Request<{}, {}, { ministryId?: string; providerId: string; code: string; codeVerifier: string; redirectUri: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, code, codeVerifier, redirectUri } = req.body;
-      if (!ministryId || !providerId || !code || !codeVerifier || !redirectUri) return this.json({ error: "Missing required parameters" }, 400);
+      if (!providerId || !code || !codeVerifier || !redirectUri) return this.json({ error: "Missing required parameters" }, 400);
 
       const provider = getProvider(providerId) as { exchangeCodeForTokens?: (code: string, codeVerifier: string, redirectUri: string) => Promise<any> } | null;
       if (!provider?.exchangeCodeForTokens) return this.json({ error: "Provider does not support code exchange" }, 400);
@@ -89,11 +128,13 @@ export class ContentProviderAuthController extends DoingBaseController {
       const tokens = await provider.exchangeCodeForTokens(code, codeVerifier, redirectUri);
       if (!tokens?.access_token) return this.json({ error: "Failed to exchange code for tokens" }, 400);
 
-      const existing = await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId);
+      const existing = ministryId
+        ? await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId)
+        : await this.repos.contentProviderAuth.loadChurchLevelByProvider(au.churchId, providerId);
       const record: ContentProviderAuth = {
         id: existing?.id,
         churchId: au.churchId,
-        ministryId,
+        ministryId: ministryId || null,
         providerId,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token || "",
@@ -107,12 +148,14 @@ export class ContentProviderAuthController extends DoingBaseController {
   }
 
   @httpPost("/refresh")
-  public async refresh(req: express.Request<{}, {}, { ministryId: string; providerId: string }>, res: express.Response): Promise<any> {
+  public async refresh(req: express.Request<{}, {}, { ministryId?: string; providerId: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId } = req.body;
-      if (!ministryId || !providerId) return this.json({ error: "Missing required parameters" }, 400);
-      const authRecord = await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId);
+      if (!providerId) return this.json({ error: "Missing required parameters" }, 400);
+      const authRecord = ministryId
+        ? await this.repos.contentProviderAuth.loadByMinistryAndProvider(au.churchId, ministryId, providerId)
+        : await this.repos.contentProviderAuth.loadChurchLevelByProvider(au.churchId, providerId);
       if (!authRecord?.accessToken) return this.json({ error: "Not linked" }, 404);
       const now = Math.floor(Date.now() / 1000);
       const expiresAt = authRecord.expiresAt ? Math.floor(authRecord.expiresAt.getTime() / 1000) : now + 3600;

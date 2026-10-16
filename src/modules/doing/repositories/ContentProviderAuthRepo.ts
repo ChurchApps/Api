@@ -45,6 +45,14 @@ export class ContentProviderAuthRepo {
     return (await getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where("ministryId", "=", ministryId).where("providerId", "=", providerId).orderBy("expiresAt", "desc").executeTakeFirst()) ?? null;
   }
 
+  public async loadChurchLevel(churchId: string) {
+    return getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where((eb) => eb.or([eb("ministryId", "is", null), eb("ministryId", "=", "")])).execute();
+  }
+
+  public async loadChurchLevelByProvider(churchId: string, providerId: string) {
+    return (await getDb().selectFrom("contentProviderAuths").selectAll().where("churchId", "=", churchId).where((eb) => eb.or([eb("ministryId", "is", null), eb("ministryId", "=", "")])).where("providerId", "=", providerId).orderBy("expiresAt", "desc").executeTakeFirst()) ?? null;
+  }
+
   public convertToModel(_churchId: string, data: any) {
     return data ? this.rowToModel(data) : data;
   }

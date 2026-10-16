@@ -2,14 +2,11 @@ import { controller, httpPost } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
-import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, ContentProviderConfig, setProviderSecret } from "@churchapps/content-providers";
-import { ContentProviderAuth } from "../models/index.js";
-
-setProviderSecret("gocurriculum", process.env.GOCURRICULUM_CLIENT_SECRET || "");
-setProviderSecret("googledrive", process.env.GOOGLE_DRIVE_CLIENT_SECRET || "");
+import { getProvider, ContentProviderAuthData } from "@churchapps/content-providers";
+import { ProviderAuthHelper } from "../helpers/ProviderAuthHelper.js";
 
 interface ProxyRequestBody {
-  ministryId: string;
+  ministryId?: string;
   providerId: string;
   path: string;
   resolution?: number;
@@ -31,74 +28,8 @@ function providerRequiresAuth(provider: Provider): boolean {
 @controller("/doing/providerProxy")
 export class ProviderProxyController extends DoingBaseController {
 
-  // Single-flight de-dup for token refreshes. If two requests race past the expiry check,
-  // the second one piggy-backs on the first's refresh promise instead of consuming the same
-  // refresh_token a second time (which would invalidate it on rotating-token providers).
-  // Static so it spans request-scoped controller instances within the same Lambda warm pool.
-  private static refreshInflight = new Map<string, Promise<ContentProviderAuthData | null>>();
-
-  private convertAuthToProviderFormat(authRecord: ContentProviderAuth): ContentProviderAuthData | null {
-    if (!authRecord.accessToken) return null;
-
-    // TokenHelper.isTokenExpired uses (created_at + expires_in) as the absolute expiry.
-    // Anchor created_at to now so the sum matches the stored expiresAt — otherwise tokens
-    // with under ~1h remaining are treated as expired and refreshed every request, which
-    // breaks rotating-refresh-token providers (Dropbox, Planning Center).
-    const now = Math.floor(Date.now() / 1000);
-    const expiresAt = authRecord.expiresAt ? Math.floor(authRecord.expiresAt.getTime() / 1000) : now + 3600;
-
-    return {
-      access_token: authRecord.accessToken,
-      refresh_token: authRecord.refreshToken || "",
-      token_type: authRecord.tokenType || "Bearer",
-      created_at: now,
-      expires_in: Math.max(0, expiresAt - now),
-      scope: authRecord.scope || ""
-    };
-  }
-
-  private async getAuthForProvider(churchId: string, ministryId: string, providerId: string): Promise<ContentProviderAuthData | null> {
-    const authRecord = await this.repos.contentProviderAuth.loadByMinistryAndProvider(churchId, ministryId, providerId);
-    if (!authRecord) return null;
-
-    let auth = this.convertAuthToProviderFormat(authRecord);
-    if (!auth) return null;
-
-    const tokenHelper = new TokenHelper();
-    if (tokenHelper.isTokenExpired(auth) && auth.refresh_token) {
-      const key = `${churchId}:${ministryId}:${providerId}`;
-      let inflight = ProviderProxyController.refreshInflight.get(key);
-      if (!inflight) {
-        const expiredAuth = auth;
-        inflight = (async (): Promise<ContentProviderAuthData | null> => {
-          // Re-read inside the critical section: another Lambda invocation in the same warm
-          // pool may have already refreshed, in which case we can skip the network call.
-          const fresh = await this.repos.contentProviderAuth.loadByMinistryAndProvider(churchId, ministryId, providerId);
-          if (fresh) {
-            const freshAuth = this.convertAuthToProviderFormat(fresh);
-            if (freshAuth && !tokenHelper.isTokenExpired(freshAuth)) return freshAuth;
-          }
-
-          const config = getProviderConfig(providerId) as ContentProviderConfig | null;
-          if (!config) return null;
-          const refreshedAuth = await tokenHelper.refreshToken(config, expiredAuth);
-          if (!refreshedAuth) return null;
-
-          authRecord.accessToken = refreshedAuth.access_token;
-          authRecord.refreshToken = refreshedAuth.refresh_token;
-          authRecord.expiresAt = new Date((refreshedAuth.created_at + refreshedAuth.expires_in) * 1000);
-          await this.repos.contentProviderAuth.save(authRecord);
-          return refreshedAuth;
-        })().finally(() => {
-          ProviderProxyController.refreshInflight.delete(key);
-        });
-        ProviderProxyController.refreshInflight.set(key, inflight);
-      }
-      const refreshed = await inflight;
-      if (refreshed) auth = refreshed;
-    }
-
-    return auth;
+  private async getAuthForProvider(churchId: string, ministryId: string | undefined, providerId: string): Promise<ContentProviderAuthData | null> {
+    return ProviderAuthHelper.getAuth(this.repos, churchId, ministryId, providerId);
   }
 
   private getProviderOrError(providerId: string): Provider {
@@ -118,8 +49,8 @@ export class ProviderProxyController extends DoingBaseController {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
-      if (!ministryId || !providerId) {
-        return this.json({ error: "Missing required parameters: ministryId, providerId" }, 400);
+      if (!providerId) {
+        return this.json({ error: "Missing required parameters: providerId" }, 400);
       }
 
       const provider = this.getProviderOrError(providerId);
@@ -139,8 +70,8 @@ export class ProviderProxyController extends DoingBaseController {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
-      if (!ministryId || !providerId || !path) {
-        return this.json({ error: "Missing required parameters: ministryId, providerId, path" }, 400);
+      if (!providerId || !path) {
+        return this.json({ error: "Missing required parameters: providerId, path" }, 400);
       }
 
       const provider = this.getProviderOrError(providerId);
@@ -161,8 +92,8 @@ export class ProviderProxyController extends DoingBaseController {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path, resolution } = req.body;
 
-      if (!ministryId || !providerId || !path) {
-        return this.json({ error: "Missing required parameters: ministryId, providerId, path" }, 400);
+      if (!providerId || !path) {
+        return this.json({ error: "Missing required parameters: providerId, path" }, 400);
       }
 
       const provider = this.getProviderOrError(providerId);
@@ -188,8 +119,8 @@ export class ProviderProxyController extends DoingBaseController {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
-      if (!ministryId || !providerId || !path) {
-        return this.json({ error: "Missing required parameters: ministryId, providerId, path" }, 400);
+      if (!providerId || !path) {
+        return this.json({ error: "Missing required parameters: providerId, path" }, 400);
       }
 
       const provider = this.getProviderOrError(providerId);
@@ -213,8 +144,8 @@ export class ProviderProxyController extends DoingBaseController {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       const { ministryId, providerId, path } = req.body;
 
-      if (!ministryId || !providerId || !path) {
-        return this.json({ error: "Missing required parameters: ministryId, providerId, path" }, 400);
+      if (!providerId || !path) {
+        return this.json({ error: "Missing required parameters: providerId, path" }, 400);
       }
 
       const provider = this.getProviderOrError(providerId);

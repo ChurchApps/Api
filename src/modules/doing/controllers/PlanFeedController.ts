@@ -77,7 +77,7 @@ export class PlanFeedController extends DoingBaseController {
         }
       }
 
-      return this.buildTree(result, null as any);
+      return SignageFeedHelper.buildTree(result, null);
     });
   }
 
@@ -94,24 +94,9 @@ export class PlanFeedController extends DoingBaseController {
       if (!plan) return { messages: [] };
 
       const planItems = (await this.repos.planItem.loadForPlan(plan.churchId, plan.id)) as PlanItem[];
-      const venueId = SignageFeedHelper.getVenueId(plan, planItems);
-      const venueFeed = venueId ? await SignageFeedHelper.fetchVenueFeed(venueId) : null;
-
-      const tree = this.buildTree(planItems, null as any);
-      const messages = tree.length > 0 ? SignageFeedHelper.buildMessages(tree, venueFeed) : SignageFeedHelper.buildDefaultMessages(venueFeed);
+      const { messages, venueFeed } = await SignageFeedHelper.buildPlanFeed(plan, planItems);
 
       return { messages, planName: plan.name, lessonName: venueFeed?.lessonName, venueName: venueFeed?.name };
     });
-  }
-
-  private buildTree(planItems: PlanItem[], parentId: string | null): PlanItem[] {
-    const result: PlanItem[] = [];
-    planItems.forEach((pi) => {
-      if (pi.parentId === parentId) {
-        pi.children = this.buildTree(planItems, pi.id || "");
-        result.push(pi);
-      }
-    });
-    return result;
   }
 }

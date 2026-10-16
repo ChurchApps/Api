@@ -43,7 +43,7 @@ export class DeviceController extends MessagingBaseController {
         };
         result = await this.repos.device.save(device);
       }
-      return result;
+      return { ...result, secret: undefined };
     });
   }
 
@@ -52,14 +52,14 @@ export class DeviceController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       let success = false;
       const existing = await this.repos.device.loadByPairingCode(pairingCode);
-      if (existing) {
-        existing.personId = au.personId;
-        existing.churchId = au.churchId;
-        existing.pairingCode = "";
-        if (req.query.contentType) existing.contentType = req.query.contentType as string;
-        if (req.query.contentId) existing.contentId = req.query.contentId as string;
-        await this.repos.device.save(existing);
+      if (existing && DeviceController.isCodeLive(existing)) {
+        const fields: { churchId: string; personId: string; contentType?: string; contentId?: string } = { churchId: au.churchId, personId: au.personId };
+        if (req.query.contentType) fields.contentType = req.query.contentType as string;
+        if (req.query.contentId) fields.contentId = req.query.contentId as string;
+        await this.repos.device.claim(existing.id, fields);
         success = true;
+        const { secret: _secret, ...device } = { ...existing, ...fields, pairingCode: "" };
+        return { success, device };
       }
       return { success };
     });
@@ -68,10 +68,12 @@ export class DeviceController extends MessagingBaseController {
   @httpPost("/enrollAnon")
   public async enrollAnon(req: express.Request<{}, {}, Device>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const pairingCode = this.generatePairingCode();
+      const pairingCode = await this.generateUniquePairingCode();
+      const secret = crypto.randomBytes(16).toString("hex");
       let device = await this.repos.device.loadByDeviceId(req.body.deviceId);
       if (device) {
         device.pairingCode = pairingCode;
+        device.secret = secret;
         device.contentType = undefined;
         device.contentId = undefined;
         device.lastActiveDate = new Date();
@@ -80,6 +82,7 @@ export class DeviceController extends MessagingBaseController {
           deviceId: req.body.deviceId,
           appName: req.body.appName || "LessonsApp",
           pairingCode,
+          secret,
           registrationDate: new Date(),
           lastActiveDate: new Date()
         };
@@ -104,9 +107,27 @@ export class DeviceController extends MessagingBaseController {
   }
 
   private generatePairingCode(): string {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const bytes = crypto.randomBytes(8);
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const bytes = crypto.randomBytes(4);
     return Array.from(bytes, (b) => chars[b % chars.length]).join("");
+  }
+
+  // A code is live for 15 minutes after enroll; a stale holder is cleared so pair can't match it.
+  private static isCodeLive(device: Device): boolean {
+    return !!device.lastActiveDate && new Date(device.lastActiveDate).getTime() > Date.now() - 15 * 60 * 1000;
+  }
+
+  private async generateUniquePairingCode(): Promise<string> {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const code = this.generatePairingCode();
+      const holder = await this.repos.device.loadByPairingCode(code);
+      if (!holder) return code;
+      if (DeviceController.isCodeLive(holder)) continue;
+      holder.pairingCode = "";
+      await this.repos.device.save(holder);
+      return code;
+    }
+    throw new Error("Could not allocate a pairing code");
   }
 
   @httpGet("/:churchId")
@@ -152,6 +173,7 @@ export class DeviceController extends MessagingBaseController {
       req.body.forEach((device) => {
         device.churchId = au.churchId;
         device.personId = device.id ? ownerById.get(device.id) : au.personId;
+        device.secret = undefined;
         device.lastActiveDate = new Date();
         if (!device.registrationDate) device.registrationDate = new Date();
         promises.push(this.repos.device.save(device));

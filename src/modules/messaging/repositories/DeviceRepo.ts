@@ -24,7 +24,8 @@ export class DeviceRepo {
       pairingCode: model.pairingCode,
       ipAddress: model.ipAddress,
       contentType: model.contentType,
-      contentId: model.contentId
+      contentId: model.contentId,
+      secret: model.secret
     } as any).execute();
     return model;
   }
@@ -43,7 +44,8 @@ export class DeviceRepo {
       pairingCode: model.pairingCode,
       ipAddress: model.ipAddress,
       contentType: model.contentType,
-      contentId: model.contentId
+      contentId: model.contentId,
+      secret: model.secret
     }).where("id", "=", model.id);
     if (model.churchId) query = query.where("churchId", "=", model.churchId);
     await query.execute();
@@ -73,6 +75,23 @@ export class DeviceRepo {
   public async loadByPairingCode(pairingCode: string): Promise<Device | undefined> {
     return (await getDb().selectFrom("devices").selectAll()
       .where("pairingCode", "=", pairingCode).executeTakeFirst()) ?? null;
+  }
+
+  public async claim(id: string, fields: { churchId: string; personId: string; contentType?: string; contentId?: string }) {
+    await getDb().updateTable("devices").set({ ...fields, pairingCode: "", lastActiveDate: new Date() }).where("id", "=", id).execute();
+  }
+
+  public async loadByAppName(churchId: string, appName: string) {
+    return getDb().selectFrom("devices").selectAll()
+      .where("churchId", "=", churchId)
+      .where("appName", "=", appName)
+      .orderBy("lastActiveDate", "desc")
+      .execute();
+  }
+
+  public async saveStatus(churchId: string, id: string, status: unknown) {
+    await getDb().updateTable("devices").set({ status: JSON.stringify(status ?? null), lastActiveDate: new Date() })
+      .where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async loadByDeviceId(deviceId: string): Promise<Device | undefined> {
@@ -116,6 +135,16 @@ export class DeviceRepo {
     await getDb().deleteFrom("devices")
       .where("fcmToken", "like", `webpush:{"endpoint":"${escaped}"%`)
       .execute();
+  }
+
+  private static parseJson(value: unknown) {
+    if (value === null || value === undefined) return null;
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
   }
 
   public static escapeLike(value: string) {
@@ -164,7 +193,8 @@ export class DeviceRepo {
       pairingCode: row.pairingCode,
       ipAddress: row.ipAddress,
       contentType: row.contentType,
-      contentId: row.contentId
+      contentId: row.contentId,
+      status: DeviceRepo.parseJson(row.status)
     };
   }
 }
