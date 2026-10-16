@@ -20,4 +20,5 @@ export class Event {
   approvalStatus?: string;
   requestedBy?: string;
   rsvpDisabled?: boolean;
+  photoUrl?: string;
 }
