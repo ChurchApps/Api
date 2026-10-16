@@ -74,8 +74,8 @@ export class DeviceController extends MessagingBaseController {
       if (device) {
         device.pairingCode = pairingCode;
         device.secret = secret;
-        device.contentType = undefined;
-        device.contentId = undefined;
+        device.contentType = null;
+        device.contentId = null;
         device.lastActiveDate = new Date();
       } else {
         device = {
