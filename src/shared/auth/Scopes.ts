@@ -6,6 +6,7 @@ interface PermPair { contentType: string; action: string; }
 const peopleRead: PermPair[] = [
   { contentType: "People", action: "View" },
   { contentType: "People", action: "View Members" },
+  { contentType: "People", action: "View Names" },
   { contentType: "Group Members", action: "View" }
 ];
 

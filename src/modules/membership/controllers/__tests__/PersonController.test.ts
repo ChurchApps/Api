@@ -4,7 +4,7 @@ const sendTransactional = jest.fn();
 const throttleAllow = jest.fn(async () => true);
 const throttleRecord = jest.fn(async () => {});
 jest.mock("../../helpers/index", () => ({
-  Permissions: { people: { edit: "peopleEdit", editSelf: "peopleEditSelf", view: "peopleView" }, server: { admin: "serverAdmin" } },
+  Permissions: { people: { edit: "peopleEdit", editSelf: "peopleEditSelf", view: "peopleView", viewNames: "peopleViewNames" }, server: { admin: "serverAdmin" } },
   UserChurchHelper: { createForPersonEmailUpdate: jest.fn() },
   PersonHelper: { getPerson: jest.fn(), registerGuestHousehold: jest.fn() },
   Environment: { supportEmail: "support@test" },
@@ -572,5 +572,57 @@ describe("PersonController names lookup", () => {
     const result = await (controller as any).postNames({ body: { peopleIds: [] } }, {});
     expect(result).toEqual([]);
     expect(repos.person.loadByIds).not.toHaveBeenCalled();
+  });
+});
+
+describe("PersonController names-only search (View People Names Only)", () => {
+  const searchRows = [{ id: "p2", displayName: "Donald Clark", photo: "d.png", membershipStatus: "Visitor", birthDate: "1970-01-01", householdId: "h2", contactInfo: { email: "donald@x.org", mobilePhone: "555" } }];
+  function searchController(access: string[]) {
+    const { controller, repos } = personController({ access, membershipStatus: "Guest" });
+    repos.person.search = jest.fn(async () => searchRows);
+    repos.person.searchEmail = jest.fn(async () => searchRows);
+    repos.person.convertAllToBasicModel = jest.fn((_c: string, rows: any[]) => rows.map((r) => ({ id: r.id, name: { display: r.displayName }, contactInfo: {}, photo: r.photo, membershipStatus: r.membershipStatus })));
+    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, rows: any[]) => rows);
+    return { controller, repos };
+  }
+
+  it("GET /search returns only id, name, photo and status for a View Names role, with opted-out people filtered", async () => {
+    const { controller, repos } = searchController(["peopleViewNames"]);
+    const result: any = await (controller as any).search({ query: { term: "Donald" } }, {});
+    expect(repos.person.search).toHaveBeenCalledWith("c1", "Donald", true);
+    expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
+    expect(JSON.stringify(result)).not.toMatch(/donald@x.org|birthDate|householdId|mobilePhone/);
+    expect(repos.person.convertAllToModelWithPermissions).not.toHaveBeenCalled();
+  });
+
+  it("POST /search returns the same names-only result for a View Names role", async () => {
+    const { controller, repos } = searchController(["peopleViewNames"]);
+    const result: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    expect(repos.person.search).toHaveBeenCalledWith("c1", "Donald", true);
+    expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
+  });
+
+  it("does not allow email lookups with View Names only", async () => {
+    const { controller, repos } = searchController(["peopleViewNames"]);
+    const result: any = await (controller as any).searchPost({ body: { email: "donald@x.org" } }, {});
+    expect(result).toEqual([]);
+    expect(repos.person.searchEmail).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 from both search endpoints with neither View People nor View Names", async () => {
+    const { controller, repos } = searchController([]);
+    const getResult: any = await (controller as any).search({ query: { term: "Donald" } }, {});
+    const postResult: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    expect(getResult.status).toBe(401);
+    expect(postResult.status).toBe(401);
+    expect(repos.person.search).not.toHaveBeenCalled();
+  });
+
+  it("keeps the full View People result unchanged", async () => {
+    const { controller, repos } = searchController(["peopleView"]);
+    const result: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    expect(repos.person.convertAllToModelWithPermissions).toHaveBeenCalled();
+    expect(repos.person.convertAllToBasicModel).not.toHaveBeenCalled();
+    expect(result[0].contactInfo.email).toBe("donald@x.org");
   });
 });
