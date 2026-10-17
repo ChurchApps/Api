@@ -154,7 +154,9 @@ export class SignageFeedHelper {
     const primaryLessonItem = planItems.find((pi) => pi.providerId && pi.providerPath);
     if (primaryLessonItem) {
       if (primaryLessonItem.providerId !== "lessonschurch") return null;
-      return primaryLessonItem.providerPath || null;
+      // Customized plans store the full content path (/lessons/{program}/{study}/{lesson}/{venueId}); the venue id is the last segment.
+      const venueId = (primaryLessonItem.providerPath || "").split("/").filter(Boolean).pop();
+      return venueId || plan.contentId || null;
     }
     if (plan.providerId && plan.providerId !== "lessonschurch") return null;
     return plan.contentId || null;

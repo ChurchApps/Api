@@ -97,6 +97,26 @@ describe("SignageFeedHelper.buildMessages", () => {
     expect(messages).toEqual([{ name: "Slide", files: [{ name: "Slide", url: "https://cdn.example.com/slide.jpg", seconds: 15, loopVideo: false }] }]);
   });
 
+  it("plays every customized lesson section plus an added external item, in plan order", () => {
+    const tree = [
+      {
+        id: "PI1",
+        itemType: "header",
+        label: "Lesson",
+        providerId: "lessonschurch",
+        providerPath: "/lessons/P/S/L/VEN1",
+        children: [
+          { id: "PI2", itemType: "providerSection", relatedId: "SEC1", label: "Countdown", children: [] },
+          { id: "PI3", itemType: "providerSection", relatedId: "SEC2", label: "Lesson", children: [] }
+        ]
+      },
+      { id: "PI4", itemType: "providerFile", label: "Alive.mp4", link: "https://dl.dropbox.com/alive.mp4", seconds: 200, children: [] }
+    ];
+    const messages = SignageFeedHelper.buildMessages(tree, venueFeed);
+    expect(messages.map((m) => m.name)).toEqual(["Countdown", "Lesson", "Alive.mp4"]);
+    expect(messages[1].files.map((f) => f.name)).toEqual(["Intro", "Loop"]);
+  });
+
   it("returns no messages when nothing is playable", () => {
     const tree = [{ id: "PI1", itemType: "header", label: "Notes", children: [{ id: "PI2", itemType: "item", label: "Talk", children: [] }] }];
     expect(SignageFeedHelper.buildMessages(tree, venueFeed)).toEqual([]);
@@ -122,6 +142,16 @@ describe("SignageFeedHelper.getVenueId", () => {
     expect(SignageFeedHelper.getVenueId(plan, items)).toBe("VENITEM");
   });
 
+  it("takes the venue id from the end of a customized lesson providerPath", () => {
+    const items = [{ id: "PI1", providerId: "lessonschurch", providerPath: "/lessons/P/S/L/VEN1" }];
+    expect(SignageFeedHelper.getVenueId({ contentId: "VENPLAN" }, items)).toBe("VEN1");
+  });
+
+  it("falls back to plan contentId when the providerPath has no venue segment", () => {
+    const items = [{ id: "PI1", providerId: "lessonschurch", providerPath: "/" }];
+    expect(SignageFeedHelper.getVenueId({ contentId: "VENPLAN" }, items)).toBe("VENPLAN");
+  });
+
   it("falls back to plan contentId when no provider items exist", () => {
     expect(SignageFeedHelper.getVenueId({ contentId: "VENPLAN" }, [])).toBe("VENPLAN");
   });
@@ -129,5 +159,23 @@ describe("SignageFeedHelper.getVenueId", () => {
   it("returns null for non-lessons providers", () => {
     expect(SignageFeedHelper.getVenueId({ providerId: "gocurriculum", contentId: "X" }, [])).toBeNull();
     expect(SignageFeedHelper.getVenueId({ contentId: "X" }, [{ id: "PI1", providerId: "gocurriculum", providerPath: "Y" }])).toBeNull();
+  });
+});
+
+describe("SignageFeedHelper.buildPlanFeed", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("keeps the lesson in the feed after the plan is customized", async () => {
+    const fetchSpy = jest.spyOn(SignageFeedHelper, "fetchVenueFeed").mockImplementation(async (venueId: string) => (venueId === "VEN1" ? venueFeed : null));
+    const plan = { providerId: "lessonschurch", contentId: "VEN1" };
+    const planItems = [
+      { id: "PI1", parentId: null, itemType: "header", label: "Lesson", providerId: "lessonschurch", providerPath: "/lessons/P/S/L/VEN1" },
+      { id: "PI2", parentId: "PI1", itemType: "providerSection", relatedId: "SEC1", label: "Countdown", providerId: "lessonschurch", providerPath: "/lessons/P/S/L/VEN1" },
+      { id: "PI3", parentId: "PI1", itemType: "providerSection", relatedId: "SEC2", label: "Lesson", providerId: "lessonschurch", providerPath: "/lessons/P/S/L/VEN1" },
+      { id: "PI4", parentId: null, itemType: "providerFile", label: "Alive.mp4", link: "https://dl.dropbox.com/alive.mp4", seconds: 200 }
+    ];
+    const { messages } = await SignageFeedHelper.buildPlanFeed(plan, planItems);
+    expect(fetchSpy).toHaveBeenCalledWith("VEN1");
+    expect(messages.map((m) => m.name)).toEqual(["Countdown", "Lesson", "Alive.mp4"]);
   });
 });
