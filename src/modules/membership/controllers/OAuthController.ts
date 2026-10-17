@@ -404,22 +404,22 @@ export class OAuthController extends MembershipBaseController {
 
   /** Create relay session for external OAuth providers; TV app receives sessionCode to poll for auth code. */
   @httpPost("/relay/sessions")
-  public async createRelaySession(req: express.Request<{}, {}, { provider: string }>, res: express.Response): Promise<any> {
+  public async createRelaySession(req: express.Request<{}, {}, { provider: string; codeChallenge?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const { provider } = req.body;
-      if (!provider) {
-        return this.json({ error: "invalid_request", error_description: "provider is required" }, 400);
-      }
+      const { provider, codeChallenge } = req.body || {};
+      if (!provider) return this.json({ error: "invalid_request", error_description: "provider is required" }, 400);
+      const challengeOk = typeof codeChallenge === "string" && /^[A-Za-z0-9\-_]{43,128}$/.test(codeChallenge);
+      if (codeChallenge != null && codeChallenge !== "" && !challengeOk) return this.json({ error: "invalid_request", error_description: "codeChallenge must be a PKCE S256 challenge" }, 400);
 
       const sessionCode = OAuthRelaySessionRepo.generateSessionCode();
       const expiresIn = 900; // 15 minutes
       const expiresAt = new Date(Date.now() + expiresIn * 1000);
       const redirectUri = `${Environment.membershipApi}/oauth/relay/callback`;
-
+      // Challenge rides in redirectUri (varchar 512) so confidential exchanges can check PKCE without a new column.
       const session: OAuthRelaySession = {
         sessionCode,
         provider,
-        redirectUri,
+        redirectUri: challengeOk ? `${redirectUri}\n${codeChallenge}` : redirectUri,
         status: "pending",
         expiresAt
       };

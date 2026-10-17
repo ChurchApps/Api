@@ -34,6 +34,7 @@ export { ClientErrorController } from "./ClientErrorController.js";
 export { QueryController } from "./QueryController.js";
 
 export { OAuthController } from "./OAuthController.js";
+export { ProviderRelayTokenController } from "./ProviderRelayTokenController.js";
 export { WebhookController } from "./WebhookController.js";
 export { ApiKeyController } from "./ApiKeyController.js";
 export { AuditLogController } from "./AuditLogController.js";
