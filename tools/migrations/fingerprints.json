@@ -805,6 +805,18 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-17_relay_auth_code_text": {
+   "checks": [
+    {
+     "kind": "columnType",
+     "table": "oAuthRelaySessions",
+     "column": "authCode",
+     "type": "text",
+     "nullable": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {
