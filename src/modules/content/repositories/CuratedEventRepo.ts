@@ -85,7 +85,8 @@ export class CuratedEventRepo {
         "e.end",
         "e.allDay",
         "e.recurrenceRule",
-        "e.visibility"
+        "e.visibility",
+        "e.photoUrl"
       ])
       .where("ce.curatedCalendarId", "=", curatedCalendarId)
       .where("ce.churchId", "=", churchId);

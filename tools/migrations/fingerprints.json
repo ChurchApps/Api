@@ -1577,6 +1577,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-16_event_photo": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "photoUrl",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "giving": {
