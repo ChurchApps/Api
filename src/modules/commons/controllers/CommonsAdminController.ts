@@ -419,6 +419,7 @@ export class CommonsAdminController extends CommonsBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       // ponytail: 8 per call fits the 30s Lambda; caller loops until remaining is 0
+      if (!QualityHelper.configured()) return this.json({ errors: ["OPENAI_API_KEY is not configured; scoring would be heuristic-only"] }, 503);
       const songs = await this.repos.song.loadUnscored(8);
       let scored = 0;
       for (const s of songs) {

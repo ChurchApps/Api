@@ -35,3 +35,13 @@ describe("QualityHelper", () => {
     expect(detail.notes).toMatch(/not an AI judgment/i);
   });
 });
+
+describe("demoted gate", () => {
+  it("exposes demoted as a boolean on the public summary and never the score", async () => {
+    const { SongPackageHelper } = await import("../helpers/SongPackageHelper");
+    const row: any = { id: "x", title: "T", qualityScore: 20, demoted: 1 };
+    const out: any = SongPackageHelper.summary(row, {});
+    expect(out.demoted).toBe(true);
+    expect(out).not.toHaveProperty("qualityScore");
+  });
+});

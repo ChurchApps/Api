@@ -1,14 +1,19 @@
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Song } from "../models/index.js";
 
-const MODEL = "gpt-4o-mini";
+// ponytail: gpt-4o-mini gave every amateur submission the identical 12/10/11/13; 4.1 with a hard-nosed rubric spreads them
+const MODEL = "gpt-4.1";
 const SYSTEM_PROMPT =
-  "You review worship song lyrics submitted to a shared church song library. Score each dimension 0-15 (15 best):\n" +
-  "coherence: lyrics make sense, consistent imagery and viewpoint\n" +
-  "depth: theological/emotional substance, not just stock phrases\n" +
-  "craft: intentional structure and repetition; penalize filler or endless copy-paste\n" +
-  "authenticity: penalize AI-generated tells (generic vocabulary, rhyme-forced nonsense, buzzword mashups)\n" +
-  'Reply ONLY JSON: {"coherence":n,"depth":n,"craft":n,"authenticity":n,"notes":"one sentence for a human reviewer"}';
+  "You are an experienced worship pastor screening song submissions (a ChordPro chart: chords in [brackets]) for a shared church library. " +
+  "Judge whether a typical congregation could and would sing this. Be demanding: a competent amateur song scores 7-10 per dimension; " +
+  "reserve 12+ for songs a church would add to its rotation; give 0-5 when the dimension is plainly broken. Use the whole range and do not default to the middle.\n" +
+  "Score each dimension 0-15 (15 best):\n" +
+  "coherence: lines make grammatical sense, images and viewpoint are consistent, verses connect to the chorus\n" +
+  "depth: theological and emotional substance beyond stock phrases; a chorus that is one sentence repeated has little depth\n" +
+  "craft: lines scan and could be sung to a steady meter; rhymes are natural, not forced; the structure is intentional. " +
+  "Chords count: chords outside the song's key with no musical logic, random accidentals, or filler syllables stretched to fit (\"ee ee\") are serious craft defects\n" +
+  "authenticity: a real human voice; penalize generic vocabulary, buzzword mashups, rhyme-forced nonsense and AI tells\n" +
+  'Reply ONLY JSON: {"coherence":n,"depth":n,"craft":n,"authenticity":n,"notes":"one sentence naming the biggest weakness, for a human reviewer"}';
 
 /** What the triage score is computed from — a song payload plus the roles of its resulting file set. */
 export interface ScoreInput {
@@ -26,6 +31,10 @@ export interface ScoreInput {
 export class QualityHelper {
   private static apiKey(): string {
     return Environment.openAiApiKey || process.env.OPENAI_API_KEY || "";
+  }
+
+  public static configured(): boolean {
+    return !!this.apiKey();
   }
 
   public static heuristicScore(song: ScoreInput): number {
@@ -60,7 +69,7 @@ export class QualityHelper {
   }
 
   public static async llmScore(song: ScoreInput): Promise<{ llm: number; detail: any }> {
-    const lyrics = (song.chordPro || "").replace(/\[[^\]]*\]/g, "").slice(0, 6000);
+    const lyrics = (song.chordPro || "").slice(0, 6000); // chords stay in: wrong-key chords are a quality signal
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey()}` },

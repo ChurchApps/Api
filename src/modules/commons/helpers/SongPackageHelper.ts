@@ -39,13 +39,15 @@ const LIST_FIELDS = [
   "hasScore",
   "hasSlides",
   "hasAccompaniment",
-  "rank"
+  "rank",
+  "demoted"
 ] as const;
 
 export interface SongSummary extends SongView {
   confidence: Confidence | null;
   sundayReady: boolean;
   featured: boolean;
+  demoted: boolean;
   firstLine: string | null;
   tune: string | null;
   hymnalCount: number;
@@ -365,6 +367,7 @@ export class SongPackageHelper {
       confidence,
       sundayReady: confidence === "sunday-ready",
       featured: !!row.featured,
+      demoted: !!row.demoted,
       firstLine: row.firstLine || null,
       tune: row.tune || null,
       hymnalCount: row.hymnalCount || 0,
