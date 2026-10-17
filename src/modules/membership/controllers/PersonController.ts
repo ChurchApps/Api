@@ -263,8 +263,10 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
-      else {
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) {
+        if (!au.checkAccess(Permissions.people.viewNames)) return this.json({}, 401);
+        return await this.searchNamesOnly(au, req.query);
+      } else {
         let data = null;
         const email: string = req.query.email?.toString();
         if (email) data = await this.repos.person.searchEmail(au.churchId, email);
@@ -278,6 +280,14 @@ export class PersonController extends MembershipBaseController {
         return await this.filterPeople(result, au);
       }
     });
+  }
+
+  // "View People Names Only": term search for pickers, returning only id, name, photo and status
+  private async searchNamesOnly(au: AuthenticatedUser, params: any) {
+    if (params?.email) return [];
+    const term = params?.term?.toString() ?? "";
+    const data = await this.repos.person.search(au.churchId, term, true);
+    return this.repos.person.convertAllToBasicModel(au.churchId, data);
   }
 
   @httpGet("/basic")
@@ -398,8 +408,10 @@ export class PersonController extends MembershipBaseController {
   @httpPost("/search")
   public async searchPost(req: express.Request<{}, {}, { email?: string; term?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
-      else {
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) {
+        if (!au.checkAccess(Permissions.people.viewNames)) return this.json({}, 401);
+        return await this.searchNamesOnly(au, req.body);
+      } else {
         let data = null;
         const email: string = req.body.email?.toString();
         if (email) data = await this.repos.person.searchEmail(au.churchId, email);
