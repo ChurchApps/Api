@@ -100,8 +100,11 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/recent")
   public async getRecent(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
-      else {
+      if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) {
+        if (!au.checkAccess(Permissions.people.viewNames)) return this.json({}, 401);
+        const data = (await this.repos.person.loadRecent(au.churchId, true)) as any[];
+        return this.repos.person.convertAllToBasicModel(au.churchId, data);
+      } else {
         const filterOptedOut = au.checkAccess(Permissions.server.admin) ? false : true;
         const data = (await this.repos.person.loadRecent(au.churchId, filterOptedOut)) as any[];
         const result = this.repos.person.convertAllToModelWithPermissions(au.churchId, data, au.checkAccess(Permissions.people.edit));

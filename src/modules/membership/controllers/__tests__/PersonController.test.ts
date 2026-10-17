@@ -625,4 +625,21 @@ describe("PersonController names-only search (View People Names Only)", () => {
     expect(repos.person.convertAllToBasicModel).not.toHaveBeenCalled();
     expect(result[0].contactInfo.email).toBe("donald@x.org");
   });
+
+  it("GET /recent returns the names-only recent list for a View Names role", async () => {
+    const { controller, repos } = searchController(["peopleViewNames"]);
+    repos.person.loadRecent = jest.fn(async () => searchRows);
+    const result: any = await (controller as any).getRecent({ query: {} }, {});
+    expect(repos.person.loadRecent).toHaveBeenCalledWith("c1", true);
+    expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
+    expect(repos.person.convertAllToModelWithPermissions).not.toHaveBeenCalled();
+  });
+
+  it("GET /recent returns 401 with neither View People nor View Names", async () => {
+    const { controller, repos } = searchController([]);
+    repos.person.loadRecent = jest.fn(async () => searchRows);
+    const result: any = await (controller as any).getRecent({ query: {} }, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.loadRecent).not.toHaveBeenCalled();
+  });
 });
