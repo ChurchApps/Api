@@ -4,6 +4,7 @@ import { DoingBaseController } from "./DoingBaseController.js";
 import { ContentProviderAuth } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { getProvider, getProviderConfig, TokenHelper, ContentProviderAuthData, ContentProviderConfig } from "@churchapps/content-providers";
+import { applyContentProviderSecrets } from "../helpers/ProviderAuthHelper.js";
 
 @controller("/doing/contentProviderAuths")
 export class ContentProviderAuthController extends DoingBaseController {
@@ -119,6 +120,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   public async exchange(req: express.Request<{}, {}, { ministryId?: string; providerId: string; code: string; codeVerifier: string; redirectUri: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
+      applyContentProviderSecrets();
       const { ministryId, providerId, code, codeVerifier, redirectUri } = req.body;
       if (!providerId || !code || !codeVerifier || !redirectUri) return this.json({ error: "Missing required parameters" }, 400);
 
@@ -151,6 +153,7 @@ export class ContentProviderAuthController extends DoingBaseController {
   public async refresh(req: express.Request<{}, {}, { ministryId?: string; providerId: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
+      applyContentProviderSecrets();
       const { ministryId, providerId } = req.body;
       if (!providerId) return this.json({ error: "Missing required parameters" }, 400);
       const authRecord = ministryId

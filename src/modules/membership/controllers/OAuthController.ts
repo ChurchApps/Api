@@ -8,6 +8,7 @@ import { OAuthDeviceCodeRepo, OAuthRelaySessionRepo } from "../repositories/inde
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { parseScopes } from "../../../shared/auth/Scopes.js";
 import { toConnections } from "../helpers/OAuthConnectionHelper.js";
+import { isPkceCodeChallenge } from "../helpers/ProviderRelayTokenHelper.js";
 
 function accessTokenTtl(): { jwtExpiresIn: number; expiresInSeconds: number } {
   const seconds = Environment.oauthAccessTokenSeconds > 0 ? Environment.oauthAccessTokenSeconds : 7 * 24 * 3600;
@@ -404,11 +405,16 @@ export class OAuthController extends MembershipBaseController {
 
   /** Create relay session for external OAuth providers; TV app receives sessionCode to poll for auth code. */
   @httpPost("/relay/sessions")
-  public async createRelaySession(req: express.Request<{}, {}, { provider: string }>, res: express.Response): Promise<any> {
+  public async createRelaySession(req: express.Request<{}, {}, { provider: string; codeChallenge?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const { provider } = req.body;
+      const { provider, codeChallenge } = req.body || {};
       if (!provider) {
         return this.json({ error: "invalid_request", error_description: "provider is required" }, 400);
+      }
+      // Optional so existing B1 clients keep working. Confidential providers (OneDrive, Google Drive,
+      // Go Curriculum) must send the S256 challenge or the server exchange endpoint will refuse the session.
+      if (codeChallenge != null && codeChallenge !== "" && !isPkceCodeChallenge(codeChallenge)) {
+        return this.json({ error: "invalid_request", error_description: "codeChallenge must be a PKCE S256 challenge" }, 400);
       }
 
       const sessionCode = OAuthRelaySessionRepo.generateSessionCode();
@@ -420,6 +426,7 @@ export class OAuthController extends MembershipBaseController {
         sessionCode,
         provider,
         redirectUri,
+        codeChallenge: isPkceCodeChallenge(codeChallenge) ? codeChallenge : null,
         status: "pending",
         expiresAt
       };
@@ -434,7 +441,8 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /** Poll relay session for auth code; returns "pending" or "completed" with authCode. */
+  /** Poll relay session for auth code; returns "pending" or "completed" with authCode and deletes the session.
+   *  Confidential providers should poll POST /relay/sessions/:sessionCode/exchange instead — this GET consumes the code. */
   @httpGet("/relay/sessions/:sessionCode")
   public async getRelaySession(@requestParam("sessionCode") sessionCode: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

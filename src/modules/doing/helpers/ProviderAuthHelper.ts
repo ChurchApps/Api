@@ -2,9 +2,15 @@ import { getProviderConfig, TokenHelper, ContentProviderAuthData, ContentProvide
 import { ContentProviderAuth } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 
-setProviderSecret("gocurriculum", process.env.GOCURRICULUM_CLIENT_SECRET || "");
-setProviderSecret("googledrive", process.env.GOOGLE_DRIVE_CLIENT_SECRET || "");
-setProviderSecret("onedrive", process.env.ONEDRIVE_CLIENT_SECRET || "");
+// Re-read at call time. Environment.init copies SSM into process.env after some modules import.
+// ContentProviderAuthController calls this on each B1 exchange/refresh. The TV relay has a copy of these lines.
+export function applyContentProviderSecrets() {
+  setProviderSecret("gocurriculum", process.env.GOCURRICULUM_CLIENT_SECRET || "");
+  setProviderSecret("googledrive", process.env.GOOGLE_DRIVE_CLIENT_SECRET || "");
+  setProviderSecret("onedrive", process.env.ONEDRIVE_CLIENT_SECRET || "");
+}
+
+applyContentProviderSecrets();
 
 export class ProviderAuthHelper {
   // Single-flight de-dup for token refreshes. If two requests race past the expiry check,

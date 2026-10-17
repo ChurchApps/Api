@@ -805,6 +805,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-17_oauth_relay_code_challenge": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "oAuthRelaySessions",
+     "column": "codeChallenge",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {

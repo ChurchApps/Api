@@ -41,6 +41,29 @@ function htmlRes() {
   return { res, getBody: () => body };
 }
 
+describe("OAuthController.createRelaySession", () => {
+  const challenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOQR";
+
+  it("stores an optional PKCE S256 challenge for the server exchange", async () => {
+    const { controller, repos } = oauthController();
+    await (controller as any).createRelaySession({ body: { provider: "onedrive", codeChallenge: challenge } }, {});
+    expect(repos.oAuthRelaySession.save).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "onedrive",
+      codeChallenge: challenge,
+      redirectUri: "https://api.example/oauth/relay/callback",
+      status: "pending"
+    }));
+  });
+
+  it("rejects a challenge that is not S256 and does not create a session", async () => {
+    const { controller, repos } = oauthController();
+    const result: any = await (controller as any).createRelaySession({ body: { provider: "onedrive", codeChallenge: "not-a-challenge" } }, {});
+    expect(result.status).toBe(400);
+    expect(result.obj.error).toBe("invalid_request");
+    expect(repos.oAuthRelaySession.save).not.toHaveBeenCalled();
+  });
+});
+
 describe("OAuthController.relayCallback", () => {
   it("does not return a script-shaped error query raw in HTML", async () => {
     const { controller } = oauthController();
