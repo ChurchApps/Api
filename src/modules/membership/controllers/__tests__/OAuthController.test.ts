@@ -44,15 +44,15 @@ function htmlRes() {
 describe("OAuthController.createRelaySession", () => {
   const challenge = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOQR";
 
-  it("stores an optional PKCE S256 challenge for the server exchange", async () => {
+  it("stores an optional PKCE S256 challenge on the relay redirect and returns the clean URI", async () => {
     const { controller, repos } = oauthController();
-    await (controller as any).createRelaySession({ body: { provider: "onedrive", codeChallenge: challenge } }, {});
+    const result: any = await (controller as any).createRelaySession({ body: { provider: "onedrive", codeChallenge: challenge } }, {});
     expect(repos.oAuthRelaySession.save).toHaveBeenCalledWith(expect.objectContaining({
       provider: "onedrive",
-      codeChallenge: challenge,
-      redirectUri: "https://api.example/oauth/relay/callback",
+      redirectUri: `https://api.example/oauth/relay/callback\n${challenge}`,
       status: "pending"
     }));
+    expect(result.obj.redirectUri).toBe("https://api.example/oauth/relay/callback");
   });
 
   it("rejects a challenge that is not S256 and does not create a session", async () => {

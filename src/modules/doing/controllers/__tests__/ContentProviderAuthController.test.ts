@@ -1,7 +1,7 @@
 import "reflect-metadata";
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { plans: { edit: "plansEdit" } } }));
-jest.mock("@churchapps/content-providers", () => ({ getProvider: jest.fn(), getProviderConfig: jest.fn(), setProviderSecret: jest.fn(), TokenHelper: class {} }));
+jest.mock("@churchapps/content-providers", () => ({ getProvider: jest.fn(), getProviderConfig: jest.fn(), TokenHelper: class {} }));
 
 import { ContentProviderAuthController } from "../ContentProviderAuthController.js";
 

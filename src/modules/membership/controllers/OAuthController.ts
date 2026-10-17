@@ -8,7 +8,6 @@ import { OAuthDeviceCodeRepo, OAuthRelaySessionRepo } from "../repositories/inde
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { parseScopes } from "../../../shared/auth/Scopes.js";
 import { toConnections } from "../helpers/OAuthConnectionHelper.js";
-import { isPkceCodeChallenge } from "../helpers/ProviderRelayTokenHelper.js";
 
 function accessTokenTtl(): { jwtExpiresIn: number; expiresInSeconds: number } {
   const seconds = Environment.oauthAccessTokenSeconds > 0 ? Environment.oauthAccessTokenSeconds : 7 * 24 * 3600;
@@ -408,25 +407,19 @@ export class OAuthController extends MembershipBaseController {
   public async createRelaySession(req: express.Request<{}, {}, { provider: string; codeChallenge?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const { provider, codeChallenge } = req.body || {};
-      if (!provider) {
-        return this.json({ error: "invalid_request", error_description: "provider is required" }, 400);
-      }
-      // Optional so existing B1 clients keep working. Confidential providers (OneDrive, Google Drive,
-      // Go Curriculum) must send the S256 challenge or the server exchange endpoint will refuse the session.
-      if (codeChallenge != null && codeChallenge !== "" && !isPkceCodeChallenge(codeChallenge)) {
-        return this.json({ error: "invalid_request", error_description: "codeChallenge must be a PKCE S256 challenge" }, 400);
-      }
+      if (!provider) return this.json({ error: "invalid_request", error_description: "provider is required" }, 400);
+      const challengeOk = typeof codeChallenge === "string" && /^[A-Za-z0-9\-_]{43,128}$/.test(codeChallenge);
+      if (codeChallenge != null && codeChallenge !== "" && !challengeOk) return this.json({ error: "invalid_request", error_description: "codeChallenge must be a PKCE S256 challenge" }, 400);
 
       const sessionCode = OAuthRelaySessionRepo.generateSessionCode();
       const expiresIn = 900; // 15 minutes
       const expiresAt = new Date(Date.now() + expiresIn * 1000);
       const redirectUri = `${Environment.membershipApi}/oauth/relay/callback`;
-
+      // Challenge rides in redirectUri (varchar 512) so confidential exchanges can check PKCE without a new column.
       const session: OAuthRelaySession = {
         sessionCode,
         provider,
-        redirectUri,
-        codeChallenge: isPkceCodeChallenge(codeChallenge) ? codeChallenge : null,
+        redirectUri: challengeOk ? `${redirectUri}\n${codeChallenge}` : redirectUri,
         status: "pending",
         expiresAt
       };
@@ -441,8 +434,7 @@ export class OAuthController extends MembershipBaseController {
     });
   }
 
-  /** Poll relay session for auth code; returns "pending" or "completed" with authCode and deletes the session.
-   *  Confidential providers should poll POST /relay/sessions/:sessionCode/exchange instead — this GET consumes the code. */
+  /** Poll relay session for auth code; returns "pending" or "completed" with authCode. */
   @httpGet("/relay/sessions/:sessionCode")
   public async getRelaySession(@requestParam("sessionCode") sessionCode: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
