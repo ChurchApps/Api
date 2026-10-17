@@ -37,8 +37,8 @@ describe("GroupAttendanceDownloadHelper.combine", () => {
         ]
       },
       { keyName: "groups", value: [{ id: "g2", groupName: "Youth" }, { id: "g1", groupName: "Choir" }] },
-      { keyName: "groupMembers", value: [{ groupId: "g1", personId: "p2" }, { groupId: "g1", personId: "p1" }, { groupId: "g2", personId: "p1" }] },
-      { keyName: "people", value: [{ id: "p1", displayName: "Ann" }, { id: "p2", displayName: "Bob" }] }
+      { keyName: "groupMembers", value: [{ groupId: "g1", personId: "p1" }, { groupId: "g1", personId: "p2" }, { groupId: "g2", personId: "p1" }] },
+      { keyName: "people", value: [{ id: "p1", displayName: "Ann", firstName: "Ann", lastName: "Zane" }, { id: "p2", displayName: "Bob", firstName: "Bob", lastName: "Adams" }] }
     ]
   });
 
@@ -56,8 +56,8 @@ describe("GroupAttendanceDownloadHelper.combine", () => {
     expect(annYouth["Sunday - 9:00 AM (2024-03-09)"]).toBe("absent");
   });
 
-  it("sorts rows by group, then name", () => {
+  it("sorts rows by group, then last name, first name", () => {
     const rows = GroupAttendanceDownloadHelper.combine(buildReport() as any);
-    expect(rows.map((r: any) => r.groupName + "/" + r.displayName)).toEqual(["Choir/Ann", "Choir/Bob", "Youth/Ann"]);
+    expect(rows.map((r: any) => r.groupName + "/" + r.displayName)).toEqual(["Choir/Bob", "Choir/Ann", "Youth/Ann"]);
   });
 });

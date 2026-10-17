@@ -526,8 +526,8 @@ describe("PersonController directory visibility gate", () => {
 });
 
 const nameRows = [
-  { id: "p1", displayName: "Ada Lovelace", photo: "a.png", birthDate: "1815-12-10", anniversary: "1835-01-01", contactInfo: { email: "ada@x.org", mobilePhone: "555" }, membershipStatus: "Visitor" },
-  { id: "p2", displayName: "Ben Clark", photo: "b.png", birthDate: "1980-02-02", contactInfo: { email: "ben@x.org" }, membershipStatus: "Member" }
+  { id: "p1", displayName: "Ada Lovelace", firstName: "Ada", lastName: "Lovelace", photo: "a.png", birthDate: "1815-12-10", anniversary: "1835-01-01", contactInfo: { email: "ada@x.org", mobilePhone: "555" }, membershipStatus: "Visitor" },
+  { id: "p2", displayName: "Ben Clark", firstName: "Ben", lastName: "Clark", photo: "b.png", birthDate: "1980-02-02", contactInfo: { email: "ben@x.org" }, membershipStatus: "Member" }
 ];
 
 describe("PersonController names lookup", () => {
@@ -537,8 +537,8 @@ describe("PersonController names lookup", () => {
     expect(repos.person.loadByIds).toHaveBeenCalledTimes(1);
     expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["p1", "p2"]);
     expect(result).toEqual([
-      { id: "p1", name: { display: "Ada Lovelace" }, photo: "a.png" },
-      { id: "p2", name: { display: "Ben Clark" }, photo: "b.png" }
+      { id: "p1", name: { display: "Ada Lovelace", first: "Ada", last: "Lovelace" }, photo: "a.png" },
+      { id: "p2", name: { display: "Ben Clark", first: "Ben", last: "Clark" }, photo: "b.png" }
     ]);
     expect(JSON.stringify(result)).not.toMatch(/email|birthDate|anniversary|membershipStatus|mobilePhone|contactInfo/);
   });
@@ -548,8 +548,8 @@ describe("PersonController names lookup", () => {
     const result = await (controller as any).getNames({ query: { ids: "p1,p2" } }, {});
     expect(repos.person.loadByIds).toHaveBeenCalledWith("c1", ["p1", "p2"]);
     expect(result).toEqual([
-      { id: "p1", name: { display: "Ada Lovelace" }, photo: "a.png" },
-      { id: "p2", name: { display: "Ben Clark" }, photo: "b.png" }
+      { id: "p1", name: { display: "Ada Lovelace", first: "Ada", last: "Lovelace" }, photo: "a.png" },
+      { id: "p2", name: { display: "Ben Clark", first: "Ben", last: "Clark" }, photo: "b.png" }
     ]);
   });
 

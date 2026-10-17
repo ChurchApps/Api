@@ -45,9 +45,12 @@ export class RoleMemberRepo {
     return getDb().selectFrom("roleMembers as rm")
       .leftJoin("userChurches as uc", (join) => join.onRef("rm.userId", "=", "uc.userId").onRef("rm.churchId", "=", "uc.churchId"))
       .selectAll("rm")
+      .leftJoin("people as p", (join) => join.onRef("p.id", "=", "uc.personId").onRef("p.churchId", "=", "rm.churchId"))
       .select("uc.personId")
       .where("rm.roleId", "=", roleId)
       .where("rm.churchId", "=", churchId)
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
       .orderBy("rm.dateAdded")
       .execute() as Promise<RoleMember[]>;
   }

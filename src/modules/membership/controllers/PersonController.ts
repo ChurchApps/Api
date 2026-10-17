@@ -634,7 +634,8 @@ export class PersonController extends MembershipBaseController {
     if (unique.length === 0) return [];
     const data = (await this.repos.person.loadByIds(au.churchId, unique)) as any[];
     const basic = this.repos.person.convertAllToBasicModel(au.churchId, data) as Person[];
-    return basic.map((p) => ({ id: p.id, name: { display: p.name?.display || "" }, photo: p.photo || "" }));
+    const rowById = new Map(data.map((d) => [d.id, d]));
+    return basic.map((p) => ({ id: p.id, name: { display: p.name?.display || "", first: rowById.get(p.id)?.firstName || "", last: rowById.get(p.id)?.lastName || "" }, photo: p.photo || "" }));
   }
 
   private async filterPeople(people: Person[], au: AuthenticatedUser) {

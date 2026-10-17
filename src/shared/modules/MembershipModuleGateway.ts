@@ -165,6 +165,7 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .where("churchId", "=", churchId)
       .where("removed", "=", 0)
       .where("id", "in", personIds)
+      .orderBy("lastName").orderBy("firstName")
       .execute();
   }
 

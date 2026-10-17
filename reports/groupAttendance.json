@@ -25,7 +25,7 @@
       "keyName": "people",
       "db": "membership",
       "sqlLines": [
-        "SELECT id, displayName, membershipStatus from people where churchId=:churchId and id in (:peopleIds)"
+        "SELECT id, displayName, CONCAT(IFNULL(lastName, ''), ', ', IFNULL(firstName, '')) as sortName, membershipStatus from people where churchId=:churchId and id in (:peopleIds)"
       ],
       "joinConditions": [
         {
@@ -114,6 +114,7 @@
         {
           "header": "Person",
           "value": "people.displayName",
+          "sortValue": "people.sortName",
           "formatter": "string"
         },
         {

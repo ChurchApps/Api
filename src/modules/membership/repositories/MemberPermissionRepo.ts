@@ -91,8 +91,8 @@ export class MemberPermissionRepo {
       .select("p.displayName as personName")
       .where("mp.churchId", "=", churchId)
       .where("mp.contentId", "=", formId)
-      .orderBy("mp.action")
-      .orderBy("mp.emailNotification", "desc")
+      .orderBy("p.lastName")
+      .orderBy("p.firstName")
       .execute();
   }
 

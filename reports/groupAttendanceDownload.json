@@ -41,7 +41,7 @@
         "keyName": "people",
         "db": "membership",
         "sqlLines": [
-          "SELECT id, displayName from people where churchId=:churchId and id in ('', :peopleIds)"
+          "SELECT id, displayName, firstName, lastName from people where churchId=:churchId and id in ('', :peopleIds)"
         ]
       }
     ],

@@ -149,7 +149,7 @@ export class PaletteController extends MembershipBaseController {
 
   private async loadPeople(churchId: string): Promise<PaletteItem[]> {
     const rows = await getDb().selectFrom("people").select(["id", "displayName", "firstName", "nickName"])
-      .where("churchId", "=", churchId).where("removed", "=", false as any).execute();
+      .where("churchId", "=", churchId).where("removed", "=", false as any).orderBy("lastName").orderBy("firstName").execute();
     return rows.map((r: any) => {
       const item: PaletteItem = { n: r.displayName, t: "person", u: "/people/" + r.id };
       if (r.nickName && r.nickName !== r.firstName) item.a = [r.nickName];

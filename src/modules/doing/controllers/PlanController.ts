@@ -129,7 +129,7 @@ export class PlanController extends DoingBaseController {
       const people = personIds.length > 0 ? await getMembershipModuleGateway().loadPeople(au.churchId, personIds) : [];
       return positions.map(p => ({
         positionId: p.id,
-        names: assignments.filter(a => a.positionId === p.id).map(a => people.find(person => person.id === a.personId)?.displayName).filter(Boolean)
+        names: people.filter(person => assignments.some(a => a.positionId === p.id && a.personId === person.id)).map(person => person.displayName)
       }));
     });
   }

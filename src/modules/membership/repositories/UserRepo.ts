@@ -117,6 +117,7 @@ export class UserRepo {
         eb("firstName", "like", searchTerm),
         eb("lastName", "like", searchTerm)
       ]))
+      .orderBy("lastName").orderBy("firstName")
       .limit(50)
       .execute() as Promise<User[]>;
   }

@@ -4,6 +4,7 @@ export class GroupAttendanceDownloadHelper {
   // One row per group member, one present/absent column per dated session.
   public static combine(report: Report) {
     const result: any[] = [];
+    const personByRow = new Map<any, any>();
     const getValue = (keyName: string) => report.queries?.find((q) => q.keyName === keyName)?.value;
     const attendance: any[] = getValue("main");
     const groups: any[] = getValue("groups");
@@ -35,10 +36,11 @@ export class GroupAttendanceDownloadHelper {
         row.personId = person.id;
         row.groupId = g.id;
         result.push(row);
+        personByRow.set(row, person);
       });
     });
 
-    result.sort((a, b) => (a.groupName || "").localeCompare(b.groupName || "") || (a.displayName || "").localeCompare(b.displayName || ""));
+    result.sort((a, b) => (a.groupName || "").localeCompare(b.groupName || "") || (personByRow.get(a).lastName || "").localeCompare(personByRow.get(b).lastName || "") || (personByRow.get(a).firstName || "").localeCompare(personByRow.get(b).firstName || ""));
     return result;
   }
 }

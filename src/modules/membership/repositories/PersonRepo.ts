@@ -160,17 +160,17 @@ export class PersonRepo {
   }
 
   public async loadAll(churchId: string) {
-    return getDb().selectFrom("people").selectAll().where("churchId", "=", churchId).where("removed", "=", false as any).execute();
+    return getDb().selectFrom("people").selectAll().where("churchId", "=", churchId).where("removed", "=", false as any).orderBy("lastName", "asc").orderBy("firstName", "asc").execute();
   }
 
   public async loadByIds(churchId: string, ids: string[]) {
     if (!ids.length) return [];
-    return getDb().selectFrom("people").selectAll().where("id", "in", ids).where("churchId", "=", churchId).execute();
+    return getDb().selectFrom("people").selectAll().where("id", "in", ids).where("churchId", "=", churchId).orderBy("lastName", "asc").orderBy("firstName", "asc").execute();
   }
 
   public async loadByIdsOnly(ids: string[]) {
     if (!ids.length) return [];
-    return getDb().selectFrom("people").selectAll().where("id", "in", ids).execute();
+    return getDb().selectFrom("people").selectAll().where("id", "in", ids).orderBy("lastName", "asc").orderBy("firstName", "asc").execute();
   }
 
   public async loadMembers(churchId: string) {
@@ -178,6 +178,7 @@ export class PersonRepo {
       .where("churchId", "=", churchId)
       .where("removed", "=", false as any)
       .where("membershipStatus", "in", ["Member", "Staff"])
+      .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .execute();
   }
 
@@ -195,6 +196,7 @@ export class PersonRepo {
       .where("removed", "=", false as any)
       .where("membershipStatus", "in", statuses)
       .where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]))
+      .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .execute();
   }
 
@@ -227,6 +229,7 @@ export class PersonRepo {
       .where("churchId", "=", churchId)
       .where("householdId", "=", householdId)
       .where("removed", "=", false as any)
+      .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .execute();
   }
 
@@ -237,7 +240,7 @@ export class PersonRepo {
       .where(sql`CONCAT(IFNULL(FirstName,''), ' ', IFNULL(MiddleName,''), ' ', IFNULL(NickName,''), ' ', IFNULL(LastName,''), ' ', IFNULL(donorNumber,''))`, "like", searchTerm)
       .where("removed", "=", 0 as any);
     if (filterOptedOut) query = query.where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]));
-    return query.limit(100).execute();
+    return query.orderBy("lastName", "asc").orderBy("firstName", "asc").limit(100).execute();
   }
 
   public async searchPhone(churchId: string, phonestring: string) {
@@ -250,6 +253,7 @@ export class PersonRepo {
         eb(sql`REPLACE(REPLACE(MobilePhone,'-',''), ' ', '')`, "like", phoneSearch)
       ]))
       .where("removed", "=", 0 as any)
+      .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .limit(100)
       .execute();
   }
@@ -259,6 +263,7 @@ export class PersonRepo {
       .where("churchId", "=", churchId)
       .where("email", "like", "%" + email + "%")
       .where("removed", "=", false as any)
+      .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .limit(100)
       .execute() as any;
   }
@@ -317,6 +322,7 @@ export class PersonRepo {
         }
         return eb.or(clauses);
       })
+      .orderBy("lastName", "asc").orderBy("firstName", "asc")
       .limit(25)
       .execute();
   }

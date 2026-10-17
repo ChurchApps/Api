@@ -55,7 +55,7 @@ export class GroupMemberRepo {
       .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
       .selectAll("gm")
       .select([
-        "p.photoUpdated", "p.displayName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole", "p.birthDate"
+        "p.photoUpdated", "p.displayName", "p.firstName", "p.lastName", "p.email", "p.homePhone", "p.mobilePhone", "p.workPhone", "p.optedOut", "p.address1", "p.address2", "p.city", "p.state", "p.zip", "p.householdId", "p.householdRole", "p.birthDate"
       ])
       .where("gm.churchId", "=", churchId)
       .where("gm.groupId", "=", groupId)
@@ -119,7 +119,7 @@ export class GroupMemberRepo {
     return getDb().selectFrom("groupMembers as gm")
       .innerJoin("people as p", (join) => join.onRef("p.id", "=", "gm.personId").on((eb) => eb.or([eb("p.removed", "=", 0 as any), eb("p.removed", "is", null)])))
       .selectAll("gm")
-      .select(["p.photoUpdated", "p.displayName", "p.email"])
+      .select(["p.photoUpdated", "p.displayName", "p.firstName", "p.lastName", "p.email"])
       .where("gm.churchId", "=", churchId)
       .where("gm.groupId", "in", groupIds)
       .orderBy("gm.leader", "desc")
@@ -235,7 +235,7 @@ export class GroupMemberRepo {
       result.person = {
         id: result.personId,
         photoUpdated: row.photoUpdated,
-        name: { display: row.displayName },
+        name: { display: row.displayName, first: row.firstName, last: row.lastName },
         contactInfo: {
           email: row.email,
           homePhone: row.homePhone,

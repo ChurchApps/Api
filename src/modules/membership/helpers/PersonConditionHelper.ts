@@ -42,7 +42,8 @@ export class PersonConditionHelper {
         const matched = ArrayHelper.getAllOperator(data, "homePhone", c.value, c.operator)
           .concat(ArrayHelper.getAllOperator(data, "workPhone", c.value, c.operator))
           .concat(ArrayHelper.getAllOperator(data, "mobilePhone", c.value, c.operator));
-        return ArrayHelper.getUnique(matched);
+        const matchedSet = new Set(matched);
+        return data.filter((p) => matchedSet.has(p));
       }
       case "id":
         return ArrayHelper.getAllOperatorArray(data, c.field, c.value.split(","), c.operator);
