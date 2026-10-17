@@ -157,9 +157,9 @@ export class ConversationController extends MessagingBaseController {
           conversation.contentType = existing.contentType;
           conversation.contentId = existing.contentId;
           const isLeader = this.isGroupFeed(existing.contentType) && !!au.leaderGroupIds?.includes(existing.contentId);
-          if (!this.isPersonNote(existing.contentType) && !isLeader && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+          if (!this.isNote(existing.contentType) && !isLeader && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
         }
-        if (this.isPersonNote(conversation.contentType) && !this.canViewPersonNotes(au, conversation.contentType)) return this.json({}, 401);
+        if (this.isNote(conversation.contentType) && !(await this.canUseNotes(au, conversation, "post"))) return this.json({}, 401);
         // A group feed row is seeded lazily by the first poster, so seeding needs the same rights as posting.
         if (this.isGroupFeed(conversation.contentType) && !(await this.canPostToGroupFeed(au, conversation.contentType, conversation.contentId))) return this.json({}, 401);
       }
@@ -212,7 +212,7 @@ export class ConversationController extends MessagingBaseController {
   @httpPost("/start")
   public async start(req: express.Request<{}, {}, { groupId: string; contentType: string; contentId: string; title: string; comment: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      if (this.isPersonNote(req.body.contentType) && !this.canViewPersonNotes(au, req.body.contentType)) return this.json({}, 401);
+      if (this.isNote(req.body.contentType) && !(await this.canUseNotes(au, req.body, "post"))) return this.json({}, 401);
       if (this.isGroupFeed(req.body.contentType) && !(await this.canPostToGroupFeed(au, req.body.contentType, req.body.contentId))) return this.json({}, 401);
       const c: Conversation = {
         churchId: au.churchId,
@@ -304,7 +304,7 @@ export class ConversationController extends MessagingBaseController {
   // Content-type level gate for routes that authorize before the conversation row exists (or before it
   // is loaded). Mirrors canReadConversation minus the row-level checks.
   private async canReadContent(au: any, contentType: string, contentId: string): Promise<boolean> {
-    if (this.isPersonNote(contentType)) return this.canViewPersonNotes(au, contentType);
+    if (this.isNote(contentType)) return this.canUseNotes(au, { contentType, contentId }, "view");
     if (au?.checkAccess(Permissions.content.edit)) return true;
     if (contentType === "group" || contentType === "groupAnnouncement") {
       return !!contentId && (!!au?.groupIds?.includes(contentId) || !!au?.leaderGroupIds?.includes(contentId));
