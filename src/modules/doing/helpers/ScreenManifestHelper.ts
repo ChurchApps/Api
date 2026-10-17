@@ -100,7 +100,7 @@ export class ScreenManifestHelper {
       title: contentByEntry.get(s.entry.id).title,
       start: s.start.toISOString(),
       end: s.end.toISOString(),
-      endBehavior: s.entry.endBehavior || "loop",
+      endBehavior: ScreenScheduleHelper.playbackEndBehavior(s.entry.endBehavior),
       items: contentByEntry.get(s.entry.id).items
     }));
     const rev = crypto.createHash("sha1").update(JSON.stringify({ timeZone, screenGroupName: group.name, fallbackTitle, fallback, occurrences })).digest("hex");

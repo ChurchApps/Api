@@ -9,6 +9,17 @@ const dailyLoop: ScheduleEntry = { id: "A", screenGroupId: "G", targetType: "pla
 const announcement: ScheduleEntry = { id: "B", screenGroupId: "G", targetType: "playlist", targetId: "P2", start: "2026-10-19T10:00:00", end: "2026-10-19T11:00:00", endBehavior: "fallback", enabled: true };
 const disabled: ScheduleEntry = { id: "C", screenGroupId: "G", targetType: "playlist", targetId: "P3", start: "2026-10-19T09:00:00", end: "2026-10-19T20:00:00", enabled: false };
 
+describe("ScreenScheduleHelper.playbackEndBehavior", () => {
+  it("sends teacher paced for a schedule saved as hold last", () => {
+    expect(ScreenScheduleHelper.playbackEndBehavior("holdLast")).toBe("teacherPaced");
+    expect(ScreenScheduleHelper.playbackEndBehavior("teacherPaced")).toBe("teacherPaced");
+    expect(ScreenScheduleHelper.playbackEndBehavior("loop")).toBe("loop");
+    expect(ScreenScheduleHelper.playbackEndBehavior("fallback")).toBe("fallback");
+    expect(ScreenScheduleHelper.playbackEndBehavior(undefined)).toBe("loop");
+    expect(ScreenScheduleHelper.playbackEndBehavior("")).toBe("loop");
+  });
+});
+
 describe("ScreenScheduleHelper.expand", () => {
   const now = new Date("2026-10-19T14:00:00Z");
 

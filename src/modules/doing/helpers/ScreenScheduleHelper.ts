@@ -22,6 +22,13 @@ export interface TimelineSegment {
 export class ScreenScheduleHelper {
   static readonly WINDOW_DAYS = 7;
 
+  // "Play once, then hold the last slide" is retired. A saved holdLast row plays as teacher paced.
+  static playbackEndBehavior(endBehavior?: string | null): "loop" | "fallback" | "teacherPaced" {
+    if (endBehavior === "holdLast" || endBehavior === "teacherPaced") return "teacherPaced";
+    if (endBehavior === "fallback") return "fallback";
+    return "loop";
+  }
+
   static validTimeZone(timeZone?: string): string {
     if (!timeZone) return "America/New_York";
     try {
