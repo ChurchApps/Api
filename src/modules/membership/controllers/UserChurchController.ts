@@ -84,14 +84,16 @@ export class UserChurchController extends MembershipBaseController {
   @httpDelete("/record/:userId/:churchId/:personId")
   public async deleteRecord(
     @requestParam("userId") userId: string,
-    @requestParam("churchId") _churchId: string,
+    @requestParam("churchId") churchId: string,
     @requestParam("personId") personId: string,
       req: express.Request,
       res: express.Response
   ): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (userId !== au.id && !au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
-      await this.repos.userChurch.deleteRecord(userId, au.churchId, personId);
+      // Users may leave any church they belong to; admins may only act within their own church.
+      const isSelf = userId === au.id;
+      if (!isSelf && (churchId !== au.churchId || !au.checkAccess(Permissions.roles.edit))) return this.json({}, 401);
+      await this.repos.userChurch.deleteRecord(userId, isSelf ? churchId : au.churchId, personId);
       return this.json({});
     });
   }

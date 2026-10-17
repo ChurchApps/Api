@@ -87,10 +87,12 @@ export class RoleMemberController extends MembershipBaseController {
   }
 
   @httpDelete("/self/:churchId/:userId")
-  public async deleteSelf(@requestParam("churchId") _churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async deleteSelf(@requestParam("churchId") churchId: string, @requestParam("userId") userId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (userId !== au.id && !au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
-      await this.repos.roleMember.deleteSelf(au.churchId, userId);
+      // Users may leave any church they belong to; admins may only act within their own church.
+      const isSelf = userId === au.id;
+      if (!isSelf && (churchId !== au.churchId || !au.checkAccess(Permissions.roles.edit))) return this.json({}, 401);
+      await this.repos.roleMember.deleteSelf(isSelf ? churchId : au.churchId, userId);
       return this.json([], 200);
     });
   }
