@@ -4,6 +4,7 @@ import { Repos } from "../repositories/index.js";
 
 setProviderSecret("gocurriculum", process.env.GOCURRICULUM_CLIENT_SECRET || "");
 setProviderSecret("googledrive", process.env.GOOGLE_DRIVE_CLIENT_SECRET || "");
+setProviderSecret("onedrive", process.env.ONEDRIVE_CLIENT_SECRET || "");
 
 export class ProviderAuthHelper {
   // Single-flight de-dup for token refreshes. If two requests race past the expiry check,

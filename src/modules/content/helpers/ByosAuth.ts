@@ -26,7 +26,7 @@ const OAUTH_CONFIGS: Record<string, ByosOAuthConfig> = {
   },
   onedrive: {
     tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-    clientId: "",
+    clientId: "49a15ab2-868f-4612-8b03-c1c7fae485f1",
     getClientSecret: () => process.env.ONEDRIVE_CLIENT_SECRET || ""
   }
 };
