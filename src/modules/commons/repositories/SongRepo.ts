@@ -156,7 +156,9 @@ export class SongRepo {
     return await this.joined().select(FULL_COLS)
       // heuristic-only rows (llm 0, scored while the key was missing) get re-scored too
       .where((eb) => eb.or([eb("songs.qualityScore", "is", null), eb(sql`json_extract(songs.qualityDetail, '$.llm')`, "=", 0)]))
-      .where("assets.status", "!=", "removed").limit(limit).execute() as SongView[];
+      .where("assets.status", "!=", "removed")
+      // heuristic-only uploads first, then the never-scored hymnal imports; the caller can stop after the first group
+      .orderBy(sql`songs.qualityScore is null`).orderBy("assets.createdAt", "desc").limit(limit).execute() as SongView[];
   }
 
   public async loadById(assetId: string): Promise<SongView | undefined> {
