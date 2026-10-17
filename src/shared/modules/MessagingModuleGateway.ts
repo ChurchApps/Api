@@ -118,7 +118,7 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     const church = { name: churchName };
     const subject = MergeFieldHelper.resolve(subjectOverride || template.subject || "", recipient, church);
     const body = MergeFieldHelper.resolve(template.htmlContent || "", recipient, church);
-    await NotificationHelper.createNotifications([personId], churchId, "task", templateId, subject, undefined, undefined, {
+    await NotificationHelper.createNotifications([personId], churchId, "email", templateId, subject, undefined, undefined, {
       category: "announcements",
       deliveryStartLevel: 2,
       emailImmediate: true,
