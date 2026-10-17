@@ -11,6 +11,6 @@ export class ScheduleEntry {
   public end?: string;
   public recurrenceRule?: string;
   public exceptionDates?: string[];
-  public endBehavior?: "loop" | "holdLast" | "fallback";
+  public endBehavior?: "loop" | "holdLast" | "fallback" | "teacherPaced";
   public enabled?: boolean;
 }

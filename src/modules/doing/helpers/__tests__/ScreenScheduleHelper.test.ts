@@ -64,3 +64,11 @@ describe("ScreenScheduleHelper item helpers", () => {
     expect(ScreenScheduleHelper.resolveType("lessonschurch")).toBe("url");
   });
 });
+
+describe("ScreenScheduleHelper teacher paced entries", () => {
+  it("carries the teacher paced end behaviour onto its occurrences", () => {
+    const lesson: ScheduleEntry = { id: "L", screenGroupId: "G", targetType: "planType", targetId: "PL1", start: "2026-10-19T09:00:00", end: "2026-10-19T10:00:00", endBehavior: "teacherPaced", enabled: true };
+    const timeline = ScreenScheduleHelper.buildTimeline(ScreenScheduleHelper.expand([lesson], new Date("2026-10-19T13:30:00Z"), TZ));
+    expect(timeline.map((s) => [s.entry.endBehavior, s.start.toISOString(), s.end.toISOString()])).toEqual([["teacherPaced", "2026-10-19T14:00:00.000Z", "2026-10-19T15:00:00.000Z"]]);
+  });
+});
