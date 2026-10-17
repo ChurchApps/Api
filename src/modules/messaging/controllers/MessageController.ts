@@ -40,7 +40,7 @@ export class MessageController extends MessagingBaseController {
       for (const message of req.body) {
         const convData = await this.repos.conversation.loadById(message.churchId, message.conversationId);
         const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
-        if (!conv?.id || conv.allowAnonymousPosts !== true || !this.isAnonPublicConversation(conv) || this.isPersonNote(conv.contentType)) return this.json({ error: "Anonymous posting not allowed" }, 401);
+        if (!conv?.id || conv.allowAnonymousPosts !== true || !this.isAnonPublicConversation(conv) || this.isNote(conv.contentType)) return this.json({ error: "Anonymous posting not allowed" }, 401);
         message.id = undefined;
         message.personId = null;
         message.churchId = conv.churchId;
@@ -139,7 +139,7 @@ export class MessageController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       for (const message of req.body) {
         const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
-        if (this.isPersonNote(conv?.contentType) && !this.canViewPersonNotes(au, conv.contentType)) return this.json({}, 401);
+        if (this.isNote(conv?.contentType) && !(await this.canUseNotes(au, conv, "post"))) return this.json({}, 401);
         // New posts need posting rights; an edit's author already participated, so it keeps the author-or-staff rule below.
         if (!message.id && (!conv?.id || !(await this.canPost(au, conv)))) return this.json({}, 401);
         if (message.id) {
@@ -250,7 +250,7 @@ export class MessageController extends MessagingBaseController {
   // Group / announcement conversations gate on group membership; DMs on being a
   // participant; staff with content.edit may always act (moderation).
   private async canParticipate(au: any, conv: any): Promise<boolean> {
-    if (this.isPersonNote(conv.contentType)) return this.canViewPersonNotes(au, conv.contentType);
+    if (this.isNote(conv.contentType)) return this.canUseNotes(au, conv, "post");
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv.contentType === "group" || conv.contentType === "groupAnnouncement") {
       return !!conv.contentId && au.groupIds?.includes(conv.contentId);
@@ -268,7 +268,7 @@ export class MessageController extends MessagingBaseController {
   // Staff with content.edit moderate anywhere; group leaders moderate their own group's
   // conversations. Person notes are never leader-moderated - they run through the notes RBAC.
   private async canModerate(au: any, conv: any): Promise<boolean> {
-    if (this.isPersonNote(conv?.contentType)) return this.canViewPersonNotes(au, conv.contentType);
+    if (this.isNote(conv?.contentType)) return this.canUseNotes(au, conv, "post");
     if (au.checkAccess(Permissions.content.edit)) return true;
     if (conv?.contentType === "group" || conv?.contentType === "groupAnnouncement") {
       return !!conv.contentId && !!au.leaderGroupIds?.includes(conv.contentId);

@@ -21,4 +21,6 @@ export class Event {
   requestedBy?: string;
   rsvpDisabled?: boolean;
   photoUrl?: string;
+  notesViewRole?: string;
+  notesPostRole?: string;
 }

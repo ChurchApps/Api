@@ -38,7 +38,9 @@ export class EventRepo {
       approvalStatus: m.approvalStatus,
       requestedBy: m.requestedBy,
       rsvpDisabled: m.rsvpDisabled ?? false,
-      photoUrl: m.photoUrl
+      photoUrl: m.photoUrl,
+      notesViewRole: m.notesViewRole || null,
+      notesPostRole: m.notesPostRole || null
     } as any).execute();
     return model;
   }
@@ -69,7 +71,9 @@ export class EventRepo {
       requestedBy: m.requestedBy,
       // explicit false so un-disabling RSVP persists (Kysely drops undefined)
       rsvpDisabled: m.rsvpDisabled ?? false,
-      photoUrl: m.photoUrl
+      photoUrl: m.photoUrl,
+      notesViewRole: m.notesViewRole || null,
+      notesPostRole: m.notesPostRole || null
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -211,7 +215,9 @@ export class EventRepo {
       approvalStatus: row.approvalStatus,
       requestedBy: row.requestedBy,
       rsvpDisabled: row.rsvpDisabled,
-      photoUrl: row.photoUrl
+      photoUrl: row.photoUrl,
+      notesViewRole: row.notesViewRole,
+      notesPostRole: row.notesPostRole
     };
   }
 }

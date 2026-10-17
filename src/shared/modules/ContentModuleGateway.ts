@@ -7,6 +7,7 @@ export interface ContentModuleGateway {
   loadRegistrationMembersByPerson(churchId: string, personId: string): Promise<any[]>;
   loadEventRsvpsByPerson(churchId: string, personId: string): Promise<any[]>;
   loadEventBookingsByPerson(churchId: string, personId: string): Promise<any[]>;
+  loadEvent(churchId: string, eventId: string): Promise<any | null>;
   // Expand a recurring event's occurrences in the window to civil-local dates.
   // Lives here (not in messaging) so the recurrence engine stays inside content.
   expandEventOccurrences(event: any, from: Date, to: Date): Promise<CivilOccurrence[]>;
@@ -48,6 +49,14 @@ class ContentModuleGatewayDb implements ContentModuleGateway {
       .where("churchId", "=", churchId)
       .where("requestedBy", "=", personId)
       .execute();
+  }
+
+  public async loadEvent(churchId: string, eventId: string) {
+    const row = await (await this.db()).selectFrom("events").selectAll()
+      .where("churchId", "=", churchId)
+      .where("id", "=", eventId)
+      .executeTakeFirst();
+    return row ?? null;
   }
 
   public async expandEventOccurrences(event: any, from: Date, to: Date): Promise<CivilOccurrence[]> {

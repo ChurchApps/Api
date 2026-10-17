@@ -6,7 +6,9 @@ jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: jest.fn() }, EncryptionHelper: { decrypt: jest.fn((s: string) => "decrypted:" + s) } }));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn(), sendAttendance: jest.fn(), sendBlockedIps: jest.fn() } }));
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { checkShouldNotify: jest.fn() } }));
-jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, tasks: { view: "tasksView" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" } } }));
+jest.mock("../../../../shared/helpers/Permissions", () => ({ Permissions: { content: { edit: "contentEdit" }, tasks: { view: "tasksView" }, chat: { host: "chatHost" }, people: { edit: "peopleEdit", viewConfidentialNotes: "peopleViewConfidentialNotes" }, groups: { edit: "groupsEdit" }, groupMembers: { view: "groupMembersView" }, calendars: { admin: "calendarsAdmin" } } }));
+const mockLoadEvent = jest.fn(async () => null as any);
+jest.mock("../../../../shared/modules/ContentModuleGateway.js", () => ({ getContentModuleGateway: () => ({ loadEvent: (...args: any[]) => mockLoadEvent(...(args as [])) }) }));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch: jest.fn(async () => ({ id: "c1" })) }) }));
 
 // workflowCard notes check the card through the doing gateway (lazy import in the controller).
@@ -55,6 +57,8 @@ function repos(opts: any = {}) {
       loadForConversation: jest.fn(async () => opts.messages ?? [{ id: "m1" }]),
       loadForConversationsPaginated: jest.fn(async (_churchId: string, ids: string[]) => new Map(ids.map((id) => [id, opts.messages ?? [{ id: "m1" }]]))),
       loadByIds: jest.fn(async () => []),
+      loadById: jest.fn(async () => null),
+      save: jest.fn(async (m: any) => ({ ...m, id: m.id || "msg1" })),
       convertToModel: (m: any) => m,
       convertAllToModel: (rows: any[]) => rows
     },
@@ -109,6 +113,42 @@ describe("ConversationController.forContent group membership", () => {
     expect((await (attach(new ConversationController(), nonHost, MEMBER) as any).forContent("streamingLiveHost", "svc1", { query: {} }, {})).status).toBe(401);
     const host = repos({ forContent: [hostConv] });
     expect(await (attach(new ConversationController(), host, HOST) as any).forContent("streamingLiveHost", "svc1", { query: {} }, {})).toEqual([hostConv]);
+  });
+});
+
+describe("group and event notes", () => {
+  const noteConv = { id: "gn1", churchId: "c1", contentType: "groupNote", contentId: "g1", allowAnonymousPosts: false, visibility: "hidden" };
+  const eventConv = { id: "en1", churchId: "c1", contentType: "eventNote", contentId: "e1", allowAnonymousPosts: false, visibility: "hidden" };
+  const forContent = (principal: any, conv: any) =>
+    (attach(new ConversationController(), repos({ forContent: [conv] }), principal) as any).forContent(conv.contentType, conv.contentId, { query: {} }, {});
+  const post = (principal: any, conv: any) =>
+    (attach(new MessageController(), repos({ byId: conv }), principal) as any).save({ body: [{ conversationId: conv.id, content: "hi" }] }, {});
+
+  it("hides group notes from members and every staff permission", async () => {
+    for (const principal of [MEMBER, STAFF, au({ access: ["groupsEdit", "groupMembersView"] }), au({ leaderGroupIds: ["other"] })]) {
+      expect((await forContent(principal, noteConv)).status).toBe(401);
+      expect((await post(principal, noteConv)).status).toBe(401);
+    }
+  });
+
+  it("lets the group's leaders read and post group notes", async () => {
+    expect(await forContent(LEADER, noteConv)).toEqual([noteConv]);
+    expect((await post(LEADER, noteConv)).status).not.toBe(401);
+  });
+
+  it("gates event notes by the event's view and post roles", async () => {
+    mockLoadEvent.mockResolvedValue({ id: "e1", groupId: "g1", notesViewRole: "members", notesPostRole: "leaders" });
+    expect(await forContent(MEMBER, eventConv)).toEqual([eventConv]);
+    expect((await forContent(NON_MEMBER, eventConv)).status).toBe(401);
+    expect((await post(MEMBER, eventConv)).status).toBe(401);
+    expect((await post(LEADER, eventConv)).status).not.toBe(401);
+    expect(await forContent(STAFF, eventConv)).toEqual([eventConv]);
+  });
+
+  it("defaults event notes to staff only", async () => {
+    mockLoadEvent.mockResolvedValue({ id: "e1", groupId: "g1" });
+    expect((await forContent(LEADER, eventConv)).status).toBe(401);
+    expect(await forContent(au({ access: ["calendarsAdmin"] }), eventConv)).toEqual([eventConv]);
   });
 });
 
