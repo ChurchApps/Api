@@ -34,7 +34,7 @@ describe("GET /donations date range", () => {
   });
 
   it("still loads everything with no filter", async () => {
-    const { controller, repos } = make();
+    const { controller } = make();
     expect(await controller.getAll({ query: {} }, {})).toEqual([{ id: "all" }]);
   });
 
