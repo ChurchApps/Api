@@ -83,6 +83,30 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
     expect(result.status).toBe(401);
     expect(repos.groupMember.loadForGroup).not.toHaveBeenCalled();
   });
+
+  // #1294: groupIds in the login token are stale for a group joined after sign-in.
+  it("lets a member who joined after sign-in see the roster (live membership check)", async () => {
+    const { controller, repos } = gmController({ groupIds: [], rows: [rosterRow("p2")] });
+    repos.groupMember.loadForPerson = jest.fn(async () => [{ groupId: "g1", personId: "p1" }]);
+    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    expect(result).toHaveLength(1);
+    expect(repos.groupMember.loadForPerson).toHaveBeenCalledWith("c1", "p1");
+  });
+
+  it("applies the live membership check to groupIds too", async () => {
+    const { controller, repos } = gmController({ groupIds: ["g1"], rows: [rosterRow("p2", "g1"), rosterRow("p3", "g2")] });
+    repos.groupMember.loadForPerson = jest.fn(async () => [{ groupId: "g1" }, { groupId: "g2" }]);
+    const result = await (controller as any).getAll({ query: { groupIds: "g1,g2" } }, {});
+    expect(result).toHaveLength(2);
+  });
+
+  it("still blocks when the live check finds no membership either (401)", async () => {
+    const { controller, repos } = gmController({ groupIds: [] });
+    repos.groupMember.loadForPerson = jest.fn(async () => [{ groupId: "other" }]);
+    const result = await (controller as any).getAll({ query: { groupIds: "g1,other" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.groupMember.loadForGroups).not.toHaveBeenCalled();
+  });
 });
 
 describe("GroupMemberController.save body shape (#1194)", () => {
