@@ -1,5 +1,8 @@
 name: Rollback Prod
 
+# Reverts the Lambda code only. Database migrations applied by Deploy Prod stay applied;
+# they are additive, so the previous code keeps working against the newer schema.
+
 on:
   workflow_dispatch:
     inputs:

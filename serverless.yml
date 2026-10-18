@@ -251,6 +251,17 @@ functions:
           rate: rate(1 minute)
           enabled: true
 
+  # Applies pending database migrations. Not wired to any event: the deploy workflows invoke it
+  # with `aws lambda invoke` after `serverless deploy`, since the prod databases are VPC-only.
+  migrate:
+    handler: lambda.migrate
+    layers:
+      - { Ref: DependenciesLambdaLayer }
+      - arn:aws:lambda:us-east-2:943013980633:layer:SentryNodeServerlessSDKv10:19
+    memorySize: 512
+    timeout: 900
+    vpc: ${self:custom.vpcSettings.current, ''}
+
   # SES identity notifications (Bounce + Complaint) for support@churchapps.org point at this topic; see ChurchEmailLimiter.
   sesFeedback:
     handler: lambda.sesFeedback

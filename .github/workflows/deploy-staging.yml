@@ -66,6 +66,18 @@ jobs:
       - name: Deploy Core APIs to Staging
         run: yarn serverless deploy --stage staging --verbose
 
+      - name: Run database migrations
+        run: |
+          aws lambda invoke \
+            --function-name api-staging-migrate \
+            --cli-read-timeout 910 \
+            migrate-result.json
+          cat migrate-result.json
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync("migrate-result.json", "utf8"));
+            if (!r.ok) { console.error("Database migrations failed"); process.exit(1); }
+          '
+
       - name: Verify deployment
         run: |
           echo "Deployment completed for Staging environment"
