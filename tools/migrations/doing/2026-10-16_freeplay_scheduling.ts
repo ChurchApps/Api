@@ -1,5 +1,20 @@
 import { type Kysely, sql } from "kysely";
 
+// MySQL commits each DDL statement, so a failed run leaves these indexes behind and is not recorded.
+async function indexExists(db: Kysely<any>, table: string, index: string): Promise<boolean> {
+  const result = await sql<{ count: number }>`
+    SELECT COUNT(*) as count
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${table} AND INDEX_NAME = ${index}
+  `.execute(db);
+  return Number((result.rows[0] as any)?.count ?? 0) > 0;
+}
+
+async function ensureIndex(db: Kysely<any>, name: string, table: string, columns: string[]): Promise<void> {
+  if (await indexExists(db, table, name)) return;
+  await db.schema.createIndex(name).on(table).columns(columns).execute();
+}
+
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .createTable("playlists")
@@ -12,7 +27,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .modifyEnd(sql`ENGINE=InnoDB`)
     .execute();
 
-  await db.schema.createIndex("idx_playlists_churchId").on("playlists").columns(["churchId"]).execute();
+  await ensureIndex(db, "idx_playlists_churchId", "playlists", ["churchId"]);
 
   await db.schema
     .createTable("screenGroups")
@@ -24,7 +39,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .modifyEnd(sql`ENGINE=InnoDB`)
     .execute();
 
-  await db.schema.createIndex("idx_screenGroups_churchId").on("screenGroups").columns(["churchId"]).execute();
+  await ensureIndex(db, "idx_screenGroups_churchId", "screenGroups", ["churchId"]);
 
   await db.schema
     .createTable("scheduleEntries")
@@ -45,7 +60,7 @@ export async function up(db: Kysely<any>): Promise<void> {
     .modifyEnd(sql`ENGINE=InnoDB`)
     .execute();
 
-  await db.schema.createIndex("idx_scheduleEntries_churchId_screenGroupId").on("scheduleEntries").columns(["churchId", "screenGroupId"]).execute();
+  await ensureIndex(db, "idx_scheduleEntries_churchId_screenGroupId", "scheduleEntries", ["churchId", "screenGroupId"]);
 }
 
 export async function down(db: Kysely<any>): Promise<void> {
