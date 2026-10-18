@@ -4,6 +4,7 @@ import { createApp } from "./dist/app.js";
 import { handleSocket } from "./dist/lambda/socket-handler.js";
 import { handle30MinTimer, handleMidnightTimer, handleScheduledTasks, handleWebhookTimer } from "./dist/lambda/timer-handler.js";
 import { handleSesFeedback } from "./dist/lambda/ses-feedback-handler.js";
+import { handleMigrate } from "./dist/lambda/migrate-handler.js";
 
 const initializeEnvironment = async () => {
   if (!Environment.currentEnvironment) {
@@ -135,4 +136,10 @@ export const timerWebhooks = async function (event, context) {
     console.error("Error in webhook timer:", error);
     throw error;
   }
+};
+
+// Invoked by the deploy workflows after `serverless deploy`; see src/lambda/migrate-handler.ts.
+export const migrate = async function () {
+  await initializeEnvironment();
+  return await handleMigrate();
 };
