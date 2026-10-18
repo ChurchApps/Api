@@ -149,6 +149,7 @@ export class Environment extends EnvironmentBase {
     if (environment === "docker") {
       if (!jwt || jwt === DOCKER_DEFAULT_JWT) console.warn("SECURITY WARNING: JWT_SECRET is unset or the public docker-compose default. Anyone can forge admin logins on this server. Set JWT_SECRET in .env to a long random value and restart.");
       if (!enc || enc === DOCKER_DEFAULT_ENCRYPTION) console.warn("SECURITY WARNING: ENCRYPTION_KEY is unset or the public docker-compose default, so stored payment/storage credentials are readable by anyone with the database. Set ENCRYPTION_KEY in .env (32 characters) before storing credentials; changing it later makes existing encrypted values unreadable.");
+      else if (enc.length !== 32) throw new Error(`ENCRYPTION_KEY must be exactly 32 characters (got ${enc.length}); aes-256-ctr cannot use it`);
       return;
     }
     if (environment === "dev" || environment === "local") return;
