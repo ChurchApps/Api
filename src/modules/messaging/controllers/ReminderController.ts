@@ -13,6 +13,13 @@ import { ReminderDefinition, NotificationEntityMute } from "../models/index.js";
 @controller("/messaging/reminders")
 export class ReminderController extends MessagingBaseController {
   // Generic over entityType (event|plan|task). The /event/:id/preview route below is 3 segments, so it never collides with these 2-segment routes.
+  // Texting volunteers and groups needs texting.send, so turning on the sms channel does too. A
+  // definition that already texts can still be edited by content.edit.
+  private addsSms(channels: unknown, existingChannels?: string): boolean {
+    const list = (value: unknown) => (Array.isArray(value) ? value : String(value || "").split(",")).map((c) => String(c).trim());
+    return list(channels).includes("sms") && !list(existingChannels).includes("sms");
+  }
+
   @httpGet("/:entityType/:entityId")
   public async listForEntity(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -32,6 +39,7 @@ export class ReminderController extends MessagingBaseController {
       if (!adapter) return this.json({}, 400);
       const body = req.body || {};
       const existing = (await this.repos.reminderDefinition.loadForEntity(au.churchId, entityType, entityId)) as ReminderDefinition[];
+      if (this.addsSms(body.channels, existing[0]?.channels) && !au.checkAccess(Permissions.texting.send)) return this.json({ error: "Sending texts requires the Texting Send permission" }, 401);
       const def: ReminderDefinition = {
         id: existing[0]?.id,
         churchId: au.churchId,
@@ -73,6 +81,7 @@ export class ReminderController extends MessagingBaseController {
       if (!adapter) return this.json({}, 400);
       const body = req.body || {};
       const existing = (await this.repos.reminderDefinition.loadForScope(au.churchId, entityType, scopeId)) as ReminderDefinition[];
+      if (this.addsSms(body.channels, existing[0]?.channels) && !au.checkAccess(Permissions.texting.send)) return this.json({ error: "Sending texts requires the Texting Send permission" }, 401);
       const def: ReminderDefinition = {
         id: existing[0]?.id,
         churchId: au.churchId,
