@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
+import { publishedBy } from "./AssetRepo.js";
 import { Song, SongView } from "../models/index.js";
 
 // Spine and author fields are aliased back to the legacy song names the site consumes.
@@ -142,7 +143,7 @@ export class SongRepo {
   }
 
   public async loadBySubmitter(submittedBy: string): Promise<SongView[]> {
-    return await this.joined().select(SUMMARY_COLS).where("assets.publisherUserId", "=", submittedBy)
+    return await this.joined().select(SUMMARY_COLS).where(publishedBy(submittedBy))
       .orderBy("assets.createdAt", "desc").execute() as SongView[];
   }
 

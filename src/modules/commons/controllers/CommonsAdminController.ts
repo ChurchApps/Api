@@ -108,7 +108,7 @@ export class CommonsAdminController extends CommonsBaseController {
           publisherName: names[r.publisherUserId || ""],
           submitterStats: stats[userId],
           isNewAsset: !r.publishedSubmissionId,
-          isThirdParty: r.publisherUserId !== r.submittedBy,
+          isThirdParty: r.publisherUserId !== r.submittedBy && !r.byCoPublisher,
           filesChanged: PublishHelper.fileSummary(files),
           song: r.assetType === "song" ? { writer: detail?.writer, songKey: detail?.songKey, bpm: detail?.bpm, firstLine: DuplicateHelper.firstLine(detail?.chordPro || "") } : undefined
         });
@@ -131,7 +131,8 @@ export class CommonsAdminController extends CommonsBaseController {
       for (const f of proposed) files.push({ ...f, url: f.action === "remove" ? undefined : await ContentLibraryHelper.signedPendingUrl(sub.id || "", f.name || "", apiBase) });
       const liveFiles = await this.repos.assetFile.loadLive(asset.id || "");
       const livePayload = asset.publishedSubmissionId ? await PublishHelper.editablePayload(this.repos, asset) : undefined;
-      const names = await userNames([sub.submittedBy, asset.publisherUserId]);
+      const publisherIds = await this.repos.asset.loadPublisherIds(asset);
+      const names = await userNames([sub.submittedBy, ...publisherIds]);
       const def = ASSET_TYPES[asset.assetType || ""];
       const contributors = asset.assetType === "song" ? parseContributors((await this.repos.song.loadSatellite(asset.id || ""))?.contributors) : [];
       return {
@@ -142,11 +143,11 @@ export class CommonsAdminController extends CommonsBaseController {
         assetName: asset.name,
         assetStatus: asset.status,
         isNewAsset: !asset.publishedSubmissionId,
-        isThirdParty: asset.publisherUserId !== sub.submittedBy,
+        isThirdParty: !publisherIds.includes(sub.submittedBy || ""),
         submittedByName: names[sub.submittedBy || ""],
         submitterStats: await this.repos.submission.countSubmitterStats(sub.submittedBy || ""),
         files,
-        live: { ...asset, publisherName: names[asset.publisherUserId || ""], files: liveFiles, fileUrls: ContentLibraryHelper.fileUrls(asset, liveFiles), payload: livePayload, contributors },
+        live: { ...asset, publisherName: publisherIds.map((id) => names[id]).join(", "), files: liveFiles, fileUrls: ContentLibraryHelper.fileUrls(asset, liveFiles), payload: livePayload, contributors },
         diff: { fields: PublishHelper.diffFields(livePayload, sub.payload), files: PublishHelper.fileSummary(proposed) },
         qualityDetail: parseQualityDetail(sub.payload?.qualityDetail),
         detailFields: def?.detailFields || [],
@@ -176,7 +177,7 @@ export class CommonsAdminController extends CommonsBaseController {
       const { declined, error } = ReviewerHelper.parseDeclined(req.body?.declineFiles, proposed, liveNames, requiredRoles);
       if (error) return this.json({ errors: [error] }, 400);
       await PublishHelper.approve(this.repos, sub, asset, au.id, req.body?.note?.slice(0, 500), declined);
-      if (asset.assetType === "song") void CommonsMauticHelper.syncWriter(this.repos, asset.publisherUserId);
+      if (asset.assetType === "song") for (const id of await this.repos.asset.loadPublisherIds(asset)) void CommonsMauticHelper.syncWriter(this.repos, id);
       return { status: "approved", assetId: asset.id, declined: declined.map((d) => d.name) };
     });
   }
@@ -280,7 +281,7 @@ export class CommonsAdminController extends CommonsBaseController {
       if (asset && action === "unpublish" && asset.status === "published") { await this.repos.asset.update(asset.id || "", { status: "unpublished", unpublishedAt: new Date(), removedReason: reason }); tookDown = true; }
       const note = String(req.body?.note || "").slice(0, 500);
       await this.repos.report.update(report.id || "", { status: "resolved", resolution, resolutionNote: note, reviewedBy: au.id, reviewedAt: new Date() });
-      if (asset && tookDown) await CommonsMailHelper.notifyTakedown(asset, report).catch((e) => console.error("[CommonsMailHelper] takedown failed:", e));
+      if (asset && tookDown) await CommonsMailHelper.notifyTakedown(asset, report, await this.repos.asset.loadPublisherIds(asset)).catch((e) => console.error("[CommonsMailHelper] takedown failed:", e));
       await CommonsMailHelper.notifyReportResolved({ ...report, resolutionNote: note }, resolution).catch((e) => console.error("[CommonsMailHelper] report resolved failed:", e));
       return { status: "resolved" };
     });
@@ -291,8 +292,31 @@ export class CommonsAdminController extends CommonsBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
       const assets = await this.repos.asset.adminSearch({ q: req.query.q?.toString(), status: req.query.status?.toString(), assetType: req.query.assetType?.toString(), page: Number(req.query.page) || 1 });
-      const names = await userNames(assets.map((a) => a.publisherUserId));
-      return assets.map((a) => ({ ...a, publisherName: names[a.publisherUserId || ""], typeLabel: ASSET_TYPES[a.assetType || ""]?.label || a.assetType }));
+      const publisherIds = await this.repos.asset.loadPublisherIdsFor(assets);
+      const names = await userNames(Object.values(publisherIds).flat());
+      return assets.map((a) => {
+        const publishers = (publisherIds[a.id || ""] || []).map((id) => ({ id, name: names[id] }));
+        return { ...a, publishers, publisherName: publishers.map((p) => p.name).join(", "), typeLabel: ASSET_TYPES[a.assetType || ""]?.label || a.assetType };
+      });
+    });
+  }
+
+  /** Replaces an asset's publishers. The first id is the primary publisher; the rest co-publish it. */
+  @httpPost("/assets/:id/publishers")
+  public async setPublishers(req: express.Request<{ id: string }, {}, { userIds?: unknown }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.server.admin)) return this.adminOnly(au);
+      const asset = await this.repos.asset.loadById(String(req.params.id));
+      if (!asset) return this.json({}, 404);
+      const raw = req.body?.userIds;
+      if (!Array.isArray(raw) || raw.length > 20 || raw.some((id) => typeof id !== "string" || !/^[A-Za-z0-9_-]{11}$/.test(id))) return this.json({ errors: ["userIds must be a list of up to 20 user ids"] }, 400);
+      const userIds = [...new Set(raw as string[])];
+      const before = await this.repos.asset.loadPublisherIds(asset);
+      await this.repos.asset.setPublishers(asset.id || "", userIds, au.id);
+      // counts move for everyone added or dropped
+      if (asset.assetType === "song") for (const id of new Set([...before, ...userIds])) void CommonsMauticHelper.syncWriter(this.repos, id);
+      const names = await userNames(userIds);
+      return { publishers: userIds.map((id) => ({ id, name: names[id] })) };
     });
   }
 

@@ -28,7 +28,8 @@ function repos(overrides: any = {}) {
   const r: any = {
     asset: {
       create: jest.fn(async (a: any) => { a.id = "asset000001"; return a; }),
-      loadById: jest.fn(async (id: string) => ({ id, assetType: "song", status: "published", publisherUserId: "owner000001" }))
+      loadById: jest.fn(async (id: string) => ({ id, assetType: "song", status: "published", publisherUserId: "owner000001" })),
+      isPublisher: jest.fn(async (a: any, u?: string) => !!u && a?.publisherUserId === u), loadPublisherIds: jest.fn(async (a: any) => [a?.publisherUserId].filter(Boolean))
     },
     submission: {
       create: jest.fn(async (s: any) => { s.id = "sub00000001"; s.status = "draft"; return s; }),

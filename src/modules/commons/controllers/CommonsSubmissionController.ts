@@ -26,7 +26,7 @@ export class CommonsSubmissionController extends CommonsBaseController {
   public async mine(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapperAuth(req, res, async (au) => {
       const rows = await this.repos.submission.loadMine(au.id, req.query.status?.toString());
-      return rows.map((r) => ({ ...r, isNewAsset: !r.publishedSubmissionId || r.publishedSubmissionId === r.id, isThirdParty: r.publisherUserId !== r.submittedBy }));
+      return rows.map((r) => ({ ...r, isNewAsset: !r.publishedSubmissionId || r.publishedSubmissionId === r.id, isThirdParty: r.publisherUserId !== r.submittedBy && !r.byCoPublisher }));
     });
   }
 
@@ -192,7 +192,8 @@ export class CommonsSubmissionController extends CommonsBaseController {
     const withUrls: (AssetFile & { url?: string })[] = [];
     for (const f of files) withUrls.push({ ...f, url: f.action === "remove" ? undefined : await ContentLibraryHelper.signedPendingUrl(sub.id || "", f.name || "", apiBase) });
     const liveFiles = asset ? await this.repos.assetFile.loadLive(asset.id || "") : [];
-    const names = await userNames([sub.submittedBy, asset?.publisherUserId]);
+    const publisherIds = asset ? await this.repos.asset.loadPublisherIds(asset) : [];
+    const names = await userNames([sub.submittedBy, ...publisherIds]);
     return {
       ...sub,
       submittedByName: names[sub.submittedBy || ""],
@@ -200,9 +201,9 @@ export class CommonsSubmissionController extends CommonsBaseController {
       assetName: asset?.name,
       assetStatus: asset?.status,
       isNewAsset: !asset?.publishedSubmissionId,
-      isThirdParty: !!asset && asset.publisherUserId !== sub.submittedBy,
+      isThirdParty: !!asset && !publisherIds.includes(sub.submittedBy || ""),
       files: withUrls,
-      live: asset ? { ...asset, publisherName: names[asset.publisherUserId || ""], fileUrls: ContentLibraryHelper.fileUrls(asset, liveFiles), files: liveFiles, payload: await PublishHelper.editablePayload(this.repos, asset) } : null
+      live: asset ? { ...asset, publisherName: publisherIds.map((id) => names[id]).join(", "), fileUrls: ContentLibraryHelper.fileUrls(asset, liveFiles), files: liveFiles, payload: await PublishHelper.editablePayload(this.repos, asset) } : null
     };
   }
 }

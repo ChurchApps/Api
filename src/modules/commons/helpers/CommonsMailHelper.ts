@@ -137,11 +137,11 @@ export class CommonsMailHelper {
     return this.mailTo(report.email, `Your report (${report.id}) is resolved`, body);
   }
 
-  /** The publisher of a song taken down by a report — reply-to-counter-notice is the appeal path. */
-  static notifyTakedown(asset: Asset, report: Report): Promise<void> {
+  /** Every publisher of a song taken down by a report — reply-to-counter-notice is the appeal path. */
+  static async notifyTakedown(asset: Asset, report: Report, publisherIds: (string | undefined)[] = [asset.publisherUserId]): Promise<void> {
     const title = esc((asset.name || "").trim()) || "your song";
     const why = report.reason === "copyright" ? "a copyright report" : "a policy report";
-    return this.mailWriter(asset.publisherUserId, `${title} was taken down from WorshipCommons`, `<p><strong>${title}</strong> is no longer available on WorshipCommons after ${why}.</p><p>If you believe this is a mistake, reply to this email with a counter-notice explaining why you have the right to publish it.</p><p>Questions? Email ${Environment.supportEmail}.</p>`);
+    for (const id of publisherIds) await this.mailWriter(id, `${title} was taken down from WorshipCommons`, `<p><strong>${title}</strong> is no longer available on WorshipCommons after ${why}.</p><p>If you believe this is a mistake, reply to this email with a counter-notice explaining why you have the right to publish it.</p><p>Questions? Email ${Environment.supportEmail}.</p>`);
   }
 
   /** Instant internal ping so the team sees each new submission the moment it lands. */

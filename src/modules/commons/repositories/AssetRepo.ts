@@ -1,7 +1,8 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
+import { type ExpressionBuilder, sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
+import type { CommonsDatabase } from "../db/DatabaseTypes.js";
 import { Asset } from "../models/index.js";
 
 export interface AssetSearch {
@@ -25,6 +26,9 @@ export interface AdminAssetSearch {
 }
 
 
+/** Assets a user publishes, as primary or co-publisher. Works on any query over assets. */
+export const publishedBy = (userId: string) => (eb: ExpressionBuilder<CommonsDatabase, "assets">) =>
+  eb.or([eb("assets.publisherUserId", "=", userId), eb("assets.id", "in", eb.selectFrom("assetPublishers").select("assetPublishers.assetId").where("assetPublishers.userId", "=", userId))]);
 
 @injectable()
 export class AssetRepo {
@@ -77,7 +81,7 @@ export class AssetRepo {
   /** Songs a writer has live in the library — the "songs released" milestone count. */
   public async countPublishedSongs(userId: string): Promise<number> {
     const row = await getDb().selectFrom("assets").select(sql<number>`count(*)`.as("n"))
-      .where("publisherUserId", "=", userId).where("assetType", "=", "song").where("status", "=", "published").executeTakeFirst();
+      .where(publishedBy(userId)).where("assetType", "=", "song").where("status", "=", "published").executeTakeFirst();
     return Number(row?.n || 0);
   }
 
@@ -85,11 +89,45 @@ export class AssetRepo {
   public async loadSongPublisherIds(): Promise<string[]> {
     const rows = await getDb().selectFrom("assets").select("publisherUserId").distinct()
       .where("assetType", "=", "song").where("publisherUserId", "is not", null).execute();
-    return rows.map((r) => r.publisherUserId as string);
+    const co = await getDb().selectFrom("assetPublishers").innerJoin("assets", "assets.id", "assetPublishers.assetId")
+      .select("assetPublishers.userId").distinct().where("assets.assetType", "=", "song").execute();
+    return [...new Set([...rows.map((r) => r.publisherUserId as string), ...co.map((r) => r.userId as string)])];
   }
 
   public async loadByPublisher(userId: string): Promise<Asset[]> {
-    return await getDb().selectFrom("assets").selectAll().where("publisherUserId", "=", userId).orderBy("createdAt", "desc").execute() as Asset[];
+    return await getDb().selectFrom("assets").selectAll().where(publishedBy(userId)).orderBy("createdAt", "desc").execute() as Asset[];
+  }
+
+  /** Everyone who publishes an asset: the primary publisher first, then its co-publishers. */
+  public async loadPublisherIds(asset: Asset): Promise<string[]> {
+    const co = await getDb().selectFrom("assetPublishers").select("userId").where("assetId", "=", asset.id || "").orderBy("createdAt").execute();
+    return [...new Set([asset.publisherUserId, ...co.map((r) => r.userId)].filter((id): id is string => !!id))];
+  }
+
+  /** assetId → all its publisher ids, primary first, for a list of assets. */
+  public async loadPublisherIdsFor(assets: Asset[]): Promise<Record<string, string[]>> {
+    const out: Record<string, string[]> = {};
+    for (const a of assets) out[a.id || ""] = a.publisherUserId ? [a.publisherUserId] : [];
+    if (!assets.length) return out;
+    const co = await getDb().selectFrom("assetPublishers").select(["assetId", "userId"]).where("assetId", "in", assets.map((a) => a.id || "")).orderBy("createdAt").execute();
+    for (const r of co) if (!out[r.assetId || ""].includes(r.userId || "")) out[r.assetId || ""].push(r.userId || "");
+    return out;
+  }
+
+  public async isPublisher(asset: Asset | undefined, userId: string | undefined): Promise<boolean> {
+    if (!asset || !userId) return false;
+    if (asset.publisherUserId === userId) return true;
+    return !!(await getDb().selectFrom("assetPublishers").select("userId").where("assetId", "=", asset.id || "").where("userId", "=", userId).executeTakeFirst());
+  }
+
+  /** Replaces every publisher of an asset: the first id becomes the primary, the rest its co-publishers. */
+  public async setPublishers(assetId: string, userIds: string[], addedBy: string): Promise<void> {
+    const [primary, ...co] = [...new Set(userIds.filter(Boolean))];
+    await getDb().transaction().execute(async (trx) => {
+      await trx.updateTable("assets").set({ publisherUserId: primary || null, modifiedAt: new Date() } as any).where("id", "=", assetId).execute();
+      await trx.deleteFrom("assetPublishers").where("assetId", "=", assetId).execute();
+      if (co.length) await trx.insertInto("assetPublishers").values(co.map((userId) => ({ assetId, userId, addedBy }))).execute();
+    });
   }
 
   public async create(asset: Asset): Promise<Asset> {
@@ -122,6 +160,7 @@ export class AssetRepo {
   public async delete(id: string): Promise<void> {
     await getDb().deleteFrom("assetRatings").where("assetId", "=", id).execute();
     await getDb().deleteFrom("assetDownloads").where("assetId", "=", id).execute();
+    await getDb().deleteFrom("assetPublishers").where("assetId", "=", id).execute();
     await getDb().deleteFrom("songs").where("assetId", "=", id).execute();
     await getDb().deleteFrom("assets").where("id", "=", id).execute();
   }

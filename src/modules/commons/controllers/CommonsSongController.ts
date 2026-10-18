@@ -91,7 +91,7 @@ export class CommonsSongController extends CommonsBaseController {
       if (!asset || asset.assetType !== "song") return this.json({}, 404);
       // refuse before a draft exists; SubmissionHelper.submit holds the same line for the edit path
       const byReviewer = ReviewerHelper.canReview(au) || await isServerAdmin(au.id);
-      if (!RightsHelper.acceptsProposals(asset.license) && asset.publisherUserId !== au.id && !byReviewer) return this.json({ errors: [NO_COMMUNITY_EDITS_MESSAGE] }, 403);
+      if (!RightsHelper.acceptsProposals(asset.license) && !byReviewer && !(await this.repos.asset.isPublisher(asset, au.id))) return this.json({ errors: [NO_COMMUNITY_EDITS_MESSAGE] }, 403);
       const abc = typeof req.body?.abc === "string" ? req.body.abc.trim() : "";
       if (!abc || abc.length > 100000) return this.json({ errors: ["abc text is required (max 100KB)"] }, 400);
       const payload = { ...(await this.editable(asset.id || "")), type: "additionalFile" };

@@ -31,7 +31,7 @@ import { PublishHelper, SubmissionHelper } from "../helpers/index.js";
 
 function songController(signedIn = true) {
   const repos: any = {
-    asset: { loadPublished: jest.fn(async (id: string) => ({ id, assetType: "song", status: "published" })), delete: jest.fn(async () => {}) },
+    asset: { loadPublished: jest.fn(async (id: string) => ({ id, assetType: "song", status: "published" })), delete: jest.fn(async () => {}), isPublisher: jest.fn(async (a: any, u?: string) => !!u && a?.publisherUserId === u), loadPublisherIds: jest.fn(async (a: any) => [a?.publisherUserId].filter(Boolean)) },
     submission: { delete: jest.fn(async () => {}) },
     assetFile: { deleteBySubmission: jest.fn(async () => {}), loadLiveMany: jest.fn(async () => ({})), loadLive: jest.fn(async () => []) },
     rating: { setSaved: jest.fn(async () => {}) },

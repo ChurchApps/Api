@@ -214,6 +214,14 @@ export interface AssetFile {
   createdAt?: Date;
 }
 
+/** A co-publisher of an asset; the primary publisher stays on assets.publisherUserId. */
+export interface AssetPublisher {
+  assetId?: string;
+  userId?: string;
+  addedBy?: string;
+  createdAt?: Date;
+}
+
 export interface AssetRating {
   assetId?: string;
   userId?: string;

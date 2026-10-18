@@ -1,6 +1,7 @@
 import { injectable } from "inversify";
 import { sql } from "kysely";
 import { getDb } from "../db/index.js";
+import { publishedBy } from "./AssetRepo.js";
 import { AssetRating } from "../models/index.js";
 
 @injectable()
@@ -44,7 +45,7 @@ export class RatingRepo {
   public async countSavesOfPublisher(userId: string, withinHours?: number): Promise<number> {
     let q = getDb().selectFrom("assetRatings").innerJoin("assets", "assets.id", "assetRatings.assetId")
       .select(sql<number>`count(*)`.as("n"))
-      .where("assets.publisherUserId", "=", userId).where("assets.assetType", "=", "song").where("assets.status", "=", "published")
+      .where(publishedBy(userId)).where("assets.assetType", "=", "song").where("assets.status", "=", "published")
       .where("assetRatings.saved", "=", true as any).where("assetRatings.userId", "!=", userId);
     if (withinHours) q = q.where("assetRatings.modifiedAt", ">=", sql<Date>`date_sub(now(), interval ${withinHours} hour)`);
     const row = await q.executeTakeFirst();

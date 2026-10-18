@@ -20,6 +20,8 @@ export interface QueueRow extends Submission {
   assetStatus?: string;
   publisherUserId?: string;
   publishedSubmissionId?: string;
+  /** The submitter co-publishes the asset (1/0). */
+  byCoPublisher?: number;
 }
 
 const parseJson = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
@@ -180,6 +182,7 @@ export class SubmissionRepo {
         sql<string>`coalesce(assets.name, json_unquote(json_extract(submissions.payload, '$.name')))`.as("assetName"),
         "assets.status as assetStatus",
         "assets.publisherUserId as publisherUserId",
+        sql<number>`exists(select 1 from assetPublishers ap where ap.assetId = submissions.assetId and ap.userId = submissions.submittedBy)`.as("byCoPublisher"),
         "assets.publishedSubmissionId as publishedSubmissionId"
       ]);
   }

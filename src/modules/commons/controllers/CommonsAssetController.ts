@@ -55,7 +55,7 @@ export class CommonsAssetController extends CommonsBaseController {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset) return this.json({}, 404);
       if (asset.status === "removed") return this.json({ removedReason: asset.removedReason }, 410);
-      const privileged = !!au.id && (au.id === asset.publisherUserId || au.checkAccess(Permissions.server.admin));
+      const privileged = !!au.id && (au.checkAccess(Permissions.server.admin) || await this.repos.asset.isPublisher(asset, au.id));
       if (asset.status !== "published" && !privileged) return this.json({}, 404);
       const [view] = await this.publicViews([asset]);
       view.version = await this.repos.submission.countApproved(asset.id || "");
@@ -89,7 +89,7 @@ export class CommonsAssetController extends CommonsBaseController {
     return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
       if (!asset || asset.status === "removed" || asset.status === "pending") return this.json({}, 404);
-      if (asset.status !== "published" && asset.publisherUserId !== au.id && !ReviewerHelper.canReview(au)) return this.json({}, 404);
+      if (asset.status !== "published" && !ReviewerHelper.canReview(au) && !(await this.repos.asset.isPublisher(asset, au.id))) return this.json({}, 404);
       return await PublishHelper.editablePayload(this.repos, asset);
     });
   }
@@ -151,7 +151,7 @@ export class CommonsAssetController extends CommonsBaseController {
   private ownVisibility(req: express.Request, res: express.Response, from: string, to: string) {
     return this.actionWrapperAuth(req, res, async (au) => {
       const asset = await this.repos.asset.loadById(String(req.params.id));
-      if (!asset || asset.publisherUserId !== au.id) return this.json({}, 404);
+      if (!asset || !(await this.repos.asset.isPublisher(asset, au.id))) return this.json({}, 404);
       if (asset.status !== from) return this.json({ errors: [`asset is ${asset.status}`] }, 400);
       await this.repos.asset.update(asset.id || "", { status: to, unpublishedAt: to === "unpublished" ? new Date() : null as any, removedReason: to === "unpublished" ? "publisher" : null as any });
       return { status: to };

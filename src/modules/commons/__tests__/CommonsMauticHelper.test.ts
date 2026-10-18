@@ -9,7 +9,7 @@ import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
 
 function repos(opts: { songs?: number; saves?: number; recentSaves?: number; recentSongs?: number } = {}): any {
   return {
-    asset: { countPublishedSongs: jest.fn(async () => opts.songs ?? 0), loadSongPublisherIds: jest.fn(async () => ["writer00001", "writer00002"]) },
+    asset: { countPublishedSongs: jest.fn(async () => opts.songs ?? 0), loadSongPublisherIds: jest.fn(async () => ["writer00001", "writer00002"]), loadPublisherIds: jest.fn(async (a: any) => [a.publisherUserId, ...(a.co || [])]) },
     rating: { countSavesOfPublisher: jest.fn(async (_id: string, hours?: number) => (hours ? opts.recentSaves ?? 0 : opts.saves ?? 0)) },
     submission: { countNewSongsSubmittedSince: jest.fn(async () => opts.recentSongs ?? 0) }
   };
@@ -27,6 +27,12 @@ describe("CommonsMauticHelper writer milestones", () => {
   it("syncs the writer, not the saver, when someone saves their song", async () => {
     await CommonsMauticHelper.afterSave(repos({ saves: 3 }), song, "saver000001", true);
     expect(MauticHelper.createAndUpdate).toHaveBeenCalledWith("writer00001@example.com", "Wes", "Writer", expect.objectContaining({ wc_song_saves: 3 }));
+  });
+
+  it("syncs every co-publisher of the song", async () => {
+    await CommonsMauticHelper.afterSave(repos({ saves: 3 }), { ...song, co: ["writer00002"] } as any, "saver000001", true);
+    expect(MauticHelper.createAndUpdate).toHaveBeenCalledWith("writer00002@example.com", "Wes", "Writer", expect.objectContaining({ wc_song_saves: 3 }));
+    expect(MauticHelper.createAndUpdate).toHaveBeenCalledTimes(2);
   });
 
   it("ignores a writer saving their own song", async () => {

@@ -98,14 +98,14 @@ export class SubmissionHelper {
       const layers = parent ? Object.values(SongPackageHelper.normalizeRights((await repos.song.loadSatellite(parent.id || ""))?.rights) || {}) : [];
       // the license still blocks everyone else; the account that published the original may translate it
       const licenseAllows = RightsHelper.allowsDerivatives([parent?.license, ...layers.map((l) => l?.license)]);
-      const byUploader = type === "translation" && !!sub.submittedBy && sub.submittedBy === parent?.publisherUserId;
+      const byUploader = type === "translation" && await repos.asset.isPublisher(parent, sub.submittedBy);
       ctx.parent = parent ? { status: parent.status, language: parent.language, derivativesAllowed: licenseAllows || byUploader } : null;
     }
     if (type === "removal" && asset.publishedSubmissionId) ctx.livePayload = (await repos.submission.loadById(asset.publishedSubmissionId))?.payload;
     if ((type === "correction" || type === "additionalFile" || type === "recording") && asset.publishedSubmissionId) {
       // the same snapshot the edit page starts from, so an untouched license compares equal
       ctx.livePayload = await PublishHelper.editablePayload(repos, asset);
-      ctx.byPublisher = !!sub.submittedBy && sub.submittedBy === asset.publisherUserId;
+      ctx.byPublisher = await repos.asset.isPublisher(asset, sub.submittedBy);
       ctx.communityEdits = RightsHelper.acceptsProposals(asset.license);
       ctx.byReviewer = !!opts.byReviewer;
     }

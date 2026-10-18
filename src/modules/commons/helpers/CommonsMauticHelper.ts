@@ -53,18 +53,20 @@ export class CommonsMauticHelper {
     return { writers: ids.length };
   };
 
-  /** After someone saves or unsaves a song: refresh the writer's counts, and flag a sudden pile of saves. */
+  /** After someone saves or unsaves a song: refresh each publisher's counts, and flag a sudden pile of saves. */
   static afterSave = async (repos: Repos, asset: Asset, saverId: string, saved: boolean): Promise<void> => {
-    const writerId = asset.publisherUserId;
-    if (!writerId || writerId === saverId || asset.assetType !== "song") return;
-    await CommonsMauticHelper.syncWriter(repos, writerId);
-    if (!saved) return;
-    try {
-      // == so the alert fires once, on the save that crosses the line, not on every save after it
-      const recent = await repos.rating.countSavesOfPublisher(writerId, BURST_HOURS);
-      if (recent === SAVE_BURST) await CommonsMauticHelper.flag(writerId, "wc-flag-save-burst", `${recent} saves of their songs in the last ${BURST_HOURS} hours`);
-    } catch (e) {
-      console.error("[CommonsMauticHelper] save burst check failed:", e);
+    if (asset.assetType !== "song") return;
+    for (const writerId of await repos.asset.loadPublisherIds(asset)) {
+      if (!writerId || writerId === saverId) continue;
+      await CommonsMauticHelper.syncWriter(repos, writerId);
+      if (!saved) continue;
+      try {
+        // == so the alert fires once, on the save that crosses the line, not on every save after it
+        const recent = await repos.rating.countSavesOfPublisher(writerId, BURST_HOURS);
+        if (recent === SAVE_BURST) await CommonsMauticHelper.flag(writerId, "wc-flag-save-burst", `${recent} saves of their songs in the last ${BURST_HOURS} hours`);
+      } catch (e) {
+        console.error("[CommonsMauticHelper] save burst check failed:", e);
+      }
     }
   };
 

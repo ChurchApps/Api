@@ -37,13 +37,15 @@ jest.mock("../helpers/index", () => ({
 
 import { CommonsAdminController } from "../controllers/CommonsAdminController.js";
 import { isServerAdmin, PublishHelper } from "../helpers/index.js";
+import { CommonsMauticHelper } from "../helpers/CommonsMauticHelper.js";
 
 const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submittedBy: "user0000001", status: "pending", type: "correction", payload: { name: "Proposed" } });
 
 function adminController(overrides: any = {}, admin = true, au: any = { id: "admin000001", email: "admin@example.com", checkAccess: () => admin }) {
   const repos: any = {
     submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), loadMine: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })), countByStatus: jest.fn(async () => 4) },
-    asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []), loadByPublisher: jest.fn(async () => []) },
+    asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []), loadByPublisher: jest.fn(async () => []),
+      isPublisher: jest.fn(async (a: any, u?: string) => !!u && a?.publisherUserId === u), loadPublisherIds: jest.fn(async (a: any) => [a?.publisherUserId].filter(Boolean)), setPublishers: jest.fn(async () => {}) },
     assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", action: "add" }]), loadLive: jest.fn(async () => []) },
     report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) },
     song: { loadPublishedForDuplicates: jest.fn(async () => []), loadSatellite: jest.fn(async () => ({ assetId: "asset000001", contributors: JSON.stringify([{ name: "Ada", what: "new song", submissionId: "sub00000000" }]) })) }
@@ -417,7 +419,7 @@ describe("admin reports and assets", () => {
     const { controller, repos } = adminController({ report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open", email: "reporter@example.com" })) } });
     await controller.resolve(req({ resolution: "upheld", note: "confirmed", action: "unpublish" }, "rep00000001"), {} as any);
     expect(repos.asset.update).toHaveBeenCalledWith("asset000001", expect.objectContaining({ status: "unpublished" }));
-    expect(notifyTakedown).toHaveBeenCalledWith(expect.objectContaining({ id: "asset000001" }), expect.objectContaining({ id: "rep00000001" }));
+    expect(notifyTakedown).toHaveBeenCalledWith(expect.objectContaining({ id: "asset000001" }), expect.objectContaining({ id: "rep00000001" }), ["owner000001"]);
     expect(notifyReportResolved).toHaveBeenCalledWith(expect.objectContaining({ email: "reporter@example.com", resolutionNote: "confirmed" }), "upheld");
   });
 
@@ -441,6 +443,28 @@ describe("admin reports and assets", () => {
     expect(PublishHelper.remove).not.toHaveBeenCalled();
     expect(repos.asset.update).not.toHaveBeenCalled();
     expect((await controller.resolve(req({ resolution: "maybe", action: "none" }, "rep00000001"), {} as any) as any).status).toBe(400);
+  });
+
+  it("replaces an asset's publishers, primary first, and resyncs everyone whose counts moved", async () => {
+    const { controller, repos } = adminController();
+    const out: any = await controller.setPublishers(req({ userIds: ["user0000001", "owner000001", "user0000001"] }, "asset000001"), {} as any);
+    expect(repos.asset.setPublishers).toHaveBeenCalledWith("asset000001", ["user0000001", "owner000001"], "admin000001");
+    expect(out.publishers).toEqual([{ id: "user0000001", name: "Sub Mitter" }, { id: "owner000001", name: "Ow Ner" }]);
+    expect(CommonsMauticHelper.syncWriter).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses bad publisher lists and non-admins", async () => {
+    const { controller, repos } = adminController();
+    expect((await controller.setPublishers(req({ userIds: "owner000001" }, "asset000001"), {} as any) as any).status).toBe(400);
+    expect((await controller.setPublishers(req({ userIds: ["x'; drop"] }, "asset000001"), {} as any) as any).status).toBe(400);
+    const { controller: visitor } = adminController({}, false);
+    expect(await visitor.setPublishers(req({ userIds: [] }, "asset000001"), {} as any)).toEqual({ obj: {}, status: 401 });
+    expect(repos.asset.setPublishers).not.toHaveBeenCalled();
+  });
+
+  it("does not badge a co-publisher's edit as third-party", async () => {
+    const { controller } = adminController({ asset: { loadPublisherIds: jest.fn(async () => ["owner000001", "user0000001"]) } });
+    expect(((await controller.submission(req(), {} as any)) as any).isThirdParty).toBe(false);
   });
 
   it("unpublish/republish/remove follow the visibility state machine", async () => {

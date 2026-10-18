@@ -34,7 +34,7 @@ function controller(status = "pending", au: any = { id: "user0000001", checkAcce
       update: jest.fn(async () => {}),
       loadMine: jest.fn(async () => [{ id: "sub00000001", assetId: "asset000001", submittedBy: "user0000001", status, type: "correction", publisherUserId: "user0000001", publishedSubmissionId: "sub00000000", payload: {} }])
     },
-    asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", status: "pending" })) },
+    asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", status: "pending" })), isPublisher: jest.fn(async (a: any, u?: string) => !!u && a?.publisherUserId === u), loadPublisherIds: jest.fn(async (a: any) => [a?.publisherUserId].filter(Boolean)) },
     assetFile: { loadBySubmission: jest.fn(async () => []), loadLive: jest.fn(async () => []) }
   };
   const c = new CommonsSubmissionController();
