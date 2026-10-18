@@ -4,5 +4,7 @@ layer
 content
 coverage
 .git
-.env
+.env*
 *.log
+.yarn
+playground-app

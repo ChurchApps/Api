@@ -9,6 +9,6 @@
     "incremental": false,
     "noEmitOnError": true
   },
-  "include": ["tools/migrations/**/*.ts"],
+  "include": ["tools/migrations/**/*.ts", "tools/migrate.ts"],
   "exclude": ["node_modules", "dist", "tools/**/*.spec.ts"]
 }

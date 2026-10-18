@@ -332,6 +332,8 @@ export class ChurchController extends MembershipBaseController {
         // create the church
         const savedChurch = (await this.repos.church.save(church)) as any;
         church = savedChurch;
+        // The SES vetting gate protects ChurchApps' sender reputation; a self-hosted SMTP server has no approver.
+        if (process.env.SELF_HOSTED || process.env.RAILWAY_ENVIRONMENT) await this.repos.church.setEmailApproved(savedChurch.id, true);
 
         // Configure church
         const instance = new RoleHelper(savedChurch.id, au.id);
