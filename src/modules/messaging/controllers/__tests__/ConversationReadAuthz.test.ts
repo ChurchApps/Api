@@ -47,7 +47,7 @@ function repos(opts: any = {}) {
       loadByIds: jest.fn(async () => opts.byIds ?? []),
       loadForContent: jest.fn(async () => opts.forContent ?? []),
       loadCurrent: jest.fn(async () => opts.current ?? null),
-      loadPosts: jest.fn(async () => []),
+      loadPosts: jest.fn(async () => opts.posts ?? []),
       save: jest.fn(async (c: any) => ({ ...c, id: c.id || "new1" })),
       updateStats: jest.fn(async () => undefined),
       convertToModel: (c: any) => c,
@@ -255,6 +255,30 @@ describe("cross-church and ownership gates", () => {
     const r = repos();
     expect((await (attach(new ConversationController(), r, NON_MEMBER) as any).getPostsForGroup("g1", {}, {})).status).toBe(401);
     expect(r.conversation.loadPosts).not.toHaveBeenCalled();
+  });
+
+  describe("posts feeds hide leader-only notes", () => {
+    const postRows = () => [
+      { id: "grp1", contentType: "group", contentId: "g1", groupId: "g1" },
+      { id: "gn1", contentType: "groupNote", contentId: "g1", groupId: "g1" }
+    ];
+    const ids = (rows: any[]) => rows.map((c) => c.id);
+
+    it("drops group notes from /posts for a member who is not a leader", async () => {
+      const r = repos({ posts: postRows() });
+      expect(ids(await (attach(new ConversationController(), r, MEMBER) as any).getPosts({}, {}))).toEqual(["grp1"]);
+    });
+
+    it("drops group notes from /posts/group for content.edit staff", async () => {
+      const r = repos({ posts: postRows() });
+      expect(ids(await (attach(new ConversationController(), r, STAFF) as any).getPostsForGroup("g1", {}, {}))).toEqual(["grp1"]);
+    });
+
+    it("keeps group notes for the group's leader", async () => {
+      const r = repos({ posts: postRows() });
+      const leader = au({ groupIds: ["g1"], leaderGroupIds: ["g1"] });
+      expect(ids(await (attach(new ConversationController(), r, leader) as any).getPosts({}, {}))).toEqual(["grp1", "gn1"]);
+    });
   });
 
   it("401s a member rewriting an existing DM conversation", async () => {

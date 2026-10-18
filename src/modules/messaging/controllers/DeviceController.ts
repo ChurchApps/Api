@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Device } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { DevicePairRateLimiter } from "../helpers/DevicePairRateLimiter.js";
 
 @controller("/messaging/devices")
 export class DeviceController extends MessagingBaseController {
@@ -50,6 +51,9 @@ export class DeviceController extends MessagingBaseController {
   @httpGet("/pair/:pairingCode")
   public async pair(@requestParam("pairingCode") pairingCode: string, req: express.Request<{}, {}, {}>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
+      // Codes are short, so only signed-in users may try them and every attempt counts toward a cap.
+      if (!this.isAuthenticated(au)) return this.json({}, 401);
+      if (!(await DevicePairRateLimiter.consume(au.id, au.churchId))) return this.json({ error: "Too many pairing attempts. Please try again later." }, 429);
       let success = false;
       const existing = await this.repos.device.loadByPairingCode(pairingCode);
       if (existing && DeviceController.isCodeLive(existing)) {
@@ -74,6 +78,9 @@ export class DeviceController extends MessagingBaseController {
       if (device) {
         device.pairingCode = pairingCode;
         device.secret = secret;
+        // Re-enrolling starts a fresh pairing: the device leaves the church it was paired to.
+        device.churchId = null;
+        device.personId = null;
         device.contentType = null;
         device.contentId = null;
         device.lastActiveDate = new Date();
