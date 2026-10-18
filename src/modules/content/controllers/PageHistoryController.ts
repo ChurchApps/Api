@@ -5,14 +5,29 @@ import { PageHistory } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { TreeHelper } from "../helpers/TreeHelper.js";
 
+// Lambda rejects responses over 6MB (after the body is escaped into its envelope); 50 full snapshots of a large page can pass that.
+const MAX_HISTORY_RESPONSE_CHARS = 2_500_000;
+
 @controller("/content/pageHistory")
 export class PageHistoryController extends ContentBaseController {
+
+  // Rows arrive newest first; keep the newest ones that fit (always at least one).
+  private capToResponseLimit(rows: PageHistory[]) {
+    const result: PageHistory[] = [];
+    let total = 0;
+    for (const row of rows || []) {
+      total += (row.snapshotJSON?.length || 0) + 500;
+      if (result.length > 0 && total > MAX_HISTORY_RESPONSE_CHARS) break;
+      result.push(row);
+    }
+    return result;
+  }
 
   @httpGet("/page/:pageId")
   public async getForPage(@requestParam("pageId") pageId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      return await this.repos.pageHistory.loadForPage(au.churchId, pageId);
+      return this.capToResponseLimit(await this.repos.pageHistory.loadForPage(au.churchId, pageId));
     });
   }
 
@@ -20,7 +35,7 @@ export class PageHistoryController extends ContentBaseController {
   public async getForBlock(@requestParam("blockId") blockId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      return await this.repos.pageHistory.loadForBlock(au.churchId, blockId);
+      return this.capToResponseLimit(await this.repos.pageHistory.loadForBlock(au.churchId, blockId));
     });
   }
 
