@@ -61,7 +61,8 @@ export class MauticHelper {
 
     const companyPayload = {
       companyname: companyName,
-      companyaddress1: address,
+      // Mautic rejects the whole company (400) when companyaddress1 is over 64 characters.
+      companyaddress1: address?.substring(0, 64),
       companycity: city,
       companystate: state,
       companyzipcode: zip,

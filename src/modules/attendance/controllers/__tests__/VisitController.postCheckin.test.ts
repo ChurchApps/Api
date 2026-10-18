@@ -19,7 +19,7 @@ function makeController(opts: any = {}) {
       convertAllToModel: (_c: string, rows: any[]) => rows,
       convertToModel: (_c: string, row: any) => row,
       loadLastLoggedDate: jest.fn(async () => null),
-      loadByServiceDatePeopleIds: jest.fn(async () => []),
+      loadByServiceDatePeopleIds: jest.fn(async () => opts.visits ?? []),
       loadByCodeToday: jest.fn(async () => []),
       countActiveByGroupToday: jest.fn(async () => opts.counts ?? []),
       save: jest.fn(async (v: any) => { if (!v.id) v.id = "vis1"; return v; }),
@@ -28,12 +28,14 @@ function makeController(opts: any = {}) {
     },
     visitSession: {
       convertAllToModel: (_c: string, rows: any[]) => rows,
-      loadByVisitIds: jest.fn(async () => []),
+      loadByVisitIds: jest.fn(async () => opts.visitSessions ?? []),
       save: jest.fn(async (v: any) => v),
       delete: jest.fn()
     },
     serviceTime: { loadByIds: jest.fn(async () => opts.serviceTimes ?? []) },
     session: {
+      convertAllToModel: (_c: string, rows: any[]) => rows,
+      loadByIds: jest.fn(async () => opts.sessions ?? []),
       loadByGroupServiceTimeDate: jest.fn(async () => ({ id: "sess1" })),
       save: jest.fn(async (s: any) => { s.id = "sess1"; return s; })
     }
@@ -250,3 +252,27 @@ describe("self check-in household scoping", () => {
   });
 });
 
+
+describe("check-in with a visit session whose session row is gone", () => {
+  // Production: POST /attendance/visits/checkin 500'd reading vs.session.serviceTimeId after a client re-posted
+  // the visits GET /checkin returned, which included a visitSession with no matching session (NULL or deleted sessionId).
+  const today = new Date();
+  const visits = () => [{ id: "v1", personId: "p1", visitDate: today, securityCode: "ABCD" }];
+  const visitSessions = () => [{ id: "vs1", visitId: "v1", sessionId: "sess1" }, { id: "vs2", visitId: "v1", sessionId: null }];
+
+  it("getCheckin leaves out visit sessions it cannot attach a session to", async () => {
+    const { controller } = makeController({ visits: visits(), visitSessions: visitSessions(), sessions: [{ id: "sess1", serviceTimeId: "st1", groupId: "g1" }] });
+    const result: any = await (controller as any).getCheckin(req(null), {});
+    expect(result).toHaveLength(1);
+    expect(result[0].visitSessions).toHaveLength(1);
+    expect(result[0].visitSessions[0].session.serviceTimeId).toBe("st1");
+  });
+
+  it("postCheckin answers 400 for a visit session without a session, and saves nothing", async () => {
+    const { controller, repos } = makeController();
+    const result: any = await (controller as any).postCheckin(req([{ personId: "p1", checkinType: "member", visitSessions: [{ sessionId: "gone" }] }]), {});
+    expect(result.status).toBe(400);
+    expect(repos.visit.save).not.toHaveBeenCalled();
+    expect(repos.session.save).not.toHaveBeenCalled();
+  });
+});

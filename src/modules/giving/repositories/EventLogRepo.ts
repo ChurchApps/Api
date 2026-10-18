@@ -21,6 +21,8 @@ export class EventLogRepo {
         return this.update({ ...eventLog, id: existingEvent.id });
       }
     }
+    // B1Admin's resolve toggle posts { id, resolved } with no providerId.
+    if (eventLog.id) return this.update(eventLog);
     return this.create(eventLog);
   }
 

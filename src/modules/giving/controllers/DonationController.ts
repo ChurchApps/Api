@@ -136,7 +136,14 @@ export class DonationController extends GivingBaseController {
         let result;
         if (canView && req.query.batchId !== undefined) result = await this.repos.donation.loadByBatchId(au.churchId, req.query.batchId.toString());
         else if (personId) result = await this.repos.donation.loadByPersonId(au.churchId, personId, canView && req.query.includeNonDeductible === "1");
-        else result = await this.repos.donation.loadAll(au.churchId);
+        else if (req.query.startDate !== undefined || req.query.endDate !== undefined) {
+          // A church's full history can pass Lambda's 6MB response limit; giving statements ask for one year.
+          const startDate = req.query.startDate?.toString() ?? "";
+          const endDate = req.query.endDate?.toString() ?? "";
+          const isDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(new Date(d).getTime());
+          if (!isDay(startDate) || !isDay(endDate)) return this.json({ error: "startDate and endDate must be YYYY-MM-DD" }, 400);
+          result = await this.repos.donation.loadByDateRange(au.churchId, startDate, endDate);
+        } else result = await this.repos.donation.loadAll(au.churchId);
         return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);
       }
     });

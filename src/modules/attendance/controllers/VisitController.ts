@@ -57,7 +57,8 @@ export class VisitController extends AttendanceBaseController {
                   sessions?.forEach((s) => {
                     if (s.id === vs.sessionId) vs.session = s;
                   });
-                  v.visitSessions.push(vs);
+                  // A visitSession whose session row is missing (NULL or deleted sessionId) can't be re-posted to postCheckin.
+                  if (vs.session) v.visitSessions.push(vs);
                 }
               });
               result.push(v);
@@ -113,6 +114,7 @@ export class VisitController extends AttendanceBaseController {
         const deleteVisitSessionIds: string[] = [];
 
         const submittedVisits = [...req.body];
+        if (submittedVisits.some((sv) => sv.visitSessions?.some((vs) => !vs.session?.serviceTimeId || !vs.session?.groupId))) return this.json({ error: "Each visit session needs a session with serviceTimeId and groupId" }, 400);
         // Re-check-ins keep their existing code; a fresh one would be returned to the client without ever being saved.
         // Only a code this batch's people already hold today is kept; anything else from the client is replaced.
         const existingCodes = new Set(existingVisits.map((v) => v.securityCode).filter(Boolean));

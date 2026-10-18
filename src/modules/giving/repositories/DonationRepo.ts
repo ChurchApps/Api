@@ -80,6 +80,18 @@ export class DonationRepo {
     return rows;
   }
 
+  // Dates are calendar days ("2026-01-01"), inclusive at both ends.
+  public async loadByDateRange(churchId: string, startDate: string, endDate: string) {
+    const rows = await getDb().selectFrom("donations").selectAll()
+      .where("churchId", "=", churchId)
+      .where((eb) => eb.or([eb("status", "is", null), eb("status", "=", "complete")]))
+      .where("donationDate", ">=", LocalDateHelper.toMysqlDateOnly(startDate) as any)
+      .where("donationDate", "<=", LocalDateHelper.toMysqlDateOnly(endDate) as any)
+      .orderBy("donationDate", "desc")
+      .execute();
+    return rows;
+  }
+
   public async deleteByBatchId(churchId: string, batchId: string) {
     await getDb().deleteFrom("fundDonations").where("churchId", "=", churchId)
       .where("donationId", "in", getDb().selectFrom("donations").select("id").where("churchId", "=", churchId).where("batchId", "=", batchId))

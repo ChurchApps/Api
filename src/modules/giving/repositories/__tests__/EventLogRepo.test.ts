@@ -58,3 +58,21 @@ describe("EventLogRepo.create idempotency under the unique constraint", () => {
     expect(result.id).toBe("evt_new");
   });
 });
+
+// Production: POST /giving/eventLog [{ id, resolved }] (B1Admin's resolve toggle) 500'd with ER_DUP_ENTRY on eventLogs.PRIMARY,
+// because a save without providerId always inserted, even for an event that already has an id.
+describe("EventLogRepo.save for an existing event", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("updates resolved instead of inserting the same id again", async () => {
+    const ops: string[] = [];
+    const chain: any = { set: () => chain, where: () => chain, execute: () => { ops.push("update"); return Promise.resolve(); } };
+    mockedGetDb.mockReturnValue({
+      insertInto: () => ({ values: () => ({ execute: () => { ops.push("insert"); return Promise.reject({ errno: 1062, code: "ER_DUP_ENTRY" }); } }) }),
+      updateTable: () => chain
+    });
+    const result = await new EventLogRepo().save({ id: "evt_existing", churchId: "C1", resolved: true } as any);
+    expect(ops).toEqual(["update"]);
+    expect(result.resolved).toBe(true);
+  });
+});
