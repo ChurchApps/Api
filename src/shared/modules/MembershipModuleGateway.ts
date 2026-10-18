@@ -30,6 +30,8 @@ export interface MembershipModuleGateway {
   loadPersonIdsWithPermission(churchId: string, contentType: string, action: string): Promise<string[]>;
   loadHouseholdPeople(churchId: string, personIds: string[]): Promise<{ id: string; householdId: string }[]>;
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string; timeZone?: string } | null>;
+  // The first campus (lowest id) with a time zone, for churches whose own timeZone was never set.
+  loadCampusTimeZone(churchId: string): Promise<string | null>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string; discussionsEnabled?: boolean | number; announcementsEnabled?: boolean | number } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
   loadPerson(churchId: string, personId: string): Promise<{
@@ -230,6 +232,18 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
   public async loadChurch(churchId: string) {
     const repos = await this.repos();
     return (await repos.church.loadById(churchId)) ?? null;
+  }
+
+  public async loadCampusTimeZone(churchId: string) {
+    const row = await this.getDb().selectFrom("campuses")
+      .select("timezone")
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("timezone", "is not", null)
+      .where("timezone", "<>", "")
+      .orderBy("id")
+      .executeTakeFirst();
+    return row?.timezone || null;
   }
 
   public async loadGroup(churchId: string, groupId: string) {

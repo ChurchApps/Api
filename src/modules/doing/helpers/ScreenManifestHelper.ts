@@ -82,8 +82,7 @@ export class ScreenManifestHelper {
   static async build(repos: Repos, churchId: string, screenGroupId: string, now = new Date()): Promise<ScreenManifest | null> {
     const group: ScreenGroup = repos.screenGroup.convertToModel(churchId, await repos.screenGroup.load(churchId, screenGroupId));
     if (!group) return null;
-    const church = await getMembershipModuleGateway().loadChurch(churchId);
-    const timeZone = ScreenScheduleHelper.validTimeZone(church?.timeZone);
+    const timeZone = ScreenScheduleHelper.validTimeZone(await this.churchTimeZone(churchId));
     const ctx: BuildContext = { repos, churchId, files: new Map(), auth: new Map() };
 
     const fallbackContent = group.defaultPlaylistId ? await this.playlistContent(ctx, group.defaultPlaylistId) : null;
@@ -116,6 +115,13 @@ export class ScreenManifestHelper {
       fallback,
       occurrences
     };
+  }
+
+  // Churches created after the timeZone backfill have none set, so fall back to the campus zone before New York.
+  private static async churchTimeZone(churchId: string): Promise<string | null> {
+    const gateway = getMembershipModuleGateway();
+    const church = await gateway.loadChurch(churchId);
+    return church?.timeZone || (await gateway.loadCampusTimeZone(churchId));
   }
 
   // Warm-instance cache so the media route can find an item without re-querying providers per file.
