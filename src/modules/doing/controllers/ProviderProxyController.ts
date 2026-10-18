@@ -14,6 +14,7 @@ interface ProxyRequestBody {
 
 interface Provider {
   readonly requiresAuth: boolean | (() => boolean);
+  readonly authTypes?: string[];
   browse(path?: string | null, auth?: ContentProviderAuthData | null): Promise<unknown[]>;
   getPresentations?(path: string, auth?: ContentProviderAuthData | null): Promise<{ allFiles?: unknown[] } | null>;
   getPlaylist?(path: string, auth?: ContentProviderAuthData | null, resolution?: number): Promise<unknown[] | null>;
@@ -36,6 +37,12 @@ export class ProviderProxyController extends DoingBaseController {
     const provider = getProvider(providerId) as unknown as Provider | null;
     if (!provider) {
       const err: any = new Error(`Unknown provider: ${providerId}`);
+      err.status = 400;
+      throw err;
+    }
+    // LAN providers (FreeShow) are reached by the device on the church network, never from the cloud.
+    if (provider.authTypes?.includes("network_discovery")) {
+      const err: any = new Error(`Provider is only reachable on the local network: ${providerId}`);
       err.status = 400;
       throw err;
     }
