@@ -66,6 +66,7 @@ interface BuildContext {
   repos: Repos;
   churchId: string;
   files: Map<string, Promise<ProviderFile[] | null>>;
+  auth: Map<string, Promise<ContentProviderAuthData | null>>;
 }
 
 const TOKEN_URLS: Record<string, (fileId: string) => string> = {
@@ -83,7 +84,7 @@ export class ScreenManifestHelper {
     if (!group) return null;
     const church = await getMembershipModuleGateway().loadChurch(churchId);
     const timeZone = ScreenScheduleHelper.validTimeZone(church?.timeZone);
-    const ctx: BuildContext = { repos, churchId, files: new Map() };
+    const ctx: BuildContext = { repos, churchId, files: new Map(), auth: new Map() };
 
     const fallbackContent = group.defaultPlaylistId ? await this.playlistContent(ctx, group.defaultPlaylistId) : null;
     const fallback = fallbackContent?.items || null;
@@ -91,8 +92,9 @@ export class ScreenManifestHelper {
     const entries: ScheduleEntry[] = repos.scheduleEntry.convertAllToModel(churchId, await repos.scheduleEntry.loadByScreenGroupId(churchId, screenGroupId));
     const expanded = ScreenScheduleHelper.expand(entries, now, timeZone);
 
-    const contentByEntry = new Map<string, EntryContent>();
-    for (const entry of new Set(expanded.map((o) => o.entry))) contentByEntry.set(entry.id, await this.entryContent(ctx, entry));
+    const uniqueEntries = [...new Set(expanded.map((o) => o.entry))];
+    const contents = await Promise.all(uniqueEntries.map((entry) => this.entryContent(ctx, entry)));
+    const contentByEntry = new Map<string, EntryContent>(uniqueEntries.map((entry, i) => [entry.id, contents[i]]));
     const segments = ScreenScheduleHelper.buildTimeline(expanded.filter((o) => contentByEntry.get(o.entry.id)?.items.length));
 
     const occurrences: ManifestOccurrence[] = segments.map((s) => ({
@@ -132,7 +134,7 @@ export class ScreenManifestHelper {
   private static async directDownload(ctx: BuildContext, providerId: string, fileId: string): Promise<{ url: string; headers?: Record<string, string> } | null> {
     const build = TOKEN_URLS[providerId];
     if (!build) return null;
-    const auth = await ProviderAuthHelper.getAuth(ctx.repos, ctx.churchId, null, providerId);
+    const auth = await this.providerAuth(ctx, providerId);
     if (!auth) return null;
     const url = build(fileId);
     const headers = { Authorization: `Bearer ${auth.access_token}` };
@@ -145,6 +147,12 @@ export class ScreenManifestHelper {
       console.error("Screen manifest: onedrive link lookup failed", e);
     }
     return { url, headers };
+  }
+
+  // One lookup per provider per build; every file in a Drive playlist used to re-read the auth row.
+  private static providerAuth(ctx: BuildContext, providerId: string): Promise<ContentProviderAuthData | null> {
+    if (!ctx.auth.has(providerId)) ctx.auth.set(providerId, ProviderAuthHelper.getAuth(ctx.repos, ctx.churchId, null, providerId));
+    return ctx.auth.get(providerId);
   }
 
   private static requiresAuth(provider: Provider): boolean {
@@ -167,7 +175,7 @@ export class ScreenManifestHelper {
       const provider = getProvider(providerId) as unknown as Provider | null;
       if (!provider) return null;
       const needsAuth = this.requiresAuth(provider);
-      const auth = needsAuth ? await ProviderAuthHelper.getAuth(ctx.repos, ctx.churchId, null, providerId) : null;
+      const auth = needsAuth ? await this.providerAuth(ctx, providerId) : null;
       if (needsAuth && !auth) return null;
       if (provider.getPlaylist) return ((await provider.getPlaylist(path, auth)) || []) as ProviderFile[];
       if (provider.getPresentations) return ((await provider.getPresentations(path, auth))?.allFiles || []) as ProviderFile[];
@@ -202,16 +210,15 @@ export class ScreenManifestHelper {
   private static async playlistContent(ctx: BuildContext, playlistId: string): Promise<EntryContent | null> {
     const playlist = ctx.repos.playlist.convertToModel(ctx.churchId, await ctx.repos.playlist.load(ctx.churchId, playlistId));
     if (!playlist) return null;
-    const result: ManifestItem[] = [];
-    for (const item of (playlist.items || []) as PlaylistItem[]) {
+    const result = await Promise.all(((playlist.items || []) as PlaylistItem[]).map(async (item) => {
       const fileId = item.fileId || item.id;
       let url = item.url;
       if (item.providerId && item.providerPath && ScreenScheduleHelper.resolveType(item.providerId) === "url" && this.providerNeedsAuth(item.providerId)) {
         const match = (await this.providerFiles(ctx, item.providerId, item.providerPath))?.find((f) => f.id === fileId);
         if (match?.url) url = match.url;
       }
-      result.push(await this.toItem(ctx, { ...item, url }, item.providerId, item.providerPath, fileId, item.url));
-    }
+      return this.toItem(ctx, { ...item, url }, item.providerId, item.providerPath, fileId, item.url);
+    }));
     return { title: playlist.name || "", items: result };
   }
 
