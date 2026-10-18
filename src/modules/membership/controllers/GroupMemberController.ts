@@ -59,15 +59,21 @@ export class GroupMemberController extends MembershipBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const canViewAll = au.checkAccess(Permissions.groupMembers.view);
-      const inGroup = (id: string) => canViewAll || !!au.groupIds?.includes(id);
+      // The token's groupIds are fixed at sign-in, so a group joined since then is checked live.
+      const inGroups = async (ids: string[]) => {
+        if (canViewAll || ids.every((id) => au.groupIds?.includes(id))) return true;
+        if (!au.personId) return false;
+        const live = ((await this.repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[]).map((gm) => gm.groupId);
+        return ids.every((id) => au.groupIds?.includes(id) || live.includes(id));
+      };
       let result = null;
       if (req.query.groupId !== undefined) {
         const groupId = req.query.groupId.toString();
-        if (!inGroup(groupId)) return this.json({}, 401);
+        if (!(await inGroups([groupId]))) return this.json({}, 401);
         result = this.filterMinors((await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[], au, groupId);
       } else if (req.query.groupIds !== undefined) {
         const groupIds = req.query.groupIds.toString().split(",").filter(Boolean);
-        if (!groupIds.every(inGroup)) return this.json({}, 401);
+        if (!(await inGroups(groupIds))) return this.json({}, 401);
         const rows = (await this.repos.groupMember.loadForGroups(au.churchId, groupIds)) as any[];
         result = rows.filter((r) => this.filterMinors([r], au, r.groupId).length > 0);
       } else if (req.query.personId !== undefined) {
