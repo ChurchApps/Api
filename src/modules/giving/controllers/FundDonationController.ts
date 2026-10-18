@@ -3,6 +3,7 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { FundDonation } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+import { BatchAccessHelper } from "../helpers/BatchAccessHelper.js";
 import { ExchangeRateHelper } from "../../../shared/helpers/ExchangeRateHelper.js";
 
 @controller("/giving/funddonations")
@@ -80,23 +81,25 @@ export class FundDonationController extends GivingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, FundDonation[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
-      else {
-        const promises: Promise<FundDonation>[] = [];
-        req.body.forEach((funddonation) => {
-          funddonation.churchId = au.churchId;
-          promises.push(this.repos.fundDonation.save(funddonation));
-        });
-        const result = await Promise.all(promises);
-        return this.repos.fundDonation.convertToModel(au.churchId, result);
+      if (!BatchAccessHelper.canEnter(au)) return this.json({}, 401);
+      for (const fundDonation of req.body) {
+        if (!(await BatchAccessHelper.canChangeFundDonation(this.repos, au, fundDonation))) return this.json({ error: "This batch is closed." }, 403);
       }
+      const promises: Promise<FundDonation>[] = [];
+      req.body.forEach((funddonation) => {
+        funddonation.churchId = au.churchId;
+        promises.push(this.repos.fundDonation.save(funddonation));
+      });
+      const result = await Promise.all(promises);
+      return this.repos.fundDonation.convertToModel(au.churchId, result);
     });
   }
 
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.donations.edit)) return this.json({}, 401);
+      if (!BatchAccessHelper.canEnter(au)) return this.json({}, 401);
+      else if (!(await BatchAccessHelper.canDeleteFundDonation(this.repos, au, id))) return this.json({ error: "This batch is closed." }, 403);
       else {
         await this.repos.fundDonation.delete(au.churchId, id);
         return this.json({});

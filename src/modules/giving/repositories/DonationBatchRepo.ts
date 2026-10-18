@@ -19,8 +19,10 @@ export class DonationBatchRepo {
       id: batch.id,
       churchId: batch.churchId,
       name: batch.name,
-      batchDate
+      batchDate,
+      status: "open"
     } as any).execute();
+    batch.status = "open";
     return batch;
   }
 
@@ -31,6 +33,16 @@ export class DonationBatchRepo {
       batchDate
     } as any).where("id", "=", batch.id).where("churchId", "=", batch.churchId).execute();
     return batch;
+  }
+
+  // Status only changes here, never through save, so posting a batch cannot reopen it.
+  public async setStatus(churchId: string, id: string, status: "open" | "closed", userId?: string) {
+    const closed = status === "closed";
+    await getDb().updateTable("donationBatches").set({
+      status,
+      closedDate: closed ? new Date() : null,
+      closedBy: closed ? userId || null : null
+    } as any).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async delete(churchId: string, id: string) {
@@ -99,6 +111,9 @@ export class DonationBatchRepo {
       id: data.id,
       name: data.name,
       batchDate: data.batchDate,
+      status: data.status || "open",
+      closedDate: data.closedDate,
+      closedBy: data.closedBy,
       donationCount: data.donationCount,
       totalAmount: data.totalAmount
     };
