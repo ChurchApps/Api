@@ -1713,6 +1713,29 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-17_batch_status": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "donationBatches",
+     "column": "status",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "donationBatches",
+     "column": "closedDate",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "donationBatches",
+     "column": "closedBy",
+     "present": true
+    }
+   ],
+   "schemaChanges": 3
   }
  },
  "messaging": {
