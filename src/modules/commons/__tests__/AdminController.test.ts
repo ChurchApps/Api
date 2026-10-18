@@ -44,8 +44,15 @@ const pending = (): any => ({ id: "sub00000001", assetId: "asset000001", submitt
 function adminController(overrides: any = {}, admin = true, au: any = { id: "admin000001", email: "admin@example.com", checkAccess: () => admin }) {
   const repos: any = {
     submission: { loadById: jest.fn(async () => pending()), loadQueue: jest.fn(async () => []), loadMine: jest.fn(async () => []), countSubmitterStats: jest.fn(async () => ({ total: 3, approved: 2 })), countByStatus: jest.fn(async () => 4) },
-    asset: { loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })), update: jest.fn(async () => {}), loadByIds: jest.fn(async () => []), loadByPublisher: jest.fn(async () => []),
-      isPublisher: jest.fn(async (a: any, u?: string) => !!u && a?.publisherUserId === u), loadPublisherIds: jest.fn(async (a: any) => [a?.publisherUserId].filter(Boolean)), setPublishers: jest.fn(async () => {}) },
+    asset: {
+      loadById: jest.fn(async () => ({ id: "asset000001", assetType: "song", name: "Live", status: "published", publisherUserId: "owner000001", publishedSubmissionId: "sub00000000" })),
+      update: jest.fn(async () => {}),
+      loadByIds: jest.fn(async () => []),
+      loadByPublisher: jest.fn(async () => []),
+      isPublisher: jest.fn(async (a: any, u?: string) => !!u && a?.publisherUserId === u),
+      loadPublisherIds: jest.fn(async (a: any) => [a?.publisherUserId].filter(Boolean)),
+      setPublishers: jest.fn(async () => {})
+    },
     assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", action: "add" }]), loadLive: jest.fn(async () => []) },
     report: { loadById: jest.fn(async () => ({ id: "rep00000001", assetId: "asset000001", reason: "copyright", status: "open" })), update: jest.fn(async () => {}), loadAll: jest.fn(async () => []) },
     song: { loadPublishedForDuplicates: jest.fn(async () => []), loadSatellite: jest.fn(async () => ({ assetId: "asset000001", contributors: JSON.stringify([{ name: "Ada", what: "new song", submissionId: "sub00000000" }]) })) }
