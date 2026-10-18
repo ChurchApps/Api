@@ -186,26 +186,33 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
+  // loadPosts returns every conversation tied to the groups, including leader-only and event notes;
+  // only callers who pass the notes gate may see those.
+  private async withoutHiddenNotes(au: any, conversations: any[]): Promise<any[]> {
+    if (!Array.isArray(conversations)) return [];
+    const visible: any[] = [];
+    for (const c of conversations) {
+      if (!this.isNote(c.contentType) || await this.canUseNotes(au, c, "view")) visible.push(c);
+    }
+    return visible;
+  }
+
   @httpGet("/posts/group/:groupId")
   public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.canReadContent(au, "group", groupId))) return this.json([], 401);
-      const result = await this.repos.conversation.loadPosts(au.churchId, [groupId]);
-      if (result && Array.isArray(result)) {
-        await this.appendMessages(result, au.churchId);
-      }
-      return result || [];
+      const result = await this.withoutHiddenNotes(au, await this.repos.conversation.loadPosts(au.churchId, [groupId]));
+      await this.appendMessages(result, au.churchId);
+      return result;
     }) as any;
   }
 
   @httpGet("/posts")
   public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = await this.repos.conversation.loadPosts(au.churchId, au.groupIds || []);
-      if (result && Array.isArray(result)) {
-        await this.appendMessages(result, au.churchId);
-      }
-      return result || [];
+      const result = await this.withoutHiddenNotes(au, await this.repos.conversation.loadPosts(au.churchId, au.groupIds || []));
+      await this.appendMessages(result, au.churchId);
+      return result;
     }) as any;
   }
 
