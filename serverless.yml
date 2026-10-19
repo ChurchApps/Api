@@ -11,8 +11,6 @@ custom:
   stageToLower:
     dev: dev
     demo: demo  
-    staging: staging
-    Staging: staging
     prod: prod
     Prod: prod
   envLower: ${self:custom.stageToLower.${self:custom.env}, self:custom.env}
