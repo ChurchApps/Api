@@ -202,21 +202,21 @@ describe("UserController authGuid", () => {
     expect(result.obj.mailConfigured).toBe(true);
   });
 
-  it.each([{ website: "http://spam.example" }, { fillMs: 400 }])("register fakes success and sends nothing for bot traps %p", async (trap) => {
+  it("register fakes success and sends nothing for a too-fast submit", async () => {
     (UserHelper.sendWelcomeEmail as jest.Mock).mockClear();
     const { controller, repos } = userController(null);
-    const result: any = await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U", ...trap } }, {});
+    const result: any = await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U", fillMs: 400 } }, {});
     expect(result.status).toBe(200);
     expect(result.obj.mailConfigured).toBe(true);
     expect(UserHelper.sendWelcomeEmail).not.toHaveBeenCalled();
     expect(repos.user.save).not.toHaveBeenCalled();
   });
 
-  it("register accepts a human-paced signup", async () => {
+  it("register accepts a human-paced signup even when autofill filled the old honeypot", async () => {
     (UserHelper.sendWelcomeEmail as jest.Mock).mockClear();
     const { controller, repos } = userController(null);
     repos.user.save.mockImplementation(async (u: any) => ({ ...u, id: "new1" }));
-    await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U", website: "", fillMs: 9000 } }, {});
+    await (controller as any).register({ body: { email: "new@b.c", firstName: "N", lastName: "U", website: "https://autofilled.example", fillMs: 9000 } }, {});
     expect(UserHelper.sendWelcomeEmail).toHaveBeenCalled();
     expect(repos.user.save).toHaveBeenCalled();
   });

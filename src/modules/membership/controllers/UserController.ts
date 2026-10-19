@@ -298,9 +298,9 @@ export class UserController extends MembershipBaseController {
       if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), "", "register", REGISTER_MAX_PER_IP, 60 * 60))) return this.json({ errors: ["Too many requests"] }, 429);
 
       const register: RegisterUserRequest = req.body;
-      // Bot traps fake success so bots don't adapt; both fields are optional so older clients (B1Mobile) still register.
-      if (register.website || (typeof register.fillMs === "number" && register.fillMs < REGISTER_MIN_FILL_MS)) {
-        console.log("Register: bot rejected", register.email, register.website ? "honeypot" : "fillMs=" + register.fillMs);
+      // Fake success so bots don't adapt; fillMs is optional so older clients (B1Mobile) still register. No honeypot: browser autofill filled it for real people.
+      if (typeof register.fillMs === "number" && register.fillMs < REGISTER_MIN_FILL_MS) {
+        console.log("Register: bot rejected", register.email, "fillMs=" + register.fillMs);
         return this.json({ email: register.email, firstName: register.firstName, lastName: register.lastName, mailConfigured: true }, 200);
       }
       let user: User = await this.repos.user.loadByEmail(register.email);
