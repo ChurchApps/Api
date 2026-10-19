@@ -74,7 +74,6 @@ npm run rebuild-layer   # Clean and rebuild Lambda layer
 
 # Deployment
 npm run deploy-demo     # Deploy to demo environment
-npm run deploy-staging  # Deploy to staging environment
 npm run deploy-prod     # Deploy to production environment
 
 # Testing
@@ -140,7 +139,7 @@ Module-specific endpoints will be documented during migration.
 - Debug logging enabled
 - WebSocket server on port 8087
 
-### Staging/Production
+### Production
 - AWS RDS for databases
 - S3 for file storage
 - CloudWatch logging
