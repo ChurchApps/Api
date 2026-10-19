@@ -82,5 +82,6 @@ function scopesForPath(path: string): string[] {
   if (lc.startsWith("/attendance")) return ["attendance:read", "attendance:write"];
   if (lc.startsWith("/content")) return ["content:read", "content:write"];
   if (lc.startsWith("/messaging")) return ["messaging:read", "messaging:write"];
+  if (lc.startsWith("/doing/workflow")) return ["workflows:read", "workflows:write"];
   return [];
 }
