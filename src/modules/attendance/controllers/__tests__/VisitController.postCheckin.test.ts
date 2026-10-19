@@ -5,10 +5,11 @@ jest.mock("../../../../shared/helpers/index", () => ({ Permissions: { attendance
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../helpers/index", () => ({
   SecurityCodeHelper: { generate: () => "ABCD" },
-  CheckinGateHelper: jest.requireActual("../../helpers/CheckinGateHelper").CheckinGateHelper
+  CheckinGateHelper: jest.requireActual("../../helpers/CheckinGateHelper").CheckinGateHelper,
+  CheckinTimeZoneHelper: jest.requireActual("../../helpers/CheckinTimeZoneHelper").CheckinTimeZoneHelper
 }));
 
-const gateway = { loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn(), loadHouseholdPeople: jest.fn(), loadChurch: jest.fn() };
+const gateway = { loadGroupsForCheckin: jest.fn(), loadSetting: jest.fn(), loadHouseholdPeople: jest.fn(), loadChurch: jest.fn(), loadCampusTimeZones: jest.fn(async () => ({})), loadCampusTimeZone: jest.fn(async () => null) };
 jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => gateway }));
 
 import { VisitController } from "../VisitController.js";
@@ -33,6 +34,7 @@ function makeController(opts: any = {}) {
       delete: jest.fn()
     },
     serviceTime: { loadByIds: jest.fn(async () => opts.serviceTimes ?? []) },
+    service: { loadAll: jest.fn(async () => []) },
     session: {
       convertAllToModel: (_c: string, rows: any[]) => rows,
       loadByIds: jest.fn(async () => opts.sessions ?? []),
