@@ -4,7 +4,7 @@ import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { Visit, VisitSession, Session } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
-import { SecurityCodeHelper, CheckinGateHelper } from "../helpers/index.js";
+import { SecurityCodeHelper, CheckinGateHelper, CheckinTimeZoneHelper } from "../helpers/index.js";
 import type { GateGroup, GateCount, GateIncoming, GateServiceTime } from "../helpers/CheckinGateHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
@@ -339,16 +339,14 @@ export class VisitController extends AttendanceBaseController {
 
   // Groups being checked into a service time whose scheduled check-in window is not open right now.
   private async findClosedServiceTimeGroups(churchId: string, serviceTimeGroups: Record<string, Set<string>>, groups: Record<string, GateGroup>) {
-    const serviceTimes = (await this.repos.serviceTime.loadByIds(churchId, Object.keys(serviceTimeGroups))) as (GateServiceTime & { id: string })[];
+    const serviceTimes = (await this.repos.serviceTime.loadByIds(churchId, Object.keys(serviceTimeGroups))) as (GateServiceTime & { id: string; serviceId?: string })[];
     const scheduled = serviceTimes.filter((st) => CheckinGateHelper.hasSchedule(st));
     if (scheduled.length === 0) return [];
-    // Churches created after the timeZone backfill have none set, so fall back to the campus zone before New York.
-    const gateway = getMembershipModuleGateway();
-    const timeZone = (await gateway.loadChurch(churchId))?.timeZone || (await gateway.loadCampusTimeZone(churchId)) || undefined;
+    const zoneFor = await CheckinTimeZoneHelper.load(churchId, this.repos.service);
     const now = new Date();
     const result: { groupId: string; groupName: string; reason: "notOpen" }[] = [];
     scheduled.forEach((st) => {
-      if (CheckinGateHelper.isServiceTimeOpen(st, now, timeZone)) return;
+      if (CheckinGateHelper.isServiceTimeOpen(st, now, zoneFor(st))) return;
       serviceTimeGroups[st.id].forEach((groupId) => {
         if (!result.some((r) => r.groupId === groupId)) result.push({ groupId, groupName: groups[groupId]?.name ?? "", reason: "notOpen" });
       });

@@ -32,6 +32,8 @@ export interface MembershipModuleGateway {
   loadChurch(churchId: string): Promise<{ id: string; name: string; subDomain: string; timeZone?: string } | null>;
   // The first campus (lowest id) with a time zone, for churches whose own timeZone was never set.
   loadCampusTimeZone(churchId: string): Promise<string | null>;
+  // Every campus that has a time zone, keyed by campus id.
+  loadCampusTimeZones(churchId: string): Promise<Record<string, string>>;
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string; discussionsEnabled?: boolean | number; announcementsEnabled?: boolean | number } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
   loadPerson(churchId: string, personId: string): Promise<{
@@ -244,6 +246,19 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .orderBy("id")
       .executeTakeFirst();
     return row?.timezone || null;
+  }
+
+  public async loadCampusTimeZones(churchId: string) {
+    const rows = (await this.getDb().selectFrom("campuses")
+      .select(["id", "timezone"])
+      .where("churchId", "=", churchId)
+      .where("removed", "=", 0)
+      .where("timezone", "is not", null)
+      .where("timezone", "<>", "")
+      .execute()) as { id: string; timezone: string }[];
+    const result: Record<string, string> = {};
+    rows.forEach((r) => (result[r.id] = r.timezone));
+    return result;
   }
 
   public async loadGroup(churchId: string, groupId: string) {
