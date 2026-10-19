@@ -43,6 +43,14 @@ export class ScreenController extends DoingBaseController {
     });
   }
 
+  @httpGet("/timeZone")
+  public async timeZone(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
+      return { timeZone: await ScreenManifestHelper.churchTimeZone(au.churchId) };
+    });
+  }
+
   @httpGet("/")
   public async getAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
