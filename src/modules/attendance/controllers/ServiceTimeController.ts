@@ -83,9 +83,15 @@ export class ServiceTimeController extends AttendanceBaseController {
   // checkinOpen lets check-in clients hide service times whose scheduled window is closed right now.
   private async appendCheckinOpen(churchId: string, times: ServiceTime[]) {
     const scheduled = times.filter((t) => CheckinGateHelper.hasSchedule(t));
-    const timeZone = scheduled.length > 0 ? (await getMembershipModuleGateway().loadChurch(churchId))?.timeZone : undefined;
+    const timeZone = scheduled.length > 0 ? await this.churchTimeZone(churchId) : undefined;
     const now = new Date();
     times.forEach((t) => (t.checkinOpen = CheckinGateHelper.isServiceTimeOpen(t, now, timeZone)));
+  }
+
+  // Churches created after the timeZone backfill have none set, so fall back to the campus zone before New York.
+  private async churchTimeZone(churchId: string) {
+    const gateway = getMembershipModuleGateway();
+    return (await gateway.loadChurch(churchId))?.timeZone || (await gateway.loadCampusTimeZone(churchId)) || undefined;
   }
 
   private async appendGroups(churchId: string, times: ServiceTime[]) {
