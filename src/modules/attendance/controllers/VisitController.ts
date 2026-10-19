@@ -342,7 +342,9 @@ export class VisitController extends AttendanceBaseController {
     const serviceTimes = (await this.repos.serviceTime.loadByIds(churchId, Object.keys(serviceTimeGroups))) as (GateServiceTime & { id: string })[];
     const scheduled = serviceTimes.filter((st) => CheckinGateHelper.hasSchedule(st));
     if (scheduled.length === 0) return [];
-    const timeZone = (await getMembershipModuleGateway().loadChurch(churchId))?.timeZone;
+    // Churches created after the timeZone backfill have none set, so fall back to the campus zone before New York.
+    const gateway = getMembershipModuleGateway();
+    const timeZone = (await gateway.loadChurch(churchId))?.timeZone || (await gateway.loadCampusTimeZone(churchId)) || undefined;
     const now = new Date();
     const result: { groupId: string; groupName: string; reason: "notOpen" }[] = [];
     scheduled.forEach((st) => {
