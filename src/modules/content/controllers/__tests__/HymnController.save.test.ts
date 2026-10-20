@@ -44,6 +44,15 @@ describe("HymnController.save", () => {
     expect(controller.repos.hymn.save).not.toHaveBeenCalled();
   });
 
+  it("rejects invalid hymn numbers and unsupported languages", async () => {
+    const controller = makeController();
+
+    const result = await controller.save({ body: [{ ...validHymn, number: 1.5, language: "French" }] } as any, {} as any);
+
+    expect(result).toEqual({ json: { errors: ["Hymn 1 needs a whole number greater than zero.", "Hymn 1 needs a supported language."] }, statusCode: 400 });
+    expect(controller.repos.hymn.save).not.toHaveBeenCalled();
+  });
+
   it("saves valid hymns to the authenticated church regardless of payload churchId", async () => {
     const controller = makeController();
 
