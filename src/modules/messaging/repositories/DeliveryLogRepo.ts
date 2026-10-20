@@ -5,8 +5,8 @@ import { getDb } from "../db/index.js";
 import { DeliveryLog } from "../models/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 
-// Mail whose wording the church controls; system notification emails aren't a spam vector.
-const CHURCH_AUTHORED = ["email", "formFollowUp", "invite", "workflowEmail"];
+// Mail whose wording the church writes. Role and group invites are a fixed template and are not counted.
+const CHURCH_AUTHORED = ["email", "formFollowUp", "workflowEmail"];
 
 @injectable()
 export class DeliveryLogRepo {

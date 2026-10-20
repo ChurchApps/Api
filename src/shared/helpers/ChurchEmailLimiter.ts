@@ -16,8 +16,9 @@ export interface ChurchEmailStatus {
   remaining: number;
 }
 
-// Church-authored mail goes out from our SES identity. A server admin must approve a church before it sends any, since
-// bots register churches faster than an automatic rule can vet them; after that the allowance grows with clean history.
+// Church-written mail (templates, form follow-ups, workflow emails) goes out from our SES identity. A server admin must
+// approve a church before it sends any of that, since bots register churches faster than an automatic rule can vet
+// them; after that the allowance grows with clean history. Role and group invites do not come through here.
 export class ChurchEmailLimiter {
   static async status(churchId: string): Promise<ChurchEmailStatus> {
     const s = await this.check(churchId);

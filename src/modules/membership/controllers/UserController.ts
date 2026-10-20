@@ -9,7 +9,6 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, LoginRateLimiter, MauticHelper, ChurchHelper, PublicPersonRateLimiter } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
-import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
 
 const emailPasswordValidation = [
   body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"),
@@ -676,8 +675,7 @@ export class UserController extends MembershipBaseController {
       // Only invite people already in this church; otherwise this is an open relay from our SES identity.
       const matches = await this.repos.person.searchEmail(au.churchId, email);
       if (!matches.some((p: Person) => (p.email || "").toLowerCase() === email.toLowerCase())) return res.status(400).json({ errors: ["No person in this church has that email"] });
-      const reserved = await ChurchEmailLimiter.reserve(au.churchId, "invite", [{ address: email }]);
-      if (!reserved) return this.json({ errors: ["Daily email limit reached"] }, 429);
+      // Fixed template (church name and role only). Not church-written mail, so it skips ChurchEmailLimiter.
       const church = await this.repos.church.loadById(au.churchId);
 
       const inviterEmail = au.email || undefined;
@@ -697,14 +695,7 @@ export class UserController extends MembershipBaseController {
           actionLabel = "Set Your Password";
         }
       }
-      try {
-        await UserHelper.sendInviteEmail(email, (personName || "").slice(0, 100), contextName.slice(0, 100), church?.name || "", loginLink, actionLabel, inviterEmail);
-        await ChurchEmailLimiter.settle(au.churchId, reserved[0], true);
-      } catch (err: any) {
-        await ChurchEmailLimiter.settle(au.churchId, reserved[0], false, err?.message || "Send failed");
-        throw err;
-      }
-
+      await UserHelper.sendInviteEmail(email, (personName || "").slice(0, 100), contextName.slice(0, 100), church?.name || "", loginLink, actionLabel, inviterEmail);
       return this.json({ success: true }, 200);
     });
   }
