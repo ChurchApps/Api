@@ -242,6 +242,9 @@ export class ScreenManifestHelper {
     if (!plan || plan.churchId !== ctx.churchId) return { title, items: [] };
     const planItems = (await ctx.repos.planItem.loadForPlan(ctx.churchId, plan.id)) as PlanItem[];
     const { messages } = await SignageFeedHelper.buildPlanFeed(plan, planItems);
+    // A linked non-Lessons plan (GO Curriculum) has no items and no venue feed, so play the provider's lesson with the church's login.
+    // Only this authenticated path does it; the anonymous signage feed must not hand out licensed media urls.
+    if (messages.length === 0 && plan.providerId && plan.providerPlanId && plan.providerId !== "lessonschurch") return { title, items: await this.folderItems(ctx, plan.providerId, plan.providerPlanId) };
     const items = await Promise.all(messages.flatMap((m) => m.files.map((f) => this.toItem(ctx, { title: f.name || m.name, url: f.url, seconds: f.seconds, loopVideo: f.loopVideo }, undefined, undefined, undefined, f.url))));
     return { title, items };
   }
