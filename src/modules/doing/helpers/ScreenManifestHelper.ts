@@ -1,11 +1,11 @@
 import crypto from "crypto";
-import { getProvider, ContentProviderAuthData } from "@churchapps/content-providers";
+import { getProvider, navigateToPath, ContentProviderAuthData, InstructionItem, Instructions } from "@churchapps/content-providers";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Plan, PlanItem, PlanType, PlaylistItem, ScheduleEntry, ScreenGroup } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { ProviderAuthHelper } from "./ProviderAuthHelper.js";
 import { ScreenScheduleHelper } from "./ScreenScheduleHelper.js";
-import { SignageFeedHelper } from "./SignageFeedHelper.js";
+import { SignageFeedHelper, SignageFile } from "./SignageFeedHelper.js";
 
 export interface ManifestItem {
   cacheKey: string;
@@ -60,12 +60,14 @@ interface Provider {
   readonly requiresAuth: boolean | (() => boolean);
   getPresentations?(path: string, auth?: ContentProviderAuthData | null): Promise<{ allFiles?: unknown[] } | null>;
   getPlaylist?(path: string, auth?: ContentProviderAuthData | null, resolution?: number): Promise<unknown[] | null>;
+  getInstructions?(path: string, auth?: ContentProviderAuthData | null): Promise<Instructions | null>;
 }
 
 interface BuildContext {
   repos: Repos;
   churchId: string;
   files: Map<string, Promise<ProviderFile[] | null>>;
+  instructions: Map<string, Promise<Instructions | null>>;
   auth: Map<string, Promise<ContentProviderAuthData | null>>;
 }
 
@@ -83,7 +85,7 @@ export class ScreenManifestHelper {
     const group: ScreenGroup = repos.screenGroup.convertToModel(churchId, await repos.screenGroup.load(churchId, screenGroupId));
     if (!group) return null;
     const timeZone = await this.churchTimeZone(churchId);
-    const ctx: BuildContext = { repos, churchId, files: new Map(), auth: new Map() };
+    const ctx: BuildContext = { repos, churchId, files: new Map(), instructions: new Map(), auth: new Map() };
 
     const fallbackContent = group.defaultPlaylistId ? await this.playlistContent(ctx, group.defaultPlaylistId) : null;
     const fallback = fallbackContent?.items || null;
@@ -193,6 +195,48 @@ export class ScreenManifestHelper {
     }
   }
 
+  private static providerInstructions(ctx: BuildContext, providerId: string, path: string): Promise<Instructions | null> {
+    const key = `${providerId}|${path}`;
+    if (!ctx.instructions.has(key)) ctx.instructions.set(key, this.loadProviderInstructions(ctx, providerId, path));
+    return ctx.instructions.get(key);
+  }
+
+  private static async loadProviderInstructions(ctx: BuildContext, providerId: string, path: string): Promise<Instructions | null> {
+    try {
+      const provider = getProvider(providerId) as unknown as Provider | null;
+      if (!provider?.getInstructions) return null;
+      const needsAuth = this.requiresAuth(provider);
+      const auth = needsAuth ? await this.providerAuth(ctx, providerId) : null;
+      if (needsAuth && !auth) return null;
+      return await provider.getInstructions(path, auth);
+    } catch (e) {
+      console.error(`Screen manifest: ${providerId} instructions lookup failed`, e);
+      return null;
+    }
+  }
+
+  // Customizing a GO plan copies the lesson into plan items that point back at the provider (providerPath + providerContentPath)
+  // with no link, since GO media needs the church's login. Look each one up here so it plays alongside items the user added.
+  private static async providerItemFiles(ctx: BuildContext, planItems: PlanItem[]): Promise<Map<PlanItem, SignageFile[]>> {
+    const resolved = new Map<PlanItem, SignageFile[]>();
+    const linked = planItems.filter((pi) => !pi.link && pi.providerId && pi.providerId !== "lessonschurch" && pi.providerPath && pi.providerContentPath && ScreenScheduleHelper.resolveType(pi.providerId) === "url");
+    await Promise.all(linked.map(async (pi) => {
+      const instructions = await this.providerInstructions(ctx, pi.providerId, pi.providerPath);
+      const node = instructions ? navigateToPath(instructions, pi.providerContentPath) : null;
+      if (!node) return;
+      const files: SignageFile[] = [];
+      const walk = (item: InstructionItem) => {
+        if (item.downloadUrl && (item.itemType === "file" || !item.children?.length)) {
+          files.push({ name: item.label, url: item.downloadUrl, seconds: item.seconds || 0, loopVideo: false, mediaType: item.mediaType as SignageFile["mediaType"], providerId: pi.providerId, providerPath: pi.providerPath, fileId: item.id || item.relatedId });
+        }
+        (item.children || []).forEach(walk);
+      };
+      walk(node);
+      if (files.length > 0) resolved.set(pi, files);
+    }));
+    return resolved;
+  }
+
   // Auth-provider urls are short-lived links, so only stable urls take part in the cache key.
   private static async toItem(ctx: BuildContext, file: ProviderFile, providerId: string | undefined, providerPath: string | undefined, fileId: string | undefined, keyUrl: string | undefined): Promise<ManifestItem> {
     const resolve = ScreenScheduleHelper.resolveType(providerId);
@@ -241,11 +285,14 @@ export class ScreenManifestHelper {
     const plan = (await ctx.repos.plan.loadCurrentByPlanTypeId(planTypeId)) as Plan;
     if (!plan || plan.churchId !== ctx.churchId) return { title, items: [] };
     const planItems = (await ctx.repos.planItem.loadForPlan(ctx.churchId, plan.id)) as PlanItem[];
-    const { messages } = await SignageFeedHelper.buildPlanFeed(plan, planItems);
+    const { messages } = await SignageFeedHelper.buildPlanFeed(plan, planItems, await this.providerItemFiles(ctx, planItems));
     // A linked non-Lessons plan (GO Curriculum) has no items and no venue feed, so play the provider's lesson with the church's login.
     // Only this authenticated path does it; the anonymous signage feed must not hand out licensed media urls.
     if (messages.length === 0 && plan.providerId && plan.providerPlanId && plan.providerId !== "lessonschurch") return { title, items: await this.folderItems(ctx, plan.providerId, plan.providerPlanId) };
-    const items = await Promise.all(messages.flatMap((m) => m.files.map((f) => this.toItem(ctx, { title: f.name || m.name, url: f.url, seconds: f.seconds, loopVideo: f.loopVideo }, undefined, undefined, undefined, f.url))));
+    const items = await Promise.all(messages.flatMap((m) => m.files.map((f) => {
+      const file: ProviderFile = { title: f.name || m.name, url: f.url, seconds: f.seconds, loopVideo: f.loopVideo, mediaType: f.mediaType };
+      return this.toItem(ctx, file, f.providerId, f.providerPath, f.fileId, f.url);
+    })));
     return { title, items };
   }
 
