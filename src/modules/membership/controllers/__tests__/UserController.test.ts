@@ -446,4 +446,19 @@ describe("UserController.sendInviteEmail", () => {
     expect(link).toBe("/login?action=register");
     expect(label).toBe("Sign Up");
   });
+
+  // Role and group invites are a fixed template. They must send even when the church
+  // is not approved for the template-email allowance, and they must not draw on it.
+  it("sends the invite without drawing on the church email limit", async () => {
+    const { ChurchEmailLimiter } = jest.requireMock("../../../../shared/helpers/ChurchEmailLimiter.js");
+    ChurchEmailLimiter.reserve.mockClear();
+    ChurchEmailLimiter.settle.mockClear();
+    ChurchEmailLimiter.reserve.mockResolvedValueOnce(null);
+    const { result } = await invite(null);
+    expect(ChurchEmailLimiter.reserve).not.toHaveBeenCalled();
+    expect(ChurchEmailLimiter.settle).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalled();
+    expect(result.status).toBe(200);
+    expect(result.obj).toEqual({ success: true });
+  });
 });
