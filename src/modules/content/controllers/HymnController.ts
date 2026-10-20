@@ -39,6 +39,22 @@ export class HymnController extends ContentBaseController {
   public async save(req: express.Request<{}, {}, Hymn[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      if (!Array.isArray(req.body) || req.body.length === 0) return this.json({ errors: ["At least one hymn is required."] }, 400);
+
+      const errors: string[] = [];
+      req.body.forEach((hymn, index) => {
+        const row = index + 1;
+        if (!hymn || typeof hymn !== "object") {
+          errors.push(`Hymn ${row} is invalid.`);
+          return;
+        }
+        if (typeof hymn.number !== "number" || !Number.isInteger(hymn.number) || hymn.number < 1) errors.push(`Hymn ${row} needs a whole number greater than zero.`);
+        if (typeof hymn.title !== "string" || !hymn.title.trim()) errors.push(`Hymn ${row} needs a title.`);
+        if (!["English", "Yoruba", "Bilingual"].includes(hymn.language || "")) errors.push(`Hymn ${row} needs a supported language.`);
+        if (!Array.isArray(hymn.verses) || hymn.verses.length === 0 || hymn.verses.some((verse) => !verse || typeof verse.text !== "string" || !verse.text.trim())) errors.push(`Hymn ${row} needs at least one verse with text.`);
+      });
+      if (errors.length) return this.json({ errors }, 400);
+
       const promises = req.body.map((hymn) => this.repos.hymn.save({ ...hymn, churchId: au.churchId }));
       return await Promise.all(promises);
     });
