@@ -618,6 +618,17 @@ describe("PersonController names-only search (View People Names Only)", () => {
     expect(repos.person.search).not.toHaveBeenCalled();
   });
 
+  it("returns a visitor for a Member with View Names, because directory access would hide them", async () => {
+    const { controller, repos } = personController({ access: ["peopleViewNames"], membershipStatus: "Member" });
+    repos.person.search = jest.fn(async () => searchRows);
+    repos.person.convertAllToBasicModel = jest.fn((_c: string, rows: any[]) => rows.map((r) => ({ id: r.id, name: { display: r.displayName }, contactInfo: {}, photo: r.photo, membershipStatus: r.membershipStatus })));
+    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, rows: any[]) => rows);
+    const result: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
+    expect(repos.person.convertAllToBasicModel).toHaveBeenCalled();
+    expect(repos.person.convertAllToModelWithPermissions).not.toHaveBeenCalled();
+    expect(result).toEqual([{ id: "p2", name: { display: "Donald Clark" }, contactInfo: {}, photo: "d.png", membershipStatus: "Visitor" }]);
+  });
+
   it("keeps the full View People result unchanged", async () => {
     const { controller, repos } = searchController(["peopleView"]);
     const result: any = await (controller as any).searchPost({ body: { term: "Donald" } }, {});
@@ -641,5 +652,44 @@ describe("PersonController names-only search (View People Names Only)", () => {
     const result: any = await (controller as any).getRecent({ query: {} }, {});
     expect(result.status).toBe(401);
     expect(repos.person.loadRecent).not.toHaveBeenCalled();
+  });
+});
+
+describe("PersonController /ids names-only (issue 1308)", () => {
+  const rows = [
+    { id: "visitor", displayName: "Zacchaeus Attendance", photo: "z.png", membershipStatus: "Visitor", optedOut: false, contactInfo: { email: "z@x.org" }, birthDate: "1990-01-01" },
+    { id: "hidden", displayName: "Opted Out", photo: "o.png", membershipStatus: "Member", optedOut: true, contactInfo: { email: "o@x.org" } }
+  ];
+
+  function idsController(access: string[], membershipStatus = "Member") {
+    const { controller, repos } = personController({ access, membershipStatus, rowsByIds: rows, personId: "me" });
+    repos.person.convertAllToBasicModel = jest.fn((_c: string, list: any[]) => list.map((r) => ({ id: r.id, name: { display: r.displayName }, photo: r.photo })));
+    repos.person.convertAllToModelWithPermissions = jest.fn((_c: string, list: any[]) => list);
+    return { controller, repos };
+  }
+
+  it("returns id, name and photo for View Names, keeps visitors, and drops opted-out people", async () => {
+    const { controller, repos } = idsController(["peopleViewNames"], "Member");
+    const result: any = await (controller as any).getMultiple({ query: { ids: "visitor,hidden" } }, {});
+    const passed = (repos.person.convertAllToBasicModel as jest.Mock).mock.calls[0][1];
+    expect(passed.map((p: any) => p.id)).toEqual(["visitor"]);
+    expect(repos.person.convertAllToModelWithPermissions).not.toHaveBeenCalled();
+    expect(result).toEqual([{ id: "visitor", name: { display: "Zacchaeus Attendance" }, photo: "z.png" }]);
+    expect(JSON.stringify(result)).not.toMatch(/email|birthDate|contactInfo|z@x.org/);
+  });
+
+  it("returns 401 with neither View People, View Names, nor directory access and does not load people", async () => {
+    const { controller, repos } = idsController([], "Guest");
+    const result: any = await (controller as any).getMultiple({ query: { ids: "visitor" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.loadByIds).not.toHaveBeenCalled();
+  });
+
+  it("keeps the full model for View People", async () => {
+    const { controller, repos } = idsController(["peopleView"], "Guest");
+    const result: any = await (controller as any).getMultiple({ query: { ids: "visitor,hidden" } }, {});
+    expect(repos.person.convertAllToModelWithPermissions).toHaveBeenCalled();
+    expect(repos.person.convertAllToBasicModel).not.toHaveBeenCalled();
+    expect(result[0].contactInfo.email).toBe("z@x.org");
   });
 });
