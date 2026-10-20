@@ -21,12 +21,18 @@ export class HymnController extends ContentBaseController {
 
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => this.repos.hymn.load(au.churchId, id));
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      return this.repos.hymn.load(au.churchId, id);
+    });
   }
 
   @httpGet("/")
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
-    return this.actionWrapper(req, res, async (au) => this.repos.hymn.loadAll(au.churchId));
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      return this.repos.hymn.loadAll(au.churchId);
+    });
   }
 
   @httpPost("/")
