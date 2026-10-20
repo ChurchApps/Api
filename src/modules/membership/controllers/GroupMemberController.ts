@@ -59,6 +59,9 @@ export class GroupMemberController extends MembershipBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const canViewAll = au.checkAccess(Permissions.groupMembers.view);
+      // Attendance takers are not members of every class they record. They get the
+      // name roster only; contact fields stay stripped unless they also have View.
+      const canTakeAttendance = au.checkAccess(Permissions.attendance.view) || au.checkAccess(Permissions.attendance.edit);
       // The token's groupIds are fixed at sign-in, so a group joined since then is checked live.
       const inGroups = async (ids: string[]) => {
         if (canViewAll || ids.every((id) => au.groupIds?.includes(id))) return true;
@@ -69,7 +72,11 @@ export class GroupMemberController extends MembershipBaseController {
       let result = null;
       if (req.query.groupId !== undefined) {
         const groupId = req.query.groupId.toString();
-        if (!(await inGroups([groupId]))) return this.json({}, 401);
+        if (!(await inGroups([groupId]))) {
+          if (!canTakeAttendance) return this.json({}, 401);
+          const group: any = await this.repos.group.load(au.churchId, groupId);
+          if (!group || group.confidential) return this.json({}, 401);
+        }
         result = this.filterMinors((await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[], au, groupId);
       } else if (req.query.groupIds !== undefined) {
         const groupIds = req.query.groupIds.toString().split(",").filter(Boolean);
@@ -108,6 +115,7 @@ export class GroupMemberController extends MembershipBaseController {
   private filterMinors(rows: any[], au: any, groupId: string): any[] {
     if (!Array.isArray(rows)) return rows;
     if (au.checkAccess(Permissions.groupMembers.view) || au.leaderGroupIds?.includes(groupId)) return rows;
+    if (au.checkAccess(Permissions.attendance.view) || au.checkAccess(Permissions.attendance.edit)) return rows;
     const cutoff = new Date();
     cutoff.setFullYear(cutoff.getFullYear() - 13);
     return rows.filter((r) => !r.birthDate || new Date(r.birthDate) <= cutoff);
