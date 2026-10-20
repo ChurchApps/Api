@@ -40,4 +40,6 @@ export { ArrangementKey } from "./ArrangementKey.js";
 export { SongDetail } from "./SongDetail.js";
 export { SongDetailLink } from "./SongDetailLink.js";
 export { Song } from "./Song.js";
+export { Hymn } from "./Hymn.js";
+export type { HymnVerse } from "./Hymn.js";
 export { StorageProvider } from "./StorageProvider.js";
