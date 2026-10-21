@@ -166,7 +166,11 @@ export class StepActionHelper {
     const membership = getMembershipModuleGateway();
     const person = await membership.loadPerson(task.churchId || "", task.associatedWithId);
     const phoneNumber = (person?.mobilePhone || "").trim();
-    if (!person || !phoneNumber) return;
+    if (!person) return;
+    if (!phoneNumber) {
+      this.appendHistory(task, "Text skipped: no mobile phone");
+      return;
+    }
     if (person.optedOut === true || person.optedOut === 1) {
       this.appendHistory(task, "Text skipped: opted out");
       return;

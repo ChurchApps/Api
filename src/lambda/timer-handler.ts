@@ -45,6 +45,13 @@ export const handle30MinTimer = async (_event: ScheduledEvent, _context: Context
     return ExecutionHelper.processDue(doingRepos);
   });
 
+  // Resume workflow cards whose wait has ended, so a "1 day" wait means about a day.
+  await JobRunHelper.run("workflowSnoozed", async () => {
+    const { WorkflowHelper } = await import("../modules/doing/helpers/WorkflowHelper.js");
+    const doingRepos = await RepoManager.getRepos<any>("doing");
+    return WorkflowHelper.processSnoozed(doingRepos);
+  });
+
   await JobRunHelper.run("scanReminders", async () => {
     const { scanReminders } = await import("../modules/messaging/helpers/ReminderBootstrap.js");
     const messagingRepos = await RepoManager.getRepos<any>("messaging");
@@ -163,14 +170,10 @@ export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Con
 
   const doingRepos = await RepoManager.getRepos<any>("doing");
 
-  // Workflow card maintenance: overdue reminders + un-snooze sweep.
+  // Workflow card overdue reminders (the un-snooze sweep runs on the 30-minute timer).
   await JobRunHelper.run("workflowOverdue", async () => {
     const { WorkflowHelper } = await import("../modules/doing/helpers/WorkflowHelper.js");
     return WorkflowHelper.processOverdue(doingRepos);
-  });
-  await JobRunHelper.run("workflowSnoozed", async () => {
-    const { WorkflowHelper } = await import("../modules/doing/helpers/WorkflowHelper.js");
-    return WorkflowHelper.processSnoozed(doingRepos);
   });
 
   // Recurring scheduled rules (pull path of the unified RuleEngine).

@@ -108,7 +108,7 @@ export class WorkflowHelper {
   public static async onStepEnter(task: Task, step: WorkflowStep, repositories?: Repos, depth = 0, suppressRoutes = false): Promise<void> {
     const repos = await this.getRepos(repositories);
 
-    task.snoozedUntil = undefined;
+    task.snoozedUntil = null;
     if (step.expectedResponseDays) task.dueDate = DateHelper.addDays(new Date(), Number(step.expectedResponseDays));
     if (!task.pinnedAssignment && !task.assignedToId && step.defaultAssignToId) {
       task.assignedToType = step.defaultAssignToType;
@@ -307,7 +307,7 @@ export class WorkflowHelper {
     const repos = await this.getRepos(repositories);
     const cards = (await repos.task.loadSnoozedDueAllChurches()) as Task[];
     for (const card of cards) {
-      card.snoozedUntil = undefined;
+      card.snoozedUntil = null;
       const cursor = StepActionHelper.readActionCursor(card);
       const step = card.stepId ? ((await repos.workflowStep.load(card.churchId || "", card.stepId)) as WorkflowStep) : null;
       if (step && cursor && cursor.stepId === card.stepId) {
