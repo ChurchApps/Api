@@ -180,6 +180,16 @@ describe("WorkflowHelper on-enter actions", () => {
     expect(notifyMock).toHaveBeenCalled();
   });
 
+  it("clears the snooze with null so the saved card is not picked up again", async () => {
+    const repos = buildRepos(steps, {});
+    const card: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", snoozedUntil: new Date(Date.now() - 1000), title: "Follow up" };
+    repos.task.loadSnoozedDueAllChurches = jest.fn(async () => [card]);
+
+    await WorkflowHelper.processSnoozed(repos);
+
+    expect(repos.task.save).toHaveBeenCalledWith(expect.objectContaining({ snoozedUntil: null }));
+  });
+
   it("runs a non-delay action (addToGroup) then rests", async () => {
     const repos = buildRepos(steps, { stepACT: [{ actionType: "addToGroup", config: JSON.stringify({ groupId: "g1", groupLabel: "Greeters" }) }] });
     const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
@@ -239,6 +249,7 @@ describe("WorkflowHelper sendText action", () => {
 
     expect(sendPersonTextMock).not.toHaveBeenCalled();
     expect(historyOf(task)).not.toContain("Text sent");
+    expect(historyOf(task)).toContain("Text skipped: no mobile phone");
   });
 
   it("records a missing provider on the card and keeps running later actions", async () => {

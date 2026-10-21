@@ -17,4 +17,10 @@ describe("handle30MinTimer", () => {
     expect(jobNames).toContain("conversationCleanup");
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
+
+  it("resumes waiting workflow cards every 30 minutes, not once a day", async () => {
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+    await handle30MinTimer({} as any, {} as any);
+    expect(jobNames).toContain("workflowSnoozed");
+  });
 });
