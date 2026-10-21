@@ -140,10 +140,10 @@ export class ScreenManifestHelper {
 
   // Drive has no pre-signed links, so the item carries the alt=media url plus a short-lived bearer the TV sends on that request
   // (refreshed on every manifest). OneDrive's /content answers with a 302 to a pre-signed link, which goes out as a plain url.
-  private static async directDownload(ctx: BuildContext, providerId: string, fileId: string): Promise<{ url: string; headers?: Record<string, string> } | null> {
+  private static async directDownload(ctx: BuildContext, providerId: string, fileId: string, ministryId: string | null): Promise<{ url: string; headers?: Record<string, string> } | null> {
     const build = TOKEN_URLS[providerId];
     if (!build) return null;
-    const auth = await this.providerAuth(ctx, providerId);
+    const auth = await this.providerAuth(ctx, providerId, ministryId);
     if (!auth) return null;
     const url = build(fileId);
     const headers = { Authorization: `Bearer ${auth.access_token}` };
@@ -158,10 +158,12 @@ export class ScreenManifestHelper {
     return { url, headers };
   }
 
-  // One lookup per provider per build; every file in a Drive playlist used to re-read the auth row.
-  private static providerAuth(ctx: BuildContext, providerId: string): Promise<ContentProviderAuthData | null> {
-    if (!ctx.auth.has(providerId)) ctx.auth.set(providerId, ProviderAuthHelper.getAuth(ctx.repos, ctx.churchId, null, providerId));
-    return ctx.auth.get(providerId);
+  // One lookup per provider and ministry per build; every file in a Drive playlist used to re-read the auth row.
+  // B1Admin links GO per ministry, so a plan's provider uses its ministry's login, falling back to the church-level one.
+  private static providerAuth(ctx: BuildContext, providerId: string, ministryId: string | null): Promise<ContentProviderAuthData | null> {
+    const key = `${providerId}|${ministryId || ""}`;
+    if (!ctx.auth.has(key)) ctx.auth.set(key, ProviderAuthHelper.getAuth(ctx.repos, ctx.churchId, ministryId, providerId));
+    return ctx.auth.get(key);
   }
 
   private static requiresAuth(provider: Provider): boolean {
@@ -173,18 +175,18 @@ export class ScreenManifestHelper {
     return !!provider && this.requiresAuth(provider);
   }
 
-  private static providerFiles(ctx: BuildContext, providerId: string, path: string): Promise<ProviderFile[] | null> {
-    const key = `${providerId}|${path}`;
-    if (!ctx.files.has(key)) ctx.files.set(key, this.loadProviderFiles(ctx, providerId, path));
+  private static providerFiles(ctx: BuildContext, providerId: string, path: string, ministryId: string | null): Promise<ProviderFile[] | null> {
+    const key = `${providerId}|${ministryId || ""}|${path}`;
+    if (!ctx.files.has(key)) ctx.files.set(key, this.loadProviderFiles(ctx, providerId, path, ministryId));
     return ctx.files.get(key);
   }
 
-  private static async loadProviderFiles(ctx: BuildContext, providerId: string, path: string): Promise<ProviderFile[] | null> {
+  private static async loadProviderFiles(ctx: BuildContext, providerId: string, path: string, ministryId: string | null): Promise<ProviderFile[] | null> {
     try {
       const provider = getProvider(providerId) as unknown as Provider | null;
       if (!provider) return null;
       const needsAuth = this.requiresAuth(provider);
-      const auth = needsAuth ? await this.providerAuth(ctx, providerId) : null;
+      const auth = needsAuth ? await this.providerAuth(ctx, providerId, ministryId) : null;
       if (needsAuth && !auth) return null;
       if (provider.getPlaylist) return ((await provider.getPlaylist(path, auth)) || []) as ProviderFile[];
       if (provider.getPresentations) return ((await provider.getPresentations(path, auth))?.allFiles || []) as ProviderFile[];
@@ -195,18 +197,18 @@ export class ScreenManifestHelper {
     }
   }
 
-  private static providerInstructions(ctx: BuildContext, providerId: string, path: string): Promise<Instructions | null> {
-    const key = `${providerId}|${path}`;
-    if (!ctx.instructions.has(key)) ctx.instructions.set(key, this.loadProviderInstructions(ctx, providerId, path));
+  private static providerInstructions(ctx: BuildContext, providerId: string, path: string, ministryId: string | null): Promise<Instructions | null> {
+    const key = `${providerId}|${ministryId || ""}|${path}`;
+    if (!ctx.instructions.has(key)) ctx.instructions.set(key, this.loadProviderInstructions(ctx, providerId, path, ministryId));
     return ctx.instructions.get(key);
   }
 
-  private static async loadProviderInstructions(ctx: BuildContext, providerId: string, path: string): Promise<Instructions | null> {
+  private static async loadProviderInstructions(ctx: BuildContext, providerId: string, path: string, ministryId: string | null): Promise<Instructions | null> {
     try {
       const provider = getProvider(providerId) as unknown as Provider | null;
       if (!provider?.getInstructions) return null;
       const needsAuth = this.requiresAuth(provider);
-      const auth = needsAuth ? await this.providerAuth(ctx, providerId) : null;
+      const auth = needsAuth ? await this.providerAuth(ctx, providerId, ministryId) : null;
       if (needsAuth && !auth) return null;
       return await provider.getInstructions(path, auth);
     } catch (e) {
@@ -217,11 +219,11 @@ export class ScreenManifestHelper {
 
   // Customizing a GO plan copies the lesson into plan items that point back at the provider (providerPath + providerContentPath)
   // with no link, since GO media needs the church's login. Look each one up here so it plays alongside items the user added.
-  private static async providerItemFiles(ctx: BuildContext, planItems: PlanItem[]): Promise<Map<PlanItem, SignageFile[]>> {
+  private static async providerItemFiles(ctx: BuildContext, planItems: PlanItem[], ministryId: string | null): Promise<Map<PlanItem, SignageFile[]>> {
     const resolved = new Map<PlanItem, SignageFile[]>();
     const linked = planItems.filter((pi) => !pi.link && pi.providerId && pi.providerId !== "lessonschurch" && pi.providerPath && pi.providerContentPath && ScreenScheduleHelper.resolveType(pi.providerId) === "url");
     await Promise.all(linked.map(async (pi) => {
-      const instructions = await this.providerInstructions(ctx, pi.providerId, pi.providerPath);
+      const instructions = await this.providerInstructions(ctx, pi.providerId, pi.providerPath, ministryId);
       const node = instructions ? navigateToPath(instructions, pi.providerContentPath) : null;
       if (!node) return;
       const files: SignageFile[] = [];
@@ -238,11 +240,11 @@ export class ScreenManifestHelper {
   }
 
   // Auth-provider urls are short-lived links, so only stable urls take part in the cache key.
-  private static async toItem(ctx: BuildContext, file: ProviderFile, providerId: string | undefined, providerPath: string | undefined, fileId: string | undefined, keyUrl: string | undefined): Promise<ManifestItem> {
+  private static async toItem(ctx: BuildContext, file: ProviderFile, providerId: string | undefined, providerPath: string | undefined, fileId: string | undefined, keyUrl: string | undefined, ministryId: string | null = null): Promise<ManifestItem> {
     const resolve = ScreenScheduleHelper.resolveType(providerId);
     const mediaType = file.mediaType || ScreenScheduleHelper.mediaTypeFromUrl(file.url);
     const ephemeralUrl = resolve === "url" && !!providerId && !!fileId && this.providerNeedsAuth(providerId);
-    const direct = providerId && fileId && TOKEN_URLS[providerId] ? await this.directDownload(ctx, providerId, fileId) : null;
+    const direct = providerId && fileId && TOKEN_URLS[providerId] ? await this.directDownload(ctx, providerId, fileId, ministryId) : null;
     return {
       cacheKey: ScreenScheduleHelper.cacheKey(providerId, fileId, ephemeralUrl ? undefined : keyUrl),
       title: file.title || "",
@@ -265,7 +267,7 @@ export class ScreenManifestHelper {
       const fileId = item.fileId || item.id;
       let url = item.url;
       if (item.providerId && item.providerPath && ScreenScheduleHelper.resolveType(item.providerId) === "url" && this.providerNeedsAuth(item.providerId)) {
-        const match = (await this.providerFiles(ctx, item.providerId, item.providerPath))?.find((f) => f.id === fileId);
+        const match = (await this.providerFiles(ctx, item.providerId, item.providerPath, null))?.find((f) => f.id === fileId);
         if (match?.url) url = match.url;
       }
       return this.toItem(ctx, { ...item, url }, item.providerId, item.providerPath, fileId, item.url);
@@ -273,36 +275,37 @@ export class ScreenManifestHelper {
     return { title: playlist.name || "", items: result };
   }
 
-  private static async planTypeTitle(ctx: BuildContext, planTypeId: string): Promise<string> {
-    const planType: PlanType = await ctx.repos.planType.load(ctx.churchId, planTypeId);
+  private static async planTypeTitle(ctx: BuildContext, planType: PlanType | null): Promise<string> {
     if (!planType) return "";
     const ministry = planType.ministryId ? await getMembershipModuleGateway().loadGroup(ctx.churchId, planType.ministryId) : null;
     return ministry?.name ? `${ministry.name} — ${planType.name || ""}` : planType.name || "";
   }
 
   private static async planTypeContent(ctx: BuildContext, planTypeId: string): Promise<EntryContent> {
-    const title = await this.planTypeTitle(ctx, planTypeId);
+    const planType: PlanType = await ctx.repos.planType.load(ctx.churchId, planTypeId);
+    const title = await this.planTypeTitle(ctx, planType);
+    const ministryId = planType?.ministryId || null;
     const plan = (await ctx.repos.plan.loadCurrentByPlanTypeId(planTypeId)) as Plan;
     if (!plan || plan.churchId !== ctx.churchId) return { title, items: [] };
     const planItems = (await ctx.repos.planItem.loadForPlan(ctx.churchId, plan.id)) as PlanItem[];
-    const { messages } = await SignageFeedHelper.buildPlanFeed(plan, planItems, await this.providerItemFiles(ctx, planItems));
-    // A linked non-Lessons plan (GO Curriculum) has no items and no venue feed, so play the provider's lesson with the church's login.
+    const { messages } = await SignageFeedHelper.buildPlanFeed(plan, planItems, await this.providerItemFiles(ctx, planItems, ministryId));
+    // A linked non-Lessons plan (GO Curriculum) has no items and no venue feed, so play the provider's lesson with the ministry's login.
     // Only this authenticated path does it; the anonymous signage feed must not hand out licensed media urls.
-    if (messages.length === 0 && plan.providerId && plan.providerPlanId && plan.providerId !== "lessonschurch") return { title, items: await this.folderItems(ctx, plan.providerId, plan.providerPlanId) };
+    if (messages.length === 0 && plan.providerId && plan.providerPlanId && plan.providerId !== "lessonschurch") return { title, items: await this.folderItems(ctx, plan.providerId, plan.providerPlanId, ministryId) };
     const items = await Promise.all(messages.flatMap((m) => m.files.map((f) => {
       const file: ProviderFile = { title: f.name || m.name, url: f.url, seconds: f.seconds, loopVideo: f.loopVideo, mediaType: f.mediaType };
-      return this.toItem(ctx, file, f.providerId, f.providerPath, f.fileId, f.url);
+      return this.toItem(ctx, file, f.providerId, f.providerPath, f.fileId, f.url, ministryId);
     })));
     return { title, items };
   }
 
   // The cloud can't reach a LAN provider, so its folder ships as one reference item (no fileId) the TV expands locally.
-  private static async folderItems(ctx: BuildContext, providerId: string, path: string): Promise<ManifestItem[]> {
+  private static async folderItems(ctx: BuildContext, providerId: string, path: string, ministryId: string | null = null): Promise<ManifestItem[]> {
     if (ScreenScheduleHelper.resolveType(providerId) === "lan") {
       return [{ cacheKey: ScreenScheduleHelper.cacheKey(providerId, path, ""), title: path, mediaType: "video", seconds: 0, loopVideo: false, resolve: "lan", providerId, providerPath: path }];
     }
-    const files = (await this.providerFiles(ctx, providerId, path)) || [];
-    return Promise.all(files.filter((f) => f.url).map((f) => this.toItem(ctx, f, providerId, path, f.id, f.url)));
+    const files = (await this.providerFiles(ctx, providerId, path, ministryId)) || [];
+    return Promise.all(files.filter((f) => f.url).map((f) => this.toItem(ctx, f, providerId, path, f.id, f.url, ministryId)));
   }
 
   private static async entryContent(ctx: BuildContext, entry: ScheduleEntry): Promise<EntryContent> {
