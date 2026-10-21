@@ -14,6 +14,7 @@ const goInstructions = jest.fn(async (path: string, auth: any) => (auth ? {
 jest.mock("@churchapps/content-providers", () => ({
   setProviderSecret: () => undefined,
   getProviderConfig: () => null,
+  TokenHelper: class { isTokenExpired() { return false; } },
   getProvider: (id: string) => (id === "gocurriculum" ? { requiresAuth: true, getPlaylist: goPlaylist, getInstructions: goInstructions } : null),
   navigateToPath: jest.requireActual("@churchapps/content-providers").navigateToPath
 }));
@@ -84,5 +85,31 @@ describe("ScreenManifestHelper.build with a customized GO Curriculum plan", () =
     getAuth = jest.spyOn(ProviderAuthHelper, "getAuth").mockResolvedValue(null);
     const manifest = await ScreenManifestHelper.build(customizedRepos, "CHU1", "G", now);
     expect(manifest.occurrences[0].items.map((i) => i.title)).toEqual(["ECHO MY GOD.mp4"]);
+  });
+});
+
+describe("ScreenManifestHelper.build with GO Curriculum linked to the plan type's ministry", () => {
+  const lessonPath = "/elementary/c1/l1";
+  // B1Admin links GO per ministry, so the church has a Children's Ministry row and no church-level row.
+  const contentProviderAuth = {
+    loadByMinistryAndProvider: jest.fn(async (_c: string, ministryId: string, providerId: string) => (ministryId === "MIN1" && providerId === "gocurriculum" ? { id: "CPA1", churchId: "CHU1", ministryId: "MIN1", providerId, accessToken: "tok", refreshToken: "", expiresAt: new Date(Date.now() + 3600 * 1000) } : null)),
+    loadChurchLevelByProvider: jest.fn(async () => null as any)
+  };
+  const ministryRepos: any = { ...repos, contentProviderAuth, planType: { load: async () => ({ id: "PT1", name: "Elementary", ministryId: "MIN1" }) } };
+
+  it("plays a plain GO plan with the ministry's GO login", async () => {
+    const manifest = await ScreenManifestHelper.build(ministryRepos, "CHU1", "G", now);
+    expect(manifest.occurrences).toHaveLength(1);
+    expect(manifest.occurrences[0].items.map((i) => i.title)).toEqual(["Elijah video"]);
+  });
+
+  it("plays a customized GO plan with the ministry's GO login", async () => {
+    const customized = [
+      { id: "I1", parentId: null, sort: 1, itemType: "providerPresentation", label: "Elijah video", providerId: "gocurriculum", providerPath: lessonPath, providerContentPath: "0" },
+      { id: "I2", parentId: null, sort: 2, itemType: "providerFile", label: "ECHO MY GOD.mp4", seconds: 240, link: "https://cdn.example.com/echo.mp4" }
+    ];
+    const customizedRepos: any = { ...ministryRepos, planItem: { loadForPlan: async () => customized.map((i) => ({ ...i })) } };
+    const manifest = await ScreenManifestHelper.build(customizedRepos, "CHU1", "G", now);
+    expect(manifest.occurrences[0].items.map((i) => i.title)).toEqual(["Elijah video", "ECHO MY GOD.mp4"]);
   });
 });
