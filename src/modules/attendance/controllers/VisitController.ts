@@ -150,8 +150,10 @@ export class VisitController extends AttendanceBaseController {
           this.populateDeleteIds(existingVisits, submittedVisits, visitSessions, deleteVisitIds, deleteVisitSessionIds);
         }
 
+        // Today's visits are re-posted with every check-in, so sessions people already hold skip the check-in window gate.
+        const heldSessions = new Set(existingVisits.flatMap((v) => (v.visitSessions || []).map((vs) => v.personId + "|" + vs.sessionId)));
         // Capacity + volunteer-ratio gates run BEFORE any save (postCheckin is not transactional).
-        const gateResponse = await this.evaluateGates(au.churchId, submittedVisits, peopleIds, req.query.acknowledgeWarnings === "true");
+        const gateResponse = await this.evaluateGates(au.churchId, submittedVisits, peopleIds, req.query.acknowledgeWarnings === "true", heldSessions);
         if (gateResponse) return this.json(gateResponse.body, gateResponse.status);
 
         const promises: Promise<any>[] = [];
@@ -286,7 +288,7 @@ export class VisitController extends AttendanceBaseController {
   }
 
   // Returns a {body,status} 409 payload when the batch must be rejected, else null.
-  private async evaluateGates(churchId: string, submittedVisits: Visit[], batchPersonIds: string[], acknowledgeWarnings: boolean): Promise<{ body: any; status: number } | null> {
+  private async evaluateGates(churchId: string, submittedVisits: Visit[], batchPersonIds: string[], acknowledgeWarnings: boolean, heldSessions: Set<string>): Promise<{ body: any; status: number } | null> {
     const incoming: Record<string, GateIncoming> = {};
     const targetGroupIds = new Set<string>();
     const serviceTimeGroups: Record<string, Set<string>> = {};
@@ -298,7 +300,7 @@ export class VisitController extends AttendanceBaseController {
         if (!gid) return;
         targetGroupIds.add(gid);
         const stId = vs.session?.serviceTimeId;
-        if (stId) (serviceTimeGroups[stId] ?? (serviceTimeGroups[stId] = new Set())).add(gid);
+        if (stId && !heldSessions.has(sv.personId + "|" + vs.sessionId)) (serviceTimeGroups[stId] ?? (serviceTimeGroups[stId] = new Set())).add(gid);
         const e = incoming[gid] ?? (incoming[gid] = { total: 0, volunteers: 0, guests: 0, nonVolunteers: 0 });
         e.total++;
         if (isVolunteer) e.volunteers++;
@@ -339,6 +341,7 @@ export class VisitController extends AttendanceBaseController {
 
   // Groups being checked into a service time whose scheduled check-in window is not open right now.
   private async findClosedServiceTimeGroups(churchId: string, serviceTimeGroups: Record<string, Set<string>>, groups: Record<string, GateGroup>) {
+    if (Object.keys(serviceTimeGroups).length === 0) return [];
     const serviceTimes = (await this.repos.serviceTime.loadByIds(churchId, Object.keys(serviceTimeGroups))) as (GateServiceTime & { id: string; serviceId?: string })[];
     const scheduled = serviceTimes.filter((st) => CheckinGateHelper.hasSchedule(st));
     if (scheduled.length === 0) return [];

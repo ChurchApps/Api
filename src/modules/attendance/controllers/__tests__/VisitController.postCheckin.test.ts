@@ -99,6 +99,16 @@ describe("postCheckin service time window", () => {
     expect(repos.visit.save).not.toHaveBeenCalled();
   });
 
+  it("re-posts a session the person already holds after its window closes, so another time can be added", async () => {
+    jest.useFakeTimers({ now: new Date("2026-10-13T09:00:00-05:00"), doNotFake: ["setTimeout", "nextTick", "setImmediate"] });
+    const visits = [{ id: "v0", personId: "p1" }];
+    const visitSessions = [{ id: "vs0", visitId: "v0", sessionId: "sess1" }];
+    const { controller, repos } = makeController({ groups, counts: [], serviceTimes: [sunday9], visits, visitSessions });
+    const result: any = await (controller as any).postCheckin(req(memberVisit()), {});
+    expect(result?.status).not.toBe(409);
+    expect(repos.visit.save).toHaveBeenCalled();
+  });
+
   it("saves inside the check-in window", async () => {
     jest.useFakeTimers({ now: new Date("2026-10-11T08:45:00-05:00"), doNotFake: ["setTimeout", "nextTick", "setImmediate"] });
     const { controller, repos } = makeController({ groups, counts: [], serviceTimes: [sunday9] });
