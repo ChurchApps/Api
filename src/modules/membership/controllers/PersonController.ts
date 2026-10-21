@@ -704,8 +704,10 @@ export class PersonController extends MembershipBaseController {
 
   // The directory gate follows the church's configured directoryVisibility tier
   // (Staff / Members / Regular Attendees / Everyone), not a fixed Member-or-Staff check.
+  // Viewers differ from listed people: under "Everyone" a Guest (what app sign-ups get) may open the directory without being listed in it.
   private async canViewDirectory(au: AuthenticatedUser): Promise<boolean> {
     const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
+    if (directoryVisibility === "Everyone" && au.membershipStatus === "Guest") return true;
     return this.shouldShowInDirectory(au.membershipStatus, directoryVisibility);
   }
 }

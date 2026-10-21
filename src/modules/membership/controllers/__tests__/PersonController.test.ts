@@ -517,6 +517,30 @@ describe("PersonController directory visibility gate", () => {
     expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();
   });
 
+  // App sign-ups are created as Guest (ChurchAppsSupport#1314); "Everyone" must let them open the directory.
+  it("lets a Guest load the directory list when the church allows Everyone", async () => {
+    const { controller, repos } = dirController({ membershipStatus: "Guest", directoryVisibility: "Everyone" });
+    const result: any = await (controller as any).getList({ query: {} }, {});
+    expect(result.status).not.toBe(401);
+    expect(repos.person.loadAlphabetical).toHaveBeenCalled();
+  });
+
+  it("lets a Guest load GET /people when the church allows Everyone, without listing Guests", async () => {
+    const { controller, repos } = dirController({ membershipStatus: "Guest", directoryVisibility: "Everyone" });
+    repos.person.loadMembersByVisibility = jest.fn(async () => [{ id: "p2", name: { display: "Donald Clark" }, membershipStatus: "Member" }, { id: "p3", name: { display: "New Guest" }, membershipStatus: "Guest" }]);
+    repos.person.convertAllToModelWithPermissions = (_c: string, rows: any[]) => rows;
+    const result: any = await (controller as any).getAll({ query: {} }, {});
+    expect(result.status).not.toBe(401);
+    expect(result.map((p: any) => p.id)).toEqual(["p2"]);
+  });
+
+  it("still blocks a Guest when the church is set to Members", async () => {
+    const { controller, repos } = dirController({ membershipStatus: "Guest", directoryVisibility: "Members" });
+    const result: any = await (controller as any).getAll({ query: {} }, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.loadMembersByVisibility).not.toHaveBeenCalled();
+  });
+
   it("still blocks a Member when the church is set to Staff only", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Member", directoryVisibility: "Staff" });
     const result: any = await (controller as any).getList({ query: {} }, {});
