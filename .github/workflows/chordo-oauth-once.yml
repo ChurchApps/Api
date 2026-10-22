@@ -1,0 +1,71 @@
+name: Chordo OAuth once
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    name: Register Chordo OAuth client
+    if: github.actor == 'Charlie-Carson' && github.head_ref == 'ops/chordo-oauth-once'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      - name: Register client inside the prod VPC
+        working-directory: tools/manual/chordo-oauth-once
+        run: |
+          set -euo pipefail
+          npm install --omit=dev --no-audit --no-fund
+          rm -f function.zip
+          zip -qr function.zip index.js node_modules package.json
+          CS="$(aws ssm get-parameter --name /prod/membershipApi/connectionString --with-decryption --query Parameter.Value --output text)"
+          echo "::add-mask::$CS"
+          jq -n --arg cs "$CS" '{Variables:{MEMBERSHIP_CONNECTION_STRING:$cs}}' > env.json
+          FN=chordo-oauth-once
+          aws lambda delete-function --function-name "$FN" >/tmp/delete.txt 2>&1 || true
+          if ! aws lambda create-function \
+            --function-name "$FN" \
+            --runtime nodejs22.x \
+            --role arn:aws:iam::428019619026:role/ChurchAppsRole \
+            --handler index.handler \
+            --zip-file fileb://function.zip \
+            --timeout 60 \
+            --memory-size 256 \
+            --vpc-config SubnetIds=subnet-01a6b61d749d10c46,SecurityGroupIds=sg-052314a1eec2f2567 \
+            --environment file://env.json \
+            >/tmp/create.txt 2>&1; then
+            echo "create-function failed"
+            cat /tmp/create.txt
+            exit 1
+          fi
+          rm -f env.json function.zip
+          aws lambda wait function-active-v2 --function-name "$FN"
+          aws lambda invoke --function-name "$FN" --cli-read-timeout 180 /tmp/out.json >/tmp/invoke-meta.txt
+          openssl rand -base64 32 > /tmp/aes.key
+          openssl enc -aes-256-cbc -pbkdf2 -pass file:/tmp/aes.key -in /tmp/out.json -out /tmp/result.enc
+          openssl pkeyutl -encrypt -pubin -inkey public.pem -in /tmp/aes.key -out /tmp/aes.enc
+          echo "AES:$(base64 -w0 /tmp/aes.enc)"
+          echo "DATA:$(base64 -w0 /tmp/result.enc)"
+          rm -f /tmp/out.json /tmp/aes.key /tmp/result.enc /tmp/aes.enc
+      - name: Delete one-off function
+        if: always()
+        working-directory: tools/manual/chordo-oauth-once
+        run: aws lambda delete-function --function-name chordo-oauth-once || true
