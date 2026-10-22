@@ -5,6 +5,18 @@ import { Permissions } from "../../../shared/helpers/index.js";
 
 @controller("/attendance/attendancerecords")
 export class AttendanceRecordController extends AttendanceBaseController {
+  // Self-scoped: the signed-in member's own visits from the last 12 months.
+  @httpGet("/my")
+  public async my(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return this.json([], 401);
+      const since = new Date();
+      since.setFullYear(since.getFullYear() - 1);
+      const data = await this.repos.attendance.loadForPerson(au.churchId, au.personId, since);
+      return this.repos.attendance.convertAllToModel(au.churchId, data as any);
+    });
+  }
+
   @httpGet("/tree")
   public async tree(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {

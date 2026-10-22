@@ -12,6 +12,28 @@ import { NotificationService } from "../../../shared/helpers/NotificationService
 
 @controller("/membership/formsubmissions")
 export class FormSubmissionController extends MembershipBaseController {
+  // Self-scoped: stand-alone forms the signed-in member submitted. Person forms (staff fill those in about someone) are left out by the repo.
+  @httpGet("/my")
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.personId) return this.json([], 401);
+      const result: FormSubmission[] = this.repos.formSubmission.convertAllToModel(au.churchId, (await this.repos.formSubmission.loadForSubmitter(au.churchId, au.personId)) as any[]);
+      if (result.length === 0) return result;
+      if (this.include(req, "questions")) {
+        const questionsByForm: Record<string, Question[]> = {};
+        for (const formId of Array.from(new Set(result.map((s) => s.formId)))) {
+          questionsByForm[formId] = this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
+        }
+        result.forEach((s) => { s.questions = questionsByForm[s.formId]; });
+      }
+      if (this.include(req, "answers")) {
+        const answers: Answer[] = this.repos.answer.convertAllToModel(au.churchId, (await this.repos.answer.loadForFormSubmissions(au.churchId, result.map((s) => s.id))) as any[]);
+        result.forEach((s) => { s.answers = answers.filter((a) => a.formSubmissionId === s.id); });
+      }
+      return result;
+    });
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -78,6 +100,8 @@ export class FormSubmissionController extends MembershipBaseController {
           } else {
             formSubmission.churchId = churchId;
             const canManage = au?.churchId === churchId && (await this.formAccess(au, formId));
+            // submittedBy grants the member read access through /my, so only managers may set it to someone else.
+            if (!canManage) formSubmission.submittedBy = (au?.churchId === churchId && au?.personId) || null;
             if (!canManage && !this.isWithinAccessWindow(form)) {
               results.push({ error: `${form.name} is not accepting submissions` });
               continue;
