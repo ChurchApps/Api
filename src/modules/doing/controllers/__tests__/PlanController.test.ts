@@ -59,6 +59,14 @@ describe("PlanController.copy", () => {
     expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ notes: "New notes", signupDeadlineHours: 24 }));
   });
 
+  // Issue #1325: a deadline the user cleared stays cleared on the copy.
+  it("keeps a cleared signup deadline cleared instead of reviving the old one", async () => {
+    repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), signupDeadlineHours: 48 }));
+    const body = { name: "Next Sunday", ministryId: "m1", serviceDate: "2026-09-27", signupDeadlineHours: null, copyMode: "none" };
+    await (makeController(repos) as any).copy("old", { body }, {});
+    expect(repos.plan.save).toHaveBeenCalledWith(expect.objectContaining({ signupDeadlineHours: null }));
+  });
+
   // Issue #1183: copying a plan should keep its volunteer settings too.
   it("carries the previous plan's volunteer settings over when the request omits them", async () => {
     repos.plan.load = jest.fn(async () => ({ id: "old", serviceDate: new Date("2026-09-20"), showVolunteerNames: false, autoReplaceOnDecline: true }));
