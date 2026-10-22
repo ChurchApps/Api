@@ -17,7 +17,9 @@ export class EventController extends ContentBaseController {
   public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
-      return await this.repos.event.loadTimelineGroup(au.churchId, groupId, au.groupIds || [], eventIds);
+      const result = await this.repos.event.loadTimelineGroup(au.churchId, groupId, au.groupIds || [], eventIds);
+      await CalendarHelper.addExceptionDates(result, this.repos);
+      return result;
     });
   }
 
@@ -25,7 +27,9 @@ export class EventController extends ContentBaseController {
   public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
-      return await this.repos.event.loadTimeline(au.churchId, au.groupIds || [], eventIds);
+      const result = await this.repos.event.loadTimeline(au.churchId, au.groupIds || [], eventIds);
+      await CalendarHelper.addExceptionDates(result, this.repos);
+      return result;
     });
   }
 
@@ -321,7 +325,9 @@ export class EventController extends ContentBaseController {
       const existing = await this.repos.event.load(au.churchId, id);
       // CA-1: a requester may withdraw their own still-pending request.
       const isSelfCancel = !!existing && existing.requestedBy === au.personId && existing.approvalStatus === "pending";
-      if (!au.checkAccess(Permissions.content.edit) && !isSelfCancel) return this.json({}, 401);
+      const hasStaffAccess = au.checkAccess(Permissions.content.edit) || au.checkAccess(Permissions.calendars.admin);
+      const isGroupLeader = !!existing?.groupId && !!au.leaderGroupIds?.includes(existing.groupId);
+      if (!hasStaffAccess && !isGroupLeader && !isSelfCancel) return this.json({}, 401);
       else {
         await this.repos.event.delete(au.churchId, id);
         await this.repos.eventBooking.deleteForEvent(au.churchId, id);

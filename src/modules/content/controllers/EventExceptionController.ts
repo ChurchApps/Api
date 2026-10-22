@@ -16,7 +16,7 @@ export class EventExceptionController extends ContentBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, EventException[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      if (!(await this.canEdit(au, req.body))) return this.json({}, 401);
       else {
         const promises: Promise<EventException>[] = [];
         req.body.forEach((eventException) => {
@@ -32,11 +32,32 @@ export class EventExceptionController extends ContentBaseController {
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      const existing = await this.repos.eventException.load(au.churchId, id);
+      if (!(await this.canEdit(au, existing ? [existing] : []))) return this.json({}, 401);
       else {
         await this.repos.eventException.delete(au.churchId, id);
         return this.json({});
       }
     });
+  }
+
+  // Same people who can save the parent event: staff, or a leader of the event's group.
+  private async canEdit(au: any, exceptions: EventException[]): Promise<boolean> {
+    if (au.checkAccess(Permissions.content.edit) || au.checkAccess(Permissions.calendars.admin)) return true;
+    if (exceptions.length === 0) return false;
+    for (const exception of exceptions) {
+      if (exception.id) {
+        const existing = await this.repos.eventException.load(au.churchId, exception.id);
+        if (!existing || !(await this.leadsEventGroup(au, existing.eventId))) return false;
+      }
+      if (!(await this.leadsEventGroup(au, exception.eventId))) return false;
+    }
+    return true;
+  }
+
+  private async leadsEventGroup(au: any, eventId?: string): Promise<boolean> {
+    if (!eventId) return false;
+    const event = await this.repos.event.load(au.churchId, eventId);
+    return !!event?.groupId && !!au.leaderGroupIds?.includes(event.groupId);
   }
 }
