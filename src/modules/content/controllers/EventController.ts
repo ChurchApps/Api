@@ -19,7 +19,7 @@ export class EventController extends ContentBaseController {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
       const result = await this.repos.event.loadTimelineGroup(au.churchId, groupId, au.groupIds || [], eventIds);
       await CalendarHelper.addExceptionDates(result, this.repos);
-      return result;
+      return await this.dropRemovedGroupEvents(au.churchId, result);
     });
   }
 
@@ -29,7 +29,7 @@ export class EventController extends ContentBaseController {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
       const result = await this.repos.event.loadTimeline(au.churchId, au.groupIds || [], eventIds);
       await CalendarHelper.addExceptionDates(result, this.repos);
-      return result;
+      return await this.dropRemovedGroupEvents(au.churchId, result);
     });
   }
 
@@ -354,6 +354,14 @@ export class EventController extends ContentBaseController {
       }
       return result;
     });
+  }
+
+  // A stale JWT or a curated calendar can still reference a deleted (soft-removed) group (#1324).
+  private async dropRemovedGroupEvents(churchId: string, events: Event[]) {
+    const groupIds = [...new Set(events.filter((e) => e.groupId).map((e) => e.groupId))];
+    if (groupIds.length === 0) return events;
+    const activeIds = new Set(await getMembershipModuleGateway().loadActiveGroupIds(churchId, groupIds));
+    return events.filter((e) => !e.groupId || activeIds.has(e.groupId));
   }
 
   private async saveBookingsForEvent(au: any, eventId: string, roomIds: string[], resources: { resourceId: string; quantity: number }[]): Promise<EventBooking[]> {

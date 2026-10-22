@@ -3,7 +3,6 @@ import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanType } from "../models/index.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
-import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 
 @controller("/doing/planTypes")
 export class PlanTypeController extends DoingBaseController {
@@ -62,17 +61,6 @@ export class PlanTypeController extends DoingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!await PlanAuth.canEditPlanType(au, id)) return this.json({}, 401);
-      // Plans have no FK to planTypes, so deleting only the type leaves its plans (and their signups) orphaned.
-      const plans = await this.repos.plan.loadByPlanTypeId(au.churchId, id);
-      for (const plan of plans) {
-        await this.repos.planItemTime.deleteByPlanId(au.churchId, plan.id);
-        await this.repos.time.deleteByPlanId(au.churchId, plan.id);
-        await this.repos.assignment.deleteByPlanId(au.churchId, plan.id);
-        await this.repos.position.deleteByPlanId(au.churchId, plan.id);
-        await this.repos.planItem.deleteByPlanId(au.churchId, plan.id);
-        await this.repos.plan.delete(au.churchId, plan.id);
-        await InternalEventBus.publish(au.churchId, "plan.destroyed", { id: plan.id });
-      }
       await this.repos.planType.delete(au.churchId, id);
       return {};
     });

@@ -126,10 +126,14 @@ export class PlanRepo {
     return getDb().selectFrom("plans as p")
       .innerJoin("positions as pos", (join) =>
         join.onRef("pos.planId", "=", "p.id").onRef("pos.churchId", "=", "p.churchId"))
+      .leftJoin("planTypes as pt", (join) =>
+        join.onRef("pt.id", "=", "p.planTypeId").onRef("pt.churchId", "=", "p.churchId"))
       .selectAll("p")
       .distinct()
       .where("p.churchId", "=", churchId)
       .where("pos.allowSelfSignup", "=", true as any)
+      // Plans whose type was deleted are orphaned; plans that never had a type still show (#1324).
+      .where((eb) => eb.or([eb("p.planTypeId", "is", null), eb("pt.id", "is not", null)]))
       .where((eb) => eb.or([eb("p.prepared", "is", null), eb("p.prepared", "=", false as any)]))
       .where("p.serviceDate", ">=", sql`CURDATE()` as any)
       .orderBy("p.serviceDate", "asc")
