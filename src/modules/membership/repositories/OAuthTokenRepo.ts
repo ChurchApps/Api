@@ -22,6 +22,7 @@ export class OAuthTokenRepo {
       userChurchId: token.userChurchId,
       scopes: token.scopes,
       planTypeId: token.planTypeId,
+      replacedById: token.replacedById,
       expiresAt: expiresAt as any,
       createdAt: sql`NOW()` as any
     }).execute();
@@ -37,6 +38,7 @@ export class OAuthTokenRepo {
       userChurchId: token.userChurchId,
       scopes: token.scopes,
       planTypeId: token.planTypeId,
+      replacedById: token.replacedById,
       expiresAt: expiresAt as any
     }).where("id", "=", token.id).execute();
     return token;
@@ -71,7 +73,8 @@ export class OAuthTokenRepo {
         "oAuthClients.name as clientName",
         "oAuthTokens.scopes as scopes",
         "oAuthTokens.createdAt as createdAt",
-        "oAuthTokens.expiresAt as expiresAt"
+        "oAuthTokens.expiresAt as expiresAt",
+        "oAuthTokens.replacedById as replacedById"
       ])
       .orderBy("oAuthTokens.createdAt", "desc")
       .execute();
@@ -79,6 +82,16 @@ export class OAuthTokenRepo {
 
   public async delete(id: string) {
     await getDb().deleteFrom("oAuthTokens").where("id", "=", id).execute();
+  }
+
+  // Revoking a connection also revokes the rotated tokens still in their refresh grace window.
+  public async deleteWithPredecessors(id: string) {
+    let ids = [id];
+    while (ids.length > 0) {
+      const predecessors = await getDb().selectFrom("oAuthTokens").select("id").where("replacedById", "in", ids).execute();
+      await getDb().deleteFrom("oAuthTokens").where("id", "in", ids).execute();
+      ids = predecessors.map((p) => p.id);
+    }
   }
 
   public async deleteByAccessToken(accessToken: string) {

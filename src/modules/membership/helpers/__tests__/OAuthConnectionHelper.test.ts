@@ -30,3 +30,13 @@ describe("toConnections", () => {
     expect(result[0].scopes).toBe("");
   });
 });
+
+describe("toConnections refresh rotation (#1024)", () => {
+  it("hides a token kept only for the rotation grace window", () => {
+    const rows = [
+      { id: "current", clientId: "fp", clientName: "FreePlay", scopes: "", createdAt: now, expiresAt: future },
+      { id: "rotated", clientId: "fp", clientName: "FreePlay", scopes: "", createdAt: past, expiresAt: future, replacedById: "current" }
+    ];
+    expect(toConnections(rows, now).map((c) => c.id)).toEqual(["current"]);
+  });
+});

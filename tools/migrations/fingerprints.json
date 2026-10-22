@@ -817,6 +817,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-22_oauth_token_replaced_by": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "oAuthTokens",
+     "column": "replacedById",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {

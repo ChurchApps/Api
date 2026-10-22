@@ -7,6 +7,8 @@ export class OAuthToken {
   public refreshToken?: string;
   public scopes?: string;
   public planTypeId?: string;
+  // Set once this refresh token was rotated; the row then lives only for the grace window.
+  public replacedById?: string;
   public expiresAt?: Date;
   public createdAt?: Date;
 }

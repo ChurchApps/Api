@@ -10,6 +10,9 @@ import { parseScopes } from "../../../shared/auth/Scopes.js";
 import { toConnections } from "../helpers/OAuthConnectionHelper.js";
 import { isAllowedSelfRegisteredRedirect, isRegisteredRedirectUri, isS256Challenge, oauthBody, verifyS256 } from "../helpers/OAuthClientHelper.js";
 
+// How long a rotated refresh token keeps working, so a client that missed the rotation reply can retry (#1024).
+const REFRESH_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+
 function accessTokenTtl(): { jwtExpiresIn: number; expiresInSeconds: number } {
   const seconds = Environment.oauthAccessTokenSeconds > 0 ? Environment.oauthAccessTokenSeconds : 7 * 24 * 3600;
   return { jwtExpiresIn: seconds, expiresInSeconds: seconds };
@@ -168,6 +171,13 @@ export class OAuthController extends MembershipBaseController {
           await this.repos.oAuthToken.delete(oldToken.id);
           return this.json({ error: "invalid_grant" }, 400);
         }
+        // A rotated token is replayed when the client never got the reply that replaced it (a TV that lost power or
+        // Wi-Fi mid-refresh). Honor it only while that replacement is unused, and drop the replacement nobody holds.
+        if (oldToken.replacedById) {
+          const replacement = (await this.repos.oAuthToken.load(oldToken.replacedById)) as any;
+          if (replacement?.replacedById) return this.json({ error: "invalid_grant" }, 400);
+          if (replacement) await this.repos.oAuthToken.delete(replacement.id);
+        }
 
         // Fetch user/church data to generate proper JWT
         const userChurch = (await this.repos.userChurch.load(oldToken.userChurchId)) as any;
@@ -200,7 +210,11 @@ export class OAuthController extends MembershipBaseController {
         };
         await this.repos.oAuthToken.save(token);
 
-        await this.repos.oAuthToken.delete(oldToken.id);
+        // Keep the old token for one access-token lifetime instead of deleting it, so a lost reply doesn't end the pairing.
+        oldToken.replacedById = token.id;
+        const graceEnd = Date.now() + REFRESH_GRACE_MS;
+        if (!oldToken.expiresAt || new Date(oldToken.expiresAt).getTime() > graceEnd) oldToken.expiresAt = new Date(graceEnd);
+        await this.repos.oAuthToken.save(oldToken);
 
         return this.json({
           access_token: token.accessToken,
@@ -576,7 +590,7 @@ h1{font-size:24px;margin-bottom:16px}p{color:rgba(255,255,255,0.7);line-height:1
       if (!token) return this.json({}, 404);
       const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
       if (!userChurch || token.userChurchId !== userChurch.id) return this.json({}, 403);
-      await this.repos.oAuthToken.delete(id);
+      await this.repos.oAuthToken.deleteWithPredecessors(id);
       return this.json({}, 200);
     });
   }

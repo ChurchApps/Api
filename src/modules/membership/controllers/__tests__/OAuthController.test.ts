@@ -282,3 +282,113 @@ describe("OAuthController MCP connector sign-in (DCR + PKCE)", () => {
     expect(repos.oAuthCode.consume).not.toHaveBeenCalled();
   });
 });
+
+describe("OAuthController refresh rotation grace window (#1024)", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  let seq = 0;
+
+  function refreshController(rows: any[]) {
+    const helpers = jest.requireMock("../../helpers/index");
+    helpers.UniqueIdHelper.secret = () => "rt" + (++seq);
+    const { AuthenticatedUser } = jest.requireMock("../../auth/index");
+    AuthenticatedUser.getCombinedApiJwt.mockReturnValue("jwt");
+    const repos: any = {
+      oAuthClient: { loadByClientIdAndSecret: jest.fn(async () => ({ clientId: "fp", name: "FreePlay", clientSecret: "s" })), loadByClientId: jest.fn(async () => null) },
+      userChurch: { load: jest.fn(async () => ({ id: "uc1", userId: "u1", churchId: "ch1", personId: "p1" })) },
+      user: { load: jest.fn(async () => ({ id: "u1", email: "a@b.c" })) },
+      church: { loadById: jest.fn(async () => ({ id: "ch1", name: "Grace", subDomain: "grace" })) },
+      person: { loadByIdsOnly: jest.fn(async () => [{ membershipStatus: "Member" }]) },
+      groupMember: { loadForPeople: jest.fn(async () => []) },
+      oAuthToken: {
+        loadByRefreshToken: jest.fn(async (rt: string) => rows.find((r) => r.refreshToken === rt) ?? null),
+        load: jest.fn(async (id: string) => rows.find((r) => r.id === id) ?? null),
+        save: jest.fn(async (t: any) => {
+          if (!t.id) { t.id = "tok" + (++seq); rows.push({ ...t }); return t; }
+          const i = rows.findIndex((r) => r.id === t.id);
+          rows[i] = { ...t };
+          return t;
+        }),
+        delete: jest.fn(async (id: string) => { const i = rows.findIndex((r) => r.id === id); if (i >= 0) rows.splice(i, 1); })
+      }
+    };
+    const controller = new OAuthController();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    (controller as any).json = (obj: any, status: number = 200) => ({ obj, status });
+    const refresh = (rt: string) => controller.token({ body: { grant_type: "refresh_token", refresh_token: rt, client_id: "fp", client_secret: "s" } } as any, {} as any) as any;
+    return { refresh, repos };
+  }
+
+  const tvToken = () => ({ id: "tv0", clientId: "fp", userChurchId: "uc1", refreshToken: "old", scopes: "plans", planTypeId: "pt1", expiresAt: new Date(Date.now() + 80 * DAY) });
+
+  afterEach(() => jest.useRealTimers());
+
+  it("keeps the old refresh token for a short grace window instead of deleting it", async () => {
+    const rows = [tvToken()];
+    const { refresh } = refreshController(rows);
+    const result = await refresh("old");
+    expect(result.status).toBe(200);
+    expect(result.obj.refresh_token).not.toBe("old");
+    const old = rows.find((r) => r.id === "tv0");
+    expect(old).toBeTruthy();
+    expect(old.replacedById).toBe(rows.find((r) => r.refreshToken === result.obj.refresh_token).id);
+    expect(new Date(old.expiresAt).getTime()).toBeLessThanOrEqual(Date.now() + 7 * DAY + 1000);
+  });
+
+  it("lets a TV that missed the rotation reply refresh again with its old token and keeps the plan type", async () => {
+    const rows = [tvToken()];
+    const { refresh } = refreshController(rows);
+    const lost = await refresh("old");
+    const retry = await refresh("old");
+    expect(retry.status).toBe(200);
+    expect(retry.obj.plan_type_id).toBe("pt1");
+    expect(retry.obj.refresh_token).not.toBe(lost.obj.refresh_token);
+    // The reply that never arrived does not linger as a second live connection.
+    expect(rows.find((r) => r.refreshToken === lost.obj.refresh_token)).toBeUndefined();
+    expect(rows.filter((r) => !r.replacedById)).toHaveLength(1);
+    const next = await refresh(retry.obj.refresh_token);
+    expect(next.status).toBe(200);
+  });
+
+  it("refuses the old token once the token that replaced it has been used", async () => {
+    const rows = [tvToken()];
+    const { refresh } = refreshController(rows);
+    const first = await refresh("old");
+    await refresh(first.obj.refresh_token);
+    const replay = await refresh("old");
+    expect(replay.status).toBe(400);
+    expect(replay.obj.error).toBe("invalid_grant");
+  });
+
+  it("refuses the old token after the grace window", async () => {
+    const rows = [tvToken()];
+    const { refresh } = refreshController(rows);
+    await refresh("old");
+    jest.useFakeTimers({ now: Date.now() + 8 * DAY });
+    const late = await refresh("old");
+    expect(late.status).toBe(400);
+    expect(late.obj.error).toBe("invalid_grant");
+  });
+
+  it("revokes the rotated tokens along with the connection", async () => {
+    const repos: any = {
+      oAuthToken: { load: jest.fn(async () => ({ id: "tok2", userChurchId: "uc1" })), delete: jest.fn(), deleteWithPredecessors: jest.fn() },
+      userChurch: { loadByUserId: jest.fn(async () => ({ id: "uc1" })) }
+    };
+    const controller = new OAuthController();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action({ id: "u1", churchId: "ch1", checkAccess: () => true });
+    (controller as any).json = (obj: any, status: number = 200) => ({ obj, status });
+    const result: any = await controller.deleteConnection("tok2", {} as any, {} as any);
+    expect(result.status).toBe(200);
+    expect(repos.oAuthToken.deleteWithPredecessors).toHaveBeenCalledWith("tok2");
+  });
+
+  it("still refuses a refresh token past its own expiry", async () => {
+    const rows = [{ ...tvToken(), expiresAt: new Date(Date.now() - DAY) }];
+    const { refresh } = refreshController(rows);
+    const result = await refresh("old");
+    expect(result.status).toBe(400);
+    expect(result.obj.error).toBe("invalid_grant");
+  });
+});
