@@ -1,3 +1,4 @@
+jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn() } }));
 import "reflect-metadata";
 
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
@@ -186,5 +187,24 @@ describe("PlanController.getSignupPlans", () => {
     expect(loadSetting).toHaveBeenCalledWith("c1", "volunteerSignupNextOnly");
     expect(result.map((r: any) => r.plan.id)).toEqual(["a1", "b1"]);
     expect(repos.position.loadByPlanIds).toHaveBeenCalledWith("c1", ["a1", "b1"]);
+  });
+});
+
+
+describe("PlanController confirmation workflow authorization", () => {
+  it("denies issuance before calling the workflow runtime", async () => {
+    const { AssignmentWorkflowHelper } = await import("../../helpers/AssignmentWorkflowHelper.js");
+    (PlanAuth.canEditPlan as jest.Mock).mockResolvedValueOnce(false);
+    const result = await (makeController({}) as any).issueRequests("otherPlan", { body: {} }, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(AssignmentWorkflowHelper.issuePlan).not.toHaveBeenCalled();
+  });
+  it("passes the authenticated church and scoped plan to issuance", async () => {
+    const { AssignmentWorkflowHelper } = await import("../../helpers/AssignmentWorkflowHelper.js");
+    (PlanAuth.canEditPlan as jest.Mock).mockResolvedValueOnce(true);
+    (AssignmentWorkflowHelper.issuePlan as jest.Mock).mockResolvedValueOnce({ issued: 1 });
+    const repos = {};
+    expect(await (makeController(repos) as any).issueRequests("plan1", { body: { churchId: "forged" } }, {})).toEqual({ issued: 1 });
+    expect(AssignmentWorkflowHelper.issuePlan).toHaveBeenCalledWith("c1", "plan1", repos);
   });
 });

@@ -2365,6 +2365,53 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-22_assignment_confirmation_workflows": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "plans",
+     "column": "confirmationWorkflowId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "assignments",
+     "column": "confirmationWorkflowId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "workflows",
+     "column": "workflowType",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "assignmentId",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "tasks",
+     "column": "followupKey",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "tasks",
+     "index": "idx_tasks_assignment",
+     "present": true
+    },
+    {
+     "kind": "index",
+     "table": "tasks",
+     "index": "uq_tasks_followup",
+     "present": true
+    }
+   ],
+   "schemaChanges": 7
   }
  }
 }

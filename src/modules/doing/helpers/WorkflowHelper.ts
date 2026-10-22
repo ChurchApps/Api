@@ -4,6 +4,8 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { Task, Workflow, WorkflowStep, WorkflowStepRoute } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
+import { AssignmentWorkflowHelper } from "./AssignmentWorkflowHelper.js";
+import { WorkflowTemplate } from "./WorkflowTemplates.js";
 import { StepActionHelper } from "./StepActionHelper.js";
 
 interface AssignTarget {
@@ -31,6 +33,8 @@ export class WorkflowHelper {
     depth = 0
   ): Promise<Task | null> {
     const repos = await this.getRepos(repositories);
+    const workflow = await repos.workflow.load(churchId, workflowId) as Workflow;
+    if (workflow?.workflowType === AssignmentWorkflowHelper.workflowType) throw new Error("Issue serving requests from a plan to use this workflow");
     const step = stepId
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
@@ -48,6 +52,8 @@ export class WorkflowHelper {
     stepId?: string
   ): Promise<Task[]> {
     const repos = await this.getRepos(repositories);
+    const workflow = await repos.workflow.load(churchId, workflowId) as Workflow;
+    if (workflow?.workflowType === AssignmentWorkflowHelper.workflowType) throw new Error("Issue serving requests from a plan to use this workflow");
     const step = stepId
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
@@ -108,7 +114,14 @@ export class WorkflowHelper {
   public static async onStepEnter(task: Task, step: WorkflowStep, repositories?: Repos, depth = 0, suppressRoutes = false): Promise<void> {
     const repos = await this.getRepos(repositories);
 
+    if (await AssignmentWorkflowHelper.stopIfResolved(task, repos)) return;
+    if (task.assignmentId && step.workflowId !== task.workflowId) { await AssignmentWorkflowHelper.close(task, "Workflow step moved", repos); return; }
+    const cursor = task.assignmentId ? StepActionHelper.readActionCursor(task) : null;
     task.snoozedUntil = null;
+    if (task.assignmentId) {
+      task.data = JSON.stringify({ ...AssignmentWorkflowHelper.data(task), entryPending: true });
+      await repos.task.save(task);
+    }
     if (step.expectedResponseDays) task.dueDate = DateHelper.addDays(new Date(), Number(step.expectedResponseDays));
     if (!task.pinnedAssignment && !task.assignedToId && step.defaultAssignToId) {
       task.assignedToType = step.defaultAssignToType;
@@ -117,17 +130,26 @@ export class WorkflowHelper {
       await this.notifyAssignee(task, `You have been assigned a card: ${task.title || task.associatedWithLabel || ""}`);
     }
 
-    if (!step.id || suppressRoutes || depth >= WorkflowHelper.MAX_STEP_DEPTH) return;
+    if (!step.id || suppressRoutes || depth >= WorkflowHelper.MAX_STEP_DEPTH) {
+      if (task.assignmentId) task.data = JSON.stringify({ ...AssignmentWorkflowHelper.data(task), entryPending: false });
+      return;
+    }
 
     // A delay parks the card; processSnoozed resumes the rest on wake.
-    const parked = await StepActionHelper.execute(task, step, repos, 0, depth);
+    const parked = await StepActionHelper.execute(task, step, repos, cursor?.stepId === step.id ? cursor.index : 0, depth);
     if (parked) return;
 
-    await this.applyEntryRoutes(task, step, repos, depth);
+    if (task.assignmentId) task.data = JSON.stringify({ ...AssignmentWorkflowHelper.data(task), entryPending: false });
+    const advanced = await this.applyEntryRoutes(task, step, repos, depth);
+    if (task.assignmentId && !advanced && task.status === "Open" && !task.assignedToId) {
+      await AssignmentWorkflowHelper.defaultAssignee(task, repos);
+      await this.notifyAssignee(task, `Serving follow-up needs attention: ${task.title || ""}`);
+    }
   }
 
   // Returns true when a matched route advanced the card to another step.
   private static async applyEntryRoutes(task: Task, step: WorkflowStep, repos: Repos, depth: number): Promise<boolean> {
+    if (await AssignmentWorkflowHelper.stopIfResolved(task, repos)) return false;
     if (depth >= WorkflowHelper.MAX_STEP_DEPTH || !step.id) return false;
     const routes = (await repos.workflowStepRoute.loadForStep(task.churchId || "", step.id)) as WorkflowStepRoute[];
     const onEnter = routes.filter((r) => r.trigger === "onEnter");
@@ -163,6 +185,7 @@ export class WorkflowHelper {
       const route = (await repos.workflowStepRoute.load(task.churchId || "", routeId)) as WorkflowStepRoute;
       if (route && route.stepId !== task.stepId) throw new Error("Route does not belong to this card's step");
       if (route && route.targetWorkflowId && route.targetWorkflowId !== task.workflowId) {
+        if (task.assignmentId) throw new Error("Serving confirmation cannot hand off to another workflow");
         return await this.handOffToWorkflow(task, route.targetWorkflowId, repos);
       }
       if (route && route.targetStepId) return await this.moveToStep(task, route.targetStepId, repos);
@@ -171,6 +194,7 @@ export class WorkflowHelper {
   }
 
   private static async closeCard(task: Task, repos: Repos): Promise<Task> {
+    if (task.assignmentId) return AssignmentWorkflowHelper.completeHumanFollowup(task, repos);
     task.status = "Closed";
     task.dateClosed = new Date();
     return await repos.task.save(task);
@@ -230,8 +254,9 @@ export class WorkflowHelper {
     if (!source) return null;
     const steps = (await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[];
 
-    const newWorkflow = (await repos.workflow.save({ churchId, name: `${source.name || "Workflow"} (copy)`, categoryId: source.categoryId, active: source.active, sort: source.sort })) as Workflow;
+    const newWorkflow = (await repos.workflow.save({ churchId, name: `${source.name || "Workflow"} (copy)`, categoryId: source.categoryId, active: source.active, sort: source.sort, workflowType: source.workflowType })) as Workflow;
     const createdStepIds: string[] = [];
+    const stepMap = new Map<string, string>();
     try {
       for (const step of steps) {
         const newStep = (await repos.workflowStep.save({
@@ -246,10 +271,30 @@ export class WorkflowHelper {
         })) as WorkflowStep;
         if (newStep.id) createdStepIds.push(newStep.id);
         if (step.id && newStep.id) {
+          stepMap.set(step.id, newStep.id);
           const actions = (await repos.workflowStepAction.loadForStep(churchId, step.id)) as any[];
           for (const action of actions) {
             await repos.workflowStepAction.save({ churchId, stepId: newStep.id, sort: action.sort, actionType: action.actionType, config: action.config });
           }
+        }
+      }
+      if (source.workflowType === AssignmentWorkflowHelper.workflowType) {
+        for (const route of await repos.workflowStepRoute.loadForWorkflow(churchId, workflowId) as WorkflowStepRoute[]) {
+          const savedRoute = await repos.workflowStepRoute.save({
+            ...route,
+            id: undefined,
+            workflowId: newWorkflow.id,
+            stepId: stepMap.get(route.stepId),
+            targetStepId: stepMap.get(route.targetStepId) || route.targetStepId
+          });
+          const groups = await repos.conjunction.loadForStepRoute(churchId, route.id);
+          const groupMap = new Map<string, string>();
+          for (const group of groups) {
+            const saved = await repos.conjunction.save({ ...group, id: undefined, stepRouteId: savedRoute.id, parentId: undefined, conjunctions: [], conditions: [] });
+            groupMap.set(group.id, saved.id);
+          }
+          for (const group of groups) if (group.parentId) await repos.conjunction.save({ ...group, id: groupMap.get(group.id), stepRouteId: savedRoute.id, parentId: groupMap.get(group.parentId), conjunctions: [], conditions: [] });
+          for (const condition of await repos.condition.loadForStepRoute(churchId, route.id)) await repos.condition.save({ ...condition, id: undefined, conjunctionId: groupMap.get(condition.conjunctionId) });
         }
       }
     } catch (err) {
@@ -259,15 +304,21 @@ export class WorkflowHelper {
     return newWorkflow;
   }
 
-  public static async createFromTemplate(churchId: string, template: { name: string; steps: { name: string; expectedResponseDays?: number }[] }, name?: string, repositories?: Repos): Promise<Workflow> {
+  public static async createFromTemplate(churchId: string, template: WorkflowTemplate, name?: string, repositories?: Repos): Promise<Workflow> {
     const repos = await this.getRepos(repositories);
-    const workflow = (await repos.workflow.save({ churchId, name: name || template.name, active: true })) as Workflow;
+    const workflow = (await repos.workflow.save({ churchId, name: name || template.name, active: true, workflowType: template.workflowType })) as Workflow;
     const createdStepIds: string[] = [];
     try {
       let sort = 1;
       for (const step of template.steps) {
         const newStep = (await repos.workflowStep.save({ churchId, workflowId: workflow.id, name: step.name, sort: sort++, expectedResponseDays: step.expectedResponseDays })) as WorkflowStep;
         if (newStep.id) createdStepIds.push(newStep.id);
+        for (const [index, action] of (step.actions || []).entries()) {
+          await repos.workflowStepAction.save({ churchId, stepId: newStep.id, sort: index + 1, actionType: action.actionType, config: JSON.stringify(action.config || {}) });
+        }
+      }
+      for (let i = 0; i < template.steps.length - 1; i++) {
+        if (template.steps[i].advance) await repos.workflowStepRoute.save({ churchId, workflowId: workflow.id, stepId: createdStepIds[i], targetStepId: createdStepIds[i + 1], trigger: "onEnter", kind: "always", sort: 1 });
       }
     } catch (err) {
       await this.rollbackWorkflow(repos, churchId, workflow.id, createdStepIds, "createFromTemplate", err);
@@ -278,8 +329,16 @@ export class WorkflowHelper {
 
   private static async rollbackWorkflow(repos: Repos, churchId: string, workflowId: string | undefined, stepIds: string[], op: string, cause: unknown): Promise<void> {
     console.error(`[WorkflowHelper] ${op} failed; rolling back partial workflow`, cause);
+    try {
+      for (const route of await repos.workflowStepRoute.loadForWorkflow(churchId, workflowId)) {
+        for (const condition of await repos.condition.loadForStepRoute(churchId, route.id)) await repos.condition.delete(churchId, condition.id);
+        for (const group of await repos.conjunction.loadForStepRoute(churchId, route.id)) await repos.conjunction.delete(churchId, group.id);
+        await repos.workflowStepRoute.delete(churchId, route.id);
+      }
+    } catch (cleanupErr) { console.error(`[WorkflowHelper] ${op} rollback: failed to delete routes`, cleanupErr); }
     for (const id of stepIds) {
       try {
+        await repos.workflowStepAction.deleteForStep(churchId, id);
         await repos.workflowStep.delete(churchId, id);
       } catch (cleanupErr) {
         console.error(`[WorkflowHelper] ${op} rollback: failed to delete step ${id}`, cleanupErr);
@@ -298,7 +357,12 @@ export class WorkflowHelper {
     const repos = await this.getRepos(repositories);
     const overdue = (await repos.task.loadOverdueAllChurches()) as Task[];
     for (const card of overdue) {
-      await this.notifyAssignee(card, `Card overdue: ${card.title || card.associatedWithLabel || ""}`);
+      if (card.assignmentId) {
+        await repos.task.withAssignmentLock(card.churchId, card.assignmentId, async () => {
+          const current = await repos.task.load(card.churchId, card.id) as Task;
+          if (current && !await AssignmentWorkflowHelper.stopIfResolved(current, repos)) await this.notifyAssignee(current, `Card overdue: ${current.title || current.associatedWithLabel || ""}`);
+        });
+      } else await this.notifyAssignee(card, `Card overdue: ${card.title || card.associatedWithLabel || ""}`);
     }
     return overdue.length;
   }
@@ -307,6 +371,7 @@ export class WorkflowHelper {
     const repos = await this.getRepos(repositories);
     const cards = (await repos.task.loadSnoozedDueAllChurches()) as Task[];
     for (const card of cards) {
+      if (card.assignmentId) continue; // reconciled under the assignment lock below
       card.snoozedUntil = null;
       const cursor = StepActionHelper.readActionCursor(card);
       const step = card.stepId ? ((await repos.workflowStep.load(card.churchId || "", card.stepId)) as WorkflowStep) : null;
@@ -320,6 +385,7 @@ export class WorkflowHelper {
         await this.notifyAssignee(card, `Snooze ended: ${card.title || card.associatedWithLabel || ""}`);
       }
     }
+    await AssignmentWorkflowHelper.processPending(repos);
     return cards.length;
   }
 

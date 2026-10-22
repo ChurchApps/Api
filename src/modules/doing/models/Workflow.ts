@@ -5,4 +5,5 @@ export class Workflow {
   public categoryId?: string;
   public active?: boolean;
   public sort?: number;
+  public workflowType?: string | null;
 }

@@ -2,12 +2,33 @@ export interface WorkflowTemplate {
   key: string;
   name: string;
   description: string;
-  steps: { name: string; expectedResponseDays?: number }[];
+  workflowType?: string;
+  steps: { name: string; expectedResponseDays?: number; advance?: boolean; actions?: { actionType: string; config?: Record<string, unknown> }[] }[];
 }
 
 // Starter templates offered when creating a new workflow.
 export class WorkflowTemplates {
   public static readonly all: WorkflowTemplate[] = [
+    {
+      key: "assignmentConfirmation",
+      name: "Serving Assignment Confirmation",
+      workflowType: "assignmentConfirmation",
+      description: "Issue a plan's requests, follow up until each person responds, then track a human call. Select this workflow in the plan settings to opt in.",
+      steps: [
+        {
+          name: "Request and wait for response",
+          advance: true,
+          actions: [
+            { actionType: "sendAssignmentRequest", config: { channel: "email" } },
+            { actionType: "sendAssignmentRequest", config: { channel: "sms" } },
+            { actionType: "delay", config: { days: 2 } },
+            { actionType: "sendAssignmentRequest", config: { channel: "email", message: "We are still waiting for your response. Please accept or decline your serving request." } },
+            { actionType: "delay", config: { days: 1 } }
+          ]
+        },
+        { name: "Call volunteer about unanswered request", expectedResponseDays: 1 }
+      ]
+    },
     {
       key: "newVisitor",
       name: "New Visitor Follow-up",

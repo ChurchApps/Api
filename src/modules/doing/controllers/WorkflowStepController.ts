@@ -1,6 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
+import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
 import { WorkflowStep } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WorkflowHelper } from "../helpers/index.js";
@@ -45,6 +46,10 @@ export class WorkflowStepController extends DoingBaseController {
         const remaining = ((await this.repos.workflowStep.loadForWorkflow(au.churchId, step.workflowId)) as WorkflowStep[]).filter((s) => s.id !== id);
         const cards = ((await this.repos.task.loadByWorkflow(au.churchId, step.workflowId, "Open")) as any[]).filter((c) => c.stepId === id);
         for (const card of cards) {
+          if (card.assignmentId) {
+            await this.repos.task.withAssignmentLock(au.churchId, card.assignmentId, async () => { const current = await this.repos.task.load(au.churchId, card.id); if (current?.status === "Open") await AssignmentWorkflowHelper.close(current, "Workflow step removed", this.repos); });
+            continue;
+          }
           if (remaining[0]?.id) await WorkflowHelper.moveToStep(card, remaining[0].id, this.repos, true);
           else await this.repos.task.save({ ...card, status: "Closed", dateClosed: new Date() });
         }

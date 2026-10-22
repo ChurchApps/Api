@@ -1,6 +1,8 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
+import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
+import { StepActionHelper } from "../helpers/StepActionHelper.js";
 import { Task } from "../models/index.js";
 import { WorkflowHelper, DirectoryUpdateHelper, AccountDeletionHelper } from "../helpers/index.js";
 import { Permissions, TaskAuth } from "../../../shared/helpers/index.js";
@@ -136,6 +138,33 @@ export class TaskController extends DoingBaseController {
             return this.json({ message: "Account deletion requests must be decided from the review action" }, 400);
           }
         }
+        if (task.id) {
+          const linked = await this.repos.task.load(au.churchId, task.id) as Task;
+          if (linked?.assignmentId) {
+            if (linked.workflowId) return this.json({ message: "Workflow cards must use the card endpoints" }, 400);
+            const saved = await this.repos.task.withAssignmentLock(au.churchId, linked.assignmentId, async () => {
+              const card = await this.repos.task.loadByFollowupKey(au.churchId, linked.assignmentId) as Task;
+              if (card && await AssignmentWorkflowHelper.stopIfResolved(card, this.repos)) return this.repos.task.load(au.churchId, linked.id);
+              if (task.status && task.status !== linked.status) StepActionHelper.appendHistory(linked, `Human follow-up marked ${task.status}`);
+              // Keep request identity/history server-owned while allowing the normal task editor.
+              return this.repos.task.save({
+                ...linked,
+                title: task.title ?? linked.title,
+                status: task.status ?? linked.status,
+                assignedToType: task.assignedToType ?? linked.assignedToType,
+                assignedToId: task.assignedToId ?? linked.assignedToId,
+                assignedToLabel: task.assignedToLabel ?? linked.assignedToLabel,
+                dateClosed: task.status === "Closed" ? new Date() : linked.dateClosed
+              });
+            });
+            if (saved) {
+              await InternalEventBus.publish(au.churchId, "task.updated", saved);
+              result.push(saved);
+            }
+            continue;
+          }
+        }
+        if (task.assignmentId || task.followupKey) return this.json({ message: "Serving confirmation links are managed by the workflow" }, 400);
         task.churchId = au.churchId;
         if (type === "directoryUpdate") await DirectoryUpdateHelper.handleDirectoryUpdate(au.churchId, task);
         const saved = await this.repos.task.save(task);
@@ -215,7 +244,7 @@ export class TaskController extends DoingBaseController {
           skipped.push(ids[i]);
           continue;
         }
-        if ((await op(task)) === null) {
+        if ((await this.assignmentOperation(task, op)) === null) {
           skipped.push(ids[i]);
           continue;
         }
@@ -225,13 +254,22 @@ export class TaskController extends DoingBaseController {
     });
   }
 
+  private async assignmentOperation(task: Task, op: (task: Task) => Promise<Task | null>): Promise<Task | null> {
+    if (!task.assignmentId) return op(task);
+    return this.repos.task.withAssignmentLock(task.churchId, task.assignmentId, async () => {
+      const current = await this.repos.task.load(task.churchId, task.id) as Task;
+      if (!current || await AssignmentWorkflowHelper.stopIfResolved(current, this.repos)) return current;
+      return op(current);
+    });
+  }
+
   // Single-card analogue of bulkApply: load, enforce per-card edit permission, run op.
   private async withCard(req: express.Request, res: express.Response, id: string, op: (task: Task) => Promise<any>): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const task = (await this.repos.task.load(au.churchId, id)) as Task;
       if (!task) return this.json({}, 404);
       if (!this.canEditCard(au, task)) return this.json({}, 401);
-      return await op(task);
+      return await this.assignmentOperation(task, op);
     });
   }
 

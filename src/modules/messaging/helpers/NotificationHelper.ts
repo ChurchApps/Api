@@ -23,6 +23,7 @@ export interface NotificationDebugTrace {
 
 export interface CreateNotificationOptions {
   deliveryStartLevel?: number;
+  appOnly?: boolean; // app alert whose confirmation workflow owns email/SMS
   deliveryTitle?: string;
   navData?: Record<string, unknown>;
   category?: string; // preference opt-out axis (architecture §2.6); derived if omitted
@@ -704,7 +705,7 @@ export class NotificationHelper {
           const deliveryMethod = await NotificationHelper.attemptDeliveryWithEscalation(
             n.churchId,
             n.personId,
-            options?.deliveryStartLevel ?? 0,
+            options?.appOnly ? 1 : (options?.deliveryStartLevel ?? 0),
             options?.deliveryTitle || title,
             n.message,
             "notification",
@@ -713,7 +714,7 @@ export class NotificationHelper {
             n.category
           );
 
-          notification.deliveryMethod = deliveryMethod;
+          notification.deliveryMethod = options?.appOnly ? "complete" : deliveryMethod;
           // Muted rows parked: isNew=false keeps out of badge counts and stops escalation.
           if (deliveryMethod === "muted") notification.isNew = false;
           await NotificationHelper.repos.notification.save(notification);
@@ -770,6 +771,27 @@ export class NotificationHelper {
       else await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", false, email, String(e));
     }
   };
+
+  // A durable workflow owns dedup and response-aware retries. Send one gated email
+  // attempt here, without leaving an unread/digest queue entry after the request ends.
+  static async sendWorkflowEmail(churchId: string, personId: string, taskId: string, email: string, subject: string, html: string): Promise<string> {
+    this.ensureInitialized();
+    if (!(await this.peopleInChurch(churchId, [personId])).includes(personId)) return "skipped (person is not in this church)";
+    const pref = await this.repos.notificationPreference.loadByPersonId(churchId, personId);
+    const overrides = await this.repos.notificationPreferenceOverride.loadForPerson(churchId, personId);
+    const gate = PreferenceGateHelper.evaluate(churchId, personId, "serving_schedule", "email", { pref, overrides });
+    if (!gate.allow) return `skipped (${gate.reason || gate.decision})`;
+    const reservation = await ChurchEmailLimiter.reserve(churchId, "workflowEmail", [{ address: email, personId, contentId: taskId }]);
+    if (!reservation) return "blocked (church email approval or daily limit)";
+    try {
+      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
+      await ChurchEmailLimiter.settle(churchId, reservation[0], true);
+      return "sent";
+    } catch (err) {
+      await ChurchEmailLimiter.settle(churchId, reservation[0], false, String(err));
+      throw err;
+    }
+  }
 
   // Legacy push paths (§4.5) route through gate so opt-outs/master-mute/quiet-hours honored.
   private static pushAllowed = async (churchId: string, personId: string, category: string): Promise<boolean> => {

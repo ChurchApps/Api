@@ -1,6 +1,7 @@
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import { UniqueIdHelper } from "@churchapps/apihelper";
+import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { MatrixEmailHelper } from "../helpers/MatrixEmailHelper.js";
 import { MatrixTextHelper } from "../helpers/MatrixTextHelper.js";
@@ -50,6 +51,16 @@ export class PlanController extends DoingBaseController {
       if (!au.checkAccess(Permissions.texting.send) || !await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
       const rows = (await this.repos.assignment.loadOverviewByDateRange(au.churchId, startDate, endDate, ministryId, planTypeId)) as any[];
       return await MatrixTextHelper.preview(au.churchId, rows);
+    });
+  }
+
+  @httpGet("/confirmationWorkflows")
+  public async confirmationWorkflows(req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const ministryId = typeof req.query.ministryId === "string" ? req.query.ministryId : undefined;
+      if (!await PlanAuth.canEditMinistry(au, ministryId)) return this.json({}, 401);
+      return (await this.repos.workflow.loadAll(au.churchId)).filter((w) => w.active && w.workflowType === AssignmentWorkflowHelper.workflowType)
+        .map((w) => ({ id: w.id, name: w.name }));
     });
   }
 
@@ -309,6 +320,14 @@ export class PlanController extends DoingBaseController {
     });
   }
 
+  @httpPost("/:id/issueRequests")
+  public async issueRequests(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!await PlanAuth.canEditPlan(au, id)) return this.json({}, 401);
+      return AssignmentWorkflowHelper.issuePlan(au.churchId, id, this.repos);
+    });
+  }
+
   @httpPost("/copy/:id")
   public async copy(@requestParam("id") id: string, req: express.Request<{}, {}, Plan & { copyMode?: string; copyServiceOrder?: boolean; targetPlanId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -338,6 +357,8 @@ export class PlanController extends DoingBaseController {
         p.signupDeadlineHours ??= oldPlan.signupDeadlineHours;
         p.showVolunteerNames ??= oldPlan.showVolunteerNames;
         p.autoReplaceOnDecline ??= oldPlan.autoReplaceOnDecline;
+        if (p.confirmationWorkflowId === undefined) p.confirmationWorkflowId = oldPlan.confirmationWorkflowId;
+        if (p.confirmationWorkflowId) await AssignmentWorkflowHelper.validateWorkflow(au.churchId, p.confirmationWorkflowId, this.repos);
         plan = await this.repos.plan.save(p);
       }
 
@@ -375,6 +396,7 @@ export class PlanController extends DoingBaseController {
       for (const plan of plans) {
         const existing: any = plan.id ? await this.repos.plan.load(au.churchId, plan.id) : null;
         if (existing && !await PlanAuth.canEditMinistry(au, existing.ministryId)) return this.json({}, 401);
+        if (plan.confirmationWorkflowId && plan.confirmationWorkflowId !== existing?.confirmationWorkflowId) await AssignmentWorkflowHelper.validateWorkflow(au.churchId, plan.confirmationWorkflowId, this.repos);
         if ((plan.ministryId || !existing) && !await PlanAuth.canEditMinistry(au, plan.ministryId)) return this.json({}, 401);
       }
 

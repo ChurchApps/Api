@@ -1,6 +1,7 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
+import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
 import { Workflow } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { WorkflowHelper, WorkflowTemplates } from "../helpers/index.js";
@@ -52,6 +53,7 @@ export class WorkflowController extends DoingBaseController {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
       const template = WorkflowTemplates.get(req.body.templateKey);
       if (!template) return this.json({}, 404);
+      if (template.workflowType === "assignmentConfirmation" && !au.checkAccess(Permissions.texting.send)) return this.json({ message: "The confirmation template includes SMS and requires texting permission" }, 401);
       return await WorkflowHelper.createFromTemplate(au.churchId, template, req.body.name, this.repos);
     });
   }
@@ -70,6 +72,13 @@ export class WorkflowController extends DoingBaseController {
   public async save(req: express.Request<{}, {}, Workflow[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
+      for (const workflow of req.body) {
+        if (workflow.workflowType && workflow.workflowType !== "assignmentConfirmation") return this.json({ message: "Invalid workflow type" }, 400);
+        if (workflow.id) {
+          const existing = await this.repos.workflow.load(au.churchId, workflow.id);
+          if ((existing?.workflowType || "") !== (workflow.workflowType || "")) return this.json({ message: "Workflow type cannot be changed" }, 400);
+        }
+      }
       const promises: Promise<Workflow>[] = [];
       req.body.forEach((workflow) => {
         workflow.churchId = au.churchId;
@@ -95,7 +104,10 @@ export class WorkflowController extends DoingBaseController {
         await this.repos.workflowStepAction.deleteForStep(au.churchId, step.id);
         await this.repos.workflowStep.delete(au.churchId, step.id);
       }
-      for (const card of cards) await this.repos.task.save({ ...card, status: "Closed", dateClosed: new Date() });
+      for (const card of cards) {
+        if (card.assignmentId) await this.repos.task.withAssignmentLock(au.churchId, card.assignmentId, async () => { const current = await this.repos.task.load(au.churchId, card.id); if (current?.status === "Open") await AssignmentWorkflowHelper.close(current, "Workflow removed", this.repos); });
+        else await this.repos.task.save({ ...card, status: "Closed", dateClosed: new Date() });
+      }
       await this.repos.workflow.delete(au.churchId, id);
       return {};
     });

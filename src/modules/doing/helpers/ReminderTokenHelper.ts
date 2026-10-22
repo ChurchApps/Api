@@ -5,11 +5,14 @@ import { Environment } from "../../../shared/helpers/Environment.js";
 
 export type ReminderAction = "accept" | "decline";
 
+export interface ReminderRequestContext { personId: string; positionId: string; planId: string; serviceDate: string }
+
 interface TokenPayload {
   a: string; // assignmentId
   c: string; // churchId
   act: ReminderAction;
   exp: number; // epoch seconds
+  request?: ReminderRequestContext;
 }
 
 const b64url = (buf: Buffer | string): string => Buffer.from(buf).toString("base64url");
@@ -21,13 +24,13 @@ const secret = (): string => {
 const sign = (data: string): string => crypto.createHmac("sha256", secret()).update(data).digest("base64url");
 
 export class ReminderTokenHelper {
-  public static create(assignmentId: string, churchId: string, action: ReminderAction, expiresAt: Date): string {
-    const payload: TokenPayload = { a: assignmentId, c: churchId, act: action, exp: Math.floor(expiresAt.getTime() / 1000) };
+  public static create(assignmentId: string, churchId: string, action: ReminderAction, expiresAt: Date, request?: ReminderRequestContext): string {
+    const payload: TokenPayload = { a: assignmentId, c: churchId, act: action, exp: Math.floor(expiresAt.getTime() / 1000), ...(request ? { request } : {}) };
     const body = b64url(JSON.stringify(payload));
     return `${body}.${sign(body)}`;
   }
 
-  public static verify(token: string | undefined): { assignmentId: string; churchId: string; action: ReminderAction } | null {
+  public static verify(token: string | undefined): { assignmentId: string; churchId: string; action: ReminderAction; request?: ReminderRequestContext } | null {
     if (!token || typeof token !== "string" || !Environment.jwtSecret) return null;
     const [body, sig] = token.split(".");
     if (!body || !sig) return null;
@@ -41,7 +44,7 @@ export class ReminderTokenHelper {
       const payload = JSON.parse(Buffer.from(body, "base64url").toString()) as TokenPayload;
       if (!payload.a || !payload.c || (payload.act !== "accept" && payload.act !== "decline")) return null;
       if (!payload.exp || payload.exp * 1000 < Date.now()) return null;
-      return { assignmentId: payload.a, churchId: payload.c, action: payload.act };
+      return { assignmentId: payload.a, churchId: payload.c, action: payload.act, ...(payload.request ? { request: payload.request } : {}) };
     } catch {
       return null;
     }

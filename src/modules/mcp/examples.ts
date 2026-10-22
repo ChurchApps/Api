@@ -24,6 +24,33 @@ export interface EndpointExample {
 }
 
 const EXAMPLES: Record<string, EndpointExample> = {
+  "POST /doing/workflows/fromTemplate": {
+    summary: "Create an editable workflow from a template. assignmentConfirmation supplies an opt-in serving request sequence.",
+    requestBody: { templateKey: "assignmentConfirmation", name: "Serving confirmation" },
+    notes: "Requires Tasks Admin; the confirmation template includes SMS and also requires Texting Send permission. Creating the template sends nothing. Edit its steps, default call assignee, actions and person-based routes before selecting it on a plan."
+  },
+  "GET /doing/plans/confirmationWorkflows": {
+    summary: "List active assignment confirmation workflows available to a plan editor. Supply ?ministryId=<ministryId>.",
+    responseSample: [{ id: "workflow1", name: "Serving confirmation" }],
+    notes: "Scoped to the authenticated church and ministry edit permission. Select an id as the plan's confirmationWorkflowId; null opts out for future requests. Saving a plan does not issue requests."
+  },
+  "POST /doing/plans/:id/issueRequests": {
+    summary: "Issue new unconfirmed requests from a published plan using its selected confirmation workflow.",
+    requestBody: {},
+    responseSample: { issued: 1 },
+    notes: "This command can send app alerts, email and opted-in SMS. Requires plan/ministry edit permission. Read the plan, its assignments and the selected workflow first. Drafts, past response deadlines, and invalid workflows are rejected. Already notified/imported requests are not retroactively enrolled. Retries do not create a second case for the same assignment.",
+    guidance: {
+      requiredDiscovery: ["Read the plan and assignment statuses; verify prepared is false and confirmationWorkflowId is the intended active assignmentConfirmation workflow.", "Review workflow actions, delays and the default human assignee before issuing."],
+      importantFields: { assignmentId: "Each card tracks one request, even when a person has multiple roles or services.", notified: "Issuance marker; reading an alert does not accept the assignment." },
+      verifyAfter: ["Read the workflow board and inspect each card's assignment context and delivery history. Blocked/skipped delivery remains on the card.", "Accepted/Declined closes the confirmation case; an unanswered deadline creates a human review task. The serving status remains Unconfirmed until a real response or coordinator edit."],
+      relatedEndpoints: ["GET /doing/plans/:id", "GET /doing/assignments/plan/:planId", "GET /doing/tasks/board/:workflowId", "GET /doing/plans/confirmationWorkflows"]
+    }
+  },
+  "POST /doing/workflowStepActions": {
+    summary: "Configure automated actions on an existing workflow step. Serving confirmation uses sendAssignmentRequest for response-aware email/SMS.",
+    requestBody: [{ stepId: "step1", sort: 1, actionType: "sendAssignmentRequest", config: "{\"channel\":\"email\",\"message\":\"Please confirm {{positionName}} for {{serviceDate}}.\"}" }],
+    notes: "Tasks Admin is required; channel=sms also requires Texting Send. config is a JSON string. sendAssignmentRequest requires an assignmentConfirmation workflow. Generic sendText/sendEmail and workflow handoffs are rejected for these workflows. Member preferences, explicit SMS opt-in, provider availability and email approval/rate limits apply. Wait actions use days; createTask supports title, assignee, description and dueDays."
+  },
   "GET /membership/people": {
     summary: "List people in the current church. Supports ?firstName=, ?lastName=, ?email= filters.",
     responseSample: [{ id: "abc123", firstName: "Jane", lastName: "Doe", contactInfo: { email: "jane@example.com" } }]

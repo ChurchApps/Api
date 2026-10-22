@@ -45,3 +45,15 @@ describe("MCP Groups, Serving, and Events guidance", () => {
     );
   });
 });
+
+
+describe("MCP serving confirmation guidance", () => {
+  it("distinguishes configuration from issuance and documents response-aware tracking", () => {
+    expect(lookupExample("POST", "/doing/workflows/fromTemplate")?.notes).toContain("sends nothing");
+    const issue = lookupExample("POST", "/doing/plans/:id/issueRequests");
+    expect(issue?.notes).toContain("can send");
+    expect(issue?.notes).toContain("Drafts");
+    expect(issue?.guidance?.verifyAfter).toEqual(expect.arrayContaining([expect.stringContaining("Unconfirmed")]));
+    expect(lookupExample("POST", "/doing/workflowStepActions")?.notes).toContain("explicit SMS opt-in");
+  });
+});

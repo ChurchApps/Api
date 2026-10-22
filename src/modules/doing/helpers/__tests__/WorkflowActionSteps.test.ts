@@ -1,3 +1,4 @@
+jest.mock("../AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", stopIfResolved: jest.fn(async () => false), processPending: jest.fn(async () => 0) } }));
 /** Tests on-enter actions + drip (delay+resume); mocks avoid external deps; repos passed explicitly. */
 
 jest.mock("@churchapps/apihelper", () => ({
@@ -35,6 +36,7 @@ function buildRepos(steps: FakeStep[], actionsByStep: Record<string, any[]>, rou
   const stepsById: Record<string, FakeStep> = {};
   steps.forEach((s) => { stepsById[s.id] = s; });
   return {
+    workflow: { load: jest.fn(async () => null) },
     workflowStepAction: { loadForStep: jest.fn(async (_c: string, stepId: string) => actionsByStep[stepId] || []) },
     workflowStep: {
       load: jest.fn(async (_c: string, id: string) => stepsById[id] || null),

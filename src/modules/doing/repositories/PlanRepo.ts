@@ -31,6 +31,7 @@ export class PlanRepo {
       showVolunteerNames: model.showVolunteerNames,
       prepared: model.prepared,
       autoReplaceOnDecline: model.autoReplaceOnDecline,
+      confirmationWorkflowId: model.confirmationWorkflowId,
       lastAutofillRunId: model.lastAutofillRunId
     }).execute();
     return model;
@@ -54,6 +55,7 @@ export class PlanRepo {
       showVolunteerNames: model.showVolunteerNames,
       prepared: model.prepared,
       autoReplaceOnDecline: model.autoReplaceOnDecline,
+      confirmationWorkflowId: model.confirmationWorkflowId,
       lastAutofillRunId: model.lastAutofillRunId
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
