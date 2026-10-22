@@ -34,8 +34,9 @@ export class AttendanceRepo {
     return rows.rows;
   }
 
-  public async loadForPerson(churchId: string, personId: string) {
-    const rows = await sql<any>`SELECT v.visitDate, v.checkinTime, c.id as campusId, c.name as campusName, ser.id as serviceId, ser.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName, s.groupId FROM visits v INNER JOIN visitSessions vs on vs.visitId = v.id INNER JOIN sessions s on s.id = vs.sessionId LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId LEFT OUTER JOIN services ser on ser.Id = st.serviceId LEFT OUTER JOIN campuses c on c.id = ser.campusId WHERE v.churchId=${churchId} AND v.PersonId = ${personId} ORDER BY v.visitDate desc, c.name, ser.name, st.name`.execute(getDb());
+  public async loadForPerson(churchId: string, personId: string, since?: Date) {
+    const sinceFilter = since ? sql`AND v.visitDate >= ${DateHelper.toMysqlDate(since)}` : sql``;
+    const rows = await sql<any>`SELECT v.visitDate, v.checkinTime, c.id as campusId, c.name as campusName, ser.id as serviceId, ser.name as serviceName, st.id as serviceTimeId, st.name as serviceTimeName, s.groupId FROM visits v INNER JOIN visitSessions vs on vs.visitId = v.id INNER JOIN sessions s on s.id = vs.sessionId LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId LEFT OUTER JOIN services ser on ser.Id = st.serviceId LEFT OUTER JOIN campuses c on c.id = ser.campusId WHERE v.churchId=${churchId} AND v.PersonId = ${personId} ${sinceFilter} ORDER BY v.visitDate desc, c.name, ser.name, st.name`.execute(getDb());
     return rows.rows;
   }
 

@@ -76,6 +76,20 @@ export class FormSubmissionRepo {
       .execute();
   }
 
+  public async loadForSubmitter(churchId: string, personId: string) {
+    return getDb().selectFrom("formSubmissions as fs")
+      .innerJoin("forms as f", (join) => join.onRef("f.id", "=", "fs.formId").onRef("f.churchId", "=", "fs.churchId"))
+      .selectAll("fs")
+      .select("f.name as formName")
+      .where("fs.churchId", "=", churchId)
+      .where("fs.submittedBy", "=", personId)
+      .where("f.removed", "=", false as any)
+      .where("f.contentType", "=", "form")
+      .orderBy("fs.submissionDate", "desc")
+      .limit(50)
+      .execute();
+  }
+
   public saveAll(models: FormSubmission[]) {
     const promises: Promise<FormSubmission>[] = [];
     models.forEach((model) => { promises.push(this.save(model)); });
@@ -87,7 +101,7 @@ export class FormSubmissionRepo {
   }
 
   protected rowToModel(row: any): FormSubmission {
-    return {
+    const result: FormSubmission = {
       id: row.id,
       churchId: row.churchId,
       formId: row.formId,
@@ -98,6 +112,8 @@ export class FormSubmissionRepo {
       revisionDate: row.revisionDate,
       revisedBy: row.revisedBy
     };
+    if (row.formName !== undefined) result.form = { id: row.formId, name: row.formName };
+    return result;
   }
 
   public convertToModel(_churchId: string, data: any) {
