@@ -5,6 +5,7 @@ import express from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { buildMcpServer } from "./McpServer.js";
 import { LoginRateLimiter } from "../membership/helpers/LoginRateLimiter.js";
+import { protectedResourceMetadataUrl } from "./OAuthMetadata.js";
 
 @controller("/mcp")
 export class McpController extends BaseHttpController {
@@ -12,6 +13,9 @@ export class McpController extends BaseHttpController {
   public async handle(req: express.Request, res: express.Response): Promise<void> {
     const churchId = (this.httpContext?.user as any)?.details?.churchId;
     if (!churchId) {
+      // Points OAuth-capable clients (claude.ai, ChatGPT) at the sign-in discovery document.
+      res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${protectedResourceMetadataUrl()}"`);
+      res.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate");
       res.status(401).json({ error: "Unauthorized — MCP requires a valid bearer token (cak_* API key or JWT)." });
       return;
     }

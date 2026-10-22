@@ -19,6 +19,7 @@ export class OAuthClientRepo {
       clientSecret: client.clientSecret,
       redirectUris: client.redirectUris,
       scopes: client.scopes,
+      selfRegistered: client.selfRegistered ? true : false,
       createdAt: sql`NOW()` as any
     }).execute();
     return client;
