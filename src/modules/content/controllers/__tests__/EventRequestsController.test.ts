@@ -4,7 +4,7 @@ jest.mock("ics", () => ({ createEvents: jest.fn() }));
 jest.mock("../../helpers/index", () => ({
   CalendarHelper: { addExceptionDates: jest.fn() },
   HolidayHelper: { getHolidays: jest.fn() },
-  Permissions: { content: { edit: "contentEdit" } }
+  Permissions: { content: { edit: "contentEdit" }, calendars: { admin: "calendarsAdmin" } }
 }));
 jest.mock("../../helpers/ApprovalHelper", () => ({ ApprovalHelper: { determineStatus: jest.fn(() => "pending") } }));
 jest.mock("../../helpers/ConflictHelper", () => ({ ConflictHelper: { findConflicts: jest.fn() } }));
