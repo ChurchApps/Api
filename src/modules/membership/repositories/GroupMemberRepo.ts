@@ -147,6 +147,7 @@ export class GroupMemberRepo {
       .selectAll("gm")
       .select(["g.name", "g.tags"])
       .where("gm.personId", "in", peopleIds)
+      .where("g.removed", "=", false as any)
       .execute();
   }
 

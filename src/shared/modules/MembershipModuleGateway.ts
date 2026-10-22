@@ -51,6 +51,7 @@ export interface MembershipModuleGateway {
   loadListMemberPersonIds(churchId: string, listId: string): Promise<string[]>;
   loadSetting(churchId: string, keyName: string): Promise<string | null>;
   loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]>;
+  loadActiveGroupIds(churchId: string, ids: string[]): Promise<string[]>;
   loadHouseholdAdults(churchId: string, personIds: string[]): Promise<HouseholdAdult[]>;
   anonymizePerson(churchId: string, personId: string): Promise<void>;
 }
@@ -356,6 +357,17 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
       .where("keyName", "=", keyName)
       .executeTakeFirst();
     return (row?.value as string) ?? null;
+  }
+
+  public async loadActiveGroupIds(churchId: string, ids: string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const rows = (await this.getDb().selectFrom("groups")
+      .select(["id"])
+      .where("churchId", "=", churchId)
+      .where("id", "in", ids)
+      .where("removed", "=", false as any)
+      .execute()) as any[];
+    return rows.map((r) => r.id);
   }
 
   public async loadGroupsForCheckin(churchId: string, groupIds: string[]): Promise<CheckinGroup[]> {

@@ -10,7 +10,8 @@ jest.mock("../../helpers/ApprovalHelper", () => ({ ApprovalHelper: { determineSt
 jest.mock("../../helpers/ConflictHelper", () => ({ ConflictHelper: { findConflicts: jest.fn() } }));
 jest.mock("../../helpers/IcsHelper", () => ({ IcsHelper: { parseEvents: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
-jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadGroupMembersForPerson: jest.fn(async () => []) }) }));
+const mockGateway = { loadGroupMembersForPerson: jest.fn(async () => []), loadActiveGroupIds: jest.fn(async (_c: string, ids: string[]) => ids) };
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => mockGateway }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import { EventController } from "../EventController.js";
@@ -54,6 +55,51 @@ describe("issue 1321: Me page timeline carries deleted occurrences", () => {
     const c = wire(new EventController(), makeRepos());
     const result = await c.getPostsForGroup("g1", { query: {} }, {});
     expect(result[0].exceptionDates).toEqual(["2026-10-25"]);
+  });
+});
+
+describe("issue 1324: Me page timeline hides events of a deleted group", () => {
+  const removedEvent = { id: "e2", churchId: "c1", groupId: "gRemoved" };
+  const churchEvent = { id: "e3", churchId: "c1" };
+
+  function timelineRepos() {
+    const repos = makeRepos();
+    const rows = () => [{ ...groupEvent }, { ...removedEvent }, { ...churchEvent }];
+    repos.event.loadTimeline = jest.fn(async () => rows()) as any;
+    repos.event.loadTimelineGroup = jest.fn(async () => rows()) as any;
+    return repos;
+  }
+
+  beforeEach(() => mockGateway.loadActiveGroupIds.mockImplementation(async (_c: string, ids: string[]) => ids.filter((id) => id !== "gRemoved")));
+  afterEach(() => mockGateway.loadActiveGroupIds.mockImplementation(async (_c: string, ids: string[]) => ids));
+
+  it("GET /timeline drops the removed group's event and keeps active-group and church events", async () => {
+    const c = wire(new EventController(), timelineRepos());
+    const result = await c.getPosts({ query: {} }, {});
+    expect(result.map((e: any) => e.id)).toEqual(["e1", "e3"]);
+    expect(mockGateway.loadActiveGroupIds).toHaveBeenCalledWith("c1", ["g1", "gRemoved"]);
+  });
+
+  it("GET /timeline/group/:groupId drops the removed group's event", async () => {
+    const c = wire(new EventController(), timelineRepos());
+    const result = await c.getPostsForGroup("g1", { query: {} }, {});
+    expect(result.map((e: any) => e.id)).toEqual(["e1", "e3"]);
+  });
+
+  it("keeps only groupless events when no group is active", async () => {
+    mockGateway.loadActiveGroupIds.mockImplementation(async () => []);
+    const c = wire(new EventController(), timelineRepos());
+    const result = await c.getPosts({ query: {} }, {});
+    expect(result.map((e: any) => e.id)).toEqual(["e3"]);
+  });
+
+  it("skips the group lookup when the timeline is empty", async () => {
+    mockGateway.loadActiveGroupIds.mockClear();
+    const repos = makeRepos();
+    repos.event.loadTimeline = jest.fn(async () => []) as any;
+    const c = wire(new EventController(), repos);
+    expect(await c.getPosts({ query: {} }, {})).toEqual([]);
+    expect(mockGateway.loadActiveGroupIds).not.toHaveBeenCalled();
   });
 });
 

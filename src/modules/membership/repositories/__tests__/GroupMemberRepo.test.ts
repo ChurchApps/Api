@@ -102,3 +102,17 @@ describe("GroupMemberRepo.isPublicGroupLeader", () => {
     expect(await new GroupMemberRepo().isPublicGroupLeader("c1", "p9", "g1")).toBe(false);
   });
 });
+
+// Issue #1324: removed groups leaked into JWT/API-key groupIds, so their events kept showing in the PWA.
+describe("GroupMemberRepo.loadForPeople", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("excludes memberships of removed groups", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new GroupMemberRepo().loadForPeople(["p1"]);
+    const wheres = whereCalls(calls);
+    expect(wheres.some((c) => c.args[0] === "gm.personId" && c.args[1] === "in")).toBe(true);
+    expect(wheres.some((c) => c.args[0] === "g.removed" && c.args[2] === false)).toBe(true);
+  });
+});
