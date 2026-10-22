@@ -7,5 +7,7 @@ export class OAuthCode {
   public redirectUri?: string;
   public expiresAt?: Date;
   public scopes?: string;
+  public codeChallenge?: string;
+  public codeChallengeMethod?: string;
   public createdAt?: Date;
 }

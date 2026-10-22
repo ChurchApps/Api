@@ -2,12 +2,13 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { LoginUserChurch, OAuthClient, OAuthCode, OAuthToken, OAuthDeviceCode, OAuthRelaySession } from "../models/index.js";
-import { Permissions, UniqueIdHelper, UserHelper } from "../helpers/index.js";
+import { LoginRateLimiter, Permissions, PublicPersonRateLimiter, UniqueIdHelper, UserHelper } from "../helpers/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { OAuthDeviceCodeRepo, OAuthRelaySessionRepo } from "../repositories/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { parseScopes } from "../../../shared/auth/Scopes.js";
 import { toConnections } from "../helpers/OAuthConnectionHelper.js";
+import { isAllowedSelfRegisteredRedirect, isRegisteredRedirectUri, isS256Challenge, oauthBody, verifyS256 } from "../helpers/OAuthClientHelper.js";
 
 function accessTokenTtl(): { jwtExpiresIn: number; expiresInSeconds: number } {
   const seconds = Environment.oauthAccessTokenSeconds > 0 ? Environment.oauthAccessTokenSeconds : 7 * 24 * 3600;
@@ -35,14 +36,18 @@ export class OAuthController extends MembershipBaseController {
 
   // authz-exempt: self-service — issues an auth code for the caller's own userChurch (loadByUserId(au.id, au.churchId)); user consents on their own behalf
   @httpPost("/authorize")
-  public async authorize(req: express.Request<{}, {}, { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string }>, res: express.Response): Promise<any> {
+  public async authorize(req: express.Request<{}, {}, { client_id: string; redirect_uri: string; response_type: string; scope: string; state?: string; code_challenge?: string; code_challenge_method?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const { client_id, redirect_uri, response_type, scope, state } = req.body;
+      const { client_id, redirect_uri, response_type, scope, state, code_challenge, code_challenge_method } = req.body;
 
       const client = (await this.repos.oAuthClient.loadByClientId(client_id)) as any;
       if (!client) return this.json({ error: "invalid_client" }, 400);
-      if (!client.redirectUris?.includes(redirect_uri)) return this.json({ error: "invalid_redirect_uri" }, 400);
+      if (!isRegisteredRedirectUri(client.redirectUris, redirect_uri)) return this.json({ error: "invalid_redirect_uri" }, 400);
       if (response_type !== "code") return this.json({ error: "unsupported_response_type" }, 400);
+      // Clients without a secret can only prove they started the sign-in through PKCE.
+      if (code_challenge) {
+        if (code_challenge_method !== "S256" || !isS256Challenge(code_challenge)) return this.json({ error: "invalid_request", error_description: "code_challenge must be S256" }, 400);
+      } else if (!client.clientSecret) return this.json({ error: "invalid_request", error_description: "code_challenge required" }, 400);
 
       const userChurch = (await this.repos.userChurch.loadByUserId(au.id, au.churchId)) as any;
       if (!userChurch) return this.json({ error: "access_denied" }, 400);
@@ -53,6 +58,8 @@ export class OAuthController extends MembershipBaseController {
         code: UniqueIdHelper.secret(),
         redirectUri: redirect_uri,
         scopes: scope,
+        codeChallenge: code_challenge || undefined,
+        codeChallengeMethod: code_challenge ? "S256" : undefined,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
       };
       await this.repos.oAuthCode.save(authCode);
@@ -77,21 +84,22 @@ export class OAuthController extends MembershipBaseController {
         client_id: string;
         client_secret?: string;
         redirect_uri?: string;
+        code_verifier?: string;
       }
     >,
     res: express.Response
   ): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
-      const { grant_type, code, refresh_token, device_code, client_id, client_secret, redirect_uri } = req.body;
+      const { grant_type, code, refresh_token, device_code, client_id, client_secret, redirect_uri, code_verifier } = oauthBody<typeof req.body>(req);
 
       // Device code grant type doesn't require client_secret
       if (grant_type === "urn:ietf:params:oauth:grant-type:device_code") {
         return this.handleDeviceCodeGrant(device_code, client_id, res);
       }
 
-      // Only public (secret-less) clients may omit client_secret on refresh_token grant; if client has a secret, it must match.
+      // Only public (secret-less) clients may omit client_secret; if client has a secret, it must match.
       let client;
-      if (grant_type === "refresh_token" && !client_secret) {
+      if ((grant_type === "refresh_token" || grant_type === "authorization_code") && !client_secret) {
         client = (await this.repos.oAuthClient.loadByClientId(client_id)) as any;
         if (client?.clientSecret) return this.json({ error: "invalid_client" }, 400);
       } else {
@@ -104,6 +112,9 @@ export class OAuthController extends MembershipBaseController {
         const authCode = (await this.repos.oAuthCode.loadByCode(code)) as any;
         if (!authCode || authCode.clientId !== client.clientId) return this.json({ error: "invalid_grant" }, 400);
         if (redirect_uri && authCode.redirectUri !== redirect_uri) return this.json({ error: "invalid_grant" }, 400);
+        if (authCode.codeChallenge) {
+          if (!verifyS256(code_verifier, authCode.codeChallenge)) return this.json({ error: "invalid_grant", error_description: "code_verifier does not match" }, 400);
+        } else if (!client.clientSecret) return this.json({ error: "invalid_grant" }, 400);
 
         if (authCode.expiresAt && authCode.expiresAt < new Date()) {
           await this.repos.oAuthCode.delete(authCode.id);
@@ -201,6 +212,44 @@ export class OAuthController extends MembershipBaseController {
           plan_type_id: token.planTypeId || undefined
         });
       } else return this.json({ error: "unsupported_grant_type" }, 400);
+    });
+  }
+
+  /** Dynamic Client Registration (RFC 7591) for public clients such as claude.ai and ChatGPT MCP connectors. */
+  @httpPost("/register")
+  public async register(req: express.Request<{}, {}, { client_name?: string; redirect_uris?: string[]; scope?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), "", "oauth-register", 20, 60 * 60))) {
+        return this.json({ error: "too_many_requests" }, 429);
+      }
+      const body = oauthBody<{ client_name?: string; redirect_uris?: string[]; scope?: string }>(req);
+      const redirectUris = Array.isArray(body.redirect_uris) ? body.redirect_uris : [];
+      if (redirectUris.length === 0 || redirectUris.length > 10 || !redirectUris.every(isAllowedSelfRegisteredRedirect)) {
+        return this.json({ error: "invalid_redirect_uri", error_description: "redirect_uris must be https or loopback addresses" }, 400);
+      }
+
+      const name = (typeof body.client_name === "string" ? body.client_name.replace(/[\u0000-\u001f<>]/g, "").trim() : "").slice(0, 45) || "AI assistant";
+      const scope = typeof body.scope === "string" ? body.scope.slice(0, 255) : "";
+      // Always a public client: no secret is issued, so the token request must carry the PKCE verifier.
+      const client = await this.repos.oAuthClient.save({
+        name,
+        clientId: UniqueIdHelper.shortId(),
+        clientSecret: null,
+        redirectUris: redirectUris.join("|"),
+        scopes: scope,
+        selfRegistered: true
+      });
+
+      return this.json({
+        client_id: client.clientId,
+        client_id_issued_at: Math.floor(Date.now() / 1000),
+        client_name: name,
+        redirect_uris: redirectUris,
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        token_endpoint_auth_method: "none",
+        ...(scope ? { scope } : {})
+      }, 201);
     });
   }
 

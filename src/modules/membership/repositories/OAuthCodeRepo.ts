@@ -21,6 +21,8 @@ export class OAuthCodeRepo {
       userChurchId: authCode.userChurchId,
       redirectUri: authCode.redirectUri,
       scopes: authCode.scopes,
+      codeChallenge: authCode.codeChallenge,
+      codeChallengeMethod: authCode.codeChallengeMethod,
       expiresAt: expiresAt as any,
       createdAt: sql`NOW()` as any
     }).execute();

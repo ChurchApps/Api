@@ -6,5 +6,6 @@ export class OAuthClient {
   public clientSecret?: string;
   public redirectUris?: string;
   public scopes?: string;
+  public selfRegistered?: boolean;
   public createdAt?: Date;
 }
