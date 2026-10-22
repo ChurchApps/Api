@@ -4,6 +4,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { MatrixEmailHelper } from "../helpers/MatrixEmailHelper.js";
 import { MatrixTextHelper } from "../helpers/MatrixTextHelper.js";
+import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
 import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
@@ -102,6 +103,8 @@ export class PlanController extends DoingBaseController {
       const allPositions: Position[] = (await this.repos.position.loadByPlanIds(churchId, planIds)) as Position[];
       const allAssignments: Assignment[] = (await this.repos.assignment.loadByPlanIds(churchId, planIds)) as Assignment[];
       const allTimes: Time[] = (await this.repos.time.loadByPlanIds(churchId, planIds)) as Time[];
+      const needsZone = plans.some(p => p.signupDeadlineHours && !allTimes.some(t => t.planId === p.id && t.startTime));
+      const timeZone = needsZone ? await SignupDeadlineHelper.churchTimeZone(churchId) : undefined;
 
       return plans.map(plan => {
         const positions = allPositions
@@ -111,7 +114,8 @@ export class PlanController extends DoingBaseController {
             return { ...p, filledCount };
           });
         const times = allTimes.filter(t => t.planId === plan.id);
-        return { plan, positions, times };
+        const deadline = plan.signupDeadlineHours ? SignupDeadlineHelper.compute(plan, times, timeZone) : null;
+        return { plan: { ...plan, signupDeadline: deadline ? deadline.toISOString() : null }, positions, times };
       });
     });
   }
@@ -335,7 +339,7 @@ export class PlanController extends DoingBaseController {
         p.churchId = au.churchId;
         p.serviceDate = new Date(req.body.serviceDate || new Date());
         p.notes ??= oldPlan.notes;
-        p.signupDeadlineHours ??= oldPlan.signupDeadlineHours;
+        if (!("signupDeadlineHours" in req.body)) p.signupDeadlineHours = oldPlan.signupDeadlineHours;
         p.showVolunteerNames ??= oldPlan.showVolunteerNames;
         p.autoReplaceOnDecline ??= oldPlan.autoReplaceOnDecline;
         plan = await this.repos.plan.save(p);

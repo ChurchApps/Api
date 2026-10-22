@@ -1,10 +1,11 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
-import { Assignment, Plan, Position } from "../models/index.js";
+import { Assignment, Plan, Position, Time } from "../models/index.js";
 import { PlanAuth } from "../../../shared/helpers/index.js";
 import { PlanHelper } from "../helpers/PlanHelper.js";
 import { ReminderTokenHelper } from "../helpers/ReminderTokenHelper.js";
+import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
 
 @controller("/doing/assignments")
 export class AssignmentController extends DoingBaseController {
@@ -157,10 +158,8 @@ export class AssignmentController extends DoingBaseController {
       // Check signup deadline
       const plan = (await this.repos.plan.load(au.churchId, position.planId)) as Plan;
       if (!plan) return this.json({}, 404);
-      if (plan.signupDeadlineHours) {
-        const deadline = new Date(plan.serviceDate);
-        deadline.setHours(deadline.getHours() - plan.signupDeadlineHours);
-        if (new Date() > deadline) throw new Error("Signup deadline has passed");
+      if (plan.signupDeadlineHours && await SignupDeadlineHelper.hasPassed(au.churchId, plan, await this.repos.time.loadByPlanId(au.churchId, plan.id) as Time[])) {
+        throw new Error("Signup deadline has passed");
       }
 
       // Check capacity
@@ -192,10 +191,8 @@ export class AssignmentController extends DoingBaseController {
 
       // Check removal deadline
       const plan = (await this.repos.plan.load(au.churchId, position.planId)) as Plan;
-      if (plan.signupDeadlineHours) {
-        const deadline = new Date(plan.serviceDate);
-        deadline.setHours(deadline.getHours() - plan.signupDeadlineHours);
-        if (new Date() > deadline) throw new Error("Removal deadline has passed");
+      if (plan?.signupDeadlineHours && await SignupDeadlineHelper.hasPassed(au.churchId, plan, await this.repos.time.loadByPlanId(au.churchId, plan.id) as Time[])) {
+        throw new Error("Removal deadline has passed");
       }
 
       await this.repos.assignment.delete(au.churchId, id);
