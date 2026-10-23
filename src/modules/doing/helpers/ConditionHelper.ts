@@ -13,9 +13,26 @@ export class ConditionHelper {
     condition.matchingIds = [];
     switch (condition.field) {
       case "today": condition.matchingIds = this.evalSimpleCondition(condition, await this.churchToday(condition.churchId)) ? ["*"] : []; break;
-      default: condition.matchingIds = await getMembershipModuleGateway().loadIdsMatchingCondition(condition as any); break;
+      default: {
+        // Relative values ({currentDay}, {currentMonth}...) resolve to the church's date; the stored condition keeps the token.
+        let query: Condition = condition;
+        if (condition.value?.startsWith("{")) query = { ...condition, value: this.resolveRelativeValue(condition.value, await this.churchToday(condition.churchId)) };
+        condition.matchingIds = await getMembershipModuleGateway().loadIdsMatchingCondition(query as any);
+        break;
+      }
     }
     return condition;
+  }
+
+  public static resolveRelativeValue(value: string | undefined, today: ChurchToday): string | undefined {
+    switch (value) {
+      case "{currentDay}": return today.dayOfMonth.toString();
+      case "{currentMonth}": return today.month.toString();
+      case "{prevMonth}":
+      case "{previousMonth}": return (today.month === 1 ? 12 : today.month - 1).toString();
+      case "{nextMonth}": return (today.month === 12 ? 1 : today.month + 1).toString();
+      default: return value;
+    }
   }
 
   // Calendar parts of "now" in the church's time zone; the scheduler runs in UTC.
