@@ -68,6 +68,22 @@ describe("PageController2.getTree visibility gating", () => {
     expect(result.sections[0].elements[0].churchId).toBeUndefined();
   });
 
+  it("keeps section ids on a public url load so the live site can apply section styles (#1326)", async () => {
+    const { controller } = makeController(publicPage(), null);
+    const result = await getTree(controller, { url: "home" });
+    expect(result.sections[0].id).toBe("s1");
+    expect(result.sections[0].churchId).toBeUndefined();
+    expect(result.sections[0].pageId).toBeUndefined();
+    expect(result.sections[0].sort).toBeUndefined();
+  });
+
+  it("keeps section ids in the published snapshot served publicly (#1326)", async () => {
+    const { controller } = makeController(publicPage({ publishedAt: new Date() }), null);
+    const result = await getTree(controller, { url: "home" });
+    expect(result.sections[0].id).toBe("snap1");
+    expect(result.sections[0].churchId).toBeUndefined();
+  });
+
   it("serves the published snapshot for an anonymous ?id= load", async () => {
     const { controller, repos } = makeController(publicPage({ publishedAt: new Date() }), null);
     const result = await getTree(controller, { id: "pg1" });

@@ -279,7 +279,7 @@ export class PageController2 extends ContentBaseController {
     delete page.churchId;
     delete page.groupIds;
     page.sections.forEach((s) => {
-      delete s.id;
+      // delete s.id; -- the live site needs it to apply section styles (#section-<id>)
       delete s.churchId;
       delete s.pageId;
       delete s.sort;
