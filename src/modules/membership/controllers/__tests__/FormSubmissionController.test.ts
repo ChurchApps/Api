@@ -9,6 +9,7 @@ jest.mock("../../helpers/index", () => ({
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn() } }));
 jest.mock("axios", () => ({ post: jest.fn() }));
+jest.mock("../../../../shared/modules/index.js", () => ({ getContentModuleGateway: () => ({ loadEvent: jest.fn(async () => null), loadEventsForGroup: jest.fn(async () => []) }) }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import { FormSubmissionController } from "../FormSubmissionController.js";
@@ -115,6 +116,13 @@ describe("FormSubmissionController.save group auto-add", () => {
     (ConversationalFormHelper.findOrCreatePerson as jest.Mock).mockResolvedValueOnce({ id: "p1", name: { first: "Al" } });
     const { controller, repos } = formSubmissionController({ form: { id: "f1", churchId: "c1", name: "Camp", restricted: false, autoCreatePerson: true, groupId: "g1" }, groupMembers: [{ personId: "p1" }] });
     await (controller as any).save({ body: [{ formId: "f1", contentType: "form", contentId: "f1", answers: [] }] }, {});
+    expect(repos.groupMember.save).not.toHaveBeenCalled();
+  });
+
+  it("only links (no auto-add) when the form does not create person records", async () => {
+    const { controller, repos } = formSubmissionController({ auChurchId: "c1", auId: "u1", au: { churchId: "c1", id: "u1", personId: "p1", checkAccess: () => false }, form: { id: "f1", churchId: "c1", name: "Outreach", restricted: false, autoCreatePerson: false, groupId: "g1" } });
+    await (controller as any).save({ body: [{ formId: "f1", contentType: "person", contentId: "p1", answers: [] }] }, {});
+    expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
     expect(repos.groupMember.save).not.toHaveBeenCalled();
   });
 

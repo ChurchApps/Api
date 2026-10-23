@@ -37,6 +37,29 @@ export class FormController extends MembershipBaseController {
     });
   }
 
+  // Forms linked to a group, for its group page. Members see the open ones to fill out; leaders also see closed ones.
+  // No submission data here — leaders read answers through /formsubmissions/group/:groupId.
+  @httpGet("/group/:groupId")
+  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const isLeader = this.leadsGroup(au, groupId);
+      if (!isLeader && !au.groupIds?.includes(groupId)) return this.json([], 401);
+      const forms: Form[] = this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadForGroup(au.churchId, groupId)) as any[]);
+      return forms
+        .filter((f) => f.contentType === "form")
+        .map((f) => ({ id: f.id, name: f.name, description: f.description, open: this.isOpen(f) }))
+        .filter((f) => isLeader || f.open);
+    });
+  }
+
+  private isOpen(form: Form) {
+    const now = Date.now();
+    if (form.accessStartTime && now < new Date(form.accessStartTime).getTime()) return false;
+    // accessEndTime is a calendar date; keep the form open through that whole day.
+    if (form.accessEndTime && now > new Date(form.accessEndTime).getTime() + 24 * 60 * 60 * 1000) return false;
+    return true;
+  }
+
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

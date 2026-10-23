@@ -88,6 +88,16 @@ export class FormRepo {
       .execute();
   }
 
+  public async loadForGroup(churchId: string, groupId: string) {
+    return getDb().selectFrom("forms").selectAll()
+      .where("churchId", "=", churchId)
+      .where("groupId", "=", groupId)
+      .where("removed", "=", false as any)
+      .where("archived", "=", false as any)
+      .orderBy("name")
+      .execute();
+  }
+
   public async loadNonMemberForms(churchId: string) {
     return getDb().selectFrom("forms").selectAll()
       .where("contentType", "<>", "form")

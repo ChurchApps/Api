@@ -9,6 +9,8 @@ import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
+import { getContentModuleGateway } from "../../../shared/modules/index.js";
+import type { AuthenticatedUser } from "@churchapps/apihelper";
 
 @controller("/membership/formsubmissions")
 export class FormSubmissionController extends MembershipBaseController {
@@ -37,11 +39,47 @@ export class FormSubmissionController extends MembershipBaseController {
   @httpGet("/:id")
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
       const result: FormSubmission = this.repos.formSubmission.convertToModel(au.churchId, await this.repos.formSubmission.load(au.churchId, id));
+      if (!au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit) && !(await this.canViewSubmission(au, result))) return this.json({}, 401);
       if (this.include(req, "form")) await this.appendForm(au.churchId, result);
       if (this.include(req, "questions")) await this.appendQuestions(au.churchId, result);
       if (this.include(req, "answers")) await this.appendAnswers(au.churchId, result);
+      return result;
+    });
+  }
+
+  // Leader-only: answers to the forms linked to this group and to the registration forms of its events.
+  @httpGet("/group/:groupId")
+  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!this.leadsGroup(au, groupId)) return this.json([], 401);
+      const result: { form: Form; event?: { id: string; title: string; start: Date }; questions: Question[]; submissions: FormSubmission[] }[] = [];
+      const forms: Form[] = this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadForGroup(au.churchId, groupId)) as any[]);
+      for (const form of forms) {
+        const submissions = this.repos.formSubmission.convertAllToModel(au.churchId, (await this.repos.formSubmission.loadByFormId(au.churchId, form.id)) as any[]);
+        result.push({ form, questions: [], submissions });
+      }
+      const events = await getContentModuleGateway().loadEventsForGroup(au.churchId, groupId);
+      for (const event of events) {
+        const form = this.repos.form.convertToModel(au.churchId, await this.repos.form.load(au.churchId, event.formId));
+        if (!form) continue;
+        const rows = (await this.repos.formSubmission.loadForContent(au.churchId, "event", event.id)) as any[];
+        const submissions = this.repos.formSubmission.convertAllToModel(au.churchId, rows.filter((r) => r.formId === form.id));
+        result.push({ form, event: { id: event.id, title: event.title, start: event.start }, questions: [], submissions });
+      }
+      const allSubmissions = result.flatMap((r) => r.submissions);
+      const answers: Answer[] = allSubmissions.length === 0 ? [] : this.repos.answer.convertAllToModel(au.churchId, (await this.repos.answer.loadForFormSubmissions(au.churchId, allSubmissions.map((s) => s.id))) as any[]);
+      // Leaders can't list people, so name each submitter here.
+      const personIdOf = (s: FormSubmission) => (s.contentType === "person" ? s.contentId : s.submittedBy);
+      const personIds = Array.from(new Set(allSubmissions.map(personIdOf).filter(Boolean)));
+      const people = personIds.length === 0 ? [] : ((await this.repos.person.loadByIds(au.churchId, personIds)) as any[]);
+      for (const r of result) {
+        r.questions = this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, r.form.id)) as any[]);
+        r.submissions.forEach((s) => {
+          s.answers = answers.filter((a) => a.formSubmissionId === s.id);
+          (s as any).personName = people.find((p) => p.id === personIdOf(s) && !p.removed)?.displayName || null;
+        });
+      }
       return result;
     });
   }
@@ -143,7 +181,8 @@ export class FormSubmissionController extends MembershipBaseController {
               }
             }
 
-            if (form.groupId && formSubmission.contentType === "person" && formSubmission.contentId) {
+            // A linked group also shows the form on that group page; only person-creating forms add submitters to it.
+            if (wantsPerson && form.groupId && formSubmission.contentType === "person" && formSubmission.contentId) {
               try {
                 await this.addToGroup(churchId, form.groupId, formSubmission.contentId);
               } catch (err) {
@@ -209,6 +248,15 @@ export class FormSubmissionController extends MembershipBaseController {
       }
       return this.repos.formSubmission.convertToModel(au.churchId, await this.repos.formSubmission.load(au.churchId, id));
     });
+  }
+
+  // Group leaders read answers to forms linked to their group (formAccess "view") and to their group's event registrations.
+  private async canViewSubmission(au: AuthenticatedUser, submission: FormSubmission) {
+    if (!submission) return false;
+    if (await this.formAccess(au, submission.formId, "view")) return true;
+    if (submission.contentType !== "event" || !submission.contentId) return false;
+    const event = await getContentModuleGateway().loadEvent(au.churchId, submission.contentId);
+    return !!event && event.formId === submission.formId && this.leadsGroup(au, event.groupId);
   }
 
   private isWithinAccessWindow(form: Form) {
