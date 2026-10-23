@@ -13,7 +13,15 @@ export class RoleController extends MembershipBaseController {
       if (!au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
       if (churchId !== au.churchId && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       else {
-        return this.repos.role.convertAllToModel(churchId, await this.repos.role.loadByChurchId(churchId));
+        const [roleRows, members] = await Promise.all([this.repos.role.loadByChurchId(churchId), this.repos.roleMember.loadAll(churchId)]);
+        const roles: Role[] = this.repos.role.convertAllToModel(churchId, roleRows);
+        const usersByRole = new Map<string, Set<string>>();
+        members.forEach((m: any) => {
+          if (!usersByRole.has(m.roleId)) usersByRole.set(m.roleId, new Set());
+          usersByRole.get(m.roleId).add(m.userId);
+        });
+        roles.forEach((r) => { r.memberCount = usersByRole.get(r.id)?.size || 0; });
+        return roles;
       }
     });
   }
