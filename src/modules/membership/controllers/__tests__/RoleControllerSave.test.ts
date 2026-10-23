@@ -38,3 +38,28 @@ describe("RoleMemberController.save body shape (#1194)", () => {
     expect(result.obj).toEqual([expect.objectContaining({ id: "rm1", roleId: "r1", userId: "u2", churchId: "c1" })]);
   });
 });
+
+describe("RoleController.loadByChurchId member counts (#1330)", () => {
+  it("returns the number of distinct users in each role", async () => {
+    const repos = {
+      role: {
+        loadByChurchId: jest.fn(async () => [{ id: "r1", churchId: "c1", name: "Admins" }, { id: "r2", churchId: "c1", name: "Empty" }]),
+        convertAllToModel: (_churchId: string, data: any[]) => data
+      },
+      roleMember: {
+        loadAll: jest.fn(async () => [
+          { id: "m1", roleId: "r1", userId: "u1" },
+          { id: "m2", roleId: "r1", userId: "u2" },
+          { id: "m3", roleId: "r1", userId: "u2" }
+        ])
+      }
+    };
+    const controller = wire(new RoleController(), repos);
+    const result = await controller.loadByChurchId("c1", {}, {});
+    expect(repos.roleMember.loadAll).toHaveBeenCalledWith("c1");
+    expect(result).toEqual([
+      { id: "r1", churchId: "c1", name: "Admins", memberCount: 2 },
+      { id: "r2", churchId: "c1", name: "Empty", memberCount: 0 }
+    ]);
+  });
+});
