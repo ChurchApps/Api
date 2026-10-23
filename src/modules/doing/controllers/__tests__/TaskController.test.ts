@@ -1,3 +1,5 @@
+jest.mock("../../helpers/StepActionHelper.js", () => ({ StepActionHelper: { appendHistory: jest.fn() } }));
+jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn() } }));
 import "reflect-metadata";
 
 jest.mock("../DoingBaseController", () => ({ DoingBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));

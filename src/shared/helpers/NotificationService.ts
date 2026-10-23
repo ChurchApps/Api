@@ -2,6 +2,7 @@
 // structurally, so shared/ doesn't import module-internal types across the module boundary.
 export interface NotificationServiceOptions {
   deliveryStartLevel?: number;
+  appOnly?: boolean;
   deliveryTitle?: string;
   navData?: Record<string, unknown>;
   category?: string;

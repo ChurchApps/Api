@@ -1,3 +1,4 @@
+import { AssignmentWorkflowHelper } from "./AssignmentWorkflowHelper.js";
 import { Repos } from "../repositories/index.js";
 import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
@@ -182,7 +183,7 @@ export class PlanHelper {
 
     for (const a of created) {
       a.churchId = churchId;
-      if (!plan.prepared) {
+      if (!plan.prepared && !plan.confirmationWorkflowId) {
         try {
           await NotificationService.createNotifications([a.personId], churchId, "assignment", plan.id, `Volunteer Requests: ${plan.name} - ${position.name}. Please log in and confirm.`);
           a.notified = new Date();
@@ -192,6 +193,7 @@ export class PlanHelper {
       }
       await repos.assignment.save(a);
     }
+    if (created.length && !plan.prepared && plan.confirmationWorkflowId) await AssignmentWorkflowHelper.issuePlan(churchId, plan.id, repos);
     return created;
   }
 

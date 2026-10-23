@@ -2,7 +2,7 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { Task } from "../models/index.js";
-import { getDb } from "../db/index.js";
+import { getDb, withDoingConnection } from "../db/index.js";
 
 @injectable()
 export class TaskRepo {
@@ -41,6 +41,8 @@ export class TaskRepo {
       dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
       snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
       sort: task.sort,
+      assignmentId: task.assignmentId,
+      followupKey: task.followupKey,
       pinnedAssignment: task.pinnedAssignment ?? false
     }).execute();
     return task;
@@ -48,7 +50,7 @@ export class TaskRepo {
 
   private async update(task: Task): Promise<Task> {
     // dateCreated is immutable; don't overwrite on update (client may send ISO string, MySQL DATETIME rejects it).
-    await getDb().updateTable("tasks").set({
+    let query = getDb().updateTable("tasks").set({
       taskType: task.taskType,
       dateClosed: (task.dateClosed ? DateHelper.toMysqlDate(task.dateClosed) : task.dateClosed) as any,
       associatedWithType: task.associatedWithType,
@@ -71,9 +73,39 @@ export class TaskRepo {
       dueDate: (task.dueDate ? DateHelper.toMysqlDate(task.dueDate) : task.dueDate) as any,
       snoozedUntil: (task.snoozedUntil ? DateHelper.toMysqlDate(task.snoozedUntil) : task.snoozedUntil) as any,
       sort: task.sort,
+      assignmentId: task.assignmentId,
+      followupKey: task.followupKey,
       pinnedAssignment: task.pinnedAssignment ?? false
-    }).where("id", "=", task.id).where("churchId", "=", task.churchId).execute();
+    }).where("id", "=", task.id).where("churchId", "=", task.churchId);
+    if (task.assignmentId && task.status === "Open") query = query.where("status", "=", "Open");
+    await query.execute();
     return task;
+  }
+
+  // MySQL advisory locks span the existing repo calls without holding a transaction
+  // open around network I/O. The dedicated connection is released only after unlock.
+  public async withAssignmentLock<T>(churchId: string, assignmentId: string, action: () => Promise<T>): Promise<T | null> {
+    return getDb().connection().execute(async (db) => {
+      const key = `confirmation:${churchId}:${assignmentId}`;
+      const lock = await sql<{ acquired: number }>`select get_lock(${key}, 0) as acquired`.execute(db);
+      if (Number(lock.rows[0]?.acquired) !== 1) return null;
+      try { return await withDoingConnection(db, action); } finally { await sql`select release_lock(${key})`.execute(db); }
+    });
+  }
+
+  public async loadByFollowupKey(churchId: string, followupKey: string) {
+    return (await getDb().selectFrom("tasks").selectAll().where("churchId", "=", churchId)
+      .where("followupKey", "=", followupKey).executeTakeFirst()) ?? null;
+  }
+
+  public async loadForAssignment(churchId: string, assignmentId: string) {
+    return getDb().selectFrom("tasks").selectAll().where("churchId", "=", churchId)
+      .where("assignmentId", "=", assignmentId).where("status", "=", "Open").execute();
+  }
+
+  public async loadOpenAssignmentCards() {
+    return getDb().selectFrom("tasks").selectAll().where("assignmentId", "is not", null)
+      .where("workflowId", "is not", null).where("status", "=", "Open").execute();
   }
 
   public async delete(churchId: string, id: string) {

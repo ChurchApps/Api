@@ -11,12 +11,12 @@ export class WorkflowRepo {
 
   private async create(model: Workflow): Promise<Workflow> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("workflows").values({ id: model.id, churchId: model.churchId, name: model.name, categoryId: model.categoryId, active: model.active ?? true, sort: model.sort }).execute();
+    await getDb().insertInto("workflows").values({ id: model.id, churchId: model.churchId, name: model.name, workflowType: model.workflowType, categoryId: model.categoryId, active: model.active ?? true, sort: model.sort }).execute();
     return model;
   }
 
   private async update(model: Workflow): Promise<Workflow> {
-    await getDb().updateTable("workflows").set({ name: model.name, categoryId: model.categoryId, active: model.active, sort: model.sort }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("workflows").set({ name: model.name, workflowType: model.workflowType, categoryId: model.categoryId, active: model.active, sort: model.sort }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 

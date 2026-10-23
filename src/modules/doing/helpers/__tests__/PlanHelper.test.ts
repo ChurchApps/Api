@@ -1,3 +1,4 @@
+jest.mock("../AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), stopIfResolved: jest.fn(async () => false), processPending: jest.fn(async () => 0) } }));
 /** Tests auto-scheduling algorithm: rotation, blockouts, max-per-month, household preferences, auto-replacement. */
 
 jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "id" + Math.random().toString(36).slice(2, 8) } }));
@@ -281,6 +282,16 @@ describe("PlanHelper.autoReplaceDeclined", () => {
     expect(saved[0].status).toBe("Unconfirmed");
     expect(saved[0].notified).toBeInstanceOf(Date);
     expect(notifyMock).toHaveBeenCalledWith(["p2"], "c1", "assignment", "plan1", expect.stringContaining("Vocals"));
+  });
+
+  it("issues replacements as fresh confirmation cases on an opted-in published plan", async () => {
+    const { AssignmentWorkflowHelper } = await import("../AssignmentWorkflowHelper.js");
+    const plan = { id: "plan1", churchId: "c1", name: "Sample Service", serviceDate: SERVICE_DATE, autoReplaceOnDecline: true, confirmationWorkflowId: "wf1" };
+    const { repos, saved } = buildRepos(plan, position, [declined]);
+    await PlanHelper.autoReplaceDeclined("c1", declined as any, repos);
+    expect(saved[0].notified).toBeUndefined();
+    expect(AssignmentWorkflowHelper.issuePlan).toHaveBeenCalledWith("c1", "plan1", repos);
+    expect(notifyMock).not.toHaveBeenCalled(); // The confirmation workflow owns the app alert and messages.
   });
 
   it("does nothing when the plan has not opted in", async () => {

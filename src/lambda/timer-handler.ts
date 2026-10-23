@@ -20,7 +20,9 @@ const initEnv = async () => {
   // Always initialize messaging helpers (repos may be undefined on warm starts)
   console.log("[initEnv] Initializing messaging repos...");
   const repos = await RepoManager.getRepos<any>("messaging");
-  NotificationHelper.init(repos);
+  // Recovered serving-request cards can create app alerts and human assignments.
+  const { initializeNotificationDelivery } = await import("../modules/messaging/index.js");
+  initializeNotificationDelivery(repos);
   console.log("[initEnv] NotificationHelper initialized with repos");
   console.log("[initEnv] Environment initialization complete");
 };

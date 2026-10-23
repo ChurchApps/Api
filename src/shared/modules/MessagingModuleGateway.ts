@@ -1,5 +1,6 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { MergeFieldHelper } from "../../modules/messaging/helpers/MergeFieldHelper.js";
+import { PreferenceGateHelper } from "../../modules/messaging/helpers/PreferenceGateHelper.js";
 import { NotificationHelper } from "../../modules/messaging/helpers/NotificationHelper.js";
 
 interface EmailRecipient {
@@ -26,6 +27,7 @@ export interface MessagingModuleGateway {
   createNotifications(notifications: any[]): Promise<any[]>;
   // Render a saved EmailTemplate and send through notification funnel; returns false if template missing or no email.
   sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
+  sendServingWorkflowMessage(churchId: string, personId: string, taskId: string, channel: "email" | "sms", person: { email?: string; mobilePhone?: string; optedOut?: boolean | number; firstName?: string; lastName?: string; displayName?: string }, message: { subject: string; html: string; text: string }, churchName: string): Promise<string>;
   // Ad-hoc bulk SMS (pre-filtered recipients, capped at 500); returns { ok: false, reason: "no_provider" } if no provider.
   sendBulkText(churchId: string, recipients: BulkTextRecipient[], message: string, context?: string): Promise<BulkTextResult>;
   // Automated SMS to one person with merge fields resolved (caller checks opt-out); returns { ok: false, reason } on no_provider, insufficient_credits or provider error.
@@ -126,6 +128,23 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
       emailByPerson: { [personId]: { subject, html: body } }
     });
     return true;
+  }
+
+  // Direct workflow attempt: never queues an unread-email escalation which could
+  // outlive the request. The card records blocked/skipped/uncertain outcomes.
+  public async sendServingWorkflowMessage(churchId: string, personId: string, taskId: string, channel: "email" | "sms", person: { email?: string; mobilePhone?: string; optedOut?: boolean | number; firstName?: string; lastName?: string; displayName?: string }, message: { subject: string; html: string; text: string }, churchName: string): Promise<string> {
+    const repos = await this.repos();
+    const pref = await repos.notificationPreference.loadByPersonId(churchId, personId);
+    const overrides = await repos.notificationPreferenceOverride.loadForPerson(churchId, personId);
+    const gate = PreferenceGateHelper.evaluate(churchId, personId, "serving_schedule", channel, { pref, overrides });
+    if (!gate.allow) return `skipped (${gate.reason || gate.decision})`;
+    if (channel === "sms") {
+      if (person.optedOut || !person.mobilePhone?.trim()) return "skipped (opted out or no mobile phone)";
+      const result = await this.sendPersonText(churchId, personId, { ...person, phoneNumber: person.mobilePhone.trim() }, message.text, churchName);
+      return result.ok ? "sent" : `blocked (${result.reason || "provider failure"})`;
+    }
+    if (!person.email) return "skipped (no email)";
+    return NotificationHelper.sendWorkflowEmail(churchId, personId, taskId, person.email, message.subject, message.html);
   }
 
   public async sendBulkText(churchId: string, recipients: BulkTextRecipient[], message: string, _context?: string): Promise<BulkTextResult> {

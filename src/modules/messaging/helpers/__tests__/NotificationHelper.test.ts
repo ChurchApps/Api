@@ -554,6 +554,45 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
     peopleInChurchSpy.mockRestore();
   });
 
+  it("keeps workflow-owned app alerts visible without an unread-email escalation", async () => {
+    const repos = buildRepos();
+    NotificationHelper.init(repos);
+    const result = await NotificationHelper.createNotifications(["PER1"], "CHU1", "assignment", "PLAN1", "Volunteer Requests: Sample service", undefined, undefined, { appOnly: true, category: "serving_schedule" });
+    expect(result[0]).toMatchObject({ deliveryMethod: "complete", isNew: true, category: "serving_schedule" });
+    expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("gates workflow emails by church membership and member preferences", async () => {
+    NotificationHelper.init(buildRepos({ pref: { emailFrequency: "never" } }));
+    expect(await NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toContain("skipped");
+    NotificationHelper.init(buildRepos());
+    peopleInChurchSpy.mockResolvedValue([]);
+    expect(await NotificationHelper.sendWorkflowEmail("CHU1", "OTHER", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toContain("not in this church");
+    expect(sendTemplatedEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps approval/rate-limited workflow emails out of the unread queue", async () => {
+    const repos = buildRepos(); NotificationHelper.init(repos);
+    const reserve = jest.spyOn(ChurchEmailLimiter, "reserve").mockResolvedValue(null);
+    try {
+      expect(await NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toContain("blocked");
+      expect(sendTemplatedEmailMock).not.toHaveBeenCalled(); expect(repos.notification.save).not.toHaveBeenCalled();
+    } finally { reserve.mockRestore(); }
+  });
+
+  it("settles a workflow email reservation after a successful or uncertain transport attempt", async () => {
+    NotificationHelper.init(buildRepos());
+    const reserve = jest.spyOn(ChurchEmailLimiter, "reserve").mockResolvedValue(["reserve1"]);
+    const settle = jest.spyOn(ChurchEmailLimiter, "settle").mockResolvedValue(undefined);
+    try {
+      expect(await NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toBe("sent");
+      expect(settle).toHaveBeenCalledWith("CHU1", "reserve1", true);
+      sendTemplatedEmailMock.mockRejectedValueOnce(new Error("transport timeout"));
+      await expect(NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).rejects.toThrow("timeout");
+      expect(settle).toHaveBeenCalledWith("CHU1", "reserve1", false, expect.stringContaining("timeout"));
+    } finally { reserve.mockRestore(); settle.mockRestore(); }
+  });
+
   it("drops recipients who are not in the notifying church", async () => {
     const repos = buildRepos();
     NotificationHelper.init(repos);

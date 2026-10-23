@@ -4,6 +4,7 @@ import { Task, WorkflowStep, WorkflowStepAction } from "../models/index.js";
 import { getMembershipModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
 import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
 import { SafeHttp } from "../../../shared/webhooks/SafeHttp.js";
+import { AssignmentWorkflowHelper } from "./AssignmentWorkflowHelper.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
 
 interface HistoryEntry {
@@ -22,9 +23,31 @@ export class StepActionHelper {
   // Returns true when parked (a delay); startIndex resumes after a wake.
   public static async execute(task: Task, step: WorkflowStep, repos: Repos, startIndex = 0, depth = 0): Promise<boolean> {
     const actions = (await repos.workflowStepAction.loadForStep(task.churchId || "", step.id || "")) as WorkflowStepAction[];
+    if (task.assignmentId) {
+      const data = this.parseData(task);
+      for (const [id, state] of Object.entries(data.actionAttempts || {})) {
+        if (state === "started") {
+          data.actionAttempts[id] = "unknown";
+          task.data = JSON.stringify(data);
+          this.appendHistory(task, "Previous action outcome unknown; review delivery history before retrying");
+          Object.assign(data, this.parseData(task));
+        }
+      }
+      task.data = JSON.stringify(data);
+    }
     for (let i = startIndex; i < actions.length; i++) {
       const action = actions[i];
       const config = this.parseConfig(action.config);
+      if (await AssignmentWorkflowHelper.stopIfResolved(task, repos)) return true;
+      if (task.assignmentId && action.actionType !== "delay") {
+        const data = this.parseData(task);
+        const key = action.id || `${step.id}:${i}`;
+        if (data.actionAttempts?.[key]) continue;
+        data.actionAttempts = { ...data.actionAttempts, [key]: "started" };
+        data.actionCursor = { stepId: step.id, index: i + 1 };
+        task.data = JSON.stringify(data);
+        await repos.task.save(task); // checkpoint before side effect, including human task creation
+      }
       try {
         switch (action.actionType) {
           case "delay": {
@@ -43,10 +66,15 @@ export class StepActionHelper {
           case "webhook":
             await this.fireWebhook(task, config);
             break;
+          case "sendAssignmentRequest":
+            await AssignmentWorkflowHelper.send(task, config, repos);
+            break;
           case "sendEmail":
+            if (task.assignmentId) throw new Error("Use a serving request message for assignment confirmation");
             await this.sendEmail(task, config);
             break;
           case "sendText":
+            if (task.assignmentId) throw new Error("Use a serving request message for assignment confirmation");
             await this.sendText(task, config);
             break;
           case "addToGroup":
@@ -71,6 +99,12 @@ export class StepActionHelper {
         const message = (err as Error)?.message || String(err);
         this.appendHistory(task, `Action ${action.actionType} failed: ${message}`);
         console.warn(`[StepActionHelper] action ${action.actionType} failed for card ${task.id || "?"}:`, message);
+      }
+      if (task.assignmentId && action.actionType !== "delay") {
+        const data = this.parseData(task);
+        data.actionAttempts[action.id || `${step.id}:${i}`] = "finished";
+        task.data = JSON.stringify(data);
+        await repos.task.save(task);
       }
     }
     this.clearActionCursor(task);
@@ -197,8 +231,9 @@ export class StepActionHelper {
   // Creates a standalone (non-card) task about the card's person, assigned per config.
   private static async createTask(task: Task, config: Record<string, any>, repos: Repos): Promise<void> {
     if (!config.title) return;
-    await repos.task.save({
+    const child = await repos.task.save({
       churchId: task.churchId,
+      assignmentId: task.assignmentId,
       taskType: "FollowUp",
       dateCreated: new Date(),
       associatedWithType: task.associatedWithType,
@@ -211,12 +246,14 @@ export class StepActionHelper {
       assignedToLabel: config.assignedToLabel,
       title: config.title,
       status: "Open",
-      data: config.description ? JSON.stringify({ description: config.description }) : undefined
+      dueDate: config.dueDays ? DateHelper.addDays(new Date(), Number(config.dueDays)) : undefined,
+      data: JSON.stringify({ description: config.description, assignment: this.parseData(task).assignment, parentCardId: task.id, ...(task.assignmentId ? { history: [{ date: new Date().toISOString(), message: "Created by serving confirmation workflow" }] } : {}) })
     });
-    this.appendHistory(task, `Task created: ${config.title}`);
+    this.appendHistory(task, `Task created: ${config.title} (${child.id || ""})`);
   }
 
   private static async addToWorkflow(task: Task, config: Record<string, any>, repos: Repos, depth: number): Promise<void> {
+    if (task.assignmentId) { this.appendHistory(task, "Workflow handoff skipped: serving confirmation must retain its assignment"); return; }
     if (task.associatedWithType !== "person" || !task.associatedWithId || !config.workflowId) return;
     await WorkflowHelper.addToWorkflow(
       task.churchId || "",

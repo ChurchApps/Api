@@ -4,6 +4,7 @@ export * from "./models/index.js";
 
 // Module initialization function
 import { InternalEventBus } from "../../shared/events/InternalEventBus.js";
+import { AssignmentWorkflowHelper } from "./helpers/AssignmentWorkflowHelper.js";
 import { RuleEngine } from "./helpers/RuleEngine.js";
 import { DirectoryUpdateHelper } from "./helpers/DirectoryUpdateHelper.js";
 import { GroupJoinRequestTaskHelper } from "./helpers/GroupJoinRequestTaskHelper.js";
@@ -12,6 +13,7 @@ export function initializeDoingModule() {
   // Event-driven rules run through the unified RuleEngine; form submissions are just
   // another event (form.submission.created). Scheduled rules run via the cron/timer.
   InternalEventBus.subscribe(RuleEngine.onEvent);
+  InternalEventBus.subscribe((churchId, event, payload) => AssignmentWorkflowHelper.onEvent(churchId, event, payload));
   // SSO logins submit member photos into the directory-update approval flow.
   InternalEventBus.subscribe(DirectoryUpdateHelper.onEvent);
   InternalEventBus.subscribe(GroupJoinRequestTaskHelper.onEvent);

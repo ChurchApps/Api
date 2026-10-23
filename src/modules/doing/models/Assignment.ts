@@ -6,4 +6,5 @@ export class Assignment {
   public status?: string;
   public notified?: Date;
   public autofillRunId?: string;
+  public confirmationWorkflowId?: string | null;
 }

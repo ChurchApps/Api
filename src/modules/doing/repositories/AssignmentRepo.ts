@@ -10,6 +10,21 @@ export class AssignmentRepo {
     return model.id ? this.update(model) : this.create(model);
   }
 
+  // Issuance is an explicit command. Saves/imports cannot enroll an assignment.
+  public async issueConfirmation(churchId: string, id: string, workflowId: string): Promise<boolean> {
+    const result = await getDb().updateTable("assignments").set({ confirmationWorkflowId: workflowId, notified: new Date() })
+      .where("churchId", "=", churchId).where("id", "=", id).where("status", "=", "Unconfirmed")
+      .where("notified", "is", null).where("confirmationWorkflowId", "is", null).executeTakeFirst();
+    return Number(result.numUpdatedRows) > 0;
+  }
+
+  public async loadIssuedConfirmations(): Promise<Assignment[]> {
+    return getDb().selectFrom("assignments as a").leftJoin("tasks as t", (j) =>
+      j.onRef("t.churchId", "=", "a.churchId").onRef("t.followupKey", "=", "a.id"))
+      .selectAll("a").where("a.confirmationWorkflowId", "is not", null)
+      .where("a.status", "=", "Unconfirmed").where("t.id", "is", null).execute();
+  }
+
   private async create(model: Assignment): Promise<Assignment> {
     model.id = UniqueIdHelper.shortId();
     await getDb().insertInto("assignments").values({ id: model.id, churchId: model.churchId, positionId: model.positionId, personId: model.personId, status: model.status, notified: model.notified, autofillRunId: model.autofillRunId }).execute();
@@ -53,7 +68,8 @@ export class AssignmentRepo {
   // Non-declined assignments on a plan, with position label, for reminders.
   public async loadForReminder(churchId: string, planId: string): Promise<any[]> {
     return getDb().selectFrom("assignments as a")
-      .innerJoin("positions as p", "p.id", "a.positionId")
+      .innerJoin("positions as p", (j) => j.onRef("p.id", "=", "a.positionId").onRef("p.churchId", "=", "a.churchId"))
+      .innerJoin("plans as pl", (j) => j.onRef("pl.id", "=", "p.planId").onRef("pl.churchId", "=", "a.churchId"))
       .select([
         "a.id",
         "a.personId",
@@ -63,7 +79,8 @@ export class AssignmentRepo {
       ])
       .where("a.churchId", "=", churchId)
       .where("p.planId", "=", planId)
-      .where("a.status", "in", ["Accepted", "Unconfirmed"])
+      .where((eb) => eb.or([eb("pl.prepared", "is", null), eb("pl.prepared", "=", false as any)]))
+      .where((eb) => eb.or([eb("a.status", "=", "Accepted"), eb.and([eb("a.status", "=", "Unconfirmed"), eb("a.confirmationWorkflowId", "is", null)])]))
       .execute();
   }
 
