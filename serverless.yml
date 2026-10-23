@@ -169,13 +169,10 @@ functions:
           path: /api/{proxy+}
           method: ANY
           cors: *cors
-      # /mcp also answers through the HTTP API so its 401 keeps a real WWW-Authenticate header. Express handles CORS for it.
-      - httpApi:
-          path: /mcp
-          method: "*"
-      - httpApi:
-          path: /mcp/{proxy+}
-          method: "*"
+      # The HTTP API exists so /mcp's 401 keeps a real WWW-Authenticate header (see provider.httpApi). The api mapping strips
+      # its "mcp" key before route matching, so only a catch-all route receives the requests; Express still gets the full
+      # /mcp path from the 1.0 payload and handles CORS itself.
+      - httpApi: "*"
 
   socket:
     handler: lambda.socket
