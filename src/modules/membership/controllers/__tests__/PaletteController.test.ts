@@ -70,4 +70,13 @@ describe("palette static items", () => {
     expect(urls({ groupsEdit: true, plans: true })).toContain("#wizard:freeplay");
     expect(urls({ content: true })).toEqual(expect.arrayContaining(["#wizard:webpage"]));
   });
+
+  it("setup terms from #1339 are searchable", () => {
+    const items = staticItems({ ...none, settings: true, content: true });
+    const aliases = (u: string) => items.find((i) => i.u === u)?.a || [];
+    expect(aliases("/mobile/checkin#qr")).toEqual(expect.arrayContaining(["qr", "guest"]));
+    expect(aliases("/mobile/checkin")).toContain("b1 checkin");
+    expect(aliases("/site/appearance")).toContain("church logo");
+    expect(aliases("#wizard:webpage")).toContain("pages");
+  });
 });

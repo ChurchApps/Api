@@ -20,11 +20,11 @@ const jump = (n: string, u: string, a?: string[]): PaletteItem => (a ? { n, a, t
 export const staticItems = (c: Access): PaletteItem[] => {
   const items: PaletteItem[] = [];
   if (c.peopleEdit) items.push({ n: "Add a person", a: ["new person", "new household", "create person"], t: "do", u: "#addPerson" });
-  if (c.content) items.push({ n: "Create a page", a: ["new page", "add page", "webpage"], t: "do", u: "#wizard:webpage" });
+  if (c.content) items.push({ n: "Create a page", a: ["new page", "add page", "add pages", "pages", "webpage"], t: "do", u: "#wizard:webpage" });
   if (c.groupsEdit) items.push({ n: "Create a group", a: ["new group", "add group", "small group"], t: "do", u: "#wizard:group" });
   if (c.groupsEdit) items.push({ n: "Set up FreeShow", a: ["freeshow", "worship team", "presentation"], t: "do", u: "#wizard:freeshow" });
   if (c.groupsEdit && c.plans) items.push({ n: "Set up FreePlay", a: ["freeplay", "classroom", "kids lessons"], t: "do", u: "#wizard:freeplay" });
-  if (c.settings) items.push({ n: "Start check-in", a: ["kiosk", "b1 check-in", "checkin app"], t: "do", u: "/mobile/checkin" });
+  if (c.settings) items.push({ n: "Start check-in", a: ["kiosk", "kiosk app", "b1 check-in", "b1 checkin", "checkin app"], t: "do", u: "/mobile/checkin" });
   items.push(jump("Sunday", "/", ["home", "dashboard", "this week", "bulletin"]));
   if (c.people) {
     items.push(jump("People", "/people", ["directory", "members", "congregation", "households"]));
@@ -54,10 +54,12 @@ export const staticItems = (c: Access): PaletteItem[] => {
   items.push(jump("Workflows", "/serving/tasks/workflows", ["automations", "pipelines", "kanban", "boards"]));
   if (c.attendance) items.push(jump("Attendance", "/attendance", ["check-in", "who's here", "rooms", "services", "service times"]));
   if (c.content) {
-    items.push(jump("Site", "/site/pages", ["website", "pages", "web"]));
+    items.push(jump("Site", "/site/pages", ["website", "pages", "web pages", "web", "page editor"]));
     items.push(jump("Blog", "/site/blog", ["blogs", "posts", "articles", "news"]));
     items.push(jump("Blocks", "/site/blocks", ["reusable blocks", "sections", "footer", "header"]));
-    items.push(jump("Appearance", "/site/appearance", ["colors", "fonts", "logo", "theme", "branding", "add your logo"]));
+    items.push(jump("Appearance", "/site/appearance", [
+      "colors", "fonts", "logo", "church logo", "upload logo", "theme", "branding", "add your logo"
+    ]));
     items.push(jump("Files", "/site/files", ["uploads", "media", "images", "documents"]));
     items.push(jump("Calendars", "/calendars", ["events", "rooms"]));
     items.push(jump("Availability", "/calendars/availability", ["time off", "unavailable", "blackout dates"]));
@@ -88,6 +90,9 @@ export const staticItems = (c: Access): PaletteItem[] => {
     items.push(jump("Batch jobs", "/settings/batches", ["bulk edits", "batch history"]));
     items.push(jump("App theme", "/mobile/theme", ["mobile colors", "app colors", "app logo"]));
     items.push(jump("B1 Mobile", "/mobile/b1-mobile", ["mobile app", "app store", "play store"]));
+    items.push(jump("QR guest registration", "/mobile/checkin#qr", [
+      "qr", "qr code", "guest", "guests", "first time guest", "visitor", "self register", "guest kiosk"
+    ]));
     items.push(jump("Check-in labels", "/mobile/checkin/labels", ["name tags", "nametags", "label printer"]));
   }
   if (c.roles || c.settings) items.push(jump("Roles", "/settings/roles", ["users", "permissions", "access", "staff logins", "invite staff", "invite team"]));
