@@ -14,6 +14,7 @@ interface Subject {
 // Canonical membership statuses (mirror B1Admin people/helpers/MembershipStatusOptions.ts).
 const MEMBERSHIP_STATUS_OPTIONS = [
   { value: "Visitor", label: "Visitor" },
+  { value: "Guest", label: "Guest" },
   { value: "Regular Attendee", label: "Regular Attendee" },
   { value: "Member", label: "Member" },
   { value: "Staff", label: "Staff" },
