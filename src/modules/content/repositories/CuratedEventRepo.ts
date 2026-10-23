@@ -92,7 +92,14 @@ export class CuratedEventRepo {
       .where("ce.curatedCalendarId", "=", curatedCalendarId)
       .where("ce.churchId", "=", churchId);
     if (!includePrivate) query = query.where("e.visibility", "=", "public");
-    return query.execute();
+    const rows = await query.execute();
+    // An event listed on its own and through its whole group comes back once, as the group row.
+    const byEvent = new Map<string, any>();
+    rows.forEach((row: any) => {
+      const current = byEvent.get(row.realEventId);
+      if (!current || (current.eventId && !row.eventId)) byEvent.set(row.realEventId, row);
+    });
+    return rows.filter((row: any) => byEvent.get(row.realEventId) === row);
   }
 
   public convertToModel(_churchId: string, data: any) { return data as CuratedEvent; }
