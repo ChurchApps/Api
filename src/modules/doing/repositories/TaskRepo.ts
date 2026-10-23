@@ -103,9 +103,11 @@ export class TaskRepo {
       .where("assignmentId", "=", assignmentId).where("status", "=", "Open").execute();
   }
 
-  public async loadOpenAssignmentCards() {
-    return getDb().selectFrom("tasks").selectAll().where("assignmentId", "is not", null)
-      .where("workflowId", "is not", null).where("status", "=", "Open").execute();
+  public async loadOpenAssignmentCards(churchId?: string) {
+    let query = getDb().selectFrom("tasks").selectAll().where("assignmentId", "is not", null)
+      .where("workflowId", "is not", null).where("status", "=", "Open");
+    if (churchId) query = query.where("churchId", "=", churchId);
+    return query.execute();
   }
 
   public async delete(churchId: string, id: string) {

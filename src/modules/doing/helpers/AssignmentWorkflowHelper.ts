@@ -241,8 +241,8 @@ export class AssignmentWorkflowHelper {
     if (event.startsWith("assignment.")) {
       await this.reconcileAssignment(churchId, payload.id, repos);
     } else {
-      for (const card of await repos.task.loadOpenAssignmentCards() as Task[]) {
-        if (card.churchId === churchId && this.data(card).assignment?.planId === payload.id) await this.reconcileAssignment(churchId, card.assignmentId, repos);
+      for (const card of await repos.task.loadOpenAssignmentCards(churchId) as Task[]) {
+        if (this.data(card).assignment?.planId === payload.id) await this.reconcileAssignment(churchId, card.assignmentId, repos);
       }
     }
   }

@@ -4,6 +4,7 @@ jest.mock("../../../../shared/helpers/index.js", () => ({ PlanAuth: { canEditPos
 const publish = jest.fn();
 jest.mock("../../../../shared/events/InternalEventBus.js", () => ({ InternalEventBus: { publish: (...args: any[]) => publish(...args) } }));
 jest.mock("../../helpers/PlanHelper.js", () => ({ PlanHelper: { autoReplaceDeclined: jest.fn(), notifyLeadersOfResponse: jest.fn() } }));
+jest.mock("../../helpers/SignupDeadlineHelper.js", () => ({ SignupDeadlineHelper: {} }));
 const verify = jest.fn();
 jest.mock("../../helpers/ReminderTokenHelper.js", () => ({ ReminderTokenHelper: { verify: (...args: any[]) => verify(...args) } }));
 import { AssignmentController } from "../AssignmentController.js";
