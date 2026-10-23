@@ -14,6 +14,11 @@ custom:
     prod: prod
     Prod: prod
   envLower: ${self:custom.stageToLower.${self:custom.env}, self:custom.env}
+  # Custom domain that /mcp is mapped onto through the HTTP API (see McpApiMapping). Stages without one skip the mapping.
+  mcpDomain:
+    prod: api.churchapps.org
+    demo: api.demo.churchapps.org
+  mcpDomainCurrent: ${self:custom.mcpDomain.${self:custom.envLower}, ''}
   serverless-offline:
     httpPort: 8084
     websocketPort: 8087
@@ -35,6 +40,12 @@ provider:
   region: us-east-2
   memorySize: 1024
   timeout: 30
+  # HTTP API (v2) that serves /mcp only. The REST API renames WWW-Authenticate to x-amzn-remapped-www-authenticate on
+  # the way out, which hides the OAuth discovery hint MCP clients key off (ChurchAppsSupport#1318); HTTP APIs pass it through.
+  httpApi:
+    name: ${self:service}-${self:custom.envLower}-mcp
+    # 1.0 payload keeps the api-mapping prefix in event.path, so Express still sees /mcp behind the custom domain.
+    payload: "1.0"
   environment:
     STAGE: ${self:custom.env}
     ENVIRONMENT: ${self:custom.env}
@@ -158,6 +169,10 @@ functions:
           path: /api/{proxy+}
           method: ANY
           cors: *cors
+      # The HTTP API exists so /mcp's 401 keeps a real WWW-Authenticate header (see provider.httpApi). The api mapping strips
+      # its "mcp" key before route matching, so only a catch-all route receives the requests; Express still gets the full
+      # /mcp path from the 1.0 payload and handles CORS itself.
+      - httpApi: "*"
 
   socket:
     handler: lambda.socket
@@ -279,7 +294,25 @@ plugins:
   - serverless-offline
 
 resources:
+  Conditions:
+    HasMcpDomain:
+      Fn::Not:
+        - Fn::Equals:
+            - ${self:custom.mcpDomainCurrent}
+            - ""
   Resources:
+    # Routes <domain>/mcp* to the HTTP API; everything else keeps hitting the REST API through its empty base path mapping.
+    McpApiMapping:
+      Type: "AWS::ApiGatewayV2::ApiMapping"
+      Condition: HasMcpDomain
+      Properties:
+        DomainName: ${self:custom.mcpDomainCurrent}
+        ApiMappingKey: mcp
+        ApiId:
+          Ref: HttpApi
+        Stage:
+          Ref: HttpApiStage
+
     GatewayResponseDefault4XX:
       Type: "AWS::ApiGateway::GatewayResponse"
       Properties:

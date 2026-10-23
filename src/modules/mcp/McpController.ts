@@ -20,7 +20,7 @@ export class McpController extends BaseHttpController {
       return;
     }
 
-    // Stateless per-request server; API Gateway REST can't stream, so disable SSE.
+    // Stateless per-request server; API Gateway (REST and HTTP API alike) buffers responses, so disable SSE.
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true
