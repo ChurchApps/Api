@@ -2,14 +2,17 @@ jest.mock("../index.js", () => ({ Permissions: { people: { view: "peopleView" } 
 
 import { ContactVisibilityHelper } from "../ContactVisibilityHelper.js";
 
-function fakeRepos(opts: { settings?: any[]; prefs?: any[]; groupRows?: any[] } = {}) {
+function fakeRepos(opts: { settings?: any[]; prefs?: any[]; groupRows?: any[]; viewerRows?: any[] } = {}) {
   return {
     setting: {
       loadPublicSettings: jest.fn(async () => opts.settings ?? []),
       convertAllToModel: (_c: string, rows: any[]) => rows
     },
     visibilityPreference: { loadForPeople: jest.fn(async () => opts.prefs ?? []) },
-    groupMember: { loadForPeople: jest.fn(async () => opts.groupRows ?? []) }
+    groupMember: {
+      loadForPeople: jest.fn(async () => opts.groupRows ?? []),
+      loadForPerson: jest.fn(async () => opts.viewerRows ?? [])
+    }
   } as any;
 }
 
@@ -29,7 +32,7 @@ function target(id = "t1") {
 }
 
 describe("ContactVisibilityHelper.canSee", () => {
-  const base = { isSelf: false, isMember: true, sharesGroup: false, leadsGroup: false };
+  const base = { isSelf: false, isMember: true, isStaff: false, sharesGroup: false, leadsGroup: false };
   it("orders the five levels strictly narrower each step", () => {
     const groupMate = { ...base, sharesGroup: true };
     const leader = { ...base, sharesGroup: true, leadsGroup: true };
@@ -41,6 +44,11 @@ describe("ContactVisibilityHelper.canSee", () => {
     expect(ContactVisibilityHelper.canSee("leaders", groupMate)).toBe(false);
     expect(ContactVisibilityHelper.canSee("leaders", leader)).toBe(true);
     expect(ContactVisibilityHelper.canSee("staff", leader)).toBe(false);
+  });
+
+  it("lets church staff (membershipStatus Staff) through every level", () => {
+    const staff = { ...base, isStaff: true };
+    (["everyone", "members", "groups", "leaders", "staff"] as const).forEach((level) => expect(ContactVisibilityHelper.canSee(level, staff)).toBe(true));
   });
 
   it("always lets people see their own record", () => {
@@ -109,6 +117,24 @@ describe("ContactVisibilityHelper.redactAll", () => {
     expect(repos.visibilityPreference.loadForPeople).toHaveBeenCalledWith("c1", ["t1", "t2", "t3"]);
     expect(repos.groupMember.loadForPeople).toHaveBeenCalledTimes(1);
     expect(result.map((p) => p.contactInfo.email)).toEqual([undefined, "t2@x.org", undefined]);
+  });
+
+  it("shows 'staff' and 'leaders' fields to a viewer whose membershipStatus is Staff without People View (#1316)", async () => {
+    const prefs = [{ personId: "t1", address: "staff", phoneNumber: "leaders", email: "leaders" }];
+    const result = await ContactVisibilityHelper.redactAll(viewer({ membershipStatus: "Staff" }), [target()], fakeRepos({ prefs }));
+    expect(result[0].contactInfo.address1).toBe("1 Main");
+    expect(result[0].contactInfo.mobilePhone).toBe("111");
+    expect(result[0].contactInfo.email).toBe("t1@x.org");
+  });
+
+  it("recognizes a leader role granted after sign-in from the live group rows (#1316)", async () => {
+    const prefs = [{ personId: "t1", address: "leaders", phoneNumber: "leaders", email: "leaders" }];
+    const groupRows = [{ churchId: "c1", personId: "t1", groupId: "g1" }];
+    const repos = fakeRepos({ prefs, groupRows, viewerRows: [{ groupId: "g1", leader: true }] });
+    const result = await ContactVisibilityHelper.redactAll(viewer(), [target()], repos);
+    expect(repos.groupMember.loadForPerson).toHaveBeenCalledWith("c1", "viewer");
+    expect(result[0].contactInfo.email).toBe("t1@x.org");
+    expect(result[0].contactInfo.address1).toBe("1 Main");
   });
 
   it("skips the group query when no level needs it", async () => {

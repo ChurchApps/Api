@@ -45,7 +45,7 @@ function personController(opts: any = {}) {
         anniversary: r.anniversary
       }))
     },
-    groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async () => []) },
+    groupMember: { isPublicGroupLeader: jest.fn(async () => opts.isPublicGroupLeader ?? false), loadForPeople: jest.fn(async () => []), loadForPerson: jest.fn(async () => []) },
     auditLog: { loadCount: jest.fn(async () => 0), create: jest.fn() },
     household: { deleteUnused: jest.fn(), save: jest.fn(async (h: any) => { h.id = "genH"; return h; }) },
     formSubmission: { convertAllToModel: (_c: string, rows: any[]) => rows, loadForContent: jest.fn(async () => []) },
@@ -512,6 +512,13 @@ describe("PersonController directory visibility gate", () => {
 
   it("still blocks a Visitor when the church has no directoryVisibility setting (defaults to Members)", async () => {
     const { controller, repos } = dirController({ membershipStatus: "Visitor" });
+    const result: any = await (controller as any).getList({ query: {} }, {});
+    expect(result.status).toBe(401);
+    expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();
+  });
+
+  it("blocks a Staff-status person without People View when the church is set to Admins Only (#1316)", async () => {
+    const { controller, repos } = dirController({ membershipStatus: "Staff", directoryVisibility: "Staff" });
     const result: any = await (controller as any).getList({ query: {} }, {});
     expect(result.status).toBe(401);
     expect(repos.person.loadAlphabetical).not.toHaveBeenCalled();

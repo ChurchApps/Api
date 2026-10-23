@@ -704,8 +704,10 @@ export class PersonController extends MembershipBaseController {
 
   // The directory gate follows the church's configured directoryVisibility tier
   // (Staff / Members / Regular Attendees / Everyone), not a fixed Member-or-Staff check.
+  // "Staff" is labelled Admins Only: callers already let People View through, so nobody else gets in.
   private async canViewDirectory(au: AuthenticatedUser): Promise<boolean> {
     const directoryVisibility = await this.getDirectoryVisibilitySetting(au.churchId);
+    if (directoryVisibility === "Staff") return false;
     return this.shouldShowInDirectory(au.membershipStatus, directoryVisibility);
   }
 }

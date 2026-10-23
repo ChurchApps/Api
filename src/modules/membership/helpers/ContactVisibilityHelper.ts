@@ -10,6 +10,7 @@ export type ContactVisibilityLevel = (typeof CONTACT_VISIBILITY_LEVELS)[number];
 export interface ContactVisibilityViewer {
   isSelf: boolean;
   isMember: boolean; // viewer's membershipStatus is Member or Staff
+  isStaff: boolean; // viewer's membershipStatus is Staff ("Staff" in the labels means church staff)
   sharesGroup: boolean; // viewer belongs to at least one group the target belongs to
   leadsGroup: boolean; // viewer leads at least one group the target belongs to
 }
@@ -39,9 +40,9 @@ export class ContactVisibilityHelper {
     switch (level) {
       case "everyone": return true;
       case "members": return viewer.isMember;
-      case "groups": return viewer.sharesGroup;
-      case "leaders": return viewer.leadsGroup;
-      case "staff": return false;
+      case "groups": return viewer.sharesGroup || viewer.isStaff;
+      case "leaders": return viewer.leadsGroup || viewer.isStaff;
+      case "staff": return viewer.isStaff;
       default: return false;
     }
   }
@@ -57,7 +58,7 @@ export class ContactVisibilityHelper {
   }
 
   // Returns new Person objects with contact fields the viewer may not see set to undefined.
-  // Staff with people.view see everything; everyone always sees their own record.
+  // People View holders see everything; everyone always sees their own record.
   public static async redactAll(au: ViewerAu, people: Person[], repos: Repos): Promise<Person[]> {
     if (!Array.isArray(people) || people.length === 0) return people;
     if (au.checkAccess(Permissions.people.view)) return people;
@@ -83,7 +84,16 @@ export class ContactVisibilityHelper {
     const groupsByPerson = needsGroups ? await this.loadTargetGroups(au.churchId, ids, repos) : new Map<string, string[]>();
     const viewerGroups = new Set(au.groupIds || []);
     const viewerLeads = new Set(au.leaderGroupIds || []);
+    // The token's groups are fixed at sign-in, so a group joined or a leader role granted since then is read live.
+    if (needsGroups && au.personId) {
+      const live = (await repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[];
+      live?.forEach((gm) => {
+        viewerGroups.add(gm.groupId);
+        if (gm.leader) viewerLeads.add(gm.groupId);
+      });
+    }
     const isMember = this.isMember(au.membershipStatus);
+    const isStaff = au.membershipStatus === "Staff";
 
     return people.map((p) => {
       if (!p?.id) return p;
@@ -92,6 +102,7 @@ export class ContactVisibilityHelper {
       const viewer: ContactVisibilityViewer = {
         isSelf: !!au.personId && au.personId === p.id,
         isMember,
+        isStaff,
         sharesGroup: targetGroups.some((g) => viewerGroups.has(g)),
         leadsGroup: targetGroups.some((g) => viewerLeads.has(g))
       };
