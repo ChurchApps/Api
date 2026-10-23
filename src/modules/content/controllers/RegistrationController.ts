@@ -324,7 +324,11 @@ export class RegistrationController extends ContentBaseController {
   @httpGet("/event/:eventId")
   public async getForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.registrations.view)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.registrations.view)) {
+        // Leaders of the event's group read its registrations, like its RSVPs.
+        const event = await this.repos.event.load(au.churchId, eventId);
+        if (!event?.groupId || !au.leaderGroupIds?.includes(event.groupId)) return this.json({}, 401);
+      }
       const registrations = await this.repos.registration.loadForEvent(au.churchId, eventId);
       for (const reg of registrations) {
         (reg as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);

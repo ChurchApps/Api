@@ -12,13 +12,20 @@ export class MembershipBaseController extends BaseController {
 
   public async formAccess(au: AuthenticatedUser, formId: string, access?: string): Promise<boolean> {
     if (!formId) return au.checkAccess(Permissions.forms.admin);
-    if (!(await this.repos.form.load(au.churchId, formId))) return false;
+    const form = await this.repos.form.load(au.churchId, formId);
+    if (!form) return false;
     if (au.checkAccess(Permissions.forms.admin)) return true;
+    // Leaders of the group a form is linked to can read its submissions, never manage the form.
+    if (access === "view" && this.leadsGroup(au, form.groupId)) return true;
 
     const formData = (await this.repos.form.loadWithMemberPermissions(au.churchId, formId, au.personId)) as any;
     if (formData?.contentType === "form") return (formData as any).action === "admin" || (formData as any).action === access;
     if (au.checkAccess(Permissions.forms.edit)) return true;
     return false;
+  }
+
+  public leadsGroup(au: AuthenticatedUser, groupId: string) {
+    return !!groupId && !!au.leaderGroupIds?.includes(groupId);
   }
 
   public async rolesInChurch(roleIds: string[], churchId: string): Promise<boolean> {

@@ -45,7 +45,7 @@ function makeController(opts: any = {}) {
     registrationSelectionChoice: { atomicInsertWithCapacityCheck: jest.fn(async () => opts.selOk ?? true), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async () => []) },
     registrationPayment: { save: jest.fn(async (r: any) => r), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async () => []) }
   };
-  const au = { churchId: "c1", personId: opts.auPersonId ?? "admin1", checkAccess: () => opts.checkAccess ?? true };
+  const au = { churchId: "c1", personId: opts.auPersonId ?? "admin1", leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: () => opts.checkAccess ?? true };
   const controller = new RegistrationController();
   (controller as any).repos = repos;
   (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
@@ -283,5 +283,19 @@ describe("guest registration privacy (M29)", () => {
     expect(result.personId).toBeUndefined();
     expect(result.householdId).toBeUndefined();
     expect(result.members[0].personId).toBeNull();
+  });
+});
+
+describe("event registrations for the event's group leaders", () => {
+  it("lets a leader of the event's group list its registrations", async () => {
+    const { controller } = makeController({ checkAccess: false, leaderGroupIds: ["g1"], event: { id: "e1", groupId: "g1" }, existingRegs: [{ id: "r1" }] });
+    const result: any = await (controller as any).getForEvent("e1", {}, {});
+    expect(result.map((r: any) => r.id)).toEqual(["r1"]);
+  });
+
+  it("refuses a leader of a different group", async () => {
+    const { controller } = makeController({ checkAccess: false, leaderGroupIds: ["g2"], event: { id: "e1", groupId: "g1" } });
+    const result: any = await (controller as any).getForEvent("e1", {}, {});
+    expect(result.status).toBe(401);
   });
 });
