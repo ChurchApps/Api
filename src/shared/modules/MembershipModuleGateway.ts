@@ -127,8 +127,10 @@ class MembershipModuleGatewayDb implements MembershipModuleGateway {
   private getDBValue(condition: ConditionInput) {
     let result = condition.value;
     switch (condition.value) {
+      case "{currentDay}": result = new Date().getDate().toString(); break;
       case "{currentMonth}": result = (new Date().getMonth() + 1).toString(); break;
       case "{prevMonth}":
+      case "{previousMonth}":
         result = new Date().getMonth().toString();
         if (result === "0") result = "12";
         break;

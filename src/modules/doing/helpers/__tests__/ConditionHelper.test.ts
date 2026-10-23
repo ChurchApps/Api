@@ -18,3 +18,26 @@ describe("ConditionHelper today conditions", () => {
     expect(ConditionHelper.evalSimpleCondition(cond("=", "9", "month"), today)).toBe(true);
   });
 });
+
+describe("ConditionHelper relative date values", () => {
+  const oct = { iso: "2026-10-22", dayOfMonth: 22, dayOfWeek: 5, month: 10 };
+  const jan = { iso: "2026-01-05", dayOfMonth: 5, dayOfWeek: 2, month: 1 };
+  const dec = { iso: "2026-12-31", dayOfMonth: 31, dayOfWeek: 5, month: 12 };
+
+  it("resolves today's day and month from the church's date", () => {
+    expect(ConditionHelper.resolveRelativeValue("{currentDay}", oct)).toBe("22");
+    expect(ConditionHelper.resolveRelativeValue("{currentMonth}", oct)).toBe("10");
+  });
+
+  it("treats {previousMonth} the same as {prevMonth} and wraps the year", () => {
+    expect(ConditionHelper.resolveRelativeValue("{previousMonth}", jan)).toBe("12");
+    expect(ConditionHelper.resolveRelativeValue("{prevMonth}", jan)).toBe("12");
+    expect(ConditionHelper.resolveRelativeValue("{previousMonth}", oct)).toBe("9");
+    expect(ConditionHelper.resolveRelativeValue("{nextMonth}", dec)).toBe("1");
+  });
+
+  it("leaves plain values alone", () => {
+    expect(ConditionHelper.resolveRelativeValue("15", oct)).toBe("15");
+    expect(ConditionHelper.resolveRelativeValue(undefined, oct)).toBeUndefined();
+  });
+});
