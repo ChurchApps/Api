@@ -41,3 +41,18 @@ describe("CuratedEventRepo.loadForEvents (#1211)", () => {
     expect(filtersPublic(calls)).toBe(false);
   });
 });
+
+describe("CuratedEventRepo.loadForEvents de-duplicates (#1337)", () => {
+  it("returns an event once when it is on the calendar on its own and through its group", async () => {
+    const rows = [
+      { id: "single", eventId: "e1", curatedGroupId: "g1", realEventId: "e1", title: "Kids Night" },
+      { id: "group", eventId: null, curatedGroupId: "g1", realEventId: "e1", title: "Kids Night" },
+      { id: "group", eventId: null, curatedGroupId: "g1", realEventId: "e2", title: "Other" }
+    ];
+    const chain: any = new Proxy({}, { get: (_t, p) => (p === "then" ? undefined : p === "execute" ? async () => rows : () => chain) });
+    (getDb as jest.Mock).mockReturnValue(chain);
+    const result: any[] = await new CuratedEventRepo().loadForEvents("CAL1", "c1");
+    expect(result.map((r) => r.realEventId)).toEqual(["e1", "e2"]);
+    expect(result[0].id).toBe("group");
+  });
+});

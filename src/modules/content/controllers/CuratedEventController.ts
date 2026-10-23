@@ -55,16 +55,21 @@ export class CuratedEventController extends ContentBaseController {
         req.body.forEach((curatedEvent) => {
           curatedEvent.churchId = au.churchId;
           const saveFunction = async () => {
+            const existing: CuratedEvent[] = (await this.repos.curatedEvent.loadByCuratedCalendarId(au.churchId, curatedEvent.curatedCalendarId)) || [];
+            const groupRow = existing.find((ce) => !ce.eventId && ce.groupId && ce.groupId === curatedEvent.groupId);
             if (curatedEvent?.eventIds) {
               // If eventIds are there, it means only specific group events are need to be added.
-              const eventPromises: Promise<CuratedEvent>[] = [];
-              curatedEvent.eventIds.forEach((id) => {
-                eventPromises.push(this.repos.curatedEvent.save({ ...curatedEvent, eventId: id }));
-              });
-
-              return await Promise.all(eventPromises);
+              // Skip events already listed, or already covered by their whole group.
+              if (groupRow) return [];
+              const { eventIds, ...base } = curatedEvent;
+              const newIds = [...new Set(eventIds)].filter((id) => !existing.some((ce) => ce.eventId === id));
+              return await Promise.all(newIds.map((id) => this.repos.curatedEvent.save({ ...base, eventId: id })));
             } else {
               // If eventId is not there, it means the whole group needs to be added to the curated calendar. All the group events will be added to the curated calendar.
+              if (groupRow) return groupRow;
+              // The group row covers the group's single-event rows, so drop them.
+              const covered = existing.filter((ce) => ce.eventId && ce.groupId && ce.groupId === curatedEvent.groupId);
+              await Promise.all(covered.map((ce) => this.repos.curatedEvent.delete(au.churchId, ce.id)));
               return await this.repos.curatedEvent.save(curatedEvent);
             }
           };
