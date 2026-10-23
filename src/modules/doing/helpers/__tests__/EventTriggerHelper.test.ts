@@ -45,3 +45,11 @@ describe("EventTriggerHelper.resolve form.submission.created", () => {
     expect(result[0].subject.label).toBe("VBS");
   });
 });
+
+describe("EventTriggerHelper.fieldDefs membership status", () => {
+  it("offers Guest, the status self-registered people get, right after Visitor", () => {
+    const def = EventTriggerHelper.fieldDefs().find(d => d.eventType === "person.created");
+    const field = def.fields.find(f => f.key === "person.membershipStatus");
+    expect(field.options.map(o => o.value).slice(0, 2)).toEqual(["Visitor", "Guest"]);
+  });
+});
