@@ -43,6 +43,10 @@ export class MessagingBaseController extends BaseController {
     if (au.checkAccess(Permissions.content.edit) || au.checkAccess(Permissions.calendars.admin)) return true;
     const { getContentModuleGateway } = await import("../../../shared/modules/ContentModuleGateway.js");
     const event = await getContentModuleGateway().loadEvent(au.churchId, eventId);
+    return this.eventRoleAllows(au, event, mode);
+  }
+
+  protected eventRoleAllows(au: any, event: any, mode: "view" | "post"): boolean {
     if (!event?.groupId) return false;
     const role = (mode === "view" ? event.notesViewRole : event.notesPostRole) || "staff";
     const isLeader = !!au.leaderGroupIds?.includes(event.groupId);
