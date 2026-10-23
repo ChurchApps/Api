@@ -71,6 +71,27 @@ export class ConversationRepo {
       .execute();
   }
 
+  // Newest-first notes across every record of the given note types, for the admin Notes page. Keyset
+  // paged on (timeSent, id) so equal timestamps never repeat or drop a row between pages.
+  public async loadNotesFeed(churchId: string, contentTypes: string[], contentIds: string[] | null, before: { timeSent: Date; id: string } | null, limit: number) {
+    if (contentTypes.length === 0 || (contentIds && contentIds.length === 0)) return [];
+    let q = getDb().selectFrom("messages as m")
+      .innerJoin("conversations as c", (join) => join.onRef("c.id", "=", "m.conversationId").onRef("c.churchId", "=", "m.churchId"))
+      .select([
+        "m.id as messageId", "m.conversationId", "c.contentType", "c.contentId", "m.personId", "m.displayName", "m.timeSent", "m.content"
+      ])
+      .where("m.churchId", "=", churchId)
+      .where("c.contentType", "in", contentTypes);
+    if (contentIds) q = q.where("c.contentId", "in", contentIds);
+    if (before) {
+      q = q.where((eb) => eb.or([
+        eb("m.timeSent", "<", before.timeSent),
+        eb.and([eb("m.timeSent", "=", before.timeSent), eb("m.id", "<", before.id)])
+      ]));
+    }
+    return q.orderBy("m.timeSent", "desc").orderBy("m.id", "desc").limit(limit).execute();
+  }
+
   public async loadById(churchId: string, id: string) {
     return (await getDb().selectFrom("conversations").selectAll()
       .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
