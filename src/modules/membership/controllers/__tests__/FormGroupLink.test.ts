@@ -117,6 +117,12 @@ describe("GET /forms/group/:groupId", () => {
     expect(result.map((f: any) => [f.id, f.open])).toEqual([["linked", true], ["closed", false]]);
   });
 
+  it("lists open and closed linked forms to a forms admin outside the group", async () => {
+    const c = wire(new FormController(), au({ perms: ["formsAdmin"] }));
+    const result: any = await (c as any).getForGroup("g1", {}, {});
+    expect(result.map((f: any) => [f.id, f.open])).toEqual([["linked", true], ["closed", false]]);
+  });
+
   it("refuses someone outside the group", async () => {
     const c = wire(new FormController(), au({ groupIds: ["g2"] }));
     const result: any = await (c as any).getForGroup("g1", {}, {});

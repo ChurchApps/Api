@@ -42,13 +42,14 @@ export class FormController extends MembershipBaseController {
   @httpGet("/group/:groupId")
   public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      const isLeader = this.leadsGroup(au, groupId);
-      if (!isLeader && !au.groupIds?.includes(groupId)) return this.json([], 401);
+      // Forms admins already see every form, so they get the leader's view (open and closed).
+      const canSeeAll = this.leadsGroup(au, groupId) || au.checkAccess(Permissions.forms.admin);
+      if (!canSeeAll && !au.groupIds?.includes(groupId)) return this.json([], 401);
       const forms: Form[] = this.repos.form.convertAllToModel(au.churchId, (await this.repos.form.loadForGroup(au.churchId, groupId)) as any[]);
       return forms
         .filter((f) => f.contentType === "form")
         .map((f) => ({ id: f.id, name: f.name, description: f.description, open: this.isOpen(f) }))
-        .filter((f) => isLeader || f.open);
+        .filter((f) => canSeeAll || f.open);
     });
   }
 
