@@ -4,12 +4,25 @@ jest.mock("../../../modules/messaging/helpers/NotificationHelper.js", () => ({ N
 const loadByIdMock = jest.fn();
 jest.mock("../../infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ emailTemplate: { loadById: loadByIdMock } })) } }));
 
+const remainingMock = jest.fn().mockResolvedValue(150);
+jest.mock("../../helpers/ChurchEmailLimiter.js", () => ({ ChurchEmailLimiter: { remaining: (...args: unknown[]) => remainingMock(...args) } }));
+
 import { getMessagingModuleGateway } from "../MessagingModuleGateway.js";
 
 describe("MessagingModuleGateway.sendTemplatedEmail", () => {
   beforeEach(() => {
     createNotificationsMock.mockClear();
     loadByIdMock.mockReset();
+    remainingMock.mockResolvedValue(150);
+  });
+
+  // #1338: an unapproved church's email is dropped downstream, so the card must not record "Email sent".
+  it("returns false without notifying when the church has no email allowance (not approved)", async () => {
+    loadByIdMock.mockResolvedValue({ subject: "Hi", htmlContent: "<p>Hi</p>" });
+    remainingMock.mockResolvedValue(0);
+    const result = await getMessagingModuleGateway().sendTemplatedEmail("c1", "p1", "t1", { email: "pat@example.com" }, "Church");
+    expect(result).toBe(false);
+    expect(createNotificationsMock).not.toHaveBeenCalled();
   });
 
   it("returns false without notifying when the recipient has no email", async () => {

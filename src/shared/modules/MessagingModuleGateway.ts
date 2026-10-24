@@ -2,6 +2,7 @@ import { RepoManager } from "../infrastructure/RepoManager.js";
 import { MergeFieldHelper } from "../../modules/messaging/helpers/MergeFieldHelper.js";
 import { PreferenceGateHelper } from "../../modules/messaging/helpers/PreferenceGateHelper.js";
 import { NotificationHelper } from "../../modules/messaging/helpers/NotificationHelper.js";
+import { ChurchEmailLimiter } from "../helpers/ChurchEmailLimiter.js";
 
 interface EmailRecipient {
   firstName?: string;
@@ -117,6 +118,8 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     const repos = await this.repos();
     const template = await repos.emailTemplate.loadById(churchId, templateId);
     if (!template) return false;
+    // An unapproved or paused church has no allowance and the send is dropped downstream; report it as not sent.
+    if ((await ChurchEmailLimiter.remaining(churchId)) < 1) return false;
     const church = { name: churchName };
     const subject = MergeFieldHelper.resolve(subjectOverride || template.subject || "", recipient, church);
     const body = MergeFieldHelper.resolve(template.htmlContent || "", recipient, church);
