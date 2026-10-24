@@ -83,14 +83,26 @@ export class YouTubeHelper {
     }
   }
 
+  // The search endpoint HTML-escapes snippet text; the videos endpoint does not.
+  private static decodeEntities(text: string) {
+    if (!text) return text;
+    const named: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'" };
+    return text.replace(/&(#x[0-9a-f]+|#[0-9]+|amp|lt|gt|quot|apos);/gi, (match, entity: string) => {
+      const lower = entity.toLowerCase();
+      if (!lower.startsWith("#")) return named[lower] ?? match;
+      const code = lower.startsWith("#x") ? parseInt(lower.substring(2), 16) : parseInt(lower.substring(1), 10);
+      return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+    });
+  }
+
   private static convertToSermons(churchId: string, json: any) {
     const sermons: Sermon[] = [];
     for (const item of json.items) {
       const sermon: Sermon = {
         churchId,
-        title: item.snippet.title,
+        title: this.decodeEntities(item.snippet.title),
         thumbnail: item.snippet.thumbnails?.maxres?.url || item.snippet.thumbnails?.high?.url || "",
-        description: item.snippet.description,
+        description: this.decodeEntities(item.snippet.description),
         publishDate: new Date(item.snippet.publishedAt),
         videoType: "youtube",
         videoData: item.id.videoId,
