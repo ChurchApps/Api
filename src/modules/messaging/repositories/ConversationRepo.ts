@@ -81,7 +81,9 @@ export class ConversationRepo {
         "m.id as messageId", "m.conversationId", "c.contentType", "c.contentId", "m.personId", "m.displayName", "m.timeSent", "m.content"
       ])
       .where("m.churchId", "=", churchId)
-      .where("c.contentType", "in", contentTypes);
+      .where("c.contentType", "in", contentTypes)
+      // The notification bell's "subscription" markers live in the thread but are not notes.
+      .where((eb) => eb.or([eb("m.messageType", "is", null), eb("m.messageType", "!=", "subscription")]));
     if (contentIds) q = q.where("c.contentId", "in", contentIds);
     if (before) {
       q = q.where((eb) => eb.or([

@@ -125,6 +125,21 @@ describe("ConversationRepo.save", () => {
   });
 });
 
+// ChurchAppsSupport#1344: the notification bell saves "subscription" marker messages ("on"/"off") into the
+// note thread. The Notes page feed must leave them out, or each bell click shows up as an empty note.
+describe("ConversationRepo.loadNotesFeed", () => {
+  const { getDb } = jest.requireMock("../../db/index");
+
+  it("excludes subscription marker messages while keeping notes with no messageType", async () => {
+    const { db, queries } = capturingDb([]);
+    getDb.mockReturnValue(db);
+    await new ConversationRepo().loadNotesFeed("CHU1", ["person"], null, null, 25);
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toMatch(/\(`m`\.`messageType` is null or `m`\.`messageType` != \?\)/);
+    expect(queries[0].parameters).toContain("subscription");
+  });
+});
+
 function capturingDb(rows: any[] = []) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
