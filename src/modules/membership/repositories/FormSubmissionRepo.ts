@@ -82,7 +82,10 @@ export class FormSubmissionRepo {
       .selectAll("fs")
       .select("f.name as formName")
       .where("fs.churchId", "=", churchId)
-      .where("fs.submittedBy", "=", personId)
+      .where((eb) => eb.or([
+        eb("fs.submittedBy", "=", personId),
+        eb.and([eb("fs.contentType", "=", "person"), eb("fs.contentId", "=", personId)])
+      ]))
       .where("f.removed", "=", false as any)
       .where("f.contentType", "=", "form")
       .orderBy("fs.submissionDate", "desc")
