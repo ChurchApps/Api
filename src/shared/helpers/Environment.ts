@@ -126,6 +126,9 @@ export class Environment extends EnvironmentBase {
     if (!process.env.GOCURRICULUM_CLIENT_SECRET) {
       process.env.GOCURRICULUM_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/gocurriculumClientSecret`);
     }
+    if (!process.env.GOCURRICULUM_FEEDS) {
+      process.env.GOCURRICULUM_FEEDS = await AwsHelper.readParameter(`/${environment}/gocurriculumFeeds`);
+    }
     if (!process.env.GOOGLE_DRIVE_CLIENT_SECRET) {
       process.env.GOOGLE_DRIVE_CLIENT_SECRET = await AwsHelper.readParameter(`/${environment}/googleDriveClientSecret`);
     }

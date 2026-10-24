@@ -3,6 +3,7 @@ import { ContentProviderAuth } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 
 setProviderSecret("gocurriculum", process.env.GOCURRICULUM_CLIENT_SECRET || "");
+setProviderSecret("gocurriculumFeeds", process.env.GOCURRICULUM_FEEDS || "");
 setProviderSecret("googledrive", process.env.GOOGLE_DRIVE_CLIENT_SECRET || "");
 setProviderSecret("onedrive", process.env.ONEDRIVE_CLIENT_SECRET || "");
 

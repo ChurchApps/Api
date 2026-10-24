@@ -87,4 +87,18 @@ describe("ProviderRelayTokenController", () => {
     expect(denied.status).toBe(400);
     expect(denied.obj.error).toBe("unsupported_provider");
   });
+
+  it("serves the Go catalog only for a token Go verifies", async () => {
+    const getCatalog = jest.fn(async (groupId: string, auth: any) => (auth.access_token === "good" ? { catalog: [{ id: groupId }] } : null));
+    (getProvider as jest.Mock).mockReturnValue({ getCatalog });
+    process.env.GOCURRICULUM_FEEDS = "{\"elementary\":\"https://feeds.test/e\"}";
+    const { controller } = harness(null);
+    const ok: any = await controller.goCurriculumCatalog({ body: { groupId: "elementary", accessToken: "good" } } as any, {} as any);
+    expect(ok).toEqual({ obj: { catalog: [{ id: "elementary" }] }, status: 200 });
+    expect(setProviderSecret).toHaveBeenCalledWith("gocurriculumFeeds", process.env.GOCURRICULUM_FEEDS);
+    const bad: any = await controller.goCurriculumCatalog({ body: { groupId: "elementary", accessToken: "bad" } } as any, {} as any);
+    expect(bad.status).toBe(404);
+    const missing: any = await controller.goCurriculumCatalog({ body: { groupId: "elementary" } } as any, {} as any);
+    expect(missing.status).toBe(400);
+  });
 });
