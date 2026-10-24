@@ -14,7 +14,7 @@ import type { AuthenticatedUser } from "@churchapps/apihelper";
 
 @controller("/membership/formsubmissions")
 export class FormSubmissionController extends MembershipBaseController {
-  // Self-scoped: stand-alone forms the signed-in member submitted. Person forms (staff fill those in about someone) are left out by the repo.
+  // Self-scoped: stand-alone forms the signed-in member submitted or an admin assigned to them. Person forms (staff fill those in about someone) are left out by the repo.
   @httpGet("/my")
   public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
