@@ -731,3 +731,22 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
     expect(result[0].deliveryMethod).not.toBe("complete");
   });
 });
+
+describe("NotificationHelper.sendEmailNotification volunteer requests", () => {
+  beforeEach(() => {
+    sendTemplatedEmailMock.mockClear();
+    sendTemplatedEmailMock.mockResolvedValue(undefined);
+    NotificationHelper.init({ notification: { save: jest.fn(async (n) => n) }, deliveryLog: { save: jest.fn(async () => ({})) } } as any);
+  });
+
+  it("keeps the position's period and breaks before the confirm line", async () => {
+    const notification = { id: "N1", churchId: "CHU1", personId: "PER1", contentType: "assignment", contentId: "A1", message: "Volunteer Requests: Oct 25, 2026 - Session 1 - Teacher. Please log in and confirm." } as any;
+
+    await NotificationHelper.sendEmailNotification("volunteer@example.com", [notification]);
+
+    expect(sendTemplatedEmailMock).toHaveBeenCalledTimes(1);
+    const content: string = sendTemplatedEmailMock.mock.calls[0][5];
+    expect(content.replace(/<[^>]+>/g, "")).not.toMatch(/Teacher\.Please/);
+    expect(content).toContain("<h4>Oct 25, 2026 - Session 1 - Teacher.</h4>");
+  });
+});

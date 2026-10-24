@@ -1014,13 +1014,17 @@ export class NotificationHelper {
         title = firstNotification.message;
         content = NotificationHelper.escapeHtml(firstNotification.message);
       } else if (firstNotification.message.includes("Volunteer Requests:")) {
-        const match = firstNotification.message.match(/Volunteer Requests:(.*).Please log in and confirm/);
+        const match = firstNotification.message.match(/Volunteer Requests:\s*(.*?)\s*Please log in and confirm/);
         title = "New Notification: Volunteer Request";
-        content = "<h3>New Notification</h3><h4>Volunteer Request</h4><h4>" + NotificationHelper.escapeHtml(match ? match[1] : firstNotification.message) + "</h4>" +
+        content = [
+          "<h3>New Notification</h3>",
+          "<h4>Volunteer Request</h4>",
+          "<h4>" + NotificationHelper.escapeHtml(match ? match[1].trim() : firstNotification.message) + "</h4>",
           (/^https?:\/\//i.test(firstNotification.link || "")
             ? "<a href='" + NotificationHelper.escapeHtml(firstNotification.link) + "' target='_blank'><button style='background-color: #0288d1; border:2px solid #0288d1; border-radius: 5px; color:white; cursor: pointer; padding: 5px'>View Details</button></a>"
-            : "") +
-          "<p>Please log in and confirm</p>";
+            : ""),
+          "<p>Please log in and confirm</p>"
+        ].filter(Boolean).join("\n");
       } else {
         title = "New Notification: " + firstNotification.message;
         content = "New Notification: " + NotificationHelper.escapeHtml(firstNotification.message);
