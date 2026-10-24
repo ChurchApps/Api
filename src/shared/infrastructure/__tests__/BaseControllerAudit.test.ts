@@ -77,6 +77,26 @@ describe("BaseController audit", () => {
     expect(sink()).toHaveLength(0);
   });
 
+  it.each([
+    ["membership", "/membership/people", "/advancedSearch"],
+    ["membership", "/membership/people", "/search"],
+    ["membership", "/membership/churches", "/search"],
+    ["content", "/content/stock", "/search"]
+  ])("does not log read-only search POSTs (%s %s%s)", async (moduleName, baseUrl, routePath) => {
+    const ctrl = makeController(moduleName, au);
+    const req = { ...baseReq, method: "POST", baseUrl, path: routePath, route: { path: routePath }, body: [{ field: "displayName", operator: "contains", value: "Donald" }] };
+    await ctrl.actionWrapper(req, {} as any, async () => [{ id: "p1" }]);
+    expect(sink()).toHaveLength(0);
+  });
+
+  it("still logs person saves alongside the search opt-outs", async () => {
+    const ctrl = makeController("membership", au);
+    const req = { ...baseReq, method: "POST", path: "/membership/people", route: { path: "/membership/people" }, body: [{ id: "p1", firstName: "Alice" }] };
+    await ctrl.actionWrapper(req, {} as any, async () => [{ id: "p1" }]);
+    expect(sink()).toHaveLength(1);
+    expect(sink()[0].action).toBe("person_saved");
+  });
+
   it("returns normally even when the audit insert fails", async () => {
     (globalThis as any).__auditThrow = true;
     const ctrl = makeController("membership", au);
