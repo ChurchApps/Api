@@ -125,7 +125,12 @@ export class BaseController extends CustomBaseController {
     "/attendance/checkin": { optOut: true },
     "/messaging/messages": { optOut: true },
     "/messaging/connections": { optOut: true },
-    "/messaging/devices": { optOut: true }
+    "/messaging/devices": { optOut: true },
+    // Read-only searches sent as POST (filters in the body); they change nothing.
+    "/membership/people/search": { optOut: true },
+    "/membership/people/advancedSearch": { optOut: true },
+    "/membership/churches/search": { optOut: true },
+    "/content/stock/search": { optOut: true }
   };
 
   // Per-entity audit for bulk endpoints (each touched id becomes one row).

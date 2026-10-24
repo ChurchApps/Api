@@ -1,5 +1,5 @@
 {
-  "displayName": "Group attendance by day - {groupName}",
+  "displayName": "Group attendance by day",
   "description": "Total counts of how many people attended a group each day.",
   "queries": [
     {
@@ -56,7 +56,7 @@
     {
       "header": "Attendees",
       "value": "attendees",
-      "formatter": "date"
+      "formatter": "number"
     }
   ],
   "permissions": [
