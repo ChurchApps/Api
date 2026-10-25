@@ -234,6 +234,15 @@ describe("WorkflowHelper notifyPerson action", () => {
     expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("Notified Pastor");
   });
 
+  it("counts the email against the church email allowance, since it carries the church's message", async () => {
+    const repos = buildRepos(steps, { stepN: [{ actionType: "notifyPerson", config: JSON.stringify({ personId: "p9", message: "Please call" }) }] });
+    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+
+    await WorkflowHelper.moveToStep(task, "stepN", repos);
+
+    expect(notifyMock).toHaveBeenCalledWith(["p9"], "c1", "task", "t1", expect.any(String), expect.any(String), undefined, expect.objectContaining({ emailImmediate: true, churchAuthored: true }));
+  });
+
   it("does nothing when no person is picked", async () => {
     const repos = buildRepos(steps, { stepN: [{ actionType: "notifyPerson", config: JSON.stringify({ message: "Please call" }) }] });
     const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };

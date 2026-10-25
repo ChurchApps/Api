@@ -259,6 +259,7 @@ export class StepActionHelper {
 
   // Emails and notifies a chosen staff person about the card. Uses only the card's
   // person, workflow/step names and the church's message, never giving data.
+  // The message is church-written, so the email draws on ChurchEmailLimiter like the Send Email step.
   private static async notifyPerson(task: Task, step: WorkflowStep, config: Record<string, any>, repos: Repos): Promise<void> {
     if (!config.personId) return;
     const workflow = task.workflowId ? await repos.workflow.load(task.churchId || "", task.workflowId) : null;
@@ -266,7 +267,7 @@ export class StepActionHelper {
     const where = [workflow?.name, step.name].filter(Boolean).join(": ");
     const text = [where ? `${subject} — ${where}` : subject, config.message?.trim()].filter(Boolean).join(". ");
     const link = (Environment.b1AdminRoot || "https://admin.b1.church").replace(/\/$/, "") + "/serving/tasks/" + task.id;
-    await NotificationService.createNotifications([config.personId], task.churchId || "", "task", task.id || "", text, link, undefined, { emailImmediate: true, deliveryTitle: "Workflow: " + (step.name || "") });
+    await NotificationService.createNotifications([config.personId], task.churchId || "", "task", task.id || "", text, link, undefined, { emailImmediate: true, churchAuthored: true, deliveryTitle: "Workflow: " + (step.name || "") });
     this.appendHistory(task, `Notified ${config.personLabel || "person"}`);
   }
 

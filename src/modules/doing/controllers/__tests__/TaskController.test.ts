@@ -9,7 +9,8 @@ jest.mock("../../../../shared/helpers/index", () => ({
   TaskAuth: jest.requireActual("../../../../shared/helpers/TaskAuth").TaskAuth
 }));
 jest.mock("../../../../shared/events/InternalEventBus", () => ({ InternalEventBus: { publish: jest.fn() } }));
-jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: jest.fn() }));
+const loadConversationMock = jest.fn();
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: jest.fn(), getMessagingModuleGateway: () => ({ loadConversation: loadConversationMock }) }));
 const prepareRequest = jest.fn();
 const completeDecision = jest.fn();
 const notifyReviewers = jest.fn();
@@ -171,6 +172,11 @@ describe("TaskController.moveStep workflow scoping", () => {
 });
 
 describe("TaskController.setConversation", () => {
+  beforeEach(() => {
+    loadConversationMock.mockReset();
+    loadConversationMock.mockImplementation(async (churchId: string, id: string) => (churchId === "c1" && id === "conv1" ? { id: "conv1", churchId: "c1", contentType: "workflowCard", contentId: "t1" } : null));
+  });
+
   function setup(task: any, canEdit = true) {
     const repos: any = { task: { load: jest.fn(async () => task), save: jest.fn(async (t: any) => ({ ...t })) } };
     const controller: any = makeController([], repos);
@@ -184,6 +190,22 @@ describe("TaskController.setConversation", () => {
     const result = await controller.setConversation("t1", { body: { conversationId: "conv1" } }, {});
     expect(repos.task.save).toHaveBeenCalledWith(expect.objectContaining({ id: "t1", conversationId: "conv1" }));
     expect(result.conversationId).toBe("conv1");
+  });
+
+  it("refuses a conversation that is not this card's notes", async () => {
+    loadConversationMock.mockImplementation(async () => ({ id: "conv2", churchId: "c1", contentType: "group", contentId: "g1" }));
+    const { controller, repos } = setup({ id: "t1", churchId: "c1", workflowId: "w1", stepId: "s1" });
+    const result = await controller.setConversation("t1", { body: { conversationId: "conv2" } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.task.save).not.toHaveBeenCalled();
+  });
+
+  it("refuses another card's notes conversation", async () => {
+    loadConversationMock.mockImplementation(async () => ({ id: "conv3", churchId: "c1", contentType: "workflowCard", contentId: "t2" }));
+    const { controller, repos } = setup({ id: "t1", churchId: "c1", workflowId: "w1", stepId: "s1" });
+    const result = await controller.setConversation("t1", { body: { conversationId: "conv3" } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.task.save).not.toHaveBeenCalled();
   });
 
   it("keeps the card's existing conversation", async () => {

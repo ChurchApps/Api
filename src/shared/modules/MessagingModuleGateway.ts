@@ -25,6 +25,7 @@ export interface MessagingModuleGateway {
   loadDeliveryLogsByPerson(churchId: string, personId: string): Promise<any[]>;
   // Person notes are conversations; the caller passes the contentTypes it is allowed to read.
   loadPersonNotes(churchId: string, personId: string, contentTypes: string[]): Promise<any[]>;
+  loadConversation(churchId: string, id: string): Promise<any | null>;
   createNotifications(notifications: any[]): Promise<any[]>;
   // Render a saved EmailTemplate and send through notification funnel; returns false if template missing or no email.
   sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
@@ -106,6 +107,10 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     const repos = await this.repos();
     const conversations = (await Promise.all(contentTypes.map((ct) => repos.conversation.loadForContent(churchId, ct, personId)))).flat();
     return Promise.all(conversations.map(async (c: any) => ({ ...c, messages: await repos.message.loadForConversation(churchId, c.id) })));
+  }
+
+  public async loadConversation(churchId: string, id: string) {
+    return (await this.repos()).conversation.loadById(churchId, id);
   }
 
   public async createNotifications(notifications: any[]) {

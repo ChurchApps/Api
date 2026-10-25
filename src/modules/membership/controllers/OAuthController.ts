@@ -278,7 +278,8 @@ export class OAuthController extends MembershipBaseController {
       }
 
       const client = await this.repos.oAuthClient.loadByClientId(client_id);
-      if (!client) {
+      // Self-registered clients sign in with a code and PKCE only; their names are caller-chosen.
+      if (!client || client.selfRegistered) {
         return this.json({ error: "invalid_client" }, 400);
       }
 
