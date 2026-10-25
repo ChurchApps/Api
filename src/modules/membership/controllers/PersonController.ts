@@ -449,9 +449,10 @@ export class PersonController extends MembershipBaseController {
   public async advancedSearch(req: express.Request<{}, {}, SearchCondition[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
+      const conditions = req.body ?? [];
+      if (!Array.isArray(conditions)) return this.json({ error: "Expected an array of search conditions" }, 400);
       else {
         let data: any[] = (await this.repos.person.loadAll(au.churchId)) as any[];
-        const conditions = req.body ?? [];
         const fieldConditions = conditions.filter((c) => typeof c.field === "string" && c.field.startsWith("personField_"));
         const standardConditions = conditions.filter((c) => !(typeof c.field === "string" && c.field.startsWith("personField_")));
         if (fieldConditions.length) data = await ListRuleHelper.filterByFieldConditions(au.churchId, data, fieldConditions, this.repos);
