@@ -11,9 +11,11 @@ const sendPersonTextMock = jest.fn().mockResolvedValue({ ok: true });
 const addGroupMemberMock = jest.fn().mockResolvedValue(undefined);
 const loadPersonMock = jest.fn().mockResolvedValue({ email: "p@example.com" });
 const loadChurchMock = jest.fn().mockResolvedValue({ name: "Demo Church" });
+const recordAttendanceMock = jest.fn().mockResolvedValue(1);
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({ loadPerson: loadPersonMock, loadChurch: loadChurchMock, addGroupMember: addGroupMemberMock, setPersonField: jest.fn() }),
-  getMessagingModuleGateway: () => ({ sendTemplatedEmail: sendTemplatedEmailMock, sendPersonText: sendPersonTextMock })
+  getMessagingModuleGateway: () => ({ sendTemplatedEmail: sendTemplatedEmailMock, sendPersonText: sendPersonTextMock }),
+  getAttendanceModuleGateway: () => ({ recordAttendance: recordAttendanceMock })
 }));
 
 jest.mock("../../../../shared/webhooks/UrlValidator.js", () => ({ UrlValidator: { validate: jest.fn().mockResolvedValue(null) } }));
@@ -340,5 +342,45 @@ describe("WorkflowHelper sendEmail action", () => {
       "Demo Church",
       undefined
     );
+  });
+});
+
+describe("WorkflowHelper recordAttendance action", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  const steps: FakeStep[] = [
+    { id: "stepA", workflowId: "wf1", sort: 1, name: "A" },
+    { id: "stepACT", workflowId: "wf1", sort: 2, name: "Auto" }
+  ];
+  const action = { actionType: "recordAttendance", config: JSON.stringify({ groupId: "g1", groupLabel: "Sunday Night Service" }) };
+
+  it("records the person's attendance at the time the card was created", async () => {
+    const repos = buildRepos(steps, { stepACT: [action] });
+    const created = new Date("2026-10-25T23:50:00Z");
+    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", dateCreated: created };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(recordAttendanceMock).toHaveBeenCalledWith("c1", "p1", "g1", created);
+    expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("Attendance recorded: Sunday Night Service");
+  });
+
+  it("notes on the card when no scheduled service is in progress", async () => {
+    recordAttendanceMock.mockResolvedValueOnce(0);
+    const repos = buildRepos(steps, { stepACT: [action] });
+    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("No scheduled service in progress — attendance not recorded");
+  });
+
+  it("skips a card that is not about a person", async () => {
+    const repos = buildRepos(steps, { stepACT: [action] });
+    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "group", associatedWithId: "g9" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(recordAttendanceMock).not.toHaveBeenCalled();
   });
 });
