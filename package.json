@@ -62,7 +62,7 @@
     "@aws-sdk/s3-request-presigner": "3.1057.0",
     "@churchapps/apihelper": "^1.1.4",
     "@churchapps/content-providers": "^0.14.0",
-    "@churchapps/helpers": "^2.10.0",
+    "@churchapps/helpers": "^2.11.1",
     "@churchapps/texting": "^0.6.0",
     "@codegenie/serverless-express": "^4.15.0",
     "@hubspot/api-client": "^13.1.0",
