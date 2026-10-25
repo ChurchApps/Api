@@ -155,12 +155,17 @@ export class ApiBibleHelper {
     }
   }
 
+  // api.bible sometimes hangs for ~29 s before answering 504, which ran the Lambda into its time limit.
+  // Successful calls finish well under this, so give up sooner and answer the same 504.
+  static requestTimeoutMs = 15000;
+
   static async getContent(url: string) {
     try {
-      const resp = await axios.get(url, { headers: { "api-key": Environment.apiBibleKey } });
+      const resp = await axios.get(url, { headers: { "api-key": Environment.apiBibleKey }, timeout: this.requestTimeoutMs });
       return resp.data;
     } catch (error: any) {
       if (error.response?.status) error.status = error.response.status;
+      else if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") error.status = 504;
       throw error;
     }
   }
