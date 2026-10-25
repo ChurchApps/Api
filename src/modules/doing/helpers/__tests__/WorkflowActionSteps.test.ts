@@ -21,6 +21,8 @@ jest.mock("../../../../shared/webhooks/UrlValidator.js", () => ({ UrlValidator: 
 const notifyMock = jest.fn().mockResolvedValue(undefined);
 jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ NotificationService: { createNotifications: notifyMock } }));
 
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { b1AdminRoot: "https://admin.test" } }));
+
 jest.mock("../ConjunctionHelper.js", () => ({ ConjunctionHelper: { personMatchesStepRoute: jest.fn().mockResolvedValue(false) } }));
 
 // Avoid loading the DB/Environment chain (Environment.ts uses import.meta.url, which
@@ -200,6 +202,45 @@ describe("WorkflowHelper on-enter actions", () => {
 
     expect(addGroupMemberMock).toHaveBeenCalledWith("c1", "g1", "p1");
     expect(task.stepId).toBe("stepACT");
+  });
+});
+
+describe("WorkflowHelper notifyPerson action", () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  const steps: FakeStep[] = [
+    { id: "stepA", workflowId: "wf1", sort: 1, name: "New" },
+    { id: "stepN", workflowId: "wf1", sort: 2, name: "Pastor call" }
+  ];
+
+  it("emails and notifies the chosen person with the card's person, workflow, step and message", async () => {
+    const repos = buildRepos(steps, { stepN: [{ actionType: "notifyPerson", config: JSON.stringify({ personId: "p9", personLabel: "Pastor", message: "Please call" }) }] });
+    repos.workflow.load = jest.fn(async () => ({ id: "wf1", name: "Lapsed Givers" }));
+    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", title: "Check in", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+
+    await WorkflowHelper.moveToStep(task, "stepN", repos);
+
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+    expect(notifyMock).toHaveBeenCalledWith(
+      ["p9"],
+      "c1",
+      "task",
+      "t1",
+      "Donald Clark — Lapsed Givers: Pastor call. Please call",
+      "https://admin.test/serving/tasks/t1",
+      undefined,
+      expect.objectContaining({ emailImmediate: true })
+    );
+    expect(JSON.parse(task.data).history.map((h: any) => h.message)).toContain("Notified Pastor");
+  });
+
+  it("does nothing when no person is picked", async () => {
+    const repos = buildRepos(steps, { stepN: [{ actionType: "notifyPerson", config: JSON.stringify({ message: "Please call" }) }] });
+    const task: any = { id: "t1", churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+
+    await WorkflowHelper.moveToStep(task, "stepN", repos);
+
+    expect(notifyMock).not.toHaveBeenCalled();
   });
 });
 

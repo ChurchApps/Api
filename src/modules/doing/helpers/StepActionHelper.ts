@@ -4,6 +4,8 @@ import { Task, WorkflowStep, WorkflowStepAction } from "../models/index.js";
 import { getMembershipModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
 import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
 import { SafeHttp } from "../../../shared/webhooks/SafeHttp.js";
+import { NotificationService } from "../../../shared/helpers/NotificationService.js";
+import { Environment } from "../../../shared/helpers/Environment.js";
 import { AssignmentWorkflowHelper } from "./AssignmentWorkflowHelper.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
 
@@ -91,6 +93,9 @@ export class StepActionHelper {
             break;
           case "createTask":
             await this.createTask(task, config, repos);
+            break;
+          case "notifyPerson":
+            await this.notifyPerson(task, step, config, repos);
             break;
           default:
             break;
@@ -250,6 +255,19 @@ export class StepActionHelper {
       data: JSON.stringify({ description: config.description, assignment: this.parseData(task).assignment, parentCardId: task.id, ...(task.assignmentId ? { history: [{ date: new Date().toISOString(), message: "Created by serving confirmation workflow" }] } : {}) })
     });
     this.appendHistory(task, `Task created: ${config.title} (${child.id || ""})`);
+  }
+
+  // Emails and notifies a chosen staff person about the card. Uses only the card's
+  // person, workflow/step names and the church's message, never giving data.
+  private static async notifyPerson(task: Task, step: WorkflowStep, config: Record<string, any>, repos: Repos): Promise<void> {
+    if (!config.personId) return;
+    const workflow = task.workflowId ? await repos.workflow.load(task.churchId || "", task.workflowId) : null;
+    const subject = task.associatedWithLabel || task.title || "Card";
+    const where = [workflow?.name, step.name].filter(Boolean).join(": ");
+    const text = [where ? `${subject} — ${where}` : subject, config.message?.trim()].filter(Boolean).join(". ");
+    const link = (Environment.b1AdminRoot || "https://admin.b1.church").replace(/\/$/, "") + "/serving/tasks/" + task.id;
+    await NotificationService.createNotifications([config.personId], task.churchId || "", "task", task.id || "", text, link, undefined, { emailImmediate: true, deliveryTitle: "Workflow: " + (step.name || "") });
+    this.appendHistory(task, `Notified ${config.personLabel || "person"}`);
   }
 
   private static async addToWorkflow(task: Task, config: Record<string, any>, repos: Repos, depth: number): Promise<void> {
