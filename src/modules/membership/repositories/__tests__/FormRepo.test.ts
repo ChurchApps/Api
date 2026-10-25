@@ -83,3 +83,26 @@ describe("FormRepo.loadByIds and submission history", () => {
     expect(wheres.map((w) => w[0])).not.toContain("archived");
   });
 });
+
+describe("FormRepo header photo round-trip", () => {
+  const repo = new FormRepo();
+
+  it("maps the photoUrl column from a db row to the model", () => {
+    const model = repo.convertToModel("ch1", { id: "f4", churchId: "ch1", name: "Summer Camp", photoUrl: "https://example.com/camp.jpg" });
+    expect(model.photoUrl).toBe("https://example.com/camp.jpg");
+  });
+
+  it("writes photoUrl on create and clears it on update", async () => {
+    const inserted: any[] = [];
+    const updated: any[] = [];
+    const insertChain = { values: (v: any) => { inserted.push(v); return { execute: async () => undefined }; } };
+    const updateChain = { set: (v: any) => { updated.push(v); return { where: () => ({ where: () => ({ execute: async () => undefined }) }) }; } };
+    (getDb as jest.Mock).mockReturnValue({ insertInto: () => insertChain, updateTable: () => updateChain });
+
+    await repo.save({ churchId: "ch1", name: "Summer Camp", contentType: "form", photoUrl: "https://example.com/camp.jpg" } as any);
+    await repo.save({ id: "f4", churchId: "ch1", name: "Summer Camp", contentType: "form", photoUrl: "" } as any);
+
+    expect(inserted[0].photoUrl).toBe("https://example.com/camp.jpg");
+    expect(updated[0]).toHaveProperty("photoUrl", null);
+  });
+});
