@@ -155,7 +155,7 @@ export class EventTriggerHelper {
           if (!t.workflowId) continue;
           if (!FilterMatcher.matches(facts, FilterMatcher.parseConditions(t.conditions))) continue;
           if (FilterMatcher.toBool(t.oncePerSubject) && subject.id
-            && (await repos.task.loadBySubjectInWorkflow(churchId, t.workflowId, subject.type, subject.id))) continue;
+            && (await ExecutionHelper.existingCardForSubject({ ...t, churchId }, subject.type, subject.id, repos))) continue;
           if (subject.type === "person" && subject.id && !subject.label) {
             const people = await getMembershipModuleGateway().loadPeople(churchId, [subject.id]);
             subject.label = people[0]?.displayName;

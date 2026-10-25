@@ -2423,6 +2423,17 @@
     }
    ],
    "schemaChanges": 7
+  },
+  "2026-10-25_workflowTriggers_allowRepeatAfterClose": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "workflowTriggers",
+     "column": "allowRepeatAfterClose",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  }
 }

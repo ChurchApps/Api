@@ -9,5 +9,6 @@ export class WorkflowTrigger {
   public stepId?: string;
   public conditions?: string; // event rules: JSON FilterNode tree. schedule rules: relational tree via conjunctions.triggerId
   public oncePerSubject?: boolean;
+  public allowRepeatAfterClose?: boolean; // with oncePerSubject: only an open card blocks a new one
   public active?: boolean;
 }

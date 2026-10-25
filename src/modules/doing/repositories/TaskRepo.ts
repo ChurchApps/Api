@@ -173,6 +173,16 @@ export class TaskRepo {
       .executeTakeFirst()) ?? null;
   }
 
+  public async loadOpenBySubjectInWorkflow(churchId: string, workflowId: string, associatedWithType: string, associatedWithId: string) {
+    return (await getDb().selectFrom("tasks").selectAll()
+      .where("churchId", "=", churchId)
+      .where("workflowId", "=", workflowId)
+      .where("associatedWithType", "=", associatedWithType)
+      .where("associatedWithId", "=", associatedWithId)
+      .where("status", "<>", "Closed")
+      .executeTakeFirst()) ?? null;
+  }
+
   private async loadNextTaskNumber(churchId: string) {
     const result = (await getDb().selectFrom("tasks")
       .select(sql`max(ifnull(taskNumber, 0)) + 1`.as("taskNumber"))
