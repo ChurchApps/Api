@@ -11,12 +11,29 @@ import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { ContactVisibilityHelper } from "../helpers/ContactVisibilityHelper.js";
+import { GuestRegistrationHelper, type GuestAddress, type GuestFieldModes, type GuestMember } from "../helpers/GuestRegistrationHelper.js";
 import { MessagingSafetyHelper, type MessagingSafetyPerson } from "../../../shared/helpers/MessagingSafetyHelper.js";
 
 @controller("/membership/people")
 export class PersonController extends MembershipBaseController {
+  @httpGet("/guest-register/options")
+  public async guestRegisterOptions(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapperAnon(req, res, async () => {
+      // authz-exempt: anon read of the church's public sign-up checklist, behind the same binding and opt-in as the POST.
+      const claimedChurchId = req.query?.churchId?.toString();
+      const bind = PublicChurchContext.bind(req, claimedChurchId);
+      if (bind.mismatch) return this.json({ error: "churchId does not match site context" }, 401);
+      const churchId = bind.churchId || claimedChurchId;
+      if (!churchId) return this.json({ error: "churchId is required" }, 400);
+      const settings = await this.loadGuestRegistrationSettings(churchId);
+      if (!bind.churchId && !settings.enabled) return this.json({ error: "Guest registration is not enabled" }, 401);
+      if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), churchId, "guest-register-options", 120))) return this.json({ error: "Too many requests" }, 429);
+      return settings.modes;
+    });
+  }
+
   @httpPost("/guest-register")
-  public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: { firstName: string, lastName: string, email?: string, phone?: string }[], siteToken?: string }>, res: express.Response): Promise<any> {
+  public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: GuestMember[], address?: GuestAddress, maritalStatus?: string, siteToken?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: anon endpoint; a claimed churchId is only honored once it matches the signed site/church token, or the church itself opted in via enableQRGuestRegistration.
       const claimedChurchId = req.body?.churchId;
@@ -24,15 +41,16 @@ export class PersonController extends MembershipBaseController {
       if (bind.mismatch) return this.json({ error: "churchId does not match site context" }, 401);
       const churchId = bind.churchId || claimedChurchId;
       if (!churchId) return this.json({ error: "churchId is required" }, 400);
-      if (!bind.churchId && !(await this.isGuestRegistrationEnabled(churchId))) return this.json({ error: "Guest registration is not enabled" }, 401);
+      const settings = await this.loadGuestRegistrationSettings(churchId);
+      if (!bind.churchId && !settings.enabled) return this.json({ error: "Guest registration is not enabled" }, 401);
       const members = req.body?.members;
       if (!members || !Array.isArray(members) || members.length === 0) return this.json({ error: "At least one member is required" }, 400);
       if (members.length > 10) return this.json({ error: "Maximum 10 members per registration" }, 400);
-      for (const m of members) {
-        if (!m.firstName || !m.lastName) return this.json({ error: "firstName and lastName are required for each member" }, 400);
-      }
+      // Fields the church turned off are dropped, even when the client sends them.
+      const { error, registration } = GuestRegistrationHelper.sanitize(req.body, settings.modes);
+      if (error) return this.json({ error }, 400);
       if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), churchId, "guest-register"))) return this.json({ error: "Too many requests" }, 429);
-      return PersonHelper.registerGuestHousehold(churchId, members);
+      return PersonHelper.registerGuestHousehold(churchId, registration);
     });
   }
 
@@ -694,13 +712,18 @@ export class PersonController extends MembershipBaseController {
     return models;
   }
 
-  private async isGuestRegistrationEnabled(churchId: string): Promise<boolean> {
+  // One public-settings read gives both the opt-in switch and the sign-up checklist.
+  private async loadGuestRegistrationSettings(churchId: string): Promise<{ enabled: boolean, modes: GuestFieldModes }> {
     const church = await this.repos.church.loadById(churchId);
-    if (!church || church.archivedDate) return false;
+    if (!church || church.archivedDate) return { enabled: false, modes: GuestRegistrationHelper.parseModes(null) };
     const rows = this.repos.setting.convertAllToModel(churchId, (await this.repos.setting.loadPublicSettings(churchId)) as any[]);
     let enabled = false;
-    rows?.forEach((s: any) => { if (s.keyName === "enableQRGuestRegistration") enabled = s.value === "true"; });
-    return enabled;
+    let fields: string = null;
+    rows?.forEach((s: any) => {
+      if (s.keyName === "enableQRGuestRegistration") enabled = s.value === "true";
+      if (s.keyName === "guestRegistrationFields") fields = s.value;
+    });
+    return { enabled, modes: GuestRegistrationHelper.parseModes(fields) };
   }
 
   // The directory gate follows the church's configured directoryVisibility tier
