@@ -351,7 +351,8 @@ export class SermonController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {
-        let sermons: Sermon[] = req.body;
+        if (!req.body) return this.json({ error: "Expected a sermon or an array of sermons" }, 400);
+        let sermons: Sermon[] = Array.isArray(req.body) ? req.body : [req.body];
         const promises: Promise<Sermon>[] = [];
         for (const s of sermons) {
           let base64Photo = "";
