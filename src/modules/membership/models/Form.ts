@@ -15,6 +15,7 @@ export class Form {
   public archived?: boolean;
   public action?: string;
   public thankYouMessage?: string;
+  public photoUrl?: string;
   public displayMode?: string;
   public autoCreatePerson?: boolean;
   public groupId?: string;

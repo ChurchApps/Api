@@ -828,6 +828,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-25_form_photo": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "forms",
+     "column": "photoUrl",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {
