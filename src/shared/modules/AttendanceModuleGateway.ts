@@ -1,5 +1,8 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { KyselyPool } from "../infrastructure/KyselyPool.js";
+import { WebhookDispatcher } from "../webhooks/WebhookDispatcher.js";
+import { DateHelper } from "../helpers/DateHelper.js";
+import { CheckinGateHelper } from "../../modules/attendance/helpers/CheckinGateHelper.js";
 
 // Gateway: the only seam through which other modules read attendance data.
 export interface AttendanceModuleGateway {
@@ -14,6 +17,9 @@ export interface AttendanceModuleGateway {
   loadSessionGroupIds(churchId: string, sessionIds: string[]): Promise<string[]>;
   // Groups that meet at a matching service time. Each id of "0" means "any".
   loadGroupIdsForServiceTimes(churchId: string, campusId: string, serviceId: string, serviceTimeId: string): Promise<string[]>;
+  // Marks the person present for each of the group's scheduled service times under way at `at`.
+  // Returns how many sessions the person is now present for (0 when none is in progress). Re-runs never double count.
+  recordAttendance(churchId: string, personId: string, groupId: string, at: Date): Promise<number>;
 }
 
 class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
@@ -52,6 +58,42 @@ class AttendanceModuleGatewayDb implements AttendanceModuleGateway {
     if (campusId !== "0") query = query.where("s.campusId", "=", campusId);
     const rows = (await query.execute()) as { groupId: string }[];
     return [...new Set(rows.map((r) => r.groupId).filter((id: string) => !!id))];
+  }
+
+  public async recordAttendance(churchId: string, personId: string, groupId: string, at: Date): Promise<number> {
+    const repos = await this.repos();
+    const links = (await repos.groupServiceTime.loadWithServiceNames(churchId, groupId)) as { serviceTimeId: string }[];
+    const serviceTimeIds = [...new Set(links.map((l) => l.serviceTimeId).filter(Boolean))];
+    if (serviceTimeIds.length === 0) return 0;
+    // Lazy: the zone helper reaches back through shared/modules, which this gateway is part of.
+    const { CheckinTimeZoneHelper } = await import("../../modules/attendance/helpers/CheckinTimeZoneHelper.js");
+    const zoneFor = await CheckinTimeZoneHelper.load(churchId, repos.service);
+    // Unscheduled service times are always open for check-in, but would match at any hour here.
+    const open = ((await repos.serviceTime.loadByIds(churchId, serviceTimeIds)) as any[])
+      .filter((st) => !st.removed && CheckinGateHelper.hasSchedule(st) && CheckinGateHelper.isServiceTimeOpen(st, at, zoneFor(st)));
+
+    let recorded = 0;
+    for (const st of open) {
+      // The church-local calendar date, held as local midnight like check-in's currentDate.
+      const [y, m, d] = DateHelper.toChurchTime(at, zoneFor(st)).substring(0, 10).split("-").map(Number);
+      const date = new Date(y, m - 1, d);
+
+      let session = await repos.session.loadByGroupServiceTimeDate(churchId, groupId, st.id, date);
+      if (!session) {
+        session = await repos.session.save({ churchId, groupId, serviceTimeId: st.id, sessionDate: date });
+        await WebhookDispatcher.emit(churchId, "session.created", session);
+      }
+
+      const existing = (await repos.visit.loadByServiceDatePeopleIds(churchId, st.serviceId, date, [personId])) as any[];
+      const visit = existing.length > 0
+        ? existing[0]
+        : await repos.visit.save({ churchId, personId, serviceId: st.serviceId, groupId, visitDate: date, checkinTime: at });
+      recorded++;
+      if (await repos.visitSession.loadByVisitIdSessionId(churchId, visit.id, session.id)) continue; // already counted
+      await repos.visitSession.save({ churchId, visitId: visit.id, sessionId: session.id });
+      await WebhookDispatcher.emit(churchId, "attendance.recorded", visit);
+    }
+    return recorded;
   }
 
   public async loadAttendeePersonIds(churchId: string, scope: { campusId?: string; serviceId?: string; serviceTimeId?: string; groupId?: string }, startDate: Date, endDate: Date) {

@@ -1,7 +1,7 @@
 import { DateHelper } from "@churchapps/apihelper";
 import { Repos } from "../repositories/index.js";
 import { Task, WorkflowStep, WorkflowStepAction } from "../models/index.js";
-import { getMembershipModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
+import { getAttendanceModuleGateway, getMembershipModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
 import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
 import { SafeHttp } from "../../../shared/webhooks/SafeHttp.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
@@ -81,6 +81,9 @@ export class StepActionHelper {
             break;
           case "addToGroup":
             await this.addToGroup(task, config);
+            break;
+          case "recordAttendance":
+            await this.recordAttendance(task, config);
             break;
           case "removeFromGroup":
             await this.removeFromGroup(task, config);
@@ -225,6 +228,15 @@ export class StepActionHelper {
     if (task.associatedWithType !== "person" || !task.associatedWithId || !config.groupId) return;
     await getMembershipModuleGateway().addGroupMember(task.churchId || "", config.groupId, task.associatedWithId);
     this.appendHistory(task, config.groupLabel ? `Added to group: ${config.groupLabel}` : "Added to group");
+  }
+
+  // Measured at the card's creation (the trigger moment) so an earlier Wait step can't push it past the service.
+  private static async recordAttendance(task: Task, config: Record<string, any>): Promise<void> {
+    if (task.associatedWithType !== "person" || !task.associatedWithId || !config.groupId) return;
+    const at = task.dateCreated ? new Date(task.dateCreated) : new Date();
+    const count = await getAttendanceModuleGateway().recordAttendance(task.churchId || "", task.associatedWithId, config.groupId, at);
+    if (count > 0) this.appendHistory(task, config.groupLabel ? `Attendance recorded: ${config.groupLabel}` : "Attendance recorded");
+    else this.appendHistory(task, "No scheduled service in progress — attendance not recorded");
   }
 
   private static async removeFromGroup(task: Task, config: Record<string, any>): Promise<void> {
