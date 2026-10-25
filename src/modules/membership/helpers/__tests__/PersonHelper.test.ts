@@ -2,6 +2,7 @@ jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { 
 jest.mock("@churchapps/apihelper", () => ({ PersonHelper: class {} }));
 jest.mock("../../../../shared/helpers/index.js", () => ({ Permissions: { people: { edit: "peopleEdit" } } }));
 jest.mock("../SsoHelper.js", () => ({ SsoHelper: { applyStashedPhoto: jest.fn() } }));
+jest.mock("../../../../shared/webhooks/WebhookDispatcher.js", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 
 import { RepoManager } from "../../../../shared/infrastructure/index.js";
 import { PersonHelper } from "../PersonHelper.js";
@@ -97,5 +98,26 @@ describe("PersonHelper.claim", () => {
     expect(person.load).not.toHaveBeenCalledWith("churchA", "personA");
     expect(result.userChurch.personId).toBe("newP");
     expect(result.userChurch.churchId).toBe("churchB");
+  });
+});
+
+describe("PersonHelper.registerGuestHousehold", () => {
+  it("records every new person as a Visitor and writes the included profile fields", async () => {
+    const saved: any[] = [];
+    const { person } = mockRepos();
+    person.save.mockImplementation(async (p: any) => { p.id = "p" + (saved.length + 1); saved.push({ ...p, contactInfo: { ...p.contactInfo } }); return p; });
+    await PersonHelper.registerGuestHousehold("c1", {
+      members: [
+        { firstName: "Pat", lastName: "Visitor", email: "pat@example.com", phone: "555-0100", birthDate: "1990-04-02", gender: "Female" },
+        { firstName: "Sam", lastName: "Visitor", grade: "3" }
+      ],
+      address: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" },
+      maritalStatus: "Married"
+    });
+    expect(saved.map((p) => p.membershipStatus)).toEqual(["Visitor", "Visitor"]);
+    expect(saved[0]).toMatchObject({ householdRole: "Head", birthDate: "1990-04-02", gender: "Female", maritalStatus: "Married", contactInfo: { email: "pat@example.com", mobilePhone: "555-0100", address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" } });
+    expect(saved[1]).toMatchObject({ householdRole: "Other", grade: "3", contactInfo: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" } });
+    expect(saved[1].maritalStatus).toBeUndefined();
+    expect(saved[1].contactInfo.email).toBeUndefined();
   });
 });
