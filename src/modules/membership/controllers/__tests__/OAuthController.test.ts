@@ -392,3 +392,32 @@ describe("OAuthController refresh rotation grace window (#1024)", () => {
     expect(result.obj.error).toBe("invalid_grant");
   });
 });
+
+describe("OAuthController device authorization client check", () => {
+  function deviceAuthController(client: any) {
+    const repos: any = {
+      oAuthClient: { loadByClientId: jest.fn(async () => client) },
+      oAuthDeviceCode: { save: jest.fn(async (d: any) => d) }
+    };
+    const controller = new OAuthController();
+    (controller as any).repos = repos;
+    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    (controller as any).json = (obj: any, status: number = 200) => ({ obj, status });
+    return { controller, repos };
+  }
+
+  it("refuses device codes for self-registered clients, which only sign in with a code and PKCE", async () => {
+    const { controller, repos } = deviceAuthController({ id: "cl1", clientId: "pub1", name: "Church TV", clientSecret: null, redirectUris: "https://claude.ai/api/mcp/auth_callback", selfRegistered: 1 });
+    const result: any = await (controller as any).deviceAuthorize({ body: { client_id: "pub1" } }, {});
+    expect(result.status).toBe(400);
+    expect(result.obj.error).toBe("invalid_client");
+    expect(repos.oAuthDeviceCode.save).not.toHaveBeenCalled();
+  });
+
+  it("still issues device codes for clients we registered", async () => {
+    const { controller, repos } = deviceAuthController({ id: "cl2", clientId: "freeplay", name: "FreePlay", clientSecret: "s", redirectUris: "", selfRegistered: 0 });
+    const result: any = await (controller as any).deviceAuthorize({ body: { client_id: "freeplay" } }, {});
+    expect(result.obj.device_code).toBe("dc");
+    expect(repos.oAuthDeviceCode.save).toHaveBeenCalled();
+  });
+});

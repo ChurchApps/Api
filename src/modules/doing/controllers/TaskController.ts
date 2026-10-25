@@ -7,7 +7,7 @@ import { Task } from "../models/index.js";
 import { WorkflowHelper, DirectoryUpdateHelper, AccountDeletionHelper } from "../helpers/index.js";
 import { Permissions, TaskAuth } from "../../../shared/helpers/index.js";
 import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
-import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { getMembershipModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
 
 @controller("/doing/tasks")
 export class TaskController extends DoingBaseController {
@@ -335,6 +335,9 @@ export class TaskController extends DoingBaseController {
     return this.withCard(req, res, id, async (task) => {
       if (task.conversationId) return task;
       if (!req.body?.conversationId) return this.json({ message: "conversationId required" }, 400);
+      // Only the card's own notes conversation; a card's notes are read and written under its rules.
+      const conversation = await getMessagingModuleGateway().loadConversation(task.churchId, req.body.conversationId);
+      if (conversation?.contentType !== "workflowCard" || conversation?.contentId !== task.id) return this.json({ message: "conversationId must be this card's notes" }, 400);
       task.conversationId = req.body.conversationId;
       const saved = await this.repos.task.save(task);
       await InternalEventBus.publish(task.churchId, "task.updated", saved);

@@ -8,6 +8,7 @@ export interface NotificationServiceOptions {
   category?: string;
   emailByPerson?: Record<string, { subject: string; html: string }>;
   emailImmediate?: boolean;
+  churchAuthored?: boolean;
 }
 
 export type CreateNotificationsFn = (
