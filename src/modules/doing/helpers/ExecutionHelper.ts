@@ -200,7 +200,18 @@ export class ExecutionHelper {
       return existing.length > 0;
     }
     if (!FilterMatcher.toBool(trigger.oncePerSubject)) return false;
-    return !!(await repos.task.loadBySubjectInWorkflow(execution.churchId || "", trigger.workflowId || "", execution.subjectType || "person", execution.subjectId));
+    return !!(await this.existingCardForSubject({ ...trigger, churchId: execution.churchId }, execution.subjectType || "person", execution.subjectId, repos));
+  }
+
+  // The "Only once per person" check, shared by the event path and retries. With
+  // allowRepeatAfterClose only an open card blocks; otherwise any card ever made does.
+  public static async existingCardForSubject(trigger: WorkflowTrigger, subjectType: string, subjectId: string, repos: Repos): Promise<Task | null> {
+    const churchId = trigger.churchId || "";
+    const workflowId = trigger.workflowId || "";
+    const openOnly = trigger.allowRepeatAfterClose !== undefined && trigger.allowRepeatAfterClose !== null && FilterMatcher.toBool(trigger.allowRepeatAfterClose);
+    return (openOnly
+      ? await repos.task.loadOpenBySubjectInWorkflow(churchId, workflowId, subjectType, subjectId)
+      : await repos.task.loadBySubjectInWorkflow(churchId, workflowId, subjectType, subjectId)) as Task | null;
   }
 
   private static async complete(execution: AutomationExecution, repos: Repos): Promise<AutomationExecution> {

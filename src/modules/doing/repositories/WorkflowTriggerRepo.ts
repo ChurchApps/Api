@@ -22,6 +22,7 @@ export class WorkflowTriggerRepo {
       stepId: model.stepId || null,
       conditions: model.conditions || null,
       oncePerSubject: model.oncePerSubject ?? true,
+      allowRepeatAfterClose: model.allowRepeatAfterClose ?? false,
       active: model.active ?? true
     }).execute();
     return model;
@@ -37,6 +38,7 @@ export class WorkflowTriggerRepo {
       stepId: model.stepId || null,
       conditions: model.conditions || null,
       oncePerSubject: model.oncePerSubject ?? true,
+      allowRepeatAfterClose: model.allowRepeatAfterClose ?? false,
       active: model.active
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
