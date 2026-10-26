@@ -7,7 +7,7 @@ import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 import { SsoHelper } from "./SsoHelper.js";
 import type { GuestRegistration } from "./GuestRegistrationHelper.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
-import { getMessagingModuleGateway } from "../../../shared/modules/index.js";
+import { getAttendanceModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
 
 export class PersonHelper extends BasePersonHelper {
   private static async repos(): Promise<Repos> {
@@ -45,7 +45,7 @@ export class PersonHelper extends BasePersonHelper {
     return person;
   }
 
-  public static async registerGuestHousehold(churchId: string, registration: GuestRegistration, groupId?: string) {
+  public static async registerGuestHousehold(churchId: string, registration: GuestRegistration, groupId?: string, recordAttendance?: boolean) {
     const members = registration?.members;
     if (!members || members.length === 0) throw new Error("At least one member is required");
     const repos = await this.repos();
@@ -89,6 +89,17 @@ export class PersonHelper extends BasePersonHelper {
         }
       } catch (err) {
         console.error("[PersonHelper] guest group add failed:", err);
+      }
+      // Only the group's scheduled service times that are under way right now count; otherwise nothing is recorded.
+      if (recordAttendance) {
+        const at = new Date();
+        for (const p of people) {
+          try {
+            await getAttendanceModuleGateway().recordAttendance(churchId, p.id, groupId, at);
+          } catch (err) {
+            console.error("[PersonHelper] guest attendance failed:", err);
+          }
+        }
       }
     }
     if (registration.comments) {

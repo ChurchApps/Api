@@ -50,7 +50,8 @@ export class PersonController extends MembershipBaseController {
       const { error, registration } = GuestRegistrationHelper.sanitize(req.body, settings.modes);
       if (error) return this.json({ error }, 400);
       if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), churchId, "guest-register"))) return this.json({ error: "Too many requests" }, 429);
-      return PersonHelper.registerGuestHousehold(churchId, registration, await this.loadGuestRegistrationGroupId(churchId));
+      const { groupId, recordAttendance } = await this.loadGuestRegistrationGroup(churchId);
+      return PersonHelper.registerGuestHousehold(churchId, registration, groupId, recordAttendance);
     });
   }
 
@@ -726,10 +727,12 @@ export class PersonController extends MembershipBaseController {
     return { enabled, modes: GuestRegistrationHelper.parseModes(fields) };
   }
 
-  // The group is a private setting the admin picks, so a guest can never choose one.
-  private async loadGuestRegistrationGroupId(churchId: string): Promise<string | undefined> {
+  // The group and the record-attendance switch are private settings the admin picks, so a guest can never choose them.
+  private async loadGuestRegistrationGroup(churchId: string): Promise<{ groupId: string | undefined, recordAttendance: boolean }> {
     const rows = (await this.repos.setting.loadAll(churchId)) as any[];
-    return rows?.find((s: any) => s.keyName === "guestRegistrationGroupId")?.value || undefined;
+    const groupId = rows?.find((s: any) => s.keyName === "guestRegistrationGroupId")?.value || undefined;
+    const recordAttendance = rows?.find((s: any) => s.keyName === "guestRegistrationRecordAttendance")?.value === "true";
+    return { groupId, recordAttendance };
   }
 
   // The directory gate follows the church's configured directoryVisibility tier

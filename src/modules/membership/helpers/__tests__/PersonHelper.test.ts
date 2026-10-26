@@ -4,7 +4,11 @@ jest.mock("../../../../shared/helpers/index.js", () => ({ Permissions: { people:
 jest.mock("../SsoHelper.js", () => ({ SsoHelper: { applyStashedPhoto: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/WebhookDispatcher.js", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 const mockCreatePersonNote = jest.fn();
-jest.mock("../../../../shared/modules/index.js", () => ({ getMessagingModuleGateway: () => ({ createPersonNote: (...args: any[]) => mockCreatePersonNote(...args) }) }));
+const mockRecordAttendance = jest.fn();
+jest.mock("../../../../shared/modules/index.js", () => ({
+  getMessagingModuleGateway: () => ({ createPersonNote: (...args: any[]) => mockCreatePersonNote(...args) }),
+  getAttendanceModuleGateway: () => ({ recordAttendance: (...args: any[]) => mockRecordAttendance(...args) })
+}));
 
 import { RepoManager } from "../../../../shared/infrastructure/index.js";
 import { PersonHelper } from "../PersonHelper.js";
@@ -172,6 +176,43 @@ describe("PersonHelper.registerGuestHousehold group and comments", () => {
     mockCreatePersonNote.mockRejectedValue(new Error("down"));
     jest.spyOn(console, "error").mockImplementation(() => {});
     const result = await PersonHelper.registerGuestHousehold("c1", { ...registration, comments: "Hi" });
+    expect(result.people).toHaveLength(2);
+  });
+});
+
+// Issue #1375: with the church's switch on, guests who sign up during one of the group's service times are marked present.
+describe("PersonHelper.registerGuestHousehold attendance", () => {
+  const registration = { members: [{ firstName: "Pat", lastName: "Visitor" }, { firstName: "Sam", lastName: "Visitor" }] };
+  const savePeople = (person: any) => {
+    let n = 0;
+    person.save.mockImplementation(async (p: any) => { if (!p.id) p.id = "p" + (++n); return p; });
+  };
+
+  beforeEach(() => { mockRecordAttendance.mockReset().mockResolvedValue(1); });
+
+  it("records attendance in the guest group for every new person when the switch is on", async () => {
+    const { person } = mockRepos([], { groups: [{ id: "g1" }] });
+    savePeople(person);
+    await PersonHelper.registerGuestHousehold("c1", registration, "g1", true);
+    expect(mockRecordAttendance.mock.calls.map((c: any[]) => c.slice(0, 3))).toEqual([["c1", "p1", "g1"], ["c1", "p2", "g1"]]);
+    expect(mockRecordAttendance.mock.calls[0][3]).toBeInstanceOf(Date);
+  });
+
+  it("does not record attendance when the switch is off, or without a group", async () => {
+    const { person } = mockRepos([], { groups: [{ id: "g1" }] });
+    savePeople(person);
+    await PersonHelper.registerGuestHousehold("c1", registration, "g1", false);
+    await PersonHelper.registerGuestHousehold("c1", registration, undefined, true);
+    expect(mockRecordAttendance).not.toHaveBeenCalled();
+  });
+
+  it("still registers when attendance cannot be recorded", async () => {
+    const { person, groupMember } = mockRepos([], { groups: [{ id: "g1" }] });
+    savePeople(person);
+    mockRecordAttendance.mockRejectedValue(new Error("down"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const result = await PersonHelper.registerGuestHousehold("c1", registration, "g1", true);
+    expect(groupMember.save).toHaveBeenCalledTimes(2);
     expect(result.people).toHaveLength(2);
   });
 });
