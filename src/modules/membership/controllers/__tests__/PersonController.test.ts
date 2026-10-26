@@ -221,7 +221,7 @@ describe("PersonController.guestRegister", () => {
   it("registers when the church enabled QR guest registration", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
     const result = await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined);
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined, false);
     expect(result).toEqual({ householdId: "h1", people: [] });
   });
 
@@ -229,7 +229,7 @@ describe("PersonController.guestRegister", () => {
     (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: "c1", mismatch: false });
     const { controller } = personController({ settings: [] });
     await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined);
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined, false);
   });
 
   it("rejects a claimed churchId that does not match the signed context", async () => {
@@ -272,7 +272,7 @@ describe("PersonController.guestRegister profile fields", () => {
       ],
       address: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" },
       maritalStatus: "Married"
-    }, undefined);
+    }, undefined, false);
   });
 
   it("ignores a field the church turned off even when the client sends it", async () => {
@@ -281,7 +281,7 @@ describe("PersonController.guestRegister profile fields", () => {
       address: { address1: "1 Main St", city: "X", state: "IL", zip: "1" },
       maritalStatus: "Single"
     });
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined);
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined, false);
   });
 
   it("rejects a missing required field", async () => {
@@ -328,12 +328,17 @@ describe("PersonController.guestRegister group and comments", () => {
 
   it("passes the church's private guest group to the household save", async () => {
     await register([enabled, { keyName: "guestRegistrationGroupId", value: "g1", public: 0 }], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, "g1");
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, "g1", false);
+  });
+
+  it("passes the church's private record-attendance switch along with the group", async () => {
+    await register([enabled, { keyName: "guestRegistrationGroupId", value: "g1", public: 0 }, { keyName: "guestRegistrationRecordAttendance", value: "true", public: 0 }], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, "g1", true);
   });
 
   it("ignores a group the guest sends in the body", async () => {
     await register([enabled], { members: [{ firstName: "Pat", lastName: "Visitor" }], groupId: "g-evil" });
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined);
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined, false);
   });
 
   it("keeps the comment only when the church included it, and enforces required", async () => {
