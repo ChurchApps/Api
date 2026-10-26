@@ -95,6 +95,7 @@ class GivingModuleGatewayDb implements GivingModuleGateway {
       .where("personId", "is not", null)
       .where("personId", "!=", "")
       .where("donationDate", ">=", regularStart)
+      .where((eb: any) => eb.or([eb("status", "is", null), eb("status", "=", "complete")]))
       .execute();
     return LapsedGiverMatch.match(rows, anchorDate, rule);
   }

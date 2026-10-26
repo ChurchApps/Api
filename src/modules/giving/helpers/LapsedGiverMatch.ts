@@ -1,7 +1,7 @@
 // "Lapsed regular giver" workflow rule: a gift in at least minWeeks of the regularWeeks weeks before
 // the lapse window, then nothing in the last lapsedWeeks weeks. Reads dates and person ids only — never amounts.
 export interface LapsedGiverRule { regularWeeks: number; minWeeks: number; lapsedWeeks: number }
-export interface DonationDateRow { personId: string | null; donationDate: string | Date }
+export interface DonationDateRow { personId: string | null; donationDate: string | Date; status?: string | null }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -38,6 +38,7 @@ export class LapsedGiverMatch {
     const recent = new Set<string>();
     rows.forEach((r) => {
       if (!r.personId || !r.donationDate) return;
+      if (r.status && r.status !== "complete") return; // failed, pending, refunded: not a gift
       const day = this.toIsoDate(r.donationDate);
       if (day >= lapseStart) recent.add(r.personId);
       else if (day >= regularStart) {

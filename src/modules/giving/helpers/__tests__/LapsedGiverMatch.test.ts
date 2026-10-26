@@ -34,6 +34,32 @@ describe("LapsedGiverMatch", () => {
     expect(LapsedGiverMatch.match(rows as any, anchor, rule)).toEqual([]);
   });
 
+  it("a failed or pending charge in the lapse window is not a recent gift", () => {
+    const rows = [
+      { personId: "FAILED", donationDate: "2026-07-20" },
+      { personId: "FAILED", donationDate: "2026-08-20" },
+      { personId: "FAILED", donationDate: "2026-09-20" },
+      { personId: "FAILED", donationDate: "2026-10-05", status: "failed" },
+      { personId: "PENDING", donationDate: "2026-07-20" },
+      { personId: "PENDING", donationDate: "2026-08-20" },
+      { personId: "PENDING", donationDate: "2026-09-20" },
+      { personId: "PENDING", donationDate: "2026-10-10", status: "pending" }
+    ];
+    expect(LapsedGiverMatch.match(rows, anchor, rule)).toEqual(["FAILED", "PENDING"]);
+  });
+
+  it("a refunded gift does not count toward the regular weeks; complete and missing status do", () => {
+    const rows = [
+      { personId: "REFUNDED", donationDate: "2026-07-20" },
+      { personId: "REFUNDED", donationDate: "2026-08-20" },
+      { personId: "REFUNDED", donationDate: "2026-09-20", status: "refunded" },
+      { personId: "COMPLETE", donationDate: "2026-07-20", status: "complete" },
+      { personId: "COMPLETE", donationDate: "2026-08-20" },
+      { personId: "COMPLETE", donationDate: "2026-09-20", status: null }
+    ];
+    expect(LapsedGiverMatch.match(rows, anchor, rule)).toEqual(["COMPLETE"]);
+  });
+
   it("ignores gifts older than the regular window", () => {
     const rows = [
       { personId: "OLD", donationDate: "2026-07-12" },
