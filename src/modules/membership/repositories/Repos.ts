@@ -21,6 +21,7 @@ import {
   ClientErrorRepo,
   JobRunRepo,
   LoginAttemptRepo,
+  UserMfaRepo,
   VisibilityPreferenceRepo,
   OAuthTokenRepo,
   OAuthCodeRepo,
@@ -76,6 +77,7 @@ export class Repos {
   public clientError: ClientErrorRepo;
   public jobRun: JobRunRepo;
   public loginAttempt: LoginAttemptRepo;
+  public userMfa: UserMfaRepo;
 
   public webhook: WebhookRepo;
   public webhookDelivery: WebhookDeliveryRepo;
@@ -127,6 +129,7 @@ export class Repos {
     this.clientError = new ClientErrorRepo();
     this.jobRun = new JobRunRepo();
     this.loginAttempt = new LoginAttemptRepo();
+    this.userMfa = new UserMfaRepo();
 
     this.webhook = new WebhookRepo();
     this.webhookDelivery = new WebhookDeliveryRepo();

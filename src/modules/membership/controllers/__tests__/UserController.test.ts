@@ -63,7 +63,8 @@ function userController(initial: any) {
     userChurch: { loadByUserId: jest.fn(), save: jest.fn() },
     person: { searchEmail: jest.fn(async () => []) },
     role: { loadAll: jest.fn(async () => []) },
-    roleMember: { save: jest.fn() }
+    roleMember: { save: jest.fn() },
+    userMfa: { isEnabled: jest.fn(async () => false) }
   };
   const controller = new UserController();
   (controller as any).repos = repos;
