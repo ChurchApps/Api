@@ -10,6 +10,7 @@ export class UserMfaController extends MembershipBaseController {
   @httpGet("/status")
   public async status(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au?.id) return this.json({}, 401);
       const record = await this.repos.userMfa.load(au.id);
       const backupCodesLeft = record?.enabled ? JSON.parse(record.backupCodes || "[]").length : 0;
       return this.json({ enabled: !!record?.enabled, backupCodesLeft }, 200);
@@ -20,6 +21,7 @@ export class UserMfaController extends MembershipBaseController {
   @httpPost("/setup")
   public async setup(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au?.id) return this.json({}, 401);
       if (await this.repos.userMfa.isEnabled(au.id)) return this.json({ errors: ["Two-factor sign-in is already on"] }, 400);
       const user = await this.repos.user.load(au.id);
       if (!user) return this.json({}, 404);
@@ -33,6 +35,7 @@ export class UserMfaController extends MembershipBaseController {
   @httpPost("/enable")
   public async enable(req: express.Request<{}, {}, { code: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au?.id) return this.json({}, 401);
       const ip = LoginRateLimiter.getClientIp(req);
       const account = "mfa-setup:" + au.id;
       if (!(await LoginRateLimiter.allow(this.repos, ip, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
@@ -57,6 +60,7 @@ export class UserMfaController extends MembershipBaseController {
   @httpPost("/disable")
   public async disable(req: express.Request<{}, {}, { code: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (!au?.id) return this.json({}, 401);
       const ip = LoginRateLimiter.getClientIp(req);
       const account = "mfa:" + au.id;
       if (!(await LoginRateLimiter.allow(this.repos, ip, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
