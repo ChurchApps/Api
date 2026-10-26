@@ -34,6 +34,7 @@ export class ConditionController extends DoingBaseController {
   public async save(req: express.Request<{}, {}, Condition[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.donations.view) && await this.touchesGiving(au.churchId, req.body)) return this.json({}, 401);
       const promises: Promise<Condition>[] = [];
       req.body.forEach((condition) => {
         condition.churchId = au.churchId;
@@ -48,8 +49,18 @@ export class ConditionController extends DoingBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
+      if (!au.checkAccess(Permissions.donations.view) && await this.touchesGiving(au.churchId, [{ id }])) return this.json({}, 401);
       await this.repos.condition.delete(au.churchId, id);
       return {};
     });
+  }
+
+  // Giving rules reveal who stopped giving, so adding, changing or removing one also needs donations View.
+  private async touchesGiving(churchId: string, conditions: Condition[]) {
+    for (const c of conditions || []) {
+      if (c.field === "giving") return true;
+      if (c.id && (await this.repos.condition.load(churchId, c.id))?.field === "giving") return true;
+    }
+    return false;
   }
 }

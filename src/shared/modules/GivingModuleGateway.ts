@@ -1,5 +1,6 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { KyselyPool } from "../infrastructure/KyselyPool.js";
+import { LapsedGiverMatch, LapsedGiverRule } from "../../modules/giving/helpers/LapsedGiverMatch.js";
 
 // Gateway: the only seam through which other modules read giving data.
 export interface GivingModuleGateway {
@@ -13,6 +14,8 @@ export interface GivingModuleGateway {
   loadDonorPersonIds(churchId: string, fundId: string | null, startDate: Date, endDate: Date): Promise<string[]>;
   // First-time-donor detection: total donation rows for the person (the new one included).
   loadDonationCountForPerson(churchId: string, personId: string): Promise<number>;
+  // Workflow "lapsed regular giver" rule: person ids only, never amounts. anchorDate is the church-local YYYY-MM-DD.
+  loadLapsedRegularGiverIds(churchId: string, anchorDate: string, rule: Partial<LapsedGiverRule>): Promise<string[]>;
   // Command palette catalog: fund names only, never donation rows.
   loadPalette(churchId: string): Promise<{ id: string; name: string }[]>;
 }
@@ -80,6 +83,21 @@ class GivingModuleGatewayDb implements GivingModuleGateway {
       .where("personId", "=", personId)
       .executeTakeFirst();
     return Number(row?.total || 0);
+  }
+
+  public async loadLapsedRegularGiverIds(churchId: string, anchorDate: string, requested: Partial<LapsedGiverRule>): Promise<string[]> {
+    const rule = LapsedGiverMatch.parseRule(requested);
+    const { regularStart } = LapsedGiverMatch.windows(anchorDate, rule);
+    const db = KyselyPool.getDb("giving") as any;
+    const rows = await db.selectFrom("donations")
+      .select(["personId", "donationDate"])
+      .where("churchId", "=", churchId)
+      .where("personId", "is not", null)
+      .where("personId", "!=", "")
+      .where("donationDate", ">=", regularStart)
+      .where((eb: any) => eb.or([eb("status", "is", null), eb("status", "=", "complete")]))
+      .execute();
+    return LapsedGiverMatch.match(rows, anchorDate, rule);
   }
 
   public async loadDonorPersonIds(churchId: string, fundId: string | null, startDate: Date, endDate: Date) {
