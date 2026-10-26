@@ -1,5 +1,5 @@
 import { Condition } from "../models/index.js";
-import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { getGivingModuleGateway, getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 export class ConditionHelper {
   public static async getPeopleIdsMatchingConditions(conditions: Condition[]) {
@@ -13,6 +13,14 @@ export class ConditionHelper {
     condition.matchingIds = [];
     switch (condition.field) {
       case "today": condition.matchingIds = this.evalSimpleCondition(condition, await this.churchToday(condition.churchId)) ? ["*"] : []; break;
+      case "giving": {
+        const today = await this.churchToday(condition.churchId);
+        // The giving module clamps the week counts and returns person ids only.
+        let rule: any = {};
+        try { rule = JSON.parse(condition.fieldData || "{}"); } catch { /* defaults */ }
+        condition.matchingIds = await getGivingModuleGateway().loadLapsedRegularGiverIds(condition.churchId || "", today.iso, { regularWeeks: rule.regularWeeks, minWeeks: rule.minWeeks, lapsedWeeks: rule.lapsedWeeks });
+        break;
+      }
       default: {
         // Relative values ({currentDay}, {currentMonth}...) resolve to the church's date; the stored condition keeps the token.
         let query: Condition = condition;
