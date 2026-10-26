@@ -591,25 +591,25 @@ BEGIN
     -- Sermons
     INSERT INTO sermons (id, churchId, playlistId, videoType, videoData, videoUrl, title, description, publishDate, thumbnail, duration, permanentUrl) VALUES
     -- Recent Sunday Sermons
-    ('SER00000001', 'CHU00000001', 'PLY00000001', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'The Power of Faith', 'Exploring how faith transforms our lives and strengthens our relationship with God', '2026-01-04 10:00:00', '/images/sermons/power-of-faith.jpg', 3600, 1),
-    ('SER00000002', 'CHU00000001', 'PLY00000001', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Walking in Love', 'Understanding God''s love and how to share it with others', '2025-12-28 10:00:00', '/images/sermons/walking-in-love.jpg', 3540, 1),
-    ('SER00000003', 'CHU00000001', 'PLY00000001', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Finding Peace in Chaos', 'Discovering God''s peace in the midst of life''s challenges', '2025-12-21 10:00:00', '/images/sermons/finding-peace.jpg', 3720, 1),
+    ('SER00000001', 'CHU00000001', 'PLY00000001', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'The Power of Faith', 'Exploring how faith transforms our lives and strengthens our relationship with God', '2026-01-04 10:00:00', '/images/playlists/sunday-sermons.jpg', 3600, 1),
+    ('SER00000002', 'CHU00000001', 'PLY00000001', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Walking in Love', 'Understanding God''s love and how to share it with others', '2025-12-28 10:00:00', '/images/playlists/sunday-sermons.jpg', 3540, 1),
+    ('SER00000003', 'CHU00000001', 'PLY00000001', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Finding Peace in Chaos', 'Discovering God''s peace in the midst of life''s challenges', '2025-12-21 10:00:00', '/images/playlists/sunday-sermons.jpg', 3720, 1),
 
     -- Special Services
-    ('SER00000004', 'CHU00000001', 'PLY00000002', 'vimeo', '123456789', 'https://vimeo.com/123456789', 'Christmas Eve Service 2025', 'Our annual Christmas Eve candlelight service with carols and message', '2025-12-24 19:00:00', '/images/sermons/christmas-eve-2025.jpg', 5400, 1),
-    ('SER00000005', 'CHU00000001', 'PLY00000002', 'vimeo', '987654321', 'https://vimeo.com/987654321', 'New Year''s Eve Service 2025', 'Special service celebrating the new year with worship and reflection', '2025-12-31 19:00:00', '/images/sermons/new-years-eve-2025.jpg', 4800, 1),
+    ('SER00000004', 'CHU00000001', 'PLY00000002', 'vimeo', '123456789', 'https://vimeo.com/123456789', 'Christmas Eve Service 2025', 'Our annual Christmas Eve candlelight service with carols and message', '2025-12-24 19:00:00', '/images/playlists/special-services.jpg', 5400, 1),
+    ('SER00000005', 'CHU00000001', 'PLY00000002', 'vimeo', '987654321', 'https://vimeo.com/987654321', 'New Year''s Eve Service 2025', 'Special service celebrating the new year with worship and reflection', '2025-12-31 19:00:00', '/images/playlists/special-services.jpg', 4800, 1),
 
     -- Bible Study Series
-    ('SER00000006', 'CHU00000001', 'PLY00000003', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Understanding the Book of Romans - Part 1', 'Introduction to Paul''s letter to the Romans', '2026-01-07 19:00:00', '/images/sermons/romans-part1.jpg', 2700, 1),
-    ('SER00000007', 'CHU00000001', 'PLY00000003', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Understanding the Book of Romans - Part 2', 'Exploring the themes of grace and faith in Romans', '2026-01-14 19:00:00', '/images/sermons/romans-part2.jpg', 2700, 1),
+    ('SER00000006', 'CHU00000001', 'PLY00000003', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Understanding the Book of Romans - Part 1', 'Introduction to Paul''s letter to the Romans', '2026-01-07 19:00:00', '/images/playlists/bible-study.jpg', 2700, 1),
+    ('SER00000007', 'CHU00000001', 'PLY00000003', 'youtube', 'dQw4w9WgXcQ', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'Understanding the Book of Romans - Part 2', 'Exploring the themes of grace and faith in Romans', '2026-01-14 19:00:00', '/images/playlists/bible-study.jpg', 2700, 1),
 
     -- Christmas Services
-    ('SER00000008', 'CHU00000001', 'PLY00000004', 'vimeo', '456789123', 'https://vimeo.com/456789123', 'Christmas Sunday Service 2025', 'Special Christmas morning service with carols and message', '2025-12-21 10:00:00', '/images/sermons/christmas-sunday-2025.jpg', 5400, 1),
-    ('SER00000009', 'CHU00000001', 'PLY00000004', 'vimeo', '789123456', 'https://vimeo.com/789123456', 'Children''s Christmas Program 2025', 'Our annual children''s Christmas program', '2025-12-14 10:00:00', '/images/sermons/childrens-christmas-2025.jpg', 3600, 1),
+    ('SER00000008', 'CHU00000001', 'PLY00000004', 'vimeo', '456789123', 'https://vimeo.com/456789123', 'Christmas Sunday Service 2025', 'Special Christmas morning service with carols and message', '2025-12-21 10:00:00', '/images/playlists/christmas.jpg', 5400, 1),
+    ('SER00000009', 'CHU00000001', 'PLY00000004', 'vimeo', '789123456', 'https://vimeo.com/789123456', 'Children''s Christmas Program 2025', 'Our annual children''s Christmas program', '2025-12-14 10:00:00', '/images/playlists/christmas.jpg', 3600, 1),
 
     -- Easter Services
-    ('SER00000010', 'CHU00000001', 'PLY00000005', 'vimeo', '321654987', 'https://vimeo.com/321654987', 'Good Friday Service 2025', 'Reflective service remembering Christ''s sacrifice', '2025-04-18 19:00:00', '/images/sermons/good-friday-2025.jpg', 3600, 1),
-    ('SER00000011', 'CHU00000001', 'PLY00000005', 'vimeo', '654987321', 'https://vimeo.com/654987321', 'Easter Sunday Service 2025', 'Celebrating Christ''s resurrection', '2025-04-20 10:00:00', '/images/sermons/easter-sunday-2025.jpg', 5400, 1);
+    ('SER00000010', 'CHU00000001', 'PLY00000005', 'vimeo', '321654987', 'https://vimeo.com/321654987', 'Good Friday Service 2025', 'Reflective service remembering Christ''s sacrifice', '2025-04-18 19:00:00', '/images/playlists/easter.jpg', 3600, 1),
+    ('SER00000011', 'CHU00000001', 'PLY00000005', 'vimeo', '654987321', 'https://vimeo.com/654987321', 'Easter Sunday Service 2025', 'Celebrating Christ''s resurrection', '2025-04-20 10:00:00', '/images/playlists/easter.jpg', 5400, 1);
 
     -- Streaming Services
     INSERT INTO streamingServices (id, churchId, serviceTime, earlyStart, chatBefore, chatAfter, provider, providerKey, videoUrl, timezoneOffset, recurring, label, sermonId) VALUES

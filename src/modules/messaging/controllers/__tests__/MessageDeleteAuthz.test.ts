@@ -7,6 +7,11 @@ jest.mock("../MessagingBaseController", () => ({
       if (!au) return false;
       return au.checkAccess(contentType === "personConfidential" ? "peopleViewConfidentialNotes" : "peopleEdit");
     }
+    isNote(contentType?: string) { return this.isPersonNote(contentType) || contentType === "groupNote" || contentType === "eventNote"; }
+    async canUseNotes(au: any, conv: { contentType?: string }) {
+      if (this.isPersonNote(conv?.contentType)) return this.canViewPersonNotes(au, conv.contentType);
+      return false;
+    }
     isGroupFeed(contentType?: string) { return contentType === "group" || contentType === "groupAnnouncement"; }
     // Membership-only stand-in; the real toggle/leader rules are covered in MessageParticipation.test.ts.
     async canPostToGroupFeed(au: any, _contentType: string, contentId?: string) { return !!contentId && !!au?.groupIds?.includes(contentId); }

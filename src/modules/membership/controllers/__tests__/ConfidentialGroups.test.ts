@@ -1,7 +1,7 @@
 import "reflect-metadata";
 jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
-  Permissions: { groupMembers: { view: "gmView", edit: "gmEdit" }, groups: { edit: "groupsEdit" }, plans: { edit: "plansEdit" } },
+  Permissions: { groupMembers: { view: "gmView", edit: "gmEdit" }, groups: { edit: "groupsEdit" }, plans: { edit: "plansEdit" }, attendance: { view: "attView", edit: "attEdit" } },
   UserChurchHelper: { createForGroupMember: jest.fn() }
 }));
 jest.mock("../../models/requests", () => ({}));

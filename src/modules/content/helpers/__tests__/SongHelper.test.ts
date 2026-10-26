@@ -14,7 +14,7 @@ describe("SongHelper.importSong (FreeShow import)", () => {
       arrangement: {
         loadByFreeShowId: jest.fn().mockResolvedValue(null),
         loadBySongDetailId: jest.fn().mockResolvedValue([]),
-        save: jest.fn(async (a: any) => ({ ...a, id: "arr_new" }))
+        save: jest.fn(async (a: any) => ({ ...a, id: a.id ?? "arr_new" }))
       },
       songDetailLink: {
         loadByServiceAndKey: jest.fn().mockResolvedValue(null),
