@@ -33,7 +33,7 @@ export class PersonController extends MembershipBaseController {
   }
 
   @httpPost("/guest-register")
-  public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: GuestMember[], address?: GuestAddress, maritalStatus?: string, siteToken?: string }>, res: express.Response): Promise<any> {
+  public async guestRegister(req: express.Request<{}, {}, { churchId: string, members: GuestMember[], address?: GuestAddress, maritalStatus?: string, comments?: string, siteToken?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: anon endpoint; a claimed churchId is only honored once it matches the signed site/church token, or the church itself opted in via enableQRGuestRegistration.
       const claimedChurchId = req.body?.churchId;
@@ -50,7 +50,7 @@ export class PersonController extends MembershipBaseController {
       const { error, registration } = GuestRegistrationHelper.sanitize(req.body, settings.modes);
       if (error) return this.json({ error }, 400);
       if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), churchId, "guest-register"))) return this.json({ error: "Too many requests" }, 429);
-      return PersonHelper.registerGuestHousehold(churchId, registration);
+      return PersonHelper.registerGuestHousehold(churchId, registration, await this.loadGuestRegistrationGroupId(churchId));
     });
   }
 
@@ -724,6 +724,12 @@ export class PersonController extends MembershipBaseController {
       if (s.keyName === "guestRegistrationFields") fields = s.value;
     });
     return { enabled, modes: GuestRegistrationHelper.parseModes(fields) };
+  }
+
+  // The group is a private setting the admin picks, so a guest can never choose one.
+  private async loadGuestRegistrationGroupId(churchId: string): Promise<string | undefined> {
+    const rows = (await this.repos.setting.loadAll(churchId)) as any[];
+    return rows?.find((s: any) => s.keyName === "guestRegistrationGroupId")?.value || undefined;
   }
 
   // The directory gate follows the church's configured directoryVisibility tier

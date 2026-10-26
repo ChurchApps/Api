@@ -1,17 +1,19 @@
 import { GRADES } from "./GradeMapping.js";
 
 export type GuestFieldMode = "off" | "optional" | "required";
-export const GUEST_FIELD_KEYS = ["email", "phone", "address", "birthDate", "gender", "maritalStatus", "grade"] as const;
+export const GUEST_FIELD_KEYS = [
+  "email", "phone", "address", "birthDate", "gender", "maritalStatus", "grade", "comments"
+] as const;
 export type GuestFieldKey = (typeof GUEST_FIELD_KEYS)[number];
 export type GuestFieldModes = Record<GuestFieldKey, GuestFieldMode>;
 
-export const DEFAULT_GUEST_FIELDS: GuestFieldModes = { email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off" };
+export const DEFAULT_GUEST_FIELDS: GuestFieldModes = { email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" };
 export const GUEST_GENDERS = ["Unspecified", "Male", "Female"];
 export const GUEST_MARITAL_STATUSES = ["Unknown", "Single", "Married", "Divorced", "Widowed"];
 
 export interface GuestMember { firstName: string; lastName: string; email?: string; phone?: string; birthDate?: string; gender?: string; grade?: string }
 export interface GuestAddress { address1?: string; address2?: string; city?: string; state?: string; zip?: string }
-export interface GuestRegistration { members: GuestMember[]; address?: GuestAddress; maritalStatus?: string }
+export interface GuestRegistration { members: GuestMember[]; address?: GuestAddress; maritalStatus?: string; comments?: string }
 
 const MODES: GuestFieldMode[] = ["off", "optional", "required"];
 
@@ -99,6 +101,11 @@ export class GuestRegistrationHelper {
         if (!GUEST_MARITAL_STATUSES.includes(maritalStatus)) return { error: "maritalStatus is not valid" };
         registration.maritalStatus = maritalStatus;
       } else if (required("maritalStatus")) return { error: "maritalStatus is required" };
+    }
+    if (on("comments")) {
+      const comments = clean(body?.comments, 1000);
+      if (comments) registration.comments = comments;
+      else if (required("comments")) return { error: "comments is required" };
     }
     return { registration };
   }

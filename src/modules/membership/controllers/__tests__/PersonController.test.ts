@@ -52,7 +52,8 @@ function personController(opts: any = {}) {
     visibilityPreference: { loadForPerson: jest.fn(async () => null), loadForPeople: jest.fn(async () => []) },
     church: { loadById: jest.fn(async () => opts.church ?? { id: "c1" }) },
     setting: {
-      loadPublicSettings: jest.fn(async () => opts.settings ?? []),
+      loadPublicSettings: jest.fn(async () => (opts.settings ?? []).filter((r: any) => r.public !== 0)),
+      loadAll: jest.fn(async () => opts.settings ?? []),
       convertAllToModel: (_c: string, rows: any[]) => rows
     }
   };
@@ -220,7 +221,7 @@ describe("PersonController.guestRegister", () => {
   it("registers when the church enabled QR guest registration", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
     const result = await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined);
     expect(result).toEqual({ householdId: "h1", people: [] });
   });
 
@@ -228,7 +229,7 @@ describe("PersonController.guestRegister", () => {
     (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: "c1", mismatch: false });
     const { controller } = personController({ settings: [] });
     await (controller as any).guestRegister({ body: guestBody, headers: {} }, {});
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: guestBody.members }, undefined);
   });
 
   it("rejects a claimed churchId that does not match the signed context", async () => {
@@ -271,7 +272,7 @@ describe("PersonController.guestRegister profile fields", () => {
       ],
       address: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" },
       maritalStatus: "Married"
-    });
+    }, undefined);
   });
 
   it("ignores a field the church turned off even when the client sends it", async () => {
@@ -280,7 +281,7 @@ describe("PersonController.guestRegister profile fields", () => {
       address: { address1: "1 Main St", city: "X", state: "IL", zip: "1" },
       maritalStatus: "Single"
     });
-    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined);
   });
 
   it("rejects a missing required field", async () => {
@@ -312,6 +313,42 @@ describe("PersonController.guestRegister profile fields", () => {
   });
 });
 
+describe("PersonController.guestRegister group and comments", () => {
+  const enabled = { keyName: "enableQRGuestRegistration", value: "true" };
+  const register = (settings: any[], body: any) => {
+    const { controller } = personController({ settings });
+    return (controller as any).guestRegister({ body: { churchId: "c1", ...body }, headers: {} }, {});
+  };
+
+  beforeEach(() => {
+    (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: null, mismatch: false });
+    (PublicPersonRateLimiter.allow as jest.Mock).mockReturnValue(true);
+    (PersonHelper.registerGuestHousehold as jest.Mock).mockClear().mockResolvedValue({ householdId: "h1", people: [] });
+  });
+
+  it("passes the church's private guest group to the household save", async () => {
+    await register([enabled, { keyName: "guestRegistrationGroupId", value: "g1", public: 0 }], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, "g1");
+  });
+
+  it("ignores a group the guest sends in the body", async () => {
+    await register([enabled], { members: [{ firstName: "Pat", lastName: "Visitor" }], groupId: "g-evil" });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined);
+  });
+
+  it("keeps the comment only when the church included it, and enforces required", async () => {
+    const fields = (modes: any) => ({ keyName: "guestRegistrationFields", value: JSON.stringify(modes) });
+    await register([enabled], { members: [{ firstName: "Pat", lastName: "Visitor" }], comments: "Hi" });
+    expect((PersonHelper.registerGuestHousehold as jest.Mock).mock.calls[0][1].comments).toBeUndefined();
+    await register([enabled, fields({ comments: "optional" })], { members: [{ firstName: "Pat", lastName: "Visitor" }], comments: "  Loved the picnic  " });
+    expect((PersonHelper.registerGuestHousehold as jest.Mock).mock.calls[1][1].comments).toBe("Loved the picnic");
+    await register([enabled, fields({ comments: "optional" })], { members: [{ firstName: "Pat", lastName: "Visitor" }], comments: "x".repeat(1200) });
+    expect((PersonHelper.registerGuestHousehold as jest.Mock).mock.calls[2][1].comments).toHaveLength(1000);
+    const r: any = await register([enabled, fields({ comments: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    expect(r.status).toBe(400);
+  });
+});
+
 describe("PersonController.guestRegisterOptions", () => {
   beforeEach(() => {
     (PublicChurchContext.bind as jest.Mock).mockReturnValue({ churchId: null, mismatch: false });
@@ -321,7 +358,7 @@ describe("PersonController.guestRegisterOptions", () => {
   it("returns the defaults when the church has not set a checklist", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
     const result = await (controller as any).guestRegisterOptions({ query: { churchId: "c1" }, headers: {} }, {});
-    expect(result).toEqual({ email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off" });
+    expect(result).toEqual({ email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" });
   });
 
   it("returns the saved checklist and ignores unknown modes", async () => {
