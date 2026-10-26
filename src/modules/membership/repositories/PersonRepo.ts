@@ -41,6 +41,8 @@ export class PersonRepo {
 
   private async create(person: Person): Promise<Person> {
     person.id = UniqueIdHelper.shortId();
+    // Stamped by the server on insert only; any client-supplied value is ignored.
+    person.dateAdded = new Date();
     this.prepareDateFields(person);
     this.prepareContactFields(person);
     const p = person as any;
@@ -79,6 +81,7 @@ export class PersonRepo {
       nametagNotes: person.nametagNotes,
       donorNumber: person.donorNumber,
       importKey: person.importKey,
+      dateAdded: person.dateAdded,
       removed: false
     }).execute();
     return person;
@@ -442,6 +445,7 @@ export class PersonRepo {
       grade: row.grade,
       school: row.school,
       photoUpdated: row.photoUpdated ? new Date(row.photoUpdated) : undefined,
+      dateAdded: row.dateAdded ? new Date(row.dateAdded) : undefined,
       id: row.id,
       churchId: row.churchId,
       importKey: row.importKey,

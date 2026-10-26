@@ -3,7 +3,7 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "per_gen" } }));
 jest.mock("../../helpers/index.js", () => ({
   __esModule: true,
-  PersonHelper: { getPhotoPath: (_c: string, p: any) => (p.photoUpdated ? "photo/" + p.id : "") },
+  PersonHelper: { getPhotoPath: (_c: string, p: any) => (p.photoUpdated ? "photo/" + p.id : ""), getDisplayNameFromPerson: (p: any) => p.name?.first + " " + p.name?.last },
   DateHelper: { toMysqlDate: (d: any) => d ?? null, toMysqlDateOnly: (d: any) => d ?? null }
 }));
 jest.mock("../../../../shared/helpers/index.js", () => ({
@@ -211,5 +211,38 @@ describe("PersonRepo.findPossibleDuplicates", () => {
     (getDb as jest.Mock).mockReturnValue(proxy);
     const result = await new PersonRepo().findPossibleDuplicates("c1", { email: "nobody@x.org" });
     expect(result).toEqual([]);
+  });
+});
+
+describe("PersonRepo dateAdded stamp", () => {
+  const person = () => ({ churchId: "c1", name: { first: "Ann", last: "Lee" }, contactInfo: {} } as any);
+  const valuesOf = (calls: any[], method: string) => calls.find((c) => c.method === method)?.args[0];
+
+  it("stamps dateAdded on insert and ignores a client-supplied value", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const p = person();
+    p.dateAdded = new Date(2001, 0, 1);
+    const before = Date.now();
+    await new PersonRepo().save(p);
+    const values = valuesOf(calls, "values");
+    expect(values.dateAdded).toBeInstanceOf(Date);
+    expect(values.dateAdded.getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("never writes dateAdded on update", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const p = person();
+    p.id = "per1";
+    p.dateAdded = new Date(2001, 0, 1);
+    await new PersonRepo().save(p);
+    expect("dateAdded" in valuesOf(calls, "set")).toBe(false);
+  });
+
+  it("maps dateAdded from the row, leaving it undefined for older people", () => {
+    const repo = new PersonRepo();
+    expect(repo.convertToModel("c1", { id: "p1", dateAdded: "2026-10-26 09:00:00" })!.dateAdded).toBeInstanceOf(Date);
+    expect(repo.convertToModel("c1", { id: "p2", dateAdded: null })!.dateAdded).toBeUndefined();
   });
 });

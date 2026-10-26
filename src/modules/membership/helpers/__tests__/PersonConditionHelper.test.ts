@@ -59,3 +59,35 @@ describe("PersonConditionHelper date fields", () => {
     expect(ids(month)).toEqual(["p2"]);
   });
 });
+
+describe("PersonConditionHelper dateAdded and lastDays", () => {
+  const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d; };
+  const rows = [
+    { id: "new", dateAdded: daysAgo(3), birthDate: daysAgo(10) },
+    { id: "old", dateAdded: daysAgo(90), birthDate: daysAgo(400) },
+    { id: "legacy", dateAdded: null as any, birthDate: null as any }
+  ];
+
+  it("filters dateAdded with before / after like the other date fields", () => {
+    const cutoff = toDateOnly(daysAgo(30));
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "dateAdded", operator: "greaterThan", value: cutoff } as any]))).toEqual(["new"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "dateAdded", operator: "lessThan", value: cutoff } as any]))).toEqual(["old"]);
+  });
+
+  it("matches people added in the last N days, leaving out undated people", () => {
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "dateAdded", operator: "lastDays", value: "30" } as any]))).toEqual(["new"]);
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "dateAdded", operator: "lastDays", value: "120" } as any]))).toEqual(["new", "old"]);
+  });
+
+  it("supports lastDays on other date fields too", () => {
+    expect(ids(PersonConditionHelper.apply(rows, [{ field: "birthDate", operator: "lastDays", value: "30" } as any]))).toEqual(["new"]);
+  });
+
+  it("matches nothing for a non-numeric day count", () => {
+    expect(PersonConditionHelper.apply(rows, [{ field: "dateAdded", operator: "lastDays", value: "abc" } as any])).toEqual([]);
+  });
+});
+
+function toDateOnly(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}

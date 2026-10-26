@@ -18,6 +18,7 @@ export class Person {
   public householdRole?: string;
   public campusId?: string;
   public photoUpdated?: Date;
+  public dateAdded?: Date;
   public photo?: string;
   public importKey?: string;
   public removed?: boolean;
