@@ -7,6 +7,7 @@ import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 import { SsoHelper } from "./SsoHelper.js";
 import type { GuestRegistration } from "./GuestRegistrationHelper.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
+import { getMessagingModuleGateway } from "../../../shared/modules/index.js";
 
 export class PersonHelper extends BasePersonHelper {
   private static async repos(): Promise<Repos> {
@@ -44,7 +45,7 @@ export class PersonHelper extends BasePersonHelper {
     return person;
   }
 
-  public static async registerGuestHousehold(churchId: string, registration: GuestRegistration) {
+  public static async registerGuestHousehold(churchId: string, registration: GuestRegistration, groupId?: string) {
     const members = registration?.members;
     if (!members || members.length === 0) throw new Error("At least one member is required");
     const repos = await this.repos();
@@ -73,6 +74,32 @@ export class PersonHelper extends BasePersonHelper {
       const saved = await repos.person.save(person);
       await WebhookDispatcher.emit(churchId, "person.created", saved);
       people.push(saved);
+    }
+
+    // The sign-up itself has succeeded by now, so a failed group add or note is logged, not returned.
+    if (groupId) {
+      try {
+        const group = await repos.group.load(churchId, groupId);
+        if (group) {
+          for (const p of people) {
+            const gm = await repos.groupMember.save({ churchId, groupId, personId: p.id, joinDate: new Date() });
+            await repos.groupMemberHistory.log(churchId, groupId, p.id, "joined");
+            await WebhookDispatcher.emit(churchId, "group.member.added", gm);
+          }
+        }
+      } catch (err) {
+        console.error("[PersonHelper] guest group add failed:", err);
+      }
+    }
+    if (registration.comments) {
+      const head = people[0];
+      try {
+        // The Notes tab reads the person's own conversation, so the new one is linked back.
+        head.conversationId = await getMessagingModuleGateway().createPersonNote(churchId, head.id, `${head.name?.first} ${head.name?.last} Notes`, registration.comments);
+        await repos.person.save(head);
+      } catch (err) {
+        console.error("[PersonHelper] guest comment note failed:", err);
+      }
     }
 
     return { householdId: household.id, people: people.map(p => ({ id: p.id, name: { first: p.name?.first, last: p.name?.last } })) };

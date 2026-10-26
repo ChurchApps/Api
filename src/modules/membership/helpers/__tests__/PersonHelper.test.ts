@@ -3,9 +3,12 @@ jest.mock("@churchapps/apihelper", () => ({ PersonHelper: class {} }));
 jest.mock("../../../../shared/helpers/index.js", () => ({ Permissions: { people: { edit: "peopleEdit" } } }));
 jest.mock("../SsoHelper.js", () => ({ SsoHelper: { applyStashedPhoto: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/WebhookDispatcher.js", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
+const mockCreatePersonNote = jest.fn();
+jest.mock("../../../../shared/modules/index.js", () => ({ getMessagingModuleGateway: () => ({ createPersonNote: (...args: any[]) => mockCreatePersonNote(...args) }) }));
 
 import { RepoManager } from "../../../../shared/infrastructure/index.js";
 import { PersonHelper } from "../PersonHelper.js";
+import { WebhookDispatcher } from "../../../../shared/webhooks/WebhookDispatcher.js";
 
 // Mirrors the real PersonRepo: searchEmail filters `removed = false`, searchEmailIncludingRemoved does not.
 // The rows fixture is the whole table for the church, so a test can never hand searchEmail a deleted
@@ -20,8 +23,11 @@ function mockRepos(rows: any[] = [], opts: any = {}) {
     restore: jest.fn()
   };
   const household = { save: jest.fn(async (h: any) => { h.id = "h1"; return h; }) };
-  (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person, household });
-  return { person, household };
+  const group = { load: jest.fn(async (_c: string, id: string) => (opts.groups ?? []).find((g: any) => g.id === id) ?? null) };
+  const groupMember = { save: jest.fn(async (gm: any) => ({ ...gm, id: "gm-" + gm.personId })) };
+  const groupMemberHistory = { log: jest.fn() };
+  (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person, household, group, groupMember, groupMemberHistory });
+  return { person, household, group, groupMember, groupMemberHistory };
 }
 
 const removedPerson = { id: "p1", churchId: "c1", email: "a@b.com", removed: true, name: {} };
@@ -119,5 +125,53 @@ describe("PersonHelper.registerGuestHousehold", () => {
     expect(saved[1]).toMatchObject({ householdRole: "Other", grade: "3", contactInfo: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" } });
     expect(saved[1].maritalStatus).toBeUndefined();
     expect(saved[1].contactInfo.email).toBeUndefined();
+  });
+});
+
+// Issue #1374: the guest QR sign-up can add the household to the church's chosen group and save a comment as a note.
+describe("PersonHelper.registerGuestHousehold group and comments", () => {
+  const registration = { members: [{ firstName: "Pat", lastName: "Visitor" }, { firstName: "Sam", lastName: "Visitor" }] };
+  const savePeople = (person: any) => {
+    let n = 0;
+    person.save.mockImplementation(async (p: any) => { if (!p.id) p.id = "p" + (++n); return p; });
+  };
+
+  beforeEach(() => { mockCreatePersonNote.mockReset().mockResolvedValue("conv1"); (WebhookDispatcher.emit as jest.Mock).mockClear(); });
+
+  it("adds every new person to the chosen group and fires group.member.added", async () => {
+    const { person, groupMember, groupMemberHistory } = mockRepos([], { groups: [{ id: "g1" }] });
+    savePeople(person);
+    await PersonHelper.registerGuestHousehold("c1", registration, "g1");
+    expect(groupMember.save.mock.calls.map((c: any[]) => c[0])).toEqual([
+      expect.objectContaining({ churchId: "c1", groupId: "g1", personId: "p1" }),
+      expect.objectContaining({ churchId: "c1", groupId: "g1", personId: "p2" })
+    ]);
+    expect(groupMemberHistory.log).toHaveBeenCalledWith("c1", "g1", "p1", "joined");
+    expect(WebhookDispatcher.emit).toHaveBeenCalledWith("c1", "group.member.added", expect.objectContaining({ groupId: "g1", personId: "p2" }));
+  });
+
+  it("skips a group that no longer exists and still registers", async () => {
+    const { person, groupMember } = mockRepos([], { groups: [] });
+    savePeople(person);
+    const result = await PersonHelper.registerGuestHousehold("c1", registration, "gone");
+    expect(groupMember.save).not.toHaveBeenCalled();
+    expect(result.people).toHaveLength(2);
+  });
+
+  it("saves the comment as a note on the head of household and links it to their Notes tab", async () => {
+    const { person } = mockRepos();
+    savePeople(person);
+    await PersonHelper.registerGuestHousehold("c1", { ...registration, comments: "Loved the picnic" });
+    expect(mockCreatePersonNote).toHaveBeenCalledWith("c1", "p1", "Pat Visitor Notes", "Loved the picnic");
+    expect(person.save).toHaveBeenLastCalledWith(expect.objectContaining({ id: "p1", conversationId: "conv1" }));
+  });
+
+  it("does not fail the sign-up when the note cannot be saved", async () => {
+    const { person } = mockRepos();
+    savePeople(person);
+    mockCreatePersonNote.mockRejectedValue(new Error("down"));
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const result = await PersonHelper.registerGuestHousehold("c1", { ...registration, comments: "Hi" });
+    expect(result.people).toHaveLength(2);
   });
 });

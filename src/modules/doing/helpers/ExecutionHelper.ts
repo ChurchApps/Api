@@ -94,6 +94,14 @@ export class ExecutionHelper {
       peopleIds = peopleIds.filter((id) => !seen.has(id));
       skipped = before - peopleIds.length;
     }
+    if (FilterMatcher.toBool(rule.oncePerSubject)) {
+      const remaining: string[] = [];
+      for (const id of peopleIds) {
+        if (await this.existingCardForSubject(rule, "person", id, repos)) skipped++;
+        else remaining.push(id);
+      }
+      peopleIds = remaining;
+    }
     if (peopleIds.length === 0) return { created: 0, skipped };
 
     const people: { id: string; displayName: string }[] = await getMembershipModuleGateway().loadPeople(rule.churchId, peopleIds);
@@ -197,7 +205,7 @@ export class ExecutionHelper {
     if (!execution.subjectId) return false;
     if (trigger.triggerKind === "schedule") {
       const existing = (await repos.task.loadByTriggerIdContent(execution.churchId || "", trigger.id || "", trigger.recurs || "", execution.subjectType || "person", [execution.subjectId])) as Task[];
-      return existing.length > 0;
+      if (existing.length > 0) return true;
     }
     if (!FilterMatcher.toBool(trigger.oncePerSubject)) return false;
     return !!(await this.existingCardForSubject({ ...trigger, churchId: execution.churchId }, execution.subjectType || "person", execution.subjectId, repos));

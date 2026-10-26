@@ -26,6 +26,8 @@ export interface MessagingModuleGateway {
   // Person notes are conversations; the caller passes the contentTypes it is allowed to read.
   loadPersonNotes(churchId: string, personId: string, contentTypes: string[]): Promise<any[]>;
   loadConversation(churchId: string, id: string): Promise<any | null>;
+  // Starts a person's hidden Notes conversation with one message; returns the conversation id.
+  createPersonNote(churchId: string, personId: string, title: string, text: string): Promise<string>;
   createNotifications(notifications: any[]): Promise<any[]>;
   // Render a saved EmailTemplate and send through notification funnel; returns false if template missing or no email.
   sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
@@ -111,6 +113,14 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
 
   public async loadConversation(churchId: string, id: string) {
     return (await this.repos()).conversation.loadById(churchId, id);
+  }
+
+  public async createPersonNote(churchId: string, personId: string, title: string, text: string) {
+    const repos = await this.repos();
+    const conversation = await repos.conversation.save({ churchId, contentType: "person", contentId: personId, title, dateCreated: new Date(), visibility: "hidden", allowAnonymousPosts: false });
+    await repos.message.save({ churchId, conversationId: conversation.id, displayName: "Guest sign-up", timeSent: new Date(), content: text, messageType: "comment" });
+    await repos.conversation.updateStats(conversation.id);
+    return conversation.id as string;
   }
 
   public async createNotifications(notifications: any[]) {
