@@ -36,6 +36,7 @@ interface PeopleTable {
   state?: string;
   zip?: string;
   photoUpdated?: Date;
+  dateAdded?: Date;
   householdId?: string;
   householdRole?: string;
   campusId?: string;

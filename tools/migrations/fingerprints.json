@@ -839,6 +839,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-10-26_person_date_added": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "people",
+     "column": "dateAdded",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "attendance": {

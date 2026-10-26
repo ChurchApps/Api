@@ -13,6 +13,7 @@ export class PersonConditionHelper {
   }
 
   public static applyOne(data: any[], c: SearchCondition) {
+    if (c.operator === "lastDays") return this.applyLastDays(data, c);
     switch (c.field) {
       case "age":
         data.forEach((p) => { p.age = PersonHelper.getAge(p.birthDate); });
@@ -27,7 +28,8 @@ export class PersonConditionHelper {
         data.forEach((p) => { p.anniversaryMonth = PersonHelper.getBirthMonth(p.anniversary); });
         return ArrayHelper.getAllOperator(data, "anniversaryMonth", c.value, c.operator, "number");
       case "birthDate":
-      case "anniversary": {
+      case "anniversary":
+      case "dateAdded": {
         // These columns come off the row as Date objects while the posted value is a
         // "YYYY-MM-DD" string, so the default string compare lines up neither for equals
         // nor for ordering. Date-only strings compare exactly and still sort chronologically.
@@ -50,5 +52,19 @@ export class PersonConditionHelper {
       default:
         return ArrayHelper.getAllOperator(data, c.field, c.value, c.operator);
     }
+  }
+
+  // "In the last N days": on or after the date N days before today. Undated people never match.
+  private static applyLastDays(data: any[], c: SearchCondition) {
+    const days = parseInt(c.value, 10);
+    if (isNaN(days) || days < 0) return [];
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    const startDateOnly = DateHelper.toMysqlDateOnly(start)!;
+    const todayDateOnly = DateHelper.toMysqlDateOnly(new Date())!;
+    return data.filter((p) => {
+      const d = DateHelper.toMysqlDateOnly(p[c.field]);
+      return !!d && d >= startDateOnly && d <= todayDateOnly;
+    });
   }
 }
