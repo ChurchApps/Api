@@ -20,8 +20,8 @@ export async function up(db: Kysely<any>): Promise<void> {
     .addColumn("copyright", sql`varchar(500)`)
     .addColumn("license", sql`varchar(255)`)
     .addColumn("attribution", sql`varchar(1000)`)
-    .addColumn("published", sql`bit(1)`, (col) => col.notNull().defaultTo(0))
-    .addColumn("archived", sql`bit(1)`, (col) => col.notNull().defaultTo(0))
+    .addColumn("published", sql`bit(1)`, (col) => col.notNull().defaultTo(sql`b'0'`))
+    .addColumn("archived", sql`bit(1)`, (col) => col.notNull().defaultTo(sql`b'0'`))
     .modifyEnd(sql`ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`)
     .execute();
 

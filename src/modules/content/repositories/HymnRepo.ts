@@ -12,7 +12,7 @@ export class HymnRepo {
 
   private async create(model: Hymn): Promise<Hymn> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("hymns").values(this.toRow(model)).execute();
+    await getDb().insertInto("hymns").values(this.toRow(model) as any).execute();
     return model;
   }
 
