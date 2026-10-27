@@ -4,6 +4,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { SsoHelper } from "../helpers/SsoHelper.js";
 import { SsoTokenHelper } from "../helpers/SsoTokenHelper.js";
+import { MfaHelper } from "../helpers/MfaHelper.js";
 import { AuditLogHelper, Environment } from "../helpers/index.js";
 
 @controller("/membership/users/sso")
@@ -67,6 +68,7 @@ export class UserSsoController extends MembershipBaseController {
 
         const { firstName, lastName } = SsoHelper.extractNames(claims);
         const { user } = await SsoHelper.findOrCreateUser(trust.email, firstName, lastName, this.repos);
+        if (await this.repos.userMfa.isEnabled(user.id)) return res.redirect(302, SsoHelper.appendFragment(returnUrl, "mfaToken", MfaHelper.createLoginToken(user.id)));
 
         user.lastLogin = new Date();
         await this.repos.user.save(user);

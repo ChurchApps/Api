@@ -22,6 +22,14 @@ describe("group attendance reports", () => {
       expect(sql).toMatch(/DATE_FORMAT\(s\.sessionDate, '%Y-%m-%d'\) as sessionDate/);
       expect(sql).not.toMatch(/:week/);
     });
+
+    // Groups with no service time record sessions with a null serviceTimeId.
+    it(`${keyName} keeps sessions that have no service time`, () => {
+      expect(sql).not.toMatch(/INNER JOIN serviceTimes/i);
+      expect(sql).not.toMatch(/INNER JOIN services/i);
+      expect(sql).toMatch(/LEFT JOIN serviceTimes st on st\.id=s\.serviceTimeId/);
+      expect(sql).toMatch(/LEFT JOIN services ser on ser\.id=st\.serviceId/);
+    });
   });
 });
 
@@ -54,6 +62,16 @@ describe("GroupAttendanceDownloadHelper.combine", () => {
     expect(bob["Sunday - 9:00 AM (2024-03-16)"]).toBe("present");
     const annYouth = rows.find((r: any) => r.displayName === "Ann" && r.groupName === "Youth");
     expect(annYouth["Sunday - 9:00 AM (2024-03-09)"]).toBe("absent");
+  });
+
+  it("labels a session with no service time by its date alone", () => {
+    const report: any = buildReport();
+    report.queries[0].value.push({ serviceName: null, serviceTimeName: null, serviceId: null, serviceTimeId: null, groupId: "g1", personId: "p2", sessionDate: "2024-03-20" });
+    const rows = GroupAttendanceDownloadHelper.combine(report);
+    const bob = rows.find((r: any) => r.displayName === "Bob" && r.groupName === "Choir");
+    expect(Object.keys(bob)).toContain("2024-03-20");
+    expect(bob["2024-03-20"]).toBe("present");
+    expect(Object.keys(bob).some((k) => k.includes("null"))).toBe(false);
   });
 
   it("sorts rows by group, then last name, first name", () => {

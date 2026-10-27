@@ -9,6 +9,7 @@ import { MembershipBaseController } from "./MembershipBaseController.js";
 import { AuthGuidHelper, UserHelper, UserChurchHelper, UniqueIdHelper, Environment, Permissions, AuditLogHelper, LoginRateLimiter, MauticHelper, ChurchHelper, PublicPersonRateLimiter } from "../helpers/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { MfaHelper } from "../helpers/MfaHelper.js";
 
 const emailPasswordValidation = [
   body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"),
@@ -75,15 +76,20 @@ export class UserController extends MembershipBaseController {
         const ip = AuditLogHelper.getClientIp(req);
         // A jwt refresh is already-proven identity, so it is not a credential guess and is not throttled.
         const isJwtRefresh = req.body.jwt !== undefined && req.body.jwt !== "";
+        const isMfaStep = !isJwtRefresh && !!req.body.mfaToken;
+        const mfaUserId = isMfaStep ? MfaHelper.verifyLoginToken(req.body.mfaToken) : null;
         const rateLimitIp = LoginRateLimiter.getClientIp(req);
-        const account = loginAccountKey(req.body);
-        if (!isJwtRefresh && !(await LoginRateLimiter.allow(this.repos, rateLimitIp, account))) {
+        const account = isMfaStep ? "mfa:" + (mfaUserId || "invalid") : loginAccountKey(req.body);
+        const accountMax = isMfaStep ? LoginRateLimiter.maxPerAccountStrict : LoginRateLimiter.maxPerAccount;
+        if (!isJwtRefresh && !(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, accountMax))) {
           return this.json({ errors: ["Too many requests"] }, 429);
         }
 
         let user: User = null;
         if (isJwtRefresh) {
           user = await AuthenticatedUser.loadUserByJwt(req.body.jwt, this.repos);
+        } else if (isMfaStep) {
+          if (mfaUserId && (await MfaHelper.verifyCode(this.repos, mfaUserId, req.body.mfaCode))) user = await this.repos.user.load(mfaUserId);
         } else if (req.body.authGuid !== undefined && req.body.authGuid !== "") {
           user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
           if (user !== null) user = await this.consumeLoginGuid(user, req.body.authGuid);
@@ -96,9 +102,12 @@ export class UserController extends MembershipBaseController {
 
         if (user === null) {
           if (!isJwtRefresh) await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
-          const failEmail = req.body.email || req.body.authGuid || "(jwt)";
-          AuditLogHelper.logLogin(this.repos, "", "", false, ip, { email: failEmail, reason: "Invalid Credentials" });
-          return this.denyAccess(["Login failed"]);
+          const failEmail = req.body.email || req.body.authGuid || (isMfaStep ? "(2fa)" : "(jwt)");
+          AuditLogHelper.logLogin(this.repos, "", mfaUserId || "", false, ip, { email: failEmail, reason: isMfaStep ? "Invalid two-factor code" : "Invalid Credentials" });
+          return this.denyAccess([isMfaStep ? "Invalid code" : "Login failed"]);
+        } else if (!isJwtRefresh && !isMfaStep && (await this.repos.userMfa.isEnabled(user.id))) {
+          await LoginRateLimiter.clearFailures(this.repos, account, rateLimitIp);
+          return this.json({ mfaRequired: true, mfaToken: MfaHelper.createLoginToken(user.id) }, 200);
         } else {
           const userChurches = await this.getUserChurches(user.id);
 
@@ -647,6 +656,7 @@ export class UserController extends MembershipBaseController {
         lastName: user.lastName,
         registrationDate: user.registrationDate,
         lastLogin: user.lastLogin,
+        mfaEnabled: await this.repos.userMfa.isEnabled(user.id),
         churches
       }, 200);
     });

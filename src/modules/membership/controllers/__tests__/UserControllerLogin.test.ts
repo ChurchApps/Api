@@ -21,7 +21,7 @@ jest.mock("../../helpers/index", () => {
     UserHelper: { replaceDomainAdminPermissions: jest.fn(), addAllReportingPermissions: jest.fn() },
     UserChurchHelper: { createForNewUser: jest.fn() },
     UniqueIdHelper: { shortId: () => "tmp" },
-    Environment: { currentEnvironment: "test" },
+    Environment: { currentEnvironment: "test", jwtSecret: "test-secret" },
     Permissions: { server: { admin: "serverAdmin" }, people: { edit: "peopleEdit" } },
     AuditLogHelper: { getClientIp: jest.fn(() => "1.1.1.1"), logLogin: jest.fn(), log: jest.fn() },
     MauticHelper: { trackLogin: jest.fn(() => Promise.resolve()) },
@@ -37,6 +37,8 @@ import bcrypt from "bcryptjs";
 import { UserController } from "../UserController.js";
 import { AuthenticatedUser } from "../../auth/index.js";
 import { LoginRateLimiter } from "../../helpers/LoginRateLimiter.js";
+import { MfaHelper } from "../../helpers/MfaHelper.js";
+import { TotpHelper } from "../../helpers/TotpHelper.js";
 
 // Stands in for the loginAttempts table, shared by every controller built in one test.
 function attemptStore() {
@@ -58,8 +60,10 @@ function userController(opts: any = {}) {
     user: {
       loadByEmail: jest.fn(async () => existing),
       loadByAuthGuid: jest.fn(async () => opts.authUser ?? null),
+      load: jest.fn(async () => existing),
       save: jest.fn(async (u: any) => u)
     },
+    userMfa: opts.userMfa ?? { isEnabled: jest.fn(async () => false) },
     rolePermission: { loadForUser: jest.fn(async () => opts.userChurches ?? [{ church: { id: "c1", name: "Test Church" } }]) },
     loginAttempt: attempts.repo
   };
@@ -211,5 +215,76 @@ describe("UserController credential rate limit", () => {
     const req: any = { ...credReq({ email: "fresh@b.c" }), headers: { "x-forwarded-for": "8.8.8.8, 203.0.113.7" } };
     const result: any = await (controller as any).login(req, {});
     expect(result.status).toBe(429);
+  });
+});
+
+describe("UserController.login two-factor", () => {
+  const secret = TotpHelper.generateSecret();
+  function mfaRepo() {
+    const row: any = { userId: "u1", secret, enabled: true, lastUsedStep: null, backupCodes: JSON.stringify([MfaHelper.hashBackupCode("abcde-fghjk")]) };
+    return {
+      row,
+      isEnabled: jest.fn(async () => true),
+      load: jest.fn(async () => ({ ...row })),
+      claimStep: jest.fn(async (_id: string, step: number) => {
+        if (row.lastUsedStep !== null && row.lastUsedStep >= step) return false;
+        row.lastUsedStep = step;
+        return true;
+      }),
+      replaceBackupCodes: jest.fn(async (_id: string, expected: string, next: string) => {
+        if (row.backupCodes !== expected) return false;
+        row.backupCodes = next;
+        return true;
+      })
+    };
+  }
+
+  beforeEach(() => { jest.spyOn(MfaHelper, "decryptSecret").mockImplementation((s: string) => s); });
+
+  it("answers a correct password with a challenge instead of tokens", async () => {
+    const { controller } = userController({ user: { id: "u1", email: "a@b.c", password: "hash" }, userMfa: mfaRepo() });
+    (bcrypt.compareSync as jest.Mock).mockReturnValue(true);
+    const result: any = await (controller as any).login(credReq(), {});
+    expect(result.status).toBe(200);
+    expect(result.obj.mfaRequired).toBe(true);
+    expect(result.obj.user).toBeUndefined();
+    expect(MfaHelper.verifyLoginToken(result.obj.mfaToken)).toBe("u1");
+    expect(AuthenticatedUser.login).not.toHaveBeenCalled();
+  });
+
+  it("logs in with the challenge token and a current code, and refuses the same code twice", async () => {
+    const userMfa = mfaRepo();
+    const { controller } = userController({ user: { id: "u1", email: "a@b.c" }, userMfa });
+    const mfaToken = MfaHelper.createLoginToken("u1");
+    const code = TotpHelper.codeAt(secret, TotpHelper.currentStep());
+    const ok: any = await (controller as any).login({ body: { mfaToken, mfaCode: code }, headers: {}, socket: { remoteAddress: "1.1.1.1" } }, {});
+    expect(ok.status).toBe(200);
+    expect(ok.obj.user.id).toBe("u1");
+    const replay: any = await (controller as any).login({ body: { mfaToken, mfaCode: code }, headers: {}, socket: { remoteAddress: "1.1.1.1" } }, {});
+    expect(replay).toEqual({ obj: { errors: ["Invalid code"] }, status: 401 });
+  });
+
+  it("accepts a backup code once", async () => {
+    const userMfa = mfaRepo();
+    const { controller } = userController({ user: { id: "u1", email: "a@b.c" }, userMfa });
+    const body = { mfaToken: MfaHelper.createLoginToken("u1"), mfaCode: "ABCDE FGHJK" };
+    expect((await (controller as any).login({ body, headers: {}, socket: {} }, {})).status).toBe(200);
+    expect((await (controller as any).login({ body, headers: {}, socket: {} }, {})).status).toBe(401);
+  });
+
+  it("rejects a forged challenge token and a user jwt posing as one", async () => {
+    const { controller } = userController({ user: { id: "u1", email: "a@b.c" }, userMfa: mfaRepo() });
+    const code = TotpHelper.codeAt(secret, TotpHelper.currentStep());
+    const jwt = require("jsonwebtoken");
+    const userJwt = jwt.sign({ id: "u1", purpose: "mfa" }, "test-secret");
+    const result: any = await (controller as any).login({ body: { mfaToken: userJwt, mfaCode: code }, headers: {}, socket: {} }, {});
+    expect(result.status).toBe(401);
+  });
+
+  it("does not challenge a jwt refresh", async () => {
+    const { controller } = userController({ user: null, userMfa: mfaRepo() });
+    (AuthenticatedUser.loadUserByJwt as jest.Mock).mockResolvedValue({ id: "u1", email: "a@b.c" });
+    const result: any = await (controller as any).login({ body: { jwt: "refresh" }, headers: {}, socket: {} }, {});
+    expect(result.obj.user.id).toBe("u1");
   });
 });

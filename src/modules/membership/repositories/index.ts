@@ -35,6 +35,7 @@ export { SettingRepo } from "./SettingRepo.js";
 export { ClientErrorRepo } from "./ClientErrorRepo.js";
 export { JobRunRepo } from "./JobRunRepo.js";
 export { LoginAttemptRepo } from "./LoginAttemptRepo.js";
+export { UserMfaRepo } from "./UserMfaRepo.js";
 
 export { OAuthTokenRepo } from "./OAuthTokenRepo.js";
 export { OAuthCodeRepo } from "./OAuthCodeRepo.js";
