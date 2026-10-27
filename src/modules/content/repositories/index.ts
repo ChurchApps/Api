@@ -20,6 +20,7 @@ export { CuratedCalendarRepo } from "./CuratedCalendarRepo.js";
 export { CuratedEventRepo } from "./CuratedEventRepo.js";
 export { RoomRepo } from "./RoomRepo.js";
 export { ResourceRepo } from "./ResourceRepo.js";
+export { HymnRepo } from "./HymnRepo.js";
 export { EventBookingRepo } from "./EventBookingRepo.js";
 export { CalendarBlockoutRepo } from "./CalendarBlockoutRepo.js";
 export { EventTemplateRepo } from "./EventTemplateRepo.js";

@@ -19,6 +19,7 @@ import {
   CuratedEventRepo,
   RoomRepo,
   ResourceRepo,
+  HymnRepo,
   EventBookingRepo,
   CalendarBlockoutRepo,
   EventTemplateRepo,
@@ -65,6 +66,7 @@ export class Repos {
   public curatedEvent: CuratedEventRepo;
   public room: RoomRepo;
   public resource: ResourceRepo;
+  public hymn: HymnRepo;
   public eventBooking: EventBookingRepo;
   public calendarBlockout: CalendarBlockoutRepo;
   public eventTemplate: EventTemplateRepo;
@@ -112,6 +114,7 @@ export class Repos {
     this.curatedEvent = new CuratedEventRepo();
     this.room = new RoomRepo();
     this.resource = new ResourceRepo();
+    this.hymn = new HymnRepo();
     this.eventBooking = new EventBookingRepo();
     this.calendarBlockout = new CalendarBlockoutRepo();
     this.eventTemplate = new EventTemplateRepo();

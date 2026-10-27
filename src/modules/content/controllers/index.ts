@@ -27,6 +27,7 @@ export { CuratedCalendarController } from "./CuratedCalendarController.js";
 export { CuratedEventController } from "./CuratedEventController.js";
 export { RoomController } from "./RoomController.js";
 export { ResourceController } from "./ResourceController.js";
+export { HymnController } from "./HymnController.js";
 export { EventBookingController } from "./EventBookingController.js";
 export { CalendarBlockoutController } from "./CalendarBlockoutController.js";
 export { EventTemplateController } from "./EventTemplateController.js";
