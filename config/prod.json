@@ -15,6 +15,7 @@
   "messagingApi": "https://api.churchapps.org/messaging",
   "aiProvider": "openai",
   "storeApi": "https://api.mutualministry.com",
+  "lessonsApi": "https://api.lessons.church",
   "ministryStuffApi": "https://api.ministrystuff.org",
   "ministryStuffContentRoot": "https://content.ministrystuff.org/"
 }

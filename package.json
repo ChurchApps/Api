@@ -40,7 +40,8 @@
     "migrate:create": "tsx tools/migrate-create.ts",
     "scheduled-tasks": "tsx tools/run-scheduled-tasks.ts",
     "timer:30min": "tsx tools/run-timer-30min.ts",
-    "timer:midnight": "tsx tools/run-timer-midnight.ts"
+    "timer:midnight": "tsx tools/run-timer-midnight.ts",
+    "mcp:lessons-routes": "tsx tools/generate-lessons-routes.ts"
   },
   "keywords": [
     "church",

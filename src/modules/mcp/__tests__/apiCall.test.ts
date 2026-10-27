@@ -1,3 +1,5 @@
+jest.mock("../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
+
 import { dispatch, setExpressApp } from "../internalDispatch.js";
 import { makeApiCallHandler } from "../tools/apiCall.js";
 import { LoginRateLimiter } from "../../membership/helpers/LoginRateLimiter.js";

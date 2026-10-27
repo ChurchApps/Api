@@ -15,6 +15,7 @@
   "messagingApi": "https://api.staging.churchapps.org/messaging",
   "aiProvider": "openrouter",
   "storeApi": "http://localhost:8096",
+  "lessonsApi": "http://localhost:8090",
   "ministryStuffApi": "http://localhost:8097",
   "ministryStuffContentRoot": "http://localhost:8097/content/"
 }
