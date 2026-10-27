@@ -57,7 +57,9 @@ interface ProviderFile {
 }
 
 interface Provider {
+  readonly name?: string;
   readonly requiresAuth: boolean | (() => boolean);
+  browse?(path?: string | null, auth?: ContentProviderAuthData | null): Promise<{ type: string; title?: string; path?: string }[]>;
   getPresentations?(path: string, auth?: ContentProviderAuthData | null): Promise<{ allFiles?: unknown[] } | null>;
   getPlaylist?(path: string, auth?: ContentProviderAuthData | null, resolution?: number): Promise<unknown[] | null>;
   getInstructions?(path: string, auth?: ContentProviderAuthData | null): Promise<Instructions | null>;
@@ -68,6 +70,7 @@ interface BuildContext {
   churchId: string;
   files: Map<string, Promise<ProviderFile[] | null>>;
   instructions: Map<string, Promise<Instructions | null>>;
+  folderTitles: Map<string, Promise<string>>;
   auth: Map<string, Promise<ContentProviderAuthData | null>>;
 }
 
@@ -85,7 +88,7 @@ export class ScreenManifestHelper {
     const group: ScreenGroup = repos.screenGroup.convertToModel(churchId, await repos.screenGroup.load(churchId, screenGroupId));
     if (!group) return null;
     const timeZone = await this.churchTimeZone(churchId);
-    const ctx: BuildContext = { repos, churchId, files: new Map(), instructions: new Map(), auth: new Map() };
+    const ctx: BuildContext = { repos, churchId, files: new Map(), instructions: new Map(), folderTitles: new Map(), auth: new Map() };
 
     const fallbackContent = group.defaultPlaylistId ? await this.playlistContent(ctx, group.defaultPlaylistId) : null;
     const fallback = fallbackContent?.items || null;
@@ -299,6 +302,41 @@ export class ScreenManifestHelper {
     return { title, items };
   }
 
+  // A schedule entry stores only the folder's path, so look its name up from the parent listing.
+  // Falls back to "provider › last segment", the label FreePlayAdmin's calendar shows; LAN providers can't be browsed from the cloud.
+  private static folderTitle(ctx: BuildContext, providerId: string, path: string): Promise<string> {
+    const key = `${providerId}|${path}`;
+    if (!ctx.folderTitles.has(key)) ctx.folderTitles.set(key, this.loadFolderTitle(ctx, providerId, path));
+    return ctx.folderTitles.get(key);
+  }
+
+  private static async loadFolderTitle(ctx: BuildContext, providerId: string, path: string): Promise<string> {
+    const provider = getProvider(providerId) as unknown as Provider | null;
+    const segments = path.split("/").filter(Boolean);
+    const last = segments[segments.length - 1];
+    let fallback = provider?.name || providerId;
+    if (last) {
+      try {
+        fallback = `${fallback} › ${decodeURIComponent(last)}`;
+      } catch {
+        fallback = `${fallback} › ${last}`;
+      }
+    }
+    if (!provider?.browse || !last || ScreenScheduleHelper.resolveType(providerId) === "lan") return fallback;
+    try {
+      const needsAuth = this.requiresAuth(provider);
+      const auth = needsAuth ? await this.providerAuth(ctx, providerId, null) : null;
+      if (needsAuth && !auth) return fallback;
+      const parentPath = segments.length > 1 ? "/" + segments.slice(0, -1).join("/") : null;
+      const normalized = "/" + segments.join("/");
+      const folder = ((await provider.browse(parentPath, auth)) || []).find((f) => f.type === "folder" && "/" + (f.path || "").split("/").filter(Boolean).join("/") === normalized);
+      return folder?.title || fallback;
+    } catch (e) {
+      console.error(`Screen manifest: ${providerId} folder name lookup failed`, e);
+      return fallback;
+    }
+  }
+
   // The cloud can't reach a LAN provider, so its folder ships as one reference item (no fileId) the TV expands locally.
   private static async folderItems(ctx: BuildContext, providerId: string, path: string, ministryId: string | null = null): Promise<ManifestItem[]> {
     if (ScreenScheduleHelper.resolveType(providerId) === "lan") {
@@ -311,7 +349,10 @@ export class ScreenManifestHelper {
   private static async entryContent(ctx: BuildContext, entry: ScheduleEntry): Promise<EntryContent> {
     if (entry.targetType === "playlist" && entry.targetId) return (await this.playlistContent(ctx, entry.targetId)) || { title: "", items: [] };
     if (entry.targetType === "planType" && entry.targetId) return this.planTypeContent(ctx, entry.targetId);
-    if (entry.targetType === "providerFolder" && entry.providerId && entry.providerPath) return { title: entry.providerPath, items: await this.folderItems(ctx, entry.providerId, entry.providerPath) };
+    if (entry.targetType === "providerFolder" && entry.providerId && entry.providerPath) {
+      const [title, items] = await Promise.all([this.folderTitle(ctx, entry.providerId, entry.providerPath), this.folderItems(ctx, entry.providerId, entry.providerPath)]);
+      return { title, items };
+    }
     return { title: "", items: [] };
   }
 }
