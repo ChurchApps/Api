@@ -18,6 +18,7 @@ export class Environment extends EnvironmentBase {
   static messagingApi: string;
   static doingApi: string;
   static storeApi: string;
+  static lessonsApi: string;
   static ministryStuffApi: string;
   static ministryStuffServiceKey: string;
   static ministryStuffContentRoot: string;
@@ -173,6 +174,7 @@ export class Environment extends EnvironmentBase {
     this.messagingApi = config.messagingApi || config.apiUrl + "/messaging";
     this.doingApi = config.doingApi || config.apiUrl + "/doing";
     this.storeApi = process.env.STORE_API_URL || config.storeApi || "";
+    this.lessonsApi = process.env.LESSONS_API_URL || config.lessonsApi || "";
     this.ministryStuffApi = process.env.MINISTRYSTUFF_API_URL || config.ministryStuffApi || "";
     this.ministryStuffServiceKey = process.env.MINISTRYSTUFF_SERVICE_KEY || "";
     this.ministryStuffContentRoot = process.env.MINISTRYSTUFF_CONTENT_ROOT || config.ministryStuffContentRoot || "";

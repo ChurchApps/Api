@@ -3,16 +3,24 @@ import { listEndpointsSchema, listEndpointsHandler } from "./tools/listEndpoints
 import { describeEndpointSchema, describeEndpointHandler } from "./tools/describeEndpoint.js";
 import { apiCallSchema, makeApiCallHandler } from "./tools/apiCall.js";
 import { describePageBuilderSchema, describePageBuilderHandler } from "./tools/describePageBuilder.js";
+import { McpPrincipal } from "./lessonsProxy.js";
+import { CHURCHAPPS_ICON_PNG_128 } from "./icon.js";
 
-export function buildMcpServer(authorization: string | undefined, clientIp: string = ""): McpServer {
-  const server = new McpServer({ name: "churchapps-api", version: "1.0.0" });
+export function buildMcpServer(authorization: string | undefined, clientIp: string = "", principal?: McpPrincipal): McpServer {
+  const server = new McpServer({
+    name: "churchapps-api",
+    title: "ChurchApps",
+    version: "1.1.0",
+    websiteUrl: "https://churchapps.org",
+    icons: [{ src: "data:image/png;base64," + CHURCHAPPS_ICON_PNG_128, mimeType: "image/png", sizes: ["128x128"] }]
+  });
 
   server.registerTool(
     "list_endpoints",
     {
       title: "List API endpoints",
       description:
-        "Lists every HTTP endpoint exposed by the ChurchApps Api, optionally filtered by path substring or HTTP method. Each entry includes the controller name and the API key scopes that likely gate access. Call this first to discover what api_call can invoke. When working on /content/* routes (building B1App pages/sections/elements/HTML blocks) call describe_page_builder first — it has the data model, the full elementType catalog, and the answersJSON shapes.",
+        "Lists every HTTP endpoint exposed by the ChurchApps Api — B1 (people, groups, attendance, giving, plans, website content…) plus FreePlay / lessons.church under /lessons/* (classrooms, schedules, venues, lessons, playlists) — optionally filtered by path substring or HTTP method. Each entry includes the controller name and the API key scopes that likely gate access. Call this first to discover what api_call can invoke. When working on /content/* routes (building B1App pages/sections/elements/HTML blocks) call describe_page_builder first — it has the data model, the full elementType catalog, and the answersJSON shapes.",
       inputSchema: listEndpointsSchema
     },
     listEndpointsHandler
@@ -34,7 +42,7 @@ export function buildMcpServer(authorization: string | undefined, clientIp: stri
     {
       title: "Call the ChurchApps API",
       description:
-        "Invokes a ChurchApps Api endpoint as the authenticated user. The request runs through the same auth, permission, and tenant-scoping middleware as a normal HTTP call — responses are scoped to the user's church and API key permissions. Response bodies above 64 KB are truncated; use query parameters to narrow results.",
+        "Invokes a ChurchApps Api endpoint as the authenticated user. The request runs through the same auth, permission, and tenant-scoping middleware as a normal HTTP call — responses are scoped to the user's church and API key permissions. Paths starting with /lessons/ are FreePlay (lessons.church) endpoints and are forwarded there as the same user; POST bodies there are arrays too. Response bodies above 64 KB are truncated; use query parameters to narrow results.",
       inputSchema: apiCallSchema,
       annotations: {
         readOnlyHint: false,
@@ -43,7 +51,7 @@ export function buildMcpServer(authorization: string | undefined, clientIp: stri
         openWorldHint: false
       }
     },
-    makeApiCallHandler(() => authorization, () => clientIp)
+    makeApiCallHandler(() => authorization, () => clientIp, () => principal)
   );
 
   server.registerTool(

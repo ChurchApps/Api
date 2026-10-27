@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import { LESSONS_ROUTES } from "./lessonsRoutes.js";
 
 // Pin strings to avoid CommonJS import that fights NodeNext resolution.
 const CONTROLLER_METADATA_KEY = "inversify-express-utils:controller";
@@ -46,6 +47,9 @@ export function buildRouteInventory(): RouteEntry[] {
     }
   }
 
+  // LessonsApi is a separate service; its routes come from a generated list and api_call forwards them (lessonsProxy).
+  for (const r of LESSONS_ROUTES) entries.push({ ...r, scopes: scopesForPath(r.path) });
+
   entries.sort((a, b) => (a.path === b.path ? a.method.localeCompare(b.method) : a.path.localeCompare(b.path)));
   cached = entries;
   return entries;
@@ -82,6 +86,8 @@ function scopesForPath(path: string): string[] {
   if (lc.startsWith("/attendance")) return ["attendance:read", "attendance:write"];
   if (lc.startsWith("/content")) return ["content:read", "content:write"];
   if (lc.startsWith("/messaging")) return ["messaging:read", "messaging:write"];
+  // LessonsApi writes check Schedules:Edit, which the content:write and plans scopes carry.
+  if (lc.startsWith("/lessons")) return ["content:write"];
   if (lc.startsWith("/doing/workflow")) return ["workflows:read", "workflows:write"];
   return [];
 }
