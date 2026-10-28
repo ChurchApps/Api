@@ -5,7 +5,7 @@ import { AuthenticatedUser } from "../auth/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
 import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 import { SsoHelper } from "./SsoHelper.js";
-import type { GuestRegistration } from "./GuestRegistrationHelper.js";
+import type { GuestMember, GuestRegistration } from "./GuestRegistrationHelper.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
 import { getAttendanceModuleGateway, getMessagingModuleGateway } from "../../../shared/modules/index.js";
 
@@ -50,16 +50,45 @@ export class PersonHelper extends BasePersonHelper {
     if (!members || members.length === 0) throw new Error("At least one member is required");
     const repos = await this.repos();
 
-    const household: Household = { churchId, name: members[0].lastName };
-    await repos.household.save(household);
+    // Someone signing up again reuses their profile: the same first name plus the same email or phone.
+    // Reused people are never edited, so an anonymous form cannot overwrite stored details.
+    const matches: Person[] = [];
+    for (const m of members) {
+      const row = (m.email || m.phone) ? await repos.person.findGuestMatch(churchId, { firstName: m.firstName, email: m.email, phone: m.phone }) : null;
+      matches.push(row ? repos.person.convertToModel(churchId, row) : null);
+    }
+    const matchedHouseholdId = matches.find((p) => p)?.householdId;
+    let householdId = matchedHouseholdId;
+    let householdPeople: Person[] = null;
 
     const people: Person[] = [];
+    const submitted: GuestMember[] = [];
+    const reusedIds = new Set<string>();
     for (let i = 0; i < members.length; i++) {
       const m = members[i];
+      let existing = matches[i];
+      // A child without contact details is matched by first name inside the household found above.
+      if (!existing && !m.email && !m.phone && matchedHouseholdId) {
+        if (!householdPeople) householdPeople = repos.person.convertAllToModel(churchId, await repos.person.loadByHousehold(churchId, matchedHouseholdId));
+        const first = (m.firstName || "").trim().toLowerCase();
+        const sameName = householdPeople.filter((p) => (p.name?.first || "").trim().toLowerCase() === first);
+        if (sameName.length === 1) existing = sameName[0];
+      }
+      if (existing) {
+        if (!reusedIds.has(existing.id)) { reusedIds.add(existing.id); people.push(existing); submitted.push(m); }
+        continue;
+      }
+
+      const joiningExisting = !!householdId;
+      if (!householdId) {
+        const household: Household = { churchId, name: m.lastName };
+        await repos.household.save(household);
+        householdId = household.id;
+      }
       const person: Person = {
         churchId,
-        householdId: household.id,
-        householdRole: i === 0 ? "Head" : "Other",
+        householdId,
+        householdRole: i === 0 && !joiningExisting ? "Head" : "Other",
         name: { first: m.firstName, last: m.lastName },
         membershipStatus: "Visitor",
         contactInfo: { ...(registration.address || {}) }
@@ -74,6 +103,7 @@ export class PersonHelper extends BasePersonHelper {
       const saved = await repos.person.save(person);
       await WebhookDispatcher.emit(churchId, "person.created", saved);
       people.push(saved);
+      submitted.push(m);
     }
 
     // The sign-up itself has succeeded by now, so a failed group add or note is logged, not returned.
@@ -81,7 +111,9 @@ export class PersonHelper extends BasePersonHelper {
       try {
         const group = await repos.group.load(churchId, groupId);
         if (group) {
+          const memberIds = new Set((await repos.groupMember.loadForGroup(churchId, groupId)).map((gm: any) => gm.personId));
           for (const p of people) {
+            if (memberIds.has(p.id)) continue;
             const gm = await repos.groupMember.save({ churchId, groupId, personId: p.id, joinDate: new Date() });
             await repos.groupMemberHistory.log(churchId, groupId, p.id, "joined");
             await WebhookDispatcher.emit(churchId, "group.member.added", gm);
@@ -106,14 +138,21 @@ export class PersonHelper extends BasePersonHelper {
       const head = people[0];
       try {
         // The Notes tab reads the person's own conversation, so the new one is linked back.
-        head.conversationId = await getMessagingModuleGateway().createPersonNote(churchId, head.id, `${head.name?.first} ${head.name?.last} Notes`, registration.comments);
-        await repos.person.save(head);
+        const conversationId = await getMessagingModuleGateway().createPersonNote(churchId, head.id, `${head.name?.first} ${head.name?.last} Notes`, registration.comments);
+        if (!reusedIds.has(head.id)) {
+          head.conversationId = conversationId;
+          await repos.person.save(head);
+        } else if (!head.conversationId) {
+          // Only link the reused person's Notes tab when it has none, and touch nothing else on their record.
+          await repos.person.updateFieldsByIds(churchId, [head.id], { conversationId });
+        }
       } catch (err) {
         console.error("[PersonHelper] guest comment note failed:", err);
       }
     }
 
-    return { householdId: household.id, people: people.map(p => ({ id: p.id, name: { first: p.name?.first, last: p.name?.last } })) };
+    // Echo the submitted names, never the stored ones, so the public form reveals nothing about a matched person.
+    return { householdId, people: people.map((p, i) => ({ id: p.id, name: { first: submitted[i].firstName, last: submitted[i].lastName } })) };
   }
 
   public static async claim(au: AuthenticatedUser, churchId: string) {

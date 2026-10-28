@@ -39,6 +39,8 @@ export class WorkflowHelper {
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
     if (!step) return null;
+    const openCard = await this.openCardFor(churchId, workflowId, associated, triggerId, repos);
+    if (openCard) return openCard as Task;
     return await this.createCard(churchId, workflowId, step, associated, createdBy, triggerId, repos, undefined, depth);
   }
 
@@ -60,10 +62,18 @@ export class WorkflowHelper {
     if (!step) return [];
     const baseSort = await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || "");
     const result: Task[] = [];
-    for (let i = 0; i < people.length; i++) {
-      result.push(await this.createCard(churchId, workflowId, step, people[i], createdBy, triggerId, repos, baseSort + i));
+    for (const person of people) {
+      if (await this.openCardFor(churchId, workflowId, person, triggerId, repos)) continue;
+      result.push(await this.createCard(churchId, workflowId, step, person, createdBy, triggerId, repos, baseSort + result.length));
     }
     return result;
+  }
+
+  // Manual and step-action adds never give someone a second open card; a closed card does not block.
+  // Trigger adds (with a triggerId) keep their own "Only once per person" setting instead.
+  private static async openCardFor(churchId: string, workflowId: string, associated: AssignTarget, triggerId: string | undefined, repos: Repos) {
+    if (triggerId || !associated?.id) return null;
+    return await repos.task.loadOpenBySubjectInWorkflow(churchId, workflowId, associated.type || "person", associated.id);
   }
 
   private static async createCard(

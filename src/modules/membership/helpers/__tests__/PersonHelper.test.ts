@@ -24,11 +24,19 @@ function mockRepos(rows: any[] = [], opts: any = {}) {
     save: jest.fn(async (p: any) => { if (!p.id) p.id = "newP"; return p; }),
     load: jest.fn(async () => opts.loaded ?? { id: "newP", churchId: "c1", removed: false, name: {} }),
     convertAllToModelWithPermissions: (_c: string, data: any[]) => data.map((d) => ({ ...d })),
+    convertToModel: (_c: string, d: any) => (d ? { ...d } : null),
+    convertAllToModel: (_c: string, data: any[]) => data.map((d) => ({ ...d })),
+    findGuestMatch: jest.fn(async (_c: string, q: any) => (opts.guestMatch ? opts.guestMatch(q) : null)),
+    loadByHousehold: jest.fn(async (_c: string, hId: string) => (opts.householdPeople ?? []).filter((p: any) => p.householdId === hId)),
+    updateFieldsByIds: jest.fn(),
     restore: jest.fn()
   };
   const household = { save: jest.fn(async (h: any) => { h.id = "h1"; return h; }) };
   const group = { load: jest.fn(async (_c: string, id: string) => (opts.groups ?? []).find((g: any) => g.id === id) ?? null) };
-  const groupMember = { save: jest.fn(async (gm: any) => ({ ...gm, id: "gm-" + gm.personId })) };
+  const groupMember = {
+    save: jest.fn(async (gm: any) => ({ ...gm, id: "gm-" + gm.personId })),
+    loadForGroup: jest.fn(async (_c: string, gId: string) => (opts.groupMembers ?? []).filter((gm: any) => gm.groupId === gId))
+  };
   const groupMemberHistory = { log: jest.fn() };
   (RepoManager.getRepos as jest.Mock).mockResolvedValue({ person, household, group, groupMember, groupMemberHistory });
   return { person, household, group, groupMember, groupMemberHistory };
@@ -214,5 +222,88 @@ describe("PersonHelper.registerGuestHousehold attendance", () => {
     const result = await PersonHelper.registerGuestHousehold("c1", registration, "g1", true);
     expect(groupMember.save).toHaveBeenCalledTimes(2);
     expect(result.people).toHaveLength(2);
+  });
+});
+
+// Issue #1408: a guest who signs up again by QR reuses their profile instead of becoming a duplicate.
+describe("PersonHelper.registerGuestHousehold reuses existing people", () => {
+  const donald = { id: "pDonald", churchId: "c1", householdId: "hClark", householdRole: "Head", name: { first: "Donald", last: "Clark" }, conversationId: null as string };
+  const carol = { id: "pCarol", churchId: "c1", householdId: "hClark", householdRole: "Spouse", name: { first: "Carol", last: "Clark" } };
+  const savePeople = (person: any) => {
+    let n = 0;
+    person.save.mockImplementation(async (p: any) => { if (!p.id) p.id = "new" + (++n); return p; });
+  };
+
+  beforeEach(() => { mockCreatePersonNote.mockReset().mockResolvedValue("conv1"); (WebhookDispatcher.emit as jest.Mock).mockClear(); });
+
+  it("reuses the one person with the same first name and email, and changes nothing on them", async () => {
+    const { person, household } = mockRepos([], { guestMatch: (q: any) => (q.email === "donald@example.com" ? { ...donald } : null) });
+    savePeople(person);
+    const result = await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clarke", email: "donald@example.com" }] });
+    expect(person.findGuestMatch).toHaveBeenCalledWith("c1", { firstName: "Donald", email: "donald@example.com", phone: undefined });
+    expect(person.save).not.toHaveBeenCalled();
+    expect(household.save).not.toHaveBeenCalled();
+    expect(WebhookDispatcher.emit).not.toHaveBeenCalledWith("c1", "person.created", expect.anything());
+    // The public response echoes what was typed, never the stored record.
+    expect(result).toEqual({ householdId: "hClark", people: [{ id: "pDonald", name: { first: "Donald", last: "Clarke" } }] });
+  });
+
+  it("reuses a person matched by phone", async () => {
+    const { person } = mockRepos([], { guestMatch: (q: any) => (q.phone === "(555) 010-0101" ? { ...donald } : null) });
+    savePeople(person);
+    const result = await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clark", phone: "(555) 010-0101" }] });
+    expect(result.people.map((p) => p.id)).toEqual(["pDonald"]);
+    expect(person.save).not.toHaveBeenCalled();
+  });
+
+  it("creates a new person when no single match is found", async () => {
+    const { person, household } = mockRepos([], { guestMatch: () => null });
+    savePeople(person);
+    const result = await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Dana", lastName: "Clark", email: "donald@example.com" }] });
+    expect(household.save).toHaveBeenCalled();
+    expect(result.people.map((p) => p.id)).toEqual(["new1"]);
+  });
+
+  it("reuses a child without contact details inside the matched household and adds new people to it", async () => {
+    const { person, household } = mockRepos([], {
+      guestMatch: (q: any) => (q.firstName === "Donald" ? { ...donald } : null),
+      householdPeople: [donald, carol]
+    });
+    savePeople(person);
+    const result = await PersonHelper.registerGuestHousehold("c1", {
+      members: [
+        { firstName: "Donald", lastName: "Clark", email: "donald@example.com" },
+        { firstName: "carol", lastName: "Clark" },
+        { firstName: "Timmy", lastName: "Clark" }
+      ]
+    });
+    expect(household.save).not.toHaveBeenCalled();
+    expect(result.people.map((p) => p.id)).toEqual(["pDonald", "pCarol", "new1"]);
+    expect(person.save).toHaveBeenCalledTimes(1);
+    expect(person.save).toHaveBeenCalledWith(expect.objectContaining({ householdId: "hClark", householdRole: "Other", name: { first: "Timmy", last: "Clark" } }));
+  });
+
+  it("does not re-add someone who is already in the group", async () => {
+    const { person, groupMember } = mockRepos([], {
+      guestMatch: (q: any) => (q.firstName === "Donald" ? { ...donald } : null),
+      groups: [{ id: "g1" }],
+      groupMembers: [{ groupId: "g1", personId: "pDonald" }]
+    });
+    savePeople(person);
+    await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clark", email: "donald@example.com" }, { firstName: "Timmy", lastName: "Clark" }] }, "g1");
+    expect(groupMember.save.mock.calls.map((c: any[]) => c[0].personId)).toEqual(["new1"]);
+  });
+
+  it("links a comment to a reused head only when they have no notes conversation yet", async () => {
+    const { person } = mockRepos([], { guestMatch: () => ({ ...donald }) });
+    savePeople(person);
+    await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clark", email: "donald@example.com" }], comments: "Back again" });
+    expect(mockCreatePersonNote).toHaveBeenCalledWith("c1", "pDonald", "Donald Clark Notes", "Back again");
+    expect(person.updateFieldsByIds).toHaveBeenCalledWith("c1", ["pDonald"], { conversationId: "conv1" });
+    expect(person.save).not.toHaveBeenCalled();
+
+    const linked = mockRepos([], { guestMatch: () => ({ ...donald, conversationId: "convOld" }) });
+    await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clark", email: "donald@example.com" }], comments: "Again" });
+    expect(linked.person.updateFieldsByIds).not.toHaveBeenCalled();
   });
 });
