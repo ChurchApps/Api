@@ -179,3 +179,13 @@ describe("SignageFeedHelper.buildPlanFeed", () => {
     expect(messages.map((m) => m.name)).toEqual(["Countdown", "Lesson", "Alive.mp4"]);
   });
 });
+
+describe("SignageFeedHelper lessons.church video file types (#1412)", () => {
+  it("keeps the feed's fileType as mediaType", () => {
+    const files = SignageFeedHelper.convertFeedFiles([
+      { name: "v", url: "https://api.lessons.church/externalVideos/download/abc", seconds: 60, fileType: "video/mp4" },
+      { name: "i", url: "https://content.lessons.church/slide", seconds: 10, fileType: "image/jpeg" }
+    ]);
+    expect(files.map((f) => f.mediaType)).toEqual(["video", "image"]);
+  });
+});
