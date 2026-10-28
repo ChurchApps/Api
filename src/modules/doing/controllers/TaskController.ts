@@ -317,6 +317,12 @@ export class TaskController extends DoingBaseController {
   }
 
   // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)
+  @httpPost("/:id/remove")
+  public async remove(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.withCard(req, res, id, (task) => WorkflowHelper.remove(task, this.repos));
+  }
+
+  // authz-exempt: gated by withCard → canEditCard(au, task) (tasks.edit or assignee)
   @httpPost("/:id/reassign")
   public async reassign(@requestParam("id") id: string, req: express.Request<{}, {}, { assignedToType?: string; assignedToId?: string; assignedToLabel?: string }>, res: express.Response): Promise<any> {
     return this.withCard(req, res, id, (task) => WorkflowHelper.reassign(task, { type: req.body.assignedToType, id: req.body.assignedToId, label: req.body.assignedToLabel }, this.repos));
