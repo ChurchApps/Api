@@ -330,6 +330,33 @@ export class PersonRepo {
       .execute();
   }
 
+  // QR guest sign-up: the one live person with the same first name and the same email or phone.
+  // Two or more matches (or none) return null so the caller creates a new person instead of guessing.
+  public async findGuestMatch(churchId: string, params: { firstName: string; email?: string; phone?: string }) {
+    const firstName = params.firstName?.trim().toLowerCase();
+    const email = params.email?.trim().toLowerCase();
+    const phoneDigits = (params.phone || "").replace(/\D/g, "");
+    if (!firstName || (!email && !phoneDigits)) return null;
+
+    const rows = await getDb().selectFrom("people").selectAll()
+      .where("churchId", "=", churchId)
+      .where("removed", "=", false as any)
+      .where(sql`LOWER(TRIM(FirstName))`, "=", firstName)
+      .where((eb) => {
+        const clauses = [];
+        if (email) clauses.push(eb(sql`LOWER(email)`, "=", email));
+        if (phoneDigits) {
+          clauses.push(eb(this.phoneDigitsSql("HomePhone"), "=", phoneDigits));
+          clauses.push(eb(this.phoneDigitsSql("WorkPhone"), "=", phoneDigits));
+          clauses.push(eb(this.phoneDigitsSql("MobilePhone"), "=", phoneDigits));
+        }
+        return eb.or(clauses);
+      })
+      .limit(2)
+      .execute();
+    return rows.length === 1 ? rows[0] : null;
+  }
+
   public async loadAttendees(churchId: string, campusId: string, serviceId: string, serviceTimeId: string, categoryName: string, groupId: string, startDate: Date, endDate: Date) {
     const conditions: ReturnType<typeof sql>[] = [];
     conditions.push(sql`p.churchId = ${churchId} AND v.visitDate BETWEEN ${startDate as any} AND ${endDate as any}`);
