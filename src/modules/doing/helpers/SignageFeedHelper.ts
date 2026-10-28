@@ -8,6 +8,7 @@ export interface FeedFile {
   url?: string;
   seconds?: number;
   loop?: boolean;
+  fileType?: string;
 }
 
 interface FeedAction {
@@ -69,8 +70,17 @@ export class SignageFeedHelper {
       const loopVideo = !!f.loop;
       let seconds = f.seconds || 0;
       if (!seconds || loopVideo) seconds = 3600;
-      return { name: f.name, url: f.url as string, seconds, loopVideo };
+      const result: SignageFile = { name: f.name, url: f.url as string, seconds, loopVideo };
+      const mediaType = this.mediaTypeFromFileType(f.fileType);
+      if (mediaType) result.mediaType = mediaType;
+      return result;
     });
+  }
+
+  // lessons.church sends a MIME type; its video links (externalVideos/download/<id>) have no extension to guess from.
+  static mediaTypeFromFileType(fileType: string | undefined): SignageFile["mediaType"] | undefined {
+    const kind = (fileType || "").toLowerCase().split("/")[0];
+    return kind === "video" || kind === "image" || kind === "audio" ? kind : undefined;
   }
 
   static getSectionFiles(venueFeed: FeedVenue, sectionId: string): SignageFile[] {

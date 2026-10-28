@@ -83,3 +83,11 @@ describe("ScreenScheduleHelper teacher paced entries", () => {
     expect(timeline.map((s) => [s.entry.endBehavior, s.start.toISOString(), s.end.toISOString()])).toEqual([["teacherPaced", "2026-10-19T14:00:00.000Z", "2026-10-19T15:00:00.000Z"]]);
   });
 });
+
+describe("ScreenScheduleHelper.mediaTypeFromUrl extensionless video hosts (#1412)", () => {
+  it("treats lessons.church externalVideos and Mux URLs as video", () => {
+    expect(ScreenScheduleHelper.mediaTypeFromUrl("https://api.lessons.church/externalVideos/download/9DgTnt_fXPu")).toBe("video");
+    expect(ScreenScheduleHelper.mediaTypeFromUrl("https://stream.mux.com/abc123")).toBe("video");
+    expect(ScreenScheduleHelper.mediaTypeFromUrl("https://content.lessons.church/slide.jpg")).toBe("image");
+  });
+});
