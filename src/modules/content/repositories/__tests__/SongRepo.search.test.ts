@@ -54,4 +54,13 @@ describe("SongRepo.search", () => {
     await new SongRepo().search("c1", "amazing grace");
     expect(calls.find((c) => c.method === "where" && c.args[0] === "s.churchId")?.args).toEqual(["s.churchId", "=", "c1"]);
   });
+
+  // Issue #1406: the plan song picker could not tell arrangements apart.
+  it("returns each key's arrangement name", async () => {
+    const { proxy, calls } = recordingDb();
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new SongRepo().search("c1", "amazing grace");
+    const columns = calls.filter((c) => c.method === "select").flatMap((c) => c.args[0]);
+    expect(columns).toContain("a.name as arrangementName");
+  });
 });
