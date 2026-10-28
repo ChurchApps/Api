@@ -210,6 +210,23 @@ export class WorkflowHelper {
     return await repos.task.save(task);
   }
 
+  // Close one card without running outcomes or routes, the same way deleting a workflow closes its cards.
+  public static async remove(task: Task, repositories?: Repos): Promise<Task> {
+    const repos = await this.getRepos(repositories);
+    if (task.assignmentId) {
+      await repos.task.withAssignmentLock(task.churchId || "", task.assignmentId, async () => {
+        const current = await repos.task.load(task.churchId || "", task.id || "");
+        if (current?.status === "Open") await AssignmentWorkflowHelper.close(current, "Removed", repos);
+      });
+      return (await repos.task.load(task.churchId || "", task.id || "")) || task;
+    }
+    StepActionHelper.appendHistory(task, "Removed");
+    task.status = "Closed";
+    task.dateClosed = new Date();
+    task.snoozedUntil = null;
+    return await repos.task.save(task);
+  }
+
   // Close the source card and start a fresh card for the same person in the target workflow.
   private static async handOffToWorkflow(task: Task, targetWorkflowId: string, repos: Repos): Promise<Task> {
     if (task.associatedWithId) {
