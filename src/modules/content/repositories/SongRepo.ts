@@ -54,7 +54,7 @@ export class SongRepo {
       .innerJoin("arrangementKeys as ak", "ak.arrangementId", "a.id")
       .innerJoin("songDetails as sd", "sd.id", "s.songDetailId")
       .selectAll("sd")
-      .select(["ak.id as arrangementKeyId", "ak.keySignature as arrangementKeySignature", "ak.shortDescription"])
+      .select(["ak.id as arrangementKeyId", "ak.keySignature as arrangementKeySignature", "ak.shortDescription", "a.name as arrangementName"])
       .where("s.churchId", "=", churchId)
       .where((eb) => eb.or([
         eb(sql`concat(sd.title, ' ', sd.artist)`, "like", q),
