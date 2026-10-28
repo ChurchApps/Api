@@ -100,7 +100,12 @@ export class ConflictHelper {
   }
 
   private static formatDate(d: Date, ctx: ConflictContext): string {
-    return d.toLocaleString("en-US", { timeZone: ctx.timeZone || "America/New_York" });
+    try {
+      return d.toLocaleString("en-US", { timeZone: ctx.timeZone || "America/New_York" });
+    } catch {
+      // A bad zone name (it can come from the browser) should not break the conflict check.
+      return d.toLocaleString("en-US", { timeZone: "America/New_York" });
+    }
   }
 
   private static findRoomConflicts(proposed: ProposedBooking, occurrences: Occurrence[], ctx: ConflictContext): Conflict[] {
