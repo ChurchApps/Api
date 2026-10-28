@@ -220,7 +220,7 @@ export class EventController extends ContentBaseController {
   // Pre-save conflict check for a proposed event + room/resource bookings.
   // authz-exempt: self-service — read-only conflict check over data scoped to au.churchId
   @httpPost("/conflicts")
-  public async conflicts(req: express.Request<{}, {}, ProposedBooking>, res: express.Response): Promise<any> {
+  public async conflicts(req: express.Request<{}, {}, ProposedBooking & { timeZone?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const proposed: ProposedBooking = {
         eventId: req.body.eventId,
@@ -237,7 +237,8 @@ export class EventController extends ContentBaseController {
       const { windowStart, windowEnd } = ConflictHelper.computeWindow(proposed.start);
       const resourceIds = proposed.resources.map((r) => r.resourceId);
       const church = await getMembershipModuleGateway().loadChurch(au.churchId);
-      const timeZone = church?.timeZone;
+      // Without a church time zone, word the warnings in the browser's zone so they match the rest of the page.
+      const timeZone = church?.timeZone || req.body.timeZone;
 
       return ConflictHelper.findConflicts(proposed, {
         windowStart,

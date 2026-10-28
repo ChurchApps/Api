@@ -197,6 +197,12 @@ describe("ConflictHelper timezone formatting", () => {
     const result = ConflictHelper.findConflicts(proposed(), ctx);
     expect(result[0].message).toContain(booking.eventStart.toLocaleString("en-US", { timeZone: "America/New_York" }));
   });
+
+  it("falls back to America/New_York instead of throwing on a bad timezone name", () => {
+    const ctx = baseContext({ timeZone: "Not/AZone", roomBookings: [booking] });
+    const result = ConflictHelper.findConflicts(proposed(), ctx);
+    expect(result[0].message).toContain(booking.eventStart.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  });
 });
 
 describe("ConflictHelper blockout conflicts", () => {
