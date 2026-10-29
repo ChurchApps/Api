@@ -55,6 +55,7 @@ export class HealthController {
         status: isHealthy ? "healthy" : "degraded",
         timestamp: new Date().toISOString(),
         environment: Environment.currentEnvironment,
+        node: process.version,
         uptime: process.uptime(),
         version: process.env.npm_package_version || "unknown"
       });

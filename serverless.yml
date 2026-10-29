@@ -2,7 +2,7 @@ service: api
 
 frameworkVersion: "3"
 
-# ponytail: framework 3.40's schema predates nodejs22.x, so validation is permanent false-positive noise
+# ponytail: framework 3's runtime enum stops at nodejs20.x, so nodejs24.x validation is permanent false-positive noise
 configValidationMode: "off"
 
 custom:
@@ -35,7 +35,7 @@ custom:
 
 provider:
   name: aws
-  runtime: nodejs22.x
+  runtime: nodejs24.x
   stage: ${opt:stage, 'dev'}
   region: us-east-2
   memorySize: 1024
@@ -130,7 +130,7 @@ layers:
     name: ${self:service}-dependencies-${self:custom.env}
     description: Dependencies layer for ${self:service}
     compatibleRuntimes:
-      - nodejs22.x
+      - nodejs24.x
     retain: false
 
 functions:

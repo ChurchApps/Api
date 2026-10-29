@@ -28,7 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "yarn"
 
       - name: Configure AWS Credentials
@@ -78,6 +78,14 @@ jobs:
         run: |
           echo "Deployment completed for Prod environment"
           yarn serverless info --stage Prod
+          for fn in web socket timer15Min timerMidnight timerScheduledTasks timerWebhooks migrate sesFeedback; do
+            runtime=$(aws lambda get-function-configuration --function-name "api-Prod-$fn" --query Runtime --output text)
+            echo "api-Prod-$fn runtime: $runtime"
+            test "$runtime" = "nodejs24.x"
+          done
+          body=$(curl -fsS https://api.churchapps.org/health)
+          echo "$body"
+          echo "$body" | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8")); if(!String(j.node||"").startsWith("v24.")){console.error("expected Node 24, got", j.node); process.exit(1)}'
 
       - name: Package deployment artifacts
         run: |

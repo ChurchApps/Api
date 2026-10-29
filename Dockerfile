@@ -1,4 +1,4 @@
-FROM node:22-slim AS build
+FROM node:24-slim AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
@@ -6,7 +6,7 @@ RUN yarn install --immutable
 COPY . .
 RUN yarn build:prod && yarn workspaces focus --production
 
-FROM node:22-slim
+FROM node:24-slim
 WORKDIR /app
 ENV NODE_ENV=production ENVIRONMENT=docker SELF_HOSTED=1 SERVER_PORT=8084
 COPY --from=build /app/node_modules ./node_modules
