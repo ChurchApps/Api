@@ -10,12 +10,14 @@ import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalE
 import { DunningHelper } from "../helpers/DunningHelper.js";
 import { DonationRequestGuard } from "../helpers/DonationRequestGuard.js";
 import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
+import { CaptchaPass } from "../helpers/CaptchaPass.js";
 import { isDuplicateKeyError } from "../repositories/EventLogRepo.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import Axios from "axios";
 import dayjs from "dayjs";
 
 const TOO_MANY = "Too many requests. Please try again later.";
+const CAPTCHA_REQUIRED = "Captcha verification required";
 
 @controller("/giving/donate")
 export class DonateController extends GivingBaseController {
@@ -88,6 +90,7 @@ export class DonateController extends GivingBaseController {
         if (au.churchId && au.churchId !== churchId) return this.json({ error: "Forbidden" }, 403);
         if (!amount || amount <= 0 || !/^[A-Z]{3}$/.test(currency)) return this.json({ error: "Invalid amount or currency" }, 400);
         if (!au.id && !(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: TOO_MANY }, 429);
+        if (!au.id && !CaptchaPass.verify(req, churchId)) return this.json({ error: CAPTCHA_REQUIRED }, 403);
 
         const gateway = await this.getGateway(churchId, req.body.provider, req.body.gatewayId);
         if (!gateway) return this.json({ error: "Gateway not found" }, 404);
@@ -420,6 +423,8 @@ export class DonateController extends GivingBaseController {
       if (fundError) return this.json({ error: fundError }, 400);
       if (!au.id && !DonationRequestGuard.stripGuestSavedMethod(donationData, gateway.provider)) return this.json({ error: "Saved payment methods require login" }, 401);
       if (!au.id && !(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: TOO_MANY }, 429);
+      if (!au.id && !CaptchaPass.verify(req, churchId)) return this.json({ error: CAPTCHA_REQUIRED }, 403);
+      delete donationData.captchaPass;
       if (!(await this.savedMethodAllowed(donationData, gateway, au, canEdit))) return this.json({ error: "Payment method not found" }, 403);
 
       const rawCurrency: string = donationData?.currency || gateway?.currency || "USD";
@@ -528,6 +533,7 @@ export class DonateController extends GivingBaseController {
 
         if (!au.id && !DonationRequestGuard.stripGuestSavedMethod(subscriptionData, gateway.provider)) return this.json({ error: "Saved payment methods require login" }, 401);
         if (!au.id && !(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: TOO_MANY }, 429);
+        if (!au.id && !CaptchaPass.verify(req, churchId)) return this.json({ error: CAPTCHA_REQUIRED }, 403);
         if (!(await this.savedMethodAllowed(subscriptionData, gateway, au, canEdit))) return this.json({ error: "Payment method not found" }, 403);
         // Provider-specific prep (e.g. reuse the person's existing vault customer). Never for guests: person.id is client-supplied.
         if (au.id) await GatewayService.prepareSubscription(gateway, subscriptionData, person, this.repos);
@@ -822,10 +828,12 @@ export class DonateController extends GivingBaseController {
   };
 
   @httpPost("/captcha-verify")
-  public async captchaVerify(req: express.Request<{}, {}, { token: string }>, res: express.Response): Promise<any> {
+  public async captchaVerify(req: express.Request<{}, {}, { token: string; churchId?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
-        const { token } = req.body;
+        // authz-exempt: anonymous captcha check; churchId only narrows which church the issued pass is good for
+        const { token, churchId } = req.body;
+        const human = () => ({ response: "human", pass: CaptchaPass.create(typeof churchId === "string" ? churchId : undefined) });
         const response = await Axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${Environment.googleRecaptchaSecretKey}&response=${token}`);
         const data = response.data;
 
@@ -835,7 +843,7 @@ export class DonateController extends GivingBaseController {
 
         // if google's response already includes b1.church in hostname property, no need to check in the DB then
         if (data.hostname === "b1.church" || data.hostname.endsWith(".b1.church")) {
-          return { response: "human" };
+          return human();
         }
 
         // if its a custom domain, verify the domain exist in the DB
@@ -843,12 +851,12 @@ export class DonateController extends GivingBaseController {
         const domain: any = await domainData.data;
 
         if (domain) {
-          return { response: "human" };
+          return human();
         }
 
-        // if calls is made from localhost
-        if (data.hostname.includes(".localhost")) {
-          return { response: "human" };
+        // localhost subdomains only count on dev-like servers, since the answer now unlocks guest giving
+        if (data.hostname.includes(".localhost") && Environment.isDevLikeEnvironment()) {
+          return human();
         }
 
         return { response: "" };

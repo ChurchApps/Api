@@ -5,6 +5,7 @@ import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayPaymentMethod } from "../models/index.js";
 import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
+import { CaptchaPass } from "../helpers/CaptchaPass.js";
 
 @controller("/giving/paymentmethods")
 export class PaymentMethodController extends GivingBaseController {
@@ -51,6 +52,7 @@ export class PaymentMethodController extends GivingBaseController {
       if (customerId && !canEdit && !(au?.id && await this.ownsCustomer(au, customerId))) customerId = undefined;
       const isGuest = !au?.id;
       if (isGuest && !(await DonationRateLimiter.allow(req, cId))) return this.json({ error: "Too many requests. Please try again later." }, 429);
+      if (isGuest && !CaptchaPass.verify(req, cId)) return this.json({ error: "Captcha verification required" }, 403);
       // A guest's personId is client-supplied, so it must never select an existing vault customer.
       const vaultPersonId = isGuest ? undefined : personId;
       // Resolve by requested provider, else any vault-capable gateway.
@@ -234,6 +236,7 @@ export class PaymentMethodController extends GivingBaseController {
       }
 
       if (!(await DonationRateLimiter.allow(req, churchId))) return this.json({ error: "Too many requests. Please try again later." }, 429);
+      if (!CaptchaPass.verify(req, churchId)) return this.json({ error: "Captcha verification required" }, 403);
 
       const gateway = await GatewayService.getGatewayForChurch(churchId, { gatewayId }, this.repos.gateway).catch((): null => null);
 
