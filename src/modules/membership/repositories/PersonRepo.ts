@@ -520,6 +520,29 @@ export class PersonRepo {
     return result;
   }
 
+  public convertAllToCheckinModel(churchId: string, data: any) {
+    return CollectionHelper.convertAll<Person>(data, (d: any) => this.convertToCheckinModel(churchId, d));
+  }
+
+  // What a check-in kiosk needs to find a family, pick eligible groups and print labels. Nothing else from the record.
+  public convertToCheckinModel(churchId: string, data: any) {
+    const result: Person = {
+      name: { display: data.displayName, first: data.firstName, last: data.lastName, nick: data.nickName },
+      contactInfo: {},
+      photo: data.photo,
+      photoUpdated: data.photoUpdated ? new Date(data.photoUpdated) : undefined,
+      membershipStatus: data.membershipStatus,
+      householdId: data.householdId,
+      householdRole: data.householdRole,
+      birthDate: data.birthDate,
+      grade: data.grade,
+      nametagNotes: data.nametagNotes,
+      id: data.id
+    };
+    if (result.photo === undefined) result.photo = PersonHelper.getPhotoPath(churchId, result);
+    return result;
+  }
+
   public convertToPreferenceModel(churchId: string, data: Person) {
     const result: Person = {
       name: { display: data.name!.display },

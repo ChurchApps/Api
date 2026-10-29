@@ -160,6 +160,7 @@ export class PersonController extends MembershipBaseController {
   public async getHouseholdMembers(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const canView = au.checkAccess(Permissions.people.view) || au.checkAccess(Permissions.people.edit);
+      if (!canView && this.isCheckinOnly(au)) return this.repos.person.convertAllToCheckinModel(au.churchId, (await this.repos.person.loadByHousehold(au.churchId, householdId)) as any[]);
       if (!canView) {
         const self = au.personId ? await this.repos.person.load(au.churchId, au.personId) : null;
         if (!self || self.householdId !== householdId) return this.json({}, 401);
@@ -256,6 +257,10 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/search/phone")
   public async searchPhone(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (this.isCheckinOnly(au)) {
+        const rows = (await this.repos.person.searchPhone(au.churchId, req.query.number?.toString() ?? "")) as any[];
+        return this.repos.person.convertAllToCheckinModel(au.churchId, rows.filter((p) => !p.optedOut));
+      }
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
         const phoneNumber = req.query.number?.toString() ?? "";
@@ -287,6 +292,7 @@ export class PersonController extends MembershipBaseController {
   @httpGet("/search")
   public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      if (this.isCheckinOnly(au)) return await this.searchCheckin(au, req.query);
       if (!au.checkAccess(Permissions.people.view) && au.checkAccess(Permissions.people.viewNames)) return await this.searchNamesOnly(au, req.query);
       if (!au.checkAccess(Permissions.people.view) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       else {
@@ -303,6 +309,13 @@ export class PersonController extends MembershipBaseController {
         return await this.filterPeople(result, au);
       }
     });
+  }
+
+  // Checkin without View People: term search for the kiosk, adding what it needs to open the household and print labels
+  private async searchCheckin(au: AuthenticatedUser, params: any) {
+    if (params?.email) return [];
+    const data = await this.repos.person.search(au.churchId, params?.term?.toString() ?? "", true);
+    return this.repos.person.convertAllToCheckinModel(au.churchId, data);
   }
 
   // "View People Names Only": term search for pickers, returning only id, name, photo and status
@@ -382,9 +395,10 @@ export class PersonController extends MembershipBaseController {
       const canNames = au.checkAccess(Permissions.people.viewNames);
       // View Names wins over directory access: attendance needs visitors, and this
       // permission promises id, name and photo rather than a profile.
-      if (!canView && !canNames && !(await this.canViewDirectory(au))) return this.json({}, 401);
+      if (!canView && !canNames && !this.isCheckinOnly(au) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       const idList = (req.query.ids?.toString() ?? "").split(",").filter(Boolean);
       const data = (await this.repos.person.loadByIds(au.churchId, idList)) as any[];
+      if (this.isCheckinOnly(au)) return this.repos.person.convertAllToCheckinModel(au.churchId, data.filter((p) => !p.optedOut || p.id === au.personId));
       if (!canView && canNames) {
         const visible = data.filter((p) => !p.optedOut || p.id === au.personId);
         return this.repos.person.convertAllToBasicModel(au.churchId, visible);
@@ -733,6 +747,11 @@ export class PersonController extends MembershipBaseController {
     const groupId = rows?.find((s: any) => s.keyName === "guestRegistrationGroupId")?.value || undefined;
     const recordAttendance = rows?.find((s: any) => s.keyName === "guestRegistrationRecordAttendance")?.value === "true";
     return { groupId, recordAttendance };
+  }
+
+  // A check-in volunteer without View People gets the kiosk's scoped person reads (convertToCheckinModel).
+  private isCheckinOnly(au: AuthenticatedUser): boolean {
+    return !au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit) && au.checkAccess(Permissions.attendance.checkin);
   }
 
   // The directory gate follows the church's configured directoryVisibility tier
