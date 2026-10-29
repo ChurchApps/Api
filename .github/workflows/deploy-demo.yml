@@ -59,17 +59,10 @@ jobs:
       - name: Deploy Core APIs to Demo
         run: yarn serverless deploy --stage demo --verbose
 
-      - name: Run database migrations
-        run: |
-          aws lambda invoke \
-            --function-name api-demo-migrate \
-            --cli-read-timeout 910 \
-            migrate-result.json
-          cat migrate-result.json
-          node -e '
-            const r = JSON.parse(require("fs").readFileSync("migrate-result.json", "utf8"));
-            if (!r.ok) { console.error("Database migrations failed"); process.exit(1); }
-          '
+      # The nightly refresh truncates kysely_migration, so these databases have no history.
+      # MigrationRunner refuses to replay every migration over live tables, and invoking
+      # api-demo-migrate fails the deploy without creating anything. Apply a new migration
+      # from Server Admin (detect, baseline, run) instead.
 
       - name: Verify deployment
         run: |

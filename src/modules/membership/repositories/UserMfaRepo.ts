@@ -3,6 +3,15 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UserMfa } from "../models/index.js";
 
+// mysql2 errno for ER_NO_SUCH_TABLE. A database that has not run 2026-10-26_user_mfa yet
+// has no userMfa table, which means nobody has two-factor on. Login must not 500 for that.
+function isMissingTable(err: unknown): boolean {
+  const e = err as { errno?: number; code?: string; message?: string; cause?: unknown };
+  if (e?.errno === 1146 || e?.code === "ER_NO_SUCH_TABLE") return true;
+  if (/userMfa/i.test(e?.message || "") && /doesn'?t exist/i.test(e?.message || "")) return true;
+  return e?.cause ? isMissingTable(e.cause) : false;
+}
+
 @injectable()
 export class UserMfaRepo {
   public async load(userId: string): Promise<UserMfa> {
@@ -10,8 +19,13 @@ export class UserMfaRepo {
   }
 
   public async isEnabled(userId: string): Promise<boolean> {
-    const row = await getDb().selectFrom("userMfa").select("enabled").where("userId", "=", userId).executeTakeFirst();
-    return !!row?.enabled;
+    try {
+      const row = await getDb().selectFrom("userMfa").select("enabled").where("userId", "=", userId).executeTakeFirst();
+      return !!row?.enabled;
+    } catch (err) {
+      if (isMissingTable(err)) return false;
+      throw err;
+    }
   }
 
   /** Starts (or restarts) setup with a fresh secret; nothing is enforced until enable(). */
