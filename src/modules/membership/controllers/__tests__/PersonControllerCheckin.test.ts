@@ -117,6 +117,23 @@ describe("PersonController with Checkin and View Names only", () => {
     expect(result[0].contactInfo).toEqual({});
   });
 
+  it("ids load keeps directory opt-outs so checkout can find the household", async () => {
+    const { person } = setup(checkinNames, [row("p1"), row("p2", { optedOut: true })]);
+    const result = await person.getMultiple({ query: { ids: "p1,p2" } }, {});
+    expect(result.map((p: any) => p.id)).toEqual(["p1", "p2"]);
+    for (const p of result) {
+      expect(p.householdId).toBe("h1");
+      expect(p.contactInfo).toEqual({});
+    }
+  });
+
+  it("ids load still hides directory opt-outs from View Names alone", async () => {
+    const { person } = setup(["peopleViewNames"], [row("p1"), row("p2", { optedOut: true })]);
+    const result = await person.getMultiple({ query: { ids: "p1,p2" } }, {});
+    expect(result.map((p: any) => p.id)).toEqual(["p1"]);
+    expect(result[0].birthDate).toBeUndefined();
+  });
+
   it("household pickup list is readable for checkout", async () => {
     const { pickup } = setup(checkinNames, []);
     const result = await pickup.getForHousehold("h1", {}, {});

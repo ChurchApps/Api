@@ -398,7 +398,9 @@ export class PersonController extends MembershipBaseController {
       if (!canView && !canNames && !this.isCheckinOnly(au) && !(await this.canViewDirectory(au))) return this.json({}, 401);
       const idList = (req.query.ids?.toString() ?? "").split(",").filter(Boolean);
       const data = (await this.repos.person.loadByIds(au.churchId, idList)) as any[];
-      if (this.isCheckinOnly(au)) return this.repos.person.convertAllToCheckinModel(au.churchId, data.filter((p) => !p.optedOut || p.id === au.personId));
+      // Checkout loads checked-in people by id to find the household; directory opt-outs
+      // can be checked in (household load returns them), so they must come back here too.
+      if (this.isCheckinOnly(au)) return this.repos.person.convertAllToCheckinModel(au.churchId, data);
       if (!canView && canNames) {
         const visible = data.filter((p) => !p.optedOut || p.id === au.personId);
         return this.repos.person.convertAllToBasicModel(au.churchId, visible);
