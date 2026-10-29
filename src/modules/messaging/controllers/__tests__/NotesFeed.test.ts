@@ -19,7 +19,8 @@ jest.mock("../../../../shared/modules/ContentModuleGateway.js", () => ({ getCont
 jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ loadTask: async (_c: string, id: string) => tasks[id] ?? null }) }));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({
   getMembershipModuleGateway: () => ({
-    loadPeople: async (_c: string, ids: string[]) => ids.map((id) => ({ id, displayName: id === "per1" ? "Donald Clark" : "Someone" })),
+    // Like the real gateway, removed (deleted or merged-away) people are not returned.
+    loadPeople: async (_c: string, ids: string[]) => ids.filter((id) => id !== "perRemoved").map((id) => ({ id, displayName: id === "per1" ? "Donald Clark" : "Someone" })),
     loadGroup: async (_c: string, id: string) => ({ id, name: id === "g1" ? "Adult Bible Class" : "Other" })
   })
 }));
@@ -122,6 +123,13 @@ describe("GET /messaging/conversations/notes/feed", () => {
     expect(mine.result.notes[0]).toMatchObject({ sourceName: "Follow up with Donald", parentId: "w1" });
     const viewer = await feed(ROWS, au({ access: ["tasksView"] }), { section: "workflows" });
     expect(viewer.result.notes.map((n: any) => n.messageId)).toEqual(["m7", "m8"]);
+  });
+
+  it("people: leaves out notes on removed (deleted or merged) people", async () => {
+    // ChurchAppsSupport#1423: these showed as "(unknown)" and linked to a blank profile.
+    const rows = [row("r1", "person", "perRemoved", 1, "Wonderful church"), ...ROWS];
+    const { result } = await feed(rows, au({ access: ["peopleEdit"] }), { section: "people" });
+    expect(result.notes.map((n: any) => n.messageId)).toEqual(["m1"]);
   });
 
   it("pages newest first with a cursor and trims long notes", async () => {

@@ -120,7 +120,8 @@ export class ConversationController extends MessagingBaseController {
     if (section === "people") {
       const { getMembershipModuleGateway } = await import("../../../shared/modules/MembershipModuleGateway.js");
       const people = await getMembershipModuleGateway().loadPeople(au.churchId, ids);
-      ids.forEach((id) => sources.set(id, { allowed: true, name: people.find((p) => p.id === id)?.displayName }));
+      // loadPeople skips removed people, so notes left on a deleted or merged-away person drop out instead of showing "(unknown)".
+      ids.forEach((id) => { const person = people.find((p) => p.id === id); sources.set(id, { allowed: !!person, name: person?.displayName }); });
     } else if (section === "groups") {
       const { getMembershipModuleGateway } = await import("../../../shared/modules/MembershipModuleGateway.js");
       for (const id of ids) {
