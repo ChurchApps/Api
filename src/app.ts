@@ -161,14 +161,18 @@ export const createApp = async () => {
         });
       }
 
-      res.status(statusCode).json({
-        error: {
-          message: statusCode >= 500 ? "Internal Server Error" : error?.message || "Internal Server Error",
-          status: statusCode,
-          timestamp: new Date().toISOString(),
-          path: req.path
-        }
-      });
+      const body: Record<string, unknown> = {
+        message: statusCode >= 500 ? "Internal Server Error" : error?.message || "Internal Server Error",
+        status: statusCode,
+        timestamp: new Date().toISOString(),
+        path: req.path
+      };
+      // Demo-only, so a runtime upgrade can show the real cause. Stripped before production.
+      if (statusCode >= 500 && (process.env.ENVIRONMENT === "demo" || process.env.STAGE === "demo")) {
+        body.detail = error?.message || String(error);
+        body.name = error?.name;
+      }
+      res.status(statusCode).json({ error: body });
     });
 
     app.use((req: express.Request, res: express.Response) => {
