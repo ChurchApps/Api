@@ -81,6 +81,8 @@ provider:
     PRAISECHARTS_CONSUMER_KEY: ${ssm:/${self:custom.envLower}/praiseChartsConsumerKey, ''}
     PRAISECHARTS_CONSUMER_SECRET: ${ssm:/${self:custom.envLower}/praiseChartsConsumerSecret, ''}
     GOOGLE_RECAPTCHA_SECRET_KEY: ${ssm:/${self:custom.envLower}/recaptcha-secret-key, ''}
+    # Guest giving refuses calls without a reCAPTCHA pass only when this is "true"
+    CAPTCHA_ENFORCE: ${ssm:/${self:custom.envLower}/captchaEnforce, 'false'}
     OPENROUTER_API_KEY: ${ssm:/${self:custom.envLower}/openRouterApiKey, ''}
     OPENAI_API_KEY: ${ssm:/${self:custom.envLower}/openAIKey, ''}
 

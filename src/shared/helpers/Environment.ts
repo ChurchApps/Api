@@ -60,6 +60,7 @@ export class Environment extends EnvironmentBase {
 
   // Giving API specific
   static googleRecaptchaSecretKey: string;
+  static captchaEnforce: boolean = process.env.CAPTCHA_ENFORCE === "true";
 
   // AI provider configuration (shared across multiple modules)
   static aiProvider: string;
@@ -142,7 +143,7 @@ export class Environment extends EnvironmentBase {
     await this.initializeAppConfigs(data);
   }
 
-  private static isDevLikeEnvironment() {
+  static isDevLikeEnvironment() {
     return this.currentEnvironment === "dev" || this.currentEnvironment === "docker" || this.currentEnvironment === "local";
   }
 
@@ -275,6 +276,7 @@ export class Environment extends EnvironmentBase {
     this.praiseChartsConsumerKey = process.env.PRAISECHARTS_CONSUMER_KEY || "";
     this.praiseChartsConsumerSecret = process.env.PRAISECHARTS_CONSUMER_SECRET || "";
     this.googleRecaptchaSecretKey = process.env.GOOGLE_RECAPTCHA_SECRET_KEY || "";
+    this.captchaEnforce = process.env.CAPTCHA_ENFORCE === "true";
     this.openRouterApiKey = process.env.OPENROUTER_API_KEY || "";
     this.openAiApiKey = process.env.OPENAI_API_KEY || "";
     this.webPushPublicKey = process.env.WEB_PUSH_PUBLIC_KEY || config.webPushPublicKey || "";
