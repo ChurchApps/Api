@@ -9,7 +9,8 @@ export class HouseholdPickupController extends MembershipBaseController {
   @httpGet("/:householdId")
   public async getForHousehold(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
-      if (!au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit)) {
+      // Checkin may read the list so a kiosk can show who is allowed to pick up at checkout.
+      if (!au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit) && !au.checkAccess(Permissions.attendance.checkin)) {
         const self = au.personId ? await this.repos.person.load(au.churchId, au.personId) : null;
         if (!self || self.householdId !== householdId) return this.json({}, 401);
       }

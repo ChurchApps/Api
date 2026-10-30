@@ -4,7 +4,7 @@ const sendTransactional = jest.fn();
 const throttleAllow = jest.fn(async () => true);
 const throttleRecord = jest.fn(async () => {});
 jest.mock("../../helpers/index", () => ({
-  Permissions: { people: { edit: "peopleEdit", editSelf: "peopleEditSelf", view: "peopleView", viewNames: "peopleViewNames" }, server: { admin: "serverAdmin" } },
+  Permissions: { people: { edit: "peopleEdit", editSelf: "peopleEditSelf", view: "peopleView", viewNames: "peopleViewNames" }, attendance: { checkin: "attendanceCheckin" }, server: { admin: "serverAdmin" } },
   UserChurchHelper: { createForPersonEmailUpdate: jest.fn() },
   PersonHelper: { getPerson: jest.fn(), registerGuestHousehold: jest.fn() },
   Environment: { supportEmail: "support@test" },
