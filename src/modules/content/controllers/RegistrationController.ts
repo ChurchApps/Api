@@ -58,7 +58,9 @@ export class RegistrationController extends ContentBaseController {
         ]);
         if (!allowed) return this.json({ error: "Too many registration attempts. Please try again later." }, 429);
       }
-      let personId = (au?.personId && data.personId === au.personId) ? au.personId : null;
+      // Staff with Registrations Edit may add any person in their church (Add Attendee); they're never charged here.
+      const staffAdd = !data.guestInfo && !!data.personId && data.personId !== au?.personId && !!au?.churchId && au.churchId === churchId && au.checkAccess(Permissions.registrations.edit);
+      let personId = staffAdd || (au?.personId && data.personId === au.personId) ? data.personId : null;
       const redact = <T extends Registration>(r: T): T => (au?.personId ? r : { ...r, personId: undefined, householdId: undefined });
       let householdId: string = null;
       let email: string = null;
@@ -74,7 +76,7 @@ export class RegistrationController extends ContentBaseController {
         if (person) {
           householdId = person.householdId;
           email = person.email;
-        }
+        } else if (staffAdd) return this.json({ error: "Person not found" }, 404);
       }
 
       if (personId) {
@@ -89,7 +91,7 @@ export class RegistrationController extends ContentBaseController {
       const typeMap = new Map(activeTypes.map((t: RegistrationType) => [t.id, t]));
       // A guest's email may match an existing person; never let an anonymous caller link that person's household.
       const requestedMembers = data.guestInfo && !au?.personId ? (data.members || []).map((m) => ({ ...m, personId: undefined as string })) : (data.members || []);
-      const members = await this.limitMemberPeople(churchId, personId, requestedMembers);
+      const members = staffAdd ? requestedMembers : await this.limitMemberPeople(churchId, personId, requestedMembers);
       for (const m of members) {
         if (m.registrationTypeId && !typeMap.has(m.registrationTypeId)) return this.json({ error: "Invalid attendee type" }, 400);
       }
@@ -165,8 +167,9 @@ export class RegistrationController extends ContentBaseController {
         return this.json({ error: "Selection is at capacity", status: "selection-full", selectionId: choiceResult.fullSelectionId }, 409);
       }
 
-      // Charge when priced; free registrations are already confirmed
-      if (total > 0) {
+      // Charge when priced; free registrations are already confirmed. Staff adds and churches with no
+      // online giving stay pending with a balance due, paid later from /mobile/registrations or in person.
+      if (total > 0 && !staffAdd && await this.hasGateway(churchId)) {
         const charge = await this.processRegistrationCharge(churchId, total, data, { personId, email, name });
         if (!charge.ok) {
           await this.deleteCascade(churchId, registration.id);
@@ -584,6 +587,12 @@ export class RegistrationController extends ContentBaseController {
     await this.repos.registration.delete(churchId, registrationId);
   }
 
+  private async hasGateway(churchId: string): Promise<boolean> {
+    const givingRepos = await RepoManager.getRepos<any>("giving");
+    const gateways = await givingRepos.gateway.loadAll(churchId);
+    return Array.isArray(gateways) && gateways.length > 0;
+  }
+
   private async processRegistrationCharge(
     churchId: string,
     amount: number,
@@ -647,7 +656,7 @@ export class RegistrationController extends ContentBaseController {
       if (!person?.email) return;
       const church = await getMembershipModuleGateway().loadChurch(churchId);
       const priced = RegistrationPricingHelper.num(promoted.totalAmount) - RegistrationPricingHelper.num(promoted.amountPaid) > 0;
-      const payUrl = priced ? `${Environment.b1AdminRoot}` : undefined;
+      const payUrl = priced && church?.subDomain ? (Environment.b1AppRoot || "https://{subdomain}.b1.church").split("{subdomain}").join(church.subDomain).replace(/\/$/, "") + "/mobile/registrations" : undefined;
       await RegistrationHelper.sendWaitlistAvailabilityEmail(person.email, church?.name || "Church", event, payUrl);
     } catch (e) {
       console.error("Failed to send waitlist promotion email", e);
