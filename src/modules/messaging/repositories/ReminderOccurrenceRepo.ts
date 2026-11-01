@@ -35,7 +35,8 @@ export class ReminderOccurrenceRepo {
       fireAt: DateHelper.toMysqlDate(model.fireAt) as any,
       status: "pending",
       attemptCount: 0
-    }).execute();
+      // A concurrent expansion can insert the same key after the select above; its row stands.
+    }).onDuplicateKeyUpdate({ id: sql`id` as any }).execute();
   }
 
   public async loadDue(limit = 100) {
