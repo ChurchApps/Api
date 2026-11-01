@@ -18,6 +18,13 @@ export class WorkflowHelper {
   // Guards against route/action cycles while allowing long legit journeys.
   private static readonly MAX_STEP_DEPTH = 25;
 
+  private static rejectAssignmentWorkflow(workflow: Workflow) {
+    if (workflow?.workflowType !== AssignmentWorkflowHelper.workflowType) return;
+    const err: any = new Error("Issue serving requests from a plan to use this workflow");
+    err.status = 400;
+    throw err;
+  }
+
   private static async getRepos(repositories?: Repos) {
     return repositories || (await RepoManager.getRepos<Repos>("doing"));
   }
@@ -34,7 +41,7 @@ export class WorkflowHelper {
   ): Promise<Task | null> {
     const repos = await this.getRepos(repositories);
     const workflow = await repos.workflow.load(churchId, workflowId) as Workflow;
-    if (workflow?.workflowType === AssignmentWorkflowHelper.workflowType) throw new Error("Issue serving requests from a plan to use this workflow");
+    this.rejectAssignmentWorkflow(workflow);
     const step = stepId
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
@@ -55,7 +62,7 @@ export class WorkflowHelper {
   ): Promise<Task[]> {
     const repos = await this.getRepos(repositories);
     const workflow = await repos.workflow.load(churchId, workflowId) as Workflow;
-    if (workflow?.workflowType === AssignmentWorkflowHelper.workflowType) throw new Error("Issue serving requests from a plan to use this workflow");
+    this.rejectAssignmentWorkflow(workflow);
     const step = stepId
       ? ((await repos.workflowStep.load(churchId, stepId)) as WorkflowStep)
       : ((await repos.workflowStep.loadForWorkflow(churchId, workflowId)) as WorkflowStep[])[0];
