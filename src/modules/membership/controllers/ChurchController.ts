@@ -379,6 +379,8 @@ export class ChurchController extends MembershipBaseController {
   public async select(req: express.Request<{}, {}, { churchId: string; subDomain: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({ message: "Unauthorized" }, 401);
+      // PersonHelper.claim needs an email to find or create the person; API keys authenticate without one.
+      if (!au.email) return this.json({ message: "Selecting a church requires a signed-in user" }, 401);
       // Any signed-in user may join a live church here - this is the member self-signup path.
       // authz-exempt: selection grants nothing beyond the role-less membership /people/claim already hands out
       let { churchId } = req.body;
