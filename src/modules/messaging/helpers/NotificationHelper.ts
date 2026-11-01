@@ -631,7 +631,7 @@ export class NotificationHelper {
         });
         if (subscribers.length > 0) {
           const title = await NotificationHelper.resolveConversationTitle(conversation);
-          await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, "New message: " + title, undefined, senderPersonId);
+          await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, title ? "New message: " + title : "New message", undefined, senderPersonId);
         }
         break;
       }
