@@ -9,7 +9,7 @@ interface BaseGatewaySettings {
   autoCapture?: boolean;
 }
 
-export namespace StripeSettings {
+namespace StripeSettings {
   export interface Settings extends BaseGatewaySettings {
     statementDescriptor?: string;
     paymentMethodTypes?: string[];
@@ -20,7 +20,7 @@ export namespace StripeSettings {
   }
 }
 
-export namespace PayPalSettings {
+namespace PayPalSettings {
   export interface Settings extends BaseGatewaySettings {
     brandName?: string;
     landingPage?: "LOGIN" | "BILLING" | "NO_PREFERENCE";
@@ -32,7 +32,7 @@ export namespace PayPalSettings {
   }
 }
 
-export namespace SquareSettings {
+namespace SquareSettings {
   export interface Settings extends BaseGatewaySettings {
     locationId?: string;
     applicationId?: string;
@@ -43,7 +43,7 @@ export namespace SquareSettings {
   }
 }
 
-export namespace ePayMintsSettings {
+namespace ePayMintsSettings {
   export interface Settings extends BaseGatewaySettings {
     merchantId?: string;
     terminalId?: string;
@@ -54,42 +54,34 @@ export namespace ePayMintsSettings {
   }
 }
 
-export namespace KingdomFundingSettings {
+namespace KingdomFundingSettings {
   export interface Settings extends BaseGatewaySettings {
     merchantId?: string;
     webhookId?: string;
   }
 }
 
-export type GatewaySettings =
-  | { provider: "stripe"; settings: StripeSettings.Settings }
-  | { provider: "paypal"; settings: PayPalSettings.Settings }
-  | { provider: "square"; settings: SquareSettings.Settings }
-  | { provider: "epaymints"; settings: ePayMintsSettings.Settings }
-  | { provider: "kingdomfunding"; settings: KingdomFundingSettings.Settings }
-  | { provider: "paystack"; settings: PaystackSettings.Settings };
-
-export function isStripeSettings(settings: any): settings is StripeSettings.Settings {
+function isStripeSettings(settings: any): settings is StripeSettings.Settings {
   return settings && typeof settings === "object";
 }
 
-export function isPayPalSettings(settings: any): settings is PayPalSettings.Settings {
+function isPayPalSettings(settings: any): settings is PayPalSettings.Settings {
   return settings && typeof settings === "object";
 }
 
-export function isSquareSettings(settings: any): settings is SquareSettings.Settings {
+function isSquareSettings(settings: any): settings is SquareSettings.Settings {
   return settings && typeof settings === "object";
 }
 
-export function isEPayMintsSettings(settings: any): settings is ePayMintsSettings.Settings {
+function isEPayMintsSettings(settings: any): settings is ePayMintsSettings.Settings {
   return settings && typeof settings === "object";
 }
 
-export function isKingdomFundingSettings(settings: any): settings is KingdomFundingSettings.Settings {
+function isKingdomFundingSettings(settings: any): settings is KingdomFundingSettings.Settings {
   return settings && typeof settings === "object";
 }
 
-export namespace PaystackSettings {
+namespace PaystackSettings {
   export type Settings = BaseGatewaySettings;
 }
 
