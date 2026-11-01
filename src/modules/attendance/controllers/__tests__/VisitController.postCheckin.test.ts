@@ -47,7 +47,7 @@ function makeController(opts: any = {}) {
   gateway.loadHouseholdPeople.mockResolvedValue(opts.household ?? [{ id: "p1" }]);
   gateway.loadChurch.mockResolvedValue({ id: "c1", timeZone: "America/Chicago" });
 
-  const au = { churchId: "c1", id: "u1", checkAccess: () => true };
+  const au = opts.au ?? { churchId: "c1", id: "u1", checkAccess: () => true };
   const controller = new VisitController();
   (controller as any).repos = repos;
   (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
@@ -66,6 +66,24 @@ beforeEach(() => {
   gateway.loadSetting.mockReset();
   gateway.loadHouseholdPeople.mockReset();
   gateway.loadChurch.mockReset();
+});
+
+// ChurchAppsSupport#1426: removing Check-in from Everyone must leave family self check-in working.
+describe("self check-in without the Check-in permission", () => {
+  const member = { churchId: "c1", id: "u1", personId: "p1", checkAccess: () => false };
+
+  it("saves a check-in for the caller's own household", async () => {
+    const { controller, repos } = makeController({ au: member });
+    await (controller as any).postCheckin(req(memberVisit()), {});
+    expect(repos.visit.save).toHaveBeenCalled();
+  });
+
+  it("refuses a check-in for someone outside the household", async () => {
+    const { controller, repos } = makeController({ au: member, household: [{ id: "p1" }] });
+    const result: any = await (controller as any).postCheckin({ ...req(memberVisit()), query: { serviceId: "s1", peopleIds: "p2" } }, {});
+    expect(result.status).toBe(403);
+    expect(repos.visit.save).not.toHaveBeenCalled();
+  });
 });
 
 describe("postCheckin capacity gate", () => {

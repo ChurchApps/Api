@@ -151,4 +151,13 @@ describe("PersonController with Checkin and View Names only", () => {
     const result = await person.searchPhone({ query: { number: "0100" } }, {});
     expect(result.status).toBe(401);
   });
+
+  // ChurchAppsSupport#1426: a role holder whose roles grant no Check-in gets none of the kiosk's reads.
+  it("refuses the kiosk's person reads for a role holder without Check-in", async () => {
+    const { person, repos } = setup([], [row("p1")]);
+    expect((await person.searchPhone({ query: { number: "0100" } }, {})).status).toBe(401);
+    expect((await person.getHouseholdMembers("h1", {}, {})).status).toBe(401);
+    expect(repos.person.searchPhone).not.toHaveBeenCalled();
+    expect(repos.person.loadByHousehold).not.toHaveBeenCalled();
+  });
 });
