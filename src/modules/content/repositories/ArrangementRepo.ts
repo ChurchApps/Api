@@ -66,6 +66,11 @@ export class ArrangementRepo {
     return (await getDb().selectFrom("arrangements").selectAll().where("churchId", "=", churchId).where("freeShowId", "=", freeShowId).executeTakeFirst()) ?? null;
   }
 
+  public async loadFreeShowIds(churchId: string): Promise<string[]> {
+    const rows = await getDb().selectFrom("arrangements").select(["freeShowId"]).where("churchId", "=", churchId).where("freeShowId", "is not", null).execute();
+    return rows.map((r: any) => r.freeShowId).filter((id: string) => id);
+  }
+
   public convertToModel(_churchId: string, data: any) { return data as Arrangement; }
   public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Arrangement[]; }
 
