@@ -834,7 +834,8 @@ export class DonateController extends GivingBaseController {
         // authz-exempt: anonymous captcha check; churchId only narrows which church the issued pass is good for
         const { token, churchId } = req.body;
         const human = () => ({ response: "human", pass: CaptchaPass.create(typeof churchId === "string" ? churchId : undefined) });
-        const response = await Axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${Environment.googleRecaptchaSecretKey}&response=${token}`);
+        if (typeof token !== "string") return { response: "robot" };
+        const response = await Axios.post(`https://www.google.com/recaptcha/api/siteverify?secret=${encodeURIComponent(Environment.googleRecaptchaSecretKey)}&response=${encodeURIComponent(token)}`);
         const data = response.data;
 
         if (!data.success) {
