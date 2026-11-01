@@ -6,7 +6,7 @@ import { forwardToLessons, isLessonsPath, McpPrincipal } from "../lessonsProxy.j
 const BLOCKLIST: RegExp[] = [
   /^\/giving\/donate\/webhook\//i,
   /^\/membership\/oauth\/clients/i,
-  /^\/membership\/users\/(login|verifyCredentials|forgot|verifyCode|register|checkEmail|setPasswordGuid)\b/i,
+  /^\/membership\/users\/(login|verifyCredentials|forgot|verifyCode|register|checkEmail|setPasswordGuid|mfa)\b/i,
   /^\/mcp\b/i
 ];
 
