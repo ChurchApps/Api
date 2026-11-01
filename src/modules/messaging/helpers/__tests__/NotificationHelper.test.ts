@@ -750,3 +750,41 @@ describe("NotificationHelper.sendEmailNotification volunteer requests", () => {
     expect(content).toContain("<h4>Oct 25, 2026 - Session 1 - Teacher.</h4>");
   });
 });
+
+describe("NotificationHelper.checkShouldNotify conversation message text", () => {
+  let createNotificationsSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    NotificationHelper.init({
+      message: {
+        loadLatestPerPerson: jest.fn(async () => [
+          { personId: "PER_A", messageType: "comment", timeSent: new Date("2026-10-30") },
+          { personId: "PER_B", messageType: "comment", timeSent: new Date("2026-10-31") }
+        ])
+      },
+      device: { loadForPerson: jest.fn(async () => []) }
+    } as any);
+    createNotificationsSpy = jest.spyOn(NotificationHelper, "createNotifications").mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    createNotificationsSpy.mockRestore();
+  });
+
+  const notify = async (conversation: any) => {
+    await NotificationHelper.checkShouldNotify({ id: "CONV1", churchId: "CHU1", contentId: "C1", ...conversation }, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1" } as any, "PER_A");
+    return createNotificationsSpy.mock.calls[0][4];
+  };
+
+  it("adds the conversation title when there is one", async () => {
+    expect(await notify({ contentType: "task", title: "Task #12" })).toBe("New message: Task #12");
+  });
+
+  it("does not print null for a conversation with no title", async () => {
+    expect(await notify({ contentType: "task", title: null })).toBe("New message");
+  });
+
+  it("does not print null when a group name cannot be resolved and there is no title", async () => {
+    expect(await notify({ contentType: "group", title: null })).toBe("New message");
+  });
+});
