@@ -29,6 +29,14 @@ describe("SongPackageHelper text readers", () => {
     expect(SongPackageHelper.draftForm(byOurSide)?.defaultOrder).toEqual(["Verse 1", "Bridge", "Chorus x2"]);
   });
 
+  it("reads a bare Introduction as a heading the way Intro is, and keeps longer words as lyrics", () => {
+    expect(sectionLabel("Introduction")).toBe("Introduction");
+    expect(sectionLabel("INTRODUCTION")).toBe("INTRODUCTION");
+    expect(sectionLabel("Introductory")).toBeNull();
+    expect(SongPackageHelper.firstLine("Introduction\n[G]Mercy and grace")).toBe("Mercy and grace");
+    expect(SongPackageHelper.firstLine("Introductory line of the song")).toBe("Introductory line of the song");
+  });
+
   it("reads {c: …} comments, trailing colons and a number run onto the heading as labels", () => {
     expect(sectionLabel("{c: Intro}")).toBe("Intro");
     expect(sectionLabel("{comment: Chorus}")).toBe("Chorus");

@@ -4,7 +4,8 @@ const LEADING_ARTICLE = /^(the|a|an)\s+/;
 // "Chorus3" counts too: the heading word may run straight into its number
 // a bare "PRE" (or "Pre 2:") is how many charts shorten the pre-chorus; only alone, so "Precious" or "Pre-ordained" stay lyrics
 // "Repeat Chorus" / "REPEAT CHORUS 1" head a repeated section the same way "(Repeat Chorus)" does
-const STANZA_LABEL = /^(?:repeat\s+)?(verse|chorus|refrain|bridge|pre-?chorus|pre(?=\s*\d*\s*:?\s*$)|intro|outro|tag|ending|interlude|coda|instrumental|turnaround)(?=\b|\d)/i;
+// "intro(duction)?" matches both; the site's chordpro.ts already did, this rule had drifted out of sync with it
+const STANZA_LABEL = /^(?:repeat\s+)?(verse|chorus|refrain|bridge|pre-?chorus|pre(?=\s*\d*\s*:?\s*$)|intro(?:duction)?|outro|tag|ending|interlude|coda|instrumental|turnaround)(?=\b|\d)/i;
 const COMMENT_DIRECTIVE = /^\{\s*(?:c|ci|comment|comment_italic)\s*:\s*(.+?)\s*\}$/i;
 // "Verse 1:", "Verse 1," and "CHORUS: (2x)" name the same sections as "Verse 1" and "CHORUS (2x)"
 const tidyLabel = (label: string) => label.replace(/:(?=\s|$)|,\s*$/g, "").replace(/\s+/g, " ").trim();
