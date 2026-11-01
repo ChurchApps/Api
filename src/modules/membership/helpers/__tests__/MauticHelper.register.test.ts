@@ -27,4 +27,12 @@ describe("MauticHelper.register", () => {
     expect(company.companyaddress1).toBe(address.substring(0, 64));
     expect(calls.map((c) => c.path)).toContain("/api/companies/7/contact/9/add");
   });
+
+  // Production: POST /api/contacts/new answered the same 400 for address1 once the company field was clipped.
+  it("clips the contact's address1 to Mautic's 64-character field too", async () => {
+    const address = "1234 Very Long Church Campus Boulevard, Building C, Suite 400, Rear Entrance";
+    await MauticHelper.register("CHURCH1", "Grace Church", "Demo", "User", address, "Springfield", "IL", "62701", "US", "demo@example.com", "B1Admin");
+    const contact = calls.find((c) => c.path === "/api/contacts/new")!.body;
+    expect(contact.address1).toBe(address.substring(0, 64));
+  });
 });

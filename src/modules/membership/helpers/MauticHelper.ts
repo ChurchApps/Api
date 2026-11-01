@@ -75,7 +75,8 @@ export class MauticHelper {
       firstname: firstName,
       lastname: lastName,
       email,
-      address1: address,
+      // Same 64-character limit as companyaddress1.
+      address1: address?.substring(0, 64),
       city,
       state,
       zipcode: zip,
