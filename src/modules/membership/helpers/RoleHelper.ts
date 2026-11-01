@@ -60,10 +60,7 @@ export class RoleHelper {
   }
 
   private async createEveryoneRole() {
-    await this.createRole("", [
-      { apiName: "MembershipApi", contentType: "People", action: "Edit Self", roleId: null },
-      { apiName: "AttendanceApi", contentType: "Attendance", action: "Checkin", roleId: null }
-    ]);
+    await this.createRole("", [{ apiName: "MembershipApi", contentType: "People", action: "Edit Self", roleId: null }]);
   }
 
   private async createChumsRole() {
