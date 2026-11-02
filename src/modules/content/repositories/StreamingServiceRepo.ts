@@ -1,5 +1,4 @@
 import { injectable } from "inversify";
-import { sql } from "kysely";
 import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { StreamingService } from "../models/index.js";
@@ -65,14 +64,16 @@ export class StreamingServiceRepo {
     return (await getDb().selectFrom("streamingServices").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  public async loadAllRecurring(): Promise<StreamingService[]> {
-    return getDb().selectFrom("streamingServices").selectAll()
-      .where("recurring", "=", 1 as any)
-      .orderBy("serviceTime").execute() as any;
+  // Recurring services, optionally only those whose next start is already before `before`.
+  public async loadAllRecurring(before?: Date): Promise<StreamingService[]> {
+    let query = getDb().selectFrom("streamingServices").selectAll().where("recurring", "=", 1 as any);
+    if (before) query = query.where("serviceTime", "<", DateHelper.toMysqlDate(before) as any);
+    return query.orderBy("serviceTime").execute() as any;
   }
 
-  public async advanceRecurringServices(): Promise<void> {
-    await sql`UPDATE streamingServices SET serviceTime = DATE_ADD(serviceTime, INTERVAL CEIL(TIMESTAMPDIFF(DAY, serviceTime, DATE_ADD(NOW(), INTERVAL 6 HOUR)) / 7) * 7 DAY) WHERE recurring = 1 AND serviceTime < DATE_SUB(NOW(), INTERVAL 6 HOUR)`.execute(getDb());
+  public async updateServiceTime(id: string, churchId: string, serviceTime: Date): Promise<void> {
+    await getDb().updateTable("streamingServices").set({ serviceTime: DateHelper.toMysqlDate(serviceTime) } as any)
+      .where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public convertToModel(_churchId: string, data: any) { return data as StreamingService; }

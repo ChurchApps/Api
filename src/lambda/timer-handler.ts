@@ -91,7 +91,8 @@ export const handleMidnightTimer = async (_event: ScheduledEvent, _context: Cont
 
   await JobRunHelper.run("advanceRecurringServices", async () => {
     const contentRepos = await RepoManager.getRepos<any>("content");
-    return contentRepos.streamingService.advanceRecurringServices();
+    const { RecurringStreamHelper } = await import("../modules/content/helpers/RecurringStreamHelper.js");
+    return RecurringStreamHelper.advanceStale(contentRepos.streamingService);
   });
 
   // Re-evaluate auto-refresh Lists (saved filters) and run their attached actions.

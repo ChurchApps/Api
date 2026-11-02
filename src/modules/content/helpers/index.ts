@@ -11,6 +11,7 @@ export { PodcastFeedHelper, PodcastFeedError } from "./PodcastFeedHelper.js";
 export { TreeHelper } from "./TreeHelper.js";
 export { SongHelper } from "./SongHelper.js";
 export { StreamingConfigHelper } from "./StreamingConfigHelper.js";
+export { RecurringStreamHelper } from "./RecurringStreamHelper.js";
 export { SubDomainHelper } from "./SubDomainHelper.js";
 export { SiteCacheHelper } from "./SiteCacheHelper.js";
 export { PollyHelper } from "./PollyHelper.js";

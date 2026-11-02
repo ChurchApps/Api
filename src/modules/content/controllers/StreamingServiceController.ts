@@ -4,8 +4,8 @@ import axios from "axios";
 import { StreamingService } from "../models/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Permissions } from "../../../shared/helpers/index.js";
-import { EncryptionHelper, DateHelper } from "@churchapps/apihelper";
-import { Environment } from "../helpers/index.js";
+import { EncryptionHelper } from "@churchapps/apihelper";
+import { Environment, RecurringStreamHelper } from "../helpers/index.js";
 
 @controller("/content/streamingServices")
 export class StreamingServiceController extends ContentBaseController {
@@ -22,18 +22,21 @@ export class StreamingServiceController extends ContentBaseController {
   public async loadAll(req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const services = await this.repos.streamingService.loadAll(au.churchId);
+      const cutoff = RecurringStreamHelper.staleCutoff();
+      const stale = services.filter((s: StreamingService) => s.serviceTime < cutoff);
+      const zones = stale.some((s: StreamingService) => s.recurring) ? await RecurringStreamHelper.zoneCandidates(au.churchId) : [];
       const promises: Promise<any>[] = [];
       const result: StreamingService[] = [];
       services.forEach((s: StreamingService) => {
-        // Update service time
-        if (s.serviceTime < DateHelper.subtractHoursFromNow(6)) {
+        if (s.serviceTime < cutoff) {
           if (!s.recurring) {
             promises.push(this.repos.streamingService.delete(s.id, s.churchId));
             // remove blocked Ips
             promises.push(axios.post(Environment.messagingApi + "/blockedIps/clear", [{ serviceId: s.id, churchId: s.churchId }]));
             return;
           }
-          while (s.serviceTime < DateHelper.subtractHoursFromNow(6)) s.serviceTime.setDate(s.serviceTime.getDate() + 7);
+          // Roll forward at the same church wall-clock time, so a daylight-saving change does not move it.
+          RecurringStreamHelper.advance(s, cutoff, RecurringStreamHelper.pickZone(zones, s.timezoneOffset, s.serviceTime));
           promises.push(this.repos.streamingService.save(s));
         }
         s.serviceTime.setMinutes(s.serviceTime.getMinutes() - s.timezoneOffset);

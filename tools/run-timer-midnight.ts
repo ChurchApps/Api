@@ -19,7 +19,8 @@ async function run() {
 
     console.log("Advancing recurring streaming services...");
     const contentRepos = await RepoManager.getRepos<any>("content");
-    await contentRepos.streamingService.advanceRecurringServices();
+    const { RecurringStreamHelper } = await import("../src/modules/content/helpers/RecurringStreamHelper.js");
+    await RecurringStreamHelper.advanceStale(contentRepos.streamingService);
 
     console.log("Reminding staff of pending account deletion requests...");
     const doingRepos = await RepoManager.getRepos<any>("doing");
