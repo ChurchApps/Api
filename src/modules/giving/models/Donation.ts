@@ -14,6 +14,7 @@ export class Donation {
   public methodDetails?: string;
   public notes?: string;
   public entryTime?: Date;
+  public enteredBy?: string;
   public status?: DonationStatus;
   public transactionId?: string;
   public fund?: Fund;

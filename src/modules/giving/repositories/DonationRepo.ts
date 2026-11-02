@@ -37,6 +37,7 @@ export class DonationRepo {
       methodDetails: donation.methodDetails,
       notes: donation.notes,
       entryTime,
+      enteredBy: donation.enteredBy ?? null,
       status: donation.status,
       transactionId: donation.transactionId
     } as any).execute();
@@ -245,6 +246,7 @@ export class DonationRepo {
       methodDetails: row.methodDetails,
       notes: row.notes,
       entryTime: row.entryTime,
+      enteredBy: row.enteredBy,
       status: row.status || "complete",
       transactionId: row.transactionId
     };
