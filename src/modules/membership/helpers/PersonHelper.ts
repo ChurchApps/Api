@@ -93,6 +93,7 @@ export class PersonHelper extends BasePersonHelper {
         membershipStatus: "Visitor",
         contactInfo: { ...(registration.address || {}) }
       };
+      if (m.title) person.name.prefix = m.title;
       if (m.email) person.contactInfo.email = m.email;
       if (m.phone) person.contactInfo.mobilePhone = m.phone;
       // birthDate is a validated YYYY-MM-DD string; PersonRepo stores it as a date-only value.

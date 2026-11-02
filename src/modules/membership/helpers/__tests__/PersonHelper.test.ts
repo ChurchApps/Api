@@ -126,7 +126,7 @@ describe("PersonHelper.registerGuestHousehold", () => {
     person.save.mockImplementation(async (p: any) => { p.id = "p" + (saved.length + 1); saved.push({ ...p, contactInfo: { ...p.contactInfo } }); return p; });
     await PersonHelper.registerGuestHousehold("c1", {
       members: [
-        { firstName: "Pat", lastName: "Visitor", email: "pat@example.com", phone: "555-0100", birthDate: "1990-04-02", gender: "Female" },
+        { firstName: "Pat", lastName: "Visitor", email: "pat@example.com", phone: "555-0100", birthDate: "1990-04-02", gender: "Female", title: "Dr" },
         { firstName: "Sam", lastName: "Visitor", grade: "3" }
       ],
       address: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" },
@@ -135,6 +135,8 @@ describe("PersonHelper.registerGuestHousehold", () => {
     expect(saved.map((p) => p.membershipStatus)).toEqual(["Visitor", "Visitor"]);
     expect(saved[0]).toMatchObject({ householdRole: "Head", birthDate: "1990-04-02", gender: "Female", maritalStatus: "Married", contactInfo: { email: "pat@example.com", mobilePhone: "555-0100", address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" } });
     expect(saved[1]).toMatchObject({ householdRole: "Other", grade: "3", contactInfo: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" } });
+    expect(saved[0].name).toEqual({ prefix: "Dr", first: "Pat", last: "Visitor" });
+    expect(saved[1].name).toEqual({ first: "Sam", last: "Visitor" });
     expect(saved[1].maritalStatus).toBeUndefined();
     expect(saved[1].contactInfo.email).toBeUndefined();
   });
