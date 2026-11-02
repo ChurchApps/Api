@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { Environment } from "../../../shared/helpers/Environment.js";
+import { Environment } from "./Environment.js";
 
 // Short-lived HMAC-signed proof that a guest giver passed reCAPTCHA. Google tokens verify only once,
 // and the Stripe guest flow makes two money calls (addcard, then charge), so the pass is reusable until it expires.

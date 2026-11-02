@@ -25,6 +25,8 @@ import { RegistrationController } from "../RegistrationController.js";
 import { GatewayService } from "../../../../shared/helpers/GatewayService.js";
 import { RepoManager } from "../../../../shared/infrastructure/RepoManager.js";
 import { RegistrationHelper } from "../../helpers/index.js";
+import { Environment } from "../../../../shared/helpers/Environment.js";
+import { CaptchaPass } from "../../../../shared/helpers/CaptchaPass.js";
 
 const processCharge = GatewayService.processCharge as jest.Mock;
 
@@ -114,6 +116,52 @@ describe("register — paid event", () => {
     const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", couponCode: "X", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
     expect(result.status).toBe(400);
     expect(result.obj.reason).toBe("inactive");
+  });
+});
+
+describe("register — guest captcha", () => {
+  const types = [{ id: "t1", name: "Adult", price: 30, active: true }];
+  const body = (extra: any = {}) => ({ churchId: "c1", eventId: "e1", provider: "stripe", token: "pm_1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "G", lastName: "H", registrationTypeId: "t1" }], ...extra });
+
+  beforeEach(() => { Object.assign(Environment, { captchaEnforce: true, jwtSecret: "test-secret" }); });
+  afterEach(() => { Object.assign(Environment, { captchaEnforce: false, jwtSecret: undefined }); });
+
+  it("refuses a paid guest registration without a pass, before charging, and rolls it back", async () => {
+    const { controller, repos } = makeController({ types });
+    const result: any = await (controller as any).register({ body: body() }, {});
+    expect(result.status).toBe(403);
+    expect(processCharge).not.toHaveBeenCalled();
+    expect(repos.registration.delete).toHaveBeenCalled();
+  });
+
+  it("charges a paid guest registration that carries a valid pass", async () => {
+    processCharge.mockResolvedValue({ success: true, data: { status: "succeeded" }, transactionId: "tx1" });
+    const { controller } = makeController({ types });
+    const result: any = await (controller as any).register({ body: body({ captchaPass: CaptchaPass.create("c1") }) }, {});
+    expect(processCharge).toHaveBeenCalled();
+    expect(result.status).toBe("confirmed");
+  });
+
+  it("refuses a pass issued for another church", async () => {
+    const { controller } = makeController({ types });
+    const result: any = await (controller as any).register({ body: body({ captchaPass: CaptchaPass.create("other") }) }, {});
+    expect(result.status).toBe(403);
+    expect(processCharge).not.toHaveBeenCalled();
+  });
+
+  it("lets a guest join the waitlist without a pass, since nothing is charged", async () => {
+    const { controller } = makeController({ types, event: { id: "e1", registrationEnabled: true, capacity: 1, waitlistEnabled: true }, capacityOk: false });
+    const result: any = await (controller as any).register({ body: body() }, {});
+    expect(result.status).toBe("waitlisted");
+  });
+
+  it("does not ask a signed-in member for a pass", async () => {
+    processCharge.mockResolvedValue({ success: true, data: { status: "succeeded" }, transactionId: "tx1" });
+    const { controller } = makeController({ types });
+    (controller as any).authUser = () => ({ id: "u1", churchId: "c1", personId: "p1", checkAccess: () => false });
+    const result: any = await (controller as any).register({ body: body({ guestInfo: undefined, personId: "p1", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] }) }, {});
+    expect(processCharge).toHaveBeenCalled();
+    expect(result.status).toBe("confirmed");
   });
 });
 

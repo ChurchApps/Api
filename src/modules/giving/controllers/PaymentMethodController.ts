@@ -5,7 +5,7 @@ import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayPaymentMethod } from "../models/index.js";
 import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
-import { CaptchaPass } from "../helpers/CaptchaPass.js";
+import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 
 @controller("/giving/paymentmethods")
 export class PaymentMethodController extends GivingBaseController {
