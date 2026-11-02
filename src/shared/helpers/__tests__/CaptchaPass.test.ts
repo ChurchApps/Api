@@ -1,5 +1,5 @@
 const env = { jwtSecret: "test-secret", captchaEnforce: true };
-jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: env }));
+jest.mock("../Environment.js", () => ({ Environment: env }));
 
 import { CaptchaPass } from "../CaptchaPass";
 
