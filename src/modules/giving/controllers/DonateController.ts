@@ -10,7 +10,7 @@ import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalE
 import { DunningHelper } from "../helpers/DunningHelper.js";
 import { DonationRequestGuard } from "../helpers/DonationRequestGuard.js";
 import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
-import { CaptchaPass } from "../helpers/CaptchaPass.js";
+import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 import { isDuplicateKeyError } from "../repositories/EventLogRepo.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import Axios from "axios";

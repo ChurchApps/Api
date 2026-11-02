@@ -9,6 +9,7 @@ import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
+import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 
 interface RegisterMemberInput { personId?: string; firstName: string; lastName: string; registrationTypeId?: string }
 interface RegisterSelectionInput { selectionId: string; quantity?: number; registrationMemberId?: string }
@@ -28,6 +29,7 @@ interface RegisterRequest {
   token?: string;
   id?: string;
   customerId?: string;
+  captchaPass?: string;
   paymentMethodId?: string;
   currency?: string;
 }
@@ -170,6 +172,10 @@ export class RegistrationController extends ContentBaseController {
       // Charge when priced; free registrations are already confirmed. Staff adds and churches with no
       // online giving stay pending with a balance due, paid later from /mobile/registrations or in person.
       if (total > 0 && !staffAdd && await this.hasGateway(churchId)) {
+        if (!au?.id && !CaptchaPass.verify(req, churchId)) {
+          await this.deleteCascade(churchId, registration.id);
+          return this.json({ error: "Captcha verification required" }, 403);
+        }
         const charge = await this.processRegistrationCharge(churchId, total, data, { personId, email, name });
         if (!charge.ok) {
           await this.deleteCascade(churchId, registration.id);
