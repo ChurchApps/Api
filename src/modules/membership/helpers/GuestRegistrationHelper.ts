@@ -2,16 +2,16 @@ import { GRADES } from "./GradeMapping.js";
 
 export type GuestFieldMode = "off" | "optional" | "required";
 export const GUEST_FIELD_KEYS = [
-  "email", "phone", "address", "birthDate", "gender", "maritalStatus", "grade", "comments"
+  "title", "email", "phone", "address", "birthDate", "gender", "maritalStatus", "grade", "comments"
 ] as const;
 export type GuestFieldKey = (typeof GUEST_FIELD_KEYS)[number];
 export type GuestFieldModes = Record<GuestFieldKey, GuestFieldMode>;
 
-export const DEFAULT_GUEST_FIELDS: GuestFieldModes = { email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" };
+export const DEFAULT_GUEST_FIELDS: GuestFieldModes = { title: "off", email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" };
 export const GUEST_GENDERS = ["Unspecified", "Male", "Female"];
 export const GUEST_MARITAL_STATUSES = ["Unknown", "Single", "Married", "Divorced", "Widowed"];
 
-export interface GuestMember { firstName: string; lastName: string; email?: string; phone?: string; birthDate?: string; gender?: string; grade?: string }
+export interface GuestMember { title?: string; firstName: string; lastName: string; email?: string; phone?: string; birthDate?: string; gender?: string; grade?: string }
 export interface GuestAddress { address1?: string; address2?: string; city?: string; state?: string; zip?: string }
 export interface GuestRegistration { members: GuestMember[]; address?: GuestAddress; maritalStatus?: string; comments?: string }
 
@@ -55,6 +55,12 @@ export class GuestRegistrationHelper {
       const m = rawMembers[i] || {};
       const member: GuestMember = { firstName: clean(m.firstName, 50), lastName: clean(m.lastName, 50) };
       if (!member.firstName || !member.lastName) return { error: "firstName and lastName are required for each member" };
+      // Stored as the person's name prefix, which staff edit as "Title".
+      if (on("title")) {
+        const title = clean(m.title, 10);
+        if (title) member.title = title;
+        else if (required("title")) return { error: "title is required for each member" };
+      }
       if (i === 0) {
         const email = clean(m.email, 100);
         const phone = clean(m.phone, 21);

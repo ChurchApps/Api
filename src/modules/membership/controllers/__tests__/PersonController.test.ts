@@ -302,6 +302,15 @@ describe("PersonController.guestRegister profile fields", () => {
     expect(PersonHelper.registerGuestHousehold).not.toHaveBeenCalled();
   });
 
+  it("passes each member's title through only when the church includes it, and enforces required", async () => {
+    await register([enabled, fields({ title: "optional" })], { members: [{ firstName: "Pat", lastName: "Visitor", title: " Dr " }, { firstName: "Sam", lastName: "Visitor", title: "" }] });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenLastCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor", title: "Dr" }, { firstName: "Sam", lastName: "Visitor" }] }, undefined, false);
+    await register([enabled], { members: [{ firstName: "Pat", lastName: "Visitor", title: "Dr" }] });
+    expect(PersonHelper.registerGuestHousehold).toHaveBeenLastCalledWith("c1", { members: [{ firstName: "Pat", lastName: "Visitor" }] }, undefined, false);
+    const r: any = await register([enabled, fields({ title: "required" })], { members: [{ firstName: "Pat", lastName: "Visitor" }] });
+    expect(r.status).toBe(400);
+  });
+
   it("rejects a future, impossible or too-old birth date", async () => {
     const settings = [enabled, fields({ birthDate: "optional" })];
     const nextYear = new Date().getUTCFullYear() + 1;
@@ -363,7 +372,7 @@ describe("PersonController.guestRegisterOptions", () => {
   it("returns the defaults when the church has not set a checklist", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
     const result = await (controller as any).guestRegisterOptions({ query: { churchId: "c1" }, headers: {} }, {});
-    expect(result).toEqual({ email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" });
+    expect(result).toEqual({ title: "off", email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" });
   });
 
   it("returns the saved checklist and ignores unknown modes", async () => {
