@@ -1769,6 +1769,17 @@
     }
    ],
    "schemaChanges": 3
+  },
+  "2026-11-01_donation_entered_by": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "donations",
+     "column": "enteredBy",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "messaging": {

@@ -159,6 +159,9 @@ export class DonationController extends GivingBaseController {
       const promises: Promise<Donation>[] = [];
       req.body.forEach((donation) => {
         donation.churchId = au.churchId;
+        // Stamped here, never from the client, and left alone on edits (including people merges).
+        if (!donation.id) donation.enteredBy = au.personId;
+        else delete donation.enteredBy;
         promises.push(this.repos.donation.save(donation));
       });
       const result = await Promise.all(promises);
