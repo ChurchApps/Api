@@ -33,6 +33,7 @@ const TYPE_MAP: Record<string, string> = {
   assignment: "serving_schedule",
   task: "tasks",
   groupPushNotification: "announcements",
+  churchPushNotification: "announcements",
   groupJoinRequest: "group_activity",
   event: "event_reminders",
   group: "group_messages",

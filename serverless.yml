@@ -259,8 +259,9 @@ functions:
     timeout: 120
     vpc: ${self:custom.vpcSettings.current, ''}
     environment:
-      # Database connection for the webhook delivery outbox worker
+      # Webhook delivery outbox worker (membership) and scheduled push notifications (messaging)
       MEMBERSHIP_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/membershipApi/connectionString, ''}
+      MESSAGING_CONNECTION_STRING: ${ssm:/${self:custom.envLower}/messagingApi/connectionString, ''}
     events:
       - schedule:
           rate: rate(1 minute)

@@ -1,4 +1,4 @@
-import type { BlockedIp, Connection, Conversation, DeliveryLog, Device, DeviceContent, EmailTemplate, Message, MessageReaction, Notification, NotificationPreference, NotificationPreferenceOverride, NotificationEntityMute, ReminderDefinition, ReminderOccurrence, ReminderSentLog, PrivateMessage, SentText, TextingProvider } from "../models/index.js";
+import type { BlockedIp, Connection, Conversation, DeliveryLog, Device, DeviceContent, EmailTemplate, Message, MessageReaction, Notification, NotificationPreference, NotificationPreferenceOverride, NotificationEntityMute, ReminderDefinition, ReminderOccurrence, ReminderSentLog, ScheduledNotification, PrivateMessage, SentText, TextingProvider } from "../models/index.js";
 
 export interface MessagingDatabase {
   blockedIps: BlockedIp;
@@ -17,6 +17,7 @@ export interface MessagingDatabase {
   reminderDefinitions: ReminderDefinition;
   reminderOccurrences: ReminderOccurrence;
   reminderSentLog: ReminderSentLog;
+  scheduledNotifications: ScheduledNotification;
   privateMessages: Omit<PrivateMessage, "conversation">;
   sentTexts: SentText;
   textingProviders: TextingProvider;
