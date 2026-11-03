@@ -2,16 +2,18 @@ import { GRADES } from "./GradeMapping.js";
 
 export type GuestFieldMode = "off" | "optional" | "required";
 export const GUEST_FIELD_KEYS = [
-  "title", "email", "phone", "address", "birthDate", "gender", "maritalStatus", "grade", "comments"
+  "title", "email", "phone", "householdRole", "address", "birthDate", "gender", "maritalStatus", "grade", "comments"
 ] as const;
 export type GuestFieldKey = (typeof GUEST_FIELD_KEYS)[number];
 export type GuestFieldModes = Record<GuestFieldKey, GuestFieldMode>;
 
-export const DEFAULT_GUEST_FIELDS: GuestFieldModes = { title: "off", email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" };
+export const DEFAULT_GUEST_FIELDS: GuestFieldModes = { title: "off", email: "optional", phone: "optional", householdRole: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" };
 export const GUEST_GENDERS = ["Unspecified", "Male", "Female"];
+// The first person heads a new household, so the role is asked of everyone after them.
+export const GUEST_HOUSEHOLD_ROLES = ["Spouse", "Child", "Other"];
 export const GUEST_MARITAL_STATUSES = ["Unknown", "Single", "Married", "Divorced", "Widowed"];
 
-export interface GuestMember { title?: string; firstName: string; lastName: string; email?: string; phone?: string; birthDate?: string; gender?: string; grade?: string }
+export interface GuestMember { title?: string; firstName: string; lastName: string; email?: string; phone?: string; householdRole?: string; birthDate?: string; gender?: string; grade?: string }
 export interface GuestAddress { address1?: string; address2?: string; city?: string; state?: string; zip?: string }
 export interface GuestRegistration { members: GuestMember[]; address?: GuestAddress; maritalStatus?: string; comments?: string }
 
@@ -61,13 +63,18 @@ export class GuestRegistrationHelper {
         if (title) member.title = title;
         else if (required("title")) return { error: "title is required for each member" };
       }
+      const phone = clean(m.phone, 21);
+      if (on("phone") && phone) member.phone = phone;
+      else if (i === 0 && required("phone")) return { error: "phone is required" };
       if (i === 0) {
         const email = clean(m.email, 100);
-        const phone = clean(m.phone, 21);
         if (on("email") && email) member.email = email;
         else if (required("email")) return { error: "email is required" };
-        if (on("phone") && phone) member.phone = phone;
-        else if (required("phone")) return { error: "phone is required" };
+      } else if (on("householdRole")) {
+        // An unknown role is dropped, so the person is filed as Other as before.
+        const role = clean(m.householdRole, 10);
+        if (GUEST_HOUSEHOLD_ROLES.includes(role)) member.householdRole = role;
+        else if (required("householdRole")) return { error: "householdRole is required for each member after the first" };
       }
       if (on("birthDate")) {
         const birthDate = clean(m.birthDate, 10);

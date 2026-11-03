@@ -142,6 +142,25 @@ describe("PersonHelper.registerGuestHousehold", () => {
   });
 });
 
+// ChurchAppsSupport#1448: the sign-up asks each later person's household role; the first person still heads a new household.
+describe("PersonHelper.registerGuestHousehold household roles", () => {
+  it("files later people under the role they picked and keeps the first as Head", async () => {
+    const saved: any[] = [];
+    const { person } = mockRepos();
+    person.save.mockImplementation(async (p: any) => { p.id = "p" + (saved.length + 1); saved.push({ ...p, contactInfo: { ...p.contactInfo } }); return p; });
+    await PersonHelper.registerGuestHousehold("c1", {
+      members: [
+        { firstName: "Pat", lastName: "Visitor", householdRole: "Child" },
+        { firstName: "Lee", lastName: "Visitor", householdRole: "Spouse", phone: "555-0101" },
+        { firstName: "Sam", lastName: "Visitor", householdRole: "Child" },
+        { firstName: "Max", lastName: "Visitor" }
+      ]
+    });
+    expect(saved.map((p) => p.householdRole)).toEqual(["Head", "Spouse", "Child", "Other"]);
+    expect(saved[1].contactInfo.mobilePhone).toBe("555-0101");
+  });
+});
+
 // Issue #1374: the guest QR sign-up can add the household to the church's chosen group and save a comment as a note.
 describe("PersonHelper.registerGuestHousehold group and comments", () => {
   const registration = { members: [{ firstName: "Pat", lastName: "Visitor" }, { firstName: "Sam", lastName: "Visitor" }] };
