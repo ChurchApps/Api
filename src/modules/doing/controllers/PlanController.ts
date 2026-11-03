@@ -6,6 +6,7 @@ import { PlanHelper } from "../helpers/PlanHelper.js";
 import { MatrixEmailHelper } from "../helpers/MatrixEmailHelper.js";
 import { MatrixTextHelper } from "../helpers/MatrixTextHelper.js";
 import { SignupDeadlineHelper } from "../helpers/SignupDeadlineHelper.js";
+import { LessonTrimHelper } from "../helpers/LessonTrimHelper.js";
 import { Assignment, Plan, PlanItem, PlanItemTime, Position, Time } from "../models/index.js";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { PlanAuth, Permissions } from "../../../shared/helpers/index.js";
@@ -355,6 +356,7 @@ export class PlanController extends DoingBaseController {
         delete (p as any).copyMode;
         delete (p as any).copyServiceOrder;
         delete (p as any).targetPlanId;
+        delete p.lessonTrimWarning;
         p.churchId = au.churchId;
         p.serviceDate = new Date(req.body.serviceDate || new Date());
         p.notes ??= oldPlan.notes;
@@ -378,6 +380,12 @@ export class PlanController extends DoingBaseController {
         planItemIdMap = await this.copyServiceOrderItems(au.churchId, id, plan.id!, positionIdMap);
       }
 
+      // A lesson scheduled by copying the previous plan gets the plan type's saved lesson trim.
+      if (!targetPlanId && !copyServiceOrder) {
+        const trimmed = await LessonTrimHelper.apply(this.repos, au.churchId, plan);
+        if (trimmed) plan.lessonTrimWarning = trimmed.warning;
+      }
+
       if (timeIdMap.size > 0 && planItemIdMap.size > 0) {
         // The new plan is already saved; failing here would 500 and invite a duplicate on retry.
         try {
@@ -397,8 +405,10 @@ export class PlanController extends DoingBaseController {
       // Handle both single plan object and array of plans
       const plans = Array.isArray(req.body) ? req.body : [req.body];
 
+      const previousPaths = new Map<Plan, string | null>();
       for (const plan of plans) {
         const existing: any = plan.id ? await this.repos.plan.load(au.churchId, plan.id) : null;
+        previousPaths.set(plan, existing ? existing.providerPlanId || null : undefined);
         if (existing && !await PlanAuth.canEditMinistry(au, existing.ministryId)) return this.json({}, 401);
         if (plan.confirmationWorkflowId && plan.confirmationWorkflowId !== existing?.confirmationWorkflowId) await AssignmentWorkflowHelper.validateWorkflow(au.churchId, plan.confirmationWorkflowId, this.repos);
         if ((plan.ministryId || !existing) && !await PlanAuth.canEditMinistry(au, plan.ministryId)) return this.json({}, 401);
@@ -413,6 +423,7 @@ export class PlanController extends DoingBaseController {
         // Sync reminder occurrences (planType-scoped serving reminders) without waiting for midnight.
         promises.push(this.repos.plan.save(plan).then(async (saved) => {
           await InternalEventBus.publish(au.churchId, "plan.updated", saved);
+          await this.applyLessonTrim(au.churchId, saved, previousPaths.get(plan));
           return saved;
         }));
       });
@@ -421,6 +432,22 @@ export class PlanController extends DoingBaseController {
       // Return single object if input was single object, array if input was array
       return Array.isArray(req.body) ? result : result[0];
     });
+  }
+
+  // New lesson-linked plans get the plan type's saved trim. A changed lesson link re-trims only when nothing was added by hand
+  // and every lesson row still points at the old lesson. previousPath undefined = the plan is new.
+  private async applyLessonTrim(churchId: string, plan: Plan, previousPath: string | null | undefined) {
+    if (!plan.providerPlanId || previousPath === plan.providerPlanId) return;
+    let force = false;
+    if (previousPath !== undefined) {
+      const rows = (await this.repos.planItem.loadForPlan(churchId, plan.id!)) as PlanItem[];
+      const handAdded = rows.some((r) => !r.providerId && r.itemType !== "header");
+      if (handAdded || rows.some((r) => r.providerId && r.providerPath === plan.providerPlanId)) return;
+      force = rows.length > 0;
+    }
+    const full = (await this.repos.plan.load(churchId, plan.id!)) as Plan;
+    const trimmed = full ? await LessonTrimHelper.apply(this.repos, churchId, full, { force }) : null;
+    if (trimmed) plan.lessonTrimWarning = trimmed.warning;
   }
 
   @httpDelete("/:id")

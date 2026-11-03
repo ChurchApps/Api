@@ -19,4 +19,5 @@ export class Plan {
   public autoReplaceOnDecline?: boolean;
   public lastAutofillRunId?: string;
   public confirmationWorkflowId?: string | null;
+  public lessonTrimWarning?: string | null;
 }
