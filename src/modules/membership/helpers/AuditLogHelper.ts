@@ -67,6 +67,9 @@ export class AuditLogHelper {
       if (value.startsWith("data:") || value.length > 4096) return "[stripped]";
       return value;
     }
+    // Dates have no own enumerable keys, so the object walk below would turn them into {} and undo
+    // would later write "[object Object]" into datetime columns. Keep them as ISO strings.
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
     if (Array.isArray(value)) return value.map((v) => AuditLogHelper.sanitizeValue(v, depth + 1));
     if (value && typeof value === "object") {
       const out: Record<string, any> = {};
