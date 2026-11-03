@@ -10,6 +10,8 @@ import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
+import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { getMembershipModuleGateway } from "../../../shared/modules/MembershipModuleGateway.js";
 
 export interface NotificationDebugStep {
   step: string;
@@ -761,7 +763,7 @@ export class NotificationHelper {
     }
 
     try {
-      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
+      await EmailHelper.sendTemplatedEmail(await this.churchFrom(notification.churchId), email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
       if (reservationId) await ChurchEmailLimiter.settle(notification.churchId, reservationId, true);
       else await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", true, email);
       notification.deliveryMethod = "complete";
@@ -784,12 +786,22 @@ export class NotificationHelper {
     const reservation = await ChurchEmailLimiter.reserve(churchId, "workflowEmail", [{ address: email, personId, contentId: taskId }]);
     if (!reservation) return "blocked (church email approval or daily limit)";
     try {
-      await EmailHelper.sendTemplatedEmail("support@churchapps.org", email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
+      await EmailHelper.sendTemplatedEmail(await this.churchFrom(churchId), email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
       await ChurchEmailLimiter.settle(churchId, reservation[0], true);
       return "sent";
     } catch (err) {
       await ChurchEmailLimiter.settle(churchId, reservation[0], false, String(err));
       throw err;
+    }
+  }
+
+  // Sender shows the church's name; a failed lookup falls back to the bare support address.
+  private static async churchFrom(churchId: string): Promise<string> {
+    try {
+      const church = await getMembershipModuleGateway().loadChurch(churchId);
+      return TransactionalEmailHelper.fromAddress(church?.name);
+    } catch {
+      return TransactionalEmailHelper.fromAddress();
     }
   }
 
@@ -1040,9 +1052,10 @@ export class NotificationHelper {
     // Delivered once any address got it; retrying the batch would re-send to the ones that succeeded.
     let emailSuccess = false;
     let emailError: string | undefined;
+    const from = await NotificationHelper.churchFrom(firstNotification.churchId);
     for (const address of addresses) {
       try {
-        await EmailHelper.sendTemplatedEmail("support@churchapps.org", address, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html", replyTo);
+        await EmailHelper.sendTemplatedEmail(from, address, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html", replyTo);
         emailSuccess = true;
       } catch (error) {
         emailError = String(error);

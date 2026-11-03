@@ -141,7 +141,7 @@ export class EmailTemplateController extends MessagingBaseController {
 
       let successCount = 0;
       let failCount = 0;
-      const from = Environment.supportEmail;
+      const from = TransactionalEmailHelper.fromAddress(churchName);
       const replyTo = au.email || undefined;
 
       for (let i = 0; i < eligible.length; i++) {

@@ -69,10 +69,11 @@ export class ListRefreshHelper {
     if (!list.createdByPersonId) return;
     const creator: any = await repos.person.load(list.churchId, list.createdByPersonId);
     if (!creator?.email) return;
+    const church: any = await repos.church.loadById(list.churchId).catch((): null => null);
     const subject = `List "${list.name}" membership changed`;
     const contents = `<h2>${list.name}</h2><p>The nightly refresh updated this list: ${addedCount} added, ${removedCount} removed.</p>`;
     try {
-      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, creator.email, "B1.church", Environment.b1AdminRoot ?? "", subject, contents, "ChurchEmailTemplate.html");
+      await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church?.name), creator.email, "B1.church", Environment.b1AdminRoot ?? "", subject, contents, "ChurchEmailTemplate.html");
     } catch (e) {
       console.error(`[ListRefreshHelper] Notification email failed for list ${list.id}:`, e);
     }

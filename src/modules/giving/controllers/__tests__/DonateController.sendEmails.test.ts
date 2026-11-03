@@ -4,7 +4,7 @@ const sendTransactionalMock = jest.fn().mockResolvedValue(undefined);
 jest.mock("../GivingBaseController", () => ({ GivingBaseController: class {} }));
 jest.mock("../../../../shared/helpers/Permissions.js", () => ({ Permissions: { donations: { edit: "donationsEdit" } } }));
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { supportEmail: "support@b1.church", appEnv: "prod" } }));
-jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: sendTransactionalMock } }));
+jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: sendTransactionalMock, fromAddress: (name?: string) => (name ? `"${name}" <support@b1.church>` : "support@b1.church") } }));
 jest.mock("../../models/index.js", () => ({}));
 jest.mock("@churchapps/apihelper", () => ({ CurrencyHelper: { formatCurrencyWithLocale: (amount: number) => "$" + amount } }));
 jest.mock("axios", () => ({ __esModule: true, default: { get: jest.fn(), post: jest.fn() } }));
@@ -22,6 +22,7 @@ describe("DonateController donation confirmation email", () => {
 
     expect(sendTransactionalMock).toHaveBeenCalledTimes(1);
     const args = sendTransactionalMock.mock.calls[0];
+    expect(args[0]).toBe('"Grace Church" <support@b1.church>');
     expect(args[2]).toBe("Grace Church");
     expect(args[8]).toBe("https://content.churchapps.org/logo.png");
   });

@@ -36,6 +36,11 @@ jest.mock("@churchapps/apihelper", () => ({
 // Environment: import.meta.url can't be parsed by CommonJS Jest.
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { getEnvironmentName: () => "test" } }));
 
+// Membership gateway: the sender display name comes from the church record.
+const loadChurchMock = jest.fn() as jest.MockedFunction<any>;
+loadChurchMock.mockResolvedValue({ id: "CHU1", name: "Grace Church" });
+jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch: loadChurchMock }) }));
+
 // axios: unused on the socket/push escalation path under test.
 jest.mock("axios", () => ({ default: { post: jest.fn() }, post: jest.fn() }));
 
@@ -433,6 +438,7 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
   beforeEach(() => {
     sendTemplatedEmailMock.mockClear();
     sendTemplatedEmailMock.mockResolvedValue(undefined);
+    loadChurchMock.mockClear();
     apihelper.ArrayHelper.getIds.mockImplementation((arr: any[], field: string) => [...new Set((arr || []).map((a) => a[field]).filter(Boolean))]);
     apihelper.ArrayHelper.getAll.mockImplementation((arr: any[], field: string, value: any) => (arr || []).filter((a) => a[field] === value));
     apihelper.ArrayHelper.getOne.mockImplementation((arr: any[], field: string, value: any) => (arr || []).find((a) => a[field] === value) || null);
@@ -483,6 +489,8 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
     const args = sendTemplatedEmailMock.mock.calls[0];
     expect(args[4]).toBe("New Message from Jane Doe"); // subject
     expect(args[7]).toBe("sender@example.com"); // reply-to
+    expect(args[0]).toBe('"Grace Church" <support@churchapps.org>'); // church name as sender display name
+    expect(loadChurchMock).toHaveBeenCalledWith("CHU1");
     expect(savedComplete.at(-1)?.deliveryMethod).toBe("complete");
     expect((result as any).pmsProcessed).toBeUndefined();
     spy.mockRestore();
@@ -518,6 +526,29 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
     expect(sendTemplatedEmailMock.mock.calls[1][1]).toBe("b@example.com");
     expect(sendTemplatedEmailMock.mock.calls[0][4]).toBe("New Notification: Please review this item");
     expect(sendTemplatedEmailMock.mock.calls[0][4]).not.toMatch(/[\r\n]/);
+    expect(sendTemplatedEmailMock.mock.calls[1][0]).toBe('"Grace Church" <support@churchapps.org>');
+    expect(loadChurchMock).toHaveBeenCalledTimes(1); // church resolved once per digest, not per address
+    spy.mockRestore();
+  });
+
+  it("falls back to the bare support address when the church lookup fails", async () => {
+    loadChurchMock.mockRejectedValueOnce(new Error("db down"));
+    const repos = {
+      notification: {
+        loadUndelivered: jest.fn(async () => [{ id: "N2", churchId: "CHU1", personId: "PER_B", contentType: "task", contentId: "T2", message: "Hello", category: "tasks" }]),
+        save: jest.fn(async (n) => n)
+      },
+      notificationPreference: { loadByPersonIds: jest.fn(async () => [{ personId: "PER_B", churchId: "CHU1", emailFrequency: "individual" }]) },
+      notificationPreferenceOverride: { loadByPersonIds: jest.fn(async () => []) },
+      deliveryLog: { save: jest.fn(async () => ({})) }
+    } as any;
+    NotificationHelper.init(repos);
+    const spy = jest.spyOn(NotificationHelper, "getEmailData").mockResolvedValue([{ id: "PER_B", email: "a@example.com" }] as any);
+
+    await NotificationHelper.sendEmailNotifications("individual");
+
+    expect(sendTemplatedEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendTemplatedEmailMock.mock.calls[0][0]).toBe("support@churchapps.org");
     spy.mockRestore();
   });
 });
@@ -586,6 +617,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
     const settle = jest.spyOn(ChurchEmailLimiter, "settle").mockResolvedValue(undefined);
     try {
       expect(await NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toBe("sent");
+      expect(sendTemplatedEmailMock.mock.calls[0][0]).toBe('"Grace Church" <support@churchapps.org>');
       expect(settle).toHaveBeenCalledWith("CHU1", "reserve1", true);
       sendTemplatedEmailMock.mockRejectedValueOnce(new Error("transport timeout"));
       await expect(NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).rejects.toThrow("timeout");
@@ -620,6 +652,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
 
     expect(sendTemplatedEmailMock).toHaveBeenCalledTimes(1);
     const args = sendTemplatedEmailMock.mock.calls[0];
+    expect(args[0]).toBe('"Grace Church" <support@churchapps.org>');
     expect(args[1]).toBe("per1@example.com");
     expect(args[4]).toBe("Custom subject");
     expect(args[5]).toBe("<p>Custom html</p>");

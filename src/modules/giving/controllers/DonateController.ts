@@ -728,7 +728,7 @@ export class DonateController extends GivingBaseController {
 
     const contents = donationType === "recurring" ? recurringDonationContent : oneTimeDonationContent;
 
-    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, to, church.name as string, `https://${domain}`, "Thank You For Donating", contents, "ChurchEmailTemplate.html", undefined, church.logo || undefined);
+    await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church.name), to, church.name as string, `https://${domain}`, "Thank You For Donating", contents, "ChurchEmailTemplate.html", undefined, church.logo || undefined);
   };
 
   // The receipt names the church, logo and funds from our records, never from the request body.

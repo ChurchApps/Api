@@ -7,7 +7,7 @@ jest.mock("../../helpers/index", () => ({
   UserChurchHelper: { createForGroupMember: jest.fn() }
 }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
-jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn() } }));
+jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn(), fromAddress: (name?: string) => (name ? `"${name}" <support@churchapps.org>` : "support@churchapps.org") } }));
 jest.mock("axios", () => ({ post: jest.fn() }));
 jest.mock("../../../../shared/modules/index.js", () => ({ getContentModuleGateway: () => ({ loadEvent: jest.fn(async () => null), loadEventsForGroup: jest.fn(async () => []) }) }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
