@@ -1,5 +1,6 @@
 import { BaseController } from "../../../shared/infrastructure/index.js";
 import { ExchangeRateHelper } from "../../../shared/helpers/ExchangeRateHelper.js";
+import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { Repos } from "../repositories/index.js";
 
 export class GivingBaseController extends BaseController {
@@ -30,11 +31,17 @@ export class GivingBaseController extends BaseController {
     return base;
   }
 
-  // The church currency is the first gateway's currency (same rule the apps use via CurrencyHelper.loadCurrency).
-  // Rates always come from the server-side cache, never from the request.
+  // The church currency is the first gateway's currency, else the church's "currency" setting, else usd
+  // (same rule the apps use via CurrencyHelper.loadCurrency). Rates always come from the server-side cache, never from the request.
   protected async loadChurchRates(churchId: string) {
     const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
-    const currency = (gateways[0]?.currency || "usd").toLowerCase();
+    let currency = gateways[0]?.currency || "";
+    if (!currency) {
+      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const settings = (await membershipRepos.setting.loadMulipleChurches(["currency"], [churchId]).catch((): any[] => [])) as any[];
+      currency = settings[0]?.value || "";
+    }
+    currency = (currency || "usd").toLowerCase();
     const table = await ExchangeRateHelper.getRateTable(currency);
     return { currency, rates: table.rates, asOf: table.asOf };
   }
