@@ -3,4 +3,5 @@ export class PlanType {
   public churchId?: string;
   public ministryId?: string;
   public name?: string;
+  public lessonTrim?: string | null;
 }

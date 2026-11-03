@@ -20,6 +20,10 @@ export class PlanTypeRepo {
     return model;
   }
 
+  public async updateLessonTrim(churchId: string, id: string, lessonTrim: string | null) {
+    await getDb().updateTable("planTypes").set({ lessonTrim }).where("id", "=", id).where("churchId", "=", churchId).execute();
+  }
+
   public async delete(churchId: string, id: string) {
     await getDb().deleteFrom("planTypes").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
@@ -54,7 +58,8 @@ export class PlanTypeRepo {
       id: row.id,
       churchId: row.churchId,
       ministryId: row.ministryId,
-      name: row.name
+      name: row.name,
+      lessonTrim: row.lessonTrim
     };
   }
 }

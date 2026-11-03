@@ -56,7 +56,9 @@ export class PlanRepo {
       prepared: model.prepared,
       autoReplaceOnDecline: model.autoReplaceOnDecline,
       confirmationWorkflowId: model.confirmationWorkflowId,
-      lastAutofillRunId: model.lastAutofillRunId
+      lastAutofillRunId: model.lastAutofillRunId,
+      // Only the Api writes a lesson trim warning (updateLessonTrimWarning); a client save can only dismiss it.
+      lessonTrimWarning: model.lessonTrimWarning === null ? null : undefined
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
@@ -68,6 +70,10 @@ export class PlanRepo {
   // Targeted update — a full save() would round-trip serviceDate through toISOString.
   public async updateLastAutofillRunId(churchId: string, planId: string, runId: string | null) {
     await getDb().updateTable("plans").set({ lastAutofillRunId: runId }).where("id", "=", planId).where("churchId", "=", churchId).execute();
+  }
+
+  public async updateLessonTrimWarning(churchId: string, planId: string, lessonTrimWarning: string | null) {
+    await getDb().updateTable("plans").set({ lessonTrimWarning }).where("id", "=", planId).where("churchId", "=", churchId).execute();
   }
 
   public async updateNotes(churchId: string, planId: string, notes: string) {

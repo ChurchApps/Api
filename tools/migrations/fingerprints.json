@@ -2466,6 +2466,23 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-02_lesson_trim": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "planTypes",
+     "column": "lessonTrim",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "plans",
+     "column": "lessonTrimWarning",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
   }
  }
 }

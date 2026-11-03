@@ -60,6 +60,7 @@ export class PlanItemController extends DoingBaseController {
         filtered[i].sort = i + 1;
         await this.repos.planItem.save(filtered[i]);
       }
+      await this.clearLessonTrimWarnings(au.churchId, [req.body.planId]);
       return [];
     });
   }
@@ -83,6 +84,7 @@ export class PlanItemController extends DoingBaseController {
         promises.push(this.repos.planItem.save(planItem));
       });
       const result = await Promise.all(promises);
+      await this.clearLessonTrimWarnings(au.churchId, req.body.map((pi) => pi.planId));
       return result;
     });
   }
@@ -109,8 +111,14 @@ export class PlanItemController extends DoingBaseController {
         await this.repos.planItemTime.deleteByPlanItemId(au.churchId, itemId);
         await this.repos.planItem.delete(au.churchId, itemId);
       }
+      await this.clearLessonTrimWarnings(au.churchId, [planItem.planId]);
       return {};
     });
+  }
+
+  // Someone editing the order of service has seen it, so a lesson trim warning on the plan is resolved.
+  private async clearLessonTrimWarnings(churchId: string, planIds: (string | undefined)[]) {
+    for (const planId of [...new Set(planIds.filter(Boolean))]) await this.repos.plan.updateLessonTrimWarning(churchId, planId!, null);
   }
 
   private buildTree(planItems: PlanItem[], parentId: string | null): PlanItem[] {
