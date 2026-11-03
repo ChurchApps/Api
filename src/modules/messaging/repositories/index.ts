@@ -17,4 +17,5 @@ export { PrivateMessageRepo } from "./PrivateMessageRepo.js";
 export { TextingProviderRepo } from "./TextingProviderRepo.js";
 export { SentTextRepo } from "./SentTextRepo.js";
 export { EmailTemplateRepo } from "./EmailTemplateRepo.js";
+export { ScheduledNotificationRepo } from "./ScheduledNotificationRepo.js";
 export { Repos } from "./Repos.js";

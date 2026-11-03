@@ -1991,6 +1991,16 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-02_scheduled_notifications": {
+   "checks": [
+    {
+     "kind": "table",
+     "table": "scheduledNotifications",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "doing": {

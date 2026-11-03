@@ -13,3 +13,4 @@ export { PrivateMessageController } from "./PrivateMessageController.js";
 export { TextingController } from "./TextingController.js";
 export { EmailTemplateController } from "./EmailTemplateController.js";
 export { WebPushController } from "./WebPushController.js";
+export { ScheduledNotificationController } from "./ScheduledNotificationController.js";

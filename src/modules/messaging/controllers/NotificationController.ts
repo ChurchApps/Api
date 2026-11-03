@@ -1,26 +1,10 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
-import { Device, Notification, NotificationPreference } from "../models/index.js";
+import { Notification } from "../models/index.js";
 import { NotificationHelper } from "../helpers/NotificationHelper.js";
-import { WebPushHelper } from "../helpers/WebPushHelper.js";
+import { PushAudienceHelper } from "../helpers/PushAudienceHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
-import { RepoManager } from "../../../shared/infrastructure/index.js";
-
-interface GroupMemberDetail {
-  personId: string;
-  displayName: string;
-}
-
-interface GroupPushPreview {
-  totalMembers: number;
-  eligibleCount: number;
-  noDeviceCount: number;
-  pushDisabledCount: number;
-  excludedSenderCount: number;
-  webPushDeviceCount: number;
-  eligiblePersonIds: string[];
-}
 
 @controller("/messaging/notifications")
 export class NotificationController extends MessagingBaseController {
@@ -29,7 +13,19 @@ export class NotificationController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
 
-      const preview = await this.getGroupPushPreview(au.churchId, groupId, au.personId);
+      const preview = await PushAudienceHelper.getGroupPushPreview(this.repos, au.churchId, groupId, au.personId);
+      const { eligiblePersonIds: _eligiblePersonIds, ...result } = preview;
+      return result;
+    }) as any;
+  }
+
+  // Recipient count for the "Everyone with the app" audience (scheduled push, ChurchAppsSupport#1411).
+  @httpGet("/churchPreview")
+  public async previewChurchPush(req: express.Request, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({ error: "Unauthorized" }, 401);
+
+      const preview = await PushAudienceHelper.getChurchPushPreview(this.repos, au.churchId, au.personId);
       const { eligiblePersonIds: _eligiblePersonIds, ...result } = preview;
       return result;
     }) as any;
@@ -132,7 +128,7 @@ export class NotificationController extends MessagingBaseController {
 
       if (!groupId || !title || !message) return this.json({ error: "groupId, title, and message are required" }, 400);
 
-      const preview = await this.getGroupPushPreview(au.churchId, groupId, au.personId);
+      const preview = await PushAudienceHelper.getGroupPushPreview(this.repos, au.churchId, groupId, au.personId);
       if (preview.eligiblePersonIds.length === 0) return this.json({ error: "No group members have PWA push enabled on this device set." }, 400);
 
       const contentId = `${groupId}:${Date.now()}`;
@@ -192,61 +188,5 @@ export class NotificationController extends MessagingBaseController {
       if (existing?.personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       await this.repos.notification.delete(au.churchId, id);
     }) as any;
-  }
-
-  private async getGroupMemberDetails(churchId: string, groupId: string): Promise<GroupMemberDetail[]> {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const members: any[] = await membershipRepos.groupMember.loadForGroup(churchId, groupId);
-    return members
-      .filter((m) => !!m.personId)
-      .map((m) => ({
-        personId: m.personId,
-        displayName: m.person?.name?.display || m.displayName || ""
-      }));
-  }
-
-  private prefAllowsPush(pref: NotificationPreference | undefined): boolean {
-    if (!pref) return true;
-    const value = pref.allowPush as any;
-    if (Buffer.isBuffer(value)) return value[0] !== 0;
-    return value !== false && value !== 0 && value !== "0";
-  }
-
-  private async getGroupPushPreview(churchId: string, groupId: string, senderPersonId: string): Promise<GroupPushPreview> {
-    const members = await this.getGroupMemberDetails(churchId, groupId);
-    const memberPersonIds = [...new Set(members.map((m) => m.personId).filter(Boolean))];
-    const senderIsMember = memberPersonIds.includes(senderPersonId);
-    const candidatePersonIds = memberPersonIds.filter((id) => id !== senderPersonId);
-    const candidateSet = new Set(candidatePersonIds);
-
-    const devices: Device[] = (await this.repos.device.loadByChurchId(churchId)) as any[];
-    const webPushDevices = devices.filter((device) => {
-      return !!device.personId && candidateSet.has(device.personId) && WebPushHelper.isWebPushToken(device.fcmToken);
-    });
-    const peopleWithWebPush = new Set(webPushDevices.map((device) => device.personId));
-
-    const prefs: NotificationPreference[] = (await this.repos.notificationPreference.loadByPersonIds(candidatePersonIds)) as any[];
-    const prefByPersonId = new Map<string, NotificationPreference>();
-    prefs
-      .filter((pref) => pref.churchId === churchId)
-      .forEach((pref) => prefByPersonId.set(pref.personId, pref));
-
-    const eligiblePersonIds = candidatePersonIds.filter((personId) => {
-      return peopleWithWebPush.has(personId) && this.prefAllowsPush(prefByPersonId.get(personId));
-    });
-
-    const pushDisabledCount = candidatePersonIds.filter((personId) => {
-      return peopleWithWebPush.has(personId) && !this.prefAllowsPush(prefByPersonId.get(personId));
-    }).length;
-
-    return {
-      totalMembers: memberPersonIds.length,
-      eligibleCount: eligiblePersonIds.length,
-      noDeviceCount: candidatePersonIds.filter((personId) => !peopleWithWebPush.has(personId)).length,
-      pushDisabledCount,
-      excludedSenderCount: senderIsMember ? 1 : 0,
-      webPushDeviceCount: webPushDevices.length,
-      eligiblePersonIds
-    };
   }
 }

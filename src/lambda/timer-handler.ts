@@ -165,6 +165,12 @@ export const handleWebhookTimer = async (_event: ScheduledEvent, _context: Conte
     const repos = await RepoManager.getRepos<any>("membership");
     return WebhookDeliveryWorker.process(repos);
   });
+  // Scheduled push notifications go out on this one-minute clock (ChurchAppsSupport#1411).
+  await JobRunHelper.run("scheduledNotifications", async () => {
+    const { ScheduledNotificationHelper } = await import("../modules/messaging/helpers/ScheduledNotificationHelper.js");
+    const messagingRepos = await RepoManager.getRepos<any>("messaging");
+    return ScheduledNotificationHelper.dispatchDue(messagingRepos);
+  });
 };
 
 export const handleScheduledTasks = async (_event: ScheduledEvent, _context: Context): Promise<void> => {
