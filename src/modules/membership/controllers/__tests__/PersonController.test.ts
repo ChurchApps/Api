@@ -372,7 +372,7 @@ describe("PersonController.guestRegisterOptions", () => {
   it("returns the defaults when the church has not set a checklist", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
     const result = await (controller as any).guestRegisterOptions({ query: { churchId: "c1" }, headers: {} }, {});
-    expect(result).toEqual({ title: "off", email: "optional", phone: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" });
+    expect(result).toEqual({ title: "off", email: "optional", phone: "optional", householdRole: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" });
   });
 
   it("returns the saved checklist and ignores unknown modes", async () => {
@@ -847,5 +847,39 @@ describe("PersonController /ids names-only (issue 1308)", () => {
     expect(repos.person.convertAllToModelWithPermissions).toHaveBeenCalled();
     expect(repos.person.convertAllToBasicModel).not.toHaveBeenCalled();
     expect(result[0].contactInfo.email).toBe("z@x.org");
+  });
+});
+
+// ChurchAppsSupport#1448: with no Directory Approval Group a member's Add Family Member saves straight to their household.
+describe("PersonController.addFamilyMember", () => {
+  const body = { first: "Sam", last: "Clark", prefix: "Mr", mobilePhone: "555-0102", householdRole: "Child" };
+
+  it("creates the person in the caller's household with the role, title and phone", async () => {
+    const { controller, repos } = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: { last: "Clark" } }, settings: [] });
+    const result: any = await (controller as any).addFamilyMember({ body }, {});
+    expect(repos.person.save).toHaveBeenCalledTimes(1);
+    expect(repos.person.save.mock.calls[0][0]).toMatchObject({ churchId: "c1", householdId: "h9", householdRole: "Child", name: { first: "Sam", last: "Clark", prefix: "Mr" }, contactInfo: { mobilePhone: "555-0102" } });
+    expect(result.id).toBe("genP");
+  });
+
+  it("falls back to Other and the caller's last name", async () => {
+    const { controller, repos } = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: { last: "Clark" } }, settings: [] });
+    await (controller as any).addFamilyMember({ body: { first: "Sam", householdRole: "Boss" } }, {});
+    expect(repos.person.save.mock.calls[0][0]).toMatchObject({ householdRole: "Other", name: { first: "Sam", last: "Clark" } });
+  });
+
+  it("refuses when the church reviews directory changes", async () => {
+    const { controller, repos } = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: {} }, settings: [{ keyName: "directoryApprovalGroupId", value: "g1" }] });
+    const result: any = await (controller as any).addFamilyMember({ body }, {});
+    expect(result.status).toBe(403);
+    expect(repos.person.save).not.toHaveBeenCalled();
+  });
+
+  it("refuses a caller without editSelf, and a missing first name", async () => {
+    const denied = personController({ access: [], person: { id: "p1", householdId: "h9", name: {} }, settings: [] });
+    expect((await (denied.controller as any).addFamilyMember({ body }, {})).status).toBe(401);
+    const blank = personController({ access: ["peopleEditSelf"], person: { id: "p1", householdId: "h9", name: {} }, settings: [] });
+    expect((await (blank.controller as any).addFamilyMember({ body: { first: " " } }, {})).status).toBe(400);
+    expect(blank.repos.person.save).not.toHaveBeenCalled();
   });
 });

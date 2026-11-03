@@ -88,7 +88,7 @@ export class PersonHelper extends BasePersonHelper {
       const person: Person = {
         churchId,
         householdId,
-        householdRole: i === 0 && !joiningExisting ? "Head" : "Other",
+        householdRole: i === 0 && !joiningExisting ? "Head" : (i > 0 && m.householdRole) || "Other",
         name: { first: m.firstName, last: m.lastName },
         membershipStatus: "Visitor",
         contactInfo: { ...(registration.address || {}) }

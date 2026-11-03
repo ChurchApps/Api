@@ -498,6 +498,38 @@ export class PersonController extends MembershipBaseController {
     });
   }
 
+  // A member's Add Family Member, for churches with no Directory Approval Group (where edits apply without review).
+  // The new person always lands in the caller's own household; churches that review changes get a task instead.
+  @httpPost("/familyMember")
+  public async addFamilyMember(req: express.Request<{}, {}, { first?: string, last?: string, prefix?: string, mobilePhone?: string, householdRole?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.people.editSelf) || !au.personId) return this.json({}, 401);
+      const clean = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+      const first = clean(req.body?.first, 50);
+      if (!first) return this.json({ error: "first is required" }, 400);
+      const settings = this.repos.setting.convertAllToModel(au.churchId, (await this.repos.setting.loadPublicSettings(au.churchId)) as any[]) || [];
+      if (settings.some((s: any) => s.keyName === "directoryApprovalGroupId" && s.value)) return this.json({ error: "Family members are added through directory approval" }, 403);
+      const self = this.repos.person.convertToModel(au.churchId, await this.repos.person.load(au.churchId, au.personId));
+      if (!self?.householdId) return this.json({}, 401);
+      const role = clean(req.body?.householdRole, 10);
+      const last = clean(req.body?.last, 50) || self.name?.last || "";
+      const person: Person = {
+        churchId: au.churchId,
+        householdId: self.householdId,
+        householdRole: ["Head", "Spouse", "Child", "Other"].includes(role) ? role : "Other",
+        name: { first, last, display: [first, last].filter(Boolean).join(" ") },
+        contactInfo: {}
+      };
+      const prefix = clean(req.body?.prefix, 10);
+      if (prefix) person.name.prefix = prefix;
+      const mobilePhone = clean(req.body?.mobilePhone, 21);
+      if (mobilePhone) person.contactInfo.mobilePhone = mobilePhone;
+      const saved = await this.repos.person.save(person);
+      await WebhookDispatcher.emit(au.churchId, "person.created", saved);
+      return this.repos.person.convertToModelWithPermissions(au.churchId, saved, au.checkAccess(Permissions.people.edit));
+    });
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Person[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
