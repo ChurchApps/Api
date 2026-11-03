@@ -299,7 +299,7 @@ export class FormSubmissionController extends MembershipBaseController {
           const contents = "<table role=\"presentation\" style=\"text-align: left;\" cellspacing=\"8\" width=\"80%\"><tablebody>" + contentRows.join(" ") + "</tablebody></table>";
           const promises: Promise<any>[] = [];
           (people as any[]).forEach((p: Person) => {
-            if (p.email) promises.push(TransactionalEmailHelper.sendTransactional(Environment.supportEmail, p.email, church.name, Environment.b1AdminRoot, "New Submissions for " + form.name, contents));
+            if (p.email) promises.push(TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church.name), p.email, church.name, Environment.b1AdminRoot, "New Submissions for " + form.name, contents));
           });
           promises.push(this.sendNotifications(churchId, form, people.map((p: Person) => p.id)));
           await Promise.all(promises);
@@ -316,7 +316,7 @@ export class FormSubmissionController extends MembershipBaseController {
     const resolvedSubject = ConversationalFormHelper.applyTokens(subject, tokens);
     const resolvedBody = ConversationalFormHelper.applyTokens(body, tokens);
     try {
-      await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
+      await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church?.name), email, church?.name, Environment.b1AdminRoot, resolvedSubject, resolvedBody, "ChurchEmailTemplate.html");
       await ChurchEmailLimiter.settle(churchId, reserved[0], true);
     } catch (err: any) {
       await ChurchEmailLimiter.settle(churchId, reserved[0], false, err?.message || "Send failed");

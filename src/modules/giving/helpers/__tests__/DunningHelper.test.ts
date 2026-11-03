@@ -1,7 +1,7 @@
 // Environment is ESM-only (import.meta.url) and the email helper must not reach SES under test.
 jest.mock("@churchapps/apihelper", () => ({ CurrencyHelper: { formatCurrencyWithLocale: (amount: number) => `$${amount.toFixed(2)}` } }));
 jest.mock("../../../../shared/helpers/Environment", () => ({ Environment: { appEnv: "prod", supportEmail: "support@test" } }));
-jest.mock("../../../../shared/helpers/TransactionalEmailHelper", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn().mockResolvedValue(undefined) } }));
+jest.mock("../../../../shared/helpers/TransactionalEmailHelper", () => ({ TransactionalEmailHelper: { sendTransactional: jest.fn().mockResolvedValue(undefined), fromAddress: (name?: string) => (name ? `"${name}" <support@test>` : "support@test") } }));
 jest.mock("../../../../shared/infrastructure/RepoManager", () => ({ RepoManager: { getRepos: jest.fn() } }));
 
 import { DunningHelper } from "../DunningHelper";
@@ -35,7 +35,8 @@ describe("DunningHelper", () => {
       expect(await DunningHelper.notify("ch1", failedDonation, 0, repos)).toBe(true);
 
       expect(sendTransactional).toHaveBeenCalledTimes(1);
-      const [, to, appName, , subject, contents] = sendTransactional.mock.calls[0];
+      const [from, to, appName, , subject, contents] = sendTransactional.mock.calls[0];
+      expect(from).toEqual('"Grace Church" <support@test>');
       expect(to).toEqual("donor@test");
       expect(appName).toEqual("Grace Church");
       expect(subject).toContain("Recurring Donation");

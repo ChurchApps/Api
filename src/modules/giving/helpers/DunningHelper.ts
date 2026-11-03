@@ -64,7 +64,7 @@ export class DunningHelper {
         <a href="https://${domain}/mobile/donate" target="_blank" rel="noreferrer noopener">Set up your gift again</a>
       </h4>
     `;
-    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, church.name, `https://${domain}`, "Your Recurring Donation Was Canceled", contents, "ChurchEmailTemplate.html");
+    await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church.name), person.email, church.name, `https://${domain}`, "Your Recurring Donation Was Canceled", contents, "ChurchEmailTemplate.html");
 
     await repos.eventLog.save({ id: "", churchId, provider: "dunning", providerId, eventType: "dunning", status: "sent", message: `Cancellation email sent to ${person.email}`, created: new Date() } as EventLog);
     return true;
@@ -99,7 +99,7 @@ export class DunningHelper {
       </h4>
     `;
 
-    await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, to, church.name, `https://${domain}`, "Your Recurring Donation Needs Attention", contents, "ChurchEmailTemplate.html");
+    await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church.name), to, church.name, `https://${domain}`, "Your Recurring Donation Needs Attention", contents, "ChurchEmailTemplate.html");
   }
 
   // Church names are set by the church, so they're escaped before going into the HTML body.

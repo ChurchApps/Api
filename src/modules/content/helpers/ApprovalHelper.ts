@@ -60,11 +60,12 @@ export class ApprovalHelper {
     for (const digest of digests) {
       try {
         const approverIds = await getMembershipModuleGateway().loadGroupMemberPersonIds(digest.churchId, digest.approvalGroupId);
-        const timeZone = (await getMembershipModuleGateway().loadChurch(digest.churchId))?.timeZone;
+        const church = await getMembershipModuleGateway().loadChurch(digest.churchId);
+        const timeZone = church?.timeZone;
         for (const personId of approverIds) {
           const person = await getMembershipModuleGateway().loadPerson(digest.churchId, personId);
           if (!person?.email) continue;
-          await TransactionalEmailHelper.sendTransactional(Environment.supportEmail, person.email, "B1.church", Environment.b1AdminRoot ?? "", this.getDigestSubject(digest), this.getDigestBody(digest, timeZone), "ChurchEmailTemplate.html");
+          await TransactionalEmailHelper.sendTransactional(TransactionalEmailHelper.fromAddress(church?.name), person.email, "B1.church", Environment.b1AdminRoot ?? "", this.getDigestSubject(digest), this.getDigestBody(digest, timeZone), "ChurchEmailTemplate.html");
           emails++;
         }
         await repos.eventBooking.markNotified(digest.bookingIds);
