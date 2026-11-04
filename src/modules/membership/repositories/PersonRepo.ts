@@ -208,13 +208,8 @@ export class PersonRepo {
       .where("churchId", "=", churchId)
       .where("removed", "=", false as any);
     if (filterOptedOut) q = q.where((eb) => eb.or([eb("optedOut", "=", false as any), eb("optedOut", "is", null)]));
-    const subResult = await q.orderBy("id", "desc").limit(25).execute();
-    subResult.sort((a: any, b: any) => {
-      const lastCmp = (a.lastName || "").localeCompare(b.lastName || "");
-      if (lastCmp !== 0) return lastCmp;
-      return (a.firstName || "").localeCompare(b.firstName || "");
-    });
-    return subResult;
+    // Ids are random shortIds, so order by dateAdded (newest first, older NULL rows last).
+    return q.orderBy(sql`dateAdded IS NULL`).orderBy("dateAdded", "desc").orderBy("id", "desc").limit(25).execute();
   }
 
   public async loadAlphabetical(churchId: string, pageSize: number, filterOptedOut?: boolean) {

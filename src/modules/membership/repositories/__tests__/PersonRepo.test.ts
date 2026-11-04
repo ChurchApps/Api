@@ -246,3 +246,17 @@ describe("PersonRepo dateAdded stamp", () => {
     expect(repo.convertToModel("c1", { id: "p2", dateAdded: null })!.dateAdded).toBeUndefined();
   });
 });
+
+describe("PersonRepo.loadRecent ordering", () => {
+  it("orders by dateAdded newest first (NULLs last) instead of the random id, and keeps that order", async () => {
+    const rows = [{ id: "z1", lastName: "Moore", firstName: "Zoe" }, { id: "a1", lastName: "Adams", firstName: "Amy" }];
+    const { proxy, calls } = recordingDb(rows);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    const result = await new PersonRepo().loadRecent("c1");
+    const orders = calls.filter((c) => c.method === "orderBy");
+    const dateIdx = orders.findIndex((c) => c.args[0] === "dateAdded" && c.args[1] === "desc");
+    expect(dateIdx).toBeGreaterThan(0);
+    expect(orders[0].args[0]).not.toBe("id");
+    expect(result.map((r: any) => r.id)).toEqual(["z1", "a1"]);
+  });
+});
