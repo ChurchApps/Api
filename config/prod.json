@@ -12,6 +12,7 @@
   "b1AdminRoot": "https://admin.b1.church",
   "b1AppRoot": "https://{subdomain}.b1.church",
   "worshipCommonsRoot": "https://worshipcommons.org",
+  "commonsSongLimits": "squlbh74qTW:500",
   "messagingApi": "https://api.churchapps.org/messaging",
   "aiProvider": "openai",
   "storeApi": "https://api.mutualministry.com",
