@@ -35,7 +35,7 @@ describe("ScheduledNotificationHelper.dispatchDue", () => {
     const repos = makeRepos([row()]);
     await ScheduledNotificationHelper.dispatchDue(repos, now);
     expect(repos.scheduledNotification.claim).toHaveBeenCalledWith("S1");
-    expect(createNotificationsMock).toHaveBeenCalledWith(["P1", "P2"], "C1", "churchPushNotification", "S1", "Starts in 15 minutes", "/mobile", "SENDER", expect.objectContaining({ deliveryStartLevel: 1, deliveryTitle: "Main session" }));
+    expect(createNotificationsMock).toHaveBeenCalledWith(["P1", "P2"], "C1", "churchPushNotification", "S1", "Starts in 15 minutes", "/mobile/notifications", "SENDER", expect.objectContaining({ deliveryStartLevel: 1, deliveryTitle: "Main session", navData: expect.objectContaining({ link: "/mobile/notifications" }) }));
     expect(repos.scheduledNotification.markSent).toHaveBeenCalledWith("S1", 2, 2);
   });
 

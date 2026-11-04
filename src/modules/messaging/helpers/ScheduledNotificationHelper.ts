@@ -20,7 +20,8 @@ export class ScheduledNotificationHelper {
       : await PushAudienceHelper.getGroupPushPreview(repos, row.churchId, row.groupId, row.createdByPersonId);
     if (preview.eligiblePersonIds.length === 0) return { recipientCount: 0, successCount: 0 };
 
-    const link = row.link || (isChurch ? "/mobile" : `/mobile/groups/${row.groupId}`);
+    // "/mobile" redirects to the dashboard; church-wide pushes with no link should open the notification list (ChurchAppsSupport#1455).
+    const link = row.link || (isChurch ? "/mobile/notifications" : `/mobile/groups/${row.groupId}`);
     const notifications = await NotificationHelper.createNotifications(
       preview.eligiblePersonIds,
       row.churchId,
