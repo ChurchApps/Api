@@ -16,7 +16,9 @@ function makeController(access: string[], existing: any = null) {
     save: jest.fn(async (r: any) => ({ ...r, id: r.id || "S1" })),
     load: jest.fn(async () => existing),
     loadForChurch: jest.fn(async () => []),
-    cancel: jest.fn(async () => !!existing && existing.status === "pending")
+    cancel: jest.fn(async () => !!existing && existing.status === "pending"),
+    delete: jest.fn(async () => !!existing && ["sent", "failed", "cancelled"].includes(existing.status)),
+    deleteFinished: jest.fn(async () => 2)
   };
   const controller = new ScheduledNotificationController();
   (controller as any).repos = { scheduledNotification };
@@ -73,9 +75,26 @@ describe("ScheduledNotificationController.save", () => {
 });
 
 describe("ScheduledNotificationController.cancel", () => {
-  it("refuses to cancel once sent", async () => {
-    const { controller } = makeController(["contentEdit"], { id: "S1", churchId: "c1", audience: "church", status: "sent" });
+  // ChurchAppsSupport#1456: a finished notification is removed from the Recent list instead of refused.
+  it("removes a notification that already went out", async () => {
+    const { controller, scheduledNotification } = makeController(["contentEdit"], { id: "S1", churchId: "c1", audience: "church", status: "sent" });
+    const result: any = await controller.cancel("S1", {} as any, {} as any);
+    expect(scheduledNotification.delete).toHaveBeenCalledWith("c1", "S1");
+    expect(scheduledNotification.cancel).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({ id: "S1", deleted: true }));
+  });
+
+  it("leaves a notification alone while it is being sent", async () => {
+    const { controller, scheduledNotification } = makeController(["contentEdit"], { id: "S1", churchId: "c1", audience: "church", status: "processing" });
     expect((await controller.cancel("S1", {} as any, {} as any) as any).status).toBe(409);
+    expect(scheduledNotification.delete).not.toHaveBeenCalled();
+    expect(scheduledNotification.cancel).not.toHaveBeenCalled();
+  });
+
+  it("refuses a group admin removing a sent everyone notification", async () => {
+    const { controller, scheduledNotification } = makeController(["groupMembersEdit"], { id: "S1", churchId: "c1", audience: "church", status: "sent" });
+    expect((await controller.cancel("S1", {} as any, {} as any) as any).status).toBe(401);
+    expect(scheduledNotification.delete).not.toHaveBeenCalled();
   });
 
   it("cancels a pending send", async () => {
@@ -88,5 +107,25 @@ describe("ScheduledNotificationController.cancel", () => {
     const { controller, scheduledNotification } = makeController(["groupMembersEdit"], { id: "S1", churchId: "c1", audience: "church", status: "pending" });
     expect((await controller.cancel("S1", {} as any, {} as any) as any).status).toBe(401);
     expect(scheduledNotification.cancel).not.toHaveBeenCalled();
+  });
+});
+
+describe("ScheduledNotificationController.clearRecent", () => {
+  it("clears only the audiences the caller can send to", async () => {
+    const { controller, scheduledNotification } = makeController(["groupMembersEdit"]);
+    expect(await controller.clearRecent({} as any, {} as any)).toEqual({ deleted: 2 });
+    expect(scheduledNotification.deleteFinished).toHaveBeenCalledWith("c1", ["group"]);
+  });
+
+  it("clears both audiences for a caller with both permissions", async () => {
+    const { controller, scheduledNotification } = makeController(["contentEdit", "groupMembersEdit"]);
+    await controller.clearRecent({} as any, {} as any);
+    expect(scheduledNotification.deleteFinished).toHaveBeenCalledWith("c1", ["church", "group"]);
+  });
+
+  it("refuses a caller with neither permission", async () => {
+    const { controller, scheduledNotification } = makeController([]);
+    expect((await controller.clearRecent({} as any, {} as any) as any).status).toBe(401);
+    expect(scheduledNotification.deleteFinished).not.toHaveBeenCalled();
   });
 });

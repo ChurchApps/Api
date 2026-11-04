@@ -7,6 +7,7 @@ import { ScheduledNotification } from "../models/index.js";
 
 const LEASE_MINUTES = 10; // a 'processing' row older than this is re-surfaced (crash recovery)
 const RECENT_LIMIT = 25;
+const FINISHED = ["sent", "failed", "cancelled"];
 
 // Times are compared against a Node-formatted "now" so they match how sendAt is written.
 const nowSql = () => DateHelper.toMysqlDate(new Date()) as any;
@@ -55,7 +56,7 @@ export class ScheduledNotificationRepo {
       .where("churchId", "=", churchId).where("status", "in", ["pending", "processing"])
       .orderBy("sendAt").execute();
     const recent = await getDb().selectFrom("scheduledNotifications").selectAll()
-      .where("churchId", "=", churchId).where("status", "in", ["sent", "failed", "cancelled"])
+      .where("churchId", "=", churchId).where("status", "in", FINISHED)
       .orderBy("sendAt", "desc").limit(RECENT_LIMIT).execute();
     return [...upcoming, ...recent];
   }
@@ -103,5 +104,19 @@ export class ScheduledNotificationRepo {
     const result = await getDb().updateTable("scheduledNotifications").set({ status: "cancelled", dateModified: nowSql() })
       .where("churchId", "=", churchId).where("id", "=", id).where("status", "=", "pending").executeTakeFirst();
     return Number(result?.numUpdatedRows ?? 0) > 0;
+  }
+
+  // Removing from the Recent list only ever touches finished rows; a pending row is cancelled instead.
+  public async delete(churchId: string, id: string): Promise<boolean> {
+    const result = await getDb().deleteFrom("scheduledNotifications")
+      .where("churchId", "=", churchId).where("id", "=", id).where("status", "in", FINISHED).executeTakeFirst();
+    return Number(result?.numDeletedRows ?? 0) > 0;
+  }
+
+  public async deleteFinished(churchId: string, audiences: string[]): Promise<number> {
+    if (audiences.length === 0) return 0;
+    const result = await getDb().deleteFrom("scheduledNotifications")
+      .where("churchId", "=", churchId).where("status", "in", FINISHED).where("audience", "in", audiences).executeTakeFirst();
+    return Number(result?.numDeletedRows ?? 0);
   }
 }
