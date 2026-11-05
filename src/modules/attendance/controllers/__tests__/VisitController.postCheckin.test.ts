@@ -133,6 +133,15 @@ describe("postCheckin service time window", () => {
     await (controller as any).postCheckin(req(memberVisit()), {});
     expect(repos.visit.save).toHaveBeenCalled();
   });
+
+  it("saves 40 minutes after the start when the schedule has no end time or close minutes (#1461)", async () => {
+    jest.useFakeTimers({ now: new Date("2026-10-11T09:40:00-05:00"), doNotFake: ["setTimeout", "nextTick", "setImmediate"] });
+    const startOnly = { id: "st1", dayOfWeek: 0, startTime: "09:00:00", endTime: null, checkinOpenMinutes: null, checkinCloseMinutes: null };
+    const { controller, repos } = makeController({ groups, counts: [], serviceTimes: [startOnly] });
+    const result: any = await (controller as any).postCheckin(req(memberVisit()), {});
+    expect(result?.status).not.toBe(409);
+    expect(repos.visit.save).toHaveBeenCalled();
+  });
 });
 
 describe("postCheckin passthrough", () => {

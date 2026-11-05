@@ -114,6 +114,15 @@ describe("CheckinGateHelper.isServiceTimeOpen", () => {
     expect(CheckinGateHelper.isServiceTimeOpen(st, at("2026-10-11T09:16:00"), tz)).toBe(false);
   });
 
+  it("stays open until the end of that day when neither an end time nor close minutes is set", () => {
+    // Issue #1461: Thursday 10:25 prayer service with blank end time and blank close field.
+    const st = { dayOfWeek: 4, startTime: "10:25", checkinOpenMinutes: null, checkinCloseMinutes: null };
+    expect(CheckinGateHelper.isServiceTimeOpen(st, at("2026-10-15T10:24:00"), tz)).toBe(false);
+    expect(CheckinGateHelper.isServiceTimeOpen(st, at("2026-10-15T10:27:00"), tz)).toBe(true);
+    expect(CheckinGateHelper.isServiceTimeOpen(st, at("2026-10-15T23:59:00"), tz)).toBe(true);
+    expect(CheckinGateHelper.isServiceTimeOpen(st, at("2026-10-16T08:00:00"), tz)).toBe(false);
+  });
+
   it("handles a window that crosses midnight and the end of the week", () => {
     // Saturday 11:00 PM service ending 12:30 AM Sunday.
     const late = { dayOfWeek: 6, startTime: "23:00", endTime: "00:30", checkinOpenMinutes: 0, checkinCloseMinutes: 0 };
