@@ -49,11 +49,13 @@ export class CheckinGateHelper {
   // True when check-in is allowed for this service time right now. A service time with no
   // day/start time is never time-gated. The window runs from checkinOpenMinutes before the
   // start to checkinCloseMinutes after the end (or the start when no end is set), in church time.
+  // With neither an end time nor close minutes it stays open until the end of that day.
   static isServiceTimeOpen(serviceTime: GateServiceTime, now: Date, timeZone?: string): boolean {
     if (!this.hasSchedule(serviceTime)) return true;
     const start = this.parseTime(serviceTime.startTime);
     const day = serviceTime.dayOfWeek;
-    let end = this.parseTime(serviceTime.endTime) ?? start;
+    const parsedEnd = this.parseTime(serviceTime.endTime);
+    let end = parsedEnd ?? start;
     if (end < start) end += MINUTES_PER_DAY; // ends after midnight
 
     const local = DateHelper.toChurchTime(now, timeZone); // "YYYY-MM-DD HH:mm:ss"
@@ -62,7 +64,8 @@ export class CheckinGateHelper {
     const nowMinute = nowDay * MINUTES_PER_DAY + Number(local.substring(11, 13)) * 60 + Number(local.substring(14, 16));
 
     const windowStart = day * MINUTES_PER_DAY + start - Math.max(0, serviceTime.checkinOpenMinutes ?? 0);
-    const windowEnd = day * MINUTES_PER_DAY + end + Math.max(0, serviceTime.checkinCloseMinutes ?? 0);
+    const openAllDay = parsedEnd === null && serviceTime.checkinCloseMinutes == null;
+    const windowEnd = openAllDay ? day * MINUTES_PER_DAY + MINUTES_PER_DAY - 1 : day * MINUTES_PER_DAY + end + Math.max(0, serviceTime.checkinCloseMinutes ?? 0);
     // The window may spill into the previous or next week (e.g. Saturday night into Sunday).
     return [nowMinute - MINUTES_PER_WEEK, nowMinute, nowMinute + MINUTES_PER_WEEK].some((t) => t >= windowStart && t <= windowEnd);
   }
