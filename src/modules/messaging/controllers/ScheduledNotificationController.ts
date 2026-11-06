@@ -86,16 +86,31 @@ export class ScheduledNotificationController extends MessagingBaseController {
     }) as any;
   }
 
+  // Clears the Recent list (ChurchAppsSupport#1456), limited to the audiences the caller can send to.
+  @httpDelete("/")
+  public async clearRecent(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      const audiences = ["church", "group"].filter((a) => this.canSendTo(au, a));
+      if (audiences.length === 0) return this.json({ error: "Unauthorized" }, 401);
+      const deleted = await this.repos.scheduledNotification.deleteFinished(au.churchId, audiences);
+      return { deleted };
+    }) as any;
+  }
+
+  // Cancels a pending notification; removes a finished one from the Recent list.
   @httpDelete("/:id")
   public async cancel(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = (await this.repos.scheduledNotification.load(au.churchId, id)) as ScheduledNotification;
       if (!existing) return this.json({ error: "Not found" }, 404);
       if (!this.canSendTo(au, existing.audience)) return this.json({ error: "Unauthorized" }, 401);
-      if (existing.status !== "pending" || !(await this.repos.scheduledNotification.cancel(au.churchId, id))) {
-        return this.json({ error: "This notification has already been sent or cancelled" }, 409);
+      if (existing.status === "processing") return this.json({ error: "This notification is being sent right now" }, 409);
+      if (existing.status === "pending") {
+        if (!(await this.repos.scheduledNotification.cancel(au.churchId, id))) return this.json({ error: "This notification has already been sent or cancelled" }, 409);
+        return { ...existing, status: "cancelled" };
       }
-      return { ...existing, status: "cancelled" };
+      if (!(await this.repos.scheduledNotification.delete(au.churchId, id))) return this.json({ error: "Not found" }, 404);
+      return { ...existing, deleted: true };
     }) as any;
   }
 
