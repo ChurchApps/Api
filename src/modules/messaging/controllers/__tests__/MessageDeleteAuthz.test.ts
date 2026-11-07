@@ -1,6 +1,7 @@
 import "reflect-metadata";
 jest.mock("../MessagingBaseController", () => ({
   MessagingBaseController: class {
+    async writeAuditLog() {}
     json(obj: any, status: number) { return { obj, status }; }
     isPersonNote(contentType?: string) { return contentType === "person" || contentType === "personConfidential"; }
     canViewPersonNotes(au: any, contentType?: string) {

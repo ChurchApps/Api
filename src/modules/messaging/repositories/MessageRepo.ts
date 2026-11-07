@@ -31,8 +31,10 @@ export class MessageRepo {
       personId: model.personId,
       displayName: model.displayName,
       content: model.content,
-      timeUpdated: model.timeUpdated
+      timeUpdated: sql`NOW()`
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    // The saved model is what gets broadcast, so it carries the edit time for the "(edited)" marker.
+    model.timeUpdated = new Date();
     return model;
   }
 
