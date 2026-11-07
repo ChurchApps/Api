@@ -395,6 +395,18 @@ export class BaseController extends CustomBaseController {
     });
   }
 
+  // One explicit audit row, for a controller whose route the registry opts out of (notes share the chat route).
+  protected async writeAuditLog(req: express.Request, au: AuthenticatedUser, category: string, action: string, entityType: string, entityId: string | undefined, details: object) {
+    if (!au?.churchId) return;
+    try {
+      const { AuditLogHelper } = await import("../../modules/membership/helpers/AuditLogHelper.js");
+      const repos = this.moduleName === "membership" ? (this as any).repos : await RepoManager.getRepos<any>("membership");
+      await AuditLogHelper.log(repos, au.churchId, au.id || "anonymous", category, action, entityType, entityId, AuditLogHelper.capDetails(details), AuditLogHelper.getClientIp(req), this.moduleName);
+    } catch (e) {
+      console.error("writeAuditLog failed:", e);
+    }
+  }
+
   private async writeAnonAuditRow(req: express.Request, config: AuditRouteConfig, payload: any) {
     const churchId = (req.body?.churchId || req.query?.churchId?.toString() || req.params?.churchId) as string | undefined;
     if (!churchId) return;

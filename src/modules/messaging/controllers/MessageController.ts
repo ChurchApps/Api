@@ -137,6 +137,7 @@ export class MessageController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Message[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const previous = new Map<string, any>();
       for (const message of req.body) {
         const conv = this.repos.conversation.convertToModel(await this.repos.conversation.loadById(au.churchId, message.conversationId));
         if (this.isNote(conv?.contentType) && !(await this.canUseNotes(au, conv, "post"))) return this.json({}, 401);
@@ -149,6 +150,7 @@ export class MessageController extends MessagingBaseController {
           if (!isOwner && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
           message.personId = existing?.personId ?? null;
           message.displayName = existing?.displayName;
+          previous.set(message.id, existing);
         }
       }
       const promises: Promise<Message>[] = [];
@@ -175,9 +177,10 @@ export class MessageController extends MessagingBaseController {
               this.repos.conversation.updateStats(message.conversationId)
             ]);
             const conv = this.repos.conversation.convertToModel(conversation);
+            const existing = message.id ? previous.get(message.id) : null;
 
-            // Fan out real-time delivery and notification escalation concurrently -
-            // both are independent side-effects that each make their own AWS/DB calls.
+            // Fan out real-time delivery, notification escalation and the note audit row concurrently -
+            // they are independent side-effects that each make their own AWS/DB calls.
             const room = contentRoom(conv?.contentType, conv?.contentId);
             await Promise.all([
               DeliveryHelper.sendConversationMessages({
@@ -192,7 +195,16 @@ export class MessageController extends MessagingBaseController {
                 action: "conversationActivity",
                 data: { contentType: conv.contentType, contentId: conv.contentId, conversationId: conv.id, kind: "message" }
               }) : Promise.resolve(),
-              shouldNotify ? NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous") : Promise.resolve()
+              shouldNotify ? NotificationHelper.checkShouldNotify(conv, savedMessage, savedMessage.personId || "anonymous") : Promise.resolve(),
+              this.logNoteAudit(req, au, conv, existing ? "note_updated" : "note_saved", {
+                op: existing ? "update" : "create",
+                before: existing ? { content: existing.content, displayName: existing.displayName, timeSent: existing.timeSent } : null,
+                after: { content: savedMessage.content, displayName: savedMessage.displayName },
+                messageId: savedMessage.id,
+                conversationId: savedMessage.conversationId,
+                contentType: conv?.contentType,
+                contentId: conv?.contentId
+              })
             ]);
 
             return savedMessage;
@@ -276,6 +288,14 @@ export class MessageController extends MessagingBaseController {
     return false;
   }
 
+  // Notes share this route with chat, which the universal audit opts out of, so note edits and deletes
+  // are logged here explicitly. Chat is never logged.
+  private async logNoteAudit(req: express.Request, au: any, conv: any, action: string, details: object) {
+    if (!this.isNote(conv?.contentType)) return;
+    const category = this.isPersonNote(conv.contentType) ? "person" : conv.contentType === "groupNote" ? "group" : "settings";
+    await this.writeAuditLog(req, au, category, action, "note", conv.contentId, details);
+  }
+
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
@@ -288,6 +308,15 @@ export class MessageController extends MessagingBaseController {
       if (!isOwner && !(await this.canModerate(au, conv))) {
         return this.json({ error: "Unauthorized" }, 401);
       }
+      await this.logNoteAudit(req, au, conv, "note_deleted", {
+        op: "delete",
+        before: { content: message.content, displayName: message.displayName, personId: message.personId, timeSent: message.timeSent },
+        after: null,
+        messageId: id,
+        conversationId: message.conversationId,
+        contentType: conv?.contentType,
+        contentId: conv?.contentId
+      });
       await this.repos.message.delete(au.churchId, id);
       await this.repos.conversation.updateStats(message.conversationId);
 
