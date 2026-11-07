@@ -48,7 +48,7 @@ export class MessageController extends MessagingBaseController {
       req.body.forEach((message) => {
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
-            console.info("[chat-push] message saved", {
+            console.debug("[chat-push] message saved", {
               route: "/messaging/messages/send",
               churchId: savedMessage.churchId,
               conversationId: savedMessage.conversationId,
@@ -57,7 +57,7 @@ export class MessageController extends MessagingBaseController {
               messageType: savedMessage.messageType || "comment"
             });
             if (!savedMessage.personId) {
-              console.warn("[chat-push] anonymous send route saved message without personId", {
+              console.debug("[chat-push] anonymous send route saved message without personId", {
                 route: "/messaging/messages/send",
                 churchId: savedMessage.churchId,
                 conversationId: savedMessage.conversationId,
@@ -159,7 +159,7 @@ export class MessageController extends MessagingBaseController {
         const shouldNotify = !message.id && message.messageType !== "subscription";
         promises.push(
           this.repos.message.save(message).then(async (savedMessage) => {
-            console.info("[chat-push] message saved", {
+            console.debug("[chat-push] message saved", {
               route: "/messaging/messages",
               churchId: savedMessage.churchId,
               conversationId: savedMessage.conversationId,

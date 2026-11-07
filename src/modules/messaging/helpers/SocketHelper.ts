@@ -17,7 +17,7 @@ export class SocketHelper {
   static init = (repos: Repos) => {
     SocketHelper.repos = repos;
     const port = Environment.websocketPort;
-    console.log(`SocketHelper: Initializing with port ${port}, deliveryProvider: ${Environment.deliveryProvider}`);
+    console.debug(`SocketHelper: Initializing with port ${port}, deliveryProvider: ${Environment.deliveryProvider}`);
 
     // When running on Railway or Docker (any host that exposes a single port), the WebSocket server
     // is attached to the HTTP server in index.ts via attachToServer(). Skip the port-based path.
@@ -38,7 +38,7 @@ export class SocketHelper {
         console.log("Continuing without WebSocket server...");
       }
     } else {
-      console.log("WebSocket server not started (AWS mode or port disabled)");
+      console.debug("WebSocket server not started (AWS mode or port disabled)");
     }
   };
 

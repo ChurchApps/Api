@@ -121,7 +121,7 @@ export class WebPushHelper {
       Environment.webPushPrivateKey
     );
     WebPushHelper.configured = true;
-    console.info("[webpush] vapid configured", WebPushHelper.getConfigSummary());
+    console.debug("[webpush] vapid configured", WebPushHelper.getConfigSummary());
   }
 
   static isEnabled(): boolean {

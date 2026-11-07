@@ -94,7 +94,7 @@ function getApiGatewayManagementClient(event: APIGatewayProxyEvent): ApiGatewayM
     const { apiId, stage } = requestContext;
     const region = process.env.AWS_REGION || "us-east-2";
     const endpoint = `https://${apiId}.execute-api.${region}.amazonaws.com/${stage}`;
-    console.log(`Using API Gateway endpoint: ${endpoint} (region: ${region})`);
+    console.debug(`Using API Gateway endpoint: ${endpoint} (region: ${region})`);
     return new ApiGatewayManagementApiClient({ apiVersion: "2020-04-16", endpoint: endpoint });
   }
 
@@ -114,7 +114,7 @@ async function handleMessage(event: APIGatewayProxyEvent, _context: Context): Pr
 
     try {
       const apiGwClient = getApiGatewayManagementClient(event);
-      console.log("Using API Gateway endpoint from event context");
+      console.debug("Using API Gateway endpoint from event context");
 
       const command = new PostToConnectionCommand({
         ConnectionId: connectionId,
