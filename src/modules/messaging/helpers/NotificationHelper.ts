@@ -249,7 +249,7 @@ export class NotificationHelper {
         const expoPushTokens = [...new Set(allTokens.filter((token) => token.startsWith("ExponentPushToken[")))];
         const { activeTokens: webPushTokens, staleTokens: staleWebPushTokens, activeDevices: activeWebPushDevices } = this.prepareWebPushDevices(devices);
         const deviceTokenDebug = devices.map((device) => this.summarizePushDeviceForDebug(device));
-        console.info("[chat-push] devices loaded", {
+        console.debug("[chat-push] devices loaded", {
           churchId,
           personId,
           contentType,
@@ -514,7 +514,7 @@ export class NotificationHelper {
         const recipientDevices = pm.notifyPersonId
           ? await NotificationHelper.repos.device.loadForPerson(conversation.churchId, pm.notifyPersonId) as any[]
           : [];
-        console.info("[chat-push] targets", {
+        console.debug("[chat-push] targets", {
           churchId: conversation.churchId,
           conversationId: conversation.id,
           senderPersonId,
@@ -622,7 +622,7 @@ export class NotificationHelper {
         const recipientDevices = subscribers.length > 0
           ? ((await Promise.all(subscribers.map((personId) => NotificationHelper.repos.device.loadForPerson(conversation.churchId, personId)))) as any[][]).flat()
           : [];
-        console.info("[chat-push] targets", {
+        console.debug("[chat-push] targets", {
           churchId: conversation.churchId,
           conversationId: conversation.id,
           senderPersonId,
@@ -675,7 +675,7 @@ export class NotificationHelper {
         }
       }
       if (suppressedPersonIds.length > 0) {
-        console.info("[chat-push] notification suppressed by unread existing", {
+        console.debug("[chat-push] notification suppressed by unread existing", {
           churchId,
           contentType,
           contentId,

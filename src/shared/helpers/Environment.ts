@@ -191,7 +191,7 @@ export class Environment extends EnvironmentBase {
       try {
         const dbConfig = DatabaseUrlParser.parseConnectionString(process.env.DOING_MEMBERSHIP_CONNECTION_STRING);
         this.dbConnections.set("membership-doing", dbConfig);
-        console.log("✅ Loaded membership database config for doing module from DOING_MEMBERSHIP_CONNECTION_STRING");
+        console.debug("✅ Loaded membership database config for doing module from DOING_MEMBERSHIP_CONNECTION_STRING");
       } catch (error) {
         console.error(`❌ Failed to parse DOING_MEMBERSHIP_CONNECTION_STRING: ${error}`);
       }
@@ -209,7 +209,7 @@ export class Environment extends EnvironmentBase {
         try {
           const dbConfig = DatabaseUrlParser.parseConnectionString(connString);
           this.dbConnections.set(moduleName, dbConfig);
-          console.log(`✅ Loaded ${moduleName} database config from ${envVar}`);
+          console.debug(`✅ Loaded ${moduleName} database config from ${envVar}`);
           successfulConnections.push(moduleName);
         } catch (error) {
           console.error(`❌ Failed to parse ${moduleName} connection string from ${envVar}: ${error}`);
@@ -292,7 +292,7 @@ export class Environment extends EnvironmentBase {
     this.microsoftSsoClientSecret = process.env.MICROSOFT_SSO_CLIENT_SECRET || "";
     this.ssoAllowedOrigins = process.env.SSO_ALLOWED_ORIGINS || "";
 
-    console.log("✅ Configuration parameters loaded from environment variables");
+    console.debug("✅ Configuration parameters loaded from environment variables");
   }
 
   static get isMailConfigured(): boolean {

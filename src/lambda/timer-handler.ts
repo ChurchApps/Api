@@ -8,23 +8,23 @@ import { RepoManager } from "../shared/infrastructure/RepoManager.js";
 import { AutomationHelper } from "../modules/bridge/helpers/AutomationHelper.js";
 
 const initEnv = async () => {
-  console.log("[initEnv] Starting environment initialization...");
+  console.debug("[initEnv] Starting environment initialization...");
   if (!Environment.currentEnvironment) {
-    console.log("[initEnv] Environment not initialized, calling Environment.init...");
+    console.debug("[initEnv] Environment not initialized, calling Environment.init...");
     await Environment.init(process.env.ENVIRONMENT || "dev");
-    console.log("[initEnv] Environment initialized");
+    console.debug("[initEnv] Environment initialized");
   } else {
-    console.log("[initEnv] Environment already initialized (warm start)");
+    console.debug("[initEnv] Environment already initialized (warm start)");
   }
 
   // Always initialize messaging helpers (repos may be undefined on warm starts)
-  console.log("[initEnv] Initializing messaging repos...");
+  console.debug("[initEnv] Initializing messaging repos...");
   const repos = await RepoManager.getRepos<any>("messaging");
   // Recovered serving-request cards can create app alerts and human assignments.
   const { initializeNotificationDelivery } = await import("../modules/messaging/index.js");
   initializeNotificationDelivery(repos);
-  console.log("[initEnv] NotificationHelper initialized with repos");
-  console.log("[initEnv] Environment initialization complete");
+  console.debug("[initEnv] NotificationHelper initialized with repos");
+  console.debug("[initEnv] Environment initialization complete");
 };
 
 export const handle30MinTimer = async (_event: ScheduledEvent, _context: Context): Promise<void> => {

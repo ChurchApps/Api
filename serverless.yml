@@ -40,6 +40,8 @@ provider:
   region: us-east-2
   memorySize: 1024
   timeout: 30
+  # Stop retaining Lambda log groups forever. Log levels are set per function under resources.extensions.
+  logRetentionInDays: 30
   # HTTP API (v2) that serves /mcp only. The REST API renames WWW-Authenticate to x-amzn-remapped-www-authenticate on
   # the way out, which hides the OAuth discovery hint MCP clients key off (ChurchAppsSupport#1318); HTTP APIs pass it through.
   httpApi:
@@ -297,6 +299,38 @@ plugins:
   - serverless-offline
 
 resources:
+  # Lambda advanced logging. Serverless v3 has no provider.logs.lambda (that is v4), so it is patched onto each function.
+  # JSON format maps console.debug/info/warn/error to levels; INFO drops console.debug, and systemLogLevel WARN drops
+  # the per-invocation START/END/REPORT lines (Duration/Errors metrics are unaffected).
+  # Add any new function here too.
+  extensions:
+    WebLambdaFunction:
+      Properties:
+        LoggingConfig: &lambdaLogging
+          LogFormat: JSON
+          ApplicationLogLevel: INFO
+          SystemLogLevel: WARN
+    SocketLambdaFunction:
+      Properties:
+        LoggingConfig: *lambdaLogging
+    Timer15MinLambdaFunction:
+      Properties:
+        LoggingConfig: *lambdaLogging
+    TimerMidnightLambdaFunction:
+      Properties:
+        LoggingConfig: *lambdaLogging
+    TimerScheduledTasksLambdaFunction:
+      Properties:
+        LoggingConfig: *lambdaLogging
+    TimerWebhooksLambdaFunction:
+      Properties:
+        LoggingConfig: *lambdaLogging
+    MigrateLambdaFunction:
+      Properties:
+        LoggingConfig: *lambdaLogging
+    SesFeedbackLambdaFunction:
+      Properties:
+        LoggingConfig: *lambdaLogging
   Conditions:
     HasMcpDomain:
       Fn::Not:

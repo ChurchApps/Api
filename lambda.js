@@ -9,8 +9,8 @@ import { handleMigrate } from "./dist/lambda/migrate-handler.js";
 const initializeEnvironment = async () => {
   if (!Environment.currentEnvironment) {
     const stage = process.env.STAGE || process.env.ENVIRONMENT || "dev";
-    console.log("Initializing environment with stage:", stage);
-    console.log("Environment variables:", {
+    console.debug("Initializing environment with stage:", stage);
+    console.debug("Environment variables:", {
       STAGE: process.env.STAGE,
       ENVIRONMENT: process.env.ENVIRONMENT,
       APP_ENV: process.env.APP_ENV
@@ -21,7 +21,7 @@ const initializeEnvironment = async () => {
       Environment.currentEnvironment = undefined;
       throw err;
     }
-    console.log("Environment initialized, connection strings loaded");
+    console.debug("Environment initialized, connection strings loaded");
 
     // Pools now auto-initialize on first use
   }
