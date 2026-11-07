@@ -50,6 +50,8 @@ provider:
     payload: "1.0"
   environment:
     STAGE: ${self:custom.env}
+    # Silence dotenv's promotional 'tip' line on every cold start, including calls inside shared packages.
+    DOTENV_CONFIG_QUIET: "true"
     ENVIRONMENT: ${self:custom.env}
     # App secrets and config loaded from SSM at deploy-time
     JWT_SECRET: ${ssm:/${self:custom.envLower}/jwtSecret, ''}
