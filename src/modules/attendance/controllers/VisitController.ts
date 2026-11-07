@@ -63,6 +63,7 @@ export class VisitController extends AttendanceBaseController {
               });
               result.push(v);
             });
+            await this.dropClosedTemplateSessions(au.churchId, visits, currentDate);
           }
 
           // Ids are always dropped (postCheckin replaces today's rows); only today's visits keep their security code.
@@ -337,6 +338,22 @@ export class VisitController extends AttendanceBaseController {
       return { body: { warning: true, error: "ratio", groups: warnings }, status: 409 };
     }
     return null;
+  }
+
+  // A visit from an earlier date is only a template for today's check-in. Drop its sessions for a
+  // service time whose check-in is closed right now (e.g. last Wednesday's rehearsal on a Monday),
+  // or the submit would carry them and be refused as notOpen. Today's visits are held and kept whole.
+  private async dropClosedTemplateSessions(churchId: string, visits: Visit[], currentDate: Date) {
+    const templates = visits.filter((v) => new Date(v.visitDate).toDateString() !== currentDate.toDateString());
+    const serviceTimeIds = [...new Set(templates.flatMap((v) => (v.visitSessions || []).map((vs) => vs.session?.serviceTimeId)).filter(Boolean))];
+    if (serviceTimeIds.length === 0) return;
+    const serviceTimes = (await this.repos.serviceTime.loadByIds(churchId, serviceTimeIds)) as (GateServiceTime & { id: string; serviceId?: string })[];
+    const scheduled = serviceTimes.filter((st) => CheckinGateHelper.hasSchedule(st));
+    if (scheduled.length === 0) return;
+    const zoneFor = await CheckinTimeZoneHelper.load(churchId, this.repos.service);
+    const now = new Date();
+    const closed = new Set(scheduled.filter((st) => !CheckinGateHelper.isServiceTimeOpen(st, now, zoneFor(st))).map((st) => st.id));
+    templates.forEach((v) => (v.visitSessions = v.visitSessions.filter((vs) => !closed.has(vs.session.serviceTimeId))));
   }
 
   // Groups being checked into a service time whose scheduled check-in window is not open right now.
