@@ -94,7 +94,8 @@ export class UserController extends MembershipBaseController {
           user = await this.repos.user.loadByAuthGuid(req.body.authGuid);
           if (user !== null) user = await this.consumeLoginGuid(user, req.body.authGuid);
         } else {
-          const found = await this.repos.user.loadByEmail(req.body.email.trim());
+          const email = typeof req.body.email === "string" ? req.body.email.trim() : "";
+          const found = email ? await this.repos.user.loadByEmail(email) : null;
           // Always run exactly one compare, even when the email is unknown, so the two failures cost the same.
           const passwordMatched = bcrypt.compareSync(req.body.password || "", found?.password?.toString() || TIMING_EQUALIZER_HASH);
           user = found !== null && passwordMatched ? found : null;

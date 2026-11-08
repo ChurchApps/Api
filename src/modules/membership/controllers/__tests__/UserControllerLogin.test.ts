@@ -115,6 +115,16 @@ describe("UserController.verifyCredentials oracle", () => {
 });
 
 describe("UserController.login", () => {
+  // Production: "reading 'trim'" 500 on /membership/users/login for a body with no email, jwt, authGuid or mfaToken.
+  it.each([[undefined], [12345]])("fails the login without crashing when email is %s", async (email) => {
+    (bcrypt.compareSync as jest.Mock).mockReturnValue(false);
+    const { controller, repos } = userController({ user: null });
+    const result: any = await (controller as any).login(credReq({ email }), {});
+    expect(result.status).toBe(401);
+    expect(repos.user.loadByEmail).not.toHaveBeenCalled();
+    expect(bcrypt.compareSync).toHaveBeenCalledTimes(1);
+  });
+
   it("returns the same 401 for unknown email and bad password", async () => {
     const unknown = userController({ user: null });
     const unknownResult: any = await (unknown.controller as any).login(credReq({ email: "missing@b.c" }), {});
