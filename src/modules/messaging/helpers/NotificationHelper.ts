@@ -633,7 +633,8 @@ export class NotificationHelper {
         });
         if (subscribers.length > 0) {
           const title = await NotificationHelper.resolveConversationTitle(conversation);
-          await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, title ? "New message: " + title : "New message", undefined, senderPersonId);
+          const link = await NotificationHelper.resolveNoteLink(conversation);
+          await this.createNotifications(subscribers, conversation.churchId, conversation.contentType, conversation.contentId, title ? "New message: " + title : "New message", link, senderPersonId);
         }
         break;
       }
@@ -988,6 +989,29 @@ export class NotificationHelper {
       return result.data?.name || conversation.title;
     } catch {
       return conversation.title;
+    }
+  };
+
+  // Where a note was written, matching B1Admin's Notes feed (#1495). Group notes open in the app; the rest only exist in B1 Admin.
+  static resolveNoteLink = async (conversation: Conversation): Promise<string | undefined> => {
+    const id = conversation.contentId;
+    if (!id) return undefined;
+    const adminRoot = (Environment.b1AdminRoot || "https://admin.b1.church").replace(/\/$/, "");
+    switch (conversation.contentType) {
+      case "groupNote": return `/mobile/groups/${id}?openChat=1&chatTab=notes`;
+      case "person":
+      case "personConfidential": return `${adminRoot}/people/${id}?view=notes`;
+      case "workflowCard": return `${adminRoot}/serving/tasks/${id}`;
+      case "eventNote": {
+        try {
+          const { getContentModuleGateway } = await import("../../../shared/modules/ContentModuleGateway.js");
+          const event = await getContentModuleGateway().loadEvent(conversation.churchId, id);
+          return event?.groupId ? `${adminRoot}/groups/${event.groupId}?view=calendar` : undefined;
+        } catch {
+          return undefined;
+        }
+      }
+      default: return undefined;
     }
   };
 

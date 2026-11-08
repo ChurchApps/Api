@@ -356,7 +356,7 @@ export class EventController extends ContentBaseController {
       const result = await this.repos.event.save(event);
       if (event.requestedBy) {
         try {
-          await NotificationService.createNotifications([event.requestedBy], au.churchId, "event", event.id, `Your event request "${event.title}" was ${status}.`);
+          await NotificationService.createNotifications([event.requestedBy], au.churchId, "event", event.id, `Your event request "${event.title}" was ${status}.`, "/mobile/myRequests");
         } catch (e) {
           console.error("[EventController] Failed to notify event requester:", e);
         }
