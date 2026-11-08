@@ -34,7 +34,11 @@ jest.mock("@churchapps/apihelper", () => ({
 }));
 
 // Environment: import.meta.url can't be parsed by CommonJS Jest.
-jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { getEnvironmentName: () => "test" } }));
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { getEnvironmentName: () => "test", b1AdminRoot: "https://admin.example.org/" } }));
+
+// Content gateway: event notes link through the event's group.
+const loadEventMock = jest.fn() as jest.MockedFunction<any>;
+jest.mock("../../../../shared/modules/ContentModuleGateway.js", () => ({ getContentModuleGateway: () => ({ loadEvent: loadEventMock }) }));
 
 // Membership gateway: the sender display name comes from the church record.
 const loadChurchMock = jest.fn() as jest.MockedFunction<any>;
@@ -819,5 +823,52 @@ describe("NotificationHelper.checkShouldNotify conversation message text", () =>
 
   it("does not print null when a group name cannot be resolved and there is no title", async () => {
     expect(await notify({ contentType: "group", title: null })).toBe("New message");
+  });
+});
+
+// #1495: a note notification should open the note where it was written.
+describe("NotificationHelper.checkShouldNotify note links (#1495)", () => {
+  let createNotificationsSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    NotificationHelper.init({
+      message: { loadLatestPerPerson: jest.fn(async () => [{ personId: "PER_B", messageType: "comment", timeSent: new Date("2026-10-31") }]) },
+      device: { loadForPerson: jest.fn(async () => []) }
+    } as any);
+    createNotificationsSpy = jest.spyOn(NotificationHelper, "createNotifications").mockResolvedValue([]);
+    loadEventMock.mockReset();
+  });
+
+  afterEach(() => {
+    createNotificationsSpy.mockRestore();
+  });
+
+  const linkFor = async (contentType: string) => {
+    await NotificationHelper.checkShouldNotify({ id: "CONV1", churchId: "CHU1", contentType, contentId: "C1", title: "Notes" } as any, { id: "MSG1", churchId: "CHU1", conversationId: "CONV1" } as any, "PER_A");
+    return createNotificationsSpy.mock.calls.at(-1)[5];
+  };
+
+  it("links event notes to the event's group calendar in B1 Admin", async () => {
+    loadEventMock.mockResolvedValue({ id: "C1", groupId: "G1" });
+    expect(await linkFor("eventNote")).toBe("https://admin.example.org/groups/G1?view=calendar");
+    expect(loadEventMock).toHaveBeenCalledWith("CHU1", "C1");
+  });
+
+  it("leaves an event note without a group unlinked", async () => {
+    loadEventMock.mockResolvedValue({ id: "C1" });
+    expect(await linkFor("eventNote")).toBeUndefined();
+  });
+
+  it("links person notes to the person's notes in B1 Admin", async () => {
+    expect(await linkFor("person")).toBe("https://admin.example.org/people/C1?view=notes");
+    expect(await linkFor("personConfidential")).toBe("https://admin.example.org/people/C1?view=notes");
+  });
+
+  it("links workflow card notes to the task in B1 Admin", async () => {
+    expect(await linkFor("workflowCard")).toBe("https://admin.example.org/serving/tasks/C1");
+  });
+
+  it("links group notes to the group's notes in the app", async () => {
+    expect(await linkFor("groupNote")).toBe("/mobile/groups/C1?openChat=1&chatTab=notes");
   });
 });

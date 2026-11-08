@@ -192,7 +192,7 @@ export class EventBookingController extends ContentBaseController {
       const target = booking.roomId ? (await this.repos.room.load(churchId, booking.roomId))?.name : (await this.repos.resource.load(churchId, booking.resourceId))?.name;
       const event = await this.repos.event.load(churchId, booking.eventId);
       const message = `Your request for ${target || "a room/resource"} for "${event?.title || "an event"}" was ${status}.`;
-      await NotificationService.createNotifications([booking.requestedBy], churchId, "eventBooking", booking.id, message);
+      await NotificationService.createNotifications([booking.requestedBy], churchId, "eventBooking", booking.id, message, "/mobile/myRequests");
     } catch (e) {
       console.error("[EventBookingController] Failed to notify requester:", e);
     }
