@@ -36,7 +36,8 @@ export class MauticHelper {
       await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
       return MauticHelper.request(method, path, body, attempt + 1);
     }
-    if (!res.ok) throw new Error(`Mautic ${path} failed: ${res.status} ${await res.text()}`);
+    // The query string can hold a contact's email (contacts?search=), so it stays out of the logged message.
+    if (!res.ok) throw new Error(`Mautic ${path.split("?")[0]} failed: ${res.status} ${await res.text()}`);
     return res.json();
   };
 
