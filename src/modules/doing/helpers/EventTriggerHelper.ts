@@ -3,6 +3,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { WorkflowTrigger } from "../models/index.js";
 import { ExecutionHelper } from "./ExecutionHelper.js";
 import { FilterMatcher } from "./FilterMatcher.js";
+import { EventContext } from "./EventContext.js";
 import { getMembershipModuleGateway, getGivingModuleGateway, getAttendanceModuleGateway } from "../../../shared/modules/index.js";
 
 interface Subject {
@@ -150,6 +151,7 @@ export class EventTriggerHelper {
 
       // Most events resolve to one subject; some (e.g. multi-person form posts) to several.
       const resolved = await EventTriggerHelper.resolve(churchId, event, payload);
+      const context = EventTriggerHelper.eventContext(event, payload);
       for (const { subject, facts } of resolved) {
         for (const t of triggers) {
           if (!t.workflowId) continue;
@@ -161,12 +163,18 @@ export class EventTriggerHelper {
             subject.label = people[0]?.displayName;
           }
           // Records the execution and creates the card; failures land in history + retry.
-          await ExecutionHelper.startAndAttempt(t, subject, event, repos);
+          await ExecutionHelper.startAndAttempt(t, subject, event, repos, context);
         }
       }
     } catch {
       // doing not reachable / transient — never break the originating write
     }
+  }
+
+  // What the card keeps of the triggering record, for the gift merge fields in its emails and texts.
+  private static eventContext(event: string, payload: any): EventContext | undefined {
+    if (event !== "donation.created") return undefined;
+    return { type: event, donationId: payload.id, amount: payload.amount, currency: payload.currency, donationDate: payload.donationDate, method: payload.method };
   }
 
   // Per-record-type logic: load related records (cross-module via gateways), then

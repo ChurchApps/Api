@@ -388,14 +388,12 @@ export class StripeHelper {
       funds = [{ id: generalFund.id, amount }];
     }
 
-    const donation: Donation = await givingRepos.donation.save(donationData);
-    const promises: Promise<FundDonation>[] = [];
-    funds.forEach((fund: any) => {
+    const fundDonations: FundDonation[] = funds.map((fund: any) => {
       const fundId = (fund?.subscriptionId && fund.subscriptionId !== "") ? fund.fundId : fund.id;
-      const fundDonation: FundDonation = { churchId, amount: fund.amount, donationId: donation.id, fundId: fundId };
-      promises.push(givingRepos.fundDonation.save(fundDonation));
+      return { churchId, amount: fund.amount, fundId: fundId };
     });
-    return await Promise.all(promises);
+    await givingRepos.donation.save(donationData, fundDonations);
+    return fundDonations;
   }
 
   static async updateDonationStatus(churchId: string, transactionId: string, status: "pending" | "complete" | "failed" | "refunded", givingRepos: any) {

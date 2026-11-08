@@ -3,18 +3,28 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { UniqueIdHelper, DateHelper, ArrayHelper } from "@churchapps/apihelper";
 import { DateHelper as LocalDateHelper } from "../../../shared/helpers/DateHelper.js";
-import { Donation, DonationSummary } from "../models/index.js";
+import { Donation, DonationSummary, FundDonation } from "../models/index.js";
+import { FundDonationRepo } from "./FundDonationRepo.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 
 @injectable()
 export class DonationRepo {
 
-  public async save(donation: Donation) {
+  public async save(donation: Donation, fundDonations?: FundDonation[]) {
     if (donation.personId === "") donation.personId = null as any;
     // Emit here rather than in the controller — online giving is logged through
     // GatewayService, so the repo is the only chokepoint that catches every path.
     const isNew = !donation.id;
     const saved = await (isNew ? this.create(donation) : this.update(donation));
+    // Fund rows are written before the emit so trigger conditions and gift merge fields see them.
+    if (fundDonations?.length) {
+      const fundDonationRepo = new FundDonationRepo();
+      for (const fd of fundDonations) {
+        fd.churchId = saved.churchId;
+        fd.donationId = saved.id;
+        await fundDonationRepo.save(fd);
+      }
+    }
     await WebhookDispatcher.emit(saved.churchId, isNew ? "donation.created" : "donation.updated", saved);
     return saved;
   }

@@ -1255,8 +1255,6 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         status
       };
 
-      const savedDonation = await repos.donation.save(donation);
-
       // Allocate funds from the synchronous /charge path (subscriptionFunds/funds/fundId).
       // Webhook-created donations (recurring auto-charges, ACH settlements) carry none, so
       // recover from the originating subscription — otherwise the money is recorded but left
@@ -1268,15 +1266,10 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
       if (fundsArray.length === 0) {
         fundsArray = await this.recoverFunds(churchId, eventData, amount, repos);
       }
-      for (const fund of fundsArray) {
-        const fundDonation: FundDonation = {
-          churchId,
-          donationId: savedDonation.id,
-          fundId: fund.fundId || fund.id || "",
-          amount: fund.amount || 0
-        };
-        if (fundDonation.fundId) await repos.fundDonation.save(fundDonation);
-      }
+      const fundDonations: FundDonation[] = fundsArray
+        .map((fund: any) => ({ churchId, fundId: fund.fundId || fund.id || "", amount: fund.amount || 0 }))
+        .filter((fd: FundDonation) => fd.fundId);
+      const savedDonation = await repos.donation.save(donation, fundDonations);
 
       return savedDonation;
     } catch (err) {

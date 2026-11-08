@@ -21,16 +21,27 @@ export class MergeFieldHelper {
     { key: "{{lastName}}", label: "Last Name" },
     { key: "{{displayName}}", label: "Display Name" },
     { key: "{{email}}", label: "Email" },
-    { key: "{{churchName}}", label: "Church Name" }
+    { key: "{{churchName}}", label: "Church Name" },
+    { key: "{{amount}}", label: "Amount" },
+    { key: "{{giftDate}}", label: "Gift Date" },
+    { key: "{{fund}}", label: "Fund" },
+    { key: "{{receipt}}", label: "Receipt" }
   ];
 
-  static resolve(template: string, person: MergeFieldPerson, church?: MergeFieldChurch): string {
-    return template
+  // Filled only for workflows started by a donation; blanked otherwise so placeholders never leak.
+  private static giftKeys = ["amount", "giftDate", "fund", "receipt"];
+
+  static resolve(template: string, person: MergeFieldPerson, church?: MergeFieldChurch, extras?: Record<string, string>): string {
+    let result = template
       .replace(/\{\{firstName\}\}/g, person.firstName || "")
       .replace(/\{\{lastName\}\}/g, person.lastName || "")
       .replace(/\{\{displayName\}\}/g, person.displayName || "")
       .replace(/\{\{email\}\}/g, person.email || "")
       .replace(/\{\{churchName\}\}/g, church?.name || "");
+    this.giftKeys.forEach((key) => {
+      result = result.split("{{" + key + "}}").join(extras?.[key] ?? "");
+    });
+    return result;
   }
 
   static resolveSample(template: string, churchName?: string): string {
@@ -39,7 +50,12 @@ export class MergeFieldHelper {
       lastName: "Smith",
       displayName: "John Smith",
       email: "john@example.com"
-    }, { name: churchName || "Your Church" });
+    }, { name: churchName || "Your Church" }, {
+      amount: "$50.00",
+      giftDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      fund: "General Fund",
+      receipt: "<table role=\"presentation\" cellspacing=\"8\"><tr><th>Fund</th><th>Amount</th></tr><tr><td>General Fund</td><td>$40.00</td></tr><tr><td>Missions</td><td>$10.00</td></tr><tr><th>Total</th><td>$50.00</td></tr></table>"
+    });
   }
 
 }

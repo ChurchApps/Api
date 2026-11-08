@@ -328,7 +328,6 @@ export class PayPalHelper {
       donationDate: new Date(eventData.create_time || Date.now()),
       notes: eventData.notes || eventData.custom_id || ""
     };
-    const donation = await givingRepos.donation.save(donationData);
     let funds: any[] = Array.isArray(eventData.funds) && eventData.funds.length ? eventData.funds : [];
     if (!funds.length && eventData.custom_id) {
       try { funds = JSON.parse(eventData.custom_id); } catch { funds = []; }
@@ -337,12 +336,11 @@ export class PayPalHelper {
       const general = await givingRepos.fund.getOrCreateGeneral(churchId);
       if (general?.id) funds = [{ id: general.id, amount }];
     }
-    const promises: Promise<FundDonation>[] = [];
-    funds.forEach((f: any) => {
-      const fundId = f.fundId || f.id;
-      if (fundId) promises.push(givingRepos.fundDonation.save({ churchId, donationId: donation.id, fundId, amount: Number(f.amount || 0) }));
-    });
-    return Promise.all(promises);
+    const fundDonations: FundDonation[] = funds
+      .filter((f: any) => f.fundId || f.id)
+      .map((f: any) => ({ churchId, fundId: f.fundId || f.id, amount: Number(f.amount || 0) }));
+    await givingRepos.donation.save(donationData, fundDonations);
+    return fundDonations;
   }
 
   // PayPal Vault API methods for customer and payment method management

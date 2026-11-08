@@ -279,23 +279,20 @@ export class SquareHelper {
       notes: eventData.note || ""
     };
 
-    const donation = await givingRepos.donation.save(donationData);
-
     // Handle fund allocations if available in note or reference_id
     const funds: FundDonation[] = [];
     try {
       const fundData = eventData.note ? JSON.parse(eventData.note) : [];
       if (Array.isArray(fundData)) {
         fundData.forEach((f: any) => {
-          funds.push({ churchId, donationId: donation.id, fundId: f.id, amount: f.amount });
+          funds.push({ churchId, fundId: f.id, amount: f.amount });
         });
       }
     } catch {
       // Ignore JSON parse errors
     }
 
-    const promises: Promise<FundDonation>[] = [];
-    funds.forEach((fd) => promises.push(givingRepos.fundDonation.save(fd)));
-    return Promise.all(promises);
+    await givingRepos.donation.save(donationData, funds);
+    return funds;
   }
 }

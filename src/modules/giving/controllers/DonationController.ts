@@ -162,7 +162,10 @@ export class DonationController extends GivingBaseController {
         // Stamped here, never from the client, and left alone on edits (including people merges).
         if (!donation.id) donation.enteredBy = au.personId;
         else delete donation.enteredBy;
-        promises.push(this.repos.donation.save(donation));
+        // New gifts may carry their fund rows so they exist before donation.created fires; only new rows, never ids.
+        const fundDonations = donation.id ? undefined : (donation.fundDonations || []).map((fd) => ({ fundId: fd.fundId, amount: fd.amount }));
+        delete donation.fundDonations;
+        promises.push(this.repos.donation.save(donation, fundDonations));
       });
       const result = await Promise.all(promises);
       return this.repos.donation.convertAllToModel(au.churchId, result as any[] as any[]);

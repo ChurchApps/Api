@@ -163,11 +163,11 @@ describe("PaystackGatewayProvider", () => {
       r.subscription.loadByCustomerId.mockResolvedValue([{ id: "SUB_1" }]);
       r.subscriptionFunds.loadBySubscriptionId.mockResolvedValue([{ fundId: "FUN_SUB", amount: 15 }]);
       await provider.logDonation(config, "CHU1", { reference: "r1", amount: 1500, customer: { customer_code: "CUS_1" }, authorization: { channel: "card" } }, r);
-      expect(r.fundDonation.save).toHaveBeenCalledWith(expect.objectContaining({ fundId: "FUN_SUB", amount: 15 }));
+      expect(r.donation.save.mock.calls[0][1]).toEqual([expect.objectContaining({ fundId: "FUN_SUB", amount: 15 })]);
 
       const r2 = repos();
       await provider.logDonation(config, "CHU1", { reference: "r2", amount: 1500, customer: { customer_code: "CUS_1" }, authorization: { channel: "card" } }, r2);
-      expect(r2.fundDonation.save).toHaveBeenCalledWith(expect.objectContaining({ fundId: "FUN_GEN", amount: 15 }));
+      expect(r2.donation.save.mock.calls[0][1]).toEqual([expect.objectContaining({ fundId: "FUN_GEN", amount: 15 })]);
     });
 
     it("logs a charge-path gift in major units with its funds and saves a reusable card", async () => {
@@ -182,7 +182,7 @@ describe("PaystackGatewayProvider", () => {
         authorization: { authorization_code: "AUTH_1", reusable: true, channel: "card", brand: "visa", last4: "4081" }
       }, r);
       expect(r.donation.save.mock.calls[0][0]).toMatchObject({ amount: 25, personId: "PER1", transactionId: "ref_1", method: "Card", methodDetails: "VISA ****4081" });
-      expect(r.fundDonation.save).toHaveBeenCalledWith(expect.objectContaining({ fundId: "FUN1", amount: 25, donationId: "DON1" }));
+      expect(r.donation.save.mock.calls[0][1]).toEqual([expect.objectContaining({ fundId: "FUN1", amount: 25 })]);
       expect(r.gatewayPaymentMethod.save).toHaveBeenCalledWith(expect.objectContaining({ externalId: "AUTH_1", customerId: "CUS_1" }));
     });
 
@@ -213,7 +213,7 @@ describe("PaystackGatewayProvider", () => {
         authorization: { channel: "card", brand: "visa", last4: "4081" }
       }, r);
       expect(r.donation.save.mock.calls[0][0].personId).toBeUndefined();
-      expect(r.fundDonation.save).toHaveBeenCalledWith(expect.objectContaining({ fundId: "FUN1", amount: 25 }));
+      expect(r.donation.save.mock.calls[0][1]).toEqual([expect.objectContaining({ fundId: "FUN1", amount: 25 })]);
     });
   });
 
