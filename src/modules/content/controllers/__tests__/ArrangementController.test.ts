@@ -13,7 +13,9 @@ function makeController(opts: any = {}) {
     arrangement: {
       load: jest.fn(async () => opts.existing ?? null),
       delete: jest.fn(async () => undefined),
-      loadBySongId: jest.fn(async () => opts.remaining ?? [{ id: "other" }])
+      loadBySongId: jest.fn(async () => opts.remaining ?? [{ id: "other" }]),
+      loadAll: jest.fn(async () => (opts.freeShowIds ?? []).map((freeShowId: string) => ({ id: "a-" + freeShowId, lyrics: "long lyrics", freeShowId }))),
+      loadFreeShowIds: jest.fn(async () => opts.freeShowIds ?? [])
     },
     arrangementKey: { deleteForArrangement: jest.fn(async () => undefined) },
     file: {
@@ -66,5 +68,32 @@ describe("ArrangementController.delete", () => {
     await (controller as any).delete("a1", {}, {});
     expect(remove).not.toHaveBeenCalled();
     expect(repos.file.deleteForContent).not.toHaveBeenCalled();
+  });
+});
+
+describe("ArrangementController.getMissingFreeShowArrangements", () => {
+  const post = (controller: any, freeShowIds: any) => controller.getMissingFreeShowArrangements({ body: { freeShowIds } }, {});
+
+  it("returns the requested ids the church does not have, in request order with duplicates kept", async () => {
+    const { controller } = makeController({ freeShowIds: ["b", "d"] });
+    const result = await post(controller, ["c", "b", "a", "c", "d"]);
+    // A bare array passes through json() with no status.
+    expect(result.obj).toEqual(["c", "a", "c"]);
+  });
+
+  it("reads only the freeShow ids, once, and never loads every arrangement with its lyrics", async () => {
+    const { controller, repos } = makeController({ freeShowIds: ["b"] });
+    await post(controller, ["a", "b"]);
+    expect(repos.arrangement.loadFreeShowIds).toHaveBeenCalledTimes(1);
+    expect(repos.arrangement.loadFreeShowIds).toHaveBeenCalledWith("c1");
+    expect(repos.arrangement.loadAll).not.toHaveBeenCalled();
+  });
+
+  it("still answers 401 without content edit and 400 for a bad body", async () => {
+    const denied = makeController({ checkAccess: false });
+    expect((await post(denied.controller, ["a"])).status).toBe(401);
+    expect(denied.repos.arrangement.loadFreeShowIds).not.toHaveBeenCalled();
+    const { controller } = makeController();
+    expect((await post(controller, "a")).status).toBe(400);
   });
 });
