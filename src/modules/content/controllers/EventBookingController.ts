@@ -49,6 +49,19 @@ export class EventBookingController extends ContentBaseController {
     });
   }
 
+  // Approvals history: decided requests, scoped the same way as /pending.
+  @httpGet("/resolved")
+  public async getResolved(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      let resolved = await this.repos.eventBooking.loadResolved(au.churchId);
+      if (!this.canResolve(au)) {
+        const groupIds = await this.loadRequesterGroupIds(au.churchId, au.personId);
+        resolved = resolved.filter((row: any) => groupIds.includes(row.roomId ? row.roomApprovalGroupId : row.resourceApprovalGroupId));
+      }
+      return resolved;
+    });
+  }
+
   @httpPost("/")
   public async save(req: express.Request<{}, {}, EventBooking[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

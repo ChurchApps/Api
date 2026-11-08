@@ -20,6 +20,7 @@ function makeController(opts: any = {}) {
     event: {
       load: jest.fn(async () => opts.event),
       loadRequestsForPerson: jest.fn(async () => opts.requests ?? []),
+      loadResolved: jest.fn(async () => opts.resolved ?? []),
       delete: jest.fn(async () => undefined)
     },
     eventBooking: {
@@ -89,5 +90,21 @@ describe("EventController.request hardening (M28)", () => {
     const saved = repos.event.save.mock.calls[0][0];
     expect(saved.groupId).toBeUndefined();
     expect(saved.title.length).toBe(255);
+  });
+});
+
+describe("EventController.getResolved (#1488)", () => {
+  it("returns decided event requests to calendar admins", async () => {
+    const { controller, repos } = makeController({ access: ["calendarsAdmin"], resolved: [{ id: "e2", approvalStatus: "approved" }] });
+    const result = await (controller as any).getResolved({}, {});
+    expect(repos.event.loadResolved).toHaveBeenCalledWith("c1");
+    expect(result).toEqual([{ id: "e2", approvalStatus: "approved" }]);
+  });
+
+  it("returns 401 without content edit or calendars admin", async () => {
+    const { controller, repos } = makeController({ access: [] });
+    const result = await (controller as any).getResolved({}, {});
+    expect(result.status).toBe(401);
+    expect(repos.event.loadResolved).not.toHaveBeenCalled();
   });
 });

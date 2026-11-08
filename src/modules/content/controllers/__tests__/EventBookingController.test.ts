@@ -15,7 +15,8 @@ function makeController(opts: any = {}) {
   const repos: any = {
     eventBooking: {
       load: jest.fn(async (_c: string, id: string) => bookings[id]),
-      save: jest.fn(async (b: any) => b)
+      save: jest.fn(async (b: any) => b),
+      loadResolved: jest.fn(async () => (opts.resolved ?? []).map((r: any) => ({ ...r })))
     },
     event: {
       load: jest.fn(async () => event),
@@ -102,5 +103,26 @@ describe("EventBookingController.approve publish (#1116)", () => {
     expect(result.status).toBe("rejected");
     expect(repos.event.save).not.toHaveBeenCalled();
     expect(repos.curatedEvent.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("EventBookingController.getResolved (#1488)", () => {
+  const resolved = [
+    { id: "b3", roomId: "r1", roomApprovalGroupId: "approvers", status: "approved", requestedBy: "p2", resolvedBy: "p1" },
+    { id: "b4", resourceId: "x1", resourceApprovalGroupId: "facilities", status: "rejected", requestedBy: "p3", resolvedBy: "p9" }
+  ];
+
+  it("returns every decided booking to a resolver without computing conflicts", async () => {
+    const { controller, repos } = makeController({ resolved });
+    const result = await (controller as any).getResolved({}, {});
+    expect(repos.eventBooking.loadResolved).toHaveBeenCalledWith("c1");
+    expect(result.map((r: any) => r.id)).toEqual(["b3", "b4"]);
+    expect(result[0]).not.toHaveProperty("conflicts");
+  });
+
+  it("limits an approval-group member to their own groups' bookings", async () => {
+    const { controller } = makeController({ resolved, access: [] });
+    const result = await (controller as any).getResolved({}, {});
+    expect(result.map((r: any) => r.id)).toEqual(["b3"]);
   });
 });

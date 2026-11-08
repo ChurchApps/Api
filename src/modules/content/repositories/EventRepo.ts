@@ -129,6 +129,14 @@ export class EventRepo {
       .orderBy("start").execute() as any;
   }
 
+  // Approved and rejected event requests for the approvals history, newest first.
+  public async loadResolved(churchId: string): Promise<Event[]> {
+    return getDb().selectFrom("events").selectAll()
+      .where("churchId", "=", churchId)
+      .where("approvalStatus", "in", ["approved", "rejected"])
+      .orderBy("start", "desc").execute() as any;
+  }
+
   // Events with an approved booking for the room, for per-room iCal feeds.
   public async loadForRoom(churchId: string, roomId: string): Promise<Event[]> {
     return getDb().selectFrom("events")
