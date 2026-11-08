@@ -95,11 +95,10 @@ export class ArrangementController extends ContentBaseController {
         return this.json({ error: "Invalid request body. Expected array of freeShowIds" }, 400);
       }
 
-      const existingArrangements = await this.repos.arrangement.loadAll(au.churchId);
-      const existingFreeShowIds = existingArrangements.map((a: Arrangement) => a.freeShowId).filter((id: string | undefined) => id);
+      const existingFreeShowIds = new Set(await this.repos.arrangement.loadFreeShowIds(au.churchId));
 
       // Return array of IDs that don't exist in B1
-      const missingIds = freeShowIds.filter((id) => !existingFreeShowIds.includes(id));
+      const missingIds = freeShowIds.filter((id) => !existingFreeShowIds.has(id));
 
       return this.json(missingIds);
     });
