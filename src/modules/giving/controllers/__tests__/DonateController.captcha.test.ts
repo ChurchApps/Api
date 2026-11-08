@@ -80,6 +80,21 @@ describe("DonateController captcha gate for guest gifts", () => {
     expect(result.pass).toBeUndefined();
   });
 
+  it("sends the token to Google as one encoded value", async () => {
+    axios.post.mockResolvedValue({ data: { success: false } });
+    await makeController().captchaVerify({ body: { token: "t&secret=other", churchId: "CHU1" } }, {});
+    const url = new URL(axios.post.mock.calls[axios.post.mock.calls.length - 1][0]);
+    expect(url.searchParams.getAll("secret")).toEqual(["k"]);
+    expect(url.searchParams.get("response")).toBe("t&secret=other");
+  });
+
+  it("calls a token that is not a string a robot without asking Google", async () => {
+    axios.post.mockClear();
+    const result = await makeController().captchaVerify({ body: { token: { a: 1 }, churchId: "CHU1" } }, {});
+    expect(result.response).toBe("robot");
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
   it("refuses a guest charge with no captcha pass", async () => {
     const result = await makeController().charge({ body: chargeBody() }, {});
     expect(result.status).toBe(403);

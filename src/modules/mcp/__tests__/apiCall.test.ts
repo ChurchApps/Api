@@ -32,6 +32,14 @@ describe("MCP api_call", () => {
     expect(seenIp).toBe("untouched");
   });
 
+  it.each(["/membership/users/mfa/status", "/membership/users/mfa/setup", "/membership/users/mfa/enable", "/membership/users/mfa/disable", "/membership/users/mfa/reset/u1"])("refuses the two-factor endpoint %s", async (path) => {
+    seenIp = "untouched";
+    const handler = makeApiCallHandler(() => "Bearer x", () => "198.51.100.4");
+    const result: any = await handler({ method: "POST", path });
+    expect(result.isError).toBe(true);
+    expect(seenIp).toBe("untouched");
+  });
+
   it("does not leak internal error messages", async () => {
     setExpressApp((() => { throw new Error("secret db host 10.0.0.5"); }) as any);
     jest.spyOn(console, "error").mockImplementation(() => {});

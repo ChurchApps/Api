@@ -1,6 +1,6 @@
 import "reflect-metadata";
 jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../helpers/index", () => ({ Permissions: { settings: { edit: "settingsEdit" } }, Environment: { contentRoot: "https://cdn.test" } }));
+jest.mock("../../helpers/index", () => ({ Permissions: { settings: { edit: "settingsEdit" }, content: { edit: "contentEdit" } }, Environment: { contentRoot: "https://cdn.test" } }));
 jest.mock("@churchapps/apihelper", () => ({ FileStorageHelper: { store: jest.fn() } }));
 
 import { ContentSettingController } from "../SettingController.js";
@@ -28,5 +28,29 @@ describe("ContentSettingController /my", () => {
     const { controller, repos } = makeController({ id: "u1", churchId: "c1", checkAccess: () => false });
     await controller.my({} as any, {} as any);
     expect(repos.setting.loadUser).toHaveBeenCalledWith("c1", "u1");
+  });
+});
+
+describe("ContentSettingController save", () => {
+  const can = (...perms: string[]) => ({ id: "u1", churchId: "c1", checkAccess: (p: string) => perms.includes(p) });
+  const footer = [{ keyName: "blogFooterHtml", value: "<div></div>", public: 1 }];
+
+  it("refuses the blog footer HTML without content edit, since it runs on the public site", async () => {
+    const { controller, repos } = makeController(can("settingsEdit"));
+    const result: any = await controller.post({ body: footer } as any, {} as any);
+    expect(result.status).toBe(401);
+    expect(repos.setting.save).not.toHaveBeenCalled();
+  });
+
+  it("saves the blog footer HTML for someone who holds both permissions", async () => {
+    const { controller, repos } = makeController(can("settingsEdit", "contentEdit"));
+    await controller.post({ body: footer } as any, {} as any);
+    expect(repos.setting.save).toHaveBeenCalledWith(expect.objectContaining({ keyName: "blogFooterHtml", churchId: "c1" }));
+  });
+
+  it("still saves ordinary settings with settings edit alone", async () => {
+    const { controller, repos } = makeController(can("settingsEdit"));
+    await controller.post({ body: [{ keyName: "hidePublicSite", value: "true" }] } as any, {} as any);
+    expect(repos.setting.save).toHaveBeenCalledWith(expect.objectContaining({ keyName: "hidePublicSite", churchId: "c1" }));
   });
 });

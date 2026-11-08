@@ -50,6 +50,8 @@ export class ContentSettingController extends ContentBaseController {
   public async post(req: express.Request<{}, {}, Setting[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
+      // This HTML runs as script on the church's public site, so it follows the content.edit rule for custom JS.
+      else if (req.body.some((s) => s.keyName === "blogFooterHtml") && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
         const promises: Promise<Setting>[] = [];
         req.body.forEach((setting) => {
