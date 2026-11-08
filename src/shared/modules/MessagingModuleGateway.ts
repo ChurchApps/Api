@@ -30,12 +30,13 @@ export interface MessagingModuleGateway {
   createPersonNote(churchId: string, personId: string, title: string, text: string): Promise<string>;
   createNotifications(notifications: any[]): Promise<any[]>;
   // Render a saved EmailTemplate and send through notification funnel; returns false if template missing or no email.
-  sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean>;
+  // extras fills the gift merge fields ({{amount}}, {{giftDate}}, {{fund}}, {{receipt}}) for donation-started workflows.
+  sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string, extras?: Record<string, string>): Promise<boolean>;
   sendServingWorkflowMessage(churchId: string, personId: string, taskId: string, channel: "email" | "sms", person: { email?: string; mobilePhone?: string; optedOut?: boolean | number; firstName?: string; lastName?: string; displayName?: string }, message: { subject: string; html: string; text: string }, churchName: string): Promise<string>;
   // Ad-hoc bulk SMS (pre-filtered recipients, capped at 500); returns { ok: false, reason: "no_provider" } if no provider.
   sendBulkText(churchId: string, recipients: BulkTextRecipient[], message: string, context?: string): Promise<BulkTextResult>;
   // Automated SMS to one person with merge fields resolved (caller checks opt-out); returns { ok: false, reason } on no_provider, insufficient_credits or provider error.
-  sendPersonText(churchId: string, personId: string, recipient: TextRecipient, message: string, churchName: string): Promise<{ ok: boolean; reason?: string }>;
+  sendPersonText(churchId: string, personId: string, recipient: TextRecipient, message: string, churchName: string, extras?: Record<string, string>): Promise<{ ok: boolean; reason?: string }>;
 }
 
 interface TextRecipient {
@@ -128,7 +129,7 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     return Promise.all(notifications.map((n) => repos.notification.save(n)));
   }
 
-  public async sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string): Promise<boolean> {
+  public async sendTemplatedEmail(churchId: string, personId: string, templateId: string, recipient: EmailRecipient, churchName: string, subjectOverride?: string, extras?: Record<string, string>): Promise<boolean> {
     if (!recipient?.email) return false;
     const repos = await this.repos();
     const template = await repos.emailTemplate.loadById(churchId, templateId);
@@ -136,8 +137,9 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     // An unapproved or paused church has no allowance and the send is dropped downstream; report it as not sent.
     if ((await ChurchEmailLimiter.remaining(churchId)) < 1) return false;
     const church = { name: churchName };
-    const subject = MergeFieldHelper.resolve(subjectOverride || template.subject || "", recipient, church);
-    const body = MergeFieldHelper.resolve(template.htmlContent || "", recipient, church);
+    // The receipt table belongs in the body; a subject only gets the plain fields.
+    const subject = MergeFieldHelper.resolve(subjectOverride || template.subject || "", recipient, church, { ...extras, receipt: "" });
+    const body = MergeFieldHelper.resolve(template.htmlContent || "", recipient, church, extras);
     await NotificationHelper.createNotifications([personId], churchId, "email", templateId, subject, undefined, undefined, {
       category: "announcements",
       deliveryStartLevel: 2,
@@ -209,9 +211,9 @@ class MessagingModuleGatewayDb implements MessagingModuleGateway {
     return { ok: true, sent: successCount, failed: failCount };
   }
 
-  public async sendPersonText(churchId: string, personId: string, recipient: TextRecipient, template: string, churchName: string): Promise<{ ok: boolean; reason?: string }> {
+  public async sendPersonText(churchId: string, personId: string, recipient: TextRecipient, template: string, churchName: string, extras?: Record<string, string>): Promise<{ ok: boolean; reason?: string }> {
     const phoneNumber = recipient.phoneNumber;
-    const message = MergeFieldHelper.resolve(template, recipient, { name: churchName }).slice(0, 1600);
+    const message = MergeFieldHelper.resolve(template, recipient, { name: churchName }, extras).slice(0, 1600);
     const repos = await this.repos();
     const config = await this.getTextingConfig(repos, churchId);
     if (!config) return { ok: false, reason: "no_provider" };

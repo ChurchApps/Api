@@ -1,6 +1,15 @@
 import { RepoManager } from "../infrastructure/RepoManager.js";
 import { KyselyPool } from "../infrastructure/KyselyPool.js";
 import { LapsedGiverMatch, LapsedGiverRule } from "../../modules/giving/helpers/LapsedGiverMatch.js";
+import { ReceiptHelper } from "../../modules/giving/helpers/ReceiptHelper.js";
+
+export interface DonationReceiptSummary {
+  amount: number;
+  currency?: string;
+  donationDate?: string | Date;
+  method?: string;
+  funds: { name: string; amount: number }[];
+}
 
 // Gateway: the only seam through which other modules read giving data.
 export interface GivingModuleGateway {
@@ -10,6 +19,10 @@ export interface GivingModuleGateway {
   // Non-sensitive descriptors only — never gateway tokens or raw payment details.
   loadPaymentMethodsByPerson(churchId: string, personId: string): Promise<any[]>;
   loadFundDonations(churchId: string, donationId: string): Promise<{ fundId: string; amount: number }[]>;
+  // One gift with its fund names, for the workflow gift merge fields.
+  loadDonationSummary(churchId: string, donationId: string): Promise<DonationReceiptSummary | null>;
+  // The same fund/amount table the online giving receipt email shows.
+  buildReceiptHtml(summary: DonationReceiptSummary): string;
   // List-condition provider: people who donated in the window (optionally to one fund).
   loadDonorPersonIds(churchId: string, fundId: string | null, startDate: Date, endDate: Date): Promise<string[]>;
   // First-time-donor detection: total donation rows for the person (the new one included).
@@ -73,6 +86,19 @@ class GivingModuleGatewayDb implements GivingModuleGateway {
 
   public async loadFundDonations(churchId: string, donationId: string) {
     return (await this.repos()).fundDonation.loadByDonationId(churchId, donationId);
+  }
+
+  public async loadDonationSummary(churchId: string, donationId: string): Promise<DonationReceiptSummary | null> {
+    const repos = await this.repos();
+    const donation = await repos.donation.load(churchId, donationId);
+    if (!donation) return null;
+    const rows: any[] = await repos.fundDonation.loadByDonationId(churchId, donationId);
+    const funds = await Promise.all(rows.map(async (r) => ({ name: (await repos.fund.load(churchId, r.fundId))?.name || "", amount: Number(r.amount || 0) })));
+    return { amount: Number(donation.amount || 0), currency: donation.currency, donationDate: donation.donationDate, method: donation.method, funds };
+  }
+
+  public buildReceiptHtml(summary: DonationReceiptSummary): string {
+    return ReceiptHelper.oneTimeTable(summary.funds, summary.amount, summary.currency || "USD");
   }
 
   public async loadDonationCountForPerson(churchId: string, personId: string): Promise<number> {

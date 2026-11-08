@@ -452,14 +452,12 @@ export class PaystackGatewayProvider implements IGatewayProvider {
       notes: eventData.notes || `Paystack ref: ${eventData.reference || ""}`,
       status
     };
-    const saved = await repos.donation.save(donation);
-
     let funds: any[] = eventData.funds || eventData.metadata?.funds || [];
     if (!funds.length) funds = await this.recoverFunds(churchId, customerCode, amount, repos);
-    for (const f of funds) {
-      const fundId = f.fundId || f.id;
-      if (fundId) await repos.fundDonation.save({ churchId, donationId: saved.id, fundId, amount: Number(f.amount || 0) } as FundDonation);
-    }
+    const fundDonations = funds
+      .filter((f: any) => f.fundId || f.id)
+      .map((f: any) => ({ churchId, fundId: f.fundId || f.id, amount: Number(f.amount || 0) } as FundDonation));
+    const saved = await repos.donation.save(donation, fundDonations);
 
     if (eventData.saveCard && auth.reusable && auth.authorization_code && personId && customerCode) {
       try {

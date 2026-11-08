@@ -7,6 +7,7 @@ import { ConjunctionHelper } from "./ConjunctionHelper.js";
 import { AssignmentWorkflowHelper } from "./AssignmentWorkflowHelper.js";
 import { WorkflowTemplate } from "./WorkflowTemplates.js";
 import { StepActionHelper } from "./StepActionHelper.js";
+import { EventContext } from "./EventContext.js";
 
 interface AssignTarget {
   type?: string;
@@ -37,7 +38,8 @@ export class WorkflowHelper {
     triggerId?: string,
     repositories?: Repos,
     stepId?: string,
-    depth = 0
+    depth = 0,
+    eventContext?: EventContext
   ): Promise<Task | null> {
     const repos = await this.getRepos(repositories);
     const workflow = await repos.workflow.load(churchId, workflowId) as Workflow;
@@ -48,7 +50,7 @@ export class WorkflowHelper {
     if (!step) return null;
     const openCard = await this.openCardFor(churchId, workflowId, associated, triggerId, repos);
     if (openCard) return openCard as Task;
-    return await this.createCard(churchId, workflowId, step, associated, createdBy, triggerId, repos, undefined, depth);
+    return await this.createCard(churchId, workflowId, step, associated, createdBy, triggerId, repos, undefined, depth, eventContext);
   }
 
   public static async addPeopleToWorkflow(
@@ -92,7 +94,8 @@ export class WorkflowHelper {
     triggerId?: string,
     repos?: Repos,
     sort?: number,
-    depth = 0
+    depth = 0,
+    eventContext?: EventContext
   ): Promise<Task> {
     const task: Task = {
       churchId,
@@ -111,6 +114,7 @@ export class WorkflowHelper {
       triggerId,
       sort: sort ?? (await repos.task.loadMaxSortForStep(churchId, workflowId, step.id || ""))
     };
+    if (eventContext) task.data = JSON.stringify({ event: eventContext });
     // Saved first so step actions (webhooks, history) see the card's id.
     const saved = await repos.task.save(task);
     await this.onStepEnter(saved, step, repos, depth);

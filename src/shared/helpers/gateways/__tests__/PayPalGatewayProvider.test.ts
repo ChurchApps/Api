@@ -52,7 +52,7 @@ describe("PayPalGatewayProvider", () => {
       expect(saved.amount).toBe(25);
       expect(saved.transactionId).toBe("CAP1");
       expect(saved.personId).toBe("PER1");
-      expect(repos.fundDonation.save).toHaveBeenCalledWith({ churchId: "CHU1", donationId: "DON1", fundId: "F1", amount: 25 });
+      expect(repos.donation.save.mock.calls[0][1]).toEqual([{ churchId: "CHU1", fundId: "F1", amount: 25 }]);
       expect(repos.fund.getOrCreateGeneral).not.toHaveBeenCalled();
     });
 
@@ -62,7 +62,7 @@ describe("PayPalGatewayProvider", () => {
       const saved = repos.donation.save.mock.calls[0][0];
       expect(saved.amount).toBe(10.5);
       expect(saved.currency).toBe("usd");
-      expect(repos.fundDonation.save).toHaveBeenCalledWith({ churchId: "CHU1", donationId: "DON1", fundId: "GEN", amount: 10.5 });
+      expect(repos.donation.save.mock.calls[0][1]).toEqual([{ churchId: "CHU1", fundId: "GEN", amount: 10.5 }]);
     });
   });
 });

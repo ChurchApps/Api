@@ -3,18 +3,17 @@ import express from "express";
 import { GivingBaseController } from "./GivingBaseController.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
-import { CurrencyHelper } from "@churchapps/apihelper";
 import { Donation, FundDonation, DonationBatch, Subscription, SubscriptionFund } from "../models/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
 import { DunningHelper } from "../helpers/DunningHelper.js";
+import { ReceiptHelper } from "../helpers/ReceiptHelper.js";
 import { DonationRequestGuard } from "../helpers/DonationRequestGuard.js";
 import { DonationRateLimiter } from "../helpers/DonationRateLimiter.js";
 import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
 import { isDuplicateKeyError } from "../repositories/EventLogRepo.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import Axios from "axios";
-import dayjs from "dayjs";
 
 const TOO_MANY = "Too many requests. Please try again later.";
 const CAPTCHA_REQUIRED = "Captcha verification required";
@@ -641,58 +640,14 @@ export class DonateController extends GivingBaseController {
   ) => {
     if (!to) return;
 
-    const contentRows: any[] = [];
-    let totalFundAmount = 0;
-    const currencyCode = (currency || "USD").toUpperCase();
-
-    funds.forEach((fund, index) => {
-      totalFundAmount += fund.amount;
-      const formattedFund = CurrencyHelper.formatCurrencyWithLocale(fund.amount, currencyCode);
-      if (donationType === "recurring") {
-        const startDate = dayjs(billingCycleAnchor).format("MMM D, YYYY");
-        contentRows.push(
-          `<tr>${index === 0 ? `<td style="font-size: 15px" rowspan="${funds.length}">${DonateController.intervalLabel(interval)}<BR><span style="font-size: 13px">(from ${startDate})</span></td>` : ""}<td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${DonateController.escapeHtml(fund.name)}</td><td style="font-size: 15px">${formattedFund}</td></tr>`
-        );
-      } else {
-        contentRows.push(`<tr><td style="font-size: 15px; text-overflow: ellipsis; overflow: hidden;">${DonateController.escapeHtml(fund.name)}</td><td style="font-size: 15px">${formattedFund}</td></tr>`);
-      }
-    });
-
-    const transactionFee = amount! - totalFundAmount;
-    const formattedFee = CurrencyHelper.formatCurrencyWithLocale(transactionFee, currencyCode);
-    const formattedTotal = CurrencyHelper.formatCurrencyWithLocale(amount || 0, currencyCode);
-
     const domain = Environment.appEnv === "staging" ? `${church.subDomain}.staging.b1.church` : `${church.subDomain}.b1.church`;
 
     const recurringDonationContent =
       `
       <h3 style="font-size: 20px;">Your recurring donation has been confirmed!</h3>
-      <table role="presentation" style="text-align: center;" cellspacing="8" width="80%">
-        <tablebody>
-          <tr>
-            <th style="font-size: 16px" width="30%">Interval</th>
-            <th style="font-size: 16px" width="30%">Fund</th>
-            <th style="font-size: 16px" width="30%">Amount</th>
-          </tr>` +
-      contentRows.join(" ") +
-      `${
-        Math.round(transactionFee * 100) === 0
-          ? ""
-          : `
-            <tr style="border-top: solid #dee2e6 1px">
-              <td></td>
-              <th style="font-size: 15px">Transaction Fee</th>
-              <td>${formattedFee}</td>
-            </tr>
-            <tr style="border-top: solid #dee2e6 1px">
-              <td></td>
-              <th style="font-size: 15px">Total</th>
-              <td>${formattedTotal}</td>
-            </tr>
-          `
-      }
-        </tablebody>
-      </table>
+      ` +
+      ReceiptHelper.recurringTable(funds, amount!, currency, interval, billingCycleAnchor) +
+      `
       <br />
       <h4 style="font-size: 14px;">
         <a href="https://${domain}/mobile/donate" target="_blank" rel="noreferrer noopener">Modify your subscription here!</a>
@@ -701,29 +656,9 @@ export class DonateController extends GivingBaseController {
     const oneTimeDonationContent =
       `
       <h3 style="font-size: 20px;">Your donation has been confirmed!</h3>
-      <table role="presentation" style="text-align: center;" cellspacing="8" width="80%">
-        <tablebody>
-          <tr>
-            <th style="font-size: 16px" width="50%">Fund</th>
-            <th style="font-size: 16px" width="50%">Amount</th>
-          </tr>` +
-      contentRows.join(" ") +
-      `${
-        Math.round(transactionFee * 100) === 0
-          ? ""
-          : `
-            <tr style="border-top: solid #dee2e6 1px">
-              <th style="font-size: 15px">Transaction Fee</th>
-              <td>${formattedFee}</td>
-            </tr>
-            <tr style="border-top: solid #dee2e6 1px">
-              <th style="font-size: 15px">Total</th>
-              <td>${formattedTotal}</td>
-            </tr>
-          `
-      }
-        </tablebody>
-      </table>
+      ` +
+      ReceiptHelper.oneTimeTable(funds, amount!, currency) +
+      `
     `;
 
     const contents = donationType === "recurring" ? recurringDonationContent : oneTimeDonationContent;
@@ -744,12 +679,6 @@ export class DonateController extends GivingBaseController {
     return { church: { name: church.name, subDomain: church.subDomain, logo }, funds: named };
   }
 
-  private static intervalLabel(interval?: { interval_count?: number; interval?: string }): string {
-    const count = Math.max(1, Math.min(365, Math.floor(Number(interval?.interval_count) || 1)));
-    const unit = ["day", "week", "month", "year"].includes(String(interval?.interval)) ? String(interval?.interval) : "";
-    return unit ? `${count} ${unit}` : "";
-  }
-
   // Funds must exist in this church; hidden funds stay allowed because giving links can target them.
   private async validateFundIds(churchId: string, funds: any[]): Promise<string | null> {
     for (const f of funds || []) {
@@ -762,26 +691,13 @@ export class DonateController extends GivingBaseController {
     return DonationRequestGuard.savedMethodAllowed(data, gateway, au, canEdit, this.repos, (customerId) => GatewayService.getCustomerCreatedAt(gateway, customerId));
   }
 
-  private static escapeHtml(value: unknown): string {
-    if (value === null || value === undefined) return "";
-    return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-
   private logDonation = async (donationData: Donation, fundData: FundDonation[]) => {
     const batch: DonationBatch = await this.repos.donationBatch.getOrCreateCurrent(donationData.churchId as string);
     donationData.batchId = batch.id;
-    const donation = await this.repos.donation.save(donationData);
-    const promises: Promise<FundDonation>[] = [];
-    fundData.forEach((fund: FundDonation) => {
-      const fundDonation: FundDonation = {
-        churchId: donation.churchId,
-        amount: fund.amount,
-        donationId: donation.id,
-        fundId: fund.id
-      };
-      promises.push(this.repos.fundDonation.save(fundDonation));
-    });
-    return await Promise.all(promises);
+    // Fund rows go in with the donation so a donation trigger sees them.
+    const fundDonations: FundDonation[] = fundData.map((fund: FundDonation) => ({ amount: fund.amount, fundId: fund.id }));
+    await this.repos.donation.save(donationData, fundDonations);
+    return fundDonations;
   };
 
 

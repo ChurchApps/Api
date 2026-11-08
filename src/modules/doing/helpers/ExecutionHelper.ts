@@ -3,6 +3,7 @@ import { AutomationExecution, Task, WorkflowTrigger } from "../models/index.js";
 import { ConjunctionHelper } from "./ConjunctionHelper.js";
 import { FilterMatcher } from "./FilterMatcher.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
+import { EventContext } from "./EventContext.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 
 interface Subject {
@@ -17,7 +18,7 @@ export class ExecutionHelper {
   private static readonly MAX_ATTEMPTS = 6;
   private static readonly RETRY_MINUTES = [5, 30, 120, 720, 1440];
 
-  public static async startAndAttempt(trigger: WorkflowTrigger, subject: Subject, eventType: string, repos: Repos): Promise<AutomationExecution> {
+  public static async startAndAttempt(trigger: WorkflowTrigger, subject: Subject, eventType: string, repos: Repos, context?: EventContext): Promise<AutomationExecution> {
     const execution: AutomationExecution = {
       churchId: trigger.churchId,
       triggerId: trigger.id,
@@ -31,10 +32,11 @@ export class ExecutionHelper {
       nextAttemptAt: this.addMinutes(new Date(), this.LEASE_MINUTES)
     };
     await repos.automationExecution.save(execution);
-    return this.attempt(execution, trigger, repos);
+    return this.attempt(execution, trigger, repos, context);
   }
 
-  public static async attempt(execution: AutomationExecution, trigger: WorkflowTrigger, repos: Repos): Promise<AutomationExecution> {
+  // A retry has no context (the execution row does not keep it), so its card's gift fields stay blank.
+  public static async attempt(execution: AutomationExecution, trigger: WorkflowTrigger, repos: Repos, context?: EventContext): Promise<AutomationExecution> {
     let card: Task | null = null;
     try {
       // A retry may follow a crash after the card was created — don't double-add.
@@ -53,7 +55,9 @@ export class ExecutionHelper {
         { type: "system", label: "Trigger" },
         trigger.id,
         repos,
-        trigger.stepId || undefined
+        trigger.stepId || undefined,
+        0,
+        context
       );
       if (!card) throw new Error("Workflow has no steps");
       execution.attemptCount = (execution.attemptCount ?? 0) + 1;

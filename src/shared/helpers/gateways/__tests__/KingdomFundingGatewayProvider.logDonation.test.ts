@@ -37,9 +37,10 @@ describe("KingdomFundingGatewayProvider.logDonation fund recovery", () => {
 
     expect(repos.subscription.loadByCustomerId).toHaveBeenCalledWith("ch1", "cust1");
     expect(repos.fund.getOrCreateGeneral).not.toHaveBeenCalled();
-    const saved = repos.fundDonation.save.mock.calls.map((c: any[]) => c[0]);
+    // Fund rows ride in with the donation so they exist before donation.created fires.
+    const saved = repos.donation.save.mock.calls[0][1];
     expect(saved).toEqual(expect.arrayContaining([
-      expect.objectContaining({ churchId: "ch1", donationId: "don1", fundId: "f1", amount: 60 }),
+      expect.objectContaining({ churchId: "ch1", fundId: "f1", amount: 60 }),
       expect.objectContaining({ fundId: "f2", amount: 40 })
     ]));
     expect(saved).toHaveLength(2);
@@ -52,10 +53,7 @@ describe("KingdomFundingGatewayProvider.logDonation fund recovery", () => {
     await provider.logDonation({} as GatewayConfig, "ch1", eventData, repos, "complete");
 
     expect(repos.fund.getOrCreateGeneral).toHaveBeenCalledWith("ch1");
-    expect(repos.fundDonation.save).toHaveBeenCalledTimes(1);
-    expect(repos.fundDonation.save.mock.calls[0][0]).toEqual(
-      expect.objectContaining({ fundId: "general", amount: 50, donationId: "don1" })
-    );
+    expect(repos.donation.save.mock.calls[0][1]).toEqual([expect.objectContaining({ fundId: "general", amount: 50 })]);
   });
 
   it("uses the funds supplied by the synchronous /charge path and skips recovery", async () => {
@@ -66,7 +64,6 @@ describe("KingdomFundingGatewayProvider.logDonation fund recovery", () => {
 
     expect(repos.subscription.loadByCustomerId).not.toHaveBeenCalled();
     expect(repos.fund.getOrCreateGeneral).not.toHaveBeenCalled();
-    expect(repos.fundDonation.save).toHaveBeenCalledTimes(1);
-    expect(repos.fundDonation.save.mock.calls[0][0]).toEqual(expect.objectContaining({ fundId: "fa", amount: 75 }));
+    expect(repos.donation.save.mock.calls[0][1]).toEqual([expect.objectContaining({ fundId: "fa", amount: 75 })]);
   });
 });

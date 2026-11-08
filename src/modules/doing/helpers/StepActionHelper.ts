@@ -8,6 +8,7 @@ import { NotificationService } from "../../../shared/helpers/NotificationService
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AssignmentWorkflowHelper } from "./AssignmentWorkflowHelper.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
+import { DonationMergeHelper } from "./DonationMergeHelper.js";
 
 interface HistoryEntry {
   date: string;
@@ -191,13 +192,15 @@ export class StepActionHelper {
     const person = await membership.loadPerson(task.churchId || "", task.associatedWithId);
     if (!person?.email) return;
     const church = await membership.loadChurch(task.churchId || "");
+    const extras = await DonationMergeHelper.extras(task.churchId || "", this.parseData(task).event, "html");
     const sent = await getMessagingModuleGateway().sendTemplatedEmail(
       task.churchId || "",
       task.associatedWithId,
       config.templateId,
       { email: person.email, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel },
       church?.name || "B1",
-      config.subject
+      config.subject,
+      extras
     );
     if (sent) this.appendHistory(task, "Email sent");
   }
@@ -219,7 +222,8 @@ export class StepActionHelper {
     }
     const church = await membership.loadChurch(task.churchId || "");
     const recipient = { phoneNumber, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel };
-    const result = await getMessagingModuleGateway().sendPersonText(task.churchId || "", task.associatedWithId, recipient, config.message, church?.name || "B1");
+    const extras = await DonationMergeHelper.extras(task.churchId || "", this.parseData(task).event, "text");
+    const result = await getMessagingModuleGateway().sendPersonText(task.churchId || "", task.associatedWithId, recipient, config.message, church?.name || "B1", extras);
     if (!result.ok) throw new Error(result.reason || "send failed");
     this.appendHistory(task, "Text sent");
   }

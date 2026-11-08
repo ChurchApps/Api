@@ -1,4 +1,4 @@
-import { Fund } from "./index.js";
+import { Fund, FundDonation } from "./index.js";
 
 export type DonationStatus = "pending" | "complete" | "failed" | "refunded";
 
@@ -18,4 +18,6 @@ export class Donation {
   public status?: DonationStatus;
   public transactionId?: string;
   public fund?: Fund;
+  // Request-only: fund rows saved with a new donation, before donation.created fires.
+  public fundDonations?: FundDonation[];
 }

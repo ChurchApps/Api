@@ -318,23 +318,20 @@ export class EPayMintsHelper {
       notes: eventData.description || ""
     };
 
-    const donation = await givingRepos.donation.save(donationData);
-
     // Handle fund allocations if available
     const funds: FundDonation[] = [];
     try {
       const fundData = eventData.metadata?.funds ? JSON.parse(eventData.metadata.funds) : [];
       if (Array.isArray(fundData)) {
         fundData.forEach((f: any) => {
-          funds.push({ churchId, donationId: donation.id, fundId: f.id, amount: f.amount });
+          funds.push({ churchId, fundId: f.id, amount: f.amount });
         });
       }
     } catch {
       // Ignore JSON parse errors
     }
 
-    const promises: Promise<FundDonation>[] = [];
-    funds.forEach((fd) => promises.push(givingRepos.fundDonation.save(fd)));
-    return Promise.all(promises);
+    await givingRepos.donation.save(donationData, funds);
+    return funds;
   }
 }

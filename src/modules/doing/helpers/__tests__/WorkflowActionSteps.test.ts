@@ -25,6 +25,9 @@ jest.mock("../../../../shared/helpers/NotificationService.js", () => ({ Notifica
 
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { b1AdminRoot: "https://admin.test" } }));
 
+const donationExtrasMock = jest.fn(async (_c: string, event: any) => (event?.donationId ? { amount: "$50.00", fund: "General Fund" } : {}));
+jest.mock("../DonationMergeHelper.js", () => ({ DonationMergeHelper: { extras: donationExtrasMock } }));
+
 jest.mock("../ConjunctionHelper.js", () => ({ ConjunctionHelper: { personMatchesStepRoute: jest.fn().mockResolvedValue(false) } }));
 
 // Avoid loading the DB/Environment chain (Environment.ts uses import.meta.url, which
@@ -278,7 +281,8 @@ describe("WorkflowHelper sendText action", () => {
       "p1",
       { phoneNumber: "555-0100", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark" },
       "Hi {{firstName}}, welcome to {{churchName}}!",
-      "Demo Church"
+      "Demo Church",
+      {}
     );
     expect(historyOf(task)).toContain("Text sent");
   });
@@ -340,7 +344,28 @@ describe("WorkflowHelper sendEmail action", () => {
       "t1",
       { email: "donald@example.com", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark" },
       "Demo Church",
-      undefined
+      undefined,
+      {}
+    );
+  });
+
+  it("stores the gift on a donation-started card and fills the gift fields in its email", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", email: "donald@example.com", firstName: "Donald", lastName: "Clark" });
+    const repos = buildRepos([{ id: "stepACT", workflowId: "wf1", sort: 1, name: "Auto" }], { stepACT: [{ actionType: "sendEmail", config: JSON.stringify({ templateId: "t1" }) }] });
+    const event = { type: "donation.created", donationId: "d1", amount: 50, currency: "usd", method: "Check" };
+
+    const card = await WorkflowHelper.addToWorkflow("c1", "wf1", { type: "person", id: "p1", label: "Donald Clark" }, { type: "system", label: "Trigger" }, "t1", repos, undefined, 0, event);
+
+    expect(JSON.parse(card?.data || "{}").event).toEqual(event);
+    expect(donationExtrasMock).toHaveBeenCalledWith("c1", event, "html");
+    expect(sendTemplatedEmailMock).toHaveBeenCalledWith(
+      "c1",
+      "p1",
+      "t1",
+      { email: "donald@example.com", firstName: "Donald", lastName: "Clark", displayName: "Donald Clark" },
+      "Demo Church",
+      undefined,
+      { amount: "$50.00", fund: "General Fund" }
     );
   });
 });
