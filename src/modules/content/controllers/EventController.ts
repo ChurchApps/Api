@@ -62,6 +62,14 @@ export class EventController extends ContentBaseController {
     });
   }
 
+  @httpGet("/resolved")
+  public async getResolved(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
+      return await this.repos.event.loadResolved(au.churchId);
+    });
+  }
+
   @httpGet("/subscribe")
   public async subscribe(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {

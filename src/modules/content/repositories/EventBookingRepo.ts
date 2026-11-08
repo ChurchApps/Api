@@ -71,6 +71,21 @@ export class EventBookingRepo {
   }
 
   public async loadPending(churchId: string): Promise<any[]> {
+    return this.approvalQuery(churchId)
+      .where("eventBookings.status", "=", "pending")
+      .orderBy("eventBookings.requestedDate")
+      .execute() as any;
+  }
+
+  // Approved and rejected requests for the approvals history, most recently decided first.
+  public async loadResolved(churchId: string): Promise<any[]> {
+    return this.approvalQuery(churchId)
+      .where("eventBookings.status", "in", ["approved", "rejected"])
+      .orderBy("eventBookings.resolvedDate", "desc")
+      .execute() as any;
+  }
+
+  private approvalQuery(churchId: string) {
     return getDb().selectFrom("eventBookings")
       .innerJoin("events", "events.id", "eventBookings.eventId")
       .leftJoin("rooms", "rooms.id", "eventBookings.roomId")
@@ -86,10 +101,7 @@ export class EventBookingRepo {
         "resources.name as resourceName",
         "resources.approvalGroupId as resourceApprovalGroupId"
       ])
-      .where("eventBookings.churchId", "=", churchId)
-      .where("eventBookings.status", "=", "pending")
-      .orderBy("eventBookings.requestedDate")
-      .execute() as any;
+      .where("eventBookings.churchId", "=", churchId);
   }
 
   // Non-rejected bookings for any of the rooms, joined with their event's schedule, for conflict checks.
