@@ -5,8 +5,8 @@ jest.mock("../../helpers/index", () => ({
   UserHelper: { replaceDomainAdminPermissions: jest.fn(async () => {}), addAllReportingPermissions: jest.fn() },
   PersonHelper: { claim: jest.fn(async (au: any) => (au?.email ? { userChurch: { churchId: "c1", personId: "p1" } } : undefined)) },
   Utils: { isEmpty: (v: any) => v === undefined || v === null || v === "" },
-  ChurchHelper: {},
-  RoleHelper: class {},
+  ChurchHelper: { selectSubDomain: jest.fn(async () => "newchurch") },
+  RoleHelper: class { async init() {} },
   Environment: {},
   HubspotHelper: {},
   MauticHelper: {},
@@ -260,5 +260,38 @@ describe("ChurchController.search name decoding", () => {
     const result: any = await controller.searchPost({ body: { name: "Grace \"Downtown\"" }, query: {} } as any, {} as any);
     expect(result.status).toBe(200);
     expect(searchedFor(repos)).toBe("Grace \"Downtown\"");
+  });
+});
+
+describe("ChurchController.addChurch currency default", () => {
+  const register = async (country: string) => {
+    const { controller, repos } = churchController();
+    repos.church.loadForUser = jest.fn(async () => []);
+    repos.church.save = jest.fn(async (c: any) => ({ ...c, id: "NEW1" }));
+    repos.setting = { save: jest.fn(async (s: any) => s) };
+    (controller as any).validateRegister = jest.fn(async () => []);
+    const result: any = await (controller as any).addChurch({ body: { name: "New Church", country } }, {});
+    return { result, repos };
+  };
+
+  it("seeds the church currency setting from the country", async () => {
+    const { result, repos } = await register("Kenya");
+    expect(result.id).toBe("NEW1");
+    expect(repos.setting.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "NEW1", keyName: "currency", value: "kes", public: "1" }));
+  });
+
+  it("does not seed a currency for an unknown country", async () => {
+    const { repos } = await register("Narnia");
+    expect(repos.setting.save).not.toHaveBeenCalled();
+  });
+
+  it("still registers the church when the seed fails", async () => {
+    const { controller, repos } = churchController();
+    repos.church.loadForUser = jest.fn(async () => []);
+    repos.church.save = jest.fn(async (c: any) => ({ ...c, id: "NEW2" }));
+    repos.setting = { save: jest.fn(async () => { throw new Error("db down"); }) };
+    (controller as any).validateRegister = jest.fn(async () => []);
+    const result: any = await (controller as any).addChurch({ body: { name: "New Church", country: "GB" } }, {});
+    expect(result.id).toBe("NEW2");
   });
 });
