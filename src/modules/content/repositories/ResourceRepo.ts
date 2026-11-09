@@ -27,7 +27,7 @@ export class ResourceRepo {
       name: model.name,
       description: model.description,
       quantity: model.quantity,
-      approvalGroupId: model.approvalGroupId
+      approvalGroupId: model.approvalGroupId ?? null
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }

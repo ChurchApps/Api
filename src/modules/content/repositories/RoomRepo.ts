@@ -27,7 +27,7 @@ export class RoomRepo {
       name: model.name,
       description: model.description,
       capacity: model.capacity,
-      approvalGroupId: model.approvalGroupId
+      approvalGroupId: model.approvalGroupId ?? null
     } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
