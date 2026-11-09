@@ -358,6 +358,7 @@ export class EventController extends ContentBaseController {
       if (!event) return this.json({}, 404);
       event.approvalStatus = status;
       if (status === "approved") event.visibility = "public";
+      else if (status === "rejected") event.visibility = "private";
       const result = await this.repos.event.save(event);
       if (event.requestedBy) {
         try {
