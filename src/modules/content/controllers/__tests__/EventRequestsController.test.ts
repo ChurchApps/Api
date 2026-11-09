@@ -108,3 +108,27 @@ describe("EventController.getResolved (#1488)", () => {
     expect(repos.event.loadResolved).not.toHaveBeenCalled();
   });
 });
+
+describe("EventController.getRequestsForPerson (#1476)", () => {
+  it("returns a person's requests with their bookings to calendar admins", async () => {
+    const { controller, repos } = makeController({ access: ["calendarsAdmin"], requests: [{ id: "e1", title: "Retreat", requestedBy: "p7" }], bookings: [{ id: "b1", status: "approved", roomName: "Sanctuary" }] });
+    const result = await (controller as any).getRequestsForPerson("p7", {}, {});
+    expect(repos.event.loadRequestsForPerson).toHaveBeenCalledWith("c1", "p7");
+    expect(repos.eventBooking.loadForEvent).toHaveBeenCalledWith("c1", "e1");
+    expect(result).toEqual([{ id: "e1", title: "Retreat", requestedBy: "p7", bookings: [{ id: "b1", status: "approved", roomName: "Sanctuary" }] }]);
+  });
+
+  it("lets content editors see a person's requests", async () => {
+    const { controller, repos } = makeController({ access: ["contentEdit"], requests: [] });
+    const result = await (controller as any).getRequestsForPerson("p7", {}, {});
+    expect(repos.event.loadRequestsForPerson).toHaveBeenCalledWith("c1", "p7");
+    expect(result).toEqual([]);
+  });
+
+  it("returns 401 without content edit or calendars admin, even for someone else's id", async () => {
+    const { controller, repos } = makeController({ access: [], personId: "p1" });
+    const result = await (controller as any).getRequestsForPerson("p7", {}, {});
+    expect(result.status).toBe(401);
+    expect(repos.event.loadRequestsForPerson).not.toHaveBeenCalled();
+  });
+});

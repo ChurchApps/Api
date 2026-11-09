@@ -45,12 +45,17 @@ export class EventController extends ContentBaseController {
   public async getMyRequests(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const events = await this.repos.event.loadRequestsForPerson(au.churchId, au.personId);
-      const result = [];
-      for (const event of events) {
-        const bookings = await this.repos.eventBooking.loadForEvent(au.churchId, event.id);
-        result.push({ ...event, bookings });
-      }
-      return result;
+      return await this.attachBookings(au.churchId, events);
+    });
+  }
+
+  // #1476: a person's event/room requests for their record, gated like the approvals inbox.
+  @httpGet("/requests/person/:personId")
+  public async getRequestsForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
+      const events = await this.repos.event.loadRequestsForPerson(au.churchId, personId);
+      return await this.attachBookings(au.churchId, events);
     });
   }
 
@@ -371,6 +376,15 @@ export class EventController extends ContentBaseController {
     if (groupIds.length === 0) return events;
     const activeIds = new Set(await getMembershipModuleGateway().loadActiveGroupIds(churchId, groupIds));
     return events.filter((e) => !e.groupId || activeIds.has(e.groupId));
+  }
+
+  private async attachBookings(churchId: string, events: Event[]) {
+    const result = [];
+    for (const event of events) {
+      const bookings = await this.repos.eventBooking.loadForEvent(churchId, event.id);
+      result.push({ ...event, bookings });
+    }
+    return result;
   }
 
   private async saveBookingsForEvent(au: any, eventId: string, roomIds: string[], resources: { resourceId: string; quantity: number }[]): Promise<EventBooking[]> {
