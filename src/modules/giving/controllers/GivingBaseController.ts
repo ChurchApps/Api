@@ -36,13 +36,20 @@ export class GivingBaseController extends BaseController {
   protected async loadChurchRates(churchId: string) {
     const gateways = (await this.repos.gateway.loadAll(churchId)) as any[];
     let currency = gateways[0]?.currency || "";
-    if (!currency) {
-      const membershipRepos = await RepoManager.getRepos<any>("membership");
-      const settings = (await membershipRepos.setting.loadMulipleChurches(["currency"], [churchId]).catch((): any[] => [])) as any[];
-      currency = settings[0]?.value || "";
-    }
+    if (!currency) currency = await this.loadChurchCurrencySetting(churchId);
     currency = (currency || "usd").toLowerCase();
     const table = await ExchangeRateHelper.getRateTable(currency);
     return { currency, rates: table.rates, asOf: table.asOf };
+  }
+
+  // The church's "currency" membership setting, or "" when it is missing or the lookup fails.
+  protected async loadChurchCurrencySetting(churchId: string): Promise<string> {
+    try {
+      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const settings = (await membershipRepos.setting.loadMulipleChurches(["currency"], [churchId]).catch((): any[] => [])) as any[];
+      return settings[0]?.value || "";
+    } catch {
+      return "";
+    }
   }
 }

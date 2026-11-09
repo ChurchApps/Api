@@ -8,6 +8,7 @@ import { Utils, Permissions, ChurchHelper, RoleHelper, Environment, HubspotHelpe
 import { Repos } from "../repositories/index.js";
 import { ArrayHelper } from "@churchapps/apihelper";
 import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalEmailHelper.js";
+import { CurrencyDefaults } from "../../../shared/helpers/CurrencyDefaults.js";
 
 const churchRegisterValidation = [
   body("name").notEmpty().withMessage("Select a church name"),
@@ -338,6 +339,10 @@ export class ChurchController extends MembershipBaseController {
         // Configure church
         const instance = new RoleHelper(savedChurch.id, au.id);
         await instance.init(); // Setup roles and permissions
+
+        // Start giving on the country's currency instead of usd (#1483); a failed seed must not fail registration
+        const currency = CurrencyDefaults.currencyForCountry(church.country);
+        if (currency) await this.repos.setting.save({ churchId: savedChurch.id, keyName: "currency", value: currency, public: "1" } as any).catch((): null => null);
 
         const postInitPromises: Promise<any>[] = [];
         if (Environment.emailOnRegistration) {

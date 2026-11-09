@@ -74,7 +74,7 @@ export class GatewayController extends GivingBaseController {
                 environment,
                 churchId: au.churchId,
                 payFees: gateway.payFees ?? false,
-                currency: gateway.currency ?? "USD"
+                currency: gateway.currency || (await this.loadChurchCurrencySetting(au.churchId)) || "USD"
               };
 
               if (req.hostname !== "localhost") {
