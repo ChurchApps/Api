@@ -36,4 +36,23 @@ describe("isPublicDiskFilePath", () => {
     expect(isPublicDiskFilePath("/files/download/abc")).toBe(false);
     expect(isPublicDiskFilePath("/c1/files/group/g1/../arrangement/a1/track.mp3")).toBe(false);
   });
+
+  it("allows the image folders the Api writes to disk", () => {
+    expect(isPublicDiskFilePath("/c1/membership/people/p1.png")).toBe(true);
+    expect(isPublicDiskFilePath("/content/c1/membership/people/p1.png")).toBe(true);
+    expect(isPublicDiskFilePath("/c1/membership/people/pending/p1-123.png")).toBe(true);
+    expect(isPublicDiskFilePath("/c1/settings/logoLight.png")).toBe(true);
+    expect(isPublicDiskFilePath("/c1/settings/users/u1/photo.png")).toBe(true);
+    expect(isPublicDiskFilePath("/c1/streamingLive/sermons/s1.png")).toBe(true);
+    expect(isPublicDiskFilePath("/c1/streamingLive/playlists/pl1.png")).toBe(true);
+    expect(isPublicDiskFilePath("/c1/gallery/photos/a.jpg")).toBe(true);
+    expect(isPublicDiskFilePath("/stockPhotos/nature/a.jpg")).toBe(true);
+  });
+
+  it("keeps the sso photo stash and traversal out of the image folders private", () => {
+    expect(isPublicDiskFilePath("/sso-photos/u1.txt")).toBe(false);
+    expect(isPublicDiskFilePath("/c1/membership/../files/group/g1/x.pdf")).toBe(false);
+    expect(isPublicDiskFilePath("/stockPhotos")).toBe(false);
+    expect(isPublicDiskFilePath("/c1/settings")).toBe(false);
+  });
 });
