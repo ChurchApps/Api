@@ -40,7 +40,7 @@ function makeController(opts: any = {}) {
       convertToModel: (c: any) => c,
       updateStats: jest.fn(async () => undefined)
     },
-    privateMessage: { loadById: jest.fn(async () => opts.privateMessage) }
+    privateMessage: { loadById: jest.fn(async () => opts.privateMessage), loadByConversationId: jest.fn(async () => opts.privateMessageByConversation ?? null) }
   };
   const au = {
     churchId: "c1",

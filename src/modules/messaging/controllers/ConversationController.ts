@@ -237,6 +237,8 @@ export class ConversationController extends MessagingBaseController {
   @httpPost("/")
   public async save(req: express.Request<{}, {}, Conversation[]>, res: express.Response): Promise<Conversation[]> {
     return this.actionWrapper(req, res, async (au) => {
+      // Signed-out callers have no church; without this they could create orphan conversations.
+      if (!au?.churchId) return this.json({}, 401);
       for (const conversation of req.body) {
         if (conversation.id) {
           const existing = await this.repos.conversation.loadById(au.churchId, conversation.id);

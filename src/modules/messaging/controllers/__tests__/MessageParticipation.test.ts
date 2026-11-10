@@ -39,7 +39,7 @@ function makeController(opts: any = {}) {
       save: jest.fn(async (m: any) => ({ ...m, id: m.id ?? "mNew" })),
       convertAllToModel: (rows: any[]) => rows
     },
-    privateMessage: { loadById: jest.fn(async () => opts.privateMessage ?? null) },
+    privateMessage: { loadById: jest.fn(async () => opts.privateMessage ?? null), loadByConversationId: jest.fn(async () => opts.privateMessageByConversation ?? null) },
     messageReaction: {
       loadOne: jest.fn(async () => null),
       create: jest.fn(async (m: any) => ({ ...m, id: "rx1" })),
@@ -98,6 +98,14 @@ describe("MessageController.save participation gate", () => {
     const { controller, repos } = makeController({ conversation: null });
     expect((await post(controller, "missing")).status).toBe(401);
     expect(repos.message.save).not.toHaveBeenCalled();
+  });
+
+  it("allows a participant to post into a DM whose contentId is a person id, as clients create them", async () => {
+    const personKeyed = { ...dmConv, contentId: "pY" };
+    const dm = makeController({ conversation: personKeyed, privateMessageByConversation: { fromPersonId: "pY", toPersonId: "p1" } });
+    await post(dm.controller, "dm1");
+    expect(dm.repos.privateMessage.loadByConversationId).toHaveBeenCalledWith("c1", "dm1");
+    expect(dm.repos.message.save).toHaveBeenCalledWith(expect.objectContaining({ personId: "p1" }));
   });
 
   it("allows a member to post into their own group, their DM, and the public livestream room", async () => {
@@ -210,7 +218,7 @@ describe("ConversationController seeding group feeds", () => {
     };
     const au = {
       id: "u1",
-      churchId: "c1",
+      churchId: opts.churchId ?? "c1",
       personId: "p1",
       firstName: "Test",
       lastName: "User",
@@ -239,6 +247,13 @@ describe("ConversationController seeding group feeds", () => {
     const { controller, repos } = makeConversationController({ groupIds: ["g1"] });
     expect((await seed(controller, "group")).status).toBe(401);
     expect((await start(controller, "group")).status).toBe(401);
+    expect(repos.conversation.save).not.toHaveBeenCalled();
+  });
+
+  it("401s a signed-out caller creating any conversation", async () => {
+    const { controller, repos } = makeConversationController({ churchId: "" });
+    const res = await controller.save({ body: [{ contentType: "privateMessage", contentId: "x", title: "anon" }] }, {});
+    expect(res.status).toBe(401);
     expect(repos.conversation.save).not.toHaveBeenCalled();
   });
 

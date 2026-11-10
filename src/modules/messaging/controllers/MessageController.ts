@@ -269,10 +269,7 @@ export class MessageController extends MessagingBaseController {
     }
     if (conv.contentType === "streamingLive") return this.isAnonPublicConversation(conv);
     if (conv.contentType === "streamingLiveHost") return !!au.checkAccess(Permissions.chat.host);
-    if (conv.contentType === "privateMessage") {
-      const pm = (await this.repos.privateMessage.loadById(au.churchId, conv.contentId)) as any;
-      return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);
-    }
+    if (conv.contentType === "privateMessage") return this.isPrivateMessageParticipant(au, conv);
     if (conv.contentType === "workflowCard") return this.canUseWorkflowCard(au, conv.contentId);
     return false;
   }
