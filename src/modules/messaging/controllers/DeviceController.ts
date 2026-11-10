@@ -196,6 +196,7 @@ export class DeviceController extends MessagingBaseController {
       const existing = await this.repos.device.loadById(au.churchId, id);
       if (existing?.personId !== au.personId && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.device.delete(au.churchId, id);
+      return this.json({});
     }) as any;
   }
 }

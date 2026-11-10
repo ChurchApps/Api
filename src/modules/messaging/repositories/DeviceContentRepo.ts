@@ -11,7 +11,7 @@ export class DeviceContentRepo {
 
   private async create(model: DeviceContent): Promise<DeviceContent> {
     model.id = UniqueIdHelper.shortId();
-    await getDb().insertInto("deviceContent").values({
+    await getDb().insertInto("deviceContents").values({
       id: model.id,
       churchId: model.churchId,
       deviceId: model.deviceId,
@@ -22,7 +22,7 @@ export class DeviceContentRepo {
   }
 
   private async update(model: DeviceContent): Promise<DeviceContent> {
-    await getDb().updateTable("deviceContent").set({
+    await getDb().updateTable("deviceContents").set({
       deviceId: model.deviceId,
       contentType: model.contentType,
       contentId: model.contentId
@@ -31,29 +31,29 @@ export class DeviceContentRepo {
   }
 
   public async loadByDeviceId(churchId: string, deviceId: string) {
-    return getDb().selectFrom("deviceContent").selectAll()
+    return getDb().selectFrom("deviceContents").selectAll()
       .where("churchId", "=", churchId)
       .where("deviceId", "=", deviceId)
       .execute();
   }
 
   public async deleteByDeviceId(churchId: string, deviceId: string) {
-    await getDb().deleteFrom("deviceContent")
+    await getDb().deleteFrom("deviceContents")
       .where("deviceId", "=", deviceId)
       .where("churchId", "=", churchId)
       .execute();
   }
 
   public async delete(churchId: string, id: string) {
-    await getDb().deleteFrom("deviceContent").where("id", "=", id).where("churchId", "=", churchId).execute();
+    await getDb().deleteFrom("deviceContents").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async load(churchId: string, id: string) {
-    return (await getDb().selectFrom("deviceContent").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
+    return (await getDb().selectFrom("deviceContents").selectAll().where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
   public async loadAll(churchId: string) {
-    return getDb().selectFrom("deviceContent").selectAll().where("churchId", "=", churchId).execute();
+    return getDb().selectFrom("deviceContents").selectAll().where("churchId", "=", churchId).execute();
   }
 
   protected rowToModel(row: any): DeviceContent {

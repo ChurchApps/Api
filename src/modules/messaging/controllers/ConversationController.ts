@@ -392,6 +392,7 @@ export class ConversationController extends MessagingBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.conversation.delete(au.churchId, id);
+      return this.json({});
     }) as any;
   }
 
