@@ -49,9 +49,16 @@ export class QuestionController extends MembershipBaseController {
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
-      if (!(await this.formAccess(au, formId, "view"))) return this.json({}, 401);
+      if (!(await this.formAccess(au, formId, "view")) && !(await this.canFillForm(au, formId))) return this.json({}, 401);
       else return this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
     });
+  }
+
+  // Anyone signed in to the church can load the questions of its stand-alone forms to fill one out (restricted forms included).
+  private async canFillForm(au: any, formId: string | null) {
+    if (!formId || !au?.id || !au?.churchId) return false;
+    const form: any = await this.repos.form.load(au.churchId, formId);
+    return !!form && form.contentType === "form" && !form.removed;
   }
 
   // authz-exempt: gated by this.formAccess(au, question.formId) — only form admins/editors may add questions; churchId forced to au.churchId

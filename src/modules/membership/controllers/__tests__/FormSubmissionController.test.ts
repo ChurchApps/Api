@@ -71,6 +71,23 @@ describe("FormSubmissionController.save churchId", () => {
     expect(result[0].churchId).toBe("c1");
   });
 
+  it("lets a signed-in person of the form's church submit a restricted form", async () => {
+    const { controller, repos } = formSubmissionController({ auChurchId: "c1", auId: "u1", form: { id: "f1", churchId: "c1", name: "Members Only", restricted: true } });
+    const result: any = await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+    expect(repos.formSubmission.save).toHaveBeenCalledTimes(1);
+    expect(result[0].error).toBeUndefined();
+  });
+
+  it("refuses a restricted form to anonymous and other-church callers", async () => {
+    const restricted = { id: "f1", churchId: "c1", name: "Members Only", restricted: true };
+    for (const au of [{ checkAccess: () => false }, { churchId: "otherChurch", id: "u2", checkAccess: () => false }]) {
+      const { controller, repos } = formSubmissionController({ au, form: restricted });
+      const result: any = await (controller as any).save({ body: [{ formId: "f1" }] }, {});
+      expect(repos.formSubmission.save).not.toHaveBeenCalled();
+      expect(result[0].error).toBe("You're not allowed to submit Members Only");
+    }
+  });
+
   it("lets an authenticated other-church caller submit an unrestricted form under the form church", async () => {
     const { controller, repos } = formSubmissionController({ auChurchId: "otherChurch", auId: "u1" });
     const result: any = await (controller as any).save({ body: [{ formId: "f1", churchId: "otherChurch" }] }, {});
