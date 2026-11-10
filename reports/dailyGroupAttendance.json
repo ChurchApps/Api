@@ -1,4 +1,5 @@
 {
+  "keyName": "dailyGroupAttendance",
   "displayName": "Group attendance by day",
   "description": "Total counts of how many people attended a group each day.",
   "queries": [
@@ -47,16 +48,21 @@
       "sourceKey": "group"
     }
   ],
-  "columns": [
+  "outputs": [
     {
-      "header": "Date",
-      "value": "sessionDate",
-      "formatter": "date"
-    },
-    {
-      "header": "Attendees",
-      "value": "attendees",
-      "formatter": "number"
+      "outputType": "table",
+      "columns": [
+        {
+          "header": "Date",
+          "value": "sessionDate",
+          "formatter": "date"
+        },
+        {
+          "header": "Attendees",
+          "value": "attendees",
+          "formatter": "number"
+        }
+      ]
     }
   ],
   "permissions": [
