@@ -118,7 +118,7 @@ export class FormSubmissionController extends MembershipBaseController {
     });
   }
 
-  // authz-exempt: open form submission — public forms accept any submitter; restricted forms gated by this.formAccess(au, formId), churchId derived from the loaded form not the request
+  // authz-exempt: open form submission — public forms accept any submitter; restricted forms need a signed-in user of the form's church (or form access), churchId derived from the loaded form not the request
   @httpPost("/")
   public async save(req: express.Request<{}, {}, FormSubmission[]>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
@@ -133,7 +133,8 @@ export class FormSubmissionController extends MembershipBaseController {
 
           if (!form || !churchId) {
             results.push({ error: `Form with id ${formId} not found` });
-          } else if (form.restricted && !(await this.formAccess(au, formId))) {
+          } else if (form.restricted && !((au?.id && au?.churchId === churchId) || (await this.formAccess(au, formId)))) {
+            // Restricted means signed-in people of the form's church may fill it out, not only form managers.
             results.push({ error: `You're not allowed to submit ${form.name}` });
           } else {
             formSubmission.churchId = churchId;
