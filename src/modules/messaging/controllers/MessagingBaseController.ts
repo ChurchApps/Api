@@ -110,6 +110,19 @@ export class MessagingBaseController extends BaseController {
     return this.isAuthenticated(au) && !!churchId && au.churchId === churchId;
   }
 
+  // Content-type level gate for routes that authorize before the conversation row exists (or before it
+  // is loaded). Mirrors canReadConversation minus the row-level checks.
+  protected async canReadContent(au: any, contentType: string, contentId: string): Promise<boolean> {
+    if (this.isNote(contentType)) return this.canUseNotes(au, { contentType, contentId }, "view");
+    if (au?.checkAccess(Permissions.content.edit)) return true;
+    if (contentType === "group" || contentType === "groupAnnouncement") {
+      return !!contentId && (!!au?.groupIds?.includes(contentId) || !!au?.leaderGroupIds?.includes(contentId));
+    }
+    if (contentType === "streamingLiveHost") return !!au?.checkAccess(Permissions.chat.host);
+    if (contentType === "workflowCard") return this.canUseWorkflowCard(au, contentId);
+    return true;
+  }
+
   // Single read gate for every messaging route: anonymous public livestream rooms are open, person
   // notes run through the notes RBAC, and everything else needs same-church plus the per-type rule.
   protected async canReadConversation(au: any, conv: any): Promise<boolean> {

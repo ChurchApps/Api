@@ -396,19 +396,6 @@ export class ConversationController extends MessagingBaseController {
     }) as any;
   }
 
-  // Content-type level gate for routes that authorize before the conversation row exists (or before it
-  // is loaded). Mirrors canReadConversation minus the row-level checks.
-  private async canReadContent(au: any, contentType: string, contentId: string): Promise<boolean> {
-    if (this.isNote(contentType)) return this.canUseNotes(au, { contentType, contentId }, "view");
-    if (au?.checkAccess(Permissions.content.edit)) return true;
-    if (contentType === "group" || contentType === "groupAnnouncement") {
-      return !!contentId && (!!au?.groupIds?.includes(contentId) || !!au?.leaderGroupIds?.includes(contentId));
-    }
-    if (contentType === "streamingLiveHost") return !!au?.checkAccess(Permissions.chat.host);
-    if (contentType === "workflowCard") return this.canUseWorkflowCard(au, contentId);
-    return true;
-  }
-
   private async getOrCreate(churchId: string, contentType: string, contentId: string, visibility: string, allowAnonymousPosts: boolean, decryptContentId: boolean) {
     const CONTENT_ID = decryptContentId && contentId.length > 11 ? EncryptionHelper.decrypt(contentId.toString()) : contentId;
     let result: Conversation = await this.repos.conversation.loadCurrent(churchId, contentType, CONTENT_ID);

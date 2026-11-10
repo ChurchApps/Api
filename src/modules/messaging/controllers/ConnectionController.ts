@@ -46,6 +46,16 @@ export class ConnectionController extends MessagingBaseController {
           planned.push({ connection, before: await this.loadOwnedConnection(connection) });
           continue;
         }
+        // "content-<type>-<id>" is a virtual room for activity on one record's conversations (e.g. a person's
+        // notes), so open tabs hear about a conversation created after they loaded. Same read rule as the content.
+        const contentMatch = /^content-([A-Za-z]+)-(.+)$/.exec(connection.conversationId || "");
+        if (contentMatch) {
+          if (!this.isAuthenticated(au) || !(await this.canReadContent(au, contentMatch[1], contentMatch[2]))) return this.json({}, 401);
+          connection.churchId = au.churchId;
+          connection.personId = au.personId || null;
+          planned.push({ connection, before: await this.loadOwnedConnection(connection) });
+          continue;
+        }
         const convData = connection.conversationId ? await this.repos.conversation.loadByIdOnly(connection.conversationId) : null;
         const conv = convData ? this.repos.conversation.convertToModel(convData) : null;
         if (!conv) return this.json({}, 401);
