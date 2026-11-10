@@ -1,3 +1,4 @@
+import { sql } from "kysely";
 import { injectable } from "inversify";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
@@ -68,13 +69,19 @@ export class PostRepo {
       .executeTakeFirst()) ?? null;
   }
 
+  // Tags are stored comma-separated ("art, music"), so match a whole tag: "art" must not match "heart".
+  public static tagPattern(tag: string): string {
+    const escaped = tag.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return "(^|,)[[:space:]]*" + escaped + "[[:space:]]*(,|$)";
+  }
+
   public async loadPublished(churchId: string, options: { category?: string; tag?: string; limit?: number; offset?: number } = {}): Promise<Post[]> {
     let query = getDb().selectFrom("posts").selectAll()
       .where("churchId", "=", churchId)
       .where("publishDate", "is not", null)
       .where("publishDate", "<=", new Date());
     if (options.category) query = query.where("category", "=", options.category);
-    if (options.tag) query = query.where("tags", "like", "%" + options.tag + "%");
+    if (options.tag) query = query.where(sql<boolean>`tags REGEXP ${PostRepo.tagPattern(options.tag)}`);
     query = query.orderBy("publishDate", "desc");
     if (options.limit) query = query.limit(options.limit);
     if (options.offset) query = query.offset(options.offset);
