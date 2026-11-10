@@ -135,12 +135,17 @@ export class MessagingBaseController extends BaseController {
       return !!conv.contentId && (!!au.groupIds?.includes(conv.contentId) || !!au.leaderGroupIds?.includes(conv.contentId));
     }
     if (conv.contentType === "streamingLiveHost") return !!au.checkAccess(Permissions.chat.host);
-    if (conv.contentType === "privateMessage") {
-      const pm = (await this.repos.privateMessage.loadById(au.churchId, conv.contentId)) as any;
-      return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);
-    }
+    if (conv.contentType === "privateMessage") return this.isPrivateMessageParticipant(au, conv);
     if (conv.contentType === "workflowCard") return this.canUseWorkflowCard(au, conv.contentId);
     return true;
+  }
+
+  // Clients set a DM conversation's contentId to a person id, not the privateMessages row id, so find the
+  // pair by the conversation itself; fall back to contentId for rows that were keyed that way.
+  protected async isPrivateMessageParticipant(au: any, conv: any): Promise<boolean> {
+    const pm = ((conv.id ? await this.repos.privateMessage.loadByConversationId(au.churchId, conv.id) : null)
+      ?? (conv.contentId ? await this.repos.privateMessage.loadById(au.churchId, conv.contentId) : null)) as any;
+    return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);
   }
 
   // Card notes: anyone who can open the card (tasks.view, or tied to it as person or group) can read and write on it.

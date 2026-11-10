@@ -71,7 +71,7 @@ function repos(opts: any = {}) {
       convertToModel: (c: any) => c,
       convertAllToModel: (rows: any[]) => rows
     },
-    privateMessage: { loadById: jest.fn(async () => opts.privateMessage ?? null) }
+    privateMessage: { loadById: jest.fn(async () => opts.privateMessage ?? null), loadByConversationId: jest.fn(async () => opts.privateMessageByConversation ?? null) }
   };
 }
 
@@ -210,6 +210,12 @@ describe("MessageController read paths", () => {
     const denied = loadByConversation(NON_MEMBER, { byId: dmConv, privateMessage: { fromPersonId: "pX", toPersonId: "pY" } });
     expect((await denied.result).status).toBe(401);
     expect(await loadByConversation(NON_MEMBER, { byId: dmConv, privateMessage: { fromPersonId: "p1", toPersonId: "pY" } }).result).toEqual([{ id: "m1" }]);
+  });
+
+  it("lets a participant read a DM whose contentId is a person id", async () => {
+    const personKeyed = { ...dmConv, contentId: "pY" };
+    expect(await loadByConversation(NON_MEMBER, { byId: personKeyed, privateMessageByConversation: { fromPersonId: "pY", toPersonId: "p1" } }).result).toEqual([{ id: "m1" }]);
+    expect((await loadByConversation(NON_MEMBER, { byId: personKeyed, privateMessageByConversation: { fromPersonId: "pY", toPersonId: "pZ" } }).result).status).toBe(401);
   });
 
   it("401s catchup on the host room for a non-host and allows a host", async () => {

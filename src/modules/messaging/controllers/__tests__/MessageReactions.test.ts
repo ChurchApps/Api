@@ -8,6 +8,10 @@ jest.mock("../MessagingBaseController", () => ({
       return au.checkAccess(contentType === "personConfidential" ? "peopleViewConfidentialNotes" : "peopleEdit");
     }
     isNote(contentType?: string) { return this.isPersonNote(contentType) || contentType === "groupNote" || contentType === "eventNote"; }
+    async isPrivateMessageParticipant(this: any, au: any, conv: any) {
+      const pm = (await this.repos.privateMessage.loadByConversationId(au.churchId, conv.id)) ?? (await this.repos.privateMessage.loadById(au.churchId, conv.contentId));
+      return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);
+    }
     async canUseNotes(au: any, conv: { contentType?: string }) {
       if (this.isPersonNote(conv?.contentType)) return this.canViewPersonNotes(au, conv.contentType);
       return false;
@@ -30,7 +34,7 @@ function makeController(opts: any = {}) {
       loadById: jest.fn(async () => opts.conversation),
       convertToModel: (c: any) => c
     },
-    privateMessage: { loadById: jest.fn(async () => opts.privateMessage) },
+    privateMessage: { loadById: jest.fn(async () => opts.privateMessage), loadByConversationId: jest.fn(async () => null) },
     messageReaction: {
       loadOne: jest.fn(async () => opts.existing ?? null),
       create: jest.fn(async (m: any) => ({ ...m, id: "rx1" })),
