@@ -13,6 +13,8 @@ export class MessageRepo {
 
   private async create(model: Message): Promise<Message> {
     model.id = UniqueIdHelper.shortId();
+    // The saved model is returned and broadcast, so it carries the send time clients sort by.
+    model.timeSent = new Date();
     await retryOnDeadlock(() => getDb().insertInto("messages").values({
       id: model.id,
       churchId: model.churchId,
