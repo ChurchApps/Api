@@ -6,7 +6,7 @@ export interface MessagingDatabase {
   conversations: Omit<Conversation, "messages">;
   deliveryLogs: DeliveryLog;
   devices: Device;
-  deviceContent: DeviceContent;
+  deviceContents: DeviceContent;
   emailTemplates: EmailTemplate;
   messages: Message;
   messageReactions: MessageReaction;

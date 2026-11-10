@@ -178,6 +178,7 @@ export class NotificationController extends MessagingBaseController {
   public async deleteMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
     return this.actionWrapper(req, res, async (au) => {
       await this.repos.notification.deleteAllForPerson(au.churchId, au.personId);
+      return this.json({});
     }) as any;
   }
 
@@ -187,6 +188,7 @@ export class NotificationController extends MessagingBaseController {
       const existing = await this.repos.notification.loadById(au.churchId, id);
       if (existing?.personId !== au.personId && !au.checkAccess(Permissions.messaging.admin)) return this.json({}, 401);
       await this.repos.notification.delete(au.churchId, id);
+      return this.json({});
     }) as any;
   }
 }
