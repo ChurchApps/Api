@@ -1633,6 +1633,23 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-11_event_resolved": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "resolvedBy",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "events",
+     "column": "resolvedDate",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
   }
  },
  "giving": {

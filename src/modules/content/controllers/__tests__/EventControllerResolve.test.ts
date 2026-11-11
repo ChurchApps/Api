@@ -47,3 +47,22 @@ describe("reversing an event request decision", () => {
     expect(NotificationService.createNotifications).toHaveBeenCalledTimes(1);
   });
 });
+
+// #1508: the approvals History shows who decided an event request and when.
+describe("recording who decided an event request", () => {
+  it("approving stores the approver and the decision time", async () => {
+    const repos = makeRepos({ id: "e1", churchId: "c1", title: "Picnic", requestedBy: "p2", approvalStatus: "pending" });
+    await wire(repos).approve("e1", {}, {});
+    const saved = repos.event.save.mock.calls[0][0];
+    expect(saved.resolvedBy).toBe("p1");
+    expect(saved.resolvedDate).toBeInstanceOf(Date);
+  });
+
+  it("rejecting stores the rejecter and the decision time", async () => {
+    const repos = makeRepos({ id: "e1", churchId: "c1", title: "Picnic", requestedBy: "p2", approvalStatus: "pending" });
+    await wire(repos).reject("e1", {}, {});
+    const saved = repos.event.save.mock.calls[0][0];
+    expect(saved.resolvedBy).toBe("p1");
+    expect(saved.resolvedDate).toBeInstanceOf(Date);
+  });
+});

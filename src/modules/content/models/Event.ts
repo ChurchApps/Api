@@ -19,6 +19,8 @@ export class Event {
   formId?: string;
   approvalStatus?: string;
   requestedBy?: string;
+  resolvedBy?: string;
+  resolvedDate?: Date;
   rsvpDisabled?: boolean;
   photoUrl?: string;
   notesViewRole?: string;
