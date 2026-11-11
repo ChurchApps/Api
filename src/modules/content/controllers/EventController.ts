@@ -357,6 +357,8 @@ export class EventController extends ContentBaseController {
       const event = await this.repos.event.load(au.churchId, id);
       if (!event) return this.json({}, 404);
       event.approvalStatus = status;
+      event.resolvedBy = au.personId;
+      event.resolvedDate = new Date();
       if (status === "approved") event.visibility = "public";
       else if (status === "rejected") event.visibility = "private";
       const result = await this.repos.event.save(event);

@@ -17,6 +17,7 @@ export class EventRepo {
     if (m.end) m.end = DateHelper.toMysqlDate(m.end);
     if (m.registrationOpenDate) m.registrationOpenDate = DateHelper.toMysqlDate(m.registrationOpenDate);
     if (m.registrationCloseDate) m.registrationCloseDate = DateHelper.toMysqlDate(m.registrationCloseDate);
+    if (m.resolvedDate) m.resolvedDate = DateHelper.toMysqlDate(m.resolvedDate);
     await getDb().insertInto("events").values({
       id: model.id,
       churchId: model.churchId,
@@ -37,6 +38,8 @@ export class EventRepo {
       formId: m.formId,
       approvalStatus: m.approvalStatus,
       requestedBy: m.requestedBy,
+      resolvedBy: m.resolvedBy,
+      resolvedDate: m.resolvedDate,
       rsvpDisabled: m.rsvpDisabled ?? false,
       photoUrl: m.photoUrl,
       notesViewRole: m.notesViewRole || null,
@@ -51,6 +54,7 @@ export class EventRepo {
     if (m.end) m.end = DateHelper.toMysqlDate(m.end);
     if (m.registrationOpenDate) m.registrationOpenDate = DateHelper.toMysqlDate(m.registrationOpenDate);
     if (m.registrationCloseDate) m.registrationCloseDate = DateHelper.toMysqlDate(m.registrationCloseDate);
+    if (m.resolvedDate) m.resolvedDate = DateHelper.toMysqlDate(m.resolvedDate);
     await getDb().updateTable("events").set({
       groupId: m.groupId,
       allDay: m.allDay,
@@ -69,6 +73,8 @@ export class EventRepo {
       formId: m.formId,
       approvalStatus: m.approvalStatus,
       requestedBy: m.requestedBy,
+      resolvedBy: m.resolvedBy,
+      resolvedDate: m.resolvedDate,
       // explicit false so un-disabling RSVP persists (Kysely drops undefined)
       rsvpDisabled: m.rsvpDisabled ?? false,
       photoUrl: m.photoUrl,
@@ -222,6 +228,8 @@ export class EventRepo {
       formId: row.formId,
       approvalStatus: row.approvalStatus,
       requestedBy: row.requestedBy,
+      resolvedBy: row.resolvedBy,
+      resolvedDate: row.resolvedDate,
       rsvpDisabled: row.rsvpDisabled,
       photoUrl: row.photoUrl,
       notesViewRole: row.notesViewRole,

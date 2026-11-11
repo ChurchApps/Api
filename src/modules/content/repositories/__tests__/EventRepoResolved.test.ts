@@ -1,6 +1,6 @@
 import "reflect-metadata";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
-jest.mock("@churchapps/apihelper", () => ({ __esModule: true, DateHelper: {}, UniqueIdHelper: { shortId: () => "gen_id" } }));
+jest.mock("@churchapps/apihelper", () => ({ __esModule: true, DateHelper: { toMysqlDate: (d: Date) => d.toISOString().slice(0, 19).replace("T", " ") }, UniqueIdHelper: { shortId: () => "gen_id" } }));
 
 import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
 import { EventRepo } from "../EventRepo";
@@ -41,5 +41,18 @@ describe("EventRepo.loadResolved", () => {
   it("returns approved and rejected event requests, newest first", async () => {
     const q = await run((r) => r.loadResolved("C1"));
     expect(q).toMatch(/where `churchId` = \? and `approvalStatus` in \(\?, \?\) order by `start` desc/);
+  });
+});
+
+// #1508: the decider and decision time are written on save, and left alone when absent.
+describe("EventRepo.save resolvedBy / resolvedDate", () => {
+  it("writes both columns when the decision is set", async () => {
+    const q = await run((r) => r.save({ id: "E1", churchId: "C1", resolvedBy: "P1", resolvedDate: new Date("2026-11-11T15:00:00Z") } as any));
+    expect(q).toMatch(/^update `events` set .*`resolvedBy` = \?.*`resolvedDate` = \?/);
+  });
+
+  it("does not touch either column on a plain edit", async () => {
+    const q = await run((r) => r.save({ id: "E1", churchId: "C1", title: "Picnic" } as any));
+    expect(q).not.toMatch(/resolvedBy|resolvedDate/);
   });
 });
