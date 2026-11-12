@@ -356,8 +356,9 @@ export class StripeHelper {
     const { method, methodDetails } = await this.getPaymentDetails(secretKey, eventData);
     const batch: DonationBatch = await givingRepos.donationBatch.getOrCreateCurrent(churchId);
 
-    // Get transaction ID for tracking (PaymentIntent ID or Charge ID)
-    const transactionId = eventData.id;
+    // Store a card gift under its PaymentIntent id whichever of charge.succeeded / payment_intent.succeeded
+    // arrives first, so the second event finds the row. Invoices and legacy charges keep their own id.
+    const transactionId = eventData.object === "charge" && eventData.payment_intent ? eventData.payment_intent : eventData.id;
 
     const donationData: Donation = {
       batchId: batch.id,
