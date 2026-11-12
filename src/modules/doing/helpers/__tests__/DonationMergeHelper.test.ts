@@ -1,6 +1,7 @@
 const loadDonationSummaryMock = jest.fn();
 jest.mock("../../../../shared/modules/index.js", () => ({ getGivingModuleGateway: () => ({ loadDonationSummary: loadDonationSummaryMock, buildReceiptHtml: (s: any) => jest.requireActual("../../../giving/helpers/ReceiptHelper.js").ReceiptHelper.oneTimeTable(s.funds, s.amount, s.currency) }) }));
-jest.mock("@churchapps/apihelper", () => ({ CurrencyHelper: { formatCurrencyWithLocale: (amount: number, currency: string) => (currency === "USD" ? "$" : currency + " ") + amount.toFixed(2) } }));
+// Mirrors @churchapps/helpers (ESM-only, so Jest cannot load it): Intl formats with the code, then the code is swapped for the symbol.
+jest.mock("@churchapps/apihelper", () => ({ CurrencyHelper: { formatCurrencyWithLocale: (amount: number, currency: string) => new Intl.NumberFormat("en-US", { style: "currency", currency, currencyDisplay: "code" }).format(amount).replace(currency, ({ USD: "$", GHS: "GH\u20b5" } as Record<string, string>)[currency] || currency) } }));
 
 import { DonationMergeHelper } from "../DonationMergeHelper.js";
 
@@ -26,19 +27,28 @@ describe("DonationMergeHelper.extras", () => {
     loadDonationSummaryMock.mockResolvedValue(summary);
     const extras = await DonationMergeHelper.extras("c1", event, "html");
     expect(loadDonationSummaryMock).toHaveBeenCalledWith("c1", "d1");
-    expect(extras.amount).toBe("$75.00");
+    expect(extras.amount).toBe("$\u00a075.00");
     expect(extras.giftDate).toBe("Nov 8, 2026");
     expect(extras.fund).toBe("General Fund, Missions <Intl>");
     expect(extras.receipt).toContain("<table");
     expect(extras.receipt).toContain("Missions &lt;Intl&gt;");
-    expect(extras.receipt).toContain("$50.00");
+    expect(extras.receipt).toContain("$\u00a050.00");
     expect(extras.receipt).toContain("Check");
   });
 
   it("uses a one-line receipt in a text", async () => {
     loadDonationSummaryMock.mockResolvedValue({ ...summary, amount: 50, funds: [{ name: "General Fund", amount: 50 }] });
     const extras = await DonationMergeHelper.extras("c1", event, "text");
-    expect(extras.receipt).toBe("$50.00 to General Fund on Nov 8, 2026");
+    expect(extras.receipt).toBe("$ 50.00 to General Fund on Nov 8, 2026");
+  });
+
+  it("keeps a text's gift fields inside the SMS alphabet", async () => {
+    loadDonationSummaryMock.mockResolvedValue({ ...summary, amount: 50, currency: "ghs", funds: [{ name: "General Fund", amount: 50 }] });
+    const text = await DonationMergeHelper.extras("c1", event, "text");
+    expect(text.amount).toBe("GHS 50.00");
+    expect(text.receipt).toBe("GHS 50.00 to General Fund on Nov 8, 2026");
+    const html = await DonationMergeHelper.extras("c1", event, "html");
+    expect(html.amount).toBe("GH\u20b5\u00a050.00");
   });
 
   it("never throws, so the message still sends", async () => {

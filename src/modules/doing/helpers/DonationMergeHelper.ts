@@ -12,7 +12,9 @@ export class DonationMergeHelper {
       const summary = await giving.loadDonationSummary(churchId, event.donationId);
       if (!summary) return {};
       const currency = (summary.currency || "USD").toUpperCase();
-      const amount = CurrencyHelper.formatCurrencyWithLocale(Number(summary.amount || 0), currency);
+      const amount = format === "text"
+        ? DonationMergeHelper.smsAmount(Number(summary.amount || 0), currency)
+        : CurrencyHelper.formatCurrencyWithLocale(Number(summary.amount || 0), currency);
       const giftDate = summary.donationDate ? dayjs(summary.donationDate).format("MMM D, YYYY") : "";
       const fund = summary.funds.map((f) => f.name).filter(Boolean).join(", ");
       const receipt = format === "html"
@@ -23,6 +25,14 @@ export class DonationMergeHelper {
       console.error("[DonationMergeHelper] could not load the gift", err);
       return {};
     }
+  }
+
+  // A symbol outside the GSM-7 SMS alphabet (GH₵, ₦, ₹) or the formatter's non-breaking space turns the
+  // whole text into a Unicode message, which some gateways accept and never deliver. Fall back to the code.
+  private static smsAmount(amount: number, currency: string): string {
+    const withSymbol = CurrencyHelper.formatCurrencyWithLocale(amount, currency).replace(/[\u00a0\u202f]/g, " ");
+    if (/^[\x20-\x7E£¥€]*$/.test(withSymbol)) return withSymbol;
+    return new Intl.NumberFormat("en-US", { style: "currency", currency, currencyDisplay: "code" }).format(amount).replace(/[\u00a0\u202f]/g, " ");
   }
 
   private static escapeHtml(value: string): string {
