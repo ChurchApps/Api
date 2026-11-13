@@ -51,3 +51,50 @@ describe("request decision notifications link to My Requests (#1495)", () => {
     expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "eventBooking", "b1", expect.stringContaining("was approved"), "/mobile/myRequests");
   });
 });
+
+// #1546: an optional reason on rejection is appended to the requester's notification.
+describe("rejection reason (#1546)", () => {
+  const eventRepos = () => {
+    const event = { id: "e1", churchId: "c1", title: "Youth Lock-in", requestedBy: "p1", approvalStatus: "pending" };
+    return { event: { load: jest.fn(async () => event), save: jest.fn(async (e: any) => e) } };
+  };
+  const bookingRepos = () => {
+    const booking = { id: "b1", churchId: "c1", eventId: "e1", roomId: "r1", status: "pending", requestedBy: "p1" };
+    return {
+      eventBooking: { load: jest.fn(async () => booking), save: jest.fn(async (b: any) => b) },
+      event: { load: jest.fn(async () => ({ id: "e1", title: "Youth Lock-in" })), save: jest.fn() },
+      room: { load: jest.fn(async () => ({ id: "r1", name: "Room A" })) },
+      resource: { load: jest.fn() }
+    };
+  };
+
+  it("event reject with a reason appends it", async () => {
+    const controller = wire(new EventController(), eventRepos());
+    await controller.reject("e1", { body: { reason: "  Projector is already booked that night.  " } }, {});
+    expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "event", "e1", 'Your event request "Youth Lock-in" was rejected: Projector is already booked that night.', "/mobile/myRequests");
+  });
+
+  it("event reject without a reason is unchanged", async () => {
+    const controller = wire(new EventController(), eventRepos());
+    await controller.reject("e1", { body: {} }, {});
+    expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "event", "e1", 'Your event request "Youth Lock-in" was rejected.', "/mobile/myRequests");
+  });
+
+  it("booking reject with a reason appends it", async () => {
+    const controller = wire(new EventBookingController(), bookingRepos());
+    await controller.reject("b1", { body: { reason: "Room A is being repainted." } }, {});
+    expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "eventBooking", "b1", 'Your request for Room A for "Youth Lock-in" was rejected: Room A is being repainted.', "/mobile/myRequests");
+  });
+
+  it("whitespace-only reason leaves the message unchanged", async () => {
+    const controller = wire(new EventBookingController(), bookingRepos());
+    await controller.reject("b1", { body: { reason: "   " } }, {});
+    expect(createNotifications).toHaveBeenCalledWith(["p1"], "c1", "eventBooking", "b1", 'Your request for Room A for "Youth Lock-in" was rejected.', "/mobile/myRequests");
+  });
+
+  it("caps the reason at 500 characters", async () => {
+    const controller = wire(new EventController(), eventRepos());
+    await controller.reject("e1", { body: { reason: "x".repeat(600) } }, {});
+    expect(createNotifications.mock.calls[0][4]).toBe(`Your event request "Youth Lock-in" was rejected: ${"x".repeat(500)}`);
+  });
+});

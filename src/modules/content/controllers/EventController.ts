@@ -9,6 +9,7 @@ import { ConflictHelper, ProposedBooking } from "../helpers/ConflictHelper.js";
 import { IcsHelper } from "../helpers/IcsHelper.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { decisionMessage } from "../helpers/DecisionMessage.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 
 @controller("/content/events")
@@ -329,8 +330,8 @@ export class EventController extends ContentBaseController {
 
   // authz-exempt: gated by resolveEvent(...) → content.edit/calendars.admin check
   @httpPost("/:id/reject")
-  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.resolveEvent(req, res, id, "rejected");
+  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, { reason?: string }>, res: express.Response): Promise<any> {
+    return this.resolveEvent(req, res, id, "rejected", req.body?.reason);
   }
 
   @httpDelete("/:id")
@@ -351,7 +352,7 @@ export class EventController extends ContentBaseController {
     });
   }
 
-  private resolveEvent(req: express.Request, res: express.Response, id: string, status: "approved" | "rejected") {
+  private resolveEvent(req: express.Request, res: express.Response, id: string, status: "approved" | "rejected", reason?: string) {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
       const event = await this.repos.event.load(au.churchId, id);
@@ -364,7 +365,7 @@ export class EventController extends ContentBaseController {
       const result = await this.repos.event.save(event);
       if (event.requestedBy) {
         try {
-          await NotificationService.createNotifications([event.requestedBy], au.churchId, "event", event.id, `Your event request "${event.title}" was ${status}.`, "/mobile/myRequests");
+          await NotificationService.createNotifications([event.requestedBy], au.churchId, "event", event.id, decisionMessage(`Your event request "${event.title}" was ${status}`, reason), "/mobile/myRequests");
         } catch (e) {
           console.error("[EventController] Failed to notify event requester:", e);
         }
