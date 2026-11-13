@@ -3,7 +3,7 @@ import type {
   BibleTranslation, BibleVerse, BibleVerseText, Block, CalendarBlockout,
   CuratedCalendar, CuratedEvent, Element, Event, EventBooking,
   EventException, EventRsvp, EventTemplate, File, GlobalStyle, Link,
-  Hymn, Page, PageHistory, Post, Playlist, Redirect, Registration, RegistrationMember,
+  Page, PageHistory, Post, Playlist, Redirect, Registration, RegistrationMember,
   RegistrationType, RegistrationSelection, RegistrationSelectionChoice, RegistrationPayment, RegistrationCoupon, Resource,
   Room, Section, Sermon, Setting, Song, SongDetail, SongDetailLink,
   StorageProvider, StreamingService
@@ -32,7 +32,6 @@ export interface ContentDatabase {
   calendarBlockouts: CalendarBlockout;
   files: Omit<File, "fileContents">;
   globalStyles: GlobalStyle;
-  hymns: Hymn;
   links: Link;
   pages: Omit<Page, "sections">;
   pageHistory: PageHistory;
