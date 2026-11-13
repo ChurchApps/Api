@@ -1,5 +1,7 @@
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { getRepos: jest.fn() } }));
-jest.mock("@churchapps/apihelper", () => ({ PersonHelper: class {} }));
+const mockStore = jest.fn();
+const mockMove = jest.fn();
+jest.mock("@churchapps/apihelper", () => ({ PersonHelper: class {}, FileStorageHelper: { store: (...a: any[]) => mockStore(...a), move: (...a: any[]) => mockMove(...a) } }));
 jest.mock("../../../../shared/helpers/index.js", () => ({ Permissions: { people: { edit: "peopleEdit" } } }));
 jest.mock("../SsoHelper.js", () => ({ SsoHelper: { applyStashedPhoto: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/WebhookDispatcher.js", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
@@ -326,5 +328,49 @@ describe("PersonHelper.registerGuestHousehold reuses existing people", () => {
     const linked = mockRepos([], { guestMatch: () => ({ ...donald, conversationId: "convOld" }) });
     await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Donald", lastName: "Clark", email: "donald@example.com" }], comments: "Again" });
     expect(linked.person.updateFieldsByIds).not.toHaveBeenCalled();
+  });
+});
+
+// ChurchAppsSupport#1554: a guest's photo is stored as the new person's profile photo.
+describe("PersonHelper.registerGuestHousehold photos", () => {
+  const png = "data:image/png;base64,iVBORw0KGgo=";
+  beforeEach(() => mockStore.mockClear());
+
+  it("stores each new person's photo at their profile photo path", async () => {
+    const saved: any[] = [];
+    const { person } = mockRepos();
+    person.save.mockImplementation(async (p: any) => { if (!p.id) { p.id = "p" + (saved.length + 1); saved.push(p); } return p; });
+    await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Pat", lastName: "Visitor", photo: png }, { firstName: "Sam", lastName: "Visitor" }] });
+    expect(mockStore).toHaveBeenCalledTimes(1);
+    expect(mockStore).toHaveBeenCalledWith("/c1/membership/people/p1.png", "image/png", Buffer.from("iVBORw0KGgo=", "base64"));
+    expect(saved[0].photoUpdated).toBeInstanceOf(Date);
+    expect(saved[1].photoUpdated).toBeUndefined();
+  });
+
+  it("never replaces the photo of someone the sign-up matched", async () => {
+    mockRepos([], { guestMatch: () => ({ id: "p9", householdId: "h9", name: { first: "Pat" } }) });
+    await PersonHelper.registerGuestHousehold("c1", { members: [{ firstName: "Pat", lastName: "Visitor", email: "pat@example.com", photo: png }] });
+    expect(mockStore).not.toHaveBeenCalled();
+  });
+});
+
+// ChurchAppsSupport#1554: approving a requested photo moves the pending file onto the person.
+describe("PersonHelper.applyPendingPhoto", () => {
+  beforeEach(() => mockMove.mockClear());
+
+  it("moves this church's pending photo to the person's photo path", async () => {
+    mockRepos();
+    const p: any = { id: "p5", churchId: "c1", photo: "http://localhost:8084/content/c1/membership/people/pending/p1-family-1700000000000.png?dt=1700000000000" };
+    expect(await PersonHelper.applyPendingPhoto("c1", p)).toBe(true);
+    expect(mockMove).toHaveBeenCalledWith("/c1/membership/people/pending/p1-family-1700000000000.png", "/c1/membership/people/p5.png");
+    expect(p.photoUpdated).toBeInstanceOf(Date);
+  });
+
+  it("ignores another church's file and anything outside the pending folder", async () => {
+    mockRepos();
+    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "http://x/content/c2/membership/people/pending/p1-1.png" } as any)).toBe(false);
+    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "http://x/content/c1/membership/people/pending/../p7.png" } as any)).toBe(false);
+    expect(await PersonHelper.applyPendingPhoto("c1", { id: "p5", photo: "/c1/membership/people/p5.png?dt=1" } as any)).toBe(false);
+    expect(mockMove).not.toHaveBeenCalled();
   });
 });

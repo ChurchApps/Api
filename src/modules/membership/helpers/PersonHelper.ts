@@ -3,7 +3,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { Household, Person, UserChurch } from "../models/index.js";
 import { AuthenticatedUser } from "../auth/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
-import { PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
+import { FileStorageHelper, PersonHelper as BasePersonHelper } from "@churchapps/apihelper";
 import { SsoHelper } from "./SsoHelper.js";
 import type { GuestMember, GuestRegistration } from "./GuestRegistrationHelper.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/WebhookDispatcher.js";
@@ -43,6 +43,32 @@ export class PersonHelper extends BasePersonHelper {
       await repos.person.restore(person.churchId, person.id);
     }
     return person;
+  }
+
+  // Stores a PNG data URL as the person's profile photo and records when it changed.
+  public static async savePhoto(churchId: string, person: Person, dataUrl: string) {
+    const key = "/" + churchId + "/membership/people/" + person.id + ".png";
+    await FileStorageHelper.store(key, "image/png", Buffer.from(dataUrl.split(",")[1] || "", "base64"));
+    person.photoUpdated = new Date();
+    person.photo = key + "?dt=" + person.photoUpdated.getTime().toString();
+    await (await this.repos()).person.save(person);
+  }
+
+  // An approved directory update hands back the pending file's URL; move that file onto the person.
+  // Only this church's pending folder is honoured, so a request cannot point at someone else's image.
+  public static async applyPendingPhoto(churchId: string, person: Person): Promise<boolean> {
+    const photo = person?.photo;
+    if (typeof photo !== "string" || !person.id) return false;
+    const prefix = "/" + churchId + "/membership/people/pending/";
+    const start = photo.indexOf(prefix);
+    if (start === -1) return false;
+    const name = photo.slice(start + prefix.length).split("?")[0];
+    if (!/^[A-Za-z0-9_-]+\.png$/.test(name)) return false;
+    await FileStorageHelper.move(prefix + name, "/" + churchId + "/membership/people/" + person.id + ".png");
+    person.photoUpdated = new Date();
+    person.photo = undefined;
+    await (await this.repos()).person.save(person);
+    return true;
   }
 
   public static async registerGuestHousehold(churchId: string, registration: GuestRegistration, groupId?: string, recordAttendance?: boolean) {
@@ -102,6 +128,7 @@ export class PersonHelper extends BasePersonHelper {
       if (m.grade) person.grade = m.grade;
       if (i === 0 && registration.maritalStatus) person.maritalStatus = registration.maritalStatus;
       const saved = await repos.person.save(person);
+      if (m.photo) await this.savePhoto(churchId, saved, m.photo);
       await WebhookDispatcher.emit(churchId, "person.created", saved);
       people.push(saved);
       submitted.push(m);

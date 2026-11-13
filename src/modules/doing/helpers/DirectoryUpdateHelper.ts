@@ -4,6 +4,7 @@ import { InternalEventBus } from "../../../shared/events/InternalEventBus.js";
 import { Task } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { Environment } from "./Environment.js";
+import { MAX_PHOTO_BYTES, PhotoDataUrl } from "../../../shared/helpers/PhotoDataUrl.js";
 
 export class DirectoryUpdateHelper {
   private static async savePhoto(churchId: string, base64Str: string, personId: string): Promise<string> {
@@ -15,12 +16,20 @@ export class DirectoryUpdateHelper {
     return Environment.contentRoot + key + "?dt=" + photoUpdated.getTime().toString();
   }
 
-  static maxPhotoBytes = 5 * 1024 * 1024;
+  static maxPhotoBytes = MAX_PHOTO_BYTES;
 
   static isAcceptablePhoto(dataUrl: string): boolean {
-    const match = /^data:image\/(png|jpeg|jpg|webp);base64,/i.exec(dataUrl);
-    if (!match) return false;
-    return (dataUrl.length - match[0].length) * 0.75 <= this.maxPhotoBytes;
+    return PhotoDataUrl.isAcceptable(dataUrl);
+  }
+
+  // A family member the member asked to add can carry a photo; it waits in the pending folder like their own.
+  private static async parkFamilyMemberPhoto(churchId: string, value: string, personId: string, index: number): Promise<string> {
+    let member: any;
+    try { member = JSON.parse(value); } catch { return value; }
+    if (!member || typeof member !== "object" || typeof member.photo !== "string" || !member.photo.startsWith("data:")) return value;
+    if (this.isAcceptablePhoto(member.photo)) member.photo = await this.savePhoto(churchId, member.photo, personId + "-family-" + index);
+    else delete member.photo;
+    return JSON.stringify(member);
   }
 
   // Rewrites any inline photo data URL in an Open directoryUpdate task to a stored file URL.
@@ -41,6 +50,7 @@ export class DirectoryUpdateHelper {
           if (!this.isAcceptablePhoto(d.value)) continue;
           d.value = await this.savePhoto(churchId, d.value, task.associatedWithId);
         }
+        if (d?.field === "familyMember" && typeof d.value === "string") d.value = await this.parkFamilyMemberPhoto(churchId, d.value, task.associatedWithId, kept.length);
         kept.push(d);
       }
       task.data = JSON.stringify(kept);
