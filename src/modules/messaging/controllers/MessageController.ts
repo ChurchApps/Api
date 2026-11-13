@@ -270,7 +270,7 @@ export class MessageController extends MessagingBaseController {
     if (conv.contentType === "streamingLive") return this.isAnonPublicConversation(conv);
     if (conv.contentType === "streamingLiveHost") return !!au.checkAccess(Permissions.chat.host);
     if (conv.contentType === "privateMessage") return this.isPrivateMessageParticipant(au, conv);
-    if (conv.contentType === "workflowCard") return this.canUseWorkflowCard(au, conv.contentId);
+    if (conv.contentType === "workflowCard" || conv.contentType === "task") return this.canUseWorkflowCard(au, conv.contentId);
     return false;
   }
 
