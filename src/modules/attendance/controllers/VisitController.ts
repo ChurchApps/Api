@@ -174,6 +174,20 @@ export class VisitController extends AttendanceBaseController {
     });
   }
 
+  @httpGet("/active")
+  public async getActive(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.attendance.view) && !au.checkAccess(Permissions.attendance.checkin)) return this.json({}, 401);
+      else {
+        const peopleIds = (req.query.peopleIds?.toString() || "").split(",").map((id) => id.trim()).filter(Boolean);
+        if (peopleIds.length === 0) return this.json({ error: "peopleIds is required" }, 400);
+        const visits: Visit[] = this.repos.visit.convertAllToModel(au.churchId, (await this.repos.visit.loadActiveTodayByPeople(au.churchId, peopleIds)) as any);
+        await this.populateSessions(au.churchId, visits);
+        return visits;
+      }
+    });
+  }
+
   @httpGet("/code/:code")
   public async getByCode(@requestParam("code") code: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {

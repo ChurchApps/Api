@@ -99,6 +99,13 @@ export class VisitRepo {
     return rows.rows;
   }
 
+  public async loadActiveTodayByPeople(churchId: string, personIds: string[]) {
+    if (personIds.length === 0) return [];
+    const today = DateHelper.toMysqlDateOnly(new Date());
+    const rows = await sql<any>`SELECT * FROM visits WHERE churchId=${churchId} AND visitDate=${today} AND personId IN (${sql.join(personIds)}) AND checkoutTime IS NULL`.execute(getDb());
+    return rows.rows;
+  }
+
   public async checkout(churchId: string, visitIds: string[], checkedOutBy?: string, checkedOutById?: string) {
     await getDb().updateTable("visits").set({
       checkoutTime: DateHelper.toMysqlDate(new Date()) as any,
