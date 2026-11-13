@@ -6,11 +6,16 @@ import { Permissions } from "../helpers/index.js";
 import { ApprovalHelper } from "../helpers/ApprovalHelper.js";
 import { ConflictHelper } from "../helpers/ConflictHelper.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { decisionMessage } from "../helpers/DecisionMessage.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 
 interface ApproveBody {
   publish?: boolean;
   curatedCalendarId?: string;
+}
+
+interface RejectBody {
+  reason?: string;
 }
 
 @controller("/content/eventBookings")
@@ -108,8 +113,8 @@ export class EventBookingController extends ContentBaseController {
 
   // authz-exempt: gated by resolveBooking(...) → canResolve(au)/approval-group membership
   @httpPost("/:id/reject")
-  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
-    return this.resolveBooking(req, res, id, "rejected");
+  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, RejectBody>, res: express.Response): Promise<any> {
+    return this.resolveBooking(req, res, id, "rejected", undefined, req.body?.reason);
   }
 
   @httpDelete("/:id")
@@ -123,7 +128,7 @@ export class EventBookingController extends ContentBaseController {
     });
   }
 
-  private resolveBooking(req: express.Request, res: express.Response, id: string, status: "approved" | "rejected", body?: ApproveBody) {
+  private resolveBooking(req: express.Request, res: express.Response, id: string, status: "approved" | "rejected", body?: ApproveBody, reason?: string) {
     return this.actionWrapper(req, res, async (au) => {
       const booking = await this.repos.eventBooking.load(au.churchId, id);
       if (!booking) return this.json({}, 404);
@@ -145,7 +150,7 @@ export class EventBookingController extends ContentBaseController {
       booking.resolvedDate = new Date();
       const result = await this.repos.eventBooking.save(booking);
       if (publish) await this.publishEvent(au.churchId, booking.eventId, curatedCalendarId);
-      await this.notifyRequester(au.churchId, booking, status);
+      await this.notifyRequester(au.churchId, booking, status, reason);
       return result;
     });
   }
@@ -186,12 +191,12 @@ export class EventBookingController extends ContentBaseController {
     return undefined;
   }
 
-  private async notifyRequester(churchId: string, booking: EventBooking, status: string) {
+  private async notifyRequester(churchId: string, booking: EventBooking, status: string, reason?: string) {
     if (!booking.requestedBy) return;
     try {
       const target = booking.roomId ? (await this.repos.room.load(churchId, booking.roomId))?.name : (await this.repos.resource.load(churchId, booking.resourceId))?.name;
       const event = await this.repos.event.load(churchId, booking.eventId);
-      const message = `Your request for ${target || "a room/resource"} for "${event?.title || "an event"}" was ${status}.`;
+      const message = decisionMessage(`Your request for ${target || "a room/resource"} for "${event?.title || "an event"}" was ${status}`, reason);
       await NotificationService.createNotifications([booking.requestedBy], churchId, "eventBooking", booking.id, message, "/mobile/myRequests");
     } catch (e) {
       console.error("[EventBookingController] Failed to notify requester:", e);
