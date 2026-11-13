@@ -148,7 +148,7 @@ export class MessagingBaseController extends BaseController {
     return !!pm && (pm.fromPersonId === au.personId || pm.toPersonId === au.personId);
   }
 
-  // Card notes: anyone who can open the card (tasks.view, or tied to it as person or group) can read and write on it.
+  // Card and plain-task notes: anyone who can open the task (tasks.view, or tied to it as person or group) can read and write on it.
   protected async canUseWorkflowCard(au: any, taskId: string): Promise<boolean> {
     if (!taskId || !au?.churchId) return false;
     const { getDoingModuleGateway } = await import("../../../shared/modules/DoingModuleGateway.js");

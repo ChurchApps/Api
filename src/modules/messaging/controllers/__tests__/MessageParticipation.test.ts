@@ -313,3 +313,29 @@ describe("MessageController.save workflowCard notes", () => {
     expect(repos.message.save).not.toHaveBeenCalled();
   });
 });
+
+describe("MessageController.save task notes", () => {
+  const taskConv = { id: "task1", churchId: "c1", contentType: "task", contentId: "t1", allowAnonymousPosts: false, visibility: "hidden" };
+
+  it("lets the assignee post without content.edit", async () => {
+    mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "p1" }));
+    const { controller, repos } = makeController({ conversation: taskConv });
+    await post(controller, "task1");
+    expect(repos.message.save).toHaveBeenCalled();
+    expect(mockLoadTask).toHaveBeenCalledWith("c1", "t1");
+  });
+
+  it("lets a member of the assigned group post", async () => {
+    mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "group", assignedToId: "g9" }));
+    const { controller, repos } = makeController({ conversation: taskConv, groupIds: ["g9"] });
+    await post(controller, "task1");
+    expect(repos.message.save).toHaveBeenCalled();
+  });
+
+  it("401s an unrelated user", async () => {
+    mockLoadTask.mockImplementation(async () => ({ id: "t1", assignedToType: "person", assignedToId: "pX", createdByType: "person", createdById: "pY" }));
+    const { controller, repos } = makeController({ conversation: taskConv, groupIds: ["g1"] });
+    expect((await post(controller, "task1")).status).toBe(401);
+    expect(repos.message.save).not.toHaveBeenCalled();
+  });
+});
