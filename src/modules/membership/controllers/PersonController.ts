@@ -5,7 +5,7 @@ import { Person, Household, SearchCondition, Group } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { FormSubmission, Form } from "../models/index.js";
 import { BulkPersonDeleteRequest, BulkPersonUpdateRequest } from "../models/requests.js";
-import { ArrayHelper, FileStorageHelper } from "@churchapps/apihelper";
+import { ArrayHelper } from "@churchapps/apihelper";
 import { Environment, Permissions, PersonConditionHelper, PersonHelper, PublicChurchContext, PublicEmailThrottle, PublicPersonRateLimiter, LoginRateLimiter, UserChurchHelper, ListRuleHelper } from "../helpers/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { AuthenticatedUser } from "@churchapps/apihelper";
@@ -13,6 +13,7 @@ import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalE
 import { ContactVisibilityHelper } from "../helpers/ContactVisibilityHelper.js";
 import { GuestRegistrationHelper, type GuestAddress, type GuestFieldModes, type GuestMember } from "../helpers/GuestRegistrationHelper.js";
 import { MessagingSafetyHelper, type MessagingSafetyPerson } from "../../../shared/helpers/MessagingSafetyHelper.js";
+import { PhotoDataUrl } from "../../../shared/helpers/PhotoDataUrl.js";
 
 @controller("/membership/people")
 export class PersonController extends MembershipBaseController {
@@ -501,7 +502,7 @@ export class PersonController extends MembershipBaseController {
   // A member's Add Family Member, for churches with no Directory Approval Group (where edits apply without review).
   // The new person always lands in the caller's own household; churches that review changes get a task instead.
   @httpPost("/familyMember")
-  public async addFamilyMember(req: express.Request<{}, {}, { first?: string, last?: string, prefix?: string, mobilePhone?: string, householdRole?: string }>, res: express.Response): Promise<any> {
+  public async addFamilyMember(req: express.Request<{}, {}, { first?: string, last?: string, prefix?: string, mobilePhone?: string, email?: string, photo?: string, householdRole?: string }>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.editSelf) || !au.personId) return this.json({}, 401);
       const clean = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
@@ -524,7 +525,11 @@ export class PersonController extends MembershipBaseController {
       if (prefix) person.name.prefix = prefix;
       const mobilePhone = clean(req.body?.mobilePhone, 21);
       if (mobilePhone) person.contactInfo.mobilePhone = mobilePhone;
+      const email = clean(req.body?.email, 100);
+      if (email) person.contactInfo.email = email;
       const saved = await this.repos.person.save(person);
+      // The caller just created this record in their own household, so they may give it a photo.
+      if (PhotoDataUrl.isAcceptable(req.body?.photo, true)) await PersonHelper.savePhoto(au.churchId, saved, req.body.photo);
       await WebhookDispatcher.emit(au.churchId, "person.created", saved);
       return this.repos.person.convertToModelWithPermissions(au.churchId, saved, au.checkAccess(Permissions.people.edit));
     });
@@ -562,7 +567,9 @@ export class PersonController extends MembershipBaseController {
           promises.push(
             this.repos.person.save(person).then(async (p) => {
               p.churchId = au.churchId;
-              if (p.photo !== undefined && p.photo.startsWith("data:image/png;base64,")) await this.savePhoto(au.churchId, p);
+              if (p.photo !== undefined && p.photo.startsWith("data:image/png;base64,")) await PersonHelper.savePhoto(au.churchId, p, p.photo);
+              // Staff applying a directory update pass the approved pending photo's URL.
+              else if (canEdit) await PersonHelper.applyPendingPhoto(au.churchId, p);
               // Create userChurch record if email matches a user and person is in groups
               if (p.email) await UserChurchHelper.createForPersonEmailUpdate(au.churchId, p.id, p.email);
               await WebhookDispatcher.emit(au.churchId, isNew ? "person.created" : "person.updated", p);
@@ -661,16 +668,6 @@ export class PersonController extends MembershipBaseController {
 
     await this.repos.household.deleteUnused(churchId);
     return this.json({ success: true, deletedIds: personIds, count: personIds.length, batchId });
-  }
-
-  private async savePhoto(churchId: string, person: Person) {
-    const base64 = person.photo.split(",")[1];
-    const key = "/" + churchId + "/membership/people/" + person.id + ".png";
-    return FileStorageHelper.store(key, "image/png", Buffer.from(base64, "base64")).then(async () => {
-      person.photoUpdated = new Date();
-      person.photo = key + "?dt=" + person.photoUpdated.getTime().toString();
-      await this.repos.person.save(person);
-    });
   }
 
   private async appendFormSubmissions(churchId: string, person: Person, repos: Repos) {

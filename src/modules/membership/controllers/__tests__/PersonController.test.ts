@@ -6,7 +6,7 @@ const throttleRecord = jest.fn(async () => {});
 jest.mock("../../helpers/index", () => ({
   Permissions: { people: { edit: "peopleEdit", editSelf: "peopleEditSelf", view: "peopleView", viewNames: "peopleViewNames" }, attendance: { checkin: "attendanceCheckin" }, server: { admin: "serverAdmin" } },
   UserChurchHelper: { createForPersonEmailUpdate: jest.fn() },
-  PersonHelper: { getPerson: jest.fn(), registerGuestHousehold: jest.fn() },
+  PersonHelper: { getPerson: jest.fn(), registerGuestHousehold: jest.fn(), savePhoto: jest.fn(), applyPendingPhoto: jest.fn() },
   Environment: { supportEmail: "support@test" },
   AuditLogHelper: { getClientIp: () => "1.2.3.4" },
   LoginRateLimiter: { getClientIp: () => "1.2.3.4" },
@@ -255,7 +255,7 @@ describe("PersonController.guestRegister profile fields", () => {
     (PersonHelper.registerGuestHousehold as jest.Mock).mockClear().mockResolvedValue({ householdId: "h1", people: [] });
   });
 
-  it("passes included fields through and keeps email and phone on the primary contact", async () => {
+  it("passes included fields through, with an email for every member (#1554)", async () => {
     const settings = [enabled, fields({ address: "required", birthDate: "optional", gender: "optional", maritalStatus: "optional", grade: "optional" })];
     await register(settings, {
       members: [
@@ -268,7 +268,7 @@ describe("PersonController.guestRegister profile fields", () => {
     expect(PersonHelper.registerGuestHousehold).toHaveBeenCalledWith("c1", {
       members: [
         { firstName: "Pat", lastName: "Visitor", email: "pat@example.com", phone: "555-0100", birthDate: "1990-04-02", gender: "Female" },
-        { firstName: "Sam", lastName: "Visitor", grade: "3" }
+        { firstName: "Sam", lastName: "Visitor", email: "kid@example.com", grade: "3" }
       ],
       address: { address1: "1 Main St", city: "Springfield", state: "IL", zip: "62701" },
       maritalStatus: "Married"
@@ -372,7 +372,7 @@ describe("PersonController.guestRegisterOptions", () => {
   it("returns the defaults when the church has not set a checklist", async () => {
     const { controller } = personController({ settings: [{ keyName: "enableQRGuestRegistration", value: "true" }] });
     const result = await (controller as any).guestRegisterOptions({ query: { churchId: "c1" }, headers: {} }, {});
-    expect(result).toEqual({ title: "off", email: "optional", phone: "optional", householdRole: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off" });
+    expect(result).toEqual({ title: "off", email: "optional", phone: "optional", householdRole: "optional", address: "off", birthDate: "off", gender: "off", maritalStatus: "off", grade: "off", comments: "off", photo: "off" });
   });
 
   it("returns the saved checklist and ignores unknown modes", async () => {

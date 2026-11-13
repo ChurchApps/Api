@@ -24,3 +24,26 @@ describe("DirectoryUpdateHelper photo checks", () => {
     expect(JSON.parse(task.data)).toEqual([{ field: "name", value: "Bob" }]);
   });
 });
+
+// ChurchAppsSupport#1554: a member can attach a photo to a family member they add.
+describe("DirectoryUpdateHelper family member photos", () => {
+  beforeEach(() => store.mockClear());
+
+  it("parks a family member's photo as a pending file and keeps the email", async () => {
+    const member = { first: "Ann", last: "Clark", email: "ann@example.com", photo: "data:image/png;base64,AAAA" };
+    const task: any = { status: "Open", associatedWithId: "p1", data: JSON.stringify([{ field: "familyMember", value: JSON.stringify(member) }]) };
+    await DirectoryUpdateHelper.handleDirectoryUpdate("c1", task);
+    expect(store).toHaveBeenCalledTimes(1);
+    const saved = JSON.parse(JSON.parse(task.data)[0].value);
+    expect(saved.email).toBe("ann@example.com");
+    expect(saved.photo).toContain("https://cdn.test/c1/membership/people/pending/p1-family-");
+  });
+
+  it("drops a family member photo that is not an acceptable image", async () => {
+    const member = { first: "Ann", photo: "data:text/html;base64,PHNjcmlwdD4=" };
+    const task: any = { status: "Open", associatedWithId: "p1", data: JSON.stringify([{ field: "familyMember", value: JSON.stringify(member) }]) };
+    await DirectoryUpdateHelper.handleDirectoryUpdate("c1", task);
+    expect(store).not.toHaveBeenCalled();
+    expect(JSON.parse(JSON.parse(task.data)[0].value)).toEqual({ first: "Ann" });
+  });
+});
