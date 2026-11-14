@@ -1,4 +1,4 @@
-import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
+import { controller, httpPost, httpGet, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { DoingBaseController } from "./DoingBaseController.js";
 import { AssignmentWorkflowHelper } from "../helpers/AssignmentWorkflowHelper.js";
@@ -132,14 +132,15 @@ export class TaskController extends DoingBaseController {
           task.createdByType = "person";
           task.createdById = au.personId;
         }
+        let existing: Task | null = null;
         if (task.id) {
-          const existing = await this.repos.task.load(au.churchId, task.id);
+          existing = await this.repos.task.load(au.churchId, task.id) as Task;
           if (existing?.taskType === AccountDeletionHelper.taskType && existing.status !== "Closed" && task.status === "Closed") {
             return this.json({ message: "Account deletion requests must be decided from the review action" }, 400);
           }
         }
         if (task.id) {
-          const linked = await this.repos.task.load(au.churchId, task.id) as Task;
+          const linked = existing;
           if (linked?.assignmentId) {
             if (linked.workflowId) return this.json({ message: "Workflow cards must use the card endpoints" }, 400);
             const saved = await this.repos.task.withAssignmentLock(au.churchId, linked.assignmentId, async () => {
@@ -167,11 +168,29 @@ export class TaskController extends DoingBaseController {
         if (task.assignmentId || task.followupKey) return this.json({ message: "Serving confirmation links are managed by the workflow" }, 400);
         task.churchId = au.churchId;
         if (type === "directoryUpdate") await DirectoryUpdateHelper.handleDirectoryUpdate(au.churchId, task);
+        if (existing && task.assignedToId !== undefined && task.assignedToId !== existing.assignedToId) {
+          task.data = task.data ?? existing.data;
+          StepActionHelper.appendHistory(task, `Reassigned from ${existing.assignedToLabel || "unassigned"} to ${task.assignedToLabel || "unassigned"}`);
+        }
         const saved = await this.repos.task.save(task);
         await InternalEventBus.publish(au.churchId, "task.updated", saved);
         result.push(saved);
       }
       return result;
+    });
+  }
+
+  // Hard delete of a plain task; workflow cards use /:id/remove and account deletion requests are decided, not deleted.
+  @httpDelete("/:id")
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.tasks.edit)) return this.json({}, 401);
+      const task = (await this.repos.task.load(au.churchId, id)) as Task;
+      if (!task) return this.json({}, 404);
+      if (task.taskType === AccountDeletionHelper.taskType) return this.json({ message: "Account deletion requests must be decided from the review action" }, 400);
+      if (task.workflowId) return this.json({ message: "Workflow cards must use the card endpoints" }, 400);
+      await this.repos.task.delete(au.churchId, id);
+      return {};
     });
   }
 

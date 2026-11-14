@@ -261,6 +261,7 @@ export class WorkflowHelper {
 
   public static async reassign(task: Task, target: AssignTarget, repositories?: Repos): Promise<Task> {
     const repos = await this.getRepos(repositories);
+    if (target.id !== task.assignedToId) StepActionHelper.appendHistory(task, `Reassigned from ${task.assignedToLabel || "unassigned"} to ${target.label || "unassigned"}`);
     task.assignedToType = target.type;
     task.assignedToId = target.id;
     task.assignedToLabel = target.label;
