@@ -1,4 +1,5 @@
-jest.mock("../../helpers/StepActionHelper.js", () => ({ StepActionHelper: { appendHistory: jest.fn() } }));
+const appendHistory = jest.fn();
+jest.mock("../../helpers/StepActionHelper.js", () => ({ StepActionHelper: { appendHistory: (...args: any[]) => appendHistory.apply(null, args as any) } }));
 jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn() } }));
 import "reflect-metadata";
 
@@ -261,5 +262,71 @@ describe("TaskController.getContact", () => {
     repos.task.load.mockResolvedValue({ ...card, assignedToId: "p7" });
     const result = await (makeController(["tasksView"], repos) as any).getContact("t1", {}, {});
     expect(result).toEqual({ personId: "per9", displayName: "Isaac Turner", mobilePhone: "555-0101", email: "isaac@example.com" });
+  });
+});
+
+describe("TaskController.save reassignment history", () => {
+  let repos: any;
+  beforeEach(() => {
+    appendHistory.mockReset();
+    repos = { task: { save: jest.fn(async (t: any) => t), load: jest.fn(async () => ({ id: "t1", title: "Call", assignedToType: "person", assignedToId: "p1", assignedToLabel: "Donald Clark", data: null })) } };
+  });
+
+  it("records a reassignment of a plain task", async () => {
+    await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", title: "Call", assignedToType: "person", assignedToId: "p2", assignedToLabel: "Carol Clark" }] }, {});
+    expect(appendHistory).toHaveBeenCalledTimes(1);
+    expect(appendHistory.mock.calls[0][1]).toBe("Reassigned from Donald Clark to Carol Clark");
+    expect(repos.task.save).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds nothing when the assignee is unchanged", async () => {
+    await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", title: "Renamed", assignedToType: "person", assignedToId: "p1", assignedToLabel: "Donald Clark" }] }, {});
+    expect(appendHistory).not.toHaveBeenCalled();
+  });
+
+  it("keeps the stored history when the client sends no data", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", assignedToId: "p1", assignedToLabel: "Donald Clark", data: JSON.stringify({ history: [] }) });
+    await (makeController(["tasksEdit"], repos) as any).save({ query: {}, body: [{ id: "t1", assignedToId: "p2", assignedToLabel: "Carol Clark" }] }, {});
+    expect(appendHistory.mock.calls[0][0].data).toBe(JSON.stringify({ history: [] }));
+  });
+});
+
+describe("TaskController.delete", () => {
+  let repos: any;
+  beforeEach(() => {
+    repos = { task: { load: jest.fn(async () => ({ id: "t1", churchId: "c1", title: "Call", status: "Closed" })), delete: jest.fn(async () => undefined) } };
+  });
+
+  it("requires tasks edit", async () => {
+    const result = await (makeController(["tasksView"], repos) as any).delete("t1", {}, {});
+    expect(result).toEqual({ obj: {}, status: 401 });
+    expect(repos.task.delete).not.toHaveBeenCalled();
+  });
+
+  it("deletes an open or closed plain task", async () => {
+    const result = await (makeController(["tasksEdit"], repos) as any).delete("t1", {}, {});
+    expect(repos.task.delete).toHaveBeenCalledWith("c1", "t1");
+    expect(result).toEqual({});
+  });
+
+  it("returns 404 for a missing task", async () => {
+    repos.task.load.mockResolvedValue(null);
+    const result = await (makeController(["tasksEdit"], repos) as any).delete("t1", {}, {});
+    expect(result.status).toBe(404);
+    expect(repos.task.delete).not.toHaveBeenCalled();
+  });
+
+  it("refuses account deletion requests", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", taskType: "accountDeletion", status: "Open" });
+    const result = await (makeController(["tasksEdit"], repos) as any).delete("t1", {}, {});
+    expect(result.status).toBe(400);
+    expect(repos.task.delete).not.toHaveBeenCalled();
+  });
+
+  it("refuses workflow cards, which use remove", async () => {
+    repos.task.load.mockResolvedValue({ id: "t1", workflowId: "w1", status: "Open" });
+    const result = await (makeController(["tasksEdit"], repos) as any).delete("t1", {}, {});
+    expect(result.status).toBe(400);
+    expect(repos.task.delete).not.toHaveBeenCalled();
   });
 });
