@@ -8,6 +8,8 @@ import { NotificationService } from "../../../shared/helpers/NotificationService
 import { WorkflowHelper } from "./WorkflowHelper.js";
 import { StepActionHelper } from "./StepActionHelper.js";
 
+// A plan or workflow that cannot issue requests is the caller's to fix: answer 400, not 500.
+const badRequest = (message: string) => Object.assign(new Error(message), { status: 400 });
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
 export class AssignmentWorkflowHelper {
@@ -21,10 +23,10 @@ export class AssignmentWorkflowHelper {
   // command binds the workflow before delivery; a timer repairs a failed card start.
   public static async issuePlan(churchId: string, planId: string, repos: Repos): Promise<{ issued: number }> {
     const plan = await repos.plan.load(churchId, planId) as Plan;
-    if (!plan || plan.prepared) throw new Error("Publish the plan before issuing requests");
-    if (!plan.confirmationWorkflowId) throw new Error("Select a confirmation workflow first");
+    if (!plan || plan.prepared) throw badRequest("Publish the plan before issuing requests");
+    if (!plan.confirmationWorkflowId) throw badRequest("Select a confirmation workflow first");
     await this.validateWorkflow(churchId, plan.confirmationWorkflowId, repos);
-    if (await this.expired(churchId, plan, repos)) throw new Error("The response deadline has passed");
+    if (await this.expired(churchId, plan, repos)) throw badRequest("The response deadline has passed");
     let issued = 0;
     for (const assignment of await repos.assignment.loadByPlanId(churchId, planId) as Assignment[]) {
       if (assignment.status !== "Unconfirmed" || assignment.notified) continue;
@@ -37,8 +39,8 @@ export class AssignmentWorkflowHelper {
 
   public static async validateWorkflow(churchId: string, workflowId: string, repos: Repos): Promise<void> {
     const workflow = await repos.workflow.load(churchId, workflowId) as Workflow;
-    if (!workflow?.active || workflow.workflowType !== this.workflowType) throw new Error("Choose an active assignment confirmation workflow from this church");
-    if (!(await repos.workflowStep.loadForWorkflow(churchId, workflowId) as WorkflowStep[]).length) throw new Error("The confirmation workflow needs a step");
+    if (!workflow?.active || workflow.workflowType !== this.workflowType) throw badRequest("Choose an active assignment confirmation workflow from this church");
+    if (!(await repos.workflowStep.loadForWorkflow(churchId, workflowId) as WorkflowStep[]).length) throw badRequest("The confirmation workflow needs a step");
   }
 
   public static async start(churchId: string, assignmentId: string, repos: Repos): Promise<void> {
