@@ -326,7 +326,8 @@ export class PayPalHelper {
       transactionId: eventData.id || undefined,
       currency: currency ? String(currency).toLowerCase() : undefined,
       donationDate: new Date(eventData.create_time || Date.now()),
-      notes: eventData.notes || eventData.custom_id || ""
+      memo: eventData.notes || undefined,
+      notes: eventData.custom_id || ""
     };
     let funds: any[] = Array.isArray(eventData.funds) && eventData.funds.length ? eventData.funds : [];
     if (!funds.length && eventData.custom_id) {

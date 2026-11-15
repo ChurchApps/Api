@@ -166,5 +166,25 @@ describe("StripeHelper currency handling", () => {
       expect(savedDonations[0].currency).toBe("jpy");
       expect(savedDonations[0].amount).toBe(2500);
     });
+
+    it("stores the donor memo from charge metadata in memo, not notes", async () => {
+      const { savedDonations, repos } = buildRepos();
+      const event: any = stripeChargeEvent("usd", 2500);
+      event.metadata.memo = "Youth trip";
+      await StripeHelper.logDonation("sk_test", "CHU1", event, repos);
+
+      expect(savedDonations[0].memo).toBe("Youth trip");
+      expect(savedDonations[0].notes).toBeUndefined();
+    });
+
+    it("treats legacy metadata.notes from older subscriptions as the donor memo", async () => {
+      const { savedDonations, repos } = buildRepos();
+      const event: any = stripeChargeEvent("usd", 2500);
+      event.metadata.notes = "Benevolence";
+      await StripeHelper.logDonation("sk_test", "CHU1", event, repos);
+
+      expect(savedDonations[0].memo).toBe("Benevolence");
+      expect(savedDonations[0].notes).toBeUndefined();
+    });
   });
 });

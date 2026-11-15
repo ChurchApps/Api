@@ -1251,6 +1251,7 @@ export class KingdomFundingGatewayProvider extends AbstractExperimentalGatewayPr
         amount,
         method,
         methodDetails,
+        memo: eventData.notes || undefined,
         notes: `KingdomFunding ref: ${refNumber}`,
         status
       };

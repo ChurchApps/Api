@@ -206,10 +206,10 @@ INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, me
 INSERT INTO donationBatches (id, churchId, name, batchDate) VALUES
 ('BAT00000014', 'CHU00000001', 'Demo User Recent Batch', DATE_SUB(CURDATE(), INTERVAL 7 DAY));
 
-INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes) VALUES
-('DON00000093', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 90 DAY),  100.00, 'Credit Card', 'STRIPE', 'Demo donation'),
-('DON00000094', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 30 DAY),  150.00, 'Credit Card', 'STRIPE', 'Demo donation'),
-('DON00000095', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 7 DAY),   200.00, 'Credit Card', 'STRIPE', 'Demo donation');
+INSERT INTO donations (id, churchId, batchId, personId, donationDate, amount, method, methodDetails, notes, memo) VALUES
+('DON00000093', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 90 DAY),  100.00, 'Credit Card', 'STRIPE', 'Demo donation', NULL),
+('DON00000094', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 30 DAY),  150.00, 'Credit Card', 'STRIPE', 'Demo donation', 'Youth trip'),
+('DON00000095', 'CHU00000001', 'BAT00000014', 'PER00000082', DATE_SUB(CURDATE(), INTERVAL 7 DAY),   200.00, 'Credit Card', 'STRIPE', 'Demo donation', 'Benevolence');
 
 -- Fund Donations for all 92 donations across 13 weeks
 INSERT INTO fundDonations (id, churchId, donationId, fundId, amount) VALUES

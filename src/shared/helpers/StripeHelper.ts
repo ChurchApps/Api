@@ -369,7 +369,8 @@ export class StripeHelper {
       method,
       methodDetails,
       donationDate: new Date(eventData.created * 1000),
-      notes: eventData?.metadata?.notes,
+      // Subscriptions created before the memo split carry the donor memo as metadata.notes.
+      memo: eventData?.metadata?.memo ?? eventData?.metadata?.notes,
       status,
       transactionId
     };

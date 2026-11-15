@@ -13,6 +13,8 @@ export class Donation {
   public method?: string;
   public methodDetails?: string;
   public notes?: string;
+  // Donor-facing memo, printed on statements. notes stays internal.
+  public memo?: string;
   public entryTime?: Date;
   public enteredBy?: string;
   public status?: DonationStatus;

@@ -56,6 +56,15 @@ describe("PayPalGatewayProvider", () => {
       expect(repos.fund.getOrCreateGeneral).not.toHaveBeenCalled();
     });
 
+    it("stores the donor's note as the memo, not in internal notes", async () => {
+      const repos = makeRepos();
+      const capture = { id: "CAP2", status: "COMPLETED", amount: { value: "25.00", currency_code: "USD" }, create_time: "2026-09-01T00:00:00Z" };
+      await provider.logDonation(config, "CHU1", { ...capture, amount: 25, person: { id: "PER1" }, funds: [{ id: "F1", amount: 25 }], notes: "Youth trip" }, repos);
+      const saved = repos.donation.save.mock.calls[0][0];
+      expect(saved.memo).toBe("Youth trip");
+      expect(saved.notes).not.toBe("Youth trip");
+    });
+
     it("reads the amount from a webhook capture and falls back to the General Fund", async () => {
       const repos = makeRepos();
       await provider.logDonation(config, "CHU1", { id: "CAP2", amount: { value: "10.50", currency_code: "USD" }, create_time: "2026-09-01T00:00:00Z" }, repos);

@@ -66,4 +66,13 @@ describe("KingdomFundingGatewayProvider.logDonation fund recovery", () => {
     expect(repos.fund.getOrCreateGeneral).not.toHaveBeenCalled();
     expect(repos.donation.save.mock.calls[0][1]).toEqual([expect.objectContaining({ fundId: "fa", amount: 75 })]);
   });
+
+  it("stores the donor's note from the /charge path as the memo and keeps the reference internal", async () => {
+    const repos = makeRepos();
+    const eventData = { auth_amount: 75, funds: [{ id: "fa", amount: 75 }], reference_number: 558, notes: "Youth trip" };
+
+    await provider.logDonation({} as GatewayConfig, "ch1", eventData, repos, "complete");
+
+    expect(repos.donation.save.mock.calls[0][0]).toMatchObject({ memo: "Youth trip", notes: "KingdomFunding ref: 558" });
+  });
 });
