@@ -46,6 +46,7 @@ export class DonationRepo {
       method: donation.method,
       methodDetails: donation.methodDetails,
       notes: donation.notes,
+      memo: donation.memo,
       entryTime,
       enteredBy: donation.enteredBy ?? null,
       status: donation.status,
@@ -66,6 +67,7 @@ export class DonationRepo {
       method: donation.method,
       methodDetails: donation.methodDetails,
       notes: donation.notes,
+      memo: donation.memo,
       entryTime,
       status: donation.status,
       transactionId: donation.transactionId
@@ -255,6 +257,7 @@ export class DonationRepo {
       method: row.method,
       methodDetails: row.methodDetails,
       notes: row.notes,
+      memo: row.memo,
       entryTime: row.entryTime,
       enteredBy: row.enteredBy,
       status: row.status || "complete",

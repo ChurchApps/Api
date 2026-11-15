@@ -201,6 +201,12 @@ describe("PaystackGatewayProvider", () => {
       expect(r.gatewayPaymentMethod.save).not.toHaveBeenCalled();
     });
 
+    it("stores the donor's note as the memo and keeps the Paystack reference in internal notes", async () => {
+      const r = repos();
+      await provider.logDonation(config, "CHU1", { reference: "ref_3", amount: 25, person: { id: "PER1" }, notes: "Youth trip", funds: [{ id: "FUN1", amount: 25 }], authorization: { channel: "card" } }, r);
+      expect(r.donation.save.mock.calls[0][0]).toMatchObject({ memo: "Youth trip", notes: "Paystack ref: ref_3" });
+    });
+
     it("leaves an anonymous gift unlinked even when the gateway customer maps to a person", async () => {
       const r = repos();
       await provider.logDonation(config, "CHU1", {

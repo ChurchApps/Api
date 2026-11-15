@@ -93,7 +93,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
 
     const currency = donationData?.currency || "usd";
 
-    const paymentData = { amount: donationData.amount, currency, customer: donationData.customerId, metadata: { funds: JSON.stringify(donationData.funds), notes: donationData.notes } };
+    const paymentData = { amount: donationData.amount, currency, customer: donationData.customerId, metadata: { funds: JSON.stringify(donationData.funds), memo: donationData.notes } };
 
     if (donationData.type === "card") {
       (paymentData as any).payment_method = donationData.id;
@@ -169,7 +169,7 @@ export class StripeGatewayProvider implements IGatewayProvider {
       billing_cycle_anchor: subscriptionData.billing_cycle_anchor,
       proration_behavior: subscriptionData.proration_behavior,
       interval: subscriptionData.interval,
-      metadata: { notes: subscriptionData.notes },
+      metadata: { memo: subscriptionData.notes },
       productId: config.productId
     };
 

@@ -89,3 +89,20 @@ describe("StripeGatewayProvider.listReplayEvents", () => {
     expect(gift.skipReason).toBeUndefined();
   });
 });
+
+describe("StripeGatewayProvider donor memo", () => {
+  const provider = new StripeGatewayProvider();
+  afterEach(() => jest.restoreAllMocks());
+
+  it("sends the online form's memo as metadata.memo on a one-time charge", async () => {
+    const donate = jest.spyOn(StripeHelper, "donate").mockResolvedValue({ id: "pi_1", status: "succeeded" } as any);
+    await provider.processCharge({ privateKey: "sk" } as any, { amount: 10, customerId: "cus_1", funds: [], notes: "Youth trip", type: "card", id: "pm_1" });
+    expect(donate.mock.calls[0][1].metadata).toEqual({ funds: "[]", memo: "Youth trip" });
+  });
+
+  it("sends the memo as metadata.memo on a new subscription", async () => {
+    const create = jest.spyOn(StripeHelper, "createSubscription").mockResolvedValue({ id: "sub_1" } as any);
+    await provider.createSubscription({ privateKey: "sk", productId: "prod" } as any, { id: "pm_1", amount: 10, customerId: "cus_1", notes: "Benevolence" });
+    expect(create.mock.calls[0][1].metadata).toEqual({ memo: "Benevolence" });
+  });
+});

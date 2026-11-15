@@ -1797,6 +1797,17 @@
     }
    ],
    "schemaChanges": 1
+  },
+  "2026-11-15_donation_memo": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "donations",
+     "column": "memo",
+     "present": true
+    }
+   ],
+   "schemaChanges": 1
   }
  },
  "messaging": {

@@ -449,7 +449,8 @@ export class PaystackGatewayProvider implements IGatewayProvider {
       amount,
       method,
       methodDetails,
-      notes: eventData.notes || `Paystack ref: ${eventData.reference || ""}`,
+      memo: eventData.notes || undefined,
+      notes: `Paystack ref: ${eventData.reference || ""}`,
       status
     };
     let funds: any[] = eventData.funds || eventData.metadata?.funds || [];
