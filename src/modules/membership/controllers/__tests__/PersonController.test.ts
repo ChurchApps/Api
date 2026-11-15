@@ -67,7 +67,9 @@ function personController(opts: any = {}) {
   return { controller, repos };
 }
 
+// Every client sends a name (PersonRepo.save needs one); mutate in place so tests can read back householdId.
 function saveReq(body: any[]) {
+  body.forEach((p) => { if (!p.name) p.name = { first: "Sample" }; });
   return { body };
 }
 

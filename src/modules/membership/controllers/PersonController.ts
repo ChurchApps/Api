@@ -542,6 +542,8 @@ export class PersonController extends MembershipBaseController {
       const canEditSelf = au.checkAccess(Permissions.people.editSelf);
       const isSelfOnly = canEditSelf && Array.isArray(req.body) && req.body.length === 1 && req.body[0]?.id === au.personId;
       if (!canEdit && !isSelfOnly) return this.json({}, 401);
+      // PersonRepo.save builds name.display, so a nameless person would fail there after its household was made.
+      if (!Array.isArray(req.body) || req.body.some((p) => !p?.name || typeof p.name !== "object")) return this.json({ error: "Each person needs a name" }, 400);
       else {
         const promises: Promise<Person>[] = [];
         for (const person of req.body) {
