@@ -33,7 +33,7 @@ export class WorkflowStepRepo {
       defaultAssignToType: model.defaultAssignToType,
       defaultAssignToId: model.defaultAssignToId,
       defaultAssignToLabel: model.defaultAssignToLabel,
-      expectedResponseDays: model.expectedResponseDays
+      expectedResponseDays: model.expectedResponseDays ?? null
     }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
