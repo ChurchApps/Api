@@ -11,8 +11,9 @@ export class VisitSessionController extends AttendanceBaseController {
   @httpPost("/log")
   public async log(req: express.Request<{}, {}, Visit>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const sessionId = (req.body as Visit).visitSessions[0].sessionId;
-      const personId = (req.body as Visit).personId;
+      const sessionId = (req.body as Visit)?.visitSessions?.[0]?.sessionId;
+      const personId = (req.body as Visit)?.personId;
+      if (!sessionId || !personId) return this.json({ error: "personId and visitSessions[0].sessionId are required" }, 400);
 
       // Check if user is a leader of the group this session belongs to
       const session: Session = await this.repos.session.load(au.churchId, sessionId);
