@@ -17,6 +17,7 @@ jest.mock("../../../../shared/webhooks/UrlValidator.js", () => ({ UrlValidator: 
 import { AssignmentWorkflowHelper as Followup } from "../AssignmentWorkflowHelper.js";
 import { WorkflowHelper } from "../WorkflowHelper.js";
 import { WorkflowTemplates } from "../WorkflowTemplates.js";
+import { statusFromError } from "../../../../shared/helpers/httpError.js";
 
 const clone = <T>(value: T): T => value == null ? value : structuredClone(value);
 function fixture() {
@@ -67,6 +68,22 @@ it("suppresses draft requests and rejects a workflow from another church", async
   f.plans[0].prepared = false; f.workflows[0].churchId = "c2";
   await expect(Followup.issuePlan("c1", "plan1", f.repos)).rejects.toThrow("this church");
   expect(delivery).not.toHaveBeenCalled(); expect(notify).not.toHaveBeenCalled();
+});
+
+// Production: 3 "The response deadline has passed" 500s on POST /doing/plans/:id/issueRequests in one evening.
+// Issuing requests for a plan that cannot take them is a bad request, not a server failure.
+it("answers 400 when a plan cannot issue requests", async () => {
+  const f = fixture(); f.plans[0].serviceDate = new Date(2030, 2, 1);
+  const expired = await Followup.issuePlan("c1", "plan1", f.repos).catch((e) => e);
+  expect(expired.message).toBe("The response deadline has passed");
+  expect(statusFromError(expired)).toBe(400);
+  f.plans[0].prepared = true;
+  expect(statusFromError(await Followup.issuePlan("c1", "plan1", f.repos).catch((e) => e))).toBe(400);
+  f.plans[0].prepared = false; f.plans[0].confirmationWorkflowId = null;
+  expect(statusFromError(await Followup.issuePlan("c1", "plan1", f.repos).catch((e) => e))).toBe(400);
+  f.plans[0].confirmationWorkflowId = "wf1"; f.workflows[0].active = false;
+  expect(statusFromError(await Followup.issuePlan("c1", "plan1", f.repos).catch((e) => e))).toBe(400);
+  expect(delivery).not.toHaveBeenCalled();
 });
 
 it("does not backfill old notified/imported assignments or self-signups", async () => {
