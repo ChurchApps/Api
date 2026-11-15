@@ -40,6 +40,7 @@ export class FormSubmissionController extends MembershipBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       const result: FormSubmission = this.repos.formSubmission.convertToModel(au.churchId, await this.repos.formSubmission.load(au.churchId, id));
+      if (!result) return this.json({ error: "Form submission not found" }, 404);
       if (!au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit) && !(await this.canViewSubmission(au, result))) return this.json({}, 401);
       if (this.include(req, "form")) await this.appendForm(au.churchId, result);
       if (this.include(req, "questions")) await this.appendQuestions(au.churchId, result);

@@ -336,3 +336,16 @@ describe("FormSubmissionController.save submittedBy", () => {
     expect(repos.formSubmission.save.mock.calls[0][0].submittedBy).toBeNull();
   });
 });
+
+// Production: one 500 "Cannot read properties of null (reading 'formId')" on GET /membership/formsubmissions/:id?include=form
+// for a submission that no longer exists.
+describe("FormSubmissionController.get missing submission", () => {
+  it("answers 404 instead of appending a form to nothing", async () => {
+    const { controller, repos } = formSubmissionController({ au: { churchId: "c1", checkAccess: () => true } });
+    repos.form.load = jest.fn(async () => null);
+    (controller as any).include = (req: any, item: string) => String(req.query?.include || "").split(",").includes(item);
+    const result: any = await (controller as any).get("missing", { query: { include: "form,questions,answers" } }, {});
+    expect(result.status).toBe(404);
+    expect(repos.form.load).not.toHaveBeenCalled();
+  });
+});
