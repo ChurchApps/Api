@@ -60,6 +60,22 @@ export class ReminderController extends MessagingBaseController {
     });
   }
 
+  // Send the saved reminder to its recipients right away (issue #1584). Scope definitions have no single target, so only entity reminders.
+  @httpPost("/:entityType/:entityId/sendNow")
+  public async sendNow(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
+      ensureRemindersReady(this.repos);
+      if (!ReminderAdapterRegistry.has(entityType)) return this.json({}, 400);
+      const def = ((await this.repos.reminderDefinition.loadForEntity(au.churchId, entityType, entityId)) as ReminderDefinition[])[0];
+      if (!def || !def.enabled) return this.json({ error: "Save and enable the reminder first" }, 400);
+      const channels = String(def.channels || "").split(",").map((c) => c.trim());
+      if (channels.includes("sms") && !au.checkAccess(Permissions.texting.send)) return this.json({ error: "Sending texts requires the Texting Send permission" }, 401);
+      const sent = await ReminderEngine.sendNow(def);
+      return { sent };
+    });
+  }
+
   // Scope (inheritance) definitions: entityId null, scopeId set (e.g. serving reminders per planType).
   // 3-segment paths never collide with the 2-segment entity routes above.
   @httpGet("/scope/:entityType/:scopeId")
