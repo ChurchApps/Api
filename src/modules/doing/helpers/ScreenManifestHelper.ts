@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getProvider, navigateToPath, ContentProviderAuthData, InstructionItem, Instructions } from "@churchapps/content-providers";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { slowRequestThreshold } from "../../../shared/helpers/SlowRequestLogger.js";
 import { Plan, PlanItem, PlanType, PlaylistItem, ScheduleEntry, ScreenGroup } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 import { ProviderAuthHelper } from "./ProviderAuthHelper.js";
@@ -72,6 +73,14 @@ interface BuildContext {
   instructions: Map<string, Promise<Instructions | null>>;
   folderTitles: Map<string, Promise<string>>;
   auth: Map<string, Promise<ContentProviderAuthData | null>>;
+  timings: Map<string, StepTiming>;
+  counts: { entries: number; occurrences: number; items: number };
+}
+
+interface StepTiming {
+  calls: number;
+  done: number;
+  maxMs: number;
 }
 
 const TOKEN_URLS: Record<string, (fileId: string) => string> = {
@@ -83,17 +92,61 @@ const CACHE_MS = 5 * 60 * 1000;
 
 export class ScreenManifestHelper {
   private static cache = new Map<string, { expires: number; manifest: ScreenManifest }>();
+  // A build still running at this mark logs what it is waiting on, since a Lambda timeout (30 s) never reaches the SLOW line.
+  static pendingLogMs = 20000;
 
+  // A slow build logs `SLOW_MANIFEST <ms>ms ...` with per-step call counts and the slowest call, keyed by step and provider id only.
   static async build(repos: Repos, churchId: string, screenGroupId: string, now = new Date()): Promise<ScreenManifest | null> {
-    const group: ScreenGroup = repos.screenGroup.convertToModel(churchId, await repos.screenGroup.load(churchId, screenGroupId));
+    const ctx: BuildContext = { repos, churchId, files: new Map(), instructions: new Map(), folderTitles: new Map(), auth: new Map(), timings: new Map(), counts: { entries: 0, occurrences: 0, items: 0 } };
+    const start = Date.now();
+    const pending = setTimeout(() => console.log(`SLOW_MANIFEST_PENDING ${Date.now() - start}ms waiting=${this.describeWaiting(ctx)} done=${this.describeSteps(ctx)}`), this.pendingLogMs);
+    pending.unref?.();
+    try {
+      const manifest = await this.buildManifest(ctx, screenGroupId, now);
+      const ms = Date.now() - start;
+      if (ms >= slowRequestThreshold()) {
+        const { entries, occurrences, items } = ctx.counts;
+        console.log(`SLOW_MANIFEST ${ms}ms entries=${entries} occurrences=${occurrences} items=${items} ${this.describeSteps(ctx)}`);
+      }
+      return manifest;
+    } finally {
+      clearTimeout(pending);
+    }
+  }
+
+  // Only the step name and a provider id go into the key, so no church, group, path or file id can reach the log.
+  private static timed<T>(ctx: BuildContext, step: string, providerId: string | null, work: () => Promise<T>): Promise<T> {
+    const key = providerId === null ? step : `${step}:${/^[a-z0-9_-]{1,40}$/i.test(providerId) ? providerId : "other"}`;
+    if (!ctx.timings.has(key)) ctx.timings.set(key, { calls: 0, done: 0, maxMs: 0 });
+    const timing = ctx.timings.get(key);
+    timing.calls++;
+    const start = Date.now();
+    return work().finally(() => {
+      timing.done++;
+      timing.maxMs = Math.max(timing.maxMs, Date.now() - start);
+    });
+  }
+
+  private static describeSteps(ctx: BuildContext): string {
+    const steps = [...ctx.timings].filter(([, t]) => t.done > 0).map(([key, t]) => `${key}=${t.done}x/${t.maxMs}ms`);
+    return steps.join(" ") || "none";
+  }
+
+  private static describeWaiting(ctx: BuildContext): string {
+    const waiting = [...ctx.timings].filter(([, t]) => t.calls > t.done).map(([key, t]) => `${key}=${t.calls - t.done}`);
+    return waiting.join(",") || "none";
+  }
+
+  private static async buildManifest(ctx: BuildContext, screenGroupId: string, now: Date): Promise<ScreenManifest | null> {
+    const { repos, churchId } = ctx;
+    const group: ScreenGroup = await this.timed(ctx, "db:group", null, async () => repos.screenGroup.convertToModel(churchId, await repos.screenGroup.load(churchId, screenGroupId)));
     if (!group) return null;
-    const timeZone = await this.churchTimeZone(churchId);
-    const ctx: BuildContext = { repos, churchId, files: new Map(), instructions: new Map(), folderTitles: new Map(), auth: new Map() };
+    const timeZone = await this.timed(ctx, "timeZone", null, () => this.churchTimeZone(churchId));
 
     const fallbackContent = group.defaultPlaylistId ? await this.playlistContent(ctx, group.defaultPlaylistId) : null;
     const fallback = fallbackContent?.items || null;
     const fallbackTitle = fallbackContent?.title || null;
-    const entries: ScheduleEntry[] = repos.scheduleEntry.convertAllToModel(churchId, await repos.scheduleEntry.loadByScreenGroupId(churchId, screenGroupId));
+    const entries: ScheduleEntry[] = await this.timed(ctx, "db:entries", null, async () => repos.scheduleEntry.convertAllToModel(churchId, await repos.scheduleEntry.loadByScreenGroupId(churchId, screenGroupId)));
     const expanded = ScreenScheduleHelper.expand(entries, now, timeZone);
 
     const uniqueEntries = [...new Set(expanded.map((o) => o.entry))];
@@ -109,6 +162,7 @@ export class ScreenManifestHelper {
       endBehavior: ScreenScheduleHelper.playbackEndBehavior(s.entry.endBehavior),
       items: contentByEntry.get(s.entry.id).items
     }));
+    ctx.counts = { entries: uniqueEntries.length, occurrences: occurrences.length, items: new Set([...(fallback || []), ...occurrences.flatMap((o) => o.items)]).size };
     const rev = crypto.createHash("sha1").update(JSON.stringify({ timeZone, screenGroupName: group.name, fallbackTitle, fallback, occurrences })).digest("hex");
     return {
       timeZone,
@@ -152,7 +206,7 @@ export class ScreenManifestHelper {
     const headers = { Authorization: `Bearer ${auth.access_token}` };
     if (providerId !== "onedrive") return { url, headers };
     try {
-      const res = await fetch(url, { headers, redirect: "manual" });
+      const res = await this.timed(ctx, "link", providerId, () => fetch(url, { headers, redirect: "manual" }));
       const location = res.headers.get("location");
       if (location) return { url: location };
     } catch (e) {
@@ -165,7 +219,7 @@ export class ScreenManifestHelper {
   // B1Admin links GO per ministry, so a plan's provider uses its ministry's login, falling back to the church-level one.
   private static providerAuth(ctx: BuildContext, providerId: string, ministryId: string | null): Promise<ContentProviderAuthData | null> {
     const key = `${providerId}|${ministryId || ""}`;
-    if (!ctx.auth.has(key)) ctx.auth.set(key, ProviderAuthHelper.getAuth(ctx.repos, ctx.churchId, ministryId, providerId));
+    if (!ctx.auth.has(key)) ctx.auth.set(key, this.timed(ctx, "auth", providerId, () => ProviderAuthHelper.getAuth(ctx.repos, ctx.churchId, ministryId, providerId)));
     return ctx.auth.get(key);
   }
 
@@ -180,7 +234,7 @@ export class ScreenManifestHelper {
 
   private static providerFiles(ctx: BuildContext, providerId: string, path: string, ministryId: string | null): Promise<ProviderFile[] | null> {
     const key = `${providerId}|${ministryId || ""}|${path}`;
-    if (!ctx.files.has(key)) ctx.files.set(key, this.loadProviderFiles(ctx, providerId, path, ministryId));
+    if (!ctx.files.has(key)) ctx.files.set(key, this.timed(ctx, "files", providerId, () => this.loadProviderFiles(ctx, providerId, path, ministryId)));
     return ctx.files.get(key);
   }
 
@@ -202,7 +256,7 @@ export class ScreenManifestHelper {
 
   private static providerInstructions(ctx: BuildContext, providerId: string, path: string, ministryId: string | null): Promise<Instructions | null> {
     const key = `${providerId}|${ministryId || ""}|${path}`;
-    if (!ctx.instructions.has(key)) ctx.instructions.set(key, this.loadProviderInstructions(ctx, providerId, path, ministryId));
+    if (!ctx.instructions.has(key)) ctx.instructions.set(key, this.timed(ctx, "instructions", providerId, () => this.loadProviderInstructions(ctx, providerId, path, ministryId)));
     return ctx.instructions.get(key);
   }
 
@@ -264,7 +318,7 @@ export class ScreenManifestHelper {
   }
 
   private static async playlistContent(ctx: BuildContext, playlistId: string): Promise<EntryContent | null> {
-    const playlist = ctx.repos.playlist.convertToModel(ctx.churchId, await ctx.repos.playlist.load(ctx.churchId, playlistId));
+    const playlist = await this.timed(ctx, "db:playlist", null, async () => ctx.repos.playlist.convertToModel(ctx.churchId, await ctx.repos.playlist.load(ctx.churchId, playlistId)));
     if (!playlist) return null;
     const result = await Promise.all(((playlist.items || []) as PlaylistItem[]).map(async (item) => {
       const fileId = item.fileId || item.id;
@@ -285,13 +339,17 @@ export class ScreenManifestHelper {
   }
 
   private static async planTypeContent(ctx: BuildContext, planTypeId: string): Promise<EntryContent> {
-    const planType: PlanType = await ctx.repos.planType.load(ctx.churchId, planTypeId);
-    const title = await this.planTypeTitle(ctx, planType);
+    const { planType, title, plan, planItems } = await this.timed(ctx, "db:plan", null, async () => {
+      const planType: PlanType = await ctx.repos.planType.load(ctx.churchId, planTypeId);
+      const title = await this.planTypeTitle(ctx, planType);
+      const plan = (await ctx.repos.plan.loadCurrentByPlanTypeId(planTypeId)) as Plan;
+      const planItems = plan && plan.churchId === ctx.churchId ? ((await ctx.repos.planItem.loadForPlan(ctx.churchId, plan.id)) as PlanItem[]) : [];
+      return { planType, title, plan, planItems };
+    });
     const ministryId = planType?.ministryId || null;
-    const plan = (await ctx.repos.plan.loadCurrentByPlanTypeId(planTypeId)) as Plan;
     if (!plan || plan.churchId !== ctx.churchId) return { title, items: [] };
-    const planItems = (await ctx.repos.planItem.loadForPlan(ctx.churchId, plan.id)) as PlanItem[];
-    const { messages } = await SignageFeedHelper.buildPlanFeed(plan, planItems, await this.providerItemFiles(ctx, planItems, ministryId));
+    const providerFiles = await this.providerItemFiles(ctx, planItems, ministryId);
+    const { messages } = await this.timed(ctx, "planFeed", null, () => SignageFeedHelper.buildPlanFeed(plan, planItems, providerFiles));
     // A linked non-Lessons plan (GO Curriculum) has no items and no venue feed, so play the provider's lesson with the ministry's login.
     // Only this authenticated path does it; the anonymous signage feed must not hand out licensed media urls.
     if (messages.length === 0 && plan.providerId && plan.providerPlanId && plan.providerId !== "lessonschurch") return { title, items: await this.folderItems(ctx, plan.providerId, plan.providerPlanId, ministryId) };
@@ -306,7 +364,7 @@ export class ScreenManifestHelper {
   // Falls back to "provider › last segment", the label FreePlayAdmin's calendar shows; LAN providers can't be browsed from the cloud.
   private static folderTitle(ctx: BuildContext, providerId: string, path: string): Promise<string> {
     const key = `${providerId}|${path}`;
-    if (!ctx.folderTitles.has(key)) ctx.folderTitles.set(key, this.loadFolderTitle(ctx, providerId, path));
+    if (!ctx.folderTitles.has(key)) ctx.folderTitles.set(key, this.timed(ctx, "title", providerId, () => this.loadFolderTitle(ctx, providerId, path)));
     return ctx.folderTitles.get(key);
   }
 
