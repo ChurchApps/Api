@@ -33,8 +33,10 @@ export class RecurrenceHelper {
     } catch {
       return start < windowEnd && end > windowStart ? [{ start, end }] : [];
     }
+    // No editor offers repeats more often than daily; walking hours, minutes or seconds from dtstart costs seconds of CPU per read.
+    if (rule.options.freq > RRule.DAILY) return start < windowEnd && end > windowStart ? [{ start, end }] : [];
 
-    const dates = rule.between(this.toFakeUtc(windowStart), this.toFakeUtc(windowEnd), true).slice(0, max);
+    const dates = rule.between(this.toFakeUtc(windowStart), this.toFakeUtc(windowEnd), true, (_d, i) => i < max);
     const occurrences = dates.map((d) => {
       const local = this.fromFakeUtc(d);
       local.setHours(start.getHours(), start.getMinutes(), start.getSeconds(), 0);
