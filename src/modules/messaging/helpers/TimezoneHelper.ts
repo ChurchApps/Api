@@ -33,6 +33,13 @@ export class TimezoneHelper {
     return localAsUtc - instantMs;
   }
 
+  // Civil date (YYYY-MM-DD) of an instant in a zone; never toISOString(), which is the UTC date.
+  static localDate(instant: Date, tz: string): string {
+    const map: Record<string, string> = {};
+    for (const p of new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(instant)) map[p.type] = p.value;
+    return `${map.year}-${map.month}-${map.day}`;
+  }
+
   static wallClockToUtc(y: number, mo: number, d: number, h: number, mi: number, tz: string): Date {
     const asIfUtc = Date.UTC(y, mo - 1, d, h, mi, 0);
     const off1 = this.offsetMs(tz, asIfUtc);

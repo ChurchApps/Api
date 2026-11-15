@@ -314,3 +314,86 @@ describe("ReminderEngine.scan channels->email wiring", () => {
     expect(options).toEqual({ category: "event_reminders", deliveryStartLevel: 1 });
   });
 });
+
+describe("ReminderEngine.sendNow", () => {
+  const def = {
+    id: "D1",
+    churchId: "CH1",
+    entityType: "ev",
+    entityId: "E1",
+    category: "event_reminders",
+    offsets: "1440",
+    sendLocalTime: "09:00:00",
+    timeZone: "UTC",
+    channels: "push",
+    message: "Bring snacks",
+    enabled: true
+  };
+
+  function buildRepos(opts: { claim?: boolean } = {}) {
+    const rows: any[] = [{ id: "OLD", definitionId: "D1", occurrenceKey: "D1:2026-12-25T10:00:00:1440", status: "pending" }];
+    return {
+      rows,
+      reminderOccurrence: {
+        upsert: jest.fn(async (m: any) => { rows.push({ ...m, id: "NOW", status: "pending" }); }),
+        loadByKey: jest.fn(async (key: string) => rows.find((r) => r.occurrenceKey === key)),
+        claim: jest.fn(async () => opts.claim ?? true),
+        markSent: jest.fn(async () => {}),
+        markCancelled: jest.fn(async () => {}),
+        markFailed: jest.fn(async () => {}),
+        markRetry: jest.fn(async () => {})
+      },
+      reminderDefinition: { load: jest.fn(async () => def) },
+      reminderSentLog: { loadPersonIdsForOccurrence: jest.fn(async () => []), insertIgnore: jest.fn(async () => {}) }
+    } as any;
+  }
+
+  it("writes one due-now row for the next occurrence and sends it once to the adapter's recipients", async () => {
+    const repos = buildRepos();
+    ReminderEngine.init(repos);
+    const now = new Date("2026-12-01T15:00:00Z");
+    const sent = await ReminderEngine.sendNow(def as any, now);
+
+    expect(sent).toBe(2);
+    expect(repos.reminderOccurrence.upsert).toHaveBeenCalledTimes(1);
+    const row = repos.reminderOccurrence.upsert.mock.calls[0][0];
+    expect(row.occurrenceKey).toBe(`D1:now:${now.getTime()}`);
+    expect(row.occLocalISO).toBe("2026-12-25T10:00:00");
+    expect(row.fireAt.getTime()).toBe(now.getTime());
+    expect(createNotificationsMock).toHaveBeenCalledTimes(1);
+    expect(createNotificationsMock.mock.calls[0][0]).toEqual(["P1", "P2"]);
+    expect(repos.reminderOccurrence.markSent).toHaveBeenCalledWith("NOW", 2);
+  });
+
+  it("falls back to today in the church time zone when the entity has no upcoming occurrence", async () => {
+    (adapter.getOccurrences as jest.Mock).mockResolvedValueOnce([]);
+    const repos = buildRepos();
+    ReminderEngine.init(repos);
+    await ReminderEngine.sendNow({ ...def, timeZone: "America/Chicago" } as any, new Date("2026-12-02T03:00:00Z"));
+    expect(repos.reminderOccurrence.upsert.mock.calls[0][0].occLocalISO).toBe("2026-12-01T09:00:00");
+  });
+
+  it("rejects a scope definition and a disabled one without touching repos", async () => {
+    const repos = buildRepos();
+    ReminderEngine.init(repos);
+    await expect(ReminderEngine.sendNow({ ...def, entityId: undefined, scopeId: "PT1" } as any)).rejects.toThrow();
+    await expect(ReminderEngine.sendNow({ ...def, enabled: false } as any)).rejects.toThrow();
+    expect(repos.reminderOccurrence.upsert).not.toHaveBeenCalled();
+    expect(createNotificationsMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves the scheduled pending rows alone", async () => {
+    const repos = buildRepos();
+    ReminderEngine.init(repos);
+    await ReminderEngine.sendNow(def as any, new Date("2026-12-01T15:00:00Z"));
+    expect(repos.rows.find((r: any) => r.id === "OLD").status).toBe("pending");
+    expect(repos.reminderOccurrence.claim).not.toHaveBeenCalledWith("OLD");
+  });
+
+  it("returns 0 when the timer already claimed the row", async () => {
+    const repos = buildRepos({ claim: false });
+    ReminderEngine.init(repos);
+    expect(await ReminderEngine.sendNow(def as any, new Date("2026-12-01T15:00:00Z"))).toBe(0);
+    expect(createNotificationsMock).not.toHaveBeenCalled();
+  });
+});

@@ -39,6 +39,10 @@ export class ReminderOccurrenceRepo {
     }).onDuplicateKeyUpdate({ id: sql`id` as any }).execute();
   }
 
+  public async loadByKey(occurrenceKey: string) {
+    return getDb().selectFrom("reminderOccurrences").selectAll().where("occurrenceKey", "=", occurrenceKey).executeTakeFirst();
+  }
+
   public async loadDue(limit = 100) {
     return getDb().selectFrom("reminderOccurrences").selectAll()
       .where((eb) => eb.or([
