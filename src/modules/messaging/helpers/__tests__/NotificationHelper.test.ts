@@ -45,6 +45,11 @@ const loadChurchMock = jest.fn() as jest.MockedFunction<any>;
 loadChurchMock.mockResolvedValue({ id: "CHU1", name: "Grace Church" });
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch: loadChurchMock }) }));
 
+// Doing gateway: task and card note titles come from the task (#1586).
+const loadTaskMock = jest.fn() as jest.MockedFunction<any>;
+loadTaskMock.mockResolvedValue(null);
+jest.mock("../../../../shared/modules/DoingModuleGateway.js", () => ({ getDoingModuleGateway: () => ({ loadTask: loadTaskMock }) }));
+
 // axios: unused on the socket/push escalation path under test.
 jest.mock("axios", () => ({ default: { post: jest.fn() }, post: jest.fn() }));
 
@@ -823,6 +828,24 @@ describe("NotificationHelper.checkShouldNotify conversation message text", () =>
 
   it("does not print null when a group name cannot be resolved and there is no title", async () => {
     expect(await notify({ contentType: "group", title: null })).toBe("New message");
+  });
+
+  // #1586: task note threads are titled "Task #<id> Notes"; the notification should name the task.
+  it("names the task instead of its id for task notes", async () => {
+    loadTaskMock.mockResolvedValueOnce({ id: "wseHZndiKmT", title: "Fix the projector" });
+    const message = await notify({ contentType: "task", contentId: "wseHZndiKmT", title: "Task #wseHZndiKmT Notes" });
+    expect(message).toBe("New message: Fix the projector Notes");
+    expect(loadTaskMock).toHaveBeenCalledWith("CHU1", "wseHZndiKmT");
+  });
+
+  it("names the task instead of its id for workflow card notes", async () => {
+    loadTaskMock.mockResolvedValueOnce({ id: "CARD1", title: "Call the new family" });
+    expect(await notify({ contentType: "workflowCard", contentId: "CARD1", title: "Card CARD1 Notes" })).toBe("New message: Call the new family Notes");
+  });
+
+  it("keeps the stored title when the task cannot be loaded", async () => {
+    loadTaskMock.mockRejectedValueOnce(new Error("db down"));
+    expect(await notify({ contentType: "task", title: "Task #12 Notes" })).toBe("New message: Task #12 Notes");
   });
 });
 

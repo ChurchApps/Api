@@ -982,6 +982,16 @@ export class NotificationHelper {
 
   // conversations.title is a snapshot from the first message; group renames never sync it, so resolve the live name (issue #973)
   static resolveConversationTitle = async (conversation: Conversation): Promise<string> => {
+    // Task and card note threads are stored as "Task #<id> Notes"; name the task instead (#1586)
+    if ((conversation.contentType === "task" || conversation.contentType === "workflowCard") && conversation.contentId) {
+      try {
+        const { getDoingModuleGateway } = await import("../../../shared/modules/DoingModuleGateway.js");
+        const task = await getDoingModuleGateway().loadTask(conversation.churchId, conversation.contentId);
+        return task?.title ? task.title + " Notes" : conversation.title;
+      } catch {
+        return conversation.title;
+      }
+    }
     const groupId = conversation.groupId || ((conversation.contentType === "group" || conversation.contentType === "groupAnnouncement") ? conversation.contentId : null);
     if (!groupId || (conversation.contentType !== "group" && conversation.contentType !== "groupAnnouncement")) return conversation.title;
     try {
