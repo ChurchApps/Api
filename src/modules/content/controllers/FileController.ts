@@ -9,6 +9,7 @@ import { EnvironmentBase, inferContentTypeFromKey, resolveMaxUploadBytes, type I
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { S3Client } from "@aws-sdk/client-s3";
 import { StorageResolver } from "../helpers/StorageResolver.js";
+import { GoogleDriveStorageProvider } from "../helpers/GoogleDriveStorageProvider.js";
 import { BYOS_PROVIDERS } from "../helpers/ByosAuth.js";
 import { QuotaExceededError } from "../helpers/MinistryStuffStorageProvider.js";
 import { isPublicFile } from "../helpers/PublicFileAccess.js";
@@ -154,9 +155,10 @@ export class FileController extends ContentBaseController {
           // clients like FreeShow omit mimeType; infer from the key so zips presign as their real type
           const inferred = req.body.mimeType || inferContentTypeFromKey(key) || "application/octet-stream";
           const mimeType = isEditor ? inferred : safeMemberMimeType(inferred);
-          const result = this.isFreeShowSync(req.body) && storage.name === "churchapps"
-            ? await this.freeShowPresignedUrl(key, size)
-            : await storage.provider.getUploadUrl(key, mimeType, size);
+          let result;
+          if (this.isFreeShowSync(req.body) && storage.name === "churchapps") result = await this.freeShowPresignedUrl(key, size);
+          else if (this.isSyncFile(req.body) && storage.provider instanceof GoogleDriveStorageProvider) result = await storage.provider.getReplaceUploadUrl(key, mimeType, size);
+          else result = await storage.provider.getUploadUrl(key, mimeType, size);
           return result || {};
         } catch (e) {
           if (e instanceof QuotaExceededError) return this.json({ error: "storage_quota_exceeded", usedBytes: e.usedBytes, quotaBytes: e.quotaBytes }, 400);
@@ -164,6 +166,28 @@ export class FileController extends ContentBaseController {
           if (detail && BYOS_PROVIDERS.includes(storage.name)) return this.json({ error: "storage_provider_error: " + detail }, 400);
           throw e;
         }
+      }
+    });
+  }
+
+  // Where a team's FreeShow sync zip lives. external=false: the platform content host at the usual
+  // /{churchId}/files/group/{teamId}/{fileName} path. external=true: the church's own storage, with the url
+  // and md5/modified markers to use instead (url absent until the first upload lands).
+  @httpGet("/sync/:teamId/:fileName")
+  public async syncFileInfo(@requestParam("teamId") teamId: string, @requestParam("fileName") fileName: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      const body = { contentType: "group", contentId: teamId, fileName };
+      if (!this.isSyncFile(body)) return this.json({ error: "unsupported_file" }, 400);
+      if (!au.checkAccess(Permissions.content.edit) && au.groupIds.indexOf(teamId) === -1) return this.json({}, 401);
+      const storage = await StorageResolver.forChurch(this.repos.storageProvider, au.churchId);
+      if (!(storage.provider instanceof GoogleDriveStorageProvider)) return { external: false };
+      try {
+        const info = await storage.provider.getKeyedFileInfo(this.buildKey(au.churchId, "group", teamId, fileName));
+        return { external: true, ...(info || {}) };
+      } catch (e) {
+        const detail = this.providerErrorDetail(e);
+        if (detail) return this.json({ error: "storage_provider_error: " + detail }, 400);
+        throw e;
       }
     });
   }
@@ -208,6 +232,11 @@ export class FileController extends ContentBaseController {
 
   private isFreeShowSync(body: { fileName: string; contentType: string; mimeType?: string }): boolean {
     return body.contentType === "group" && !body.mimeType && ["current.zip", "previous.zip"].includes(path.basename(body.fileName || ""));
+  }
+
+  // FreeShow's per-team sync state: one file per name that each sync overwrites, whatever the client sends as mimeType.
+  private isSyncFile(body: { fileName: string; contentType: string }): boolean {
+    return body.contentType === "group" && ["current.zip", "previous.zip"].includes(path.basename(body.fileName || ""));
   }
 
   // Temp patch for FreeShow double appending content type and public read.
