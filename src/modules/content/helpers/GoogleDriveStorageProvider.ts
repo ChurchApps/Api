@@ -7,6 +7,8 @@ import { ByosAuth } from "./ByosAuth.js";
 
 const API = "https://www.googleapis.com/drive/v3";
 const UPLOAD_API = "https://www.googleapis.com/upload/drive/v3";
+// appProperties key holding the B1 storage key, for files looked up by key rather than by stored file id
+const KEY_PROPERTY = "b1Key";
 
 // drive.file scope: only files/folders created by the app are visible, which is all we need.
 // Files are identified by Drive file id (stored in files.externalId), not by path.
@@ -63,6 +65,49 @@ export class GoogleDriveStorageProvider implements IStorageProvider {
     const url = resp.headers.location || resp.headers.Location;
     if (!url) return null;
     return { url, fields: {}, key, method: "PUT", rawBody: true, externalIdField: "id" };
+  }
+
+  // Drive ids files, not paths, so a plain create duplicates on every upload. For files that must keep a
+  // stable identity (FreeShow sync zips), tag them with the full key and PATCH the existing file instead.
+  public async getReplaceUploadUrl(key: string, contentType: string, size: number): Promise<PresignedPostData | null> {
+    const token = await this.token();
+    const headers = { ...this.headers(token), "X-Upload-Content-Type": contentType, "X-Upload-Content-Length": String(size) };
+    const existing = await this.findByKey(token, key);
+    const resp = existing
+      ? await axios.patch(UPLOAD_API + "/files/" + existing.id + "?uploadType=resumable", {}, { headers })
+      : await axios.post(UPLOAD_API + "/files?uploadType=resumable", { name: path.basename(key), parents: [await this.ensureFolder(token)], appProperties: { [KEY_PROPERTY]: key } }, { headers });
+    const url = resp.headers.location || resp.headers.Location;
+    if (!url) return null;
+    return { url, fields: {}, key, method: "PUT", rawBody: true, externalIdField: "id" };
+  }
+
+  // Location and change markers for a file written by getReplaceUploadUrl. Its client never registers a
+  // files row, so confirmUpload never runs; the file is shared publicly here the first time it is read.
+  public async getKeyedFileInfo(key: string): Promise<{ url: string; md5: string | null; modified: string | null; size: number | null } | null> {
+    const token = await this.token();
+    const file = await this.findByKey(token, key);
+    if (!file) return null;
+    if (!file.shared) await this.makePublic(token, file.id);
+    return {
+      url: "https://drive.usercontent.google.com/download?id=" + encodeURIComponent(file.id) + "&export=download&confirm=t",
+      md5: file.md5Checksum || null,
+      modified: file.modifiedTime || null,
+      size: file.size ? parseInt(file.size, 10) : null
+    };
+  }
+
+  // Newest first, so if two first-time uploads ever raced into two files, both callers settle on the same one.
+  private async findByKey(token: string, key: string): Promise<{ id: string; md5Checksum?: string; modifiedTime?: string; size?: string; shared?: boolean } | null> {
+    const escaped = key.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const params = {
+      q: `appProperties has { key='${KEY_PROPERTY}' and value='${escaped}' } and trashed=false`,
+      fields: "files(id,md5Checksum,modifiedTime,size,shared)",
+      orderBy: "modifiedTime desc",
+      pageSize: 1,
+      spaces: "drive"
+    };
+    const resp = await axios.get(API + "/files", { headers: this.headers(token), params });
+    return resp.data?.files?.[0] || null;
   }
 
   // key = the Drive file id (files.externalId), registered by the client after the resumable upload completes

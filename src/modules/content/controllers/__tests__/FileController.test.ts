@@ -11,11 +11,19 @@ jest.mock("@churchapps/apihelper", () => ({
   inferContentTypeFromKey: jest.fn(() => "application/octet-stream"),
   resolveMaxUploadBytes: jest.fn((n: number) => n)
 }));
+jest.mock("../../helpers/GoogleDriveStorageProvider", () => ({
+  GoogleDriveStorageProvider: class {
+    getUploadUrl = jest.fn(async () => ({ url: "create" }));
+    getReplaceUploadUrl = jest.fn(async () => ({ url: "replace" }));
+    getKeyedFileInfo = jest.fn(async (): Promise<any> => null);
+  }
+}));
 jest.mock("@aws-sdk/s3-presigned-post", () => ({ createPresignedPost: jest.fn() }));
 jest.mock("@aws-sdk/client-s3", () => ({ S3Client: class {} }));
 
 import { FileController } from "../FileController.js";
 import { StorageResolver } from "../../helpers/StorageResolver.js";
+import { GoogleDriveStorageProvider } from "../../helpers/GoogleDriveStorageProvider.js";
 
 function makeController(opts: any = {}) {
   const repos = {
@@ -224,5 +232,59 @@ describe("FileController group-member upload hardening", () => {
     const { controller, repos } = makeController({ au: groupAu });
     await (controller as any).save({ body: [{ contentType: "group", contentId: "g1", fileName: "a.txt", fileType: "image/svg+xml", size: 1, fileContents: "data:text/plain;base64,QUJDRA==" }] }, {});
     expect(repos.file.save).toHaveBeenCalledWith(expect.objectContaining({ size: 4, fileType: "application/octet-stream" }));
+  });
+});
+
+describe("FileController FreeShow sync on Google Drive", () => {
+  const groupAu = { churchId: "c1", checkAccess: () => false, groupIds: ["g1"] };
+  const useDrive = () => {
+    const provider: any = new (GoogleDriveStorageProvider as any)();
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "googledrive", provider });
+    return provider;
+  };
+
+  it("presigns sync zips as a replace of the keyed Drive file", async () => {
+    const provider = useDrive();
+    const { controller } = makeController({ au: groupAu });
+    const result: any = await (controller as any).getUploadUrl({ body: { contentType: "group", contentId: "g1", fileName: "current.zip", mimeType: "application/zip", size: 10 } }, {});
+    expect(result).toEqual({ url: "replace" });
+    expect(provider.getReplaceUploadUrl).toHaveBeenCalledWith("/c1/files/group/g1/current.zip", "application/zip", 10);
+    expect(provider.getUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("still creates new Drive files for other group uploads", async () => {
+    const provider = useDrive();
+    const { controller } = makeController({ au: groupAu });
+    await (controller as any).getUploadUrl({ body: { contentType: "group", contentId: "g1", fileName: "notes.zip", mimeType: "application/zip", size: 10 } }, {});
+    expect(provider.getUploadUrl).toHaveBeenCalled();
+    expect(provider.getReplaceUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("reports the Drive location and change markers of a sync zip", async () => {
+    const provider = useDrive();
+    provider.getKeyedFileInfo.mockResolvedValue({ url: "https://drive/x", md5: "abc", modified: "2026-11-16T00:00:00Z", size: 5 });
+    const { controller } = makeController({ au: groupAu });
+    const result: any = await (controller as any).syncFileInfo("g1", "current.zip", {}, {});
+    expect(provider.getKeyedFileInfo).toHaveBeenCalledWith("/c1/files/group/g1/current.zip");
+    expect(result).toEqual({ external: true, url: "https://drive/x", md5: "abc", modified: "2026-11-16T00:00:00Z", size: 5 });
+  });
+
+  it("reports external with no url before the first Drive upload", async () => {
+    useDrive();
+    const { controller } = makeController({ au: groupAu });
+    expect(await (controller as any).syncFileInfo("g1", "previous.zip", {}, {})).toEqual({ external: true });
+  });
+
+  it("points non-Drive churches at the platform content host", async () => {
+    (StorageResolver.forChurch as jest.Mock).mockResolvedValue({ name: "churchapps", provider: {} });
+    const { controller } = makeController({ au: groupAu });
+    expect(await (controller as any).syncFileInfo("g1", "current.zip", {}, {})).toEqual({ external: false });
+  });
+
+  it("rejects other file names and teams the caller is not on", async () => {
+    useDrive();
+    const { controller } = makeController({ au: groupAu });
+    expect(((await (controller as any).syncFileInfo("g1", "other.zip", {}, {})) as any).status).toBe(400);
+    expect(((await (controller as any).syncFileInfo("g2", "current.zip", {}, {})) as any).status).toBe(401);
   });
 });

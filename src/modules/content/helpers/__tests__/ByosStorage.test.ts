@@ -1,4 +1,4 @@
-jest.mock("axios", () => ({ post: jest.fn(), get: jest.fn(), delete: jest.fn(), put: jest.fn() }));
+jest.mock("axios", () => ({ post: jest.fn(), get: jest.fn(), delete: jest.fn(), put: jest.fn(), patch: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({
   EncryptionHelper: {
     encrypt: (v: string) => "enc:" + v,
@@ -64,6 +64,48 @@ describe("GoogleDriveStorageProvider", () => {
     const [url, body] = mockedAxios.post.mock.calls[0];
     expect(url).toContain("/files/driveId9/permissions");
     expect(body).toEqual({ role: "reader", type: "anyone" });
+  });
+
+  it("creates a key-tagged file when no sync file exists yet", async () => {
+    const row = connectedRow("googledrive", { settings: JSON.stringify({ folderId: "fld1" }) });
+    mockedAxios.get.mockResolvedValue({ data: { files: [] } });
+    mockedAxios.post.mockResolvedValue({ headers: { location: "https://upload.session/new" }, data: {} });
+    const provider = new GoogleDriveStorageProvider(row as any, makeRepo([row]) as any);
+    const result = await provider.getReplaceUploadUrl("/ch1/files/group/t1/current.zip", "application/zip", 99);
+    expect(result).toMatchObject({ url: "https://upload.session/new", method: "PUT", rawBody: true });
+    expect(mockedAxios.get.mock.calls[0][1].params.q).toBe("appProperties has { key='b1Key' and value='/ch1/files/group/t1/current.zip' } and trashed=false");
+    expect(mockedAxios.post.mock.calls[0][1]).toEqual({ name: "current.zip", parents: ["fld1"], appProperties: { b1Key: "/ch1/files/group/t1/current.zip" } });
+    expect(mockedAxios.patch).not.toHaveBeenCalled();
+  });
+
+  it("opens a resumable PATCH on the existing sync file instead of creating another", async () => {
+    const row = connectedRow("googledrive", { settings: JSON.stringify({ folderId: "fld1" }) });
+    mockedAxios.get.mockResolvedValue({ data: { files: [{ id: "drv1", shared: true }] } });
+    mockedAxios.patch.mockResolvedValue({ headers: { location: "https://upload.session/upd" }, data: {} });
+    const provider = new GoogleDriveStorageProvider(row as any, makeRepo([row]) as any);
+    const result = await provider.getReplaceUploadUrl("/ch1/files/group/t1/current.zip", "application/zip", 99);
+    expect(result).toMatchObject({ url: "https://upload.session/upd", method: "PUT", rawBody: true });
+    const [url, , config] = mockedAxios.patch.mock.calls[0];
+    expect(url).toContain("/files/drv1?uploadType=resumable");
+    expect(config.headers["X-Upload-Content-Length"]).toBe("99");
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it("shares an unshared sync file and returns its download url and markers", async () => {
+    const row = connectedRow("googledrive");
+    mockedAxios.get.mockResolvedValue({ data: { files: [{ id: "drv1", md5Checksum: "m5", modifiedTime: "2026-11-16T00:00:00Z", size: "42", shared: false }] } });
+    mockedAxios.post.mockResolvedValue({ data: {} });
+    const provider = new GoogleDriveStorageProvider(row as any, makeRepo([row]) as any);
+    const info = await provider.getKeyedFileInfo("/ch1/files/group/t1/current.zip");
+    expect(info).toEqual({ url: "https://drive.usercontent.google.com/download?id=drv1&export=download&confirm=t", md5: "m5", modified: "2026-11-16T00:00:00Z", size: 42 });
+    expect(mockedAxios.post.mock.calls[0][0]).toContain("/files/drv1/permissions");
+  });
+
+  it("returns null info when the sync file has not been uploaded", async () => {
+    const row = connectedRow("googledrive");
+    mockedAxios.get.mockResolvedValue({ data: { files: [] } });
+    const provider = new GoogleDriveStorageProvider(row as any, makeRepo([row]) as any);
+    expect(await provider.getKeyedFileInfo("/ch1/files/group/t1/current.zip")).toBeNull();
   });
 
   it("mints webContentLink for downloads", async () => {
