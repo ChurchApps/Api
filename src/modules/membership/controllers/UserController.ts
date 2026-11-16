@@ -55,6 +55,13 @@ const VERIFICATION_MAX_ATTEMPTS = 5;
 // unknown so both failure paths burn the same bcrypt time and cannot be told apart by response time.
 const TIMING_EQUALIZER_HASH = "$2a$10$EIDWkbY3nzGaFR.cML8bBuI7fFECgvh7y93pqA6uT.8KrdHHy.Kma";
 
+// Runs before normalizeEmail and keeps the address as typed. Staff-invited and Google/Microsoft accounts are
+// stored that way (plus-tags and googlemail.com intact), so the canonical form alone never finds them.
+const keepTypedEmail = (value: any, { req }: any) => {
+  req.typedEmail = (value || "").toString().trim().toLowerCase();
+  return value;
+};
+
 /** The rate-limit bucket an attempt belongs to: the account being targeted, if we can name one. */
 function loginAccountKey(body: { email?: string; authGuid?: string }): string {
   const email = (body?.email || "").toString().trim().toLowerCase();
@@ -294,6 +301,14 @@ export class UserController extends MembershipBaseController {
     return this.repos.roleMember.existsForUser(churchId, userId);
   }
 
+  /** Finds the account by the address as typed first, then by its canonical form (how sign-up stores it). */
+  private async loadByTypedEmail(req: express.Request<any, any, any>, canonical: string): Promise<User | null> {
+    const typed: string = (req as any).typedEmail || "";
+    const user = typed ? await this.repos.user.loadByEmail(typed) : null;
+    if (user || typed === canonical) return user;
+    return this.repos.user.loadByEmail(canonical);
+  }
+
   private publicUser(user: User) {
     return { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName };
   }
@@ -419,7 +434,7 @@ export class UserController extends MembershipBaseController {
     });
   }
 
-  @httpPost("/forgot", body("userEmail").exists().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"))
+  @httpPost("/forgot", body("userEmail").exists().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"))
   public async forgotPassword(req: express.Request<{}, {}, ResetPasswordRequest>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
@@ -438,7 +453,7 @@ export class UserController extends MembershipBaseController {
         if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
         await LoginRateLimiter.recordFailure(this.repos, rateLimitIp, account);
 
-        const user = await this.repos.user.loadByEmail(req.body.userEmail);
+        const user = await this.loadByTypedEmail(req, req.body.userEmail);
         if (user !== null) {
           user.authGuid = "";
           const code = generateVerificationCode();
@@ -462,7 +477,7 @@ export class UserController extends MembershipBaseController {
     });
   }
 
-  @httpPost("/verifyCode", body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("code").isString().isLength({ min: 6, max: 6 }).withMessage("enter a 6-digit code"))
+  @httpPost("/verifyCode", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }).withMessage("enter a valid email address"), body("code").isString().isLength({ min: 6, max: 6 }).withMessage("enter a 6-digit code"))
   public async verifyCode(req: express.Request<{}, {}, { email: string; code: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       try {
@@ -476,7 +491,7 @@ export class UserController extends MembershipBaseController {
         const account = "verify:" + (req.body.email || "").toString().trim().toLowerCase();
         if (!(await LoginRateLimiter.allow(this.repos, rateLimitIp, account, LoginRateLimiter.maxPerAccountStrict))) return this.json({ errors: ["Too many requests"] }, 429);
 
-        const user = await this.repos.user.loadByEmail(req.body.email);
+        const user = await this.loadByTypedEmail(req, req.body.email);
         if (user === null) return this.json({ errors: ["invalid code"] }, 400);
         if (!user.verificationCode || !user.verificationExpires) return this.json({ errors: ["invalid code"] }, 400);
         if (new Date(user.verificationExpires).getTime() < Date.now()) return this.json({ errors: ["code expired"] }, 400);
@@ -511,7 +526,7 @@ export class UserController extends MembershipBaseController {
     });
   }
 
-  @httpPost("/checkEmail", body("email").isEmail().trim().normalizeEmail({ gmail_remove_dots: false }))
+  @httpPost("/checkEmail", body("email").isEmail().customSanitizer(keepTypedEmail).trim().normalizeEmail({ gmail_remove_dots: false }))
   public async checkEmail(req: express.Request<{}, {}, { email: string }>, res: express.Response): Promise<any> {
     return this.actionWrapperAnon(req, res, async () => {
       const errors = validationResult(req);
@@ -519,7 +534,7 @@ export class UserController extends MembershipBaseController {
 
       if (!(await PublicPersonRateLimiter.allow(this.repos, LoginRateLimiter.getClientIp(req), "", "checkEmail", CHECK_EMAIL_MAX_PER_IP))) return this.json({ errors: ["Too many requests"] }, 429);
 
-      const user = await this.repos.user.loadByEmail(req.body.email);
+      const user = await this.loadByTypedEmail(req, req.body.email);
       return this.json({ exists: !!user, peopleMatches: [] }, 200);
     });
   }
