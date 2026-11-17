@@ -1,11 +1,12 @@
 import "reflect-metadata";
 jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
-jest.mock("../../helpers/index", () => ({ Environment: { fileStore: "S3" }, Permissions: { content: { edit: "contentEdit" } } }));
+const mockEnvironment = { fileStore: "S3" };
+jest.mock("../../helpers/index", () => ({ Environment: mockEnvironment, Permissions: { content: { edit: "contentEdit" } } }));
 // apihelper ships untransformed ESM; stub the symbols GalleryController uses.
 jest.mock("@churchapps/apihelper", () => ({
   __esModule: true,
   AwsHelper: { S3PresignedUrl: jest.fn(async (key: string) => ({ key, url: "https://s3.test/upload" })) },
-  FileStorageHelper: { list: jest.fn(async () => ["c1/gallery/0/1.jpg"]), remove: jest.fn(async () => {}) }
+  FileStorageHelper: { list: jest.fn(async () => ["c1/gallery/0/1.jpg"]), remove: jest.fn(async () => {}), store: jest.fn(async () => {}) }
 }));
 
 import { GalleryController } from "../GalleryController.js";
@@ -26,6 +27,8 @@ function makeController(opts: any = {}) {
 }
 
 beforeEach(() => {
+  mockEnvironment.fileStore = "S3";
+  (FileStorageHelper.store as jest.Mock).mockClear();
   (AwsHelper.S3PresignedUrl as jest.Mock).mockClear();
   (FileStorageHelper.list as jest.Mock).mockClear();
   (FileStorageHelper.remove as jest.Mock).mockClear();
@@ -70,6 +73,14 @@ describe("GalleryController.getAll", () => {
     expect(result.images).toEqual(["c1/gallery/0/1.jpg"]);
   });
 
+  // The disk store lists bare file names where S3 lists full keys; the dialog builds image urls from full keys.
+  it("returns full keys when the disk store lists bare file names", async () => {
+    (FileStorageHelper.list as jest.Mock).mockResolvedValueOnce(["1.png"]);
+    const { controller } = makeController({ access: ["contentEdit"] });
+    const result: any = await controller.getAll("1.78", {} as any, {} as any);
+    expect(result.images).toEqual(["c1/gallery/1.78/1.png"]);
+  });
+
   it("rejects a plain member who leads no groups", async () => {
     const { controller } = makeController({});
     const result: any = await controller.getAll("0", {} as any, {} as any);
@@ -91,5 +102,48 @@ describe("GalleryController.delete", () => {
     const { controller } = makeController({ access: ["contentEdit"] });
     await controller.delete("0", "1.jpg", {} as any, {} as any);
     expect(FileStorageHelper.remove).toHaveBeenCalledWith("c1/gallery/0/1.jpg");
+  });
+});
+
+// Self-hosted installs store files on disk, where there is no presigned S3 slot to hand back, so the
+// gallery dialog posts the image itself.
+describe("GalleryController.upload", () => {
+  const png = "data:image/png;base64," + Buffer.from("png-bytes").toString("base64");
+
+  it("stores the image on disk for a content admin", async () => {
+    mockEnvironment.fileStore = "disk";
+    const { controller } = makeController({ access: ["contentEdit"] });
+    const result: any = await controller.upload({ body: { folder: "1.78", fileName: "1.png", contentType: "image/png", fileContents: png } } as any, {} as any);
+    expect(result.key).toBe("c1/gallery/1.78/1.png");
+    expect(FileStorageHelper.store).toHaveBeenCalledWith("c1/gallery/1.78/1.png", "image/png", Buffer.from("png-bytes"));
+  });
+
+  it("gives a group leader an unguessable name", async () => {
+    mockEnvironment.fileStore = "disk";
+    const { controller } = makeController({ leaderGroupIds: ["g1"] });
+    const result: any = await controller.upload({ body: { folder: "1.78", fileName: "1.png", contentType: "image/png", fileContents: png } } as any, {} as any);
+    expect(result.key).toMatch(/^c1\/gallery\/1\.78\/1-[0-9a-f]{12}\.png$/);
+  });
+
+  it("rejects non-image uploads from a group leader", async () => {
+    mockEnvironment.fileStore = "disk";
+    const { controller } = makeController({ leaderGroupIds: ["g1"] });
+    const result: any = await controller.upload({ body: { folder: "1.78", fileName: "x.svg", contentType: "image/svg+xml", fileContents: png } } as any, {} as any);
+    expect(result.status).toBe(400);
+    expect(FileStorageHelper.store).not.toHaveBeenCalled();
+  });
+
+  it("rejects a plain member who leads no groups", async () => {
+    mockEnvironment.fileStore = "disk";
+    const { controller } = makeController({ groupIds: ["g1"] });
+    const result: any = await controller.upload({ body: { folder: "1.78", fileName: "1.png", contentType: "image/png", fileContents: png } } as any, {} as any);
+    expect(result.status).toBe(401);
+  });
+
+  it("is not used when files live in S3", async () => {
+    const { controller } = makeController({ access: ["contentEdit"] });
+    const result: any = await controller.upload({ body: { folder: "1.78", fileName: "1.png", contentType: "image/png", fileContents: png } } as any, {} as any);
+    expect(result.status).toBe(400);
+    expect(FileStorageHelper.store).not.toHaveBeenCalled();
   });
 });
