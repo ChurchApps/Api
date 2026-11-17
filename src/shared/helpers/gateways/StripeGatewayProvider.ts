@@ -69,7 +69,9 @@ export class StripeGatewayProvider implements IGatewayProvider {
       // Skip processing subscription charge.succeeded events to avoid duplicates
       // Also skip payment_intent.succeeded for subscription invoices (handled by invoice.paid)
       let shouldProcess = true;
-      if (stripeEvent.type === "charge.succeeded" && subscriptionEvent) {
+      // A charge made through a PaymentIntent is recorded from payment_intent.succeeded; processing
+      // charge.succeeded too let the two concurrent deliveries both insert the gift.
+      if (stripeEvent.type === "charge.succeeded" && (subscriptionEvent || eventData.payment_intent)) {
         shouldProcess = false;
       }
       if (stripeEvent.type === "payment_intent.succeeded" && eventData.invoice) {
