@@ -25,13 +25,16 @@ jest.mock("../../../../shared/helpers/GatewayService.js", () => {
 import { DonateController } from "../DonateController.js";
 import { GatewayService } from "../../../../shared/helpers/GatewayService.js";
 import { StripeHelper } from "../../../../shared/helpers/StripeHelper.js";
+import { StripeGatewayProvider } from "../../../../shared/helpers/gateways/StripeGatewayProvider.js";
 
 // One one-time card gift: Stripe sends charge.succeeded and payment_intent.succeeded for it.
 const charge = { id: "ch_1", object: "charge", payment_intent: "pi_1", amount: 12301, currency: "usd", customer: "cus_1", created: 1762600000, metadata: {} };
 const paymentIntent = { id: "pi_1", object: "payment_intent", latest_charge: "ch_1", amount: 12301, amount_received: 12301, currency: "usd", customer: "cus_1", created: 1762600000, metadata: {} };
 const events: Record<string, any> = {
   charge: { eventId: "evt_charge", eventType: "charge.succeeded", eventData: charge },
-  paymentIntent: { eventId: "evt_pi", eventType: "payment_intent.succeeded", eventData: paymentIntent }
+  paymentIntent: { eventId: "evt_pi", eventType: "payment_intent.succeeded", eventData: paymentIntent },
+  // A source-based charge from before PaymentIntents: charge.succeeded is its only event.
+  legacy: { eventId: "evt_legacy", eventType: "charge.succeeded", eventData: { ...charge, id: "ch_2", payment_intent: null } }
 };
 
 function makeController() {
@@ -55,7 +58,11 @@ function makeController() {
 }
 
 async function deliver(controller: DonateController, key: string) {
-  (GatewayService.verifyWebhook as jest.Mock).mockResolvedValueOnce({ success: true, shouldProcess: true, ...events[key] });
+  // Run the provider's real skip rules so the test sees which events it lets through.
+  (GatewayService.verifyWebhook as jest.Mock).mockImplementationOnce(async () => {
+    jest.spyOn(StripeHelper, "verifySignature").mockResolvedValueOnce({ id: events[key].eventId, type: events[key].eventType, data: { object: events[key].eventData } } as any);
+    return new StripeGatewayProvider().verifyWebhookSignature({ privateKey: "sk_test", webhookKey: "whsec_test" } as any, { "stripe-signature": "sig" }, {});
+  });
   const req: any = { params: { provider: "stripe" }, query: { churchId: "CHU1" }, headers: {}, body: { id: events[key].eventId }, protocol: "https", hostname: "api", get: () => undefined };
   return (controller as any).webhook(req, {});
 }
@@ -81,12 +88,26 @@ describe("DonateController Stripe webhook: one-time card gift", () => {
     expect(rows[0].status).toBe("complete");
   });
 
-  it("stores the gift under its PaymentIntent id whichever event arrives first", async () => {
+  it("records the gift from payment_intent.succeeded and leaves its charge.succeeded alone", async () => {
     const first = makeController();
     await deliver(first.controller, "charge");
     const second = makeController();
     await deliver(second.controller, "paymentIntent");
-    expect(first.rows[0].transactionId).toBe("pi_1");
+    expect(first.rows).toHaveLength(0);
     expect(second.rows[0].transactionId).toBe("pi_1");
+  });
+
+  it("still records a legacy charge that has no PaymentIntent", async () => {
+    const { controller, rows } = makeController();
+    await deliver(controller, "legacy");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].transactionId).toBe("ch_2");
+  });
+
+  it("records one donation when both events are delivered at the same time", async () => {
+    const { controller, rows } = makeController();
+    await Promise.all([deliver(controller, "charge"), deliver(controller, "paymentIntent")]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].transactionId).toBe("pi_1");
   });
 });
