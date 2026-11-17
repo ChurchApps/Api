@@ -764,7 +764,7 @@ export class NotificationHelper {
     }
 
     try {
-      await EmailHelper.sendTemplatedEmail(await this.churchFrom(notification.churchId), email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
+      await EmailHelper.sendTemplatedEmail(await this.churchFrom(notification.churchId), email, "B1.church", NotificationHelper.adminRoot(), subject, html, "ChurchEmailTemplate.html");
       if (reservationId) await ChurchEmailLimiter.settle(notification.churchId, reservationId, true);
       else await this.logDelivery(notification.churchId, notification.personId, "notification", notification.id, "email", true, email);
       notification.deliveryMethod = "complete";
@@ -787,13 +787,18 @@ export class NotificationHelper {
     const reservation = await ChurchEmailLimiter.reserve(churchId, "workflowEmail", [{ address: email, personId, contentId: taskId }]);
     if (!reservation) return "blocked (church email approval or daily limit)";
     try {
-      await EmailHelper.sendTemplatedEmail(await this.churchFrom(churchId), email, "B1.church", "https://admin.b1.church", subject, html, "ChurchEmailTemplate.html");
+      await EmailHelper.sendTemplatedEmail(await this.churchFrom(churchId), email, "B1.church", NotificationHelper.adminRoot(), subject, html, "ChurchEmailTemplate.html");
       await ChurchEmailLimiter.settle(churchId, reservation[0], true);
       return "sent";
     } catch (err) {
       await ChurchEmailLimiter.settle(churchId, reservation[0], false, String(err));
       throw err;
     }
+  }
+
+  // The install's own B1 Admin URL, so self-hosted emails link back to their domain.
+  private static adminRoot(): string {
+    return (Environment.b1AdminRoot || "https://admin.b1.church").replace(/\/$/, "");
   }
 
   // Sender shows the church's name; a failed lookup falls back to the bare support address.
@@ -1006,7 +1011,7 @@ export class NotificationHelper {
   static resolveNoteLink = async (conversation: Conversation): Promise<string | undefined> => {
     const id = conversation.contentId;
     if (!id) return undefined;
-    const adminRoot = (Environment.b1AdminRoot || "https://admin.b1.church").replace(/\/$/, "");
+    const adminRoot = NotificationHelper.adminRoot();
     switch (conversation.contentType) {
       case "groupNote": return `/mobile/groups/${id}?openChat=1&chatTab=notes`;
       case "person":
@@ -1089,7 +1094,7 @@ export class NotificationHelper {
     const from = await NotificationHelper.churchFrom(firstNotification.churchId);
     for (const address of addresses) {
       try {
-        await EmailHelper.sendTemplatedEmail(from, address, "B1.church", "https://admin.b1.church", title, content, "ChurchEmailTemplate.html", replyTo);
+        await EmailHelper.sendTemplatedEmail(from, address, "B1.church", NotificationHelper.adminRoot(), title, content, "ChurchEmailTemplate.html", replyTo);
         emailSuccess = true;
       } catch (error) {
         emailError = String(error);
