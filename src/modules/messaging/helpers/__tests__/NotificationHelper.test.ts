@@ -499,6 +499,7 @@ describe("NotificationHelper.sendEmailNotifications direct messages", () => {
     expect(args[4]).toBe("New Message from Jane Doe"); // subject
     expect(args[7]).toBe("sender@example.com"); // reply-to
     expect(args[0]).toBe('"Grace Church" <support@churchapps.org>'); // church name as sender display name
+    expect(args[3]).toBe("https://admin.example.org"); // header link follows the install's admin root
     expect(loadChurchMock).toHaveBeenCalledWith("CHU1");
     expect(savedComplete.at(-1)?.deliveryMethod).toBe("complete");
     expect((result as any).pmsProcessed).toBeUndefined();
@@ -627,6 +628,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
     try {
       expect(await NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).toBe("sent");
       expect(sendTemplatedEmailMock.mock.calls[0][0]).toBe('"Grace Church" <support@churchapps.org>');
+      expect(sendTemplatedEmailMock.mock.calls[0][3]).toBe("https://admin.example.org");
       expect(settle).toHaveBeenCalledWith("CHU1", "reserve1", true);
       sendTemplatedEmailMock.mockRejectedValueOnce(new Error("transport timeout"));
       await expect(NotificationHelper.sendWorkflowEmail("CHU1", "PER1", "CARD1", "volunteer@example.test", "S", "<p>Body</p>")).rejects.toThrow("timeout");
@@ -663,6 +665,7 @@ describe("NotificationHelper.createNotifications emailImmediate", () => {
     const args = sendTemplatedEmailMock.mock.calls[0];
     expect(args[0]).toBe('"Grace Church" <support@churchapps.org>');
     expect(args[1]).toBe("per1@example.com");
+    expect(args[3]).toBe("https://admin.example.org");
     expect(args[4]).toBe("Custom subject");
     expect(args[5]).toBe("<p>Custom html</p>");
     expect(repos.deliveryLog.save).toHaveBeenCalledWith(expect.objectContaining({ deliveryMethod: "email", success: true, personId: "PER1" }));
