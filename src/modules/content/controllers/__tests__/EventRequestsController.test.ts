@@ -10,7 +10,8 @@ jest.mock("../../helpers/ApprovalHelper", () => ({ ApprovalHelper: { determineSt
 jest.mock("../../helpers/ConflictHelper", () => ({ ConflictHelper: { findConflicts: jest.fn() } }));
 jest.mock("../../helpers/IcsHelper", () => ({ IcsHelper: { parseEvents: jest.fn() } }));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
-jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadGroupMembersForPerson: jest.fn(async () => []) }) }));
+const mockLoadPerson = jest.fn(async (_churchId: string, personId: string): Promise<any> => (personId === "p5" ? { id: "p5" } : null));
+jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGateway: () => ({ loadGroupMembersForPerson: jest.fn(async () => []), loadPerson: mockLoadPerson }) }));
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import { EventController } from "../EventController.js";
@@ -21,10 +22,12 @@ function makeController(opts: any = {}) {
       load: jest.fn(async () => opts.event),
       loadRequestsForPerson: jest.fn(async () => opts.requests ?? []),
       loadResolved: jest.fn(async () => opts.resolved ?? []),
-      delete: jest.fn(async () => undefined)
+      delete: jest.fn(async () => undefined),
+      save: jest.fn(async (e: any) => e)
     },
     eventBooking: {
       loadForEvent: jest.fn(async () => opts.bookings ?? []),
+      setRequestedByForEvent: jest.fn(async (_c: string, _e: string, personId: string) => (opts.bookings ?? []).forEach((b: any) => (b.requestedBy = personId))),
       deleteForEvent: jest.fn(async () => undefined)
     }
   };
@@ -130,5 +133,52 @@ describe("EventController.getRequestsForPerson (#1476)", () => {
     const result = await (controller as any).getRequestsForPerson("p7", {}, {});
     expect(result.status).toBe(401);
     expect(repos.event.loadRequestsForPerson).not.toHaveBeenCalled();
+  });
+});
+
+describe("EventController.setRequester (#1603)", () => {
+  it("returns 401 without content edit or calendars admin", async () => {
+    const { controller, repos } = makeController({ event: { id: "e1", requestedBy: "p1", approvalStatus: "pending" } });
+    const result = await (controller as any).setRequester("e1", { body: { personId: "p5" } }, {});
+    expect(result.status).toBe(401);
+    expect(repos.event.save).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for an unknown event", async () => {
+    const { controller } = makeController({ access: ["calendarsAdmin"] });
+    const result = await (controller as any).setRequester("e9", { body: { personId: "p5" } }, {});
+    expect(result.status).toBe(404);
+  });
+
+  it("returns 400 for a person outside the church", async () => {
+    const { controller, repos } = makeController({ access: ["calendarsAdmin"], event: { id: "e1", requestedBy: "p1", approvalStatus: "pending" } });
+    const result = await (controller as any).setRequester("e1", { body: { personId: "p404" } }, {});
+    expect(result.status).toBe(400);
+    expect(repos.event.save).not.toHaveBeenCalled();
+    expect(repos.eventBooking.setRequestedByForEvent).not.toHaveBeenCalled();
+  });
+
+  it("moves a pending request and every booking on it to the new person", async () => {
+    const { controller, repos } = makeController({
+      access: ["contentEdit"],
+      event: { id: "e1", requestedBy: "p1", approvalStatus: "pending" },
+      bookings: [{ id: "b1", eventId: "e1", requestedBy: "p1" }, { id: "b2", eventId: "e1", requestedBy: "p1" }]
+    });
+    const result = await (controller as any).setRequester("e1", { body: { personId: "p5" } }, {});
+    expect(repos.event.save).toHaveBeenCalledWith(expect.objectContaining({ id: "e1", requestedBy: "p5", approvalStatus: "pending" }));
+    expect(repos.eventBooking.setRequestedByForEvent).toHaveBeenCalledWith("c1", "e1", "p5");
+    expect(result.event.requestedBy).toBe("p5");
+    expect(result.bookings.map((b: any) => b.requestedBy)).toEqual(["p5", "p5"]);
+  });
+
+  it("moves the bookings of a staff-created event but leaves the event itself alone", async () => {
+    const { controller, repos } = makeController({
+      access: ["calendarsAdmin"],
+      event: { id: "e1", requestedBy: "p1" },
+      bookings: [{ id: "b1", eventId: "e1", requestedBy: "p1" }]
+    });
+    await (controller as any).setRequester("e1", { body: { personId: "p5" } }, {});
+    expect(repos.event.save).not.toHaveBeenCalled();
+    expect(repos.eventBooking.setRequestedByForEvent).toHaveBeenCalledWith("c1", "e1", "p5");
   });
 });
