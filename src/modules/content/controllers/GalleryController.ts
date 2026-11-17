@@ -28,10 +28,24 @@ export class GalleryController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
-        const files = await FileStorageHelper.list(au.churchId + "/gallery/" + path.basename(folder));
-        return { images: files };
+        const prefix = au.churchId + "/gallery/" + path.basename(folder);
+        const files = await FileStorageHelper.list(prefix);
+        // The disk store lists bare file names; S3 lists full keys, which is what the gallery dialog expects.
+        return { images: files.map((f: string) => (f.includes("/") ? f : prefix + "/" + f)) };
       }
     });
+  }
+
+  // Non-editors may only add images, under an unguessable name so they can't overwrite existing gallery images.
+  private getUploadKey(au: any, folder: string, requestedName: string, contentType?: string): { key?: string; error?: string } {
+    let fileName = path.basename(requestedName);
+    if (!au.checkAccess(Permissions.content.edit)) {
+      const ext = path.extname(fileName).toLowerCase();
+      if (![".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext)) return { error: "Unsupported image type" };
+      if (contentType && !/^image\/(jpeg|png|webp|gif)$/i.test(contentType)) return { error: "Unsupported image type" };
+      fileName = path.basename(fileName, path.extname(fileName)) + "-" + crypto.randomBytes(6).toString("hex") + ext;
+    }
+    return { key: au.churchId + "/gallery/" + path.basename(folder) + "/" + fileName };
   }
 
   @httpPost("/requestUpload")
@@ -39,18 +53,26 @@ export class GalleryController extends ContentBaseController {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
-        let fileName = path.basename(req.body.fileName);
-        if (!au.checkAccess(Permissions.content.edit)) {
-          const ext = path.extname(fileName).toLowerCase();
-          if (![".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext)) return this.json({ error: "Unsupported image type" }, 400);
-          if (req.body.contentType && !/^image\/(jpeg|png|webp|gif)$/i.test(req.body.contentType)) return this.json({ error: "Unsupported image type" }, 400);
-          // non-editors get an unguessable key so they can't overwrite existing gallery images
-          fileName = path.basename(fileName, path.extname(fileName)) + "-" + crypto.randomBytes(6).toString("hex") + ext;
-        }
-        const key = au.churchId + "/gallery/" + path.basename(req.body.folder) + "/" + fileName;
+        const { key, error } = this.getUploadKey(au, req.body.folder, req.body.fileName, req.body.contentType);
+        if (error) return this.json({ error }, 400);
         const result = Environment.fileStore === "S3" ? await AwsHelper.S3PresignedUrl(key, req.body.contentType, req.body.size) : {};
         return result;
       }
+    });
+  }
+
+  // Disk-backed (self-hosted) installs have no presigned slot, so the gallery posts the image here instead.
+  @httpPost("/upload")
+  public async upload(req: express.Request<{}, {}, { folder: string; fileName: string; contentType: string; fileContents: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!this.canUseGallery(au)) return this.json({}, 401);
+      if (Environment.fileStore === "S3") return this.json({ error: "Use requestUpload" }, 400);
+      const { key, error } = this.getUploadKey(au, req.body.folder, req.body.fileName, req.body.contentType);
+      if (error) return this.json({ error }, 400);
+      const contents = req.body.fileContents || "";
+      const buffer = Buffer.from(contents.includes(",") ? contents.split(",")[1] : contents, "base64");
+      await FileStorageHelper.store(key, req.body.contentType, buffer);
+      return { key };
     });
   }
 
