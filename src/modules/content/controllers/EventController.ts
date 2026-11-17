@@ -334,6 +334,29 @@ export class EventController extends ContentBaseController {
     return this.resolveEvent(req, res, id, "rejected", req.body?.reason);
   }
 
+  // authz-exempt: gated by content.edit/calendars.admin check
+  // #1603: move a request (the event when it is a request, and every booking on it) to the person it is for.
+  @httpPost("/:id/requester")
+  public async setRequester(@requestParam("id") id: string, req: express.Request<{}, {}, { personId?: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
+      const event = await this.repos.event.load(au.churchId, id);
+      if (!event) return this.json({}, 404);
+      const personId = req.body?.personId;
+      if (!personId) return this.json({ error: "personId is required" }, 400);
+      const person = await getMembershipModuleGateway().loadPerson(au.churchId, personId);
+      if (!person) return this.json({ error: "Person not found" }, 400);
+      await this.repos.eventBooking.setRequestedByForEvent(au.churchId, id, personId);
+      const bookings = await this.repos.eventBooking.loadForEvent(au.churchId, id);
+      let result = event;
+      if (event.approvalStatus) {
+        event.requestedBy = personId;
+        result = await this.repos.event.save(event);
+      }
+      return { event: result, bookings };
+    });
+  }
+
   @httpDelete("/:id")
   public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {

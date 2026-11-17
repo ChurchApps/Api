@@ -47,6 +47,11 @@ export class EventBookingRepo {
     return model;
   }
 
+  // #1603: update() deliberately keeps the original requester, so moving a request is its own write.
+  public async setRequestedByForEvent(churchId: string, eventId: string, personId: string) {
+    await getDb().updateTable("eventBookings").set({ requestedBy: personId } as any).where("eventId", "=", eventId).where("churchId", "=", churchId).execute();
+  }
+
   public async delete(churchId: string, id: string) {
     await getDb().deleteFrom("eventBookings").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
