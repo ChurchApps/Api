@@ -27,10 +27,31 @@ describe("ArrangementRepo.loadFreeShowIds", () => {
     const ids = await new ArrangementRepo().loadFreeShowIds("c1");
 
     expect(ids).toEqual(["a", "b"]);
-    expect(calls.find((c) => c.method === "selectFrom")?.args[0]).toBe("arrangements");
-    expect(calls.find((c) => c.method === "select")?.args[0]).toEqual(["freeShowId"]);
+    expect(calls.find((c) => c.method === "selectFrom")?.args[0]).toBe("arrangements as a");
+    expect(calls.find((c) => c.method === "select")?.args[0]).toEqual(["a.freeShowId"]);
     expect(calls.some((c) => c.method === "selectAll")).toBe(false);
-    expect(calls.find((c) => c.method === "where" && c.args[0] === "churchId")?.args).toEqual(["churchId", "=", "c1"]);
-    expect(calls.find((c) => c.method === "where" && c.args[0] === "freeShowId")?.args).toEqual(["freeShowId", "is not", null]);
+    expect(calls.find((c) => c.method === "where" && c.args[0] === "a.churchId")?.args).toEqual(["a.churchId", "=", "c1"]);
+    expect(calls.find((c) => c.method === "where" && c.args[0] === "a.freeShowId")?.args).toEqual(["a.freeShowId", "is not", null]);
+  });
+
+  it("only counts arrangements whose song still exists (FreeShow#3999)", async () => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await new ArrangementRepo().loadFreeShowIds("c1");
+    expect(calls.find((c) => c.method === "innerJoin")?.args[0]).toBe("songs as s");
+  });
+});
+
+describe("ArrangementRepo song-scoped FreeShow lookups", () => {
+  it.each([
+    ["loadByFreeShowId", ["c1", "fs1"], "a.freeShowId"],
+    ["loadBySongDetailId", ["c1", "sd1"], "a.songDetailId"]
+  ])("%s joins live songs and selects only arrangement columns", async (method, args, column) => {
+    const { proxy, calls } = recordingDb([]);
+    (getDb as jest.Mock).mockReturnValue(proxy);
+    await (new ArrangementRepo() as any)[method](...args);
+    expect(calls.find((c) => c.method === "innerJoin")?.args[0]).toBe("songs as s");
+    expect(calls.find((c) => c.method === "selectAll")?.args).toEqual(["a"]);
+    expect(calls.find((c) => c.method === "where" && c.args[0] === column)?.args).toEqual([column, "=", args[1]]);
   });
 });

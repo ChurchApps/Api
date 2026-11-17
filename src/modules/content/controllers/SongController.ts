@@ -4,6 +4,7 @@ import { Song } from "../models/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Permissions } from "../helpers/index.js";
 import { FreeShowSong, SongHelper } from "../helpers/SongHelper.js";
+import { ArrangementDeleteHelper } from "../helpers/ArrangementDeleteHelper.js";
 
 @controller("/content/songs")
 export class SongController extends ContentBaseController {
@@ -71,7 +72,7 @@ export class SongController extends ContentBaseController {
   public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
-      await this.repos.song.delete(au.churchId, id);
+      await ArrangementDeleteHelper.deleteSong(this.repos, au.churchId, id);
       return null;
     });
   }
