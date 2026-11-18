@@ -1,3 +1,4 @@
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 const sendPersonTextMock = jest.fn() as jest.MockedFunction<any>;
 const people: Record<string, any> = {
   P1: { id: "P1", firstName: "Donald", lastName: "Clark", mobilePhone: "(555) 010-1000", optedOut: false },

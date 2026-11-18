@@ -3,6 +3,7 @@ import { NotificationService } from "../../../shared/helpers/NotificationService
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Plan, PlanItem } from "../models/index.js";
 import { ProviderAuthHelper } from "./ProviderAuthHelper.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
 // A plan type's saved lesson trim (#1401): the parts of a lesson kept in one hand-customized plan, re-applied by name
 // (and, for a part inside a section, by position) to every lesson scheduled into that plan type. Provider-neutral:
@@ -302,7 +303,7 @@ export class LessonTrimHelper {
       const leaderIds = await gateway.loadGroupLeaderPersonIds(churchId, plan.ministryId);
       if (leaderIds.length === 0) return;
       const church = await gateway.loadChurch(churchId);
-      const planUrl = `https://${church?.subDomain || "app"}.b1.church/mobile/plans/${plan.id}`;
+      const planUrl = AppUrlHelper.b1AppUrl(church?.subDomain || "app") + `/mobile/plans/${plan.id}`;
       await NotificationService.createNotifications(leaderIds, churchId, "plan", plan.id, `${plan.name}: ${warning}`.slice(0, 500), planUrl);
     } catch (e) {
       console.error("Lesson trim notification failed:", e);

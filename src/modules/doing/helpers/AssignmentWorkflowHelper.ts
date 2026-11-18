@@ -7,6 +7,7 @@ import { ScreenScheduleHelper } from "./ScreenScheduleHelper.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { WorkflowHelper } from "./WorkflowHelper.js";
 import { StepActionHelper } from "./StepActionHelper.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
 // A plan or workflow that cannot issue requests is the caller's to fix: answer 400, not 500.
 const badRequest = (message: string) => Object.assign(new Error(message), { status: 400 });
@@ -296,7 +297,7 @@ export class AssignmentWorkflowHelper {
     const person = await membership.loadPerson(task.churchId, assignment.personId);
     const church = await membership.loadChurch(task.churchId);
     if (!person) { StepActionHelper.appendHistory(task, "Serving message skipped: person removed"); return; }
-    const planUrl = `https://${church?.subDomain || "app"}.b1.church/mobile/plans/${plan.id}`;
+    const planUrl = AppUrlHelper.b1AppUrl(church?.subDomain || "app") + `/mobile/plans/${plan.id}`;
     const serviceDate = DateHelper.toMysqlDateOnly(plan.serviceDate);
     const summary = `${plan.name} · ${position.name} · ${serviceDate}`;
     const message = (config.message || "Please accept or decline your serving request.")

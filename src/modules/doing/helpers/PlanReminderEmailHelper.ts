@@ -2,6 +2,7 @@ import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { ReminderTokenHelper } from "./ReminderTokenHelper.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
 const esc = (s: unknown): string =>
   String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c] as string));
@@ -15,7 +16,7 @@ export class PlanReminderEmailHelper {
     const membership = getMembershipModuleGateway();
     const church = await membership.loadChurch(churchId);
     const subDomain = church?.subDomain || "app";
-    const planUrl = `https://${subDomain}.b1.church/mobile/plans/${plan.id}`;
+    const planUrl = AppUrlHelper.b1AppUrl(subDomain) + `/mobile/plans/${plan.id}`;
     const dateStr = new Date(plan.serviceDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
     const wanted = new Set(personIds);

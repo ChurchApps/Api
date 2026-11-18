@@ -5,6 +5,7 @@ import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 import { CalendarHelper } from "../../content/helpers/CalendarHelper.js";
 import { RecurrenceHelper } from "../../content/helpers/RecurrenceHelper.js";
 import { HolidayHelper } from "../../content/helpers/HolidayHelper.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
 export class AutomationHelper {
   private static subdomainCache: { [key: string]: string } = {};
@@ -69,7 +70,7 @@ export class AutomationHelper {
             timeSent: new Date(),
             isNew: true,
             message: `Reminder: attendance hasn't been recorded for ${group.name} (${dateStr})`,
-            link: subDomain ? `https://${subDomain}.b1.church/mobile/groups/${group.id}` : undefined
+            link: subDomain ? AppUrlHelper.b1AppUrl(subDomain) + `/mobile/groups/${group.id}` : undefined
           });
         }
       } catch (e) {

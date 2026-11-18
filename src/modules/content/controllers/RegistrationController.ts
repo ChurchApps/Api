@@ -10,6 +10,7 @@ import { GatewayService } from "../../../shared/helpers/GatewayService.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
 interface RegisterMemberInput { personId?: string; firstName: string; lastName: string; registrationTypeId?: string }
 interface RegisterSelectionInput { selectionId: string; quantity?: number; registrationMemberId?: string }
@@ -662,7 +663,7 @@ export class RegistrationController extends ContentBaseController {
       if (!person?.email) return;
       const church = await getMembershipModuleGateway().loadChurch(churchId);
       const priced = RegistrationPricingHelper.num(promoted.totalAmount) - RegistrationPricingHelper.num(promoted.amountPaid) > 0;
-      const payUrl = priced && church?.subDomain ? (Environment.b1AppRoot || "https://{subdomain}.b1.church").split("{subdomain}").join(church.subDomain).replace(/\/$/, "") + "/mobile/registrations" : undefined;
+      const payUrl = priced && church?.subDomain ? AppUrlHelper.b1AppUrl(church.subDomain) + "/mobile/registrations" : undefined;
       await RegistrationHelper.sendWaitlistAvailabilityEmail(person.email, church?.name || "Church", event, payUrl);
     } catch (e) {
       console.error("Failed to send waitlist promotion email", e);
