@@ -232,6 +232,29 @@ export class RolePermissionRepo {
       .execute();
   }
 
+  // Everyone permissions for several churches at once, keyed by churchId and grouped into the apis shape a login carries.
+  public async loadEveryoneApis(churchIds: string[]): Promise<Record<string, Api[]>> {
+    const result: Record<string, Api[]> = {};
+    if (churchIds.length === 0) return result;
+    const rows = await getDb().selectFrom("rolePermissions")
+      .select(["churchId", "apiName", "contentType", "contentId", "action"])
+      .where("churchId", "in", churchIds)
+      .where("roleId", "is", null)
+      .where(sql<boolean>`COALESCE(contentType,'') <> 'Server'`)
+      .orderBy("churchId").orderBy("apiName").orderBy("contentType").orderBy("action")
+      .execute();
+    rows.forEach((row: any) => {
+      const apis = (result[row.churchId] ??= []);
+      let api = apis.find((a) => a.keyName === row.apiName);
+      if (!api) {
+        api = { keyName: row.apiName, permissions: [] };
+        apis.push(api);
+      }
+      api.permissions.push({ action: row.action, contentId: row.contentId, contentType: row.contentType });
+    });
+    return result;
+  }
+
   public saveAll(models: RolePermission[]) {
     const promises: Promise<RolePermission>[] = [];
     models.forEach((model) => { promises.push(this.save(model)); });

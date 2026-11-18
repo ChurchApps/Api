@@ -170,10 +170,16 @@ export class UserController extends MembershipBaseController {
 
     // Load churches via userChurches relationships
     const userChurches: LoginUserChurch[] = await this.repos.church.loadForUser(id);
+    const memberOnly = userChurches.filter((uc) => !ArrayHelper.getOne(roleUserChurches, "church.id", uc.church.id));
 
-    userChurches.forEach((uc) => {
-      if (!ArrayHelper.getOne(roleUserChurches, "church.id", uc.church.id)) roleUserChurches.push(uc);
-    });
+    // Members in no role still get the church's Everyone permissions (e.g. People / Edit Self)
+    if (memberOnly.length > 0) {
+      const everyone = await this.repos.rolePermission.loadEveryoneApis(memberOnly.map((uc) => uc.church.id));
+      memberOnly.forEach((uc) => {
+        uc.apis = everyone[uc.church.id] ?? [];
+        roleUserChurches.push(uc);
+      });
+    }
 
     const peopleIds: string[] = [];
     roleUserChurches.forEach((uc) => {
