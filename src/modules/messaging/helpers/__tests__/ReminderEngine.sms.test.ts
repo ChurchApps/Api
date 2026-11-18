@@ -95,6 +95,37 @@ describe("ReminderEngine.scan text channel", () => {
   });
 });
 
+describe("ReminderEngine text counts", () => {
+  const sendNowDef = { id: "D1", churchId: "CH1", entityType: "smsplan", entityId: "PL1", category: "serving_schedule", offsets: "1440", sendLocalTime: "09:00:00", timeZone: "UTC", enabled: true };
+  function sendNowRepos(channels: string) {
+    const repos = buildRepos(channels);
+    repos.reminderOccurrence.upsert = jest.fn(async () => {});
+    repos.reminderOccurrence.loadByKey = jest.fn(async () => occ);
+    return repos;
+  }
+
+  it("Send now reports recipients, texts sent and texts skipped", async () => {
+    ReminderEngine.init(sendNowRepos("push,sms"));
+    expect(await ReminderEngine.sendNow({ ...sendNowDef, channels: "push,sms" } as any)).toEqual({ recipients: 4, textsSent: 1, textsSkipped: 3 });
+  });
+
+  it("counts a provider failure as skipped", async () => {
+    sendPersonTextMock.mockResolvedValue({ ok: false, reason: "provider_error" });
+    ReminderEngine.init(sendNowRepos("sms"));
+    expect(await ReminderEngine.sendNow({ ...sendNowDef, channels: "sms" } as any)).toEqual({ recipients: 4, textsSent: 0, textsSkipped: 4 });
+  });
+
+  it("reports zero texts when the reminder has no Text channel", async () => {
+    ReminderEngine.init(sendNowRepos("push"));
+    expect(await ReminderEngine.sendNow({ ...sendNowDef, channels: "push" } as any)).toEqual({ recipients: 4, textsSent: 0, textsSkipped: 0 });
+  });
+
+  it("scan still returns the recipient count as sent", async () => {
+    ReminderEngine.init(buildRepos("push,sms"));
+    expect(await ReminderEngine.scan()).toEqual({ processed: 1, sent: 4 });
+  });
+});
+
 describe("ReminderEngine.smsBody", () => {
   it("fits one 160-character segment with the opt-out line", () => {
     const body = ReminderEngine.smsBody("Grace Church", "x".repeat(400));

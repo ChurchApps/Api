@@ -71,8 +71,8 @@ export class ReminderController extends MessagingBaseController {
       if (!def || !def.enabled) return this.json({ error: "Save and enable the reminder first" }, 400);
       const channels = String(def.channels || "").split(",").map((c) => c.trim());
       if (channels.includes("sms") && !au.checkAccess(Permissions.texting.send)) return this.json({ error: "Sending texts requires the Texting Send permission" }, 401);
-      const sent = await ReminderEngine.sendNow(def);
-      return { sent };
+      const result = await ReminderEngine.sendNow(def);
+      return { sent: result.recipients, textsSent: result.textsSent, textsSkipped: result.textsSkipped };
     });
   }
 

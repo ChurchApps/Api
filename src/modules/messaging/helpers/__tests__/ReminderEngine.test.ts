@@ -352,9 +352,9 @@ describe("ReminderEngine.sendNow", () => {
     const repos = buildRepos();
     ReminderEngine.init(repos);
     const now = new Date("2026-12-01T15:00:00Z");
-    const sent = await ReminderEngine.sendNow(def as any, now);
+    const result = await ReminderEngine.sendNow(def as any, now);
 
-    expect(sent).toBe(2);
+    expect(result).toEqual({ recipients: 2, textsSent: 0, textsSkipped: 0 });
     expect(repos.reminderOccurrence.upsert).toHaveBeenCalledTimes(1);
     const row = repos.reminderOccurrence.upsert.mock.calls[0][0];
     expect(row.occurrenceKey).toBe(`D1:now:${now.getTime()}`);
@@ -393,7 +393,7 @@ describe("ReminderEngine.sendNow", () => {
   it("returns 0 when the timer already claimed the row", async () => {
     const repos = buildRepos({ claim: false });
     ReminderEngine.init(repos);
-    expect(await ReminderEngine.sendNow(def as any, new Date("2026-12-01T15:00:00Z"))).toBe(0);
+    expect(await ReminderEngine.sendNow(def as any, new Date("2026-12-01T15:00:00Z"))).toEqual({ recipients: 0, textsSent: 0, textsSkipped: 0 });
     expect(createNotificationsMock).not.toHaveBeenCalled();
   });
 });
