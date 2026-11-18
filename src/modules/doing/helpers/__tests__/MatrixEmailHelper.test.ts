@@ -10,6 +10,8 @@ const loadChurchMock = jest.fn();
 const loadPeopleMock = jest.fn();
 jest.mock("../../../../shared/modules/index.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch: loadChurchMock, loadPeople: loadPeopleMock }) }));
 
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
+import { Environment } from "../../../../shared/helpers/Environment.js";
 import { groupOverviewByPerson, MatrixEmailHelper, type OverviewEmailRow } from "../MatrixEmailHelper.js";
 
 describe("groupOverviewByPerson", () => {
@@ -111,6 +113,18 @@ describe("MatrixEmailHelper.sendConsolidated", () => {
     expect(link).toBe("https://grace.b1.church/mobile/plans");
     expect(options.emailByPerson.P1.html).toContain("https://grace.b1.church/mobile/plans");
     expect(options.emailByPerson.P1.html).not.toContain("/my/plans");
+  });
+
+  it("points \"View your schedule\" at the install's own member site when B1APP_ROOT is a bare origin (self-hosted)", async () => {
+    const saved = Environment.b1AppRoot;
+    Environment.b1AppRoot = "https://mychurch.example.org";
+    try {
+      await MatrixEmailHelper.sendConsolidated("CHU1", rows, "MIN1");
+      const [, , , , , link] = createNotificationsMock.mock.calls[0];
+      expect(link).toBe("https://mychurch.example.org/mobile/plans");
+    } finally {
+      Environment.b1AppRoot = saved;
+    }
   });
 
   it("returns zero counts without calling the funnel when there are no assigned people", async () => {

@@ -7,6 +7,7 @@ const loadPeople = jest.fn(async () => [{ id: "p1", displayName: "Pat Smith" }, 
 jest.mock("../../../../shared/modules/index.js", () => ({ getMembershipModuleGateway: () => ({ loadChurch, loadPeople }) }));
 
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { supportEmail: "support@test", doingApi: "https://api.test/doing", jwtSecret: "test-secret" } }));
+import { Environment } from "../../../../shared/helpers/Environment.js";
 
 import { PlanReminderEmailHelper } from "../PlanReminderEmailHelper.js";
 
@@ -51,6 +52,17 @@ describe("PlanReminderEmailHelper.build", () => {
     const emails = await PlanReminderEmailHelper.build("c1", "plan1", ["p1"], undefined);
     expect(emails.p1.html).toContain("https://demo.b1.church/mobile/plans/plan1");
     expect(emails.p1.html).not.toContain("/my/plans");
+  });
+
+  it("links to the install's own member site when B1APP_ROOT is a bare origin (self-hosted)", async () => {
+    (Environment as any).b1AppRoot = "https://mychurch.example.org/";
+    try {
+      const emails = await PlanReminderEmailHelper.build("c1", "plan1", ["p1"], undefined);
+      expect(emails.p1.html).toContain("https://mychurch.example.org/mobile/plans/plan1");
+      expect(emails.p1.html).not.toContain("b1.church");
+    } finally {
+      delete (Environment as any).b1AppRoot;
+    }
   });
 
   it("returns an empty map when the plan is missing", async () => {

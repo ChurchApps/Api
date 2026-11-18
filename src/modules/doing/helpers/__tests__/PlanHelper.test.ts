@@ -1,3 +1,4 @@
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 jest.mock("../AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), stopIfResolved: jest.fn(async () => false), processPending: jest.fn(async () => 0) } }));
 /** Tests auto-scheduling algorithm: rotation, blockouts, max-per-month, household preferences, auto-replacement. */
 

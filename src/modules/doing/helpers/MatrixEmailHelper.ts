@@ -1,5 +1,6 @@
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
 // Cross-plan serving summary email: one message per person across assigned plans in date range (matrix "Email all" action). Distinct from per-plan reminder engine reminders.
 
@@ -69,7 +70,7 @@ export class MatrixEmailHelper {
     const membership = getMembershipModuleGateway();
     const church = await membership.loadChurch(churchId);
     const subDomain = church?.subDomain || "app";
-    const scheduleUrl = `https://${subDomain}.b1.church/mobile/plans`;
+    const scheduleUrl = AppUrlHelper.b1AppUrl(subDomain) + "/mobile/plans";
 
     const names = new Map<string, string>();
     for (const p of (await membership.loadPeople(churchId, recipients.map((r) => r.personId))) as any[]) names.set(p.id, p.displayName);

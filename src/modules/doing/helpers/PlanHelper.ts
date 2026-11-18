@@ -4,6 +4,7 @@ import { RepoManager } from "../../../shared/infrastructure/index.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { Plan, PlanItem, Position, Assignment, BlockoutDate, SchedulingPreference, Time } from "../models/index.js";
+import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
 
 interface TeamCandidates {
   positionId: string;
@@ -214,7 +215,7 @@ export class PlanHelper {
         gateway.loadPeople(churchId, [assignment.personId]),
         gateway.loadChurch(churchId)
       ]);
-      const planUrl = `https://${church?.subDomain || "app"}.b1.church/mobile/plans/${plan.id}`;
+      const planUrl = AppUrlHelper.b1AppUrl(church?.subDomain || "app") + `/mobile/plans/${plan.id}`;
       const dateStr = plan.serviceDate
         ? new Date(plan.serviceDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
         : "";

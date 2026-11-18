@@ -1,3 +1,4 @@
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 jest.mock("../../helpers/AssignmentWorkflowHelper.js", () => ({ AssignmentWorkflowHelper: { workflowType: "assignmentConfirmation", issuePlan: jest.fn(), validateWorkflow: jest.fn() } }));
 import "reflect-metadata";
 

@@ -1,5 +1,6 @@
 /** A lesson trim saved from one customized plan is re-applied to every lesson scheduled into the plan type (#1401). */
 
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 const getInstructionsMock = jest.fn();
 jest.mock("@churchapps/content-providers", () => ({
   setProviderSecret: () => undefined,

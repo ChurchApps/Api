@@ -1,3 +1,4 @@
+jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
 const createNotificationsMock = jest.fn().mockResolvedValue(undefined);
 
 let groupsFixture: any[] = [];
