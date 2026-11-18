@@ -1650,6 +1650,23 @@
     }
    ],
    "schemaChanges": 2
+  },
+  "2026-11-18_rooms_resources_active": {
+   "checks": [
+    {
+     "kind": "column",
+     "table": "rooms",
+     "column": "active",
+     "present": true
+    },
+    {
+     "kind": "column",
+     "table": "resources",
+     "column": "active",
+     "present": true
+    }
+   ],
+   "schemaChanges": 2
   }
  },
  "giving": {
