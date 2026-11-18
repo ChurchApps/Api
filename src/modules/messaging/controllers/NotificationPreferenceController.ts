@@ -4,6 +4,7 @@ import { MessagingBaseController } from "./MessagingBaseController.js";
 import { NotificationHelper } from "../helpers/NotificationHelper.js";
 import { NotificationCategoryHelper } from "../helpers/NotificationCategoryHelper.js";
 import { NotificationPreference } from "../models/index.js";
+import { Permissions } from "../../../shared/helpers/Permissions.js";
 
 const PREF_FIELDS = [
   "allowPush", "allowSms", "emailFrequency", "masterMute", "quietHoursStart", "quietHoursEnd", "timeZone", "maxPushPerDay"
@@ -52,6 +53,29 @@ export class NotificationPreferenceController extends MessagingBaseController {
         }
       }
       return this.resolve(au.churchId, au.personId);
+    });
+  }
+
+  // Staff with Texting Send can read and set one person's Text reminders switch (issue #1600). Only allowSms is touched.
+  @httpGet("/person/:personId/sms")
+  public async loadPersonSms(req: express.Request<{ personId: string }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
+      const pref = await this.repos.notificationPreference.loadByPersonId(au.churchId, req.params.personId);
+      return { allowSms: !!pref?.allowSms };
+    });
+  }
+
+  @httpPost("/person/:personId/sms")
+  public async savePersonSms(req: express.Request<{ personId: string }, {}, { allowSms: boolean }>, res: express.Response): Promise<any> {
+    return this.actionWrapper(req, res, async (au) => {
+      if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
+      const personId = req.params.personId;
+      let pref = await this.repos.notificationPreference.loadByPersonId(au.churchId, personId);
+      if (!pref) pref = await NotificationHelper.createNotificationPref(au.churchId, personId);
+      pref.allowSms = !!req.body?.allowSms;
+      await this.repos.notificationPreference.save(pref);
+      return { allowSms: pref.allowSms };
     });
   }
 
