@@ -28,7 +28,11 @@ export class GdprController extends MembershipBaseController {
       const userId = userChurch?.userId || null;
 
       const person: any = await this.repos.person.load(au.churchId, personId);
-      await GdprErasureHelper.anonymize(au.churchId, personId, userId, this.repos);
+      try {
+        await GdprErasureHelper.anonymize(au.churchId, personId, userId, this.repos);
+      } catch (e) {
+        return this.json({ errors: [(e as Error).message] }, 400);
+      }
       await WebhookDispatcher.emit(au.churchId, "person.destroyed", { id: personId, churchId: au.churchId, email: person?.email });
       return {};
     });

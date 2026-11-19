@@ -736,6 +736,12 @@ export class UserController extends MembershipBaseController {
   @httpDelete("/")
   public async Delete(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
     return this.actionWrapper(req, res, async (au) => {
+      const soleAdminChurchIds = await this.repos.roleMember.loadSoleDomainAdminChurchIds(au.id);
+      if (soleAdminChurchIds.length > 0) {
+        const churches = await this.repos.church.loadByIds(soleAdminChurchIds);
+        const names = churches.map((c: any) => c.name).join(", ") || "your church";
+        return this.json({ errors: ["You are the only Domain Admin for " + names + ". Make someone else a Domain Admin before deleting your account."] }, 400);
+      }
       await this.repos.user.delete(au.id);
       await this.repos.userChurch.delete(au.id);
       await this.repos.roleMember.deleteUser(au.id);

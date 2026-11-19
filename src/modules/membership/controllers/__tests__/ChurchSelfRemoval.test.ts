@@ -22,7 +22,7 @@ describe("Removing a church from your own church list (#1270)", () => {
   });
 
   it("deletes role memberships in the picked church and leaves the current church's roles alone", async () => {
-    const repos = { roleMember: { deleteSelf: jest.fn() } };
+    const repos = { roleMember: { deleteSelf: jest.fn(), isSoleDomainAdmin: jest.fn(async () => false) } };
     const controller = wire(new RoleMemberController(), repos);
     await controller.deleteSelf("other", "u1", {}, {});
     expect(repos.roleMember.deleteSelf).toHaveBeenCalledWith("other", "u1");
@@ -30,7 +30,7 @@ describe("Removing a church from your own church list (#1270)", () => {
 
   it("keeps an admin acting on another user locked to their own church", async () => {
     const ucRepos = { userChurch: { deleteRecord: jest.fn() } };
-    const rmRepos = { roleMember: { deleteSelf: jest.fn() } };
+    const rmRepos = { roleMember: { deleteSelf: jest.fn(), isSoleDomainAdmin: jest.fn(async () => false) } };
     const uc = wire(new UserChurchController(), ucRepos, () => true);
     const rm = wire(new RoleMemberController(), rmRepos, () => true);
     const r1 = await uc.deleteRecord("u2", "other", "p2", {}, {});
@@ -42,7 +42,7 @@ describe("Removing a church from your own church list (#1270)", () => {
   });
 
   it("still lets an admin remove another user within their own church", async () => {
-    const repos = { userChurch: { deleteRecord: jest.fn() }, roleMember: { deleteSelf: jest.fn() } };
+    const repos = { userChurch: { deleteRecord: jest.fn() }, roleMember: { deleteSelf: jest.fn(), isSoleDomainAdmin: jest.fn(async () => false) } };
     const uc = wire(new UserChurchController(), repos, () => true);
     const rm = wire(new RoleMemberController(), repos, () => true);
     await uc.deleteRecord("u2", "current", "p2", {}, {});
