@@ -463,3 +463,32 @@ describe("UserController.sendInviteEmail", () => {
     expect(result.obj).toEqual({ success: true });
   });
 });
+
+describe("UserController.Delete (#1627)", () => {
+  function deleteController(soleChurchIds: string[]) {
+    const { controller, repos } = userController({ id: "u1" });
+    repos.user.delete = jest.fn();
+    repos.userChurch.delete = jest.fn();
+    repos.roleMember.deleteUser = jest.fn();
+    repos.roleMember.loadSoleDomainAdminChurchIds = jest.fn(async () => soleChurchIds);
+    repos.church = { loadByIds: jest.fn(async (ids: string[]) => ids.map((id) => ({ id, name: "Grace Church" }))) };
+    return { controller, repos };
+  }
+
+  it("refuses to delete the only Domain Admin's account and names the church", async () => {
+    const { controller, repos } = deleteController(["c1"]);
+    const result: any = await (controller as any).Delete({}, {});
+    expect(result.status).toBe(400);
+    expect(result.obj.errors[0]).toContain("Grace Church");
+    expect(repos.user.delete).not.toHaveBeenCalled();
+    expect(repos.userChurch.delete).not.toHaveBeenCalled();
+    expect(repos.roleMember.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("deletes the account when every church has another Domain Admin", async () => {
+    const { controller, repos } = deleteController([]);
+    await (controller as any).Delete({}, {});
+    expect(repos.user.delete).toHaveBeenCalledWith("u1");
+    expect(repos.roleMember.deleteUser).toHaveBeenCalledWith("u1");
+  });
+});

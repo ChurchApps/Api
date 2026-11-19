@@ -80,6 +80,10 @@ export class RoleMemberController extends MembershipBaseController {
       const hasAccess = await this.checkAccess([member], Permissions.roles.edit, au);
       if (!hasAccess) return this.json({}, 401);
       else {
+        const role = member ? await this.repos.role.loadById(au.churchId, member.roleId) : null;
+        if (role?.name === "Domain Admins" && (await this.repos.roleMember.isSoleDomainAdmin(au.churchId, member.userId))) {
+          return this.json({ errors: ["At least one Domain Admin is required. Add another Domain Admin before removing this one."] }, 400);
+        }
         await this.repos.roleMember.delete(id, au.churchId);
         return this.json([], 200);
       }
@@ -92,7 +96,11 @@ export class RoleMemberController extends MembershipBaseController {
       // Users may leave any church they belong to; admins may only act within their own church.
       const isSelf = userId === au.id;
       if (!isSelf && (churchId !== au.churchId || !au.checkAccess(Permissions.roles.edit))) return this.json({}, 401);
-      await this.repos.roleMember.deleteSelf(isSelf ? churchId : au.churchId, userId);
+      const targetChurchId = isSelf ? churchId : au.churchId;
+      if (await this.repos.roleMember.isSoleDomainAdmin(targetChurchId, userId)) {
+        return this.json({ errors: ["You are the only Domain Admin for this church. Make someone else a Domain Admin before leaving."] }, 400);
+      }
+      await this.repos.roleMember.deleteSelf(targetChurchId, userId);
       return this.json([], 200);
     });
   }

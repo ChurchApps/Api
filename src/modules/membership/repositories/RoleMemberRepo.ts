@@ -76,6 +76,26 @@ export class RoleMemberRepo {
     return !!row;
   }
 
+  /** Churches where this user is the only member of the Domain Admins role. */
+  public async loadSoleDomainAdminChurchIds(userId: string, churchId?: string): Promise<string[]> {
+    let query = getDb().selectFrom("roleMembers as rm")
+      .innerJoin("roles as r", (join) => join.onRef("r.id", "=", "rm.roleId").onRef("r.churchId", "=", "rm.churchId"))
+      .select("rm.churchId")
+      .where("r.name", "=", "Domain Admins")
+      .where("rm.userId", "is not", null);
+    if (churchId) query = query.where("rm.churchId", "=", churchId);
+    const rows = await query
+      .groupBy("rm.churchId")
+      .having(sql`COUNT(DISTINCT rm.userId)`, "=", 1)
+      .having(sql`MAX(rm.userId = ${userId})`, "=", 1)
+      .execute();
+    return rows.map((r: any) => r.churchId);
+  }
+
+  public async isSoleDomainAdmin(churchId: string, userId: string): Promise<boolean> {
+    return (await this.loadSoleDomainAdminChurchIds(userId, churchId)).length > 0;
+  }
+
   public async loadAll(churchId: string) {
     return getDb().selectFrom("roleMembers").selectAll().where("churchId", "=", churchId).execute();
   }

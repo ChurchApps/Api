@@ -61,6 +61,7 @@ export class RoleController extends MembershipBaseController {
       const roles: Role[] = [role];
       if (!role) return this.json({}, 404);
       if (!(await this.checkAccess(roles, Permissions.roles.edit, au))) return this.json({}, 401);
+      else if (role.name === "Domain Admins") return this.json({ errors: ["At least one Domain Admin is required. The Domain Admins role cannot be deleted."] }, 400);
       else {
         await this.repos.rolePermission.deleteForRole(au.churchId, id);
         await this.repos.roleMember.deleteForRole(au.churchId, id);

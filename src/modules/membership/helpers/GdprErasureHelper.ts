@@ -6,6 +6,10 @@ export class GdprErasureHelper {
 
   /** Replaces PII with generic values while preserving operational records for reporting */
   public static async anonymize(churchId: string, personId: string, userId: string | null, membershipRepos: Repos) {
+    if (userId && (await membershipRepos.roleMember.isSoleDomainAdmin(churchId, userId))) {
+      throw new Error("This person is the only Domain Admin for this church. Make someone else a Domain Admin before deleting their account.");
+    }
+
     await Promise.all([
       this.anonymizeMembership(churchId, personId, membershipRepos),
       this.anonymizeGiving(churchId, personId),
