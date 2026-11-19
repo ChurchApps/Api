@@ -456,8 +456,10 @@ export class EventController extends ContentBaseController {
       newEv.end = new Date(ev.end || ev.start).getTime();
       newEv.title = ev.title;
       newEv.description = ev.description || "";
-      newEv.recurrenceRule = ev.recurrenceRule || "";
-      newEv.exclusionDates = (ev.exceptionDates || []).map((d) => new Date(d).getTime());
+      if (ev.recurrenceRule) newEv.recurrenceRule = ev.recurrenceRule;
+      // ics writes a bare "EXDATE:" for an empty array, which strict clients reject
+      const exclusionDates = (ev.exceptionDates || []).map((d) => new Date(d).getTime());
+      if (exclusionDates.length > 0) newEv.exclusionDates = exclusionDates;
       result.push(newEv);
     });
     return result;
