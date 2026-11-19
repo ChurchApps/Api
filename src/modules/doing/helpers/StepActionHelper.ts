@@ -197,7 +197,7 @@ export class StepActionHelper {
       task.churchId || "",
       task.associatedWithId,
       config.templateId,
-      { email: person.email, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel },
+      { email: person.email, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel, donorNumber: person.donorNumber },
       church?.name || "B1",
       config.subject,
       extras
@@ -221,7 +221,7 @@ export class StepActionHelper {
       return;
     }
     const church = await membership.loadChurch(task.churchId || "");
-    const recipient = { phoneNumber, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel };
+    const recipient = { phoneNumber, firstName: person.firstName, lastName: person.lastName, displayName: person.displayName || task.associatedWithLabel, donorNumber: person.donorNumber };
     const extras = await DonationMergeHelper.extras(task.churchId || "", this.parseData(task).event, "text");
     const result = await getMessagingModuleGateway().sendPersonText(task.churchId || "", task.associatedWithId, recipient, config.message, church?.name || "B1", extras);
     if (!result.ok) throw new Error(result.reason || "send failed");

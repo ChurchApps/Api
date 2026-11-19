@@ -9,6 +9,7 @@ interface EmailRecipient {
   lastName?: string;
   displayName?: string;
   email: string;
+  donorNumber?: string;
 }
 
 // Gateway: the only seam through which other modules read/write messaging data.
@@ -44,6 +45,7 @@ interface TextRecipient {
   firstName?: string;
   lastName?: string;
   displayName?: string;
+  donorNumber?: string;
 }
 
 interface BulkTextRecipient {

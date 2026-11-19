@@ -6,7 +6,7 @@ describe("MergeFieldHelper gift fields", () => {
   it("lists Amount, Gift Date, Fund and Receipt after the person fields", () => {
     const keys = MergeFieldHelper.availableFields.map((f) => f.key);
     expect(keys).toEqual([
-      "{{firstName}}", "{{lastName}}", "{{displayName}}", "{{email}}", "{{churchName}}", "{{amount}}", "{{giftDate}}", "{{fund}}", "{{receipt}}"
+      "{{firstName}}", "{{lastName}}", "{{displayName}}", "{{email}}", "{{donorNumber}}", "{{churchName}}", "{{amount}}", "{{giftDate}}", "{{fund}}", "{{receipt}}"
     ]);
   });
 
@@ -21,8 +21,18 @@ describe("MergeFieldHelper gift fields", () => {
     expect(result).toBe("Hi Donald ||| from Grace");
   });
 
+  it("fills the donor number from the person and blanks it when unset", () => {
+    const template = "Hi {{firstName}}, donor #{{donorNumber}}.";
+    expect(MergeFieldHelper.resolve(template, { ...person, donorNumber: "1042" }, { name: "Grace" })).toBe("Hi Donald, donor #1042.");
+    expect(MergeFieldHelper.resolve(template, person, { name: "Grace" })).toBe("Hi Donald, donor #.");
+  });
+
   it("fills sample gift values in the preview", () => {
     const result = MergeFieldHelper.resolveSample("{{amount}} {{fund}}");
     expect(result).toBe("$50.00 General Fund");
+  });
+
+  it("fills a sample donor number in the preview", () => {
+    expect(MergeFieldHelper.resolveSample("{{donorNumber}}")).toBe("1042");
   });
 });

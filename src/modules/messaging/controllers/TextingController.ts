@@ -267,7 +267,7 @@ export class TextingController extends MessagingBaseController {
         await provider.addSubscriber(config, phoneNumber, { firstName: parts[0] || "", lastName: parts.slice(1).join(" ") || "" });
       }
       const resolved = message.includes("{{")
-        ? MergeFieldHelper.resolve(message, { firstName: person.firstName, lastName: person.lastName, displayName: person.displayName }, { name: await this.loadChurchName(au.churchId) }).slice(0, 1600)
+        ? MergeFieldHelper.resolve(message, { firstName: person.firstName, lastName: person.lastName, displayName: person.displayName, donorNumber: person.donorNumber }, { name: await this.loadChurchName(au.churchId) }).slice(0, 1600)
         : message;
       const result = await provider.sendMessage(config, phoneNumber, resolved);
       if (!result.success && result.error?.includes("insufficient_credits")) {
