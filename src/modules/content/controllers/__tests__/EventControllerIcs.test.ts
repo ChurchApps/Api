@@ -26,4 +26,18 @@ describe("EventController.subscribe ICS", () => {
     expect(body).toContain("BEGIN:VEVENT");
     expect(body).toContain("EXDATE");
   });
+
+  it("omits EXDATE for events without exception dates", async () => {
+    const { CalendarHelper } = jest.requireMock("../../helpers/index");
+    CalendarHelper.addExceptionDates.mockImplementationOnce(async (events: any[]) => { events.forEach((e) => { e.exceptionDates = []; }); });
+    const controller = new EventController();
+    (controller as any).repos = { event: { loadPublicForGroup: jest.fn(async () => [{ id: "e2", churchId: "c1", title: "Picnic", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z") }]) } };
+    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
+    const res: any = { status: jest.fn(() => res), send: jest.fn(), set: jest.fn() };
+    await (controller as any).subscribe({ query: { groupId: "g1", churchId: "c1" } }, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const body = res.send.mock.calls[0][0];
+    expect(body).toContain("BEGIN:VEVENT");
+    expect(body).not.toContain("EXDATE");
+  });
 });
