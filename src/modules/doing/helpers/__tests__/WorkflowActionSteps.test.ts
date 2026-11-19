@@ -287,6 +287,15 @@ describe("WorkflowHelper sendText action", () => {
     expect(historyOf(task)).toContain("Text sent");
   });
 
+  it("passes the person's donor number so {{donorNumber}} resolves", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", lastName: "Clark", mobilePhone: "555-0100", donorNumber: "1042" });
+    const repos = buildRepos(steps, { stepACT: [textAction] });
+
+    await WorkflowHelper.moveToStep(newTask(), "stepACT", repos);
+
+    expect(sendPersonTextMock.mock.calls[0][2]).toEqual(expect.objectContaining({ donorNumber: "1042" }));
+  });
+
   it("skips a person who opted out of texts", async () => {
     loadPersonMock.mockResolvedValueOnce({ id: "p1", firstName: "Donald", mobilePhone: "555-0100", optedOut: 1 });
     const repos = buildRepos(steps, { stepACT: [textAction] });
@@ -347,6 +356,16 @@ describe("WorkflowHelper sendEmail action", () => {
       undefined,
       {}
     );
+  });
+
+  it("passes the person's donor number so {{donorNumber}} resolves", async () => {
+    loadPersonMock.mockResolvedValueOnce({ id: "p1", email: "donald@example.com", firstName: "Donald", lastName: "Clark", donorNumber: "1042" });
+    const repos = buildRepos(steps, { stepACT: [{ actionType: "sendEmail", config: JSON.stringify({ templateId: "t1" }) }] });
+    const task: any = { churchId: "c1", workflowId: "wf1", stepId: "stepA", associatedWithType: "person", associatedWithId: "p1", associatedWithLabel: "Donald Clark" };
+
+    await WorkflowHelper.moveToStep(task, "stepACT", repos);
+
+    expect(sendTemplatedEmailMock.mock.calls[0][3]).toEqual(expect.objectContaining({ donorNumber: "1042" }));
   });
 
   it("stores the gift on a donation-started card and fills the gift fields in its email", async () => {

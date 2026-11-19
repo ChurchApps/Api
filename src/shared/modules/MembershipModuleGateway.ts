@@ -37,7 +37,7 @@ export interface MembershipModuleGateway {
   loadGroup(churchId: string, groupId: string): Promise<{ id: string; name: string; categoryName?: string; discussionsEnabled?: boolean | number; announcementsEnabled?: boolean | number } | null>;
   searchPersonByEmail(churchId: string, email: string): Promise<{ id: string; householdId: string; email: string }[]>;
   loadPerson(churchId: string, personId: string): Promise<{
-    id: string; householdId: string; email: string; firstName?: string; lastName?: string; displayName?: string; mobilePhone?: string; optedOut?: boolean | number;
+    id: string; householdId: string; email: string; firstName?: string; lastName?: string; displayName?: string; mobilePhone?: string; optedOut?: boolean | number; donorNumber?: string;
     membershipStatus?: string; gender?: string; maritalStatus?: string; birthDate?: Date; householdRole?: string;
   } | null>;
   getOrCreateGuestPerson(churchId: string, guestInfo: GuestInfo): Promise<{ personId: string; householdId: string; email: string }>;

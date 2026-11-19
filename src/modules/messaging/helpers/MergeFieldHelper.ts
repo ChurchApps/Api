@@ -3,6 +3,7 @@ export interface MergeFieldPerson {
   lastName?: string;
   displayName?: string;
   email?: string;
+  donorNumber?: string;
 }
 
 export interface MergeFieldChurch {
@@ -21,6 +22,7 @@ export class MergeFieldHelper {
     { key: "{{lastName}}", label: "Last Name" },
     { key: "{{displayName}}", label: "Display Name" },
     { key: "{{email}}", label: "Email" },
+    { key: "{{donorNumber}}", label: "Donor Number" },
     { key: "{{churchName}}", label: "Church Name" },
     { key: "{{amount}}", label: "Amount" },
     { key: "{{giftDate}}", label: "Gift Date" },
@@ -37,6 +39,7 @@ export class MergeFieldHelper {
       .replace(/\{\{lastName\}\}/g, person.lastName || "")
       .replace(/\{\{displayName\}\}/g, person.displayName || "")
       .replace(/\{\{email\}\}/g, person.email || "")
+      .replace(/\{\{donorNumber\}\}/g, person.donorNumber || "")
       .replace(/\{\{churchName\}\}/g, church?.name || "");
     this.giftKeys.forEach((key) => {
       result = result.split("{{" + key + "}}").join(extras?.[key] ?? "");
@@ -49,7 +52,8 @@ export class MergeFieldHelper {
       firstName: "John",
       lastName: "Smith",
       displayName: "John Smith",
-      email: "john@example.com"
+      email: "john@example.com",
+      donorNumber: "1042"
     }, { name: churchName || "Your Church" }, {
       amount: "$50.00",
       giftDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
