@@ -2,6 +2,9 @@ import axios from "axios";
 import { XMLParser } from "fast-xml-parser";
 import { UrlValidator } from "../../../shared/webhooks/UrlValidator.js";
 
+// A parsed fast-xml-parser node: element names (and "@_attr" / "#text") mapped to child values.
+type XmlRecord = Record<string, unknown>;
+
 interface PodcastEpisode {
   guid: string;
   title: string;
@@ -103,7 +106,7 @@ export class PodcastFeedHelper {
   }
 
   static parse(xml: string): PodcastFeed {
-    let doc: any;
+    let doc: { rss?: { channel?: XmlRecord & { image?: XmlRecord } } };
     try {
       doc = this.parser.parse(xml);
     } catch {
@@ -113,9 +116,9 @@ export class PodcastFeedHelper {
     if (!channel) throw new PodcastFeedError("The URL is not an RSS podcast feed", 422);
 
     const channelImage = this.attr(channel["itunes:image"], "href") || this.text(channel.image?.url);
-    const rawItems = channel.item === undefined ? [] : Array.isArray(channel.item) ? channel.item : [channel.item];
+    const rawItems: XmlRecord[] = channel.item === undefined ? [] : Array.isArray(channel.item) ? channel.item : [channel.item as XmlRecord];
 
-    const episodes: PodcastEpisode[] = rawItems.slice(0, MAX_EPISODES).map((item: any, index: number) => {
+    const episodes: PodcastEpisode[] = rawItems.slice(0, MAX_EPISODES).map((item, index: number) => {
       const audioUrl = this.attr(item.enclosure, "url");
       const rawNumber = parseInt(this.text(item["itunes:episode"]), 10);
       return {
@@ -143,18 +146,21 @@ export class PodcastFeedHelper {
   }
 
   // fast-xml-parser returns a string for simple nodes and an object with "#text" when the node also carries attributes.
-  private static text(node: any): string {
+  private static text(node: unknown): string {
     if (node === undefined || node === null) return "";
     if (Array.isArray(node)) return this.text(node[0]);
-    if (typeof node === "object") return node["#text"] === undefined ? "" : String(node["#text"]).trim();
+    if (typeof node === "object") {
+      const textValue = (node as XmlRecord)["#text"];
+      return textValue === undefined ? "" : String(textValue).trim();
+    }
     return String(node).trim();
   }
 
-  private static attr(node: any, name: string): string {
+  private static attr(node: unknown, name: string): string {
     if (!node) return "";
-    const target = Array.isArray(node) ? node[0] : node;
+    const target: unknown = Array.isArray(node) ? node[0] : node;
     if (typeof target !== "object") return "";
-    const value = target["@_" + name];
+    const value = (target as XmlRecord)["@_" + name];
     return value === undefined || value === null ? "" : String(value).trim();
   }
 

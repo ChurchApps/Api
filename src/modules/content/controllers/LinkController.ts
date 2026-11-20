@@ -3,6 +3,7 @@ import express from "express";
 import { Permissions } from "../helpers/index.js";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Link } from "../models/index.js";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 
 @controller("/content/links")
 export class LinkController extends ContentBaseController {
@@ -10,7 +11,7 @@ export class LinkController extends ContentBaseController {
   // Authenticated access - filters links by visibility based on user context
   // Note: "team" visibility is handled client-side since group tags aren't in the JWT
   @httpGet("/church/:churchId/filtered")
-  public async loadFiltered(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadFiltered(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query.category?.toString();
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
@@ -24,7 +25,7 @@ export class LinkController extends ContentBaseController {
     });
   }
 
-  private isLinkVisible(link: Link, au: any): boolean {
+  private isLinkVisible(link: Link, au: Partial<Pick<AuthenticatedUser, "personId" | "membershipStatus" | "groupIds">>): boolean {
     const visibility = link.visibility || "everyone";
 
     switch (visibility) {
@@ -52,7 +53,7 @@ export class LinkController extends ContentBaseController {
 
   // Anonymous access
   @httpGet("/church/:churchId")
-  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async loadAnon(@requestParam("churchId") churchId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const category = req.query.category?.toString();
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
@@ -62,7 +63,7 @@ export class LinkController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.link.load(au.churchId, id);
       return this.repos.link.convertToModel(au.churchId, data);
@@ -71,7 +72,7 @@ export class LinkController extends ContentBaseController {
 
   // Override GET / to support optional category filter
   @httpGet("/")
-  public async loadAll(req: express.Request, res: express.Response): Promise<any> {
+  public async loadAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const category = req.query?.category?.toString();
       const siteId = (typeof req.query.siteId === "string" ? req.query.siteId : "");
@@ -81,7 +82,7 @@ export class LinkController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Link[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<Link>[] = [];
@@ -101,7 +102,7 @@ export class LinkController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

@@ -6,11 +6,12 @@ const getRepos = jest.fn();
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { getRepos: (...args: unknown[]) => getRepos(...args) } }));
 
 import { SongHelper } from "../SongHelper.js";
+import { Arrangement, ArrangementKey } from "../../models/index.js";
 
 describe("SongHelper.importSong on an existing match", () => {
   const existing = { id: "arr-1", churchId: "CHURCH1", songId: "song-1", songDetailId: "sd-1", name: "Default", freeShowId: "fs-1" };
-  const saveArrangement = jest.fn(async (a: any) => ({ ...a, id: a.id || "arr-2" }));
-  const saveKey = jest.fn(async (k: any) => k);
+  const saveArrangement = jest.fn(async (a: Arrangement) => ({ ...a, id: a.id || "arr-2" }));
+  const saveKey = jest.fn(async (k: ArrangementKey) => k);
 
   beforeEach(() => {
     saveArrangement.mockClear();

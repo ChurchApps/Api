@@ -9,14 +9,14 @@ import { MusicBrainzHelper } from "../helpers/MusicBrainzHelper.js";
 @controller("/content/songDetails")
 export class SongDetailsController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       return await this.repos.songDetail.loadGlobal(id);
     });
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const limit = req.query.limit ? parseInt(req.query.limit.toString(), 10) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset.toString(), 10) : undefined;
@@ -35,7 +35,7 @@ export class SongDetailsController extends ContentBaseController {
   }
 
   @httpPost("/create")
-  public async post(req: express.Request<{}, {}, SongDetail>, res: express.Response): Promise<any> {
+  public async post(req: express.Request<{}, {}, SongDetail>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const sd = req.body;
@@ -59,7 +59,7 @@ export class SongDetailsController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, SongDetail[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, SongDetail[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const isServerAdmin = au.checkAccess(Permissions.server.admin);

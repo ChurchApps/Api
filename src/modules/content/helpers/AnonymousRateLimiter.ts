@@ -3,13 +3,24 @@ import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 
 export interface RateBucket { key: string; max: number }
 
+interface SourceIpContext { identity?: { sourceIp?: string }; http?: { sourceIp?: string } }
+// serverless-http attaches the API Gateway event to the request; express's types don't know about it.
+type GatewayRequest = express.Request & { apiGateway?: { event?: { requestContext?: SourceIpContext } }; requestContext?: SourceIpContext };
+
+// The membership loginAttempt repo, described locally because content may not import the membership module.
+interface LoginAttemptStore {
+  loadCount(attemptKey: string, windowSeconds: number): Promise<number>;
+  increment(attemptKey: string, windowSeconds: number): Promise<void>;
+}
+
 // DB-backed (membership loginAttempts table) so the count survives across Lambda containers.
 export class AnonymousRateLimiter {
   static windowSeconds = 60 * 60;
 
   // API Gateway appends the real source IP last, so the last X-Forwarded-For hop is the unforgeable one.
   static getClientIp(req: express.Request): string {
-    const ctx: any = (req as any)?.apiGateway?.event?.requestContext ?? (req as any)?.requestContext;
+    const gatewayReq = req as GatewayRequest;
+    const ctx: SourceIpContext = gatewayReq?.apiGateway?.event?.requestContext ?? gatewayReq?.requestContext;
     const sourceIp = ctx?.identity?.sourceIp || ctx?.http?.sourceIp;
     if (sourceIp) return sourceIp;
     const hops = ((req?.headers?.["x-forwarded-for"] as string) || "").split(",").map((h) => h.trim()).filter((h) => h.length > 0);
@@ -39,7 +50,7 @@ export class AnonymousRateLimiter {
     const active = buckets.filter((b): b is RateBucket => !!b);
     if (active.length === 0) return true;
     try {
-      const repo = (await RepoManager.getRepos<any>("membership")).loginAttempt;
+      const repo = (await RepoManager.getRepos<{ loginAttempt: LoginAttemptStore }>("membership")).loginAttempt;
       for (const b of active) {
         if (await repo.loadCount(b.key, windowSeconds) >= b.max) return false;
       }

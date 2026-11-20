@@ -1,14 +1,18 @@
 import "reflect-metadata";
+import express from "express";
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getAll: () => [], getIds: () => [] } }));
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("../../helpers/index", () => ({ Permissions: { content: { edit: "contentEdit" } } }));
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } bumpSiteCache() {} } }));
-jest.mock("../../helpers/TreeHelper", () => ({ TreeHelper: { populateAnswers: (items: any[]) => items.forEach((i) => { i.answers = JSON.parse(i.answersJSON || "{}"); }) } }));
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } bumpSiteCache() {} } }));
+jest.mock("../../helpers/TreeHelper", () => ({ TreeHelper: { populateAnswers: (items: { answers?: unknown; answersJSON?: string }[]) => items.forEach((i) => { i.answers = JSON.parse(i.answersJSON || "{}"); }) } }));
 
 import { BlockController } from "../BlockController.js";
+import { Section } from "../../models/index.js";
 
-const section = (id: string, extra: any = {}) => ({ id, answersJSON: "{}", stylesJSON: "{}", animationsJSON: "{}", ...extra });
-const element = (id: string, answers: any = {}) => ({ id, answersJSON: JSON.stringify(answers), stylesJSON: "{}", animationsJSON: "{}" });
+type JsonResult = { obj: unknown; status: number };
+
+const section = (id: string, extra: Partial<Section> = {}) => ({ id, answersJSON: "{}", stylesJSON: "{}", animationsJSON: "{}", ...extra });
+const element = (id: string, answers: Record<string, unknown> = {}) => ({ id, answersJSON: JSON.stringify(answers), stylesJSON: "{}", animationsJSON: "{}" });
 
 function makeController(overrides: { checkAccess?: boolean; blockId?: string } = {}) {
   const blockId = overrides.blockId ?? "B";
@@ -27,11 +31,13 @@ function makeController(overrides: { checkAccess?: boolean; blockId?: string } =
   };
   const au = { churchId: "c1", checkAccess: () => overrides.checkAccess ?? true };
   const controller = new BlockController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
   const bumpSiteCache = jest.fn();
-  (controller as any).bumpSiteCache = bumpSiteCache;
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status }),
+    bumpSiteCache
+  });
   return { controller, repos, bumpSiteCache, blockId };
 }
 
@@ -40,7 +46,7 @@ const ids = (fn: jest.Mock) => fn.mock.calls.map((c) => c[1]);
 describe("BlockController.delete cascade", () => {
   it("deletes the block's own sections/elements and every consumer of it", async () => {
     const { controller, repos, bumpSiteCache } = makeController();
-    const res = await (controller as any).delete("B", {}, {});
+    const res = await controller.delete("B", {} as express.Request, {} as express.Response);
     expect(res).toEqual({});
     expect(ids(repos.element.delete as jest.Mock).sort()).toEqual(["be1", "be2", "e1"]);
     expect(ids(repos.section.delete as jest.Mock).sort()).toEqual(["bs1", "s1"]);
@@ -50,8 +56,8 @@ describe("BlockController.delete cascade", () => {
 
   it("rejects without content-edit permission and deletes nothing", async () => {
     const { controller, repos, bumpSiteCache } = makeController({ checkAccess: false });
-    const res = await (controller as any).delete("B", {}, {});
-    expect(res.status).toBe(401);
+    const res = await controller.delete("B", {} as express.Request, {} as express.Response);
+    expect((res as JsonResult).status).toBe(401);
     expect(repos.block.delete).not.toHaveBeenCalled();
     expect(repos.section.delete).not.toHaveBeenCalled();
     expect(repos.element.delete).not.toHaveBeenCalled();
@@ -60,7 +66,7 @@ describe("BlockController.delete cascade", () => {
 
   it("is a no-op for an unknown block id", async () => {
     const { controller, repos } = makeController();
-    const res = await (controller as any).delete("nope", {}, {});
+    const res = await controller.delete("nope", {} as express.Request, {} as express.Response);
     expect(res).toEqual({});
     expect(repos.section.delete).not.toHaveBeenCalled();
     expect(repos.element.delete).not.toHaveBeenCalled();

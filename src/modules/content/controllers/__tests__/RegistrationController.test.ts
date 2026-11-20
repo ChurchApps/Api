@@ -1,6 +1,7 @@
 import "reflect-metadata";
+import express from "express";
 
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
   Permissions: { registrations: { view: "regView", edit: "regEdit" } },
   RegistrationHelper: { sendConfirmationEmail: jest.fn(), sendCancellationEmail: jest.fn(), sendWaitlistAvailabilityEmail: jest.fn() },
@@ -17,8 +18,8 @@ jest.mock("../../../../shared/modules/index", () => ({
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
 jest.mock("../../../../shared/infrastructure/RepoManager", () => ({ RepoManager: { getRepos: jest.fn(async () => ({ gateway: { loadAll: jest.fn(async () => [{ id: "g1", provider: "stripe" }]) } })) } }));
 jest.mock("../../../../shared/helpers/GatewayService", () => ({ GatewayService: { getGatewayForChurch: jest.fn(async () => ({ provider: "stripe", currency: "USD" })), prepareCharge: jest.fn(), processCharge: jest.fn() } }));
-const consume = jest.fn(async () => true);
-jest.mock("../../helpers/AnonymousRateLimiter", () => ({ AnonymousRateLimiter: { consume: (...args: any[]) => (consume as any)(...args), ipBucket: jest.fn(() => ({ key: "ip", max: 1 })), keyBucket: jest.fn(() => ({ key: "k", max: 1 })) } }));
+const consume = jest.fn(async (..._args: unknown[]) => true);
+jest.mock("../../helpers/AnonymousRateLimiter", () => ({ AnonymousRateLimiter: { consume: (...args: unknown[]) => consume(...args), ipBucket: jest.fn(() => ({ key: "ip", max: 1 })), keyBucket: jest.fn(() => ({ key: "k", max: 1 })) } }));
 jest.mock("../../../../shared/helpers/Environment", () => ({ Environment: { b1AdminRoot: "https://app.test", b1AppRoot: "https://{subdomain}.b1.test", supportEmail: "s@test" } }));
 
 import { RegistrationController } from "../RegistrationController.js";
@@ -27,16 +28,42 @@ import { RepoManager } from "../../../../shared/infrastructure/RepoManager.js";
 import { RegistrationHelper } from "../../helpers/index.js";
 import { Environment } from "../../../../shared/helpers/Environment.js";
 import { CaptchaPass } from "../../../../shared/helpers/CaptchaPass.js";
+import { Event, Registration, RegistrationCoupon, RegistrationMember, RegistrationPayment, RegistrationSelection, RegistrationSelectionChoice, RegistrationType } from "../../models/index.js";
+
+type JsonResult = { obj: unknown; status: number };
+// Actions return either the saved registration or the json(obj, status) stub's error shape.
+type RegResult = Omit<Registration, "status"> & { status?: string | number; obj?: { error?: string; reason?: string; status?: string } };
+// MySQL DECIMAL columns come back as strings, so fixtures mirror that.
+type DbRegistrationType = Omit<RegistrationType, "price"> & { price?: number | string };
+type DbRegistrationCoupon = Omit<RegistrationCoupon, "value"> & { value?: number | string };
+
+interface ControllerOpts {
+  event?: Event;
+  existingRegs?: Registration[];
+  capacityOk?: boolean;
+  existing?: Registration;
+  couponUses?: number;
+  promoted?: Registration | null;
+  types?: DbRegistrationType[];
+  selections?: RegistrationSelection[];
+  coupon?: DbRegistrationCoupon;
+  typeOk?: boolean;
+  savedMembers?: RegistrationMember[];
+  selOk?: boolean;
+  auPersonId?: string;
+  leaderGroupIds?: string[];
+  checkAccess?: boolean;
+}
 
 const processCharge = GatewayService.processCharge as jest.Mock;
 
-function makeController(opts: any = {}) {
-  const repos: any = {
+function makeController(opts: ControllerOpts = {}) {
+  const repos = {
     event: { load: jest.fn(async () => opts.event ?? { id: "e1", registrationEnabled: true, capacity: 50 }) },
     registration: {
       loadForEvent: jest.fn(async () => opts.existingRegs ?? []),
-      atomicInsertWithCapacityCheck: jest.fn(async (reg: any) => { reg.id = "REGID"; return opts.capacityOk ?? true; }),
-      save: jest.fn(async (r: any) => { if (!r.id) r.id = "REGID"; return r; }),
+      atomicInsertWithCapacityCheck: jest.fn(async (reg: Registration) => { reg.id = "REGID"; return opts.capacityOk ?? true; }),
+      save: jest.fn(async (r: Registration) => { if (!r.id) r.id = "REGID"; return r; }),
       delete: jest.fn(),
       load: jest.fn(async () => opts.existing),
       countActiveForCoupon: jest.fn(async () => opts.couponUses ?? 0),
@@ -45,17 +72,19 @@ function makeController(opts: any = {}) {
     registrationType: { loadForEvent: jest.fn(async () => opts.types ?? []) },
     registrationSelection: { loadForEvent: jest.fn(async () => opts.selections ?? []) },
     registrationCoupon: { loadByCode: jest.fn(async () => opts.coupon), load: jest.fn(async () => opts.coupon) },
-    registrationMember: { atomicInsertWithTypeCapacity: jest.fn(async () => opts.typeOk ?? true), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async () => opts.savedMembers ?? []) },
-    registrationSelectionChoice: { atomicInsertWithCapacityCheck: jest.fn(async () => opts.selOk ?? true), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async () => []) },
-    registrationPayment: { save: jest.fn(async (r: any) => r), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async () => []) }
+    registrationMember: { atomicInsertWithTypeCapacity: jest.fn(async (_m: RegistrationMember, _capacity: number | null) => opts.typeOk ?? true), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async () => opts.savedMembers ?? []) },
+    registrationSelectionChoice: { atomicInsertWithCapacityCheck: jest.fn(async () => opts.selOk ?? true), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async (): Promise<RegistrationSelectionChoice[]> => []) },
+    registrationPayment: { save: jest.fn(async (r: RegistrationPayment) => r), deleteForRegistration: jest.fn(), loadForRegistration: jest.fn(async (): Promise<RegistrationPayment[]> => []) }
   };
   const au = { churchId: "c1", personId: opts.auPersonId ?? "admin1", leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: () => opts.checkAccess ?? true };
   const controller = new RegistrationController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).authUser = () => au;
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof au) => unknown) => action(au),
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action(),
+    authUser: () => au,
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, repos };
 }
 
@@ -64,7 +93,7 @@ beforeEach(() => { processCharge.mockReset(); });
 describe("register — free event", () => {
   it("confirms without charging when total is 0", async () => {
     const { controller, repos } = makeController();
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge).not.toHaveBeenCalled();
     expect(result.status).toBe("confirmed");
     expect(repos.registration.atomicInsertWithCapacityCheck).toHaveBeenCalled();
@@ -77,7 +106,7 @@ describe("register — paid event", () => {
   it("charges the server-computed total (ignoring a tampered client amount) and records the payment", async () => {
     processCharge.mockResolvedValue({ success: true, transactionId: "tx1", data: { id: "tx1", status: "succeeded", currency: "usd" } });
     const { controller, repos } = makeController({ types, auPersonId: "p1" });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", amount: 999, members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", amount: 999, members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge).toHaveBeenCalledTimes(1);
     expect(processCharge.mock.calls[0][1].amount).toBe(45);
     expect(repos.registrationPayment.save).toHaveBeenCalled();
@@ -88,7 +117,7 @@ describe("register — paid event", () => {
   it("rolls back inserted rows and returns the gateway error when the charge declines", async () => {
     processCharge.mockResolvedValue({ success: false, error: "Card declined" });
     const { controller, repos } = makeController({ types, auPersonId: "p1" });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(400);
     expect(result.obj.error).toBe("Card declined");
     expect(repos.registration.delete).toHaveBeenCalled();
@@ -99,13 +128,13 @@ describe("register — paid event", () => {
     processCharge.mockResolvedValue({ success: true, transactionId: "tx2", data: { id: "tx2", status: "succeeded" } });
     const coupon = { id: "cp1", discountType: "percent", value: 10, active: true };
     const { controller } = makeController({ types, coupon, auPersonId: "p1" });
-    await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", couponCode: "EARLYBIRD", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
+    await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", couponCode: "EARLYBIRD", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response);
     expect(processCharge.mock.calls[0][1].amount).toBe(40.5);
   });
 
   it("rejects an attendee type that does not belong to the event", async () => {
     const { controller } = makeController({ types });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B", registrationTypeId: "ghost" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B", registrationTypeId: "ghost" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(400);
     expect(result.obj.error).toBe("Invalid attendee type");
   });
@@ -113,7 +142,7 @@ describe("register — paid event", () => {
   it("rejects an invalid coupon with its reason", async () => {
     const coupon = { id: "cp1", discountType: "percent", value: 10, active: false };
     const { controller } = makeController({ types, coupon });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", couponCode: "X", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", couponCode: "X", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(400);
     expect(result.obj.reason).toBe("inactive");
   });
@@ -121,14 +150,14 @@ describe("register — paid event", () => {
 
 describe("register — guest captcha", () => {
   const types = [{ id: "t1", name: "Adult", price: 30, active: true }];
-  const body = (extra: any = {}) => ({ churchId: "c1", eventId: "e1", provider: "stripe", token: "pm_1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "G", lastName: "H", registrationTypeId: "t1" }], ...extra });
+  const body = (extra: Record<string, unknown> = {}) => ({ churchId: "c1", eventId: "e1", provider: "stripe", token: "pm_1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "G", lastName: "H", registrationTypeId: "t1" }], ...extra });
 
   beforeEach(() => { Object.assign(Environment, { captchaEnforce: true, jwtSecret: "test-secret" }); });
   afterEach(() => { Object.assign(Environment, { captchaEnforce: false, jwtSecret: undefined }); });
 
   it("refuses a paid guest registration without a pass, before charging, and rolls it back", async () => {
     const { controller, repos } = makeController({ types });
-    const result: any = await (controller as any).register({ body: body() }, {});
+    const result = (await controller.register({ body: body() } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(403);
     expect(processCharge).not.toHaveBeenCalled();
     expect(repos.registration.delete).toHaveBeenCalled();
@@ -137,29 +166,29 @@ describe("register — guest captcha", () => {
   it("charges a paid guest registration that carries a valid pass", async () => {
     processCharge.mockResolvedValue({ success: true, data: { status: "succeeded" }, transactionId: "tx1" });
     const { controller } = makeController({ types });
-    const result: any = await (controller as any).register({ body: body({ captchaPass: CaptchaPass.create("c1") }) }, {});
+    const result = (await controller.register({ body: body({ captchaPass: CaptchaPass.create("c1") }) } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge).toHaveBeenCalled();
     expect(result.status).toBe("confirmed");
   });
 
   it("refuses a pass issued for another church", async () => {
     const { controller } = makeController({ types });
-    const result: any = await (controller as any).register({ body: body({ captchaPass: CaptchaPass.create("other") }) }, {});
+    const result = (await controller.register({ body: body({ captchaPass: CaptchaPass.create("other") }) } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(403);
     expect(processCharge).not.toHaveBeenCalled();
   });
 
   it("lets a guest join the waitlist without a pass, since nothing is charged", async () => {
     const { controller } = makeController({ types, event: { id: "e1", registrationEnabled: true, capacity: 1, waitlistEnabled: true }, capacityOk: false });
-    const result: any = await (controller as any).register({ body: body() }, {});
+    const result = (await controller.register({ body: body() } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe("waitlisted");
   });
 
   it("does not ask a signed-in member for a pass", async () => {
     processCharge.mockResolvedValue({ success: true, data: { status: "succeeded" }, transactionId: "tx1" });
     const { controller } = makeController({ types });
-    (controller as any).authUser = () => ({ id: "u1", churchId: "c1", personId: "p1", checkAccess: () => false });
-    const result: any = await (controller as any).register({ body: body({ guestInfo: undefined, personId: "p1", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] }) }, {});
+    Object.assign(controller, { authUser: () => ({ id: "u1", churchId: "c1", personId: "p1", checkAccess: () => false }) });
+    const result = (await controller.register({ body: body({ guestInfo: undefined, personId: "p1", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] }) } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge).toHaveBeenCalled();
     expect(result.status).toBe("confirmed");
   });
@@ -168,7 +197,7 @@ describe("register — guest captcha", () => {
 describe("register — capacity and waitlist", () => {
   it("lands on the waitlist (no charge) when full and waitlist is enabled", async () => {
     const { controller, repos } = makeController({ event: { id: "e1", registrationEnabled: true, capacity: 1, waitlistEnabled: true }, capacityOk: false, types: [{ id: "t1", price: "45.00", active: true }] });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", provider: "stripe", token: "tok", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe("waitlisted");
     expect(processCharge).not.toHaveBeenCalled();
     expect(repos.registration.save).toHaveBeenCalled();
@@ -176,14 +205,14 @@ describe("register — capacity and waitlist", () => {
 
   it("returns 409 full when capacity is reached and waitlist is disabled", async () => {
     const { controller } = makeController({ event: { id: "e1", registrationEnabled: true, capacity: 1, waitlistEnabled: false }, capacityOk: false });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(409);
     expect(result.obj.status).toBe("full");
   });
 
   it("rolls back and returns 409 type-full when a per-type guard rejects", async () => {
     const { controller, repos } = makeController({ types: [{ id: "t1", price: "0", capacity: 2, active: true }], typeOk: false });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(409);
     expect(result.obj.status).toBe("type-full");
     expect(repos.registration.delete).toHaveBeenCalled();
@@ -194,7 +223,7 @@ describe("pay", () => {
   it("charges the outstanding balance and increments amountPaid", async () => {
     processCharge.mockResolvedValue({ success: true, transactionId: "tx3", data: { id: "tx3", status: "succeeded" } });
     const { controller, repos } = makeController({ existing: { id: "r1", churchId: "c1", personId: "p1", totalAmount: 100, amountPaid: 0, status: "pending" }, auPersonId: "p1" });
-    const result = await (controller as any).pay("r1", { body: { provider: "stripe", token: "tok" } }, {});
+    const result = (await controller.pay("r1", { body: { provider: "stripe", token: "tok" } } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge.mock.calls[0][1].amount).toBe(100);
     expect(repos.registrationPayment.save).toHaveBeenCalled();
     expect(result.amountPaid).toBe(100);
@@ -202,7 +231,7 @@ describe("pay", () => {
 
   it("rejects when there is no balance due", async () => {
     const { controller } = makeController({ existing: { id: "r1", churchId: "c1", personId: "p1", totalAmount: 50, amountPaid: 50 }, auPersonId: "p1" });
-    const result = await (controller as any).pay("r1", { body: { provider: "stripe", token: "tok" } }, {});
+    const result = (await controller.pay("r1", { body: { provider: "stripe", token: "tok" } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(400);
     expect(result.obj.error).toBe("No balance due");
   });
@@ -211,13 +240,13 @@ describe("pay", () => {
 describe("promote", () => {
   it("returns 409 when nothing can be promoted", async () => {
     const { controller } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1" }, promoted: null });
-    const result = await (controller as any).promote("r1", { body: null }, {});
+    const result = (await controller.promote("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(409);
   });
 
   it("returns the promoted registration when a spot frees", async () => {
     const { controller } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1" }, promoted: { id: "r2", status: "pending", personId: "p2" } });
-    const result = await (controller as any).promote("r1", { body: null }, {});
+    const result = (await controller.promote("r1", { body: null } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe("pending");
   });
 });
@@ -226,7 +255,7 @@ describe("edit", () => {
   it("recomputes totalAmount from new members without charging", async () => {
     const types = [{ id: "t1", price: "20.00", active: true }];
     const { controller, repos } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", amountPaid: 0 }, types, auPersonId: "p1", savedMembers: [{ registrationTypeId: "t1" }] });
-    const result = await (controller as any).edit("r1", { body: { members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.edit("r1", { body: { members: [{ firstName: "A", lastName: "B", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge).not.toHaveBeenCalled();
     expect(result.totalAmount).toBe(20);
     expect(repos.registration.save).toHaveBeenCalled();
@@ -236,7 +265,7 @@ describe("edit", () => {
 describe("review fixes", () => {
   it("refuses to take payment for a waitlisted registration", async () => {
     const { controller } = makeController({ existing: { id: "r1", churchId: "c1", personId: "p1", totalAmount: 100, amountPaid: 0, status: "waitlisted" }, auPersonId: "p1" });
-    const result = await (controller as any).pay("r1", { body: { provider: "stripe", token: "tok" } }, {});
+    const result = (await controller.pay("r1", { body: { provider: "stripe", token: "tok" } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(409);
     expect(processCharge).not.toHaveBeenCalled();
   });
@@ -244,13 +273,13 @@ describe("review fixes", () => {
   it("confirms a pending registration once the balance is paid", async () => {
     processCharge.mockResolvedValue({ success: true, transactionId: "tx4", data: { id: "tx4", status: "succeeded" } });
     const { controller } = makeController({ existing: { id: "r1", churchId: "c1", personId: "p1", totalAmount: 40, amountPaid: 0, status: "pending" }, auPersonId: "p1" });
-    const result = await (controller as any).pay("r1", { body: { provider: "stripe", token: "tok" } }, {});
+    const result = (await controller.pay("r1", { body: { provider: "stripe", token: "tok" } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe("confirmed");
   });
 
   it("promotes the registration staff clicked", async () => {
     const { controller, repos } = makeController({ existing: { id: "r7", churchId: "c1", eventId: "e1" }, promoted: { id: "r7", status: "pending" } });
-    await (controller as any).promote("r7", { body: null }, {});
+    await controller.promote("r7", { body: null } as express.Request, {} as express.Response);
     expect(repos.registration.promoteFromWaitlist).toHaveBeenCalledWith("c1", "e1", 50, "r7");
   });
 
@@ -258,8 +287,8 @@ describe("review fixes", () => {
     const types = [{ id: "t1", price: "0", capacity: 1, active: true }];
     const old = [{ id: "m1", churchId: "c1", registrationId: "r1", firstName: "Old", lastName: "Member" }];
     const { controller, repos } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1" }, types, auPersonId: "p1", savedMembers: old });
-    repos.registrationMember.atomicInsertWithTypeCapacity.mockImplementation(async (_m: any, capacity: number | null) => capacity === null);
-    const result = await (controller as any).edit("r1", { body: { members: [{ firstName: "New", lastName: "Member", registrationTypeId: "t1" }] } }, {});
+    repos.registrationMember.atomicInsertWithTypeCapacity.mockImplementation(async (_m: RegistrationMember, capacity: number | null) => capacity === null);
+    const result = (await controller.edit("r1", { body: { members: [{ firstName: "New", lastName: "Member", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(409);
     expect(repos.registrationMember.atomicInsertWithTypeCapacity).toHaveBeenLastCalledWith(old[0], null);
     expect(repos.registration.save).not.toHaveBeenCalled();
@@ -269,7 +298,7 @@ describe("review fixes", () => {
     const coupon = { id: "cp1", code: "X", discountType: "amount", value: "5", maxUses: 1, active: true };
     const { controller, repos } = makeController({ coupon, couponUses: 0 });
     repos.registration.countActiveForCoupon.mockResolvedValueOnce(0).mockResolvedValueOnce(2);
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", couponCode: "X", members: [{ firstName: "A", lastName: "B" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", couponCode: "X", members: [{ firstName: "A", lastName: "B" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(400);
     expect(repos.registration.delete).toHaveBeenCalled();
   });
@@ -278,8 +307,8 @@ describe("review fixes", () => {
 describe("attendee person links", () => {
   it("drops member personIds outside the registrant's household", async () => {
     const { controller, repos } = makeController({ auPersonId: "p1" });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p1", members: [{ firstName: "A", lastName: "B", personId: "p1" }, { firstName: "C", lastName: "D", personId: "stranger" }] } }, {});
-    expect(result.members.map((m: any) => m.personId)).toEqual(["p1", null]);
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p1", members: [{ firstName: "A", lastName: "B", personId: "p1" }, { firstName: "C", lastName: "D", personId: "stranger" }] } } as express.Request, {} as express.Response)) as RegResult;
+    expect(result.members.map((m) => m.personId)).toEqual(["p1", null]);
     expect(repos.registrationMember.atomicInsertWithTypeCapacity).toHaveBeenCalledTimes(2);
   });
 });
@@ -289,22 +318,22 @@ describe("paid attendee types are required", () => {
 
   it("rejects a register that omits attendee types on a paid event", async () => {
     const { controller, repos } = makeController({ types });
-    const noType: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "A", lastName: "B" }] } }, {});
+    const noType = (await controller.register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "A", lastName: "B" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(noType.status).toBe(400);
-    const noMembers: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" } } }, {});
+    const noMembers = (await controller.register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" } } } as express.Request, {} as express.Response)) as RegResult;
     expect(noMembers.status).toBe(400);
     expect(repos.registration.atomicInsertWithCapacityCheck).not.toHaveBeenCalled();
   });
 
   it("still allows free typed events without a type", async () => {
     const { controller } = makeController({ types: [{ id: "t1", price: "0", active: true }] });
-    const result = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", members: [{ firstName: "A", lastName: "B" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe("confirmed");
   });
 
   it("rejects a self edit that strips paid types", async () => {
     const { controller } = makeController({ types, checkAccess: false, auPersonId: "p1", existing: { id: "r1", churchId: "c1", eventId: "e1", personId: "p1", totalAmount: 45, amountPaid: 0, status: "pending" } });
-    const result: any = await (controller as any).edit("r1", { body: { members: [{ firstName: "A", lastName: "B" }] } }, {});
+    const result = (await controller.edit("r1", { body: { members: [{ firstName: "A", lastName: "B" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(400);
   });
 });
@@ -313,7 +342,7 @@ describe("anonymous rate limit", () => {
   it("returns 429 when the anonymous limiter is exhausted", async () => {
     consume.mockResolvedValueOnce(false);
     const { controller, repos } = makeController();
-    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" } } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" } } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(429);
     expect(repos.registration.atomicInsertWithCapacityCheck).not.toHaveBeenCalled();
   });
@@ -321,7 +350,7 @@ describe("anonymous rate limit", () => {
   it("throttles anonymous coupon validation", async () => {
     consume.mockResolvedValueOnce(false);
     const { controller } = makeController();
-    const result: any = await (controller as any).validateCoupon({ body: { churchId: "c1", eventId: "e1", code: "X" } }, {});
+    const result = (await controller.validateCoupon({ body: { churchId: "c1", eventId: "e1", code: "X" } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(429);
   });
 });
@@ -329,7 +358,7 @@ describe("anonymous rate limit", () => {
 describe("guest registration privacy (M29)", () => {
   it("does not link household people or echo person ids to an anonymous guest", async () => {
     const { controller } = makeController({ auPersonId: "" });
-    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "victim@x.com" }, members: [{ firstName: "Kid", lastName: "H", personId: "p1kid" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "victim@x.com" }, members: [{ firstName: "Kid", lastName: "H", personId: "p1kid" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.personId).toBeUndefined();
     expect(result.householdId).toBeUndefined();
     expect(result.members[0].personId).toBeNull();
@@ -339,14 +368,14 @@ describe("guest registration privacy (M29)", () => {
 describe("event registrations for the event's group leaders", () => {
   it("lets a leader of the event's group list its registrations", async () => {
     const { controller } = makeController({ checkAccess: false, leaderGroupIds: ["g1"], event: { id: "e1", groupId: "g1" }, existingRegs: [{ id: "r1" }] });
-    const result: any = await (controller as any).getForEvent("e1", {}, {});
-    expect(result.map((r: any) => r.id)).toEqual(["r1"]);
+    const result = await controller.getForEvent("e1", {} as express.Request, {} as express.Response);
+    expect((result as Registration[]).map((r) => r.id)).toEqual(["r1"]);
   });
 
   it("refuses a leader of a different group", async () => {
     const { controller } = makeController({ checkAccess: false, leaderGroupIds: ["g2"], event: { id: "e1", groupId: "g1" } });
-    const result: any = await (controller as any).getForEvent("e1", {}, {});
-    expect(result.status).toBe(401);
+    const result = await controller.getForEvent("e1", {} as express.Request, {} as express.Response);
+    expect((result as JsonResult).status).toBe(401);
   });
 });
 
@@ -355,7 +384,7 @@ describe("issue 1417 — staff Add Attendee and pay later", () => {
 
   it("lets staff register another person on a paid type with a balance due and no charge", async () => {
     const { controller } = makeController({ types, auPersonId: "admin1" });
-    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p2", members: [{ personId: "p2", firstName: "Donald", lastName: "Clark", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p2", members: [{ personId: "p2", firstName: "Donald", lastName: "Clark", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge).not.toHaveBeenCalled();
     expect(result.status).toBe("pending");
     expect(result.personId).toBe("p2");
@@ -366,7 +395,7 @@ describe("issue 1417 — staff Add Attendee and pay later", () => {
 
   it("keeps the person when staff add someone to a free event", async () => {
     const { controller } = makeController({ auPersonId: "admin1" });
-    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p2", members: [{ personId: "p2", firstName: "Sam", lastName: "Demo" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p2", members: [{ personId: "p2", firstName: "Sam", lastName: "Demo" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe("confirmed");
     expect(result.personId).toBe("p2");
     expect(result.members[0].personId).toBe("p2");
@@ -374,14 +403,14 @@ describe("issue 1417 — staff Add Attendee and pay later", () => {
 
   it("does not let a non-staff user register someone else", async () => {
     const { controller } = makeController({ auPersonId: "p1", checkAccess: false });
-    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", personId: "p2", members: [{ personId: "p2", firstName: "Sam", lastName: "Demo" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", personId: "p2", members: [{ personId: "p2", firstName: "Sam", lastName: "Demo" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.personId).toBeNull();
   });
 
   it("saves a paid registration as pending with a balance due when the church has no gateway", async () => {
-    (RepoManager.getRepos as jest.Mock).mockResolvedValueOnce({ gateway: { loadAll: jest.fn(async () => []) } });
+    (RepoManager.getRepos as jest.Mock).mockResolvedValueOnce({ gateway: { loadAll: jest.fn(async (): Promise<{ id: string; provider: string }[]> => []) } });
     const { controller } = makeController({ types, auPersonId: "" });
-    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "G", lastName: "H", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "G", lastName: "H", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(processCharge).not.toHaveBeenCalled();
     expect(result.status).toBe("pending");
     expect(result.totalAmount).toBe(45);
@@ -391,7 +420,7 @@ describe("issue 1417 — staff Add Attendee and pay later", () => {
   it("still requires payment when the church has a gateway", async () => {
     (RepoManager.getRepos as jest.Mock).mockResolvedValueOnce({ gateway: { loadAll: jest.fn(async () => [{ id: "g1", provider: "stripe" }]) } });
     const { controller } = makeController({ types, auPersonId: "" });
-    const result: any = await (controller as any).register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "G", lastName: "H", registrationTypeId: "t1" }] } }, {});
+    const result = (await controller.register({ body: { churchId: "c1", eventId: "e1", guestInfo: { firstName: "G", lastName: "H", email: "g@x.com" }, members: [{ firstName: "G", lastName: "H", registrationTypeId: "t1" }] } } as express.Request, {} as express.Response)) as RegResult;
     expect(result.status).toBe(400);
   });
 
@@ -399,7 +428,7 @@ describe("issue 1417 — staff Add Attendee and pay later", () => {
     const send = RegistrationHelper.sendWaitlistAvailabilityEmail as jest.Mock;
     send.mockClear();
     const { controller } = makeController({ existing: { id: "r1", churchId: "c1", eventId: "e1" }, promoted: { id: "r1", status: "pending", personId: "p2", totalAmount: 45, amountPaid: 0 } });
-    await (controller as any).promote("r1", { body: null }, {});
+    await controller.promote("r1", { body: null } as express.Request, {} as express.Response);
     expect(send.mock.calls[0][3]).toBe("https://grace.b1.test/mobile/registrations");
   });
 });

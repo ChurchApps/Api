@@ -2,8 +2,8 @@ import { Event, EventException } from "../models/index.js";
 import { Repos } from "../repositories/index.js";
 
 export class CalendarHelper {
-  public static eventKey(event: Event | Record<string, any>): string | undefined {
-    const e = event as any;
+  public static eventKey(event: Event | Record<string, unknown>): string | undefined {
+    const e = event as { realEventId?: string; eventId?: string; id?: string };
     return e.realEventId || e.eventId || e.id;
   }
 

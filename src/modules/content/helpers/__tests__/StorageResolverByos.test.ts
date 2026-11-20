@@ -14,44 +14,47 @@ jest.mock("@churchapps/apihelper", () => {
 
 import { StorageResolver } from "../StorageResolver.js";
 import { DropboxStorageProvider } from "../DropboxStorageProvider.js";
+import { StorageProvider } from "../../models/index.js";
+import type { StorageProviderRepo } from "../../repositories/StorageProviderRepo.js";
 
-const makeRepo = (rows: any[]) => ({
+// StorageResolver and the BYOS providers only call loadByChurchId / convertAllToModel / save on the repo.
+const makeRepo = (rows: StorageProvider[]): Partial<StorageProviderRepo> => ({
   loadByChurchId: jest.fn().mockResolvedValue(rows),
-  convertAllToModel: jest.fn((r: any[]) => r),
-  save: jest.fn(async (m: any) => m)
+  convertAllToModel: jest.fn((r: StorageProvider[]) => r),
+  save: jest.fn(async (m: StorageProvider) => m)
 });
 
 describe("StorageResolver BYOS routing", () => {
   it("constructs a per-church provider for an enabled BYOS row", async () => {
     const repo = makeRepo([{ id: "r1", churchId: "ch1", provider: "dropbox", enabled: true, accessToken: "enc:t" }]);
-    const storage = await StorageResolver.forChurch(repo as any, "ch1");
+    const storage = await StorageResolver.forChurch(repo as StorageProviderRepo, "ch1");
     expect(storage.name).toBe("dropbox");
     expect(storage.provider).toBeInstanceOf(DropboxStorageProvider);
   });
 
   it("falls back to churchapps when no row is enabled", async () => {
     const repo = makeRepo([{ id: "r1", churchId: "ch1", provider: "dropbox", enabled: false }]);
-    const storage = await StorageResolver.forChurch(repo as any, "ch1");
+    const storage = await StorageResolver.forChurch(repo as StorageProviderRepo, "ch1");
     expect(storage.name).toBe("churchapps");
   });
 
   it("routes files to the provider named on the row, even when disabled", async () => {
     const repo = makeRepo([{ id: "r1", churchId: "ch1", provider: "dropbox", enabled: false, accessToken: "enc:t" }]);
-    const storage = await StorageResolver.forFile(repo as any, { churchId: "ch1", provider: "dropbox", externalId: "/ch1/files/a.pdf" } as any);
+    const storage = await StorageResolver.forFile(repo as StorageProviderRepo, { churchId: "ch1", provider: "dropbox", externalId: "/ch1/files/a.pdf" });
     expect(storage.name).toBe("dropbox");
   });
 
   it("returns null when the file's provider row was deleted", async () => {
     const repo = makeRepo([]);
-    const storage = await StorageResolver.forFile(repo as any, { churchId: "ch1", provider: "dropbox", externalId: "x" } as any);
+    const storage = await StorageResolver.forFile(repo as StorageProviderRepo, { churchId: "ch1", provider: "dropbox", externalId: "x" });
     expect(storage).toBeNull();
   });
 
   it("derives legacy files from their url", async () => {
     const repo = makeRepo([]);
-    const storage = await StorageResolver.forFile(repo as any, { churchId: "ch1", contentPath: "https://content.churchapps.org/ch1/files/a.pdf?dt=1" } as any);
+    const storage = await StorageResolver.forFile(repo as StorageProviderRepo, { churchId: "ch1", contentPath: "https://content.churchapps.org/ch1/files/a.pdf?dt=1" });
     expect(storage.name).toBe("churchapps");
-    const ms = await StorageResolver.forFile(repo as any, { churchId: "ch1", contentPath: "https://ms.example.com/ch1/files/a.pdf" } as any);
+    const ms = await StorageResolver.forFile(repo as StorageProviderRepo, { churchId: "ch1", contentPath: "https://ms.example.com/ch1/files/a.pdf" });
     expect(ms.name).toBe("ministrystuff");
   });
 });

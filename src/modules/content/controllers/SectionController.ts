@@ -6,17 +6,20 @@ import { Permissions } from "../helpers/index.js";
 import { TreeHelper } from "../helpers/TreeHelper.js";
 import * as churchappsHelpers from "@churchapps/helpers";
 
+type ElementAnswersValidator = { validateElementAnswers?: (elementType: string, answers: unknown) => string[] };
+type JsonField = "answersJSON" | "stylesJSON" | "animationsJSON";
+
 @controller("/content/sections")
 export class SectionController extends ContentBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.section.load(au.churchId, id);
     });
   }
 
   @httpPost("/duplicate/:id")
-  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async duplicate(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -38,7 +41,7 @@ export class SectionController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Section[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Section[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -63,7 +66,7 @@ export class SectionController extends ContentBaseController {
 
   // Creates a section plus its full nested element tree in one call (section templates, AI generation).
   @httpPost("/tree")
-  public async saveTree(req: express.Request<{}, {}, { section: Section }>, res: express.Response): Promise<any> {
+  public async saveTree(req: express.Request<{}, {}, { section: Section }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const section = req.body?.section;
@@ -92,9 +95,10 @@ export class SectionController extends ContentBaseController {
 
   private validateElement(element: Element, index: number): string[] {
     const errors: string[] = [];
-    const validate = (churchappsHelpers as any).validateElementAnswers;
-    ["answersJSON", "stylesJSON", "animationsJSON"].forEach((field) => {
-      const value = (element as any)[field];
+    const validate = (churchappsHelpers as ElementAnswersValidator).validateElementAnswers;
+    const jsonFields: JsonField[] = ["answersJSON", "stylesJSON", "animationsJSON"];
+    jsonFields.forEach((field) => {
+      const value = element[field];
       if (!value) return;
       try { JSON.parse(value); } catch { errors.push("elements[" + index + "]: " + field + " is not valid JSON"); }
     });
@@ -120,8 +124,9 @@ export class SectionController extends ContentBaseController {
   private validateJson(sections: Section[]): string[] {
     const errors: string[] = [];
     sections.forEach((section, index) => {
-      ["answersJSON", "stylesJSON", "animationsJSON"].forEach((field) => {
-        const value = (section as any)[field];
+      const jsonFields: JsonField[] = ["answersJSON", "stylesJSON", "animationsJSON"];
+      jsonFields.forEach((field) => {
+        const value = section[field];
         if (!value) return;
         try { JSON.parse(value); } catch { errors.push("sections[" + index + "]: " + field + " is not valid JSON"); }
       });
@@ -130,7 +135,7 @@ export class SectionController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

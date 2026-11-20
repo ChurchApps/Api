@@ -79,7 +79,7 @@ export class OpenAiHelper {
       const parsed = JSON.parse(jsonString);
 
       if (Array.isArray(parsed)) {
-        return parsed.map((item: any) => ({
+        return parsed.map((item: { postIdea?: string; visual?: string; caption?: string }) => ({
           postIdea: item.postIdea || "",
           visual: item.visual || "",
           caption: item.caption || ""

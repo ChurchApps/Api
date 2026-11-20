@@ -10,7 +10,7 @@ export interface CouponValidation {
 // Pure pricing/discount math. Prices arrive from MySQL DECIMAL columns as strings,
 // so every amount is coerced with Number() before arithmetic.
 export class RegistrationPricingHelper {
-  static num(value: any): number {
+  static num(value: unknown): number {
     const n = Number(value);
     return isNaN(n) ? 0 : n;
   }
@@ -19,9 +19,9 @@ export class RegistrationPricingHelper {
     return Math.round(value * 100) / 100;
   }
 
-  static isValidQuantity(quantity: any): boolean {
+  static isValidQuantity(quantity: unknown): boolean {
     if (quantity === undefined || quantity === null) return true;
-    return Number.isInteger(quantity) && quantity >= 1;
+    return Number.isInteger(quantity) && (quantity as number) >= 1;
   }
 
   // Omitting attendee types must not turn a paid event into a free one.

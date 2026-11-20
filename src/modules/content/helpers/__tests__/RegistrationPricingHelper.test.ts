@@ -1,15 +1,21 @@
 import { RegistrationPricingHelper } from "../RegistrationPricingHelper.js";
+import { RegistrationCoupon, RegistrationMember, RegistrationSelection, RegistrationType } from "../../models/index.js";
 
-const types = [
+// MySQL DECIMAL columns arrive as strings (or null), which the helper coerces with Number().
+type DecimalPriceRow<T> = Omit<T, "price"> & { price?: number | string | null };
+
+const typeRows: DecimalPriceRow<RegistrationType>[] = [
   { id: "t1", price: "45.00", capacity: 6 },
   { id: "t2", price: "15.00", capacity: null },
   { id: "t3", price: null }
-] as any[];
+];
+const types = typeRows as RegistrationType[];
 
-const selections = [
+const selectionRows: DecimalPriceRow<RegistrationSelection>[] = [
   { id: "s1", price: "12.00" },
   { id: "s2", price: null }
-] as any[];
+];
+const selections = selectionRows as RegistrationSelection[];
 
 describe("RegistrationPricingHelper.isValidQuantity", () => {
   it("accepts omitted or positive integer quantities", () => {
@@ -31,7 +37,7 @@ describe("RegistrationPricingHelper.computeTotal", () => {
   });
 
   it("returns 0 when there are no types or selections (today's free-event behavior)", () => {
-    expect(RegistrationPricingHelper.computeTotal([], [], [{ firstName: "A" } as any], [])).toBe(0);
+    expect(RegistrationPricingHelper.computeTotal([], [], [{ firstName: "A" } as RegistrationMember], [])).toBe(0);
   });
 
   it("treats null prices as 0 and defaults quantity to 1", () => {
@@ -50,13 +56,13 @@ describe("RegistrationPricingHelper.computeTotal", () => {
 
 describe("RegistrationPricingHelper.applyDiscount", () => {
   it("applies a percent discount", () => {
-    expect(RegistrationPricingHelper.applyDiscount(100, { discountType: "percent", value: 10 } as any)).toBe(90);
+    expect(RegistrationPricingHelper.applyDiscount(100, { discountType: "percent", value: 10 })).toBe(90);
   });
   it("applies a fixed-amount discount", () => {
-    expect(RegistrationPricingHelper.applyDiscount(100, { discountType: "amount", value: 25 } as any)).toBe(75);
+    expect(RegistrationPricingHelper.applyDiscount(100, { discountType: "amount", value: 25 })).toBe(75);
   });
   it("never drives the total below 0", () => {
-    expect(RegistrationPricingHelper.applyDiscount(20, { discountType: "amount", value: 50 } as any)).toBe(0);
+    expect(RegistrationPricingHelper.applyDiscount(20, { discountType: "amount", value: 50 })).toBe(0);
   });
   it("returns the total unchanged with no coupon", () => {
     expect(RegistrationPricingHelper.applyDiscount(42.5, null)).toBe(42.5);
@@ -65,7 +71,7 @@ describe("RegistrationPricingHelper.applyDiscount", () => {
 
 describe("RegistrationPricingHelper.validateCoupon", () => {
   const now = new Date("2026-07-03T12:00:00Z");
-  const base = { id: "c1", discountType: "percent", value: 10, active: true } as any;
+  const base: RegistrationCoupon = { id: "c1", discountType: "percent", value: 10, active: true };
 
   it("accepts a valid coupon", () => {
     expect(RegistrationPricingHelper.validateCoupon(base, 2, 0, now)).toMatchObject({ valid: true, discountType: "percent", value: 10 });

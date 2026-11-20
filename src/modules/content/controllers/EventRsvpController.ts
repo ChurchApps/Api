@@ -9,14 +9,14 @@ export class EventRsvpController extends ContentBaseController {
   // Batch counts + the caller's own response for every occurrence in a window.
   // Group member only. Registered before /:eventId/rsvps so the literal path wins.
   @httpGet("/rsvps/group/:groupId")
-  public async getGroupBatch(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getGroupBatch(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.groupIds?.includes(groupId)) return this.json({}, 401);
       const from = req.query.from ? new Date(req.query.from.toString()) : new Date();
       const to = req.query.to ? new Date(req.query.to.toString()) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
       const rows = await this.repos.eventRsvp.loadForGroupWindow(au.churchId, groupId, from, to);
-      const map = new Map<string, { eventId: string; occurrenceStart: any; yes: number; no: number; maybe: number; mine: string | null }>();
-      for (const r of rows as any[]) {
+      const map = new Map<string, { eventId: string; occurrenceStart: Date; yes: number; no: number; maybe: number; mine: string | null }>();
+      for (const r of rows) {
         const key = `${r.eventId}|${new Date(r.occurrenceStart).getTime()}`;
         let entry = map.get(key);
         if (!entry) {
@@ -34,7 +34,7 @@ export class EventRsvpController extends ContentBaseController {
 
   // Full roster for one occurrence, grouped-by-response on the client. Leader or staff.
   @httpGet("/:eventId/rsvps")
-  public async getRoster(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getRoster(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const event = await this.repos.event.load(au.churchId, eventId);
       if (!event) return this.json({}, 404);
@@ -46,7 +46,7 @@ export class EventRsvpController extends ContentBaseController {
   }
 
   @httpPost("/:eventId/rsvp")
-  public async setRsvp(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, { occurrenceStart: string; response: "yes" | "no" | "maybe" }>, res: express.Response): Promise<any> {
+  public async setRsvp(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, { occurrenceStart: string; response: "yes" | "no" | "maybe" }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const event = await this.repos.event.load(au.churchId, eventId);
       if (!event) return this.json({}, 404);
@@ -66,7 +66,7 @@ export class EventRsvpController extends ContentBaseController {
 
   // authz-exempt: gated on group membership (au.groupIds) below; deletes only the caller's own row (au.personId)
   @httpDelete("/:eventId/rsvp")
-  public async clearRsvp(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async clearRsvp(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const event = await this.repos.event.load(au.churchId, eventId);
       if (!event) return this.json({}, 404);

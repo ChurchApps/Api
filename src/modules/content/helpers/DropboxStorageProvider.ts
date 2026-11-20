@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import type { IStorageProvider, PresignedPostData } from "@churchapps/apihelper";
 import { StorageProvider } from "../models/index.js";
 import type { StorageProviderRepo } from "../repositories/StorageProviderRepo.js";
@@ -41,8 +41,8 @@ export class DropboxStorageProvider implements IStorageProvider {
     const token = await this.token();
     try {
       await axios.post(API + "/files/delete_v2", { path: key }, { headers: { Authorization: "Bearer " + token } });
-    } catch (e: any) {
-      const summary = e?.response?.data?.error_summary || "";
+    } catch (e) {
+      const summary = (e as AxiosError<{ error_summary?: string }>)?.response?.data?.error_summary || "";
       if (!summary.startsWith("path_lookup/not_found")) throw e;
     }
   }

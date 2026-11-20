@@ -1,7 +1,7 @@
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: { praiseChartsConsumerKey: "k", praiseChartsConsumerSecret: "s" } }));
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: { getRepos: jest.fn(async () => ({})) } }));
 
-import { PraiseChartsHelper } from "../PraiseChartsHelper.js";
+import { PraiseChartsHelper, PraiseChartsItem } from "../PraiseChartsHelper.js";
 
 const items = [
   { id: "1", details: { title: "Goodness Of God", artists: { names: "Bethel Music" }, lyrics: "" } },
@@ -11,7 +11,7 @@ const items = [
 describe("PraiseChartsHelper.findBestMatch title threshold", () => {
   beforeEach(() => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ arrangements: { items } }) })) as never;
-    jest.spyOn(PraiseChartsHelper, "convertItemToSongDetail").mockImplementation((item: any) => ({ praiseChartsId: item.id, title: item.details.title, artist: item.details.artists.names }) as never);
+    jest.spyOn(PraiseChartsHelper, "convertItemToSongDetail").mockImplementation((item: PraiseChartsItem) => ({ praiseChartsId: item.id, title: item.details.title, artist: item.details.artists.names }) as never);
   });
   afterEach(() => jest.restoreAllMocks());
 

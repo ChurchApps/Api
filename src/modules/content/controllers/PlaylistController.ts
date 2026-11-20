@@ -10,14 +10,14 @@ import { FileStorageHelper } from "@churchapps/apihelper";
 export class PlaylistController extends ContentBaseController {
 
   @httpGet("/public/:churchId")
-  public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async loadPublicAll(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.playlist.loadPublicAll(churchId);
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.playlist.load(au.churchId, id);
       return this.repos.playlist.convertToModel(au.churchId, data);
@@ -25,7 +25,7 @@ export class PlaylistController extends ContentBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.playlist.loadAll(au.churchId);
       return this.repos.playlist.convertAllToModel(au.churchId, data);
@@ -33,7 +33,7 @@ export class PlaylistController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Playlist[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Playlist[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       else {
@@ -66,7 +66,7 @@ export class PlaylistController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.streamingServices.edit)) return this.json({}, 401);
       await this.repos.playlist.delete(au.churchId, id);
