@@ -9,7 +9,7 @@ import { listAllScopes, parseScopes, unknownScopes } from "../../../shared/auth/
 @controller("/membership/apiKeys")
 export class ApiKeyController extends MembershipBaseController {
   @httpGet("/scopes")
-  public async getScopes(req: express.Request, res: express.Response): Promise<any> {
+  public async getScopes(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       return { scopes: listAllScopes() };
@@ -17,7 +17,7 @@ export class ApiKeyController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const keys = await this.repos.apiKey.loadAll(au.churchId);
@@ -29,7 +29,7 @@ export class ApiKeyController extends MembershipBaseController {
   // exactly once here and never again — only its SHA-256 hash is stored. The
   // key is bound to the creating user, so it can never exceed their access.
   @httpPost("/")
-  public async create(req: express.Request<{}, {}, { name?: string; scopes?: string | string[]; expiresAt?: string }>, res: express.Response): Promise<any> {
+  public async create(req: express.Request<{}, {}, { name?: string; scopes?: string | string[]; expiresAt?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const input = req.body;
@@ -61,7 +61,7 @@ export class ApiKeyController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       await this.repos.apiKey.delete(au.churchId, id);

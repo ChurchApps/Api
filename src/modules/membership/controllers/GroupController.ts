@@ -7,36 +7,43 @@ import { Permissions } from "../helpers/index.js";
 import { ArrayHelper, SlugHelper } from "@churchapps/apihelper";
 import { KyselyPool } from "../../../shared/infrastructure/KyselyPool.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
+// Only the doing.plans columns this controller filters on; selectAll still returns every column.
+interface DoingPlansDb { plans: { id: string; churchId: string; planTypeId: string; serviceDate: Date } }
+
+// Raw SQL aggregate rows. MySQL may return SUM/AVG as strings, so the code wraps them in Number().
+interface HealthSummaryRow { groupId: string; memberCount: number | string; leaderCount: number | string; averageAge: number | string | null; femaleCount: number | string; maleCount: number | string }
+interface HistoryCountRow { groupId: string; action: string; count: number | string }
+interface MonthlyStatRow { month: string; action: string; count: number | string }
 
 @controller("/membership/groups")
 export class GroupController extends MembershipBaseController {
   @httpGet("/search")
-  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const campusId = req.query.campusId?.toString() ?? "";
       const serviceId = req.query.serviceId?.toString() ?? "";
       const serviceTimeId = req.query.serviceTimeId?.toString() ?? "";
-      return this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.search(au.churchId, campusId, serviceId, serviceTimeId)) as any[]);
+      return this.repos.group.convertAllToModel(au.churchId, await this.repos.group.search(au.churchId, campusId, serviceId, serviceTimeId));
     });
   }
 
   @httpGet("/my/:tag")
-  public async getMyTag(@requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMyTag(@requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const result = this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.loadAllForPerson(au.personId)) as any[]);
+      const result = this.repos.group.convertAllToModel(au.churchId, await this.repos.group.loadAllForPerson(au.personId));
       return result.filter((g) => (g.tags || "").indexOf(tag) > -1);
     });
   }
 
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.loadForPerson(au.personId)) as any[]);
+      return this.repos.group.convertAllToModel(au.churchId, await this.repos.group.loadForPerson(au.personId));
     });
   }
 
   @httpGet("/public/:churchId/slug/:slug")
-  public async getPublicSlug(@requestParam("churchId") churchId: string, @requestParam("slug") slug: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicSlug(@requestParam("churchId") churchId: string, @requestParam("slug") slug: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const group = await this.repos.group.loadPublicSlug(churchId, slug);
       return group ? this.repos.group.convertToModel(churchId, group) : this.json({ error: "Group not found" }, 404);
@@ -44,46 +51,46 @@ export class GroupController extends MembershipBaseController {
   }
 
   @httpGet("/public/:churchId/label")
-  public async getPublicLabel(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicLabel(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const label = req.query.label.toString();
-      return this.repos.group.convertAllToModel(churchId, (await this.repos.group.publicLabel(churchId, label)) as any[]);
+      return this.repos.group.convertAllToModel(churchId, await this.repos.group.publicLabel(churchId, label));
     });
   }
 
   @httpGet("/public/:churchId/list")
-  public async getPublicList(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicList(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      const groups = this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadByTag(churchId, "standard")) as any[]);
+      const groups = this.repos.group.convertAllToModel(churchId, await this.repos.group.loadByTag(churchId, "standard"));
       return groups.filter((g) => !g.confidential);
     });
   }
 
   @httpGet("/public/:churchId/:id")
-  public async getPublic(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublic(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const group = await this.repos.group.load(churchId, id);
-      return group && !(group as any).archived && !(group as any).confidential ? this.repos.group.convertToModel(churchId, group) : this.json({ error: "Group not found" }, 404);
+      return group && !group.archived && !group.confidential ? this.repos.group.convertToModel(churchId, group) : this.json({ error: "Group not found" }, 404);
     });
   }
 
   @httpGet("/tag/:tag")
-  public async getByTag(@requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByTag(@requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      return this.repos.group.convertAllToModel(au.churchId, (await this.repos.group.loadByTag(au.churchId, tag)) as any[]);
+      return this.repos.group.convertAllToModel(au.churchId, await this.repos.group.loadByTag(au.churchId, tag));
     });
   }
 
   @httpGet("/public/:churchId/tag/:tag")
-  public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      const groups = this.repos.group.convertAllToModel(churchId, (await this.repos.group.loadByTag(churchId, tag)) as any[]);
+      const groups = this.repos.group.convertAllToModel(churchId, await this.repos.group.loadByTag(churchId, tag));
       return groups.filter((g) => !g.confidential);
     });
   }
 
   @httpGet("/health/summary")
-  public async healthSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async healthSummary(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.view)) return this.json({}, 401);
       const since = new Date();
@@ -93,10 +100,10 @@ export class GroupController extends MembershipBaseController {
         this.repos.groupMember.loadHealthSummary(au.churchId),
         this.repos.groupMemberHistory.loadCountsSince(au.churchId, since)
       ]);
-      return (groups as any[]).map((g) => {
-        const m = (members as any[]).find((r) => r.groupId === g.id);
-        const joins90 = Number((history as any[]).find((h) => h.groupId === g.id && h.action === "joined")?.count || 0);
-        const leaves90 = Number((history as any[]).find((h) => h.groupId === g.id && h.action === "left")?.count || 0);
+      return groups.map((g) => {
+        const m = (members as HealthSummaryRow[]).find((r) => r.groupId === g.id);
+        const joins90 = Number((history as HistoryCountRow[]).find((h) => h.groupId === g.id && h.action === "joined")?.count || 0);
+        const leaves90 = Number((history as HistoryCountRow[]).find((h) => h.groupId === g.id && h.action === "left")?.count || 0);
         const memberCount = Number(m?.memberCount || 0);
         return {
           groupId: g.id,
@@ -116,7 +123,7 @@ export class GroupController extends MembershipBaseController {
   }
 
   @httpGet("/:id/health")
-  public async health(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async health(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.view) && !au.leaderGroupIds?.includes(id)) return this.json({}, 401);
       const since = new Date();
@@ -127,9 +134,9 @@ export class GroupController extends MembershipBaseController {
         this.repos.groupMemberHistory.loadMonthlyStats(au.churchId, id, 12),
         this.repos.groupMember.loadDemographicsForGroup(au.churchId, id)
       ]);
-      const m = (summary as any[]).find((r) => r.groupId === id);
-      const joins90 = Number((history as any[]).find((h) => h.groupId === id && h.action === "joined")?.count || 0);
-      const leaves90 = Number((history as any[]).find((h) => h.groupId === id && h.action === "left")?.count || 0);
+      const m = (summary as HealthSummaryRow[]).find((r) => r.groupId === id);
+      const joins90 = Number((history as HistoryCountRow[]).find((h) => h.groupId === id && h.action === "joined")?.count || 0);
+      const leaves90 = Number((history as HistoryCountRow[]).find((h) => h.groupId === id && h.action === "left")?.count || 0);
       const memberCount = Number(m?.memberCount || 0);
 
       // Fill the last 12 calendar months so charts get a continuous axis.
@@ -139,8 +146,8 @@ export class GroupController extends MembershipBaseController {
       cursor.setMonth(cursor.getMonth() - 11);
       for (let i = 0; i < 12; i++) {
         const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
-        const joins = Number((monthlyRows as any[]).find((r) => r.month === key && r.action === "joined")?.count || 0);
-        const leaves = Number((monthlyRows as any[]).find((r) => r.month === key && r.action === "left")?.count || 0);
+        const joins = Number((monthlyRows as MonthlyStatRow[]).find((r) => r.month === key && r.action === "joined")?.count || 0);
+        const leaves = Number((monthlyRows as MonthlyStatRow[]).find((r) => r.month === key && r.action === "left")?.count || 0);
         monthly.push({ month: key, joins, leaves });
         cursor.setMonth(cursor.getMonth() + 1);
       }
@@ -166,23 +173,23 @@ export class GroupController extends MembershipBaseController {
   }
 
   @httpGet("/:id/plans")
-  public async getPlans(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getPlans(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const isAdmin = au.checkAccess(Permissions.groups.edit) || au.checkAccess(Permissions.plans.edit);
       if (!isAdmin) {
-        const member = await (this.repos.groupMember as any).loadForPerson(au.churchId, au.personId);
-        const isMember = Array.isArray(member) && member.some((m: any) => m.groupId === id);
+        const member = await this.repos.groupMember.loadForPerson(au.churchId, au.personId);
+        const isMember = Array.isArray(member) && member.some((m) => m.groupId === id);
         if (!isMember) return this.json({ error: "Not a member of this group" }, 403);
       }
       const associations = (await this.repos.associatedGroup.loadByGroup(au.churchId, id, "planType")) as { contentId: string; settings: string | null }[];
       if (associations.length === 0) return [];
-      const doingDb = KyselyPool.getDb<any>("doing");
+      const doingDb = KyselyPool.getDb<DoingPlansDb>("doing");
       return doingDb.selectFrom("plans").selectAll()
         .where("churchId", "=", au.churchId)
-        .where((eb: any) => eb.or(associations.map((a) => {
+        .where((eb) => eb.or(associations.map((a) => {
           const base = eb("planTypeId", "=", a.contentId);
-          if (a.settings === "past") return eb.and([base, eb("serviceDate", "<=", sql`CURDATE()`)]);
-          if (a.settings === "future") return eb.and([base, eb("serviceDate", ">=", sql`CURDATE()`)]);
+          if (a.settings === "past") return eb.and([base, eb("serviceDate", "<=", sql<Date>`CURDATE()`)]);
+          if (a.settings === "future") return eb.and([base, eb("serviceDate", ">=", sql<Date>`CURDATE()`)]);
           return base;
         })))
         .orderBy("serviceDate", "desc")
@@ -191,7 +198,7 @@ export class GroupController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.group.load(au.churchId, id);
       return this.repos.group.convertToModel(au.churchId, data);
@@ -199,7 +206,7 @@ export class GroupController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = req.query.archived === "1"
         ? await this.repos.group.loadArchived(au.churchId)
@@ -210,7 +217,7 @@ export class GroupController extends MembershipBaseController {
 
   // Custom POST implementation (slug generation)
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Group[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Group[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groups.edit)) return this.json({}, 401);
       else {
@@ -234,14 +241,14 @@ export class GroupController extends MembershipBaseController {
 
   // Custom DELETE implementation (ministry tag handling)
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groups.edit)) return this.json({}, 401);
       else {
         const group: Group = await this.repos.group.load(au.churchId, id);
         if (!group) return this.json({}, 404);
         if ((group.tags || "").indexOf("ministry") > -1) {
-          const AllTeams = (await this.repos.group.loadByTag(au.churchId, "team")) as any[];
+          const AllTeams = await this.repos.group.loadByTag(au.churchId, "team");
           const ministryTeams = ArrayHelper.getAll(AllTeams, "categoryName", id);
           const ids = ArrayHelper.getIds(ministryTeams, "id");
           await this.repos.group.delete(au.churchId, id);

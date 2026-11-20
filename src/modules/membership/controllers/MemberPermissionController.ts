@@ -7,7 +7,7 @@ import { Permissions } from "../helpers/index.js";
 @controller("/membership/memberpermissions")
 export class MemberPermissionController extends MembershipBaseController {
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const permission = await this.repos.memberPermission.load(au.churchId, id);
       if (!permission || !(await this.formAccess(au, permission.contentId, "view"))) return this.json({}, 401);
@@ -16,24 +16,24 @@ export class MemberPermissionController extends MembershipBaseController {
   }
 
   @httpGet("/member/:id")
-  public async getByMember(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByMember(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (id !== au.personId && !au.checkAccess(Permissions.forms.admin) && !au.checkAccess(Permissions.forms.edit)) return this.json({}, 401);
-      else return this.repos.memberPermission.convertAllToModel(au.churchId, (await this.repos.memberPermission.loadFormsByPerson(au.churchId, id)) as any[]);
+      else return this.repos.memberPermission.convertAllToModel(au.churchId, await this.repos.memberPermission.loadFormsByPerson(au.churchId, id));
     });
   }
 
   @httpGet("/form/:id")
-  public async getByForm(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getByForm(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.formAccess(au, id))) return this.json({}, 401);
-      else return this.repos.memberPermission.convertAllToModel(au.churchId, (await this.repos.memberPermission.loadPeopleByForm(au.churchId, id)) as any[]);
+      else return this.repos.memberPermission.convertAllToModel(au.churchId, await this.repos.memberPermission.loadPeopleByForm(au.churchId, id));
     });
   }
 
   // authz-exempt: returns only the caller's own permission row (scoped to au.churchId + au.personId)
   @httpGet("/form/:id/my")
-  public async getMyPermissions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMyPermissions(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const permission = await this.repos.memberPermission.loadMyByForm(au.churchId, id, au.personId);
       return permission ? this.repos.memberPermission.convertToModel(au.churchId, permission) : null;
@@ -42,7 +42,7 @@ export class MemberPermissionController extends MembershipBaseController {
 
   // authz-exempt: gated by this.formAccess(au, contentId) — only form admins/editors may manage a form's member permissions; churchId forced to au.churchId
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, MemberPermission[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, MemberPermission[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<MemberPermission>[] = [];
       for (const memberPermission of req.body) {
@@ -62,7 +62,7 @@ export class MemberPermissionController extends MembershipBaseController {
 
   // authz-exempt: gated by this.formAccess(au, formId) — only form admins/editors may delete a form's member permissions; delete scoped to au.churchId
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString();
       const existing = await this.repos.memberPermission.load(au.churchId, id);
@@ -76,7 +76,7 @@ export class MemberPermissionController extends MembershipBaseController {
 
   // authz-exempt: gated by this.formAccess(au, formId) — only form admins/editors may delete a member's form permissions; delete scoped to au.churchId
   @httpDelete("/member/:id")
-  public async deleteByMemberId(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteByMemberId(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString();
       if (!formId || !(await this.formAccess(au, formId))) return this.json({}, 401);

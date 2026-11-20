@@ -33,7 +33,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     userChurch.groups?.forEach((g) => groupIds.push(g.id));
     const leaderGroupIds: string[] = [];
     userChurch.groups?.forEach((g) => { if (g.leader) leaderGroupIds.push(g.id); });
-    const options: SignOptions = { expiresIn: Environment.jwtExpiration as any };
+    const options: SignOptions = { expiresIn: Environment.jwtExpiration as SignOptions["expiresIn"] };
     return jwt.sign(
       {
         id: user.id,
@@ -60,7 +60,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
     userChurch.groups?.forEach((g) => groupIds.push(g.id));
     const leaderGroupIds: string[] = [];
     userChurch.groups?.forEach((g) => { if (g.leader) leaderGroupIds.push(g.id); });
-    const options: SignOptions = { expiresIn: Environment.jwtExpiration as any };
+    const options: SignOptions = { expiresIn: Environment.jwtExpiration as SignOptions["expiresIn"] };
     return jwt.sign(
       {
         id: user.id,
@@ -114,7 +114,7 @@ export class AuthenticatedUser extends BaseAuthenticatedUser {
   }
 
   public static getUserJwt(user: User, expiresIn: string = Environment.jwtExpiration) {
-    return jwt.sign({ id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName }, Environment.jwtSecret, { expiresIn: expiresIn as any });
+    return jwt.sign({ id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName }, Environment.jwtSecret, { expiresIn: expiresIn as SignOptions["expiresIn"] });
   }
 
   public static setJwt(allUserChurches: LoginUserChurch[], user: User) {

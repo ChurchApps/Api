@@ -2,14 +2,15 @@ import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversi
 import express from "express";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Question } from "../models/index.js";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 
 @controller("/membership/questions")
 export class QuestionController extends MembershipBaseController {
   @httpGet("/sort/:id/up")
-  public async moveQuestionUp(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async moveQuestionUp(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const question = await this.repos.question.load(au.churchId, id);
-      const formId = (question as any)?.formId || null;
+      const formId = question?.formId || null;
       if (!(await this.formAccess(au, formId))) return this.json({}, 401);
       await this.repos.question.moveQuestionUp(au.churchId, id);
       return this.json({});
@@ -17,10 +18,10 @@ export class QuestionController extends MembershipBaseController {
   }
 
   @httpGet("/sort/:id/down")
-  public async moveQuestionDown(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async moveQuestionDown(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const question = await this.repos.question.load(au.churchId, id);
-      const formId = (question as any)?.formId || null;
+      const formId = question?.formId || null;
       if (!(await this.formAccess(au, formId))) return this.json({}, 401);
       await this.repos.question.moveQuestionDown(au.churchId, id);
       return this.json({});
@@ -28,16 +29,16 @@ export class QuestionController extends MembershipBaseController {
   }
 
   @httpGet("/unrestricted")
-  public async getUnrestricted(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getUnrestricted(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (_au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!formId) return this.json({}, 401);
-      else return this.repos.question.convertAllToModel("", (await this.repos.question.loadForUnrestrictedForm(formId)) as any[]);
+      else return this.repos.question.convertAllToModel("", await this.repos.question.loadForUnrestrictedForm(formId));
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!(await this.formAccess(au, formId, "view"))) return this.json({}, 401);
@@ -46,24 +47,24 @@ export class QuestionController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const formId = req?.query?.formId?.toString() || null;
       if (!(await this.formAccess(au, formId, "view")) && !(await this.canFillForm(au, formId))) return this.json({}, 401);
-      else return this.repos.question.convertAllToModel(au.churchId, (await this.repos.question.loadForForm(au.churchId, formId)) as any[]);
+      else return this.repos.question.convertAllToModel(au.churchId, await this.repos.question.loadForForm(au.churchId, formId));
     });
   }
 
   // Anyone signed in to the church can load the questions of its stand-alone forms to fill one out (restricted forms included).
-  private async canFillForm(au: any, formId: string | null) {
+  private async canFillForm(au: AuthenticatedUser, formId: string | null) {
     if (!formId || !au?.id || !au?.churchId) return false;
-    const form: any = await this.repos.form.load(au.churchId, formId);
+    const form = await this.repos.form.load(au.churchId, formId);
     return !!form && form.contentType === "form" && !form.removed;
   }
 
   // authz-exempt: gated by this.formAccess(au, question.formId) — only form admins/editors may add questions; churchId forced to au.churchId
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Question[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Question[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const promises: Promise<Question>[] = [];
       const questions = req.body;
@@ -74,8 +75,9 @@ export class QuestionController extends MembershipBaseController {
           if (!existing || !(await this.formAccess(au, existing.formId))) continue;
         }
         if (await this.formAccess(au, question.formId)) {
-          const availableQuestions = (await this.repos.question.loadForForm(au.churchId, question.formId)) as any[];
-          const maxValue = Math.max(...(availableQuestions as any[]).map((q: any) => q.sort));
+          const availableQuestions = await this.repos.question.loadForForm(au.churchId, question.formId);
+          // Math.max applies ToNumber to each argument, so Number() here keeps the same result.
+          const maxValue = Math.max(...availableQuestions.map((q) => Number(q.sort)));
           const addBy = i + 1;
           const sort = availableQuestions.length > 0 ? maxValue + addBy : 1;
           question.churchId = au.churchId;
@@ -90,7 +92,7 @@ export class QuestionController extends MembershipBaseController {
 
   // authz-exempt: gated by this.formAccess(au, formId) — only form admins/editors may delete questions; delete scoped to au.churchId
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const question = await this.repos.question.load(au.churchId, id);
       if (!question || !(await this.formAccess(au, question.formId))) return this.json({}, 401);

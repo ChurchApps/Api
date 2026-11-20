@@ -1,22 +1,28 @@
 import "reflect-metadata";
-jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../models/index", () => ({}));
 
+import express from "express";
 import { QuestionController } from "../QuestionController.js";
 
+const req = {} as express.Request<{}, {}, null>;
+const res = {} as express.Response;
+
 function questionController() {
-  const repos: any = {
+  const repos = {
     question: {
       load: jest.fn(async () => ({ id: "q2", formId: "f1", sort: 2 })),
-      moveQuestionUp: jest.fn(async () => undefined),
-      moveQuestionDown: jest.fn(async () => undefined)
+      moveQuestionUp: jest.fn(async (): Promise<void> => undefined),
+      moveQuestionDown: jest.fn(async (): Promise<void> => undefined)
     }
   };
   const au = { churchId: "c1", id: "u1" };
   const controller = new QuestionController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).formAccess = jest.fn(async () => true);
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (user: typeof au) => unknown) => action(au),
+    formAccess: jest.fn(async () => true)
+  });
   return { controller, repos };
 }
 
@@ -25,14 +31,14 @@ function questionController() {
 describe("QuestionController sort routes (issue 1254)", () => {
   it("responds after moving a question up", async () => {
     const { controller, repos } = questionController();
-    const result = await (controller as any).moveQuestionUp("q2", {}, {});
+    const result = await controller.moveQuestionUp("q2", req, res);
     expect(repos.question.moveQuestionUp).toHaveBeenCalledWith("c1", "q2");
     expect(result).not.toBeUndefined();
   });
 
   it("responds after moving a question down", async () => {
     const { controller, repos } = questionController();
-    const result = await (controller as any).moveQuestionDown("q2", {}, {});
+    const result = await controller.moveQuestionDown("q2", req, res);
     expect(repos.question.moveQuestionDown).toHaveBeenCalledWith("c1", "q2");
     expect(result).not.toBeUndefined();
   });

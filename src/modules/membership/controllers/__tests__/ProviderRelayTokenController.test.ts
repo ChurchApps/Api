@@ -14,19 +14,27 @@ jest.mock("@churchapps/content-providers", () => ({
   TokenHelper: class { refreshToken(...args: unknown[]) { return mockRefresh(...args); } }
 }));
 
+import express from "express";
 import { getProvider, setProviderSecret } from "@churchapps/content-providers";
 import { ProviderRelayTokenController } from "../ProviderRelayTokenController.js";
+import type { OAuthRelaySession } from "../../models/index.js";
+
+type JsonOut = { obj: Record<string, unknown>; status: number };
+const req = (data: Partial<express.Request>) => data as express.Request;
+const res = {} as express.Response;
 
 const VERIFIER = "a".repeat(64);
 const CHALLENGE = crypto.createHash("sha256").update(VERIFIER).digest("base64url");
 const REDIRECT = "https://api.example/membership/oauth/relay/callback";
 
-function harness(session: any) {
-  const repos: any = { oAuthRelaySession: { loadBySessionCode: jest.fn(async () => session), delete: jest.fn() } };
+function harness(session: OAuthRelaySession | null) {
+  const repos = { oAuthRelaySession: { loadBySessionCode: jest.fn(async () => session), delete: jest.fn() } };
   const controller = new ProviderRelayTokenController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).json = (obj: any, status?: number) => ({ obj, status: status ?? 200 });
+  Object.assign(controller, {
+    repos,
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action(),
+    json: (obj: unknown, status?: number) => ({ obj, status: status ?? 200 })
+  });
   return { controller, repos };
 }
 
@@ -40,9 +48,9 @@ describe("ProviderRelayTokenController", () => {
   });
 
   it.each(["onedrive", "googledrive"])("exchanges the captured %s code when the verifier matches", async (provider) => {
-    const session = { id: "s1", provider, status: "completed", authCode: "captured-code", redirectUri: `${REDIRECT}\n${CHALLENGE}` };
+    const session: OAuthRelaySession = { id: "s1", provider, status: "completed", authCode: "captured-code", redirectUri: `${REDIRECT}\n${CHALLENGE}` };
     const { controller, repos } = harness(session);
-    const result: any = await controller.exchange("ABCD2345", { body: { codeVerifier: VERIFIER } } as any, {} as any);
+    const result = await controller.exchange("ABCD2345", req({ body: { codeVerifier: VERIFIER } }), res) as JsonOut;
     expect(mockExchange).toHaveBeenCalledWith("captured-code", VERIFIER, REDIRECT);
     expect(repos.oAuthRelaySession.delete).toHaveBeenCalledWith("s1");
     expect(result.status).toBe(200);
@@ -51,9 +59,9 @@ describe("ProviderRelayTokenController", () => {
   });
 
   it("returns pending and leaves the session in place", async () => {
-    const session = { id: "s1", provider: "onedrive", status: "pending", authCode: null, redirectUri: `${REDIRECT}\n${CHALLENGE}`, expiresAt: new Date(Date.now() + 50_000) };
+    const session: OAuthRelaySession = { id: "s1", provider: "onedrive", status: "pending", authCode: null, redirectUri: `${REDIRECT}\n${CHALLENGE}`, expiresAt: new Date(Date.now() + 50_000) };
     const { controller, repos } = harness(session);
-    const result: any = await controller.exchange("ABCD2345", { body: { codeVerifier: VERIFIER } } as any, {} as any);
+    const result = await controller.exchange("ABCD2345", req({ body: { codeVerifier: VERIFIER } }), res) as JsonOut;
     expect(result.obj.status).toBe("pending");
     expect(result.obj.expiresIn).toBeGreaterThan(0);
     expect(result.obj).not.toHaveProperty("authCode");
@@ -62,9 +70,9 @@ describe("ProviderRelayTokenController", () => {
   });
 
   it("rejects a verifier that does not match the stored challenge", async () => {
-    const session = { id: "s1", provider: "onedrive", status: "completed", authCode: "captured-code", redirectUri: `${REDIRECT}\n${CHALLENGE}` };
+    const session: OAuthRelaySession = { id: "s1", provider: "onedrive", status: "completed", authCode: "captured-code", redirectUri: `${REDIRECT}\n${CHALLENGE}` };
     const { controller, repos } = harness(session);
-    const result: any = await controller.exchange("ABCD2345", { body: { codeVerifier: "b".repeat(64) } } as any, {} as any);
+    const result = await controller.exchange("ABCD2345", req({ body: { codeVerifier: "b".repeat(64) } }), res) as JsonOut;
     expect(result.status).toBe(400);
     expect(result.obj.error).toBe("invalid_grant");
     expect(getProvider).not.toHaveBeenCalled();
@@ -72,9 +80,9 @@ describe("ProviderRelayTokenController", () => {
   });
 
   it("rejects providers that do not need a server secret", async () => {
-    const session = { id: "s1", provider: "dropbox", status: "completed", authCode: "c", redirectUri: `${REDIRECT}\n${CHALLENGE}` };
-    const dropbox: any = await harness(session).controller.exchange("ABCD2345", { body: { codeVerifier: VERIFIER } } as any, {} as any);
-    const go: any = await harness({ ...session, provider: "gocurriculum" }).controller.exchange("ABCD2345", { body: { codeVerifier: VERIFIER } } as any, {} as any);
+    const session: OAuthRelaySession = { id: "s1", provider: "dropbox", status: "completed", authCode: "c", redirectUri: `${REDIRECT}\n${CHALLENGE}` };
+    const dropbox = await harness(session).controller.exchange("ABCD2345", req({ body: { codeVerifier: VERIFIER } }), res) as JsonOut;
+    const go = await harness({ ...session, provider: "gocurriculum" }).controller.exchange("ABCD2345", req({ body: { codeVerifier: VERIFIER } }), res) as JsonOut;
     expect(dropbox.obj.error).toBe("unsupported_provider");
     expect(go.obj.error).toBe("unsupported_provider");
     expect(getProvider).not.toHaveBeenCalled();
@@ -82,11 +90,11 @@ describe("ProviderRelayTokenController", () => {
 
   it("refreshes onedrive and googledrive and rejects anything else", async () => {
     const { controller } = harness(null);
-    const ok: any = await controller.refresh({ body: { provider: "onedrive", refreshToken: "refresh-1" } } as any, {} as any);
+    const ok = await controller.refresh(req({ body: { provider: "onedrive", refreshToken: "refresh-1" } }), res) as JsonOut;
     expect(ok.status).toBe(200);
     expect(ok.obj).toEqual(expect.objectContaining({ access_token: "new-at", refresh_token: "new-rt" }));
     expect(mockRefresh).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ refresh_token: "refresh-1" }));
-    const denied: any = await controller.refresh({ body: { provider: "gocurriculum", refreshToken: "refresh-1" } } as any, {} as any);
+    const denied = await controller.refresh(req({ body: { provider: "gocurriculum", refreshToken: "refresh-1" } }), res) as JsonOut;
     expect(denied.status).toBe(400);
     expect(denied.obj.error).toBe("unsupported_provider");
   });
@@ -96,23 +104,23 @@ describe("ProviderRelayTokenController", () => {
     (getProvider as jest.Mock).mockReturnValue({ getCatalog });
     mockAllow.mockResolvedValueOnce(false);
     const { controller, repos } = harness({});
-    const result: any = await controller.goCurriculumCatalog({ body: { groupId: "elementary", accessToken: "guess" } } as any, {} as any);
+    const result = await controller.goCurriculumCatalog(req({ body: { groupId: "elementary", accessToken: "guess" } }), res) as JsonOut;
     expect(result.status).toBe(429);
     expect(getCatalog).not.toHaveBeenCalled();
     expect(mockAllow).toHaveBeenCalledWith(repos, "203.0.113.9", "", "go-catalog", 300, 3600);
   });
 
   it("serves the Go catalog only for a token Go verifies", async () => {
-    const getCatalog = jest.fn(async (groupId: string, auth: any) => (auth.access_token === "good" ? { catalog: [{ id: groupId }] } : null));
+    const getCatalog = jest.fn(async (groupId: string, auth: { access_token?: string }) => (auth.access_token === "good" ? { catalog: [{ id: groupId }] } : null));
     (getProvider as jest.Mock).mockReturnValue({ getCatalog });
     process.env.GOCURRICULUM_FEEDS = "{\"elementary\":\"https://feeds.test/e\"}";
     const { controller } = harness(null);
-    const ok: any = await controller.goCurriculumCatalog({ body: { groupId: "elementary", accessToken: "good" } } as any, {} as any);
+    const ok = await controller.goCurriculumCatalog(req({ body: { groupId: "elementary", accessToken: "good" } }), res) as JsonOut;
     expect(ok).toEqual({ obj: { catalog: [{ id: "elementary" }] }, status: 200 });
     expect(setProviderSecret).toHaveBeenCalledWith("gocurriculumFeeds", process.env.GOCURRICULUM_FEEDS);
-    const bad: any = await controller.goCurriculumCatalog({ body: { groupId: "elementary", accessToken: "bad" } } as any, {} as any);
+    const bad = await controller.goCurriculumCatalog(req({ body: { groupId: "elementary", accessToken: "bad" } }), res) as JsonOut;
     expect(bad.status).toBe(404);
-    const missing: any = await controller.goCurriculumCatalog({ body: { groupId: "elementary" } } as any, {} as any);
+    const missing = await controller.goCurriculumCatalog(req({ body: { groupId: "elementary" } }), res) as JsonOut;
     expect(missing.status).toBe(400);
   });
 });

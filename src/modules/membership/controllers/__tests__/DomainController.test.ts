@@ -1,9 +1,9 @@
 import "reflect-metadata";
-jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
   Permissions: { server: { admin: "serverAdmin" }, settings: { edit: "settingsEdit" } },
   CaddyHelper: {
-    generateJsonData: jest.fn(async () => ({ apps: { http: { servers: { proxy: { routes: [] } } } } })),
+    generateJsonData: jest.fn(async () => ({ apps: { http: { servers: { proxy: { routes: [] as unknown[] } } } } })),
     updateCaddy: jest.fn(async () => {}),
     initializeCaddy: jest.fn(async () => ({ success: true }))
   }
@@ -13,28 +13,43 @@ jest.mock("../../models/index", () => ({}));
 jest.mock("../../repositories/index", () => ({ Repos: class {} }));
 jest.mock("@churchapps/apihelper", () => ({}));
 
+import express from "express";
 import { DomainController } from "../DomainController.js";
 import { CaddyHelper } from "../../helpers/index.js";
 import { DomainHealthHelper } from "../../helpers/DomainHealthHelper.js";
+import { Domain } from "../../models/index.js";
 
-function domainController(opts: any = {}) {
-  const repos: any = {
+type DomainRequest = express.Request<{}, {}, null>;
+type JsonResult = { obj: unknown; status: number };
+type DomainControllerOpts = { domainRow?: Domain | null; pairs?: { host: string; dial: string }[]; auChurchId?: string; access?: string[] };
+
+const emptyRes = {} as express.Response;
+const asRequest = (partial: Partial<DomainRequest>) => partial as DomainRequest;
+
+function domainController(opts: DomainControllerOpts = {}) {
+  const repos = {
     domain: {
       loadByName: jest.fn(async () => ("domainRow" in opts ? opts.domainRow : { id: "d1", churchId: "c1", siteId: "s1", domainName: "x.com", subDomain: "firstchurch" })),
       loadPairs: jest.fn(async () => opts.pairs ?? [{ host: "x.com", dial: "firstchurch.b1.church:443" }])
     }
   };
-  const au = { id: "u1", churchId: opts.auChurchId ?? "c1", checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
+  const au = { id: "u1", churchId: opts.auChurchId ?? "c1", checkAccess: (perm: string) => (opts.access ?? []).includes(perm) };
   const controller = new DomainController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (user: typeof au) => unknown) => action(au),
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action(),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, repos };
 }
 
 function req(headers: Record<string, string> = {}) {
-  return { header: (name: string) => headers[name.toLowerCase()] };
+  return asRequest({ header: ((name: string) => headers[name.toLowerCase()]) as DomainRequest["header"] });
+}
+
+function hostmapRes(): Partial<express.Response> {
+  return { set: jest.fn(), send: jest.fn() };
 }
 
 describe("DomainController admin route authorization", () => {
@@ -49,7 +64,7 @@ describe("DomainController admin route authorization", () => {
   it("rejects caddy without server admin or internal key", async () => {
     delete process.env.INTERNAL_API_KEY;
     const { controller } = domainController({ access: [] });
-    const result: any = await (controller as any).caddy(req(), {});
+    const result = (await controller.caddy(req(), emptyRes)) as JsonResult;
     expect(result.status).toBe(401);
     expect(CaddyHelper.generateJsonData).not.toHaveBeenCalled();
     expect(CaddyHelper.updateCaddy).not.toHaveBeenCalled();
@@ -58,8 +73,8 @@ describe("DomainController admin route authorization", () => {
   it("rejects caddy/init and health without server admin or internal key", async () => {
     delete process.env.INTERNAL_API_KEY;
     const { controller, repos } = domainController({ access: [] });
-    const init: any = await (controller as any).caddyInit(req(), {});
-    const health: any = await (controller as any).runHealthCheck(req(), {});
+    const init = (await controller.caddyInit(req(), emptyRes)) as JsonResult;
+    const health = (await controller.runHealthCheck(req(), emptyRes)) as JsonResult;
     expect(init.status).toBe(401);
     expect(health.status).toBe(401);
     expect(CaddyHelper.initializeCaddy).not.toHaveBeenCalled();
@@ -70,8 +85,8 @@ describe("DomainController admin route authorization", () => {
   it("serves hostmap anonymously when INTERNAL_API_KEY is not configured", async () => {
     delete process.env.INTERNAL_API_KEY;
     const { controller, repos } = domainController({ access: [] });
-    const res = { set: jest.fn(), send: jest.fn() };
-    await (controller as any).hostmap(req(), res);
+    const res = hostmapRes();
+    await controller.hostmap(req(), res as express.Response);
     expect(repos.domain.loadPairs).toHaveBeenCalled();
     expect(res.send).toHaveBeenCalledWith("x.com firstchurch.b1.church");
   });
@@ -79,7 +94,7 @@ describe("DomainController admin route authorization", () => {
   it("rejects hostmap with a wrong x-internal-key when INTERNAL_API_KEY is set", async () => {
     process.env.INTERNAL_API_KEY = "edge-secret";
     const { controller, repos } = domainController({ access: [] });
-    const result: any = await (controller as any).hostmap(req({ "x-internal-key": "nope" }), { set: jest.fn(), send: jest.fn() });
+    const result = (await controller.hostmap(req({ "x-internal-key": "nope" }), hostmapRes() as express.Response)) as JsonResult;
     expect(result.status).toBe(401);
     expect(repos.domain.loadPairs).not.toHaveBeenCalled();
   });
@@ -87,7 +102,7 @@ describe("DomainController admin route authorization", () => {
   it("lets a server admin generate caddy JSON and update live routes", async () => {
     delete process.env.INTERNAL_API_KEY;
     const { controller } = domainController({ access: ["serverAdmin"] });
-    const result: any = await (controller as any).caddy(req(), {});
+    const result = (await controller.caddy(req(), emptyRes)) as { apps?: unknown };
     expect(CaddyHelper.generateJsonData).toHaveBeenCalled();
     expect(CaddyHelper.updateCaddy).toHaveBeenCalled();
     expect(result.apps).toBeDefined();
@@ -96,8 +111,8 @@ describe("DomainController admin route authorization", () => {
   it("lets x-internal-key call hostmap without a JWT", async () => {
     process.env.INTERNAL_API_KEY = "edge-secret";
     const { controller, repos } = domainController({ access: [] });
-    const res = { set: jest.fn(), send: jest.fn() };
-    await (controller as any).hostmap(req({ "x-internal-key": "edge-secret" }), res);
+    const res = hostmapRes();
+    await controller.hostmap(req({ "x-internal-key": "edge-secret" }), res as express.Response);
     expect(repos.domain.loadPairs).toHaveBeenCalled();
     expect(res.send).toHaveBeenCalledWith("x.com firstchurch.b1.church");
   });
@@ -105,7 +120,7 @@ describe("DomainController admin route authorization", () => {
   it("rejects a wrong x-internal-key when the caller is not a server admin", async () => {
     process.env.INTERNAL_API_KEY = "edge-secret";
     const { controller } = domainController({ access: [] });
-    const result: any = await (controller as any).caddyInit(req({ "x-internal-key": "nope" }), {});
+    const result = (await controller.caddyInit(req({ "x-internal-key": "nope" }), emptyRes)) as JsonResult;
     expect(result.status).toBe(401);
     expect(CaddyHelper.initializeCaddy).not.toHaveBeenCalled();
   });
@@ -114,7 +129,7 @@ describe("DomainController admin route authorization", () => {
 describe("DomainController public lookup", () => {
   it("returns only subDomain and omits churchId and siteId", async () => {
     const { controller, repos } = domainController();
-    const result: any = await (controller as any).getPublicByName("x.com", {}, {});
+    const result = (await controller.getPublicByName("x.com", asRequest({}), emptyRes)) as Domain;
     expect(repos.domain.loadByName).toHaveBeenCalledWith("x.com");
     expect(result).toEqual({ subDomain: "firstchurch" });
     expect(result.churchId).toBeUndefined();
@@ -123,18 +138,18 @@ describe("DomainController public lookup", () => {
 
   it("answers domain ownership with a yes/no and never the churchId", async () => {
     const { controller, repos } = domainController();
-    const owned: any = await (controller as any).getPublicOwnership("x.com", { query: { churchId: "c1" } }, {});
+    const owned = await controller.getPublicOwnership("x.com", asRequest({ query: { churchId: "c1" } }), emptyRes);
     expect(owned).toEqual({ owned: true });
     expect(repos.domain.loadByName).toHaveBeenCalledWith("x.com");
-    const foreign: any = await (controller as any).getPublicOwnership("x.com", { query: { churchId: "c2" } }, {});
+    const foreign = await controller.getPublicOwnership("x.com", asRequest({ query: { churchId: "c2" } }), emptyRes);
     expect(foreign).toEqual({ owned: false });
-    const anonymous: any = await (controller as any).getPublicOwnership("x.com", { query: {} }, {});
+    const anonymous = await controller.getPublicOwnership("x.com", asRequest({ query: {} }), emptyRes);
     expect(anonymous).toEqual({ owned: false });
   });
 
   it("returns an empty object when the domain is unknown", async () => {
     const { controller } = domainController({ domainRow: null });
-    const result: any = await (controller as any).getPublicByName("gone.com", {}, {});
+    const result = await controller.getPublicByName("gone.com", asRequest({}), emptyRes);
     expect(result).toEqual({});
   });
 });

@@ -1,7 +1,7 @@
 import "reflect-metadata";
 
 // express-validator is real here: the defect is in what the route's sanitizers do to the typed address.
-jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("bcryptjs", () => {
   const compare = jest.fn(async () => true);
   const hashSync = jest.fn(() => "hashed");
@@ -28,17 +28,24 @@ jest.mock("../../models/index", () => ({}));
 jest.mock("../../../../shared/helpers/TransactionalEmailHelper.js", () => ({ TransactionalEmailHelper: {} }));
 jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getOne: () => null, getAll: () => [] } }));
 
+import express from "express";
+import type { ValidationChain } from "express-validator";
 import { METADATA_KEY } from "inversify-express-utils";
 import { UserController } from "../UserController.js";
 import { UserHelper } from "../../helpers/index.js";
+import type { User } from "../../models/index.js";
+
+type RouteMethod = "forgotPassword" | "verifyCode" | "checkEmail";
+// The slice of inversify's controller-method metadata this test reads; these routes' middleware are validation chains.
+interface RouteMetadata { key: string; middleware: ValidationChain[] }
 
 // Accounts created by a staff invite or Google/Microsoft sign-in keep the address as typed.
 function controllerWithUser(storedEmail: string) {
-  const stored = { id: "u1", email: storedEmail, verificationCode: "hash", verificationExpires: new Date(Date.now() + 60000) };
-  const repos: any = {
+  const stored: User = { id: "u1", email: storedEmail, verificationCode: "hash", verificationExpires: new Date(Date.now() + 60000) };
+  const repos = {
     user: {
       loadByEmail: jest.fn(async (email: string) => (email === storedEmail ? stored : null)),
-      save: jest.fn(async (u: any) => u),
+      save: jest.fn(async (u: User) => u),
       updateVerification: jest.fn(async () => {}),
       incrementVerificationAttempts: jest.fn(async () => 1),
       clearVerification: jest.fn(async () => {})
@@ -46,20 +53,22 @@ function controllerWithUser(storedEmail: string) {
     loginAttempt: { loadCount: jest.fn(async () => 0), increment: jest.fn(async () => {}), clear: jest.fn(async () => {}) }
   };
   const controller = new UserController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
-  (controller as any).error = (errors: string[]) => ({ obj: { errors }, status: 500 });
+  Object.assign(controller, {
+    repos,
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action(),
+    json: (obj: unknown, status: number) => ({ obj, status }),
+    error: (errors: string[]) => ({ obj: { errors }, status: 500 })
+  });
   return { controller, repos };
 }
 
 // Runs the route's express-validator chain on the body, then the handler, like the router does.
-async function callRoute(controller: any, method: string, body: any) {
-  const routes: any[] = Reflect.getMetadata(METADATA_KEY.controllerMethod, UserController);
+async function callRoute(controller: UserController, method: RouteMethod, body: Record<string, string>) {
+  const routes = Reflect.getMetadata(METADATA_KEY.controllerMethod, UserController) as RouteMetadata[];
   const route = routes.find((r) => r.key === method);
-  const req: any = { body: { ...body }, headers: {}, socket: { remoteAddress: "1.1.1.1" } };
+  const req = { body: { ...body }, headers: {}, socket: { remoteAddress: "1.1.1.1" } } as express.Request;
   for (const mw of route.middleware) await mw.run(req);
-  return controller[method](req, {});
+  return controller[method](req, {} as express.Response);
 }
 
 describe("password reset looks up the account by the address as typed", () => {

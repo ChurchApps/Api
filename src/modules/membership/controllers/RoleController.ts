@@ -8,7 +8,7 @@ import { Permissions, IPermission } from "../helpers/index.js";
 @controller("/membership/roles")
 export class RoleController extends MembershipBaseController {
   @httpGet("/church/:churchId")
-  public async loadByChurchId(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadByChurchId(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.view)) return this.json({}, 401);
       if (churchId !== au.churchId && !au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
@@ -16,7 +16,7 @@ export class RoleController extends MembershipBaseController {
         const [roleRows, members] = await Promise.all([this.repos.role.loadByChurchId(churchId), this.repos.roleMember.loadAll(churchId)]);
         const roles: Role[] = this.repos.role.convertAllToModel(churchId, roleRows);
         const usersByRole = new Map<string, Set<string>>();
-        members.forEach((m: any) => {
+        members.forEach((m) => {
           if (!usersByRole.has(m.roleId)) usersByRole.set(m.roleId, new Set());
           usersByRole.get(m.roleId).add(m.userId);
         });
@@ -27,7 +27,7 @@ export class RoleController extends MembershipBaseController {
   }
 
   @httpGet("/:id")
-  public async loadById(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async loadById(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const role: Role = await this.repos.role.loadById(au.churchId, id);
       const roles: Role[] = [role];
@@ -38,7 +38,7 @@ export class RoleController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Role[] | Role>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Role[] | Role>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.roles.edit)) return this.json({}, 401);
       else {
@@ -55,7 +55,7 @@ export class RoleController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, []>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const role: Role = await this.repos.role.loadById(au.churchId, id);
       const roles: Role[] = [role];

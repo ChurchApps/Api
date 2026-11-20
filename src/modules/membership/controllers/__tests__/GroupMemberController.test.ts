@@ -1,14 +1,46 @@
 import "reflect-metadata";
-jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+jest.mock("../MembershipBaseController", () => ({ MembershipBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
   Permissions: { groupMembers: { view: "gmView", edit: "gmEdit" }, attendance: { view: "attView", edit: "attEdit" } },
   UserChurchHelper: { createForGroupMember: jest.fn() }
 }));
 jest.mock("../../models/requests", () => ({}));
 jest.mock("../../../../shared/webhooks/index", () => ({ WebhookDispatcher: { emit: jest.fn() } }));
-jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getAll: () => [], getIds: () => [] } }));
+jest.mock("@churchapps/apihelper", () => ({ ArrayHelper: { getAll: (): unknown[] => [], getIds: (): string[] => [] } }));
 
 import { GroupMemberController } from "../GroupMemberController.js";
+import type express from "express";
+import { Group, GroupMember } from "../../models/index.js";
+
+interface ControllerOpts {
+  group?: Group;
+  rows?: GroupMember[];
+  personId?: string;
+  groupIds?: string[];
+  leaderGroupIds?: string[];
+  access?: string[];
+}
+
+interface GmRepos {
+  group: { load: jest.Mock };
+  groupMember: {
+    loadForGroup: jest.Mock;
+    loadForGroups: jest.Mock;
+    loadForPerson: jest.Mock;
+    loadAll: jest.Mock;
+    convertAllToModel: (_c: string, r: GroupMember[]) => GroupMember[];
+    save?: jest.Mock;
+  };
+  groupMemberHistory?: { log: jest.Mock };
+}
+
+interface JsonOut { obj: unknown; status: number }
+
+const res = {} as express.Response;
+
+function makeReq(r: Partial<express.Request>): express.Request {
+  return r as express.Request;
+}
 
 function rosterRow(personId: string, groupId = "g1") {
   return {
@@ -26,31 +58,33 @@ function rosterRow(personId: string, groupId = "g1") {
   };
 }
 
-function gmController(opts: any = {}) {
-  const repos: any = {
+function gmController(opts: ControllerOpts = {}) {
+  const repos: GmRepos = {
     group: { load: jest.fn(async () => opts.group ?? { id: "g1" }) },
     groupMember: {
       loadForGroup: jest.fn(async () => opts.rows ?? []),
       loadForGroups: jest.fn(async () => opts.rows ?? []),
       loadForPerson: jest.fn(async () => opts.rows ?? []),
       loadAll: jest.fn(async () => opts.rows ?? []),
-      convertAllToModel: (_c: string, r: any[]) => r
+      convertAllToModel: (_c: string, r: GroupMember[]) => r
     }
   };
-  const au = { churchId: "c1", personId: opts.personId ?? "p1", groupIds: opts.groupIds ?? [], leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: (perm: any) => (opts.access ?? []).includes(perm) };
+  const au = { churchId: "c1", personId: opts.personId ?? "p1", groupIds: opts.groupIds ?? [], leaderGroupIds: opts.leaderGroupIds ?? [], checkAccess: (perm: string) => (opts.access ?? []).includes(perm) };
   const controller = new GroupMemberController();
-  (controller as any).repos = repos;
-  (controller as any).actionWrapper = (_req: any, _res: any, action: any) => action(au);
-  (controller as any).json = (obj: any, status: number) => ({ obj, status });
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (user: typeof au) => Promise<unknown>) => action(au),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, repos };
 }
 
 describe("GroupMemberController.getAll roster contact privacy", () => {
   it("strips contact and household fields for an ordinary member of the group", async () => {
     const { controller } = gmController({ groupIds: ["g1"], rows: [rosterRow("p2"), rosterRow("p3")] });
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as GroupMember[];
     expect(result).toHaveLength(2);
-    result.forEach((gm: any) => {
+    result.forEach((gm) => {
       expect(gm.person.name.display).toBeDefined();
       expect(gm.person.contactInfo).toBeUndefined();
       expect(gm.person.householdId).toBeUndefined();
@@ -60,26 +94,26 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
 
   it("keeps contact fields for a leader of that group", async () => {
     const { controller } = gmController({ groupIds: ["g1"], leaderGroupIds: ["g1"], rows: [rosterRow("p2")] });
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as GroupMember[];
     expect(result[0].person.contactInfo.email).toBe("p2@x.org");
     expect(result[0].person.householdId).toBe("h1");
   });
 
   it("keeps contact fields for staff with groupMembers.view", async () => {
     const { controller } = gmController({ access: ["gmView"], rows: [rosterRow("p2")] });
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as GroupMember[];
     expect(result[0].person.contactInfo.email).toBe("p2@x.org");
   });
 
   it("a leader of one group still gets a stripped roster for a group they only belong to", async () => {
     const { controller } = gmController({ groupIds: ["g1", "g2"], leaderGroupIds: ["g2"], rows: [rosterRow("p2", "g1")] });
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as GroupMember[];
     expect(result[0].person.contactInfo).toBeUndefined();
   });
 
   it("still blocks a caller who is neither staff nor a member of the group (401)", async () => {
     const { controller, repos } = gmController({ groupIds: ["other"] });
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.groupMember.loadForGroup).not.toHaveBeenCalled();
   });
@@ -88,7 +122,7 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
   it("lets a member who joined after sign-in see the roster (live membership check)", async () => {
     const { controller, repos } = gmController({ groupIds: [], rows: [rosterRow("p2")] });
     repos.groupMember.loadForPerson = jest.fn(async () => [{ groupId: "g1", personId: "p1" }]);
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as GroupMember[];
     expect(result).toHaveLength(1);
     expect(repos.groupMember.loadForPerson).toHaveBeenCalledWith("c1", "p1");
   });
@@ -96,14 +130,14 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
   it("applies the live membership check to groupIds too", async () => {
     const { controller, repos } = gmController({ groupIds: ["g1"], rows: [rosterRow("p2", "g1"), rosterRow("p3", "g2")] });
     repos.groupMember.loadForPerson = jest.fn(async () => [{ groupId: "g1" }, { groupId: "g2" }]);
-    const result = await (controller as any).getAll({ query: { groupIds: "g1,g2" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupIds: "g1,g2" } }), res)) as GroupMember[];
     expect(result).toHaveLength(2);
   });
 
   it("still blocks when the live check finds no membership either (401)", async () => {
     const { controller, repos } = gmController({ groupIds: [] });
     repos.groupMember.loadForPerson = jest.fn(async () => [{ groupId: "other" }]);
-    const result = await (controller as any).getAll({ query: { groupIds: "g1,other" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupIds: "g1,other" } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.groupMember.loadForGroups).not.toHaveBeenCalled();
   });
@@ -113,12 +147,12 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
     const child = { ...rosterRow("kid"), birthDate: "2018-03-10" };
     const adult = { ...rosterRow("adult"), birthDate: "1980-01-01" };
     const { controller, repos } = gmController({ groupIds: [], access: ["attView"] });
-    repos.groupMember.loadForPerson = jest.fn(async () => []);
+    repos.groupMember.loadForPerson = jest.fn(async (): Promise<GroupMember[]> => []);
     repos.groupMember.loadForGroup = jest.fn(async () => [child, adult]);
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as GroupMember[];
     expect(repos.groupMember.loadForGroup).toHaveBeenCalledWith("c1", "g1");
-    expect(result.map((r: any) => r.personId).sort()).toEqual(["adult", "kid"]);
-    result.forEach((gm: any) => {
+    expect(result.map((r) => r.personId).sort()).toEqual(["adult", "kid"]);
+    result.forEach((gm) => {
       expect(gm.person.name.display).toBeDefined();
       expect(gm.person.contactInfo).toBeUndefined();
       expect(gm.person.householdId).toBeUndefined();
@@ -127,8 +161,8 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
 
   it("still hides a confidential group from an attendance taker who is not a member", async () => {
     const { controller, repos } = gmController({ groupIds: [], access: ["attEdit"], group: { id: "g1", confidential: true } });
-    repos.groupMember.loadForPerson = jest.fn(async () => []);
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
+    repos.groupMember.loadForPerson = jest.fn(async (): Promise<GroupMember[]> => []);
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as JsonOut;
     expect(result.status).toBe(401);
     expect(repos.groupMember.loadForGroup).not.toHaveBeenCalled();
   });
@@ -137,35 +171,35 @@ describe("GroupMemberController.getAll roster contact privacy", () => {
     const child = { ...rosterRow("kid"), birthDate: new Date().toISOString() };
     const adult = { ...rosterRow("adult"), birthDate: "1980-01-01" };
     const { controller } = gmController({ groupIds: ["g1"], rows: [child, adult] });
-    const result = await (controller as any).getAll({ query: { groupId: "g1" } }, {});
-    expect(result.map((r: any) => r.personId)).toEqual(["adult"]);
+    const result = (await controller.getAll(makeReq({ query: { groupId: "g1" } }), res)) as GroupMember[];
+    expect(result.map((r) => r.personId)).toEqual(["adult"]);
   });
 });
 
 describe("GroupMemberController.save body shape (#1194)", () => {
   function saveController() {
     const { controller, repos } = gmController({ access: ["gmEdit"] });
-    repos.groupMember.save = jest.fn(async (gm: any) => ({ ...gm, id: "new-" + gm.personId }));
+    repos.groupMember.save = jest.fn(async (gm: GroupMember) => ({ ...gm, id: "new-" + gm.personId }));
     repos.groupMemberHistory = { log: jest.fn() };
     return { controller, repos };
   }
 
   it("accepts a single object instead of an array", async () => {
     const { controller, repos } = saveController();
-    const result = await (controller as any).save({ body: { churchId: "other", groupId: "g1", personId: "p2" } }, {});
+    const result = (await controller.save(makeReq({ body: { churchId: "other", groupId: "g1", personId: "p2" } }), res)) as GroupMember[];
     expect(result).toEqual([expect.objectContaining({ id: "new-p2", churchId: "c1", groupId: "g1", personId: "p2" })]);
     expect(repos.groupMember.save).toHaveBeenCalledTimes(1);
   });
 
   it("still accepts an array", async () => {
     const { controller } = saveController();
-    const result = await (controller as any).save({ body: [{ groupId: "g1", personId: "p2" }, { groupId: "g1", personId: "p3" }] }, {});
+    const result = (await controller.save(makeReq({ body: [{ groupId: "g1", personId: "p2" }, { groupId: "g1", personId: "p3" }] }), res)) as GroupMember[];
     expect(result).toHaveLength(2);
   });
 
   it("returns 400 when a new member is missing groupId or personId", async () => {
     const { controller, repos } = saveController();
-    const result = await (controller as any).save({ body: { groupId: "g1" } }, {});
+    const result = (await controller.save(makeReq({ body: { groupId: "g1" } }), res)) as JsonOut;
     expect(result.status).toBe(400);
     expect(repos.groupMember.save).not.toHaveBeenCalled();
   });

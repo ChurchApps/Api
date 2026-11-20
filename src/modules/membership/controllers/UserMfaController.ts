@@ -8,7 +8,7 @@ import { TotpHelper } from "../helpers/TotpHelper.js";
 @controller("/membership/users/mfa")
 export class UserMfaController extends MembershipBaseController {
   @httpGet("/status")
-  public async status(req: express.Request, res: express.Response): Promise<any> {
+  public async status(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({}, 401);
       const record = await this.repos.userMfa.load(au.id);
@@ -19,7 +19,7 @@ export class UserMfaController extends MembershipBaseController {
 
   // authz-exempt: self-service — only ever touches au.id's own 2FA record
   @httpPost("/setup")
-  public async setup(req: express.Request, res: express.Response): Promise<any> {
+  public async setup(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({}, 401);
       if (await this.repos.userMfa.isEnabled(au.id)) return this.json({ errors: ["Two-factor sign-in is already on"] }, 400);
@@ -33,7 +33,7 @@ export class UserMfaController extends MembershipBaseController {
 
   // authz-exempt: self-service — only ever touches au.id's own 2FA record
   @httpPost("/enable")
-  public async enable(req: express.Request<{}, {}, { code: string }>, res: express.Response): Promise<any> {
+  public async enable(req: express.Request<{}, {}, { code: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({}, 401);
       const ip = LoginRateLimiter.getClientIp(req);
@@ -58,7 +58,7 @@ export class UserMfaController extends MembershipBaseController {
 
   // authz-exempt: self-service — only ever touches au.id's own 2FA record, and needs a current code
   @httpPost("/disable")
-  public async disable(req: express.Request<{}, {}, { code: string }>, res: express.Response): Promise<any> {
+  public async disable(req: express.Request<{}, {}, { code: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au?.id) return this.json({}, 401);
       const ip = LoginRateLimiter.getClientIp(req);
@@ -75,7 +75,7 @@ export class UserMfaController extends MembershipBaseController {
   }
 
   @httpPost("/reset/:userId")
-  public async reset(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async reset(@requestParam("userId") userId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.server.admin)) return this.json({}, 401);
       await this.repos.userMfa.delete(userId);

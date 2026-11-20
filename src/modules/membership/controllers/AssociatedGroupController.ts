@@ -12,7 +12,7 @@ export class AssociatedGroupController extends MembershipBaseController {
     @requestParam("contentId") contentId: string,
       req: express.Request,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.associatedGroup.loadByContent(au.churchId, contentType, contentId);
       return this.repos.associatedGroup.convertAllToModel(au.churchId, data);
@@ -24,7 +24,7 @@ export class AssociatedGroupController extends MembershipBaseController {
     @requestParam("groupId") groupId: string,
       req: express.Request,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const contentType = typeof req.query.contentType === "string" ? req.query.contentType : undefined;
       const data = await this.repos.associatedGroup.loadByGroup(au.churchId, groupId, contentType);
@@ -33,7 +33,7 @@ export class AssociatedGroupController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, AssociatedGroup[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, AssociatedGroup[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
       for (const item of req.body) {
@@ -41,7 +41,7 @@ export class AssociatedGroupController extends MembershipBaseController {
           if (!await PlanAuth.canEditPlanType(au, item.contentId)) return this.json({}, 401);
         }
         if (item.id) {
-          const existing: any = await this.repos.associatedGroup.load(au.churchId, item.id);
+          const existing = await this.repos.associatedGroup.load(au.churchId, item.id);
           if (existing?.contentType === "planType" && !await PlanAuth.canEditPlanType(au, existing.contentId)) return this.json({}, 401);
         }
       }
@@ -53,10 +53,10 @@ export class AssociatedGroupController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.plans.edit)) return this.json({}, 401);
-      const assoc: any = await this.repos.associatedGroup.load(au.churchId, id);
+      const assoc = await this.repos.associatedGroup.load(au.churchId, id);
       if (assoc?.contentType === "planType") {
         if (!await PlanAuth.canEditPlanType(au, assoc.contentId)) return this.json({}, 401);
       }

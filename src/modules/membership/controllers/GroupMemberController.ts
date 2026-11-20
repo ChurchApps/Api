@@ -1,5 +1,6 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { MembershipBaseController } from "./MembershipBaseController.js";
 import { Permissions, UserChurchHelper } from "../helpers/index.js";
 import { GroupMember } from "../models/index.js";
@@ -9,45 +10,45 @@ import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 @controller("/membership/groupmembers")
 export class GroupMemberController extends MembershipBaseController {
   @httpGet("/my")
-  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMy(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return this.repos.groupMember.loadForPerson(au.churchId, au.personId);
     });
   }
 
   @httpGet("/public/leaders/:churchId/:groupId")
-  public async getPublicLeaders(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicLeaders(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      const group: any = await this.repos.group.load(churchId, groupId);
+      const group = await this.repos.group.load(churchId, groupId);
       if (group?.confidential) return [];
-      const result = (await this.repos.groupMember.loadLeadersForGroup(churchId, groupId)) as any[];
+      const result = await this.repos.groupMember.loadLeadersForGroup(churchId, groupId);
       return this.repos.groupMember.convertAllToModel(churchId, result);
     });
   }
 
   @httpGet("/public/:churchId/:groupId")
-  public async getPublicMembers(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicMembers(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
-      const group: any = await this.repos.group.load(churchId, groupId);
+      const group = await this.repos.group.load(churchId, groupId);
       if (group?.confidential) return [];
-      const rows = (await this.repos.groupMember.loadPublicForGroup(churchId, groupId)) as any[];
+      const rows = await this.repos.groupMember.loadPublicForGroup(churchId, groupId);
       return this.repos.groupMember.convertAllToPublicModel(churchId, rows);
     });
   }
 
   @httpGet("/basic/:groupId")
-  public async getbasic(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getbasic(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Confidential-group rosters are members-or-staff only.
-      const group: any = await this.repos.group.load(au.churchId, groupId);
+      const group = await this.repos.group.load(au.churchId, groupId);
       if (group?.confidential && !au.groupIds?.includes(groupId) && !au.checkAccess(Permissions.groupMembers.view)) return this.json({}, 401);
-      const result = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
+      const result = await this.repos.groupMember.loadForGroup(au.churchId, groupId);
       return this.repos.groupMember.convertAllToBasicModel(au.churchId, this.filterMinors(result, au, groupId));
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.view)) return this.json({}, 401);
       const data = await this.repos.groupMember.load(au.churchId, id);
@@ -56,7 +57,7 @@ export class GroupMemberController extends MembershipBaseController {
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const canViewAll = au.checkAccess(Permissions.groupMembers.view);
       // Attendance takers are not members of every class they record. They get the
@@ -66,7 +67,7 @@ export class GroupMemberController extends MembershipBaseController {
       const inGroups = async (ids: string[]) => {
         if (canViewAll || ids.every((id) => au.groupIds?.includes(id))) return true;
         if (!au.personId) return false;
-        const live = ((await this.repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[]).map((gm) => gm.groupId);
+        const live = (await this.repos.groupMember.loadForPerson(au.churchId, au.personId)).map((gm) => gm.groupId);
         return ids.every((id) => au.groupIds?.includes(id) || live.includes(id));
       };
       let result = null;
@@ -74,14 +75,14 @@ export class GroupMemberController extends MembershipBaseController {
         const groupId = req.query.groupId.toString();
         if (!(await inGroups([groupId]))) {
           if (!canTakeAttendance) return this.json({}, 401);
-          const group: any = await this.repos.group.load(au.churchId, groupId);
+          const group = await this.repos.group.load(au.churchId, groupId);
           if (!group || group.confidential) return this.json({}, 401);
         }
-        result = this.filterMinors((await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[], au, groupId);
+        result = this.filterMinors(await this.repos.groupMember.loadForGroup(au.churchId, groupId), au, groupId);
       } else if (req.query.groupIds !== undefined) {
         const groupIds = req.query.groupIds.toString().split(",").filter(Boolean);
         if (!(await inGroups(groupIds))) return this.json({}, 401);
-        const rows = (await this.repos.groupMember.loadForGroups(au.churchId, groupIds)) as any[];
+        const rows = await this.repos.groupMember.loadForGroups(au.churchId, groupIds);
         result = rows.filter((r) => this.filterMinors([r], au, r.groupId).length > 0);
       } else if (req.query.personId !== undefined) {
         const personId = req.query.personId.toString();
@@ -98,7 +99,7 @@ export class GroupMemberController extends MembershipBaseController {
   // Roster rows embed the person's contact fields. Staff (groupMembers.view) and the group's
   // leaders keep them; any other viewer gets name/photo/role only (contact details go through
   // GET /people/:id, which applies the per-field visibility levels).
-  private stripContactInfo(models: GroupMember[], au: any): GroupMember[] {
+  private stripContactInfo(models: GroupMember[], au: AuthenticatedUser): GroupMember[] {
     if (!Array.isArray(models)) return models;
     if (au.checkAccess(Permissions.groupMembers.view)) return models;
     models.forEach((gm) => {
@@ -112,7 +113,7 @@ export class GroupMemberController extends MembershipBaseController {
 
   // Under-13 privacy: regular members see the roster without known minors;
   // staff and the group's leaders see everyone. Unknown birthDate stays visible.
-  private filterMinors(rows: any[], au: any, groupId: string): any[] {
+  private filterMinors<T extends { personId?: string; birthDate?: Date }>(rows: T[], au: AuthenticatedUser, groupId: string): T[] {
     if (!Array.isArray(rows)) return rows;
     if (au.checkAccess(Permissions.groupMembers.view) || au.leaderGroupIds?.includes(groupId)) return rows;
     if (au.checkAccess(Permissions.attendance.view) || au.checkAccess(Permissions.attendance.edit)) return rows;
@@ -122,7 +123,7 @@ export class GroupMemberController extends MembershipBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, GroupMember[] | GroupMember>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, GroupMember[] | GroupMember>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) {
         return this.json({ error: "Unauthorized" }, 401);
@@ -132,12 +133,12 @@ export class GroupMemberController extends MembershipBaseController {
       if (members.some((gm) => !gm || (!gm.id && (!gm.groupId || !gm.personId)))) return this.json({ error: "groupId and personId are required" }, 400);
 
       const promises: Promise<GroupMember>[] = [];
-      const rosters = new Map<string, any[]>();
+      const rosters = new Map<string, GroupMember[]>();
       for (const gm of members) {
         gm.churchId = au.churchId;
         const isNew = !gm.id;
         if (isNew && gm.groupId && gm.personId) {
-          if (!rosters.has(gm.groupId)) rosters.set(gm.groupId, (await this.repos.groupMember.loadForGroup(au.churchId, gm.groupId)) as any[]);
+          if (!rosters.has(gm.groupId)) rosters.set(gm.groupId, await this.repos.groupMember.loadForGroup(au.churchId, gm.groupId));
           const roster = rosters.get(gm.groupId);
           const existing = roster.find((m) => m.personId === gm.personId);
           if (existing) {
@@ -168,7 +169,7 @@ export class GroupMemberController extends MembershipBaseController {
   }
 
   @httpPost("/bulk-add")
-  public async bulkAdd(req: express.Request<{}, {}, BulkGroupMemberRequest>, res: express.Response): Promise<any> {
+  public async bulkAdd(req: express.Request<{}, {}, BulkGroupMemberRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
 
@@ -177,7 +178,7 @@ export class GroupMemberController extends MembershipBaseController {
       const personIds = Array.isArray(req.body?.personIds) ? Array.from(new Set(req.body.personIds.filter((id) => typeof id === "string").map((id) => id.trim()).filter(Boolean))) : [];
       if (personIds.length === 0) return this.json({ error: "personIds is required" }, 400);
 
-      const existing = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
+      const existing = await this.repos.groupMember.loadForGroup(au.churchId, groupId);
       const existingPersonIds = new Set(existing.map((gm) => gm.personId));
       const newPersonIds = personIds.filter((id) => !existingPersonIds.has(id));
 
@@ -198,7 +199,7 @@ export class GroupMemberController extends MembershipBaseController {
   }
 
   @httpPost("/bulk-remove")
-  public async bulkRemove(req: express.Request<{}, {}, BulkGroupMemberRequest>, res: express.Response): Promise<any> {
+  public async bulkRemove(req: express.Request<{}, {}, BulkGroupMemberRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({ error: "Unauthorized" }, 401);
 
@@ -207,7 +208,7 @@ export class GroupMemberController extends MembershipBaseController {
       const personIds = Array.isArray(req.body?.personIds) ? Array.from(new Set(req.body.personIds.filter((id) => typeof id === "string").map((id) => id.trim()).filter(Boolean))) : [];
       if (personIds.length === 0) return this.json({ error: "personIds is required" }, 400);
 
-      const existing = (await this.repos.groupMember.loadForGroup(au.churchId, groupId)) as any[];
+      const existing = await this.repos.groupMember.loadForGroup(au.churchId, groupId);
       const toRemove = existing.filter((gm) => personIds.indexOf(gm.personId) !== -1);
 
       const batch = await this.repos.batch.create({ churchId: au.churchId, userId: au.id, source: "bulk-remove", label: `Remove ${toRemove.length} group members`, status: "open" });
@@ -224,21 +225,21 @@ export class GroupMemberController extends MembershipBaseController {
   }
 
   @httpPost("/self")
-  public async joinSelf(req: express.Request<{}, {}, { groupId: string }>, res: express.Response): Promise<any> {
+  public async joinSelf(req: express.Request<{}, {}, { groupId: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const groupId = req.body?.groupId;
       if (!groupId) return this.json({ error: "groupId required" }, 400);
       if (!au.personId) return this.json({}, 401);
 
-      const group: any = await this.repos.group.load(au.churchId, groupId);
+      const group = await this.repos.group.load(au.churchId, groupId);
       if (!group || group.archived) return this.json({ error: "Group not found" }, 404);
 
       const policy = group.joinPolicy ?? "open";
       if (policy === "closed" || (group.confidential && policy !== "request")) return this.json({ error: "Group is closed to new members" }, 403);
       if (policy === "request") return this.json({ redirect: "request", error: "This group requires approval" }, 409);
 
-      const existing = (await this.repos.groupMember.loadForPerson(au.churchId, au.personId)) as any[];
-      const already = existing.find((m: any) => m.groupId === groupId);
+      const existing = await this.repos.groupMember.loadForPerson(au.churchId, au.personId);
+      const already = existing.find((m) => m.groupId === groupId);
       if (already) return this.repos.groupMember.convertToModel(au.churchId, already);
 
       const member: GroupMember = { churchId: au.churchId, groupId, personId: au.personId, leader: false };
@@ -251,12 +252,12 @@ export class GroupMemberController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const existing = await this.repos.groupMember.load(au.churchId, id);
       await this.repos.groupMember.delete(au.churchId, id);
-      if (existing) await this.repos.groupMemberHistory.log(au.churchId, (existing as any).groupId, (existing as any).personId, "left");
+      if (existing) await this.repos.groupMemberHistory.log(au.churchId, existing.groupId, existing.personId, "left");
       await WebhookDispatcher.emit(au.churchId, "group.member.removed", existing ?? { id, churchId: au.churchId });
       return {};
     });

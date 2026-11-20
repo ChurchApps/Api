@@ -10,14 +10,14 @@ import { AuditLogHelper, Environment } from "../helpers/index.js";
 @controller("/membership/users/sso")
 export class UserSsoController extends MembershipBaseController {
   @httpGet("/providers")
-  public async getProviders(req: express.Request, res: express.Response): Promise<any> {
+  public async getProviders(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       return this.json(SsoHelper.configuredProviders(), 200);
     });
   }
 
   @httpGet("/authorize/:provider")
-  public async authorize(@requestParam("provider") provider: string, req: express.Request, res: express.Response): Promise<any> {
+  public async authorize(@requestParam("provider") provider: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const cfg = SsoHelper.getProviderConfig(provider);
       if (!cfg) return res.status(400).send("Unknown or unconfigured provider");
@@ -39,7 +39,7 @@ export class UserSsoController extends MembershipBaseController {
   }
 
   @httpGet("/callback/:provider")
-  public async callback(@requestParam("provider") provider: string, req: express.Request, res: express.Response): Promise<any> {
+  public async callback(@requestParam("provider") provider: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const state = req.query.state as string;
       const code = req.query.code as string;

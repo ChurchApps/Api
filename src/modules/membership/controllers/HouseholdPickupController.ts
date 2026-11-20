@@ -7,7 +7,7 @@ import { HouseholdPickupPerson } from "../models/index.js";
 @controller("/membership/householdpickup")
 export class HouseholdPickupController extends MembershipBaseController {
   @httpGet("/:householdId")
-  public async getForHousehold(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForHousehold(@requestParam("householdId") householdId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Checkin may read the list so a kiosk can show who is allowed to pick up at checkout.
       if (!au.checkAccess(Permissions.people.view) && !au.checkAccess(Permissions.people.edit) && !au.checkAccess(Permissions.attendance.checkin)) {
@@ -15,12 +15,12 @@ export class HouseholdPickupController extends MembershipBaseController {
         if (!self || self.householdId !== householdId) return this.json({}, 401);
       }
       const data = await this.repos.householdPickupPerson.loadByHousehold(au.churchId, householdId);
-      return this.repos.householdPickupPerson.convertAllToModel(au.churchId, data as any[]);
+      return this.repos.householdPickupPerson.convertAllToModel(au.churchId, data);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, HouseholdPickupPerson[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, HouseholdPickupPerson[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       const promises: Promise<HouseholdPickupPerson>[] = [];
@@ -34,7 +34,7 @@ export class HouseholdPickupController extends MembershipBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.people.edit)) return this.json({}, 401);
       await this.repos.householdPickupPerson.delete(au.churchId, id);

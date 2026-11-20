@@ -3,18 +3,19 @@ jest.mock("../../models/index.js", () => ({}));
 jest.mock("../../repositories/index.js", () => ({ Repos: class {} }));
 jest.mock("../../helpers/index.js", () => ({ Environment: { jwtSecret: "test-secret", jwtExpiration: "2 days" } }));
 jest.mock("../../../../shared/auth/buildPermStrings.js", () => ({ buildPermStrings: () => [] }));
-jest.mock("../../../../shared/auth/Scopes.js", () => ({ filterPermissionsByScopes: (p: any) => p }));
+jest.mock("../../../../shared/auth/Scopes.js", () => ({ filterPermissionsByScopes: (p: unknown) => p }));
 
 import jwt from "jsonwebtoken";
 import { AuthenticatedUser } from "../AuthenticatedUser.js";
 import { Environment } from "../../helpers/index.js";
+import type { LoginUserChurch, User } from "../../models/index.js";
 
 function ttlSeconds(token: string) {
   const decoded = jwt.decode(token) as jwt.JwtPayload;
   return (decoded.exp as number) - (decoded.iat as number);
 }
 
-const user = { id: "u1", email: "a@b.c", firstName: "A", lastName: "B" } as any;
+const user: User = { id: "u1", email: "a@b.c", firstName: "A", lastName: "B" };
 
 describe("AuthenticatedUser.getUserJwt", () => {
   it("defaults to Environment.jwtExpiration", () => {
@@ -32,7 +33,7 @@ describe("AuthenticatedUser.getUserJwt", () => {
 });
 
 describe("AuthenticatedUser.getCombinedApiJwt", () => {
-  const userChurch = { church: { id: "c1" }, person: { id: "p1" }, groups: [], apis: [] } as any;
+  const userChurch = { church: { id: "c1" }, person: { id: "p1" }, groups: [], apis: [] } as LoginUserChurch;
 
   it("honors a numeric TTL in seconds (local 10-second JWTs)", () => {
     expect(ttlSeconds(AuthenticatedUser.getCombinedApiJwt(user, userChurch, 10))).toBe(10);
