@@ -1,6 +1,16 @@
 // Scheduled push notifications (ChurchAppsSupport#1411): the one-minute timer claims due rows,
 // resolves the audience at send time, and hands off to the normal notification pipeline.
-const createNotificationsMock = jest.fn() as jest.MockedFunction<any>;
+import type { NotificationHelper } from "../NotificationHelper.js";
+import type { Repos } from "../../repositories/index.js";
+import type { Device, NotificationPreference, ScheduledNotification } from "../../models/index.js";
+
+// Only the repos and methods a test touches exist; the rest of Repos is never reached. Mocks keep each
+// method's parameters but return plain fixtures, so only the parameter lists are checked.
+type MockedMethods<T> = { [M in keyof T]?: T[M] extends (...args: infer A) => unknown ? (...args: A) => unknown : T[M] };
+type RepoMocks = { [K in keyof Repos]?: MockedMethods<Repos[K]> };
+const asRepos = (mocks: RepoMocks) => mocks as Repos;
+
+const createNotificationsMock: jest.MockedFunction<typeof NotificationHelper.createNotifications> = jest.fn();
 jest.mock("../NotificationHelper.js", () => ({ NotificationHelper: { createNotifications: createNotificationsMock } }));
 jest.mock("web-push", () => ({ setVapidDetails: jest.fn(), sendNotification: jest.fn() }));
 jest.mock("../../../../shared/helpers/Environment.js", () => ({ Environment: {} }));
@@ -11,22 +21,22 @@ import { PushAudienceHelper } from "../PushAudienceHelper.js";
 
 const webPush = (personId: string) => ({ personId, fcmToken: "webpush:" + JSON.stringify({ endpoint: "https://push.example/" + personId, keys: { p256dh: "a", auth: "b" } }) });
 
-function makeRepos(rows: any[], opts: { claim?: boolean; devices?: any[]; prefs?: any[] } = {}) {
-  return {
+function makeRepos(rows: ScheduledNotification[], opts: { claim?: boolean; devices?: Device[]; prefs?: NotificationPreference[] } = {}) {
+  return asRepos({
     scheduledNotification: {
-      loadDue: jest.fn(async () => rows),
-      claim: jest.fn(async () => opts.claim ?? true),
-      markSent: jest.fn(async () => undefined),
-      markRetry: jest.fn(async () => undefined),
-      markFailed: jest.fn(async () => undefined)
+      loadDue: jest.fn(async (): Promise<ScheduledNotification[]> => rows),
+      claim: jest.fn(async (): Promise<boolean> => opts.claim ?? true),
+      markSent: jest.fn(async (): Promise<void> => undefined),
+      markRetry: jest.fn(async (): Promise<void> => undefined),
+      markFailed: jest.fn(async (): Promise<void> => undefined)
     },
-    device: { loadByChurchId: jest.fn(async () => opts.devices ?? [webPush("P1"), webPush("P2"), webPush("SENDER"), { personId: "P3", fcmToken: "ExponentPushToken[x]" }]) },
-    notificationPreference: { loadByPersonIds: jest.fn(async () => opts.prefs ?? []) }
-  } as any;
+    device: { loadByChurchId: jest.fn(async (): Promise<Device[]> => opts.devices ?? [webPush("P1"), webPush("P2"), webPush("SENDER"), { personId: "P3", fcmToken: "ExponentPushToken[x]" }]) },
+    notificationPreference: { loadByPersonIds: jest.fn(async (): Promise<NotificationPreference[]> => opts.prefs ?? []) }
+  });
 }
 
 const now = new Date("2026-11-12T15:00:00Z");
-const row = (over: any = {}) => ({ id: "S1", churchId: "C1", audience: "church", title: "Main session", message: "Starts in 15 minutes", sendAt: new Date("2026-11-12T14:59:00Z"), attemptCount: 0, createdByPersonId: "SENDER", ...over });
+const row = (over: Partial<ScheduledNotification> = {}): ScheduledNotification => ({ id: "S1", churchId: "C1", audience: "church", title: "Main session", message: "Starts in 15 minutes", sendAt: new Date("2026-11-12T14:59:00Z"), attemptCount: 0, createdByPersonId: "SENDER", ...over });
 
 beforeEach(() => createNotificationsMock.mockReset().mockImplementation(async (ids: string[]) => ids.map((personId) => ({ personId, deliveryMethod: "push" }))));
 

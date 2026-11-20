@@ -122,7 +122,8 @@ export class DeliveryHelper {
 
       await Promise.race([client.send(command), timeoutPromise]);
       return "ok";
-    } catch (e: any) {
+    } catch (caught) {
+      const e = caught as { name?: string; message?: string; code?: string; $metadata?: { httpStatusCode?: number } };
       // GoneException (410): connection stale, expected.
       if (e.name === "GoneException" || e.$metadata?.httpStatusCode === 410) {
         return "gone";

@@ -16,8 +16,8 @@ export class NotificationPreferenceOverrideRepo {
     if (existing) {
       await getDb().updateTable("notificationPreferenceOverrides")
         .set({ optedIn: model.optedIn })
-        .where("id", "=", (existing as any).id).execute();
-      model.id = (existing as any).id;
+        .where("id", "=", existing.id).execute();
+      model.id = existing.id;
       return model;
     }
     model.id = UniqueIdHelper.shortId();
@@ -51,7 +51,7 @@ export class NotificationPreferenceOverrideRepo {
       .where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(data: any): NotificationPreferenceOverride {
+  protected rowToModel(data: NotificationPreferenceOverride): NotificationPreferenceOverride {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -63,11 +63,11 @@ export class NotificationPreferenceOverrideRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: NotificationPreferenceOverride) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: NotificationPreferenceOverride[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

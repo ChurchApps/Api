@@ -4,6 +4,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { DeliveryLog } from "../models/index.js";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { mysqlDate } from "./MysqlDate.js";
 
 // Mail whose wording the church writes. Role and group invites are a fixed template and are not counted.
 const CHURCH_AUTHORED = ["email", "formFollowUp", "workflowEmail"];
@@ -87,10 +88,10 @@ export class DeliveryLogRepo {
       .where("churchId", "=", churchId)
       .where("personId", "=", personId);
     if (startDate) {
-      query = query.where("attemptTime", ">=", DateHelper.toMysqlDate(startDate) as any);
+      query = query.where("attemptTime", ">=", mysqlDate(startDate));
     }
     if (endDate) {
-      query = query.where("attemptTime", "<=", DateHelper.toMysqlDate(endDate) as any);
+      query = query.where("attemptTime", "<=", mysqlDate(endDate));
     }
     return query.orderBy("attemptTime", "desc").execute();
   }
@@ -109,7 +110,7 @@ export class DeliveryLogRepo {
       .where("churchId", "=", churchId)
       .where("deliveryMethod", "=", "email")
       .where("contentType", "in", CHURCH_AUTHORED)
-      .where("attemptTime", ">=", DateHelper.toMysqlDate(since) as any)
+      .where("attemptTime", ">=", mysqlDate(since))
       .executeTakeFirst();
     return Number(row?.cnt ?? 0);
   }
@@ -125,7 +126,7 @@ export class DeliveryLogRepo {
       .select((eb) => eb.fn.countAll<number>().as("cnt"))
       .where("churchId", "=", churchId)
       .where("deliveryMethod", "=", deliveryMethod)
-      .where("attemptTime", ">=", DateHelper.toMysqlDate(since) as any)
+      .where("attemptTime", ">=", mysqlDate(since))
       .executeTakeFirst();
     return Number(row?.cnt ?? 0);
   }
@@ -135,8 +136,8 @@ export class DeliveryLogRepo {
       .where("deliveryAddress", "=", address)
       .where("deliveryMethod", "=", "email")
       .where("contentType", "in", CHURCH_AUTHORED)
-      .where("attemptTime", ">=", DateHelper.toMysqlDate(from) as any)
-      .where("attemptTime", "<=", DateHelper.toMysqlDate(to) as any)
+      .where("attemptTime", ">=", mysqlDate(from))
+      .where("attemptTime", "<=", mysqlDate(to))
       .orderBy("attemptTime", "desc")
       .executeTakeFirst()) ?? null;
   }
@@ -145,7 +146,7 @@ export class DeliveryLogRepo {
     await getDb().deleteFrom("deliveryLogs").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(data: any): DeliveryLog {
+  protected rowToModel(data: DeliveryLog): DeliveryLog {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -160,11 +161,11 @@ export class DeliveryLogRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: DeliveryLog) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: DeliveryLog[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

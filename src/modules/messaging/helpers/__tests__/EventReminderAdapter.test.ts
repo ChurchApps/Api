@@ -1,9 +1,10 @@
-const getReposMock = jest.fn() as jest.MockedFunction<any>;
-jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: (...a: any[]) => getReposMock(...a) } }));
+const getReposMock = jest.fn<Promise<unknown>, [string]>();
+jest.mock("../../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager: { getRepos: (...a: [string]) => getReposMock(...a) } }));
 
 import { EventReminderAdapter } from "../adapters/EventReminderAdapter.js";
+import { ContentRepos, ForeignGroupMemberRow, ForeignRegistrationMemberRow, MembershipRepos } from "../ForeignRepos.js";
 
-function wire(content: any, membership: any) {
+function wire(content: Partial<ContentRepos>, membership: Partial<MembershipRepos>) {
   getReposMock.mockImplementation(async (mod: string) => (mod === "content" ? content : membership));
 }
 
@@ -33,7 +34,7 @@ describe("EventReminderAdapter.loadRecipients", () => {
   it("auto without registration: falls back to group members, dropping opted-out and unlinked", async () => {
     const membership = {
       groupMember: {
-        loadForGroup: jest.fn(async () => [
+        loadForGroup: jest.fn(async (): Promise<ForeignGroupMemberRow[]> => [
           { personId: "P1", optedOut: false, email: "a@x.com" },
           { personId: "P2", optedOut: true },
           { personId: null }
@@ -54,7 +55,7 @@ describe("EventReminderAdapter.loadRecipients", () => {
           { id: "R3", status: "confirmed", personId: "H1" } // dup HoH
         ])
       },
-      registrationMember: { loadForEvent: jest.fn(async () => []) }
+      registrationMember: { loadForEvent: jest.fn(async (): Promise<ForeignRegistrationMemberRow[]> => []) }
     };
     wire(content, {});
     const recipients = await EventReminderAdapter.loadRecipients("CH1", { id: "E1", registrationEnabled: true }, "", "registrantsHoh");

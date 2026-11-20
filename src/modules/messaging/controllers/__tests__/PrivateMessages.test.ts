@@ -3,21 +3,38 @@ import "reflect-metadata";
 // Infrastructure only is stubbed; the controller under test is the real one.
 jest.mock("../../../../shared/infrastructure/index", () => ({ BaseController: class { constructor(_module?: string) {} } }));
 jest.mock("../../repositories/index", () => ({ Repos: class {} }));
-jest.mock("@churchapps/apihelper", () => ({ BasePermissions: class {}, ArrayHelper: { getOne: (arr: any[], key: string, value: any) => (arr || []).find((a) => a[key] === value) || null } }));
+jest.mock("@churchapps/apihelper", () => ({ BasePermissions: class {}, ArrayHelper: { getOne: (arr: Record<string, unknown>[], key: string, value: unknown) => (arr || []).find((a) => a[key] === value) || null } }));
 jest.mock("../../helpers/DeliveryHelper", () => ({ DeliveryHelper: { sendConversationMessages: jest.fn() } }));
 const notifyUser = jest.fn();
 jest.mock("../../helpers/NotificationHelper", () => ({ NotificationHelper: { notifyUser } }));
 // The shared barrel drags in Environment (needs apihelper, mocked above); only the age gate is real here.
 jest.mock("../../../../shared/helpers/index", () => ({ MessagingSafetyHelper: jest.requireActual("../../../../shared/helpers/MessagingSafetyHelper").MessagingSafetyHelper }));
-const loadSetting = jest.fn(async () => null);
-const loadPerson = jest.fn(async (_churchId: string, id: string) => ({ id, birthDate: new Date("1980-01-01") }));
+const loadSetting = jest.fn(async (): Promise<string | null> => null);
+type GatewayPerson = { id: string; birthDate?: Date; householdRole?: string };
+const loadPerson = jest.fn(async (_churchId: string, id: string): Promise<GatewayPerson> => ({ id, birthDate: new Date("1980-01-01") }));
 jest.mock("../../../../shared/modules/MembershipModuleGateway.js", () => ({ getMembershipModuleGateway: () => ({ loadSetting, loadPerson }) }));
 
+import express from "express";
 import { PrivateMessageController } from "../PrivateMessageController.js";
+import { Conversation, Message, PrivateMessage } from "../../models/index.js";
 
 const AU = { id: "u1", churchId: "c1", personId: "pMe", checkAccess: () => false };
 
-const pmRow = (over: any = {}) => ({
+interface BuildOpts {
+  byPerson?: PrivateMessage[];
+  existing?: PrivateMessage | null;
+  byId?: PrivateMessage | null;
+  byConversation?: PrivateMessage | null;
+  messages?: Message[];
+  conv?: Conversation | null;
+  au?: typeof AU;
+}
+
+type SaveReq = express.Request<{}, {}, PrivateMessage[]>;
+const getReq = {} as express.Request<{}, {}, []>;
+const res = {} as express.Response;
+
+const pmRow = (over: Partial<PrivateMessage> = {}): PrivateMessage => ({
   id: "pm1",
   churchId: "c1",
   fromPersonId: "pOther",
@@ -28,27 +45,29 @@ const pmRow = (over: any = {}) => ({
   ...over
 });
 
-function build(opts: any = {}) {
+function build(opts: BuildOpts = {}) {
   const repos = {
     privateMessage: {
       loadByPersonId: jest.fn(async () => opts.byPerson ?? []),
       loadExisting: jest.fn(async () => opts.existing ?? null),
       loadById: jest.fn(async () => opts.byId ?? null),
       loadByConversationId: jest.fn(async () => opts.byConversation ?? null),
-      save: jest.fn(async (pm: any) => ({ ...pm, id: pm.id || "pmNew" })),
-      markAllRead: jest.fn(async () => undefined)
+      save: jest.fn(async (pm: PrivateMessage) => ({ ...pm, id: pm.id || "pmNew" })),
+      markAllRead: jest.fn(async (): Promise<void> => undefined)
     },
     notification: {
-      markPrivateMessageRead: jest.fn(async () => undefined),
-      markPrivateMessagesRead: jest.fn(async () => undefined)
+      markPrivateMessageRead: jest.fn(async (): Promise<void> => undefined),
+      markPrivateMessagesRead: jest.fn(async (): Promise<void> => undefined)
     },
     message: { loadByIds: jest.fn(async () => opts.messages ?? [{ id: "m1", content: "hello" }]) },
     conversation: { loadById: jest.fn(async () => (opts.conv === undefined ? { id: "cvNew", churchId: "c1", contentType: "privateMessage" } : opts.conv)) }
   };
-  const controller: any = new PrivateMessageController();
-  controller.repos = repos;
-  controller.actionWrapper = (_req: any, _res: any, action: any) => action(opts.au ?? AU);
-  controller.json = (obj: any, status: number) => ({ obj, status });
+  const controller = new PrivateMessageController();
+  Object.assign(controller, {
+    repos,
+    actionWrapper: (_req: express.Request, _res: express.Response, action: (a: typeof AU) => unknown) => action(opts.au ?? AU),
+    json: (obj: unknown, status: number) => ({ obj, status })
+  });
   return { controller, repos };
 }
 
@@ -56,13 +75,13 @@ beforeEach(() => {
   notifyUser.mockClear();
   loadSetting.mockClear();
   loadPerson.mockClear();
-  loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, birthDate: new Date("1980-01-01") }) as any);
+  loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, birthDate: new Date("1980-01-01") }));
 });
 
 describe("PrivateMessageController.getAll", () => {
   it("is a pure read — never marks the inbox read", async () => {
     const { controller, repos } = build({ byPerson: [pmRow({ notifyPersonId: "pMe" })] });
-    const result = await controller.getAll({}, {});
+    const result = (await controller.getAll(getReq, res)) as PrivateMessage[];
     expect(result[0].notifyPersonId).toBe("pMe");
     expect(result[0].conversation.messages).toEqual([{ id: "m1", content: "hello" }]);
     expect(repos.privateMessage.markAllRead).not.toHaveBeenCalled();
@@ -72,7 +91,7 @@ describe("PrivateMessageController.getAll", () => {
 
   it("still returns rows with no last post", async () => {
     const { controller, repos } = build({ byPerson: [pmRow({ conversation: { id: "cv1", lastPostId: null } })] });
-    const result = await controller.getAll({}, {});
+    const result = (await controller.getAll(getReq, res)) as PrivateMessage[];
     expect(result[0].conversation.messages).toEqual([]);
     expect(repos.notification.markPrivateMessagesRead).not.toHaveBeenCalled();
   });
@@ -81,14 +100,14 @@ describe("PrivateMessageController.getAll", () => {
 describe("PrivateMessageController.getExisting", () => {
   it("returns {} when there is no thread with that person", async () => {
     const { controller, repos } = build({ existing: null });
-    const result = await controller.getExisting("pOther", {}, {});
+    const result = (await controller.getExisting("pOther", getReq, res)) as PrivateMessage;
     expect(result).toEqual({});
     expect(repos.privateMessage.loadExisting).toHaveBeenCalledWith("c1", "pMe", "pOther");
   });
 
   it("clears notifyPersonId and retires the shadow row when the caller is the notified party", async () => {
     const { controller, repos } = build({ existing: pmRow({ notifyPersonId: "pMe" }) });
-    const result = await controller.getExisting("pOther", {}, {});
+    const result = (await controller.getExisting("pOther", getReq, res)) as PrivateMessage;
     expect(result.notifyPersonId).toBeNull();
     expect(result.conversationId).toBe("cv1");
     expect(repos.privateMessage.save).toHaveBeenCalledWith(expect.objectContaining({ id: "pm1", notifyPersonId: null }));
@@ -97,7 +116,7 @@ describe("PrivateMessageController.getExisting", () => {
 
   it("leaves another person's unread flag alone", async () => {
     const { controller, repos } = build({ existing: pmRow({ notifyPersonId: "pOther" }) });
-    const result = await controller.getExisting("pOther", {}, {});
+    const result = (await controller.getExisting("pOther", getReq, res)) as PrivateMessage;
     expect(result.notifyPersonId).toBe("pOther");
     expect(repos.privateMessage.save).not.toHaveBeenCalled();
     expect(repos.notification.markPrivateMessageRead).not.toHaveBeenCalled();
@@ -108,7 +127,7 @@ describe("PrivateMessageController.save", () => {
   it("returns the existing pair row instead of inserting a duplicate", async () => {
     const existing = pmRow();
     const { controller, repos } = build({ existing });
-    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] }, {});
+    const result = (await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] } as SaveReq, res)) as PrivateMessage[];
     expect(result).toEqual([existing]);
     expect(repos.privateMessage.save).not.toHaveBeenCalled();
     expect(notifyUser).not.toHaveBeenCalled();
@@ -116,7 +135,7 @@ describe("PrivateMessageController.save", () => {
 
   it("creates the row when the pair has none, without a generic notification", async () => {
     const { controller, repos } = build({ existing: null });
-    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] }, {});
+    const result = (await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] } as SaveReq, res)) as PrivateMessage[];
     expect(repos.privateMessage.save).toHaveBeenCalledWith(expect.objectContaining({ churchId: "c1", fromPersonId: "pMe", toPersonId: "pOther", conversationId: "cvNew" }));
     expect(result[0].id).toBe("pmNew");
     expect(notifyUser).not.toHaveBeenCalled();
@@ -124,7 +143,7 @@ describe("PrivateMessageController.save", () => {
 
   it("ignores a client-supplied id and notifyPersonId", async () => {
     const { controller, repos } = build({ existing: null });
-    await controller.save({ body: [{ id: "pmVictim", notifyPersonId: "pOther", toPersonId: "pOther", conversationId: "cvNew" }] }, {});
+    await controller.save({ body: [{ id: "pmVictim", notifyPersonId: "pOther", toPersonId: "pOther", conversationId: "cvNew" }] } as SaveReq, res);
     const saved = repos.privateMessage.save.mock.calls[0][0];
     expect(saved.id).not.toBe("pmVictim");
     expect(saved.notifyPersonId).toBeUndefined();
@@ -132,22 +151,22 @@ describe("PrivateMessageController.save", () => {
 
   it("401s when the conversation is not a private-message thread", async () => {
     const { controller, repos } = build({ existing: null, conv: { id: "cvNote", churchId: "c1", contentType: "person" } });
-    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNote" }] }, {});
+    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNote" }] } as SaveReq, res);
     expect(result).toEqual({ obj: {}, status: 401 });
     expect(repos.privateMessage.save).not.toHaveBeenCalled();
   });
 
   it("401s when the conversation already belongs to another pair", async () => {
     const { controller, repos } = build({ existing: null, byConversation: pmRow({ conversationId: "cvNew" }) });
-    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] }, {});
+    const result = await controller.save({ body: [{ toPersonId: "pOther", conversationId: "cvNew" }] } as SaveReq, res);
     expect(result).toEqual({ obj: {}, status: 401 });
     expect(repos.privateMessage.save).not.toHaveBeenCalled();
   });
 
   it("403s ageRestricted before touching the repo", async () => {
-    loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, householdRole: "Child" }) as any);
+    loadPerson.mockImplementation(async (_churchId: string, id: string) => ({ id, householdRole: "Child" }));
     const { controller, repos } = build({ existing: null });
-    const result = await controller.save({ body: [{ toPersonId: "pKid", conversationId: "cvNew" }] }, {});
+    const result = await controller.save({ body: [{ toPersonId: "pKid", conversationId: "cvNew" }] } as SaveReq, res);
     expect(result).toEqual({ obj: { errors: ["ageRestricted"] }, status: 403 });
     expect(repos.privateMessage.loadExisting).not.toHaveBeenCalled();
     expect(repos.privateMessage.save).not.toHaveBeenCalled();

@@ -1,10 +1,14 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import { MessagingBaseController } from "./MessagingBaseController.js";
 import { Device } from "../models/index.js";
 import { WebPushHelper, WebPushSubscriptionPayload } from "../helpers/WebPushHelper.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
+
+// Some principals carry the login user id separately from the principal id; it is logged when present.
+type AuthWithUserId = AuthenticatedUser & { userId?: string };
 
 interface WebPushEnrollBody {
   subscription: WebPushSubscriptionPayload;
@@ -51,13 +55,13 @@ export class WebPushController extends MessagingBaseController {
       console.info("[webpush] subscribe auth", {
         churchId: au.churchId,
         personId: au.personId,
-        userId: (au as any)?.userId || au.id,
+        userId: (au as AuthWithUserId)?.userId || au.id,
         principalId: au.id
       });
       if (!au.personId) {
         console.warn("[webpush] subscribe missing personId", {
           churchId: au.churchId,
-          userId: (au as any)?.userId || au.id,
+          userId: (au as AuthWithUserId)?.userId || au.id,
           principalId: au.id,
           appName: req.body.appName || "B1AppPwa"
         });
@@ -95,7 +99,7 @@ export class WebPushController extends MessagingBaseController {
         ...WebPushHelper.getConfigSummary(),
         churchId: au.churchId,
         personId: au.personId,
-        userId: (au as any)?.userId || au.id,
+        userId: (au as AuthWithUserId)?.userId || au.id,
         deviceId: device.id,
         appName: device.appName,
         lastActiveDate: device.lastActiveDate,

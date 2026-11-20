@@ -1,4 +1,5 @@
 import { ScheduledNotification } from "../models/index.js";
+import { Repos } from "../repositories/index.js";
 import { NotificationHelper } from "./NotificationHelper.js";
 import { PushAudienceHelper } from "./PushAudienceHelper.js";
 
@@ -13,7 +14,7 @@ export interface ScheduledSendResult {
 
 // Scheduled push notifications (ChurchAppsSupport#1411), sent by the one-minute timer.
 export class ScheduledNotificationHelper {
-  static async send(repos: any, row: ScheduledNotification): Promise<ScheduledSendResult> {
+  static async send(repos: Repos, row: ScheduledNotification): Promise<ScheduledSendResult> {
     const isChurch = row.audience === "church";
     const preview = isChurch
       ? await PushAudienceHelper.getChurchPushPreview(repos, row.churchId, row.createdByPersonId)
@@ -41,12 +42,12 @@ export class ScheduledNotificationHelper {
         }
       }
     );
-    const successCount = notifications.filter((n: any) => n.deliveryMethod === "push").length;
+    const successCount = notifications.filter((n) => n.deliveryMethod === "push").length;
     return { recipientCount: preview.eligiblePersonIds.length, successCount };
   }
 
-  static async dispatchDue(repos: any, now: Date = new Date()) {
-    const due: ScheduledNotification[] = (await repos.scheduledNotification.loadDue()) as any[];
+  static async dispatchDue(repos: Repos, now: Date = new Date()) {
+    const due: ScheduledNotification[] = await repos.scheduledNotification.loadDue();
     let sent = 0;
     let failed = 0;
     for (const row of due) {
@@ -61,8 +62,8 @@ export class ScheduledNotificationHelper {
         const result = await this.send(repos, row);
         await repos.scheduledNotification.markSent(row.id, result.recipientCount, result.successCount);
         sent++;
-      } catch (e: any) {
-        const error = e?.message || String(e);
+      } catch (e) {
+        const error = (e as Error)?.message || String(e);
         if (attempt >= MAX_ATTEMPTS) {
           await repos.scheduledNotification.markFailed(row.id, error);
           failed++;
@@ -73,14 +74,14 @@ export class ScheduledNotificationHelper {
   }
 
   // "Send now" from the list page: claim so a concurrent timer run can't double-send.
-  static async sendNow(repos: any, row: ScheduledNotification): Promise<ScheduledSendResult | null> {
+  static async sendNow(repos: Repos, row: ScheduledNotification): Promise<ScheduledSendResult | null> {
     if (!(await repos.scheduledNotification.claim(row.id))) return null;
     try {
       const result = await this.send(repos, row);
       await repos.scheduledNotification.markSent(row.id, result.recipientCount, result.successCount);
       return result;
-    } catch (e: any) {
-      await repos.scheduledNotification.markRetry(row.id, e?.message || String(e));
+    } catch (e) {
+      await repos.scheduledNotification.markRetry(row.id, (e as Error)?.message || String(e));
       throw e;
     }
   }

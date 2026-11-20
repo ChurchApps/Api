@@ -11,6 +11,7 @@ import { TextingConfigHelper } from "../helpers/TextingConfigHelper.js";
 import { MergeFieldHelper } from "../helpers/MergeFieldHelper.js";
 import { SmsOptOutHelper } from "../helpers/SmsOptOutHelper.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import type { MembershipRepos } from "../helpers/ForeignRepos.js";
 
 interface GroupMemberDetail {
   personId: string;
@@ -19,6 +20,16 @@ interface GroupMemberDetail {
   lastName: string;
   mobilePhone: string;
   optedOut: boolean;
+}
+
+// One row of the membership API's /groupmembers response; only the fields read here.
+interface GroupMemberApiRow {
+  personId: string;
+  person?: {
+    name?: { display?: string; first?: string; last?: string };
+    contactInfo?: { mobilePhone?: string };
+    optedOut?: boolean | number;
+  };
 }
 
 interface CategorizedRecipients {
@@ -31,11 +42,11 @@ interface CategorizedRecipients {
 export class TextingController extends MessagingBaseController {
 
   @httpGet("/providers")
-  public async getProviders(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getProviders(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send) && !au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       const providers = await this.repos.textingProvider.loadByChurchId(au.churchId);
-      const result = this.repos.textingProvider.convertAllToModel(providers as any[]);
+      const result = this.repos.textingProvider.convertAllToModel(providers);
       // Never return raw credentials to the frontend
       return result.map((p: TextingProvider) => ({ ...p, apiKey: p.apiKey ? "********" : "", apiSecret: p.apiSecret ? "********" : "" }));
     });
@@ -43,17 +54,17 @@ export class TextingController extends MessagingBaseController {
 
   // Any signed-in church user: lets reminder editors and member settings show "Text" only when the church can send texts.
   @httpGet("/status")
-  public async getStatus(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getStatus(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.churchId) return this.json({}, 401);
-      const providers = this.repos.textingProvider.convertAllToModel((await this.repos.textingProvider.loadByChurchId(au.churchId)) as any[]);
+      const providers = this.repos.textingProvider.convertAllToModel(await this.repos.textingProvider.loadByChurchId(au.churchId));
       return { enabled: !!providers[0]?.enabled }; // TextingConfigHelper.load uses only the first row, so match it without decrypting credentials
     });
   }
 
   // Webhook URL the church pastes into its provider so STOP replies opt people out here too.
   @httpGet("/inboundUrl")
-  public async getInboundUrl(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getInboundUrl(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send) && !au.checkAccess(Permissions.settings.edit)) return this.json({}, 401);
       return { url: SmsOptOutHelper.inboundUrl(au.churchId) };
@@ -62,7 +73,7 @@ export class TextingController extends MessagingBaseController {
 
   // Unauthenticated provider webhook; the HMAC token in the path ties it to one church. Non-STOP replies are acknowledged and ignored.
   @httpPost("/inbound/:churchId/:token")
-  public async inbound(@requestParam("churchId") churchId: string, @requestParam("token") token: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async inbound(@requestParam("churchId") churchId: string, @requestParam("token") token: string, req: express.Request<{}, {}, unknown>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       if (!SmsOptOutHelper.verify(churchId, token)) return this.json({}, 401);
       const { from, text } = SmsOptOutHelper.parse(req.body);
@@ -72,7 +83,7 @@ export class TextingController extends MessagingBaseController {
   }
 
   @httpPost("/providers")
-  public async saveProvider(req: express.Request<{}, {}, TextingProvider[]>, res: express.Response): Promise<any> {
+  public async saveProvider(req: express.Request<{}, {}, TextingProvider[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const saved = await Promise.all(
@@ -83,7 +94,7 @@ export class TextingController extends MessagingBaseController {
           let existing: TextingProvider | null = null;
           if (provider.apiKey === "********" || provider.apiSecret === "********") {
             const rows = await this.repos.textingProvider.loadByChurchId(au.churchId);
-            const arr = this.repos.textingProvider.convertAllToModel(rows as any[]);
+            const arr = this.repos.textingProvider.convertAllToModel(rows);
             if (arr.length > 0) existing = arr[0];
           }
 
@@ -102,13 +113,13 @@ export class TextingController extends MessagingBaseController {
           return this.repos.textingProvider.save(provider);
         })
       );
-      const result = this.repos.textingProvider.convertAllToModel(saved as any[]);
+      const result = this.repos.textingProvider.convertAllToModel(saved);
       return result.map((p: TextingProvider) => ({ ...p, apiSecret: "********", apiKey: "********" }));
     });
   }
 
   @httpDelete("/providers/:id")
-  public async deleteProvider(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteProvider(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       await this.repos.textingProvider.delete(au.churchId, id);
@@ -117,14 +128,14 @@ export class TextingController extends MessagingBaseController {
   }
 
   @httpGet("/credits")
-  public async getCredits(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getCredits(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const config = await this.getProviderConfig(au.churchId);
       if (!config) return { configured: false, supported: false };
       if (config.providerName.toLowerCase() !== "ministrystuff") return { configured: true, supported: false };
       try {
         const url = Environment.ministryStuffApi + "/check/credits?churchId=" + encodeURIComponent(au.churchId) + "&creditType=texting";
-        const resp = await axios.get(url, { headers: { "X-Service-Key": Environment.ministryStuffServiceKey } });
+        const resp = await axios.get<GroupMemberApiRow[]>(url, { headers: { "X-Service-Key": Environment.ministryStuffServiceKey } });
         return { configured: true, supported: true, ...resp.data };
       } catch {
         return { configured: true, supported: true, hasCredits: false, error: "unavailable" };
@@ -133,7 +144,7 @@ export class TextingController extends MessagingBaseController {
   }
 
   @httpGet("/preview/:groupId")
-  public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const members = await this.getGroupMemberDetails(au.churchId, groupId, au.jwt);
@@ -151,7 +162,7 @@ export class TextingController extends MessagingBaseController {
   }
 
   @httpPost("/send")
-  public async sendToGroup(req: express.Request<{}, {}, { groupId: string; message: string }>, res: express.Response): Promise<any> {
+  public async sendToGroup(req: express.Request<{}, {}, { groupId: string; message: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const { groupId, message } = req.body;
@@ -201,7 +212,7 @@ export class TextingController extends MessagingBaseController {
       const savedSentText = await this.repos.sentText.save(sentText);
 
       // Save per-recipient delivery logs
-      const deliveryPromises: Promise<any>[] = [];
+      const deliveryPromises: Promise<DeliveryLog>[] = [];
 
       eligible.forEach((m, i) => {
         const log: DeliveryLog = {
@@ -245,14 +256,14 @@ export class TextingController extends MessagingBaseController {
   }
 
   @httpPost("/sendPerson")
-  public async sendToPerson(req: express.Request<{}, {}, { personId: string; phoneNumber: string; message: string; personName?: string }>, res: express.Response): Promise<any> {
+  public async sendToPerson(req: express.Request<{}, {}, { personId: string; phoneNumber: string; message: string; personName?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const { personId, message, personName } = req.body;
       if (!personId || !message) return this.json({ error: "personId and message are required" }, 400);
       // Number comes from the person record, never the request, so this can't text arbitrary phones or opted-out people.
-      const membershipRepos = await RepoManager.getRepos<any>("membership");
-      const person = ((await membershipRepos.person.loadByIds(au.churchId, [personId])) as any[])[0];
+      const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
+      const person = (await membershipRepos.person.loadByIds(au.churchId, [personId]))[0];
       if (!person) return this.json({ error: "Person not found" }, 404);
       const phoneNumber: string = (person.mobilePhone || "").trim();
       if (!phoneNumber) return this.json({ error: "Person has no mobile phone" }, 400);
@@ -304,23 +315,23 @@ export class TextingController extends MessagingBaseController {
   }
 
   @httpGet("/sent")
-  public async getSentTexts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getSentTexts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const data = await this.repos.sentText.loadByChurchId(au.churchId);
-      return this.repos.sentText.convertAllToModel(data as any[]);
+      return this.repos.sentText.convertAllToModel(data);
     });
   }
 
   @httpGet("/sent/:id/details")
-  public async getSentTextDetails(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getSentTextDetails(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.texting.send)) return this.json({}, 401);
       const row = await this.repos.sentText.loadById(au.churchId, id);
       if (!row) return this.json({ error: "Not found" }, 404);
       const sentText = this.repos.sentText.convertToModel(row);
       const logRows = await this.repos.deliveryLog.loadByContent(au.churchId, "sentText", id);
-      const deliveryLogs = this.repos.deliveryLog.convertAllToModel(logRows as any[]);
+      const deliveryLogs = this.repos.deliveryLog.convertAllToModel(logRows);
       return { sentText, deliveryLogs };
     });
   }
@@ -331,7 +342,7 @@ export class TextingController extends MessagingBaseController {
 
   private async loadChurchName(churchId: string): Promise<string> {
     try {
-      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
       const churchRow = await membershipRepos.church.load(churchId, churchId);
       return churchRow?.name || "";
     } catch {
@@ -341,9 +352,9 @@ export class TextingController extends MessagingBaseController {
 
   private async getGroupMemberDetails(_churchId: string, groupId: string, jwt: string): Promise<GroupMemberDetail[]> {
     const url = Environment.membershipApi + "/groupmembers?groupId=" + groupId;
-    const resp = await axios.get(url, { headers: { Authorization: "Bearer " + jwt } });
-    const members: any[] = resp.data || [];
-    return members.map((m: any) => {
+    const resp = await axios.get<GroupMemberApiRow[]>(url, { headers: { Authorization: "Bearer " + jwt } });
+    const members: GroupMemberApiRow[] = resp.data || [];
+    return members.map((m) => {
       const displayName: string = m.person?.name?.display || "";
       const parts = displayName.split(" ");
       return {

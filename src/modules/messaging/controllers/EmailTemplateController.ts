@@ -8,6 +8,7 @@ import { TransactionalEmailHelper } from "../../../shared/helpers/TransactionalE
 import { ChurchEmailLimiter } from "../../../shared/helpers/ChurchEmailLimiter.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import type { MembershipRepos } from "../helpers/ForeignRepos.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -23,22 +24,22 @@ interface GroupMemberEmailDetail {
 export class EmailTemplateController extends MessagingBaseController {
 
   @httpGet("/")
-  public async getAll(req: express.Request, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const rows = await this.repos.emailTemplate.loadByChurchId(au.churchId);
-      return this.repos.emailTemplate.convertAllToModel(rows as any[]);
+      return this.repos.emailTemplate.convertAllToModel(rows);
     });
   }
 
   @httpGet("/mergeFields")
-  public async getMergeFields(req: express.Request, res: express.Response): Promise<any> {
+  public async getMergeFields(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (_au) => {
       return MergeFieldHelper.availableFields;
     });
   }
 
   @httpGet("/sendStatus")
-  public async sendStatus(req: express.Request, res: express.Response): Promise<any> {
+  public async sendStatus(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Workflow managers read it too, so the Send Email action can warn when mail won't go out.
       if (!au.checkAccess(Permissions.groupMembers.edit) && !au.checkAccess(Permissions.tasks.admin)) return this.json({}, 401);
@@ -50,12 +51,12 @@ export class EmailTemplateController extends MessagingBaseController {
 
   // Asks the ChurchApps team to approve group email; at most one notice per church per week.
   @httpPost("/requestApproval")
-  public async requestApproval(req: express.Request, res: express.Response): Promise<any> {
+  public async requestApproval(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       if ((await ChurchEmailLimiter.status(au.churchId)).approved) return { requested: false, approved: true };
       if ((await this.repos.deliveryLog.countByMethodSince(au.churchId, "emailApprovalRequest", new Date(Date.now() - 7 * DAY_MS))) > 0) return { requested: true };
-      const membershipRepos = await RepoManager.getRepos<any>("membership");
+      const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
       const church = await membershipRepos.church.loadById(au.churchId);
       // API-key principals carry no name or email, so look the user up.
       const viaApiKey = !au.jwt && !!au.id;
@@ -71,7 +72,7 @@ export class EmailTemplateController extends MessagingBaseController {
   }
 
   @httpGet("/preview/:groupId")
-  public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async previewGroup(@requestParam("groupId") groupId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const members = await this.getGroupMemberEmailDetails(au.churchId, groupId);
@@ -86,7 +87,7 @@ export class EmailTemplateController extends MessagingBaseController {
   }
 
   @httpGet("/:id")
-  public async getOne(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async getOne(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const row = await this.repos.emailTemplate.loadById(au.churchId, id);
       if (!row) return this.json({ error: "Not found" }, 404);
@@ -95,7 +96,7 @@ export class EmailTemplateController extends MessagingBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, EmailTemplate[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, EmailTemplate[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const saved = await Promise.all(
@@ -104,12 +105,12 @@ export class EmailTemplateController extends MessagingBaseController {
           return this.repos.emailTemplate.save(template);
         })
       );
-      return this.repos.emailTemplate.convertAllToModel(saved as any[]);
+      return this.repos.emailTemplate.convertAllToModel(saved);
     });
   }
 
   @httpPost("/send")
-  public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<any> {
+  public async send(req: express.Request<{}, {}, { subject: string; htmlContent: string; groupId?: string; personIds?: string[] }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       const { subject, htmlContent, groupId, personIds } = req.body;
@@ -118,7 +119,7 @@ export class EmailTemplateController extends MessagingBaseController {
 
       let churchName = "";
       try {
-        const membershipRepos = await RepoManager.getRepos<any>("membership");
+        const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
         const churchRow = await membershipRepos.church.load(au.churchId, au.churchId);
         churchName = churchRow?.name || "";
       } catch { /* church name is optional */ }
@@ -154,9 +155,9 @@ export class EmailTemplateController extends MessagingBaseController {
           await TransactionalEmailHelper.sendTransactional(from, member.email, churchName || "B1", "", resolvedSubject, resolvedBody, "ChurchEmailTemplate.html", replyTo);
           successCount++;
           await ChurchEmailLimiter.settle(au.churchId, reserved[i], true);
-        } catch (err: any) {
+        } catch (err) {
           failCount++;
-          await ChurchEmailLimiter.settle(au.churchId, reserved[i], false, err?.message || "Send failed");
+          await ChurchEmailLimiter.settle(au.churchId, reserved[i], false, (err as Error)?.message || "Send failed");
         }
       }
 
@@ -172,7 +173,7 @@ export class EmailTemplateController extends MessagingBaseController {
   }
 
   @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.groupMembers.edit)) return this.json({}, 401);
       await this.repos.emailTemplate.delete(au.churchId, id);
@@ -181,12 +182,12 @@ export class EmailTemplateController extends MessagingBaseController {
   }
 
   private async getGroupMemberEmailDetails(churchId: string, groupId: string): Promise<GroupMemberEmailDetail[]> {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const members: any[] = await membershipRepos.groupMember.loadForGroup(churchId, groupId);
-    const personIds = members.map((m: any) => m.personId).filter(Boolean);
+    const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
+    const members = await membershipRepos.groupMember.loadForGroup(churchId, groupId);
+    const personIds = members.map((m) => m.personId).filter(Boolean);
     if (!personIds.length) return [];
-    const people: any[] = await membershipRepos.person.loadByIds(churchId, personIds);
-    return people.map((p: any) => ({
+    const people = await membershipRepos.person.loadByIds(churchId, personIds);
+    return people.map((p) => ({
       personId: p.id,
       firstName: p.firstName || "",
       lastName: p.lastName || "",
@@ -196,9 +197,9 @@ export class EmailTemplateController extends MessagingBaseController {
   }
 
   private async getPersonEmailDetails(churchId: string, personIds: string[]): Promise<GroupMemberEmailDetail[]> {
-    const membershipRepos = await RepoManager.getRepos<any>("membership");
-    const people: any[] = await membershipRepos.person.loadByIds(churchId, personIds);
-    return people.map((p: any) => ({
+    const membershipRepos = await RepoManager.getRepos<MembershipRepos>("membership");
+    const people = await membershipRepos.person.loadByIds(churchId, personIds);
+    return people.map((p) => ({
       personId: p.id,
       firstName: p.firstName || "",
       lastName: p.lastName || "",

@@ -1,5 +1,5 @@
-const sendNotificationMock = jest.fn() as jest.MockedFunction<any>;
-const setVapidDetailsMock = jest.fn() as jest.MockedFunction<any>;
+const sendNotificationMock = jest.fn();
+const setVapidDetailsMock = jest.fn();
 
 jest.mock("web-push", () => ({
   __esModule: true,

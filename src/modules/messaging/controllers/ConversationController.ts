@@ -1,8 +1,8 @@
 import { controller, httpGet, httpPost, httpDelete, requestParam } from "inversify-express-utils";
 import express from "express";
 import { MessagingBaseController } from "./MessagingBaseController.js";
-import { Conversation, Message } from "../models/index.js";
-import { ArrayHelper, EncryptionHelper } from "@churchapps/apihelper";
+import { Conversation, Message, MessageReaction } from "../models/index.js";
+import { ArrayHelper, AuthenticatedUser, EncryptionHelper } from "@churchapps/apihelper";
 import { DeliveryHelper } from "../helpers/DeliveryHelper.js";
 import { Permissions } from "../../../shared/helpers/Permissions.js";
 import { TaskAuth } from "../../../shared/helpers/TaskAuth.js";
@@ -18,6 +18,38 @@ const NOTE_SECTIONS: Record<string, string[]> = {
   workflows: ["workflowCard"]
 };
 
+// One row of ConversationRepo.loadNotesFeed (a note message joined to its conversation).
+interface NoteFeedRow {
+  messageId: string;
+  conversationId: string;
+  contentType: string;
+  contentId: string;
+  personId: string;
+  displayName: string;
+  timeSent: Date;
+  content: string;
+}
+
+interface NoteFeedItem extends NoteFeedRow {
+  sourceName: string;
+  parentId?: string;
+}
+
+interface ReactionSummary { emoji: string; count: number; mine: boolean }
+
+// Raw rows the content/doing gateways hand back; only the fields the notes feed reads.
+interface NoteEventSource { title?: string; groupId?: string; notesViewRole?: string; notesPostRole?: string }
+interface NoteTaskSource {
+  title?: string;
+  workflowId?: string;
+  associatedWithType?: string;
+  associatedWithId?: string;
+  createdByType?: string;
+  createdById?: string;
+  assignedToType?: string;
+  assignedToId?: string;
+}
+
 @controller("/messaging/conversations")
 export class ConversationController extends MessagingBaseController {
   private async appendMessages(conversations: Conversation[], churchId: string) {
@@ -27,11 +59,11 @@ export class ConversationController extends MessagingBaseController {
         if (c && c.firstPostId && postIds.indexOf(c.firstPostId) === -1) postIds.push(c.firstPostId);
         if (c && c.lastPostId && postIds.indexOf(c.lastPostId) === -1) postIds.push(c.lastPostId);
         if (c) c.messages = [];
-      }) as any;
+      });
 
       if (postIds.length > 0) {
         const posts = await this.repos.message.loadByIds(churchId, postIds);
-        conversations.forEach((c: any) => {
+        conversations.forEach((c: Conversation) => {
           if (c && c.firstPostId) {
             const message = ArrayHelper.getOne(posts, "id", c.firstPostId);
             if (message) c.messages.push(message);
@@ -40,14 +72,14 @@ export class ConversationController extends MessagingBaseController {
             const message = ArrayHelper.getOne(posts, "id", c.lastPostId);
             if (message) c.messages.push(message);
           }
-        }) as any;
+        });
       }
       conversations.forEach((c: Conversation) => {
         if (c) {
           c.firstPostId = undefined;
           c.lastPostId = undefined;
         }
-      }) as any;
+      });
     }
   }
 
@@ -63,7 +95,7 @@ export class ConversationController extends MessagingBaseController {
         await this.appendMessages(result, au.churchId);
       }
       return result || [];
-    }) as any;
+    });
   }
 
   // Notes page (ChurchAppsSupport#1334): newest notes of one section across every record. Each note
@@ -83,11 +115,11 @@ export class ConversationController extends MessagingBaseController {
       if (section === "groups") contentIds = au.leaderGroupIds || [];
 
       const sources = new Map<string, { allowed: boolean; name?: string; parentId?: string }>();
-      const notes: any[] = [];
+      const notes: NoteFeedItem[] = [];
       let exhausted = false;
       // Rows the caller can't see are dropped after the query, so keep reading until the page is full.
       for (let batch = 0; batch < 5 && notes.length < limit && !exhausted; batch++) {
-        const rows: any[] = await this.repos.conversation.loadNotesFeed(au.churchId, contentTypes, contentIds, before, limit * 2);
+        const rows: NoteFeedRow[] = await this.repos.conversation.loadNotesFeed(au.churchId, contentTypes, contentIds, before, limit * 2);
         if (rows.length < limit * 2) exhausted = true;
         if (rows.length === 0) break;
         await this.loadNoteSources(au, section, rows, sources);
@@ -103,7 +135,7 @@ export class ConversationController extends MessagingBaseController {
       const last = notes[notes.length - 1];
       const cursorAt = notes.length === limit ? { timeSent: last.timeSent, id: last.messageId } : (exhausted ? null : before);
       return { notes, cursor: cursorAt ? new Date(cursorAt.timeSent).toISOString() + "|" + cursorAt.id : null };
-    }) as any;
+    });
   }
 
   private parseNotesCursor(value: string) {
@@ -114,7 +146,7 @@ export class ConversationController extends MessagingBaseController {
 
   // Looks up each new source once per request: whether the caller may see its notes, its display name,
   // and the parent the client links through (an event's group, a card's workflow).
-  private async loadNoteSources(au: any, section: string, rows: any[], sources: Map<string, { allowed: boolean; name?: string; parentId?: string }>) {
+  private async loadNoteSources(au: AuthenticatedUser, section: string, rows: NoteFeedRow[], sources: Map<string, { allowed: boolean; name?: string; parentId?: string }>) {
     const ids = Array.from(new Set(rows.map((r) => r.contentId))).filter((id) => !sources.has(id));
     if (ids.length === 0) return;
     if (section === "people") {
@@ -125,20 +157,20 @@ export class ConversationController extends MessagingBaseController {
     } else if (section === "groups") {
       const { getMembershipModuleGateway } = await import("../../../shared/modules/MembershipModuleGateway.js");
       for (const id of ids) {
-        const group: any = await getMembershipModuleGateway().loadGroup(au.churchId, id);
+        const group = await getMembershipModuleGateway().loadGroup(au.churchId, id);
         sources.set(id, { allowed: this.canUseGroupNotes(au, id), name: group?.name });
       }
     } else if (section === "events") {
       const { getContentModuleGateway } = await import("../../../shared/modules/ContentModuleGateway.js");
       const isCalendarStaff = au.checkAccess(Permissions.content.edit) || au.checkAccess(Permissions.calendars.admin);
       for (const id of ids) {
-        const event: any = await getContentModuleGateway().loadEvent(au.churchId, id);
+        const event: NoteEventSource = await getContentModuleGateway().loadEvent(au.churchId, id);
         sources.set(id, { allowed: !!event && (isCalendarStaff || this.eventRoleAllows(au, event, "view")), name: event?.title, parentId: event?.groupId });
       }
     } else if (section === "workflows") {
       const { getDoingModuleGateway } = await import("../../../shared/modules/DoingModuleGateway.js");
       for (const id of ids) {
-        const task: any = await getDoingModuleGateway().loadTask(au.churchId, id);
+        const task: NoteTaskSource = await getDoingModuleGateway().loadTask(au.churchId, id);
         sources.set(id, { allowed: !!task && TaskAuth.canViewTask(au, task), name: task?.title, parentId: task?.workflowId });
       }
     }
@@ -150,7 +182,7 @@ export class ConversationController extends MessagingBaseController {
     @requestParam("contentId") contentId: string,
       req: express.Request,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!(await this.canReadContent(au, contentType, contentId))) return this.json([], 401);
       const churchId = au.churchId;
@@ -182,16 +214,16 @@ export class ConversationController extends MessagingBaseController {
       await this.appendReactions(conversations, churchId, au.personId);
 
       return conversations;
-    }) as any;
+    });
   }
 
   private async appendReactions(conversations: Conversation[], churchId: string, personId: string) {
     const messageIds: string[] = [];
-    conversations.forEach((c) => (c.messages || []).forEach((m: any) => { if (m?.id) messageIds.push(m.id); }));
+    conversations.forEach((c) => (c.messages || []).forEach((m: Message) => { if (m?.id) messageIds.push(m.id); }));
     if (messageIds.length === 0) return;
     const rows = await this.repos.messageReaction.loadForMessages(churchId, messageIds);
-    const byMessage = new Map<string, Map<string, { emoji: string; count: number; mine: boolean }>>();
-    for (const r of rows as any[]) {
+    const byMessage = new Map<string, Map<string, ReactionSummary>>();
+    for (const r of rows as MessageReaction[]) {
       let emojiMap = byMessage.get(r.messageId);
       if (!emojiMap) { emojiMap = new Map(); byMessage.set(r.messageId, emojiMap); }
       let entry = emojiMap.get(r.emoji);
@@ -199,9 +231,9 @@ export class ConversationController extends MessagingBaseController {
       entry.count++;
       if (r.personId === personId) entry.mine = true;
     }
-    conversations.forEach((c) => (c.messages || []).forEach((m: any) => {
+    conversations.forEach((c) => (c.messages || []).forEach((m) => {
       const emojiMap = byMessage.get(m.id);
-      m.reactions = emojiMap ? Array.from(emojiMap.values()) : [];
+      (m as Message & { reactions?: ReactionSummary[] }).reactions = emojiMap ? Array.from(emojiMap.values()) : [];
     }));
   }
 
@@ -212,30 +244,30 @@ export class ConversationController extends MessagingBaseController {
     @requestParam("contentId") contentId: string,
       req: express.Request<{}, {}, null>,
       res: express.Response
-  ): Promise<Conversation[]> {
-    return this.actionWrapperAnon(req, res, async (): Promise<Conversation[]> => {
-      if (!(await this.canReadContent(this.authUser(), contentType, contentId))) return this.json([], 401) as any;
+  ): Promise<unknown> {
+    return this.actionWrapperAnon(req, res, async () => {
+      if (!(await this.canReadContent(this.authUser(), contentType, contentId))) return this.json([], 401);
       const data = await this.repos.conversation.loadForContent(churchId, contentType, contentId);
-      const result = this.repos.conversation.convertAllToModel(data as any[]);
-      if (!this.isSameChurch(this.authUser(), churchId) && result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401) as any;
+      const result = this.repos.conversation.convertAllToModel(data);
+      if (!this.isSameChurch(this.authUser(), churchId) && result.some((conv) => !this.isAnonPublicConversation(conv))) return this.json([], 401);
       return result;
-    }) as any;
+    });
   }
 
   @httpGet("/:churchId/:id")
-  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<Conversation> {
+  public async loadById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = await this.repos.conversation.loadById(churchId, id);
       if (!data) return this.json({}, 401);
       const result = this.repos.conversation.convertToModel(data);
       if (!(await this.canReadConversation(this.authUser(), result))) return this.json({}, 401);
       return result;
-    }) as any;
+    });
   }
 
   // authz-exempt: self-service — every conversation's churchId is forced to au.churchId from the JWT before save
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Conversation[]>, res: express.Response): Promise<Conversation[]> {
+  public async save(req: express.Request<{}, {}, Conversation[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       // Signed-out callers have no church; without this they could create orphan conversations.
       if (!au?.churchId) return this.json({}, 401);
@@ -256,7 +288,7 @@ export class ConversationController extends MessagingBaseController {
       req.body.forEach((conversation) => {
         conversation.churchId = au.churchId;
         promises.push(this.repos.conversation.save(conversation));
-      }) as any;
+      });
       const result = await Promise.all(promises);
       // Notify subscribed clients so other tabs see the new conversation.
       const activityPromises: Promise<unknown>[] = [];
@@ -272,14 +304,14 @@ export class ConversationController extends MessagingBaseController {
       });
       await Promise.all(activityPromises);
       return this.repos.conversation.convertAllToModel(result);
-    }) as any;
+    });
   }
 
   // loadPosts returns every conversation tied to the groups, including leader-only and event notes;
   // only callers who pass the notes gate may see those.
-  private async withoutHiddenNotes(au: any, conversations: any[]): Promise<any[]> {
+  private async withoutHiddenNotes(au: AuthenticatedUser, conversations: Conversation[]): Promise<Conversation[]> {
     if (!Array.isArray(conversations)) return [];
-    const visible: any[] = [];
+    const visible: Conversation[] = [];
     for (const c of conversations) {
       if (!this.isNote(c.contentType) || await this.canUseNotes(au, c, "view")) visible.push(c);
     }
@@ -293,7 +325,7 @@ export class ConversationController extends MessagingBaseController {
       const result = await this.withoutHiddenNotes(au, await this.repos.conversation.loadPosts(au.churchId, [groupId]));
       await this.appendMessages(result, au.churchId);
       return result;
-    }) as any;
+    });
   }
 
   @httpGet("/posts")
@@ -302,7 +334,7 @@ export class ConversationController extends MessagingBaseController {
       const result = await this.withoutHiddenNotes(au, await this.repos.conversation.loadPosts(au.churchId, au.groupIds || []));
       await this.appendMessages(result, au.churchId);
       return result;
-    }) as any;
+    });
   }
 
   @httpPost("/start")
@@ -336,7 +368,7 @@ export class ConversationController extends MessagingBaseController {
       this.repos.conversation.updateStats(conversation.id);
 
       return conversation;
-    }) as any;
+    });
   }
 
   // authz-exempt: self-service — any member may ensure their own church's public livestream room, and
@@ -344,12 +376,12 @@ export class ConversationController extends MessagingBaseController {
   // the action an empty AuthenticatedUser), so isAuthenticated is what makes "from the JWT" true here;
   // without it an anonymous POST created rooms under churchId "".
   @httpPost("/ensure")
-  public async ensure(req: express.Request<{}, {}, { contentType?: string; contentId?: string }>, res: express.Response): Promise<any> {
+  public async ensure(req: express.Request<{}, {}, { contentType?: string; contentId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.isAuthenticated(au)) return this.json({}, 401);
       if (req.body?.contentType !== "streamingLive" || !req.body?.contentId) return this.json({}, 401);
       return await this.getOrCreate(au.churchId, "streamingLive", req.body.contentId, "public", true, false);
-    }) as any;
+    });
   }
 
   @httpGet("/current/:churchId/:contentType/:contentId")
@@ -359,7 +391,7 @@ export class ConversationController extends MessagingBaseController {
     @requestParam("contentId") contentId: string,
       req: express.Request<{}, {}, {}>,
       res: express.Response
-  ): Promise<any> {
+  ): Promise<unknown> {
     if (contentType !== "streamingLive") {
       return this.actionWrapper(req, res, async (au) => {
         if (!this.isSameChurch(au, churchId)) return this.json({}, 401);
@@ -367,7 +399,7 @@ export class ConversationController extends MessagingBaseController {
         const conversation = await this.getOrCreate(churchId, contentType, contentId, "public", false, true);
         if (contentType === "streamingLiveHost" && conversation?.contentId) await this.getOrCreate(churchId, "streamingLive", conversation.contentId, "public", true, false);
         return conversation;
-      }) as any;
+      });
     }
     return this.actionWrapperAnon(req, res, async () => {
       const au = this.authUser();
@@ -385,17 +417,17 @@ export class ConversationController extends MessagingBaseController {
       const church = await getMembershipModuleGateway().loadChurch(churchId);
       if (!church) return this.json({}, 404);
       return await this.getOrCreate(churchId, contentType, contentId, "public", true, false);
-    }) as any;
+    });
   }
 
 
   @httpDelete("/:churchId/:id")
-  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<void> {
+  public async delete(@requestParam("churchId") _churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await this.repos.conversation.delete(au.churchId, id);
       return this.json({});
-    }) as any;
+    });
   }
 
   private async getOrCreate(churchId: string, contentType: string, contentId: string, visibility: string, allowAnonymousPosts: boolean, decryptContentId: boolean) {
