@@ -2,7 +2,8 @@ import * as rrulePkg from "rrule";
 
 // rrule ships CJS: under Node ESM only the default export is visible, while
 // Jest's CJS transform exposes the named exports. Resolve both shapes.
-const RRule = ((rrulePkg as any).RRule ?? (rrulePkg as any).default?.RRule) as typeof rrulePkg.RRule;
+const rruleModule = rrulePkg as Partial<typeof rrulePkg> & { default?: typeof rrulePkg };
+const RRule = (rruleModule.RRule ?? rruleModule.default?.RRule) as typeof rrulePkg.RRule;
 
 interface OccurrenceSource {
   start: Date | string;

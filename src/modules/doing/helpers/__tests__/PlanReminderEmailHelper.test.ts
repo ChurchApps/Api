@@ -55,13 +55,13 @@ describe("PlanReminderEmailHelper.build", () => {
   });
 
   it("links to the install's own member site when B1APP_ROOT is a bare origin (self-hosted)", async () => {
-    (Environment as any).b1AppRoot = "https://mychurch.example.org/";
+    Environment.b1AppRoot = "https://mychurch.example.org/";
     try {
       const emails = await PlanReminderEmailHelper.build("c1", "plan1", ["p1"], undefined);
       expect(emails.p1.html).toContain("https://mychurch.example.org/mobile/plans/plan1");
       expect(emails.p1.html).not.toContain("b1.church");
     } finally {
-      delete (Environment as any).b1AppRoot;
+      delete Environment.b1AppRoot;
     }
   });
 

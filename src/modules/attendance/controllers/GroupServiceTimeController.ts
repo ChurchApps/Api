@@ -3,6 +3,7 @@ import express from "express";
 import { AttendanceBaseController } from "./AttendanceBaseController.js";
 import { GroupServiceTime } from "../models/index.js";
 import { Permissions } from "../../../shared/helpers/index.js";
+import type { GroupServiceTimeRow } from "../repositories/GroupServiceTimeRepo.js";
 
 @controller("/attendance/groupservicetimes")
 export class GroupServiceTimeController extends AttendanceBaseController {
@@ -10,17 +11,17 @@ export class GroupServiceTimeController extends AttendanceBaseController {
   public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const data = await this.repos.groupServiceTime.load(au.churchId, id);
-      return this.repos.groupServiceTime.convertToModel(au.churchId, data as any);
+      return this.repos.groupServiceTime.convertToModel(au.churchId, data);
     });
   }
 
   @httpGet("/")
   public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      let result = null;
+      let result: GroupServiceTimeRow[] = null;
       if (req.query.groupId !== undefined) result = await this.repos.groupServiceTime.loadWithServiceNames(au.churchId, req.query.groupId.toString());
       else result = await this.repos.groupServiceTime.loadAll(au.churchId);
-      return this.repos.groupServiceTime.convertAllToModel(au.churchId, result as any);
+      return this.repos.groupServiceTime.convertAllToModel(au.churchId, result);
     });
   }
 

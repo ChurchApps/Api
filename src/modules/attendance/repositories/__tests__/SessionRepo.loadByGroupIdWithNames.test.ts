@@ -14,7 +14,7 @@ const db = buildDb();
 jest.mock("../../db/index", () => ({ getDb: () => db }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "tst" } }));
 
-import { SessionRepo } from "../SessionRepo";
+import { SessionRepo } from "../SessionRepo.js";
 
 const CHURCH_ID = "tst1168";
 const GROUP_ID = "tst1168g";
@@ -32,7 +32,7 @@ describe("SessionRepo.loadByGroupIdWithNames", () => {
   });
 
   it("returns the session date, service time, and group with the display name", async () => {
-    const rows: any[] = await new SessionRepo().loadByGroupIdWithNames(CHURCH_ID, GROUP_ID);
+    const rows = await new SessionRepo().loadByGroupIdWithNames(CHURCH_ID, GROUP_ID);
     expect(rows).toHaveLength(1);
     expect(rows[0].displayName).toBe("09/27/2026 - 9:00 AM");
     expect(rows[0].groupId).toBe(GROUP_ID);

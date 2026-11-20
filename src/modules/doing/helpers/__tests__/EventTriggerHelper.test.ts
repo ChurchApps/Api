@@ -11,7 +11,9 @@ jest.mock("../FilterMatcher.js", () => ({ FilterMatcher: {} }));
 
 import { EventTriggerHelper } from "../EventTriggerHelper.js";
 
-const resolve = (payload: any) => (EventTriggerHelper as any).resolve("c1", "form.submission.created", payload);
+interface FormSubmissionPayload { id?: string; formId?: string; contentType?: string; contentId?: string; submittedBy?: string; formName?: string; submitterName?: string }
+
+const resolve = (payload: FormSubmissionPayload) => EventTriggerHelper["resolve"]("c1", "form.submission.created", payload);
 
 describe("EventTriggerHelper.resolve form.submission.created", () => {
   beforeEach(() => { loadPersonMock.mockClear(); });
@@ -62,10 +64,10 @@ describe("EventTriggerHelper donation.created context", () => {
     const trigger = { id: "t1", workflowId: "wf1", conditions: "[]" };
     RepoManager.getRepos.mockResolvedValue({ workflowTrigger: { loadEventTypesForChurch: jest.fn(async () => ["donation.created"]), loadByEventType: jest.fn(async () => [trigger]) } });
     FilterMatcher.matches = () => true;
-    FilterMatcher.parseConditions = (): any[] => [];
+    FilterMatcher.parseConditions = (): unknown[] => [];
     FilterMatcher.toBool = () => false;
-    jest.spyOn(EventTriggerHelper as any, "eventTypesForChurch").mockResolvedValue(new Set(["donation.created"]));
-    jest.spyOn(EventTriggerHelper as any, "resolve").mockResolvedValue([{ subject: { type: "person", id: "p1", label: "Donald Clark" }, facts: {} }]);
+    jest.spyOn(EventTriggerHelper, "eventTypesForChurch").mockResolvedValue(new Set(["donation.created"]));
+    jest.spyOn(EventTriggerHelper, "resolve").mockResolvedValue([{ subject: { type: "person", id: "p1", label: "Donald Clark" }, facts: {} }]);
 
     const donationDate = new Date("2026-11-08T00:00:00Z");
     await EventTriggerHelper.onEvent("c1", "donation.created", { id: "d1", personId: "p1", amount: 50, currency: "usd", donationDate, method: "Check" });

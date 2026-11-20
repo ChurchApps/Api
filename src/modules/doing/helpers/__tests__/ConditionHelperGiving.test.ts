@@ -6,6 +6,7 @@ jest.mock("../../../../shared/modules/index.js", () => ({
 }));
 
 import { ConditionHelper } from "../ConditionHelper.js";
+import type { Condition } from "../../models/index.js";
 
 describe("ConditionHelper giving conditions", () => {
   beforeEach(() => {
@@ -15,7 +16,7 @@ describe("ConditionHelper giving conditions", () => {
   afterEach(() => jest.useRealTimers());
 
   it("asks the giving module for lapsed regular givers as of the church's today", async () => {
-    const condition: any = { churchId: "CHU1", field: "giving", operator: "lapsed", fieldData: JSON.stringify({ regularWeeks: 10, minWeeks: 4, lapsedWeeks: 2 }) };
+    const condition: Condition = { churchId: "CHU1", field: "giving", operator: "lapsed", fieldData: JSON.stringify({ regularWeeks: 10, minWeeks: 4, lapsedWeeks: 2 }) };
     const [result] = await ConditionHelper.getPeopleIdsMatchingConditions([condition]);
     expect(loadLapsedRegularGiverIds).toHaveBeenCalledWith("CHU1", "2026-10-26", { regularWeeks: 10, minWeeks: 4, lapsedWeeks: 2 });
     expect(result.matchingIds).toEqual(["PER1"]);

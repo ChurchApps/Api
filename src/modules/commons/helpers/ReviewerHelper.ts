@@ -1,9 +1,10 @@
+import { IPermission } from "@churchapps/apihelper";
 import { fileRole } from "@churchapps/helpers";
 import { Environment, Permissions } from "../../../shared/helpers/index.js";
 import { AssetFile, SubmissionPayload } from "../models/index.js";
 
 /** The slice of AuthenticatedUser the review gates need. */
-export interface Reviewer { id?: string; email?: string; checkAccess: (p: any) => boolean }
+export interface Reviewer { id?: string; email?: string; checkAccess: (p: IPermission) => boolean }
 
 export interface DeclinedFile { name: string; reason: string }
 
@@ -54,8 +55,8 @@ export class ReviewerHelper {
     const names = new Set(proposed.filter((f) => f.action !== "remove").map((f) => f.name || ""));
     const declined: DeclinedFile[] = [];
     for (const item of raw) {
-      const name = text((item as any)?.name);
-      const reason = text((item as any)?.reason).slice(0, 200);
+      const name = text((item as { name?: unknown })?.name);
+      const reason = text((item as { reason?: unknown })?.reason).slice(0, 200);
       if (!names.has(name)) return { declined: [], error: `${name || "(blank)"} is not a proposed file` };
       if (!reason) return { declined: [], error: `a reason is required to decline ${name}` };
       if (declined.some((d) => d.name === name)) return { declined: [], error: `${name} is listed twice` };

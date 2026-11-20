@@ -5,7 +5,7 @@ export type FilterNode =
 // Evaluates the inline JSON FilterNode tree (event-rule conditions) against a flat
 // facts map. Shared by EventTriggerHelper (live events) and ExecutionHelper (run-now).
 export class FilterMatcher {
-  public static matches(facts: Record<string, any>, node: FilterNode | null): boolean {
+  public static matches(facts: Record<string, unknown>, node: FilterNode | null): boolean {
     if (!node) return true;
     if (node.type === "group") {
       const children = node.children || [];
@@ -15,11 +15,11 @@ export class FilterMatcher {
         : children.every((c) => FilterMatcher.matches(facts, c));
     }
     const actual = facts[node.field];
-    const test = (a: any) => FilterMatcher.compare(a, node.operator, node.value);
+    const test = (a: unknown) => FilterMatcher.compare(a, node.operator, node.value);
     return Array.isArray(actual) ? actual.some(test) : test(actual);
   }
 
-  private static compare(actual: any, operator: string, value: string): boolean {
+  private static compare(actual: unknown, operator: string, value: string): boolean {
     const missing = actual === null || actual === undefined;
     switch (operator) {
       case "=": return !missing && String(actual) === String(value);
@@ -61,7 +61,7 @@ export class FilterMatcher {
   }
 
   // bit(1) columns can come back as Buffer / number / boolean depending on the driver.
-  public static toBool(v: any): boolean {
+  public static toBool(v: unknown): boolean {
     if (v === null || v === undefined) return true;
     if (Buffer.isBuffer(v)) return v[0] === 1;
     if (typeof v === "number") return v === 1;

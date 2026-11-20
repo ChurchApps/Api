@@ -39,7 +39,7 @@ export class AssetRepo {
     if (options.assetType) base = base.where("assetType", "=", options.assetType);
     if (options.language) base = base.where("language", "=", options.language);
     if (options.license) base = base.where("license", "=", options.license);
-    if (options.featured) base = base.where("featured", "=", true as any);
+    if (options.featured) base = base.where("featured", "=", true);
     if (options.tags) for (const tag of options.tags.split(",").map((t) => t.trim()).filter(Boolean)) base = base.where("tags", "like", `%${tag}%`);
     if (options.q) base = base.where((eb) => eb.or([eb("name", "like", `%${options.q}%`), eb("description", "like", `%${options.q}%`)]));
     const total = Number((await base.select(sql<number>`count(*)`.as("n")).executeTakeFirst())?.n || 0);
@@ -124,7 +124,7 @@ export class AssetRepo {
   public async setPublishers(assetId: string, userIds: string[], addedBy: string): Promise<void> {
     const [primary, ...co] = [...new Set(userIds.filter(Boolean))];
     await getDb().transaction().execute(async (trx) => {
-      await trx.updateTable("assets").set({ publisherUserId: primary || null, modifiedAt: new Date() } as any).where("id", "=", assetId).execute();
+      await trx.updateTable("assets").set({ publisherUserId: primary || null, modifiedAt: new Date() }).where("id", "=", assetId).execute();
       await trx.deleteFrom("assetPublishers").where("assetId", "=", assetId).execute();
       if (co.length) await trx.insertInto("assetPublishers").values(co.map((userId) => ({ assetId, userId, addedBy }))).execute();
     });
@@ -148,12 +148,12 @@ export class AssetRepo {
       ratingCount: 0,
       ratingSum: 0,
       featured: false
-    } as any).execute();
+    }).execute();
     return asset;
   }
 
   public async update(id: string, fields: Partial<Asset>): Promise<void> {
-    await getDb().updateTable("assets").set({ ...fields, modifiedAt: new Date() } as any).where("id", "=", id).execute();
+    await getDb().updateTable("assets").set({ ...fields, modifiedAt: new Date() }).where("id", "=", id).execute();
   }
 
   /** Only for assets that were never published (a rejected first submission); counters and ratings go with it. */
@@ -166,12 +166,12 @@ export class AssetRepo {
   }
 
   public async recordDownload(assetId: string, ipHash: string): Promise<boolean> {
-    const result = await getDb().insertInto("assetDownloads").ignore().values({ assetId, ipHash, ymd: sql`curdate()` } as any).executeTakeFirst();
+    const result = await getDb().insertInto("assetDownloads").ignore().values({ assetId, ipHash, ymd: sql`curdate()` }).executeTakeFirst();
     return Number(result.numInsertedOrUpdatedRows || 0) > 0;
   }
 
   public async incrementDownloadCount(id: string): Promise<number> {
-    await getDb().updateTable("assets").set((eb) => ({ downloadCount: eb("downloadCount", "+", 1) } as any)).where("id", "=", id).execute();
+    await getDb().updateTable("assets").set((eb) => ({ downloadCount: eb("downloadCount", "+", 1) })).where("id", "=", id).execute();
     return (await this.loadById(id))?.downloadCount || 0;
   }
 

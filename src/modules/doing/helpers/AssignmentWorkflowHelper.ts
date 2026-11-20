@@ -8,6 +8,7 @@ import { NotificationService } from "../../../shared/helpers/NotificationService
 import { WorkflowHelper } from "./WorkflowHelper.js";
 import { StepActionHelper } from "./StepActionHelper.js";
 import { AppUrlHelper } from "../../../shared/helpers/AppUrlHelper.js";
+import { CardData, StepActionConfig } from "./CardData.js";
 
 // A plan or workflow that cannot issue requests is the caller's to fix: answer 400, not 500.
 const badRequest = (message: string) => Object.assign(new Error(message), { status: 400 });
@@ -16,7 +17,7 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "
 export class AssignmentWorkflowHelper {
   public static readonly workflowType = "assignmentConfirmation";
 
-  public static data(task: Task): Record<string, any> {
+  public static data(task: Task): CardData {
     try { return JSON.parse(task.data || "{}") || {}; } catch { return {}; }
   }
 
@@ -238,14 +239,16 @@ export class AssignmentWorkflowHelper {
 
   // Existing event bus gives prompt termination; the existing 30-minute workflow
   // timer is the repair path for missed events, indirect removals, and starts.
-  public static async onEvent(churchId: string, event: string, payload: any): Promise<void> {
+  public static async onEvent(churchId: string, event: string, payload: unknown): Promise<void> {
     if (!["assignment.updated", "assignment.destroyed", "plan.updated", "plan.destroyed"].includes(event)) return;
     const repos = await RepoManager.getRepos<Repos>("doing");
+    // Bus payload is the changed Assignment or Plan row.
+    const record = payload as { id?: string };
     if (event.startsWith("assignment.")) {
-      await this.reconcileAssignment(churchId, payload.id, repos);
+      await this.reconcileAssignment(churchId, record.id, repos);
     } else {
       for (const card of await repos.task.loadOpenAssignmentCards(churchId) as Task[]) {
-        if (this.data(card).assignment?.planId === payload.id) await this.reconcileAssignment(churchId, card.assignmentId, repos);
+        if (this.data(card).assignment?.planId === record.id) await this.reconcileAssignment(churchId, card.assignmentId, repos);
       }
     }
   }
@@ -288,7 +291,7 @@ export class AssignmentWorkflowHelper {
     return cards.length;
   }
 
-  public static async send(task: Task, config: Record<string, any>, repos: Repos): Promise<void> {
+  public static async send(task: Task, config: StepActionConfig, repos: Repos): Promise<void> {
     if (!task.assignmentId) { StepActionHelper.appendHistory(task, "Serving message skipped: card has no assignment"); return; }
     const assignment = await repos.assignment.load(task.churchId, task.assignmentId) as Assignment;
     const position = await repos.position.load(task.churchId, assignment.positionId) as Position;

@@ -122,7 +122,7 @@ export class ExecutionHelper {
 
     const node = FilterMatcher.parseConditions(trigger.conditions);
     const membership = getMembershipModuleGateway();
-    let candidates: { id: string; label?: string; facts: Record<string, any> }[] = [];
+    let candidates: { id: string; label?: string; facts: Record<string, unknown> }[] = [];
 
     switch (trigger.eventType) {
       case "person.created":

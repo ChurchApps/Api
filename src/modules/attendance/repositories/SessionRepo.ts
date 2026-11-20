@@ -19,7 +19,7 @@ export class SessionRepo {
       churchId: session.churchId,
       groupId: session.groupId,
       serviceTimeId: session.serviceTimeId,
-      sessionDate: sessionDate as any,
+      sessionDate: sessionDate,
       notes: session.notes
     }).execute();
     return session;
@@ -30,7 +30,7 @@ export class SessionRepo {
     await getDb().updateTable("sessions").set({
       groupId: session.groupId,
       serviceTimeId: session.serviceTimeId,
-      sessionDate: sessionDate as any,
+      sessionDate: sessionDate,
       notes: session.notes
     }).where("id", "=", session.id)
       .where("churchId", "=", session.churchId)
@@ -57,24 +57,24 @@ export class SessionRepo {
 
   public async loadByGroupServiceTimeDate(churchId: string, groupId: string, serviceTimeId: string, sessionDate: Date) {
     const sessDate = DateHelper.toMysqlDateOnly(sessionDate);
-    const row = await sql<any>`SELECT * FROM sessions WHERE churchId=${churchId} AND groupId = ${groupId} AND serviceTimeId = ${serviceTimeId} AND sessionDate = ${sessDate}`.execute(getDb());
+    const row = await sql<Session>`SELECT * FROM sessions WHERE churchId=${churchId} AND groupId = ${groupId} AND serviceTimeId = ${serviceTimeId} AND sessionDate = ${sessDate}`.execute(getDb());
     return row.rows.length > 0 ? this.rowToModel(row.rows[0]) : null;
   }
 
   public async loadByGroupIdWithNames(churchId: string, groupId: string) {
-    const rows = await sql<any>`select s.id, s.groupId, s.serviceTimeId, s.sessionDate, s.notes, (SELECT COUNT(*) FROM visitSessions vs WHERE vs.churchId=s.churchId AND vs.sessionId=s.id) AS visitCount, CASE WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y') ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name) END AS displayName FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId WHERE s.churchId=${churchId} AND s.groupId=${groupId} ORDER by s.sessionDate desc`.execute(getDb());
+    const rows = await sql<Session>`select s.id, s.groupId, s.serviceTimeId, s.sessionDate, s.notes, (SELECT COUNT(*) FROM visitSessions vs WHERE vs.churchId=s.churchId AND vs.sessionId=s.id) AS visitCount, CASE WHEN st.name IS NULL THEN DATE_FORMAT(sessionDate, '%m/%d/%Y') ELSE concat(DATE_FORMAT(sessionDate, '%m/%d/%Y'), ' - ', st.name) END AS displayName FROM sessions s LEFT OUTER JOIN serviceTimes st on st.id = s.serviceTimeId WHERE s.churchId=${churchId} AND s.groupId=${groupId} ORDER by s.sessionDate desc`.execute(getDb());
     return rows.rows;
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: Session) {
     return data ? this.rowToModel(data) : data;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): Session[] {
+  public convertAllToModel(_churchId: string, data: Session[]): Session[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(data: any): Session {
+  protected rowToModel(data: Session): Session {
     const result: Session = {
       id: data.id,
       groupId: data.groupId,

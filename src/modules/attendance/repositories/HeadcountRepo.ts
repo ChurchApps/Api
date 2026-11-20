@@ -18,7 +18,7 @@ export class HeadcountRepo {
       serviceId: model.serviceId ?? null,
       serviceTimeId: model.serviceTimeId ?? null,
       groupId: model.groupId ?? null,
-      headcountDate: DateHelper.toMysqlDateOnly(model.headcountDate) as any,
+      headcountDate: DateHelper.toMysqlDateOnly(model.headcountDate),
       value: model.value,
       enteredBy: model.enteredBy ?? null
     }).execute();
@@ -31,7 +31,7 @@ export class HeadcountRepo {
       serviceId: model.serviceId ?? null,
       serviceTimeId: model.serviceTimeId ?? null,
       groupId: model.groupId ?? null,
-      headcountDate: DateHelper.toMysqlDateOnly(model.headcountDate) as any,
+      headcountDate: DateHelper.toMysqlDateOnly(model.headcountDate),
       value: model.value
     }).where("id", "=", model.id)
       .where("churchId", "=", model.churchId)
@@ -48,7 +48,7 @@ export class HeadcountRepo {
   }
 
   public async loadAll(churchId: string) {
-    const rows = await sql<any>`SELECT h.*, ser.name AS serviceName, st.name AS serviceTimeName FROM headcounts h LEFT JOIN serviceTimes st ON st.id = h.serviceTimeId LEFT JOIN services ser ON ser.id = COALESCE(h.serviceId, st.serviceId) WHERE h.churchId=${churchId} ORDER BY h.headcountDate DESC, ser.name, st.name`.execute(getDb());
+    const rows = await sql<Headcount>`SELECT h.*, ser.name AS serviceName, st.name AS serviceTimeName FROM headcounts h LEFT JOIN serviceTimes st ON st.id = h.serviceTimeId LEFT JOIN services ser ON ser.id = COALESCE(h.serviceId, st.serviceId) WHERE h.churchId=${churchId} ORDER BY h.headcountDate DESC, ser.name, st.name`.execute(getDb());
     return rows.rows;
   }
 
@@ -60,15 +60,15 @@ export class HeadcountRepo {
     return getDb().selectFrom("headcounts").selectAll().where("churchId", "=", churchId).where("groupId", "=", groupId).orderBy("headcountDate", "desc").execute();
   }
 
-  public convertToModel(_churchId: string, data: any): Headcount {
+  public convertToModel(_churchId: string, data: Headcount): Headcount {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]): Headcount[] {
+  public convertAllToModel(_churchId: string, data: Headcount[]): Headcount[] {
     return data.map((row) => this.rowToModel(row));
   }
 
-  protected rowToModel(row: any): Headcount {
+  protected rowToModel(row: Headcount): Headcount {
     const result: Headcount = {
       id: row.id,
       campusId: row.campusId,

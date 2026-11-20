@@ -1,5 +1,6 @@
+import type { DonationReceiptSummary } from "../../../../shared/modules/GivingModuleGateway.js";
 const loadDonationSummaryMock = jest.fn();
-jest.mock("../../../../shared/modules/index.js", () => ({ getGivingModuleGateway: () => ({ loadDonationSummary: loadDonationSummaryMock, buildReceiptHtml: (s: any) => jest.requireActual("../../../giving/helpers/ReceiptHelper.js").ReceiptHelper.oneTimeTable(s.funds, s.amount, s.currency) }) }));
+jest.mock("../../../../shared/modules/index.js", () => ({ getGivingModuleGateway: () => ({ loadDonationSummary: loadDonationSummaryMock, buildReceiptHtml: (s: DonationReceiptSummary) => jest.requireActual("../../../giving/helpers/ReceiptHelper.js").ReceiptHelper.oneTimeTable(s.funds, s.amount, s.currency) }) }));
 // Mirrors @churchapps/helpers (ESM-only, so Jest cannot load it): Intl formats with the code, then the code is swapped for the symbol.
 jest.mock("@churchapps/apihelper", () => ({ CurrencyHelper: { formatCurrencyWithLocale: (amount: number, currency: string) => new Intl.NumberFormat("en-US", { style: "currency", currency, currencyDisplay: "code" }).format(amount).replace(currency, ({ USD: "$", GHS: "GH\u20b5" } as Record<string, string>)[currency] || currency) } }));
 

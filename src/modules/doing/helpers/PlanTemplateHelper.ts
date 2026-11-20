@@ -1,19 +1,21 @@
 // Capture/apply plan snapshots (service order, positions, notes) to templates.
+import { PlanItem, Position } from "../models/index.js";
+import { Repos } from "../repositories/index.js";
 
 export interface PlanTemplateData {
   notes?: string;
-  items?: any[];
-  positions?: any[];
+  items?: PlanItem[];
+  positions?: Position[];
 }
 
 export class PlanTemplateHelper {
-  public static async captureFromPlan(repos: any, churchId: string, planId: string): Promise<PlanTemplateData> {
+  public static async captureFromPlan(repos: Repos, churchId: string, planId: string): Promise<PlanTemplateData> {
     const items = await repos.planItem.loadForPlan(churchId, planId);
     const positions = await repos.position.loadByPlanId(churchId, planId);
     const plan = await repos.plan.load(churchId, planId);
     return {
       notes: plan?.notes || "",
-      items: (items || []).map((i: any) => ({
+      items: (items || []).map((i) => ({
         id: i.id,
         parentId: i.parentId,
         sort: i.sort,
@@ -28,7 +30,7 @@ export class PlanTemplateHelper {
         providerContentPath: i.providerContentPath,
         thumbnailUrl: i.thumbnailUrl
       })),
-      positions: (positions || []).map((p: any) => ({
+      positions: (positions || []).map((p) => ({
         categoryName: p.categoryName,
         name: p.name,
         count: p.count,
@@ -39,7 +41,7 @@ export class PlanTemplateHelper {
     };
   }
 
-  public static async applyToPlan(repos: any, churchId: string, planId: string, data: PlanTemplateData, opts: { serviceOrder: boolean; positions: boolean }): Promise<void> {
+  public static async applyToPlan(repos: Repos, churchId: string, planId: string, data: PlanTemplateData, opts: { serviceOrder: boolean; positions: boolean }): Promise<void> {
     if (data.notes) await repos.plan.updateNotes(churchId, planId, data.notes);
     if (opts.serviceOrder) {
       await repos.planItemTime.deleteByPlanId(churchId, planId);
@@ -56,7 +58,7 @@ export class PlanTemplateHelper {
   }
 
   // Root items first, then children level by level so a child listed before its parent still gets copied.
-  private static async createItems(repos: any, churchId: string, planId: string, items: any[]): Promise<void> {
+  private static async createItems(repos: Repos, churchId: string, planId: string, items: PlanItem[]): Promise<void> {
     const idMap = new Map<string, string>();
     for (const item of items.filter((i) => !i.parentId)) {
       const oldId = item.id;

@@ -1,15 +1,17 @@
 jest.mock("../../../../shared/infrastructure/index.js", () => ({ RepoManager: {} }));
-jest.mock("../ConditionHelper.js", () => ({ ConditionHelper: { getPeopleIdsMatchingConditions: async (c: any[]) => c } }));
+jest.mock("../ConditionHelper.js", () => ({ ConditionHelper: { getPeopleIdsMatchingConditions: async (c: Condition[]) => c } }));
 jest.mock("@churchapps/apihelper", () => ({
   ArrayHelper: {
-    getOne: (arr: any[], prop: string, value: any) => arr.find((a) => a[prop] === value) || null,
-    getAll: (arr: any[], prop: string, value: any) => arr.filter((a) => a[prop] === value)
+    getOne: (arr: Record<string, unknown>[], prop: string, value: unknown) => arr.find((a) => a[prop] === value) || null,
+    getAll: (arr: Record<string, unknown>[], prop: string, value: unknown) => arr.filter((a) => a[prop] === value)
   }
 }));
 
 import { ConjunctionHelper } from "../ConjunctionHelper.js";
+import type { Condition, Conjunction } from "../../models/index.js";
+import type { Repos } from "../../repositories/Repos.js";
 
-const and = (...sets: string[][]) => ({ groupType: "AND", conditions: sets.map((matchingIds) => ({ matchingIds })), conjunctions: [] }) as any;
+const and = (...sets: string[][]) => ({ groupType: "AND", conditions: sets.map((matchingIds) => ({ matchingIds })), conjunctions: [] }) as Conjunction;
 
 describe("ConjunctionHelper.getPeopleFromTree AND", () => {
   it("stays empty once an intersection is empty", () => {
@@ -29,11 +31,11 @@ describe("ConjunctionHelper.getPeopleFromTree AND", () => {
 });
 
 describe("ConjunctionHelper.getPeopleIdsForStepRoute", () => {
-  const repos = (conjunctions: any[], conditions: any[]) =>
+  const repos = (conjunctions: Partial<Conjunction>[], conditions: Condition[]) =>
     ({
-      conjunction: { loadForStepRoute: async () => conjunctions },
-      condition: { loadForStepRoute: async () => conditions }
-    }) as any;
+      conjunction: { loadForStepRoute: async (_churchId: string, _stepRouteId: string) => conjunctions },
+      condition: { loadForStepRoute: async (_churchId: string, _stepRouteId: string) => conditions }
+    }) as Repos;
 
   it("matches everyone when the route has no conditions", async () => {
     expect(await ConjunctionHelper.getPeopleIdsForStepRoute("c1", "r1", repos([], []))).toEqual(["*"]);

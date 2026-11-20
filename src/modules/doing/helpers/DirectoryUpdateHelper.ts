@@ -6,6 +6,20 @@ import { Repos } from "../repositories/index.js";
 import { Environment } from "./Environment.js";
 import { MAX_PHOTO_BYTES, PhotoDataUrl } from "../../../shared/helpers/PhotoDataUrl.js";
 
+// One requested change in a directoryUpdate task's data array.
+interface DirectoryUpdateField {
+  field?: string;
+  label?: string;
+  value?: unknown;
+}
+
+// Published with sso.photoSubmitted by the membership module.
+interface PhotoSubmittedPayload {
+  personId?: string;
+  dataUrl?: string;
+  assignedTo?: { type: string; id: string };
+}
+
 export class DirectoryUpdateHelper {
   private static async savePhoto(churchId: string, base64Str: string, personId: string): Promise<string> {
     const base64Parts = base64Str.split(",");
@@ -24,7 +38,7 @@ export class DirectoryUpdateHelper {
 
   // A family member the member asked to add can carry a photo; it waits in the pending folder like their own.
   private static async parkFamilyMemberPhoto(churchId: string, value: string, personId: string, index: number): Promise<string> {
-    let member: any;
+    let member: { photo?: unknown } | null;
     try { member = JSON.parse(value); } catch { return value; }
     if (!member || typeof member !== "object" || typeof member.photo !== "string" || !member.photo.startsWith("data:")) return value;
     if (this.isAcceptablePhoto(member.photo)) member.photo = await this.savePhoto(churchId, member.photo, personId + "-family-" + index);
@@ -44,8 +58,8 @@ export class DirectoryUpdateHelper {
           }
         })()
         : [];
-      const kept: any[] = [];
-      for (const d of Array.isArray(data) ? data : []) {
+      const kept: DirectoryUpdateField[] = [];
+      for (const d of (Array.isArray(data) ? data : []) as DirectoryUpdateField[]) {
         if (d?.field === "photo" && typeof d.value === "string" && d.value.startsWith("data:")) {
           if (!this.isAcceptablePhoto(d.value)) continue;
           d.value = await this.savePhoto(churchId, d.value, task.associatedWithId);
@@ -83,9 +97,10 @@ export class DirectoryUpdateHelper {
 
   // Bus subscriber: the membership module publishes "sso.photoSubmitted" after an SSO
   // login so the photo enters the same staff-approval flow as member self-service.
-  public static onEvent = async (churchId: string, event: string, payload: any): Promise<void> => {
+  public static onEvent = async (churchId: string, event: string, payload: unknown): Promise<void> => {
     if (event !== "sso.photoSubmitted") return;
-    if (!payload?.personId || !payload?.dataUrl) return;
-    await DirectoryUpdateHelper.createPhotoTask(churchId, payload.personId, payload.dataUrl, payload.assignedTo);
+    const photo = payload as PhotoSubmittedPayload | null;
+    if (!photo?.personId || !photo?.dataUrl) return;
+    await DirectoryUpdateHelper.createPhotoTask(churchId, photo.personId, photo.dataUrl, photo.assignedTo);
   };
 }

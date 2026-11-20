@@ -156,7 +156,7 @@ export class PlanHelper {
 
     const assignments = (await repos.assignment.loadByPlanId(churchId, plan.id)) as Assignment[];
     const blockoutDates = (await repos.blockoutDate.loadUpcoming(churchId)) as BlockoutDate[];
-    const lastServed = (await repos.assignment.loadLastServed(churchId)) as any[];
+    const lastServed = (await repos.assignment.loadLastServed(churchId)) as { personId: string; serviceDate: Date }[];
     const assignmentsOnSameDate = (await repos.assignment.loadByServiceDate(churchId, serviceDate, plan.id)) as Assignment[];
     const times = (await repos.time.loadByPlanId(churchId, plan.id)) as Time[];
     const preferences = (await repos.schedulingPreference.loadByPersonIds(churchId, memberIds)) as SchedulingPreference[];

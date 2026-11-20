@@ -21,7 +21,7 @@ export class PublishHelper {
     if (sub.type === "removal") return await this.approveRemoval(repos, sub, asset, reviewerId, note);
     const payload = sub.payload || {};
     const generic: Partial<Asset> = {};
-    for (const k of APPLIED_FIELDS) if (payload[k] !== undefined) (generic as any)[k] = payload[k];
+    for (const k of APPLIED_FIELDS) if (payload[k] !== undefined) generic[k] = payload[k];
     if (generic.tags !== undefined) generic.tags = normalizeTags(String(generic.tags));
     if (typeof generic.name === "string") generic.name = generic.name.trim(); // "My Father My Friend " came through
     await repos.asset.update(asset.id || "", generic);
@@ -95,7 +95,7 @@ export class PublishHelper {
       writeFile: async (name, contentType, body) => {
         const liveName = place(name);
         await ContentLibraryHelper.store(ContentLibraryHelper.liveKey(asset, liveName), contentType, body);
-        await repos.assetFile.upsert({ assetId: asset.id, submissionId: null, name: liveName, action: "add", sizeBytes: body.length, contentHash: ContentLibraryHelper.sha256(body), uploadedBy: null as any });
+        await repos.assetFile.upsert({ assetId: asset.id, submissionId: null, name: liveName, action: "add", sizeBytes: body.length, contentHash: ContentLibraryHelper.sha256(body), uploadedBy: null });
         ctx.files = await repos.assetFile.loadLive(asset.id || "");
       }
     };
@@ -105,8 +105,8 @@ export class PublishHelper {
     const now = new Date();
     // An unpublished asset stays down; putting it back up is the republish action, not a side effect of an edit.
     if (asset.status === "unpublished") await repos.asset.update(asset.id || "", { publishedSubmissionId: sub.id });
-    else await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null as any, removedReason: null as any });
-    await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged });
+    else await repos.asset.update(asset.id || "", { status: "published", publishedAt: asset.publishedAt || now, publishedSubmissionId: sub.id, unpublishedAt: null, removedReason: null });
+    await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null, filesChanged });
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
     // A song whose package has no output/ yet is not finished until the content repo's publish job builds it; the
     // writer hears when syncOutput first registers that build, so the link they get shows the finished song.
@@ -124,7 +124,7 @@ export class PublishHelper {
   private static async approveRemoval(repos: Repos, sub: Submission, asset: Asset, reviewerId: string, note?: string): Promise<void> {
     const now = new Date();
     if (asset.status === "published") await repos.asset.update(asset.id || "", { status: "unpublished", unpublishedAt: now, removedReason: "publisher" });
-    await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null as any, filesChanged: [] });
+    await repos.submission.update(sub.id || "", { status: "approved", reviewedBy: reviewerId, reviewedAt: now, reviewNote: note || null, filesChanged: [] });
     await repos.assetFile.deleteBySubmission(sub.id || "");
     await ContentLibraryHelper.removePrefix(ContentLibraryHelper.pendingPrefix(sub.id || ""));
     await CommonsMailHelper.notifyApproved(sub, asset.id || "").catch((e) => console.error("[CommonsMailHelper] approved failed:", e));

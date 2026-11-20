@@ -2,8 +2,8 @@
 
 const browse = jest.fn();
 jest.mock("@churchapps/content-providers", () => ({
-  setProviderSecret: () => undefined,
-  getProviderConfig: () => null,
+  setProviderSecret: (): void => undefined,
+  getProviderConfig: (): null => null,
   getProvider: (id: string) => (id === "signpresenter"
     ? { name: "SignPresenter", requiresAuth: false, browse, getPlaylist: async () => [{ id: "f1", title: "Slide 1", url: "https://cdn.example.com/1.png", mediaType: "image", seconds: 8 }] }
     : null)
@@ -11,18 +11,23 @@ jest.mock("@churchapps/content-providers", () => ({
 jest.mock("../../../../shared/modules/index.js", () => ({
   getMembershipModuleGateway: () => ({
     loadChurch: async () => ({ timeZone: "America/Chicago" }),
-    loadGroup: async () => null
+    loadGroup: async (): Promise<null> => null
   })
 }));
 
 import { ScreenManifestHelper } from "../ScreenManifestHelper.js";
+import type { Repos } from "../../repositories/Repos.js";
+
+// Test doubles implement only the repo methods a test reads, with loose return shapes.
+type FakeRepos = { [K in keyof Repos]?: { [M in keyof Repos[K]]?: Repos[K][M] extends (...args: infer A) => unknown ? (...args: A) => unknown : Repos[K][M] } };
+const asRepos = (fake: FakeRepos) => fake as Repos;
 
 const entries = [{ id: "A", screenGroupId: "G", targetType: "providerFolder", providerId: "signpresenter", providerPath: "/playlists/8383735095", start: "2026-10-19T08:00:00", end: "2026-10-19T12:00:00", endBehavior: "loop", enabled: true }];
 
-const repos: any = {
-  screenGroup: { load: async () => ({ id: "G", name: "Lobby" }), convertToModel: (_c: string, d: any) => d },
-  scheduleEntry: { loadByScreenGroupId: async () => entries, convertAllToModel: (_c: string, d: any) => d }
-};
+const repos = asRepos({
+  screenGroup: { load: async () => ({ id: "G", name: "Lobby" }), convertToModel: <T>(_c: string, d: T) => d },
+  scheduleEntry: { loadByScreenGroupId: async () => entries, convertAllToModel: <T>(_c: string, d: T) => d }
+});
 
 const now = new Date("2026-10-19T12:00:00Z");
 
