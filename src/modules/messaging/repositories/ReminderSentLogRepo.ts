@@ -22,10 +22,10 @@ export class ReminderSentLogRepo {
         status: model.status,
         reason: model.reason,
         idempotencyKey: model.idempotencyKey,
-        sentAt: model.sentAt ? (model.sentAt as any) : (model.status === "sent" ? sql`NOW()` as any : null)
+        sentAt: model.sentAt ? model.sentAt : (model.status === "sent" ? sql`NOW()` : null)
       }).execute();
-    } catch (e: any) {
-      if (!String(e?.message || e).match(/duplicate/i)) throw e;
+    } catch (e) {
+      if (!String((e as { message?: string } | null)?.message || e).match(/duplicate/i)) throw e;
     }
   }
 
@@ -33,6 +33,6 @@ export class ReminderSentLogRepo {
   public async loadPersonIdsForOccurrence(occurrenceId: string): Promise<string[]> {
     const rows = await getDb().selectFrom("reminderSentLog").select(["personId"])
       .where("occurrenceId", "=", occurrenceId).where("status", "=", "sent").execute();
-    return rows.map((r: any) => r.personId);
+    return rows.map((r) => r.personId);
   }
 }

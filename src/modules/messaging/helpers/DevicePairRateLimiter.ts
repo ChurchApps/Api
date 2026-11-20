@@ -1,4 +1,5 @@
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
+import { MembershipRepos } from "./ForeignRepos.js";
 
 // Pairing codes are four letters, so cap how many a user and a church can try. DB-backed (membership loginAttempts) to hold across Lambda containers.
 export class DevicePairRateLimiter {
@@ -13,7 +14,7 @@ export class DevicePairRateLimiter {
       { key: "devicePair:church|" + churchId, max: this.maxPerChurch }
     ];
     try {
-      const repo = (await RepoManager.getRepos<any>("membership")).loginAttempt;
+      const repo = (await RepoManager.getRepos<MembershipRepos>("membership")).loginAttempt;
       for (const b of buckets) {
         if (await repo.loadCount(b.key, this.windowSeconds) >= b.max) return false;
       }

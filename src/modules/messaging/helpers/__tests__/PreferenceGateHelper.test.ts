@@ -1,4 +1,5 @@
 import { PreferenceGateHelper } from "../PreferenceGateHelper.js";
+import type { NotificationPreference } from "../../models/index.js";
 
 const CHURCH = "CHU00000001";
 const PERSON = "PER00000001";
@@ -17,7 +18,8 @@ describe("PreferenceGateHelper.evaluate", () => {
 
   it("Layer 2: allowPush off suppresses the push channel (truthy + numeric 0)", () => {
     expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", { pref: { allowPush: false } }).reason).toBe("channel_off");
-    expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", { pref: { allowPush: 0 as any } }).reason).toBe("channel_off");
+    const numericOff: Record<string, unknown> = { allowPush: 0 }; // a TINYINT column read back as 0
+    expect(PreferenceGateHelper.evaluate(CHURCH, PERSON, "event_reminders", "push", { pref: numericOff as NotificationPreference }).reason).toBe("channel_off");
   });
 
   it("Layer 2: emailFrequency=never suppresses the email channel", () => {

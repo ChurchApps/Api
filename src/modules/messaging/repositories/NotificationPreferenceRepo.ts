@@ -71,7 +71,7 @@ export class NotificationPreferenceRepo {
       .execute();
   }
 
-  protected rowToModel(data: any): NotificationPreference {
+  protected rowToModel(data: NotificationPreference): NotificationPreference {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -87,11 +87,11 @@ export class NotificationPreferenceRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: NotificationPreference) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: NotificationPreference[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

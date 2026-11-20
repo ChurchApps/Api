@@ -8,7 +8,7 @@ import { Permissions } from "../../../shared/helpers/Permissions.js";
 @controller("/messaging/blockedips")
 export class BlockedIpController extends MessagingBaseController {
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, BlockedIp[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, BlockedIp[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       const promises: Promise<BlockedIp>[] = [];
@@ -26,7 +26,7 @@ export class BlockedIpController extends MessagingBaseController {
   }
 
   @httpPost("/clear")
-  public async clear(req: express.Request<{}, {}, { serviceId: string; churchId: string }[]>, res: express.Response): Promise<any> {
+  public async clear(req: express.Request<{}, {}, { serviceId: string; churchId: string }[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       for (const { serviceId } of req.body) {

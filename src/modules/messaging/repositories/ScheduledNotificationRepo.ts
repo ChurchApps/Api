@@ -2,7 +2,7 @@ import { injectable } from "inversify";
 import { sql } from "kysely";
 import { UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
-import { DateHelper } from "../../../shared/helpers/DateHelper.js";
+import { mysqlDate } from "./MysqlDate.js";
 import { ScheduledNotification } from "../models/index.js";
 
 const LEASE_MINUTES = 10; // a 'processing' row older than this is re-surfaced (crash recovery)
@@ -10,8 +10,8 @@ const RECENT_LIMIT = 25;
 const FINISHED = ["sent", "failed", "cancelled"];
 
 // Times are compared against a Node-formatted "now" so they match how sendAt is written.
-const nowSql = () => DateHelper.toMysqlDate(new Date()) as any;
-const leaseCutoff = () => DateHelper.toMysqlDate(new Date(Date.now() - LEASE_MINUTES * 60 * 1000)) as any;
+const nowSql = () => mysqlDate(new Date());
+const leaseCutoff = () => mysqlDate(new Date(Date.now() - LEASE_MINUTES * 60 * 1000));
 
 @injectable()
 export class ScheduledNotificationRepo {
@@ -24,10 +24,10 @@ export class ScheduledNotificationRepo {
       message: model.message,
       link: model.link || null,
       imageUrl: model.imageUrl || null,
-      sendAt: DateHelper.toMysqlDate(model.sendAt) as any,
+      sendAt: mysqlDate(model.sendAt),
       timeZone: model.timeZone || null,
       status: model.status || "pending"
-    } as any;
+    };
     if (model.id) {
       await getDb().updateTable("scheduledNotifications").set({ ...values, dateModified: nowSql() })
         .where("id", "=", model.id).where("churchId", "=", model.churchId).where("status", "=", "pending").execute();
@@ -75,7 +75,7 @@ export class ScheduledNotificationRepo {
   // Atomic claim: only the worker that flips pending->processing proceeds.
   public async claim(id: string): Promise<boolean> {
     const result = await getDb().updateTable("scheduledNotifications")
-      .set({ status: "processing", claimedAt: nowSql(), attemptCount: sql`attemptCount + 1` as any })
+      .set({ status: "processing", claimedAt: nowSql(), attemptCount: sql`attemptCount + 1` })
       .where("id", "=", id)
       .where((eb) => eb.or([
         eb("status", "=", "pending"),
@@ -87,7 +87,7 @@ export class ScheduledNotificationRepo {
 
   public async markSent(id: string, recipientCount: number, successCount: number) {
     await getDb().updateTable("scheduledNotifications")
-      .set({ status: "sent", sentAt: nowSql(), recipientCount, successCount, lastError: null as any }).where("id", "=", id).execute();
+      .set({ status: "sent", sentAt: nowSql(), recipientCount, successCount, lastError: null }).where("id", "=", id).execute();
   }
 
   public async markRetry(id: string, lastError: string) {

@@ -49,7 +49,7 @@ export class TextingProviderRepo {
     await getDb().deleteFrom("textingProviders").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(data: any): TextingProvider {
+  protected rowToModel(data: TextingProvider): TextingProvider {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -61,11 +61,11 @@ export class TextingProviderRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: TextingProvider) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: TextingProvider[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

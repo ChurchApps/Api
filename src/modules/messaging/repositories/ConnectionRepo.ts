@@ -43,7 +43,7 @@ export class ConnectionRepo {
       .where("conversationId", "=", conversationId)
       .orderBy("displayName")
       .execute();
-    const result: ViewerInterface[] = data as any;
+    const result: ViewerInterface[] = data;
     result.forEach((d: ViewerInterface) => {
       if (d.displayName === "") d.displayName = "Anonymous";
     });
@@ -101,7 +101,7 @@ export class ConnectionRepo {
 
   public async deleteStaleAws(olderThanHours: number) {
     await getDb().deleteFrom("connections")
-      .where("timeJoined", "<", sql`DATE_SUB(NOW(), INTERVAL ${olderThanHours} HOUR)` as any)
+      .where("timeJoined", "<", sql<Date>`DATE_SUB(NOW(), INTERVAL ${olderThanHours} HOUR)`)
       .execute();
   }
 
@@ -114,7 +114,7 @@ export class ConnectionRepo {
       .execute();
   }
 
-  protected rowToModel(data: any): Connection {
+  protected rowToModel(data: Connection): Connection {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -127,11 +127,11 @@ export class ConnectionRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: Connection) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: Connection[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

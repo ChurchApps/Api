@@ -3,8 +3,10 @@ jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 // apihelper ships untransformed ESM; stub the only symbol ConversationRepo uses.
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "cvs_generated" } }));
 
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
-import { ConversationRepo } from "../ConversationRepo";
+import { CompiledQuery, DatabaseConnection, DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler, QueryResult } from "kysely";
+import type { MessagingDatabase } from "../../db/DatabaseTypes.js";
+import { ConversationRepo } from "../ConversationRepo.js";
+import type { Conversation } from "../../models/index.js";
 
 // Regression: rowToModel dropped allowAnonymousPosts, so undefined check always rejected anon posts despite db=true.
 describe("ConversationRepo.convertToModel", () => {
@@ -21,7 +23,8 @@ describe("ConversationRepo.convertToModel", () => {
   });
 
   it("coerces a truthy non-boolean (e.g. 1 from a BIT/TINYINT column) to boolean true", () => {
-    const model = repo.convertToModel({ id: "CVS1", churchId: "C1", allowAnonymousPosts: 1 });
+    const bitRow: Record<string, unknown> = { id: "CVS1", churchId: "C1", allowAnonymousPosts: 1 };
+    const model = repo.convertToModel(bitRow as Conversation);
     expect(model.allowAnonymousPosts).toBe(true);
   });
 
@@ -140,17 +143,17 @@ describe("ConversationRepo.loadNotesFeed", () => {
   });
 });
 
-function capturingDb(rows: any[] = []) {
+function capturingDb(rows: Record<string, unknown>[] = []) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
-  driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+  driver.acquireConnection = async (): Promise<DatabaseConnection> => ({
+    executeQuery: async <R>(q: CompiledQuery): Promise<QueryResult<R>> => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows } as any;
+      return { rows: rows as R[] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<MessagingDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,

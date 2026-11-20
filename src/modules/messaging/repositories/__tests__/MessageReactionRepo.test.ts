@@ -5,20 +5,22 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "ge
 import { getDb } from "../../db/index.js";
 import { MessageReactionRepo } from "../MessageReactionRepo.js";
 
-function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+type Call = { method: string; args: unknown[] };
+
+function recordingDb(results: { execute?: unknown; executeTakeFirst?: unknown } = {}) {
+  const calls: Call[] = [];
+  const proxy: unknown = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => results.execute ?? [];
       if (prop === "executeTakeFirst") return async () => results.executeTakeFirst ?? null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
 
-const firstArg = (calls: { method: string; args: any[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
+const firstArg = (calls: Call[], method: string) => calls.find((c) => c.method === method)?.args[0];
 
 describe("MessageReactionRepo", () => {
   afterEach(() => jest.restoreAllMocks());

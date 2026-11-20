@@ -53,7 +53,7 @@ export class EmailTemplateRepo {
     await getDb().deleteFrom("emailTemplates").where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(data: any): EmailTemplate {
+  protected rowToModel(data: EmailTemplate): EmailTemplate {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -66,11 +66,11 @@ export class EmailTemplateRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: EmailTemplate) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: EmailTemplate[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

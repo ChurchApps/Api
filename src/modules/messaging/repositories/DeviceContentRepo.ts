@@ -56,7 +56,7 @@ export class DeviceContentRepo {
     return getDb().selectFrom("deviceContents").selectAll().where("churchId", "=", churchId).execute();
   }
 
-  protected rowToModel(row: any): DeviceContent {
+  protected rowToModel(row: DeviceContent): DeviceContent {
     return {
       id: row.id,
       churchId: row.churchId,

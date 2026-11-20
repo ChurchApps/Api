@@ -48,7 +48,7 @@ export class SentTextRepo {
       .where("id", "=", id).where("churchId", "=", churchId).executeTakeFirst()) ?? null;
   }
 
-  protected rowToModel(data: any): SentText {
+  protected rowToModel(data: SentText): SentText {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -63,11 +63,11 @@ export class SentTextRepo {
     };
   }
 
-  public convertToModel(data: any) {
+  public convertToModel(data: SentText) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(data: SentText[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

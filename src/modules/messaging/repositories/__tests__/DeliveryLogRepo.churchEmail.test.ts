@@ -2,8 +2,9 @@ import "reflect-metadata";
 jest.mock("../../db/index", () => ({ getDb: jest.fn() }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "dl_generated" } }));
 
-import { DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler } from "kysely";
-import { DeliveryLogRepo } from "../DeliveryLogRepo";
+import { CompiledQuery, DatabaseConnection, DummyDriver, Kysely, MysqlAdapter, MysqlIntrospector, MysqlQueryCompiler, QueryResult } from "kysely";
+import type { MessagingDatabase } from "../../db/DatabaseTypes.js";
+import { DeliveryLogRepo } from "../DeliveryLogRepo.js";
 
 const { getDb } = jest.requireMock("../../db/index");
 
@@ -33,17 +34,17 @@ function contentTypes(parameters: readonly unknown[]): string[] {
   return parameters.filter((p): p is string => p === "email" || p === "formFollowUp" || p === "invite" || p === "workflowEmail");
 }
 
-function capturingDb(rows: any[] = []) {
+function capturingDb(rows: Record<string, unknown>[] = []) {
   const queries: { sql: string; parameters: readonly unknown[] }[] = [];
   const driver = new DummyDriver();
-  driver.acquireConnection = async () => ({
-    executeQuery: async (q: any) => {
+  driver.acquireConnection = async (): Promise<DatabaseConnection> => ({
+    executeQuery: async <R>(q: CompiledQuery): Promise<QueryResult<R>> => {
       queries.push({ sql: q.sql, parameters: q.parameters });
-      return { rows } as any;
+      return { rows: rows as R[] };
     },
     streamQuery: async function* () {}
   });
-  const db = new Kysely<any>({
+  const db = new Kysely<MessagingDatabase>({
     dialect: {
       createAdapter: () => new MysqlAdapter(),
       createDriver: () => driver,

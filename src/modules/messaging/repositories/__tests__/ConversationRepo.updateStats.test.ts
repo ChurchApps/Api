@@ -11,12 +11,12 @@ import { createPool } from "mysql2";
 // The real messaging database, without pulling in Environment/apihelper (ESM-only in Jest).
 const db = buildDb();
 const other = buildDb();
-let current: any = db;
+let current: Kysely<never> = db;
 
 jest.mock("../../db/index", () => ({ getDb: () => current }));
 jest.mock("@churchapps/apihelper", () => ({ __esModule: true, UniqueIdHelper: { shortId: () => "gen" } }));
 
-import { ConversationRepo } from "../ConversationRepo";
+import { ConversationRepo } from "../ConversationRepo.js";
 
 const CHURCH_ID = "tstconvst";
 const CONV_ID = "tstconvstc1";
@@ -40,14 +40,14 @@ describe("ConversationRepo.updateStats", () => {
   it("sets first, last and count", async () => {
     current = db;
     await new ConversationRepo().updateStats(CONV_ID);
-    const row: any = await db.selectFrom("conversations" as never).selectAll().where("id" as never, "=", CONV_ID as never).executeTakeFirst();
+    const row = (await db.selectFrom("conversations" as never).selectAll().where("id" as never, "=", CONV_ID as never).executeTakeFirst()) as { firstPostId?: string; lastPostId?: string; postCount?: number | string };
     expect(row.firstPostId).toBe("tstconvstm1");
     expect(row.lastPostId).toBe("tstconvstm2");
     expect(Number(row.postCount)).toBe(2);
   });
 
   it("does not lock messages against a concurrent insert", async () => {
-    let insertError: any = null;
+    let insertError: string | null = null;
     await db.transaction().execute(async (trx) => {
       current = trx;
       await new ConversationRepo().updateStats(CONV_ID);
@@ -56,8 +56,9 @@ describe("ConversationRepo.updateStats", () => {
         await sql`SET SESSION innodb_lock_wait_timeout = 1`.execute(conn);
         try {
           await conn.insertInto("messages" as never).values({ id: "tstconvstm3", churchId: CHURCH_ID, conversationId: CONV_ID, messageType: "comment", content: "c", timeSent: "2026-10-01 10:10:00" } as never).execute();
-        } catch (e: any) {
-          insertError = e.code || e.message;
+        } catch (e) {
+          const err = e as { code?: string; message?: string };
+          insertError = err.code || err.message;
         }
       });
     });

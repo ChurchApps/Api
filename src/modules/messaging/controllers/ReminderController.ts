@@ -9,6 +9,20 @@ import { ReminderAdapterRegistry } from "../helpers/ReminderAdapter.js";
 import { TimezoneHelper } from "../helpers/TimezoneHelper.js";
 import { ensureRemindersReady } from "../helpers/ReminderBootstrap.js";
 import { ReminderDefinition, NotificationEntityMute } from "../models/index.js";
+import { ContentRepos, ForeignEventRow } from "../helpers/ForeignRepos.js";
+
+// Save body for a reminder definition; offsets and channels may arrive as arrays or as CSV strings.
+interface ReminderDefinitionBody {
+  offsets?: string | (string | number)[];
+  sendLocalTime?: string;
+  timeZone?: string;
+  message?: string;
+  channels?: string | string[];
+  recipientMode?: string;
+  enabled?: boolean;
+}
+
+interface EntityMuteBody { entityType?: string; entityId?: string; level?: string }
 
 @controller("/messaging/reminders")
 export class ReminderController extends MessagingBaseController {
@@ -21,7 +35,7 @@ export class ReminderController extends MessagingBaseController {
   }
 
   @httpGet("/:entityType/:entityId")
-  public async listForEntity(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async listForEntity(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
@@ -31,7 +45,7 @@ export class ReminderController extends MessagingBaseController {
   }
 
   @httpPost("/:entityType/:entityId")
-  public async saveForEntity(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async saveForEntity(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request<{}, {}, ReminderDefinitionBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
@@ -62,7 +76,7 @@ export class ReminderController extends MessagingBaseController {
 
   // Send the saved reminder to its recipients right away (issue #1584). Scope definitions have no single target, so only entity reminders.
   @httpPost("/:entityType/:entityId/sendNow")
-  public async sendNow(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async sendNow(@requestParam("entityType") entityType: string, @requestParam("entityId") entityId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
@@ -79,7 +93,7 @@ export class ReminderController extends MessagingBaseController {
   // Scope (inheritance) definitions: entityId null, scopeId set (e.g. serving reminders per planType).
   // 3-segment paths never collide with the 2-segment entity routes above.
   @httpGet("/scope/:entityType/:scopeId")
-  public async listForScope(@requestParam("entityType") entityType: string, @requestParam("scopeId") scopeId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async listForScope(@requestParam("entityType") entityType: string, @requestParam("scopeId") scopeId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
@@ -89,7 +103,7 @@ export class ReminderController extends MessagingBaseController {
   }
 
   @httpPost("/scope/:entityType/:scopeId")
-  public async saveForScope(@requestParam("entityType") entityType: string, @requestParam("scopeId") scopeId: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async saveForScope(@requestParam("entityType") entityType: string, @requestParam("scopeId") scopeId: string, req: express.Request<{}, {}, ReminderDefinitionBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
@@ -120,7 +134,7 @@ export class ReminderController extends MessagingBaseController {
   }
 
   @httpDelete("/:defId")
-  public async remove(@requestParam("defId") defId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async remove(@requestParam("defId") defId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       if (!(await this.repos.reminderDefinition.load(au.churchId, defId))) return this.json({}, 404);
@@ -131,12 +145,12 @@ export class ReminderController extends MessagingBaseController {
   }
 
   @httpGet("/event/:eventId/preview")
-  public async preview(@requestParam("eventId") eventId: string, req: express.Request, res: express.Response): Promise<any> {
+  public async preview(@requestParam("eventId") eventId: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       ensureRemindersReady(this.repos);
       const adapter = ReminderAdapterRegistry.get("event")!;
-      const entity = await adapter.loadEntity(au.churchId, eventId);
+      const entity = (await adapter.loadEntity(au.churchId, eventId)) as ForeignEventRow | null; // the "event" adapter loads events
       if (!entity) return { recipientCount: 0, scope: "none", unlinkedAttendeeCount: 0, nextFires: [] };
 
       const recipientMode = (req.query.recipientMode as string) || "auto";
@@ -145,9 +159,9 @@ export class ReminderController extends MessagingBaseController {
 
       let unlinkedAttendeeCount = 0;
       if (scope === "registrants") {
-        const content = await RepoManager.getRepos<any>("content");
+        const content = await RepoManager.getRepos<ContentRepos>("content");
         const members = (await content.registrationMember.loadForEvent(au.churchId, eventId)) || [];
-        unlinkedAttendeeCount = members.filter((m: any) => !m.personId).length;
+        unlinkedAttendeeCount = members.filter((m) => !m.personId).length;
       }
 
       const offsets = ReminderEngine.parseOffsets((req.query.offsets as string) || "1440");
@@ -167,7 +181,7 @@ export class ReminderController extends MessagingBaseController {
   }
 
   @httpGet("/log")
-  public async log(req: express.Request, res: express.Response): Promise<any> {
+  public async log(req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.messaging.admin) && !au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       return this.repos.reminderOccurrence.loadRecent(au.churchId, 50);
@@ -175,7 +189,7 @@ export class ReminderController extends MessagingBaseController {
   }
 
   @httpPost("/mute")
-  public async mute(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async mute(req: express.Request<{}, {}, EntityMuteBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const body = req.body || {};
       if (!body.entityType || !body.entityId) return this.json({}, 400);
