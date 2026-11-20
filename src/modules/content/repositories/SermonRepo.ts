@@ -12,42 +12,40 @@ export class SermonRepo {
 
   private async create(model: Sermon): Promise<Sermon> {
     model.id = UniqueIdHelper.shortId();
-    const m: any = { ...model };
-    if (m.publishDate) m.publishDate = DateHelper.toMysqlDate(m.publishDate);
+    const publishDate = model.publishDate ? DateHelper.toMysqlDate(model.publishDate) : model.publishDate;
     await getDb().insertInto("sermons").values({
       id: model.id,
       churchId: model.churchId,
-      playlistId: m.playlistId,
-      videoType: m.videoType,
-      videoData: m.videoData,
-      videoUrl: m.videoUrl,
-      title: m.title,
-      description: m.description,
-      publishDate: m.publishDate,
-      thumbnail: m.thumbnail,
-      duration: m.duration,
-      permanentUrl: m.permanentUrl,
-      audioUrl: m.audioUrl ?? null
-    } as any).execute();
+      playlistId: model.playlistId,
+      videoType: model.videoType,
+      videoData: model.videoData,
+      videoUrl: model.videoUrl,
+      title: model.title,
+      description: model.description,
+      publishDate,
+      thumbnail: model.thumbnail,
+      duration: model.duration,
+      permanentUrl: model.permanentUrl,
+      audioUrl: model.audioUrl ?? null
+    }).execute();
     return model;
   }
 
   private async update(model: Sermon): Promise<Sermon> {
-    const m: any = { ...model };
-    if (m.publishDate) m.publishDate = DateHelper.toMysqlDate(m.publishDate);
+    const publishDate = model.publishDate ? DateHelper.toMysqlDate(model.publishDate) : model.publishDate;
     await getDb().updateTable("sermons").set({
-      playlistId: m.playlistId,
-      videoType: m.videoType,
-      videoData: m.videoData,
-      videoUrl: m.videoUrl,
-      title: m.title,
-      description: m.description,
-      publishDate: m.publishDate,
-      thumbnail: m.thumbnail,
-      duration: m.duration,
-      permanentUrl: m.permanentUrl,
-      audioUrl: m.audioUrl ?? null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+      playlistId: model.playlistId,
+      videoType: model.videoType,
+      videoData: model.videoData,
+      videoUrl: model.videoUrl,
+      title: model.title,
+      description: model.description,
+      publishDate,
+      thumbnail: model.thumbnail,
+      duration: model.duration,
+      permanentUrl: model.permanentUrl,
+      audioUrl: model.audioUrl ?? null
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -64,14 +62,14 @@ export class SermonRepo {
   }
 
   public async loadAll(churchId: string): Promise<Sermon[]> {
-    return getDb().selectFrom("sermons").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
+    return getDb().selectFrom("sermons").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute();
   }
 
   public async loadPublicAll(churchId: string): Promise<Sermon[]> {
     return getDb().selectFrom("sermons").selectAll()
       .where("churchId", "=", churchId)
       .where((eb) => eb.or([eb("publishDate", "is", null), eb("publishDate", "<=", sql<Date>`NOW()`)]))
-      .orderBy("publishDate", "desc").execute() as any;
+      .orderBy("publishDate", "desc").execute();
   }
 
   public async loadTimeline(churchId: string, sermonIds: string[]) {
@@ -83,10 +81,10 @@ export class SermonRepo {
     return result.rows;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Sermon; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Sermon[]; }
+  public convertToModel(_churchId: string, data: Sermon) { return data; }
+  public convertAllToModel(_churchId: string, data: Sermon[]) { return data || []; }
 
-  protected rowToModel(row: any): Sermon {
+  protected rowToModel(row: Sermon): Sermon {
     return {
       id: row.id,
       churchId: row.churchId,

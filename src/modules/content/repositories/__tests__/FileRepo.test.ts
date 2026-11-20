@@ -6,12 +6,12 @@ import { getDb } from "../../db/index.js";
 import { FileRepo } from "../FileRepo.js";
 
 function recordingDb() {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
-      if (prop === "execute" || prop === "executeTakeFirst") return async () => [];
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      if (prop === "execute" || prop === "executeTakeFirst") return async (): Promise<unknown[]> => [];
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };

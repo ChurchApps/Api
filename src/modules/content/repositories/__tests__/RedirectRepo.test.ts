@@ -5,16 +5,16 @@ jest.mock("@churchapps/apihelper", () => ({ UniqueIdHelper: { shortId: () => "ge
 import { getDb } from "../../db/index.js";
 import { RedirectRepo } from "../RedirectRepo.js";
 
-function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy(
+function recordingDb(results: { execute?: unknown; executeTakeFirst?: unknown } = {}) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy(
     {},
     {
       get(_t, prop) {
         if (typeof prop === "symbol" || prop === "then") return undefined;
         if (prop === "execute") return async () => results.execute ?? [];
         if (prop === "executeTakeFirst") return async () => results.executeTakeFirst ?? null;
-        return (...args: any[]) => {
+        return (...args: unknown[]) => {
           calls.push({ method: prop as string, args });
           return proxy;
         };
@@ -24,8 +24,8 @@ function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
   return { proxy, calls };
 }
 
-const firstArg = (calls: { method: string; args: any[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
-const whereCalls = (calls: { method: string; args: any[] }[]) => calls.filter((c) => c.method === "where");
+const firstArg = (calls: { method: string; args: unknown[] }[], method: string) => calls.find((c) => c.method === method)?.args[0] as Record<string, unknown>;
+const whereCalls = (calls: { method: string; args: unknown[] }[]) => calls.filter((c) => c.method === "where");
 
 describe("RedirectRepo.normalizePath", () => {
   it("adds a leading slash and lowercases", () => {

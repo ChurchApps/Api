@@ -17,7 +17,7 @@ export class ArrangementKeyRepo {
       arrangementId: model.arrangementId,
       keySignature: model.keySignature,
       shortDescription: model.shortDescription
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -39,7 +39,7 @@ export class ArrangementKeyRepo {
   }
 
   public async loadAll(churchId: string): Promise<ArrangementKey[]> {
-    return getDb().selectFrom("arrangementKeys").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("arrangementKeys").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async deleteForArrangement(churchId: string, arrangementId: string) {
@@ -47,13 +47,13 @@ export class ArrangementKeyRepo {
   }
 
   public async loadByArrangementId(churchId: string, arrangementId: string) {
-    return getDb().selectFrom("arrangementKeys").selectAll().where("churchId", "=", churchId).where("arrangementId", "=", arrangementId).execute() as any;
+    return getDb().selectFrom("arrangementKeys").selectAll().where("churchId", "=", churchId).where("arrangementId", "=", arrangementId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as ArrangementKey; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as ArrangementKey[]; }
+  public convertToModel(_churchId: string, data: ArrangementKey) { return data; }
+  public convertAllToModel(_churchId: string, data: ArrangementKey[]) { return data || []; }
 
-  protected rowToModel(row: any): ArrangementKey {
+  protected rowToModel(row: ArrangementKey): ArrangementKey {
     return {
       id: row.id,
       churchId: row.churchId,

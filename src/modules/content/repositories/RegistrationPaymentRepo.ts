@@ -11,24 +11,22 @@ export class RegistrationPaymentRepo {
 
   private async create(model: RegistrationPayment): Promise<RegistrationPayment> {
     model.id = UniqueIdHelper.shortId();
-    const m: any = { ...model };
-    if (!m.createdDate) m.createdDate = new Date();
-    m.createdDate = DateHelper.toMysqlDate(m.createdDate);
+    const createdDate = DateHelper.toMysqlDate(model.createdDate || new Date());
     await getDb().insertInto("registrationPayments").values({
       id: model.id,
       churchId: model.churchId,
       registrationId: model.registrationId,
-      gatewayId: m.gatewayId ?? null,
-      provider: m.provider ?? null,
-      transactionId: m.transactionId ?? null,
-      method: m.method ?? null,
-      amount: m.amount ?? null,
-      currency: m.currency ?? null,
-      kind: m.kind ?? "charge",
-      status: m.status ?? null,
-      personId: m.personId ?? null,
-      createdDate: m.createdDate
-    } as any).execute();
+      gatewayId: model.gatewayId ?? null,
+      provider: model.provider ?? null,
+      transactionId: model.transactionId ?? null,
+      method: model.method ?? null,
+      amount: model.amount ?? null,
+      currency: model.currency ?? null,
+      kind: model.kind ?? "charge",
+      status: model.status ?? null,
+      personId: model.personId ?? null,
+      createdDate
+    }).execute();
     return model;
   }
 
@@ -37,7 +35,7 @@ export class RegistrationPaymentRepo {
       status: model.status ?? null,
       transactionId: model.transactionId ?? null,
       amount: model.amount ?? null
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -49,7 +47,7 @@ export class RegistrationPaymentRepo {
     return getDb().selectFrom("registrationPayments").selectAll()
       .where("churchId", "=", churchId)
       .where("registrationId", "=", registrationId)
-      .orderBy("createdDate").execute() as any;
+      .orderBy("createdDate").execute();
   }
 
   public async deleteForRegistration(churchId: string, registrationId: string): Promise<void> {
@@ -58,6 +56,6 @@ export class RegistrationPaymentRepo {
       .where("registrationId", "=", registrationId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as RegistrationPayment; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationPayment[]; }
+  public convertToModel(_churchId: string, data: RegistrationPayment) { return data; }
+  public convertAllToModel(_churchId: string, data: RegistrationPayment[]) { return data || []; }
 }

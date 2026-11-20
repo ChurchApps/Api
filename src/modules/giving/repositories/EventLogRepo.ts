@@ -5,10 +5,11 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { EventLog } from "../models/index.js";
 
 // MySQL duplicate-key (errno 1062 / ER_DUP_ENTRY) surfaced through mysql2/kysely.
-export function isDuplicateKeyError(err: any): boolean {
-  return err?.errno === 1062
-    || err?.code === "ER_DUP_ENTRY"
-    || /duplicate entry/i.test(err?.message || "");
+export function isDuplicateKeyError(err: unknown): boolean {
+  const e = err as { errno?: number; code?: string; message?: string } | null | undefined;
+  return e?.errno === 1062
+    || e?.code === "ER_DUP_ENTRY"
+    || /duplicate entry/i.test(e?.message || "");
 }
 
 @injectable()
@@ -40,12 +41,12 @@ export class EventLogRepo {
       status: model.status,
       created: model.created,
       resolved: false
-    } as any).execute();
+    }).execute();
     return model;
   }
 
   private async update(model: EventLog): Promise<EventLog> {
-    await getDb().updateTable("eventLogs").set({ resolved: model.resolved } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    await getDb().updateTable("eventLogs").set({ resolved: model.resolved }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -66,8 +67,8 @@ export class EventLogRepo {
     return row ? this.rowToModel(row) : null;
   }
 
-  public async loadByType(churchId: string, status: string) {
-    const result = await sql<any>`
+  public async loadByType(churchId: string, status: string): Promise<EventLog[]> {
+    const result = await sql<EventLog>`
       SELECT eventLogs.*, customers.personId
       FROM eventLogs
       LEFT JOIN customers ON customers.id = eventLogs.customerId AND customers.churchId = eventLogs.churchId
@@ -77,19 +78,19 @@ export class EventLogRepo {
     return result.rows;
   }
 
-  public async loadAll(churchId: string) {
+  public async loadAll(churchId: string): Promise<EventLog[]> {
     return getDb().selectFrom("eventLogs").selectAll().where("churchId", "=", churchId).orderBy("created", "desc").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: EventLog) {
     return data ? this.rowToModel(data) : null;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: EventLog[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 
-  private rowToModel(row: any): EventLog {
+  private rowToModel(row: EventLog): EventLog {
     return { ...row };
   }
 }

@@ -5,23 +5,24 @@ jest.mock("@churchapps/apihelper", () => ({
   DateHelper: { toMysqlDate: (d: Date) => new Date(d).toISOString().slice(0, 19).replace("T", " ") }
 }));
 
+import { sql, type RawBuilder } from "kysely";
 import { getDb } from "../../db/index.js";
 import { EventRsvpRepo } from "../EventRsvpRepo.js";
 
-function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy({}, {
+function recordingDb(results: { execute?: unknown; executeTakeFirst?: unknown } = {}) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy({}, {
     get(_t, prop) {
       if (typeof prop === "symbol" || prop === "then") return undefined;
       if (prop === "execute") return async () => results.execute ?? [];
       if (prop === "executeTakeFirst") return async () => results.executeTakeFirst ?? null;
-      return (...args: any[]) => { calls.push({ method: prop as string, args }); return proxy; };
+      return (...args: unknown[]) => { calls.push({ method: prop as string, args }); return proxy; };
     }
   });
   return { proxy, calls };
 }
 
-const firstArg = (calls: { method: string; args: any[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
+const firstArg = (calls: { method: string; args: unknown[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
 
 describe("EventRsvpRepo upsert", () => {
   afterEach(() => jest.restoreAllMocks());
@@ -52,8 +53,9 @@ describe("EventRsvpRepo upsert", () => {
     (getDb as jest.Mock).mockReturnValue(proxy);
     await new EventRsvpRepo().deleteOwn("c1", "e1", "p1", base.occurrenceStart);
     expect(firstArg(calls, "deleteFrom")).toBe("eventRsvps");
-    const wheres = calls.filter((c) => c.method === "where").map((c) => c.args[0]);
-    expect(wheres).toEqual(expect.arrayContaining(["churchId", "eventId", "personId", "occurrenceStart"]));
+    // occurrenceStart is compared in its stored string form, so it is passed as sql.ref("occurrenceStart").
+    const wheres = calls.filter((c) => c.method === "where").map((c) => (typeof c.args[0] === "string" ? c.args[0] : (c.args[0] as RawBuilder<unknown>).toOperationNode()));
+    expect(wheres).toEqual(expect.arrayContaining(["churchId", "eventId", "personId", sql.ref("occurrenceStart").toOperationNode()]));
   });
 
   it("loadForGroupWindow joins events and filters by groupId + window", async () => {

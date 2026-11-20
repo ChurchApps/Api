@@ -1,4 +1,5 @@
 import { injectable } from "inversify";
+import { sql } from "kysely";
 import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { StreamingService } from "../models/index.js";
@@ -26,7 +27,7 @@ export class StreamingServiceRepo {
       recurring: model.recurring,
       label: model.label,
       sermonId: model.sermonId
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -44,7 +45,7 @@ export class StreamingServiceRepo {
       recurring: model.recurring,
       label: model.label,
       sermonId: model.sermonId
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -57,7 +58,7 @@ export class StreamingServiceRepo {
   }
 
   public async loadAll(churchId: string): Promise<StreamingService[]> {
-    return getDb().selectFrom("streamingServices").selectAll().where("churchId", "=", churchId).orderBy("serviceTime").execute() as any;
+    return getDb().selectFrom("streamingServices").selectAll().where("churchId", "=", churchId).orderBy("serviceTime").execute();
   }
 
   public async loadById(id: string, churchId: string): Promise<StreamingService | undefined> {
@@ -66,20 +67,20 @@ export class StreamingServiceRepo {
 
   // Recurring services, optionally only those whose next start is already before `before`.
   public async loadAllRecurring(before?: Date): Promise<StreamingService[]> {
-    let query = getDb().selectFrom("streamingServices").selectAll().where("recurring", "=", 1 as any);
-    if (before) query = query.where("serviceTime", "<", DateHelper.toMysqlDate(before) as any);
-    return query.orderBy("serviceTime").execute() as any;
+    let query = getDb().selectFrom("streamingServices").selectAll().where(sql.ref<number>("recurring"), "=", 1);
+    if (before) query = query.where(sql.ref<string>("serviceTime"), "<", DateHelper.toMysqlDate(before));
+    return query.orderBy("serviceTime").execute();
   }
 
   public async updateServiceTime(id: string, churchId: string, serviceTime: Date): Promise<void> {
-    await getDb().updateTable("streamingServices").set({ serviceTime: DateHelper.toMysqlDate(serviceTime) } as any)
+    await getDb().updateTable("streamingServices").set({ serviceTime: DateHelper.toMysqlDate(serviceTime) })
       .where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as StreamingService; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as StreamingService[]; }
+  public convertToModel(_churchId: string, data: StreamingService) { return data; }
+  public convertAllToModel(_churchId: string, data: StreamingService[]) { return data || []; }
 
-  protected rowToModel(row: any): StreamingService {
+  protected rowToModel(row: StreamingService): StreamingService {
     return {
       id: row.id,
       churchId: row.churchId,

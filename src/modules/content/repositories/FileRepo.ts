@@ -21,8 +21,8 @@ export class FileRepo {
       size: model.size,
       provider: model.provider,
       externalId: model.externalId,
-      dateModified: sql`NOW()` as any
-    } as any).execute();
+      dateModified: sql<Date>`NOW()`
+    }).execute();
     return model;
   }
 
@@ -37,7 +37,7 @@ export class FileRepo {
       provider: model.provider,
       externalId: model.externalId,
       dateModified: model.dateModified
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -67,31 +67,31 @@ export class FileRepo {
       .where("churchId", "=", churchId)
       .where("provider", "=", provider)
       .executeTakeFirst();
-    return Number((result as any)?.total || 0);
+    return Number(result?.total || 0);
   }
 
   public async loadAll(churchId: string): Promise<File[]> {
-    return getDb().selectFrom("files").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("files").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async loadByIds(churchId: string, ids: string[]): Promise<File[]> {
     if (!ids || ids.length === 0) return [];
     return getDb().selectFrom("files").selectAll()
       .where("churchId", "=", churchId)
-      .where("id", "in", ids).execute() as any;
+      .where("id", "in", ids).execute();
   }
 
   public async loadForContent(churchId: string, contentType: string, contentId: string): Promise<File[]> {
     return getDb().selectFrom("files").selectAll()
       .where("churchId", "=", churchId)
       .where("contentType", "=", contentType)
-      .where("contentId", "=", contentId).execute() as any;
+      .where("contentId", "=", contentId).execute();
   }
 
   public async loadForWebsite(churchId: string): Promise<File[]> {
     return getDb().selectFrom("files").selectAll()
       .where("churchId", "=", churchId)
-      .where("contentType", "=", "website").execute() as any;
+      .where("contentType", "=", "website").execute();
   }
 
   public async loadTotalBytes(churchId: string, contentType: string, contentId: string): Promise<{ size: number }> {
@@ -101,9 +101,9 @@ export class FileRepo {
       .where("contentType", "=", contentType)
       .where("contentId", "=", contentId)
       .executeTakeFirst();
-    return result as any;
+    return result;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as File; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as File[]; }
+  public convertToModel(_churchId: string, data: File) { return data; }
+  public convertAllToModel(_churchId: string, data: File[]) { return data || []; }
 }

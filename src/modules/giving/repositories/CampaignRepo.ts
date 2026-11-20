@@ -5,6 +5,7 @@ import { UniqueIdHelper } from "@churchapps/apihelper";
 import { DateHelper } from "../../../shared/helpers/DateHelper.js";
 import { Campaign } from "../models/index.js";
 import { GivingTotal } from "../helpers/CampaignHelper.js";
+import type { CampaignRow } from "./types.js";
 
 @injectable()
 export class CampaignRepo {
@@ -27,7 +28,7 @@ export class CampaignRepo {
       showPublic: campaign.showPublic ? 1 : 0,
       allowSelfPledge: campaign.allowSelfPledge ? 1 : 0,
       removed: 0
-    } as any).execute();
+    }).execute();
     return campaign;
   }
 
@@ -41,32 +42,32 @@ export class CampaignRepo {
       endDate: DateHelper.toMysqlDateOnly(campaign.endDate),
       showPublic: campaign.showPublic ? 1 : 0,
       allowSelfPledge: campaign.allowSelfPledge ? 1 : 0
-    } as any).where("id", "=", campaign.id).where("churchId", "=", campaign.churchId).execute();
+    }).where("id", "=", campaign.id).where("churchId", "=", campaign.churchId).execute();
     return campaign;
   }
 
   public async delete(churchId: string, id: string) {
     // Soft delete
-    await getDb().updateTable("campaigns").set({ removed: 1 } as any).where("id", "=", id).where("churchId", "=", churchId).execute();
+    await getDb().updateTable("campaigns").set({ removed: 1 }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
-  public async load(churchId: string, id: string) {
-    return (await (getDb().selectFrom("campaigns").selectAll().where("id", "=", id).where("churchId", "=", churchId) as any).where(sql.ref("removed"), "=", 0).executeTakeFirst()) ?? null;
+  public async load(churchId: string, id: string): Promise<CampaignRow | null> {
+    return (await getDb().selectFrom("campaigns").selectAll().where("id", "=", id).where("churchId", "=", churchId).where(sql.ref<number>("removed"), "=", 0).executeTakeFirst()) ?? null;
   }
 
-  public async loadAll(churchId: string) {
-    const rows = await (getDb().selectFrom("campaigns").selectAll()
-      .where("churchId", "=", churchId) as any)
-      .where(sql.ref("removed"), "=", 0)
+  public async loadAll(churchId: string): Promise<CampaignRow[]> {
+    const rows = await getDb().selectFrom("campaigns").selectAll()
+      .where("churchId", "=", churchId)
+      .where(sql.ref<number>("removed"), "=", 0)
       .orderBy("startDate")
       .orderBy("name")
       .execute();
     return rows;
   }
 
-  public async loadPublic(churchId: string) {
+  public async loadPublic(churchId: string): Promise<CampaignRow[]> {
     const today = DateHelper.today();
-    const result = await sql<any>`
+    const result = await sql<CampaignRow>`
       SELECT * FROM campaigns
       WHERE churchId = ${churchId} AND removed = 0 AND showPublic = 1
         AND (endDate IS NULL OR endDate >= ${today})
@@ -75,7 +76,7 @@ export class CampaignRepo {
   }
 
   public async loadGivingTotals(churchId: string, campaignId?: string, personId?: string): Promise<GivingTotal[]> {
-    const result = await sql<any>`
+    const result = await sql<{ campaignId: string; personId: string | null; amount: number | string | null }>`
       SELECT c.id AS campaignId, d.personId, SUM(fd.amount) AS amount
       FROM campaigns c
       INNER JOIN fundDonations fd ON fd.churchId = c.churchId AND fd.fundId = c.fundId
@@ -87,10 +88,10 @@ export class CampaignRepo {
         ${campaignId ? sql`AND c.id = ${campaignId}` : sql``}
         ${personId ? sql`AND d.personId = ${personId}` : sql``}
       GROUP BY c.id, d.personId`.execute(getDb());
-    return result.rows.map((r: any) => ({ campaignId: r.campaignId, personId: r.personId ?? null, amount: Number(r.amount) || 0 }));
+    return result.rows.map((r) => ({ campaignId: r.campaignId, personId: r.personId ?? null, amount: Number(r.amount) || 0 }));
   }
 
-  private rowToModel(data: any): Campaign {
+  private rowToModel(data: CampaignRow): Campaign {
     return {
       id: data.id,
       churchId: data.churchId,
@@ -105,11 +106,11 @@ export class CampaignRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: CampaignRow) {
     return data ? this.rowToModel(data) : null;
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: CampaignRow[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

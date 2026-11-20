@@ -8,16 +8,16 @@ import { ArrangementRepo } from "../ArrangementRepo.js";
 import { SongDetailRepo } from "../SongDetailRepo.js";
 
 // Records Kysely builder calls for assertion without DB execution.
-function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy(
+function recordingDb(results: { execute?: unknown; executeTakeFirst?: unknown } = {}) {
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy(
     {},
     {
       get(_t, prop) {
         if (typeof prop === "symbol" || prop === "then") return undefined;
         if (prop === "execute") return async () => results.execute ?? [];
         if (prop === "executeTakeFirst") return async () => results.executeTakeFirst ?? null;
-        return (...args: any[]) => {
+        return (...args: unknown[]) => {
           calls.push({ method: prop as string, args });
           return proxy;
         };
@@ -27,7 +27,7 @@ function recordingDb(results: { execute?: any; executeTakeFirst?: any } = {}) {
   return { proxy, calls };
 }
 
-const firstArg = (calls: { method: string; args: any[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
+const firstArg = (calls: { method: string; args: unknown[] }[], method: string) => calls.find((c) => c.method === method)?.args[0];
 
 describe("SongRepo persists song identity (songDetailId)", () => {
   afterEach(() => jest.restoreAllMocks());

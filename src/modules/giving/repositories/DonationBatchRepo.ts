@@ -21,7 +21,7 @@ export class DonationBatchRepo {
       name: batch.name,
       batchDate,
       status: "open"
-    } as any).execute();
+    }).execute();
     batch.status = "open";
     return batch;
   }
@@ -31,7 +31,7 @@ export class DonationBatchRepo {
     await getDb().updateTable("donationBatches").set({
       name: batch.name,
       batchDate
-    } as any).where("id", "=", batch.id).where("churchId", "=", batch.churchId).execute();
+    }).where("id", "=", batch.id).where("churchId", "=", batch.churchId).execute();
     return batch;
   }
 
@@ -42,7 +42,7 @@ export class DonationBatchRepo {
       status,
       closedDate: closed ? new Date() : null,
       closedBy: closed ? userId || null : null
-    } as any).where("id", "=", id).where("churchId", "=", churchId).execute();
+    }).where("id", "=", id).where("churchId", "=", churchId).execute();
   }
 
   public async delete(churchId: string, id: string) {
@@ -70,7 +70,7 @@ export class DonationBatchRepo {
   }
 
   public async loadAll(churchId: string) {
-    const result = await sql<any>`
+    const result = await sql<DonationBatch>`
       SELECT db.*,
         IFNULL(d.donationCount, 0) AS donationCount,
         IFNULL(d.totalAmount, 0) AS totalAmount
@@ -90,7 +90,7 @@ export class DonationBatchRepo {
   // A null currency is left as-is; the caller treats it as the church currency.
   public async loadAmountsByCurrency(churchId: string, batchId?: string) {
     const batchFilter = batchId ? sql`AND batchId = ${batchId}` : sql``;
-    const amounts = await sql<any>`
+    const amounts = await sql<{ batchId: string; currency: string | null; donationCount: number | string; amount: number | string }>`
       SELECT batchId, currency, COUNT(*) AS donationCount, SUM(amount) AS amount
       FROM donations
       WHERE churchId = ${churchId}
@@ -106,7 +106,7 @@ export class DonationBatchRepo {
     return amountsByBatch;
   }
 
-  private rowToModel(data: any): DonationBatch {
+  private rowToModel(data: DonationBatch): DonationBatch {
     return {
       id: data.id,
       name: data.name,
@@ -119,11 +119,11 @@ export class DonationBatchRepo {
     };
   }
 
-  public convertToModel(_churchId: string, data: any) {
+  public convertToModel(_churchId: string, data: DonationBatch) {
     return this.rowToModel(data);
   }
 
-  public convertAllToModel(_churchId: string, data: any[]) {
-    return data.map((d: any) => this.rowToModel(d));
+  public convertAllToModel(_churchId: string, data: DonationBatch[]) {
+    return data.map((d) => this.rowToModel(d));
   }
 }

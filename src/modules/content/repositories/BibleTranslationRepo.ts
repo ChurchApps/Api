@@ -24,7 +24,7 @@ export class BibleTranslationRepo {
       copyright: model.copyright,
       attributionRequired: model.attributionRequired,
       attributionString: model.attributionString
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -53,7 +53,7 @@ export class BibleTranslationRepo {
     return (await getDb().selectFrom("bibleTranslations").selectAll().where("id", "=", id).executeTakeFirst()) ?? null;
   }
 
-  public async loadBySourceKey(source: string | null, sourceKey: string) {
+  public async loadBySourceKey(source: string | null, sourceKey: string): Promise<BibleTranslation | undefined> {
     if (source) {
       return (await getDb().selectFrom("bibleTranslations").selectAll()
         .where("source", "=", source)
@@ -65,18 +65,18 @@ export class BibleTranslationRepo {
       .executeTakeFirst()) ?? null;
   }
 
-  public async loadByAbbreviation(abbreviation: string) {
+  public async loadByAbbreviation(abbreviation: string): Promise<BibleTranslation | undefined> {
     return (await getDb().selectFrom("bibleTranslations").selectAll()
       .where("abbreviation", "=", abbreviation)
       .executeTakeFirst()) ?? null;
   }
 
-  public async loadAll() {
-    return getDb().selectFrom("bibleTranslations").selectAll().orderBy("name").execute() as any;
+  public async loadAll(): Promise<BibleTranslation[]> {
+    return getDb().selectFrom("bibleTranslations").selectAll().orderBy("name").execute();
   }
 
-  public async loadNeedingCopyrights() {
-    return getDb().selectFrom("bibleTranslations").selectAll().where("copyright", "is", null).execute() as any;
+  public async loadNeedingCopyrights(): Promise<BibleTranslation[]> {
+    return getDb().selectFrom("bibleTranslations").selectAll().where("copyright", "is", null).execute();
   }
 
   public async saveAll(models: BibleTranslation[]) {
@@ -84,10 +84,10 @@ export class BibleTranslationRepo {
     return Promise.all(promises);
   }
 
-  public convertToModel(data: any) { return data as BibleTranslation; }
-  public convertAllToModel(data: any[]) { return (data || []) as BibleTranslation[]; }
+  public convertToModel(data: BibleTranslation) { return data; }
+  public convertAllToModel(data: BibleTranslation[]) { return data || []; }
 
-  protected rowToModel(row: any): BibleTranslation {
+  protected rowToModel(row: BibleTranslation): BibleTranslation {
     return {
       id: row.id,
       abbreviation: row.abbreviation,

@@ -23,7 +23,7 @@ export class GlobalStyleRepo {
       navStyles: model.navStyles,
       customCss: model.customCss,
       customJS: model.customJS
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -51,7 +51,7 @@ export class GlobalStyleRepo {
   }
 
   public async loadAll(churchId: string): Promise<GlobalStyle[]> {
-    return getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).execute() as any;
+    return getDb().selectFrom("globalStyles").selectAll().where("churchId", "=", churchId).execute();
   }
 
   public async loadForChurch(churchId: string, siteId = ""): Promise<GlobalStyle | undefined> {
@@ -65,10 +65,10 @@ export class GlobalStyleRepo {
     return null;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as GlobalStyle; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as GlobalStyle[]; }
+  public convertToModel(_churchId: string, data: GlobalStyle) { return data; }
+  public convertAllToModel(_churchId: string, data: GlobalStyle[]) { return data || []; }
 
-  protected rowToModel(row: any): GlobalStyle {
+  protected rowToModel(row: GlobalStyle): GlobalStyle {
     return {
       id: row.id,
       churchId: row.churchId,

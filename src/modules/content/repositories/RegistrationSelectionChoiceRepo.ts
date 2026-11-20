@@ -3,6 +3,7 @@ import { sql } from "kysely";
 import { getDb } from "../db/index.js";
 import { RegistrationSelectionChoice } from "../models/index.js";
 import { injectable } from "inversify";
+import type { MysqlWriteResult } from "./types.js";
 
 @injectable()
 export class RegistrationSelectionChoiceRepo {
@@ -19,7 +20,7 @@ export class RegistrationSelectionChoiceRepo {
       registrationMemberId: model.registrationMemberId ?? null,
       selectionId: model.selectionId,
       quantity: model.quantity ?? 1
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -28,7 +29,7 @@ export class RegistrationSelectionChoiceRepo {
       registrationMemberId: model.registrationMemberId ?? null,
       selectionId: model.selectionId,
       quantity: model.quantity ?? 1
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -39,7 +40,7 @@ export class RegistrationSelectionChoiceRepo {
   public async loadForRegistration(churchId: string, registrationId: string): Promise<RegistrationSelectionChoice[]> {
     return getDb().selectFrom("registrationSelectionChoices").selectAll()
       .where("churchId", "=", churchId)
-      .where("registrationId", "=", registrationId).execute() as any;
+      .where("registrationId", "=", registrationId).execute();
   }
 
   public async deleteForRegistration(churchId: string, registrationId: string): Promise<void> {
@@ -59,7 +60,7 @@ export class RegistrationSelectionChoiceRepo {
       return true;
     }
 
-    const result: any = await sql`INSERT INTO registrationSelectionChoices (id, churchId, registrationId, registrationMemberId, selectionId, quantity)
+    const result: MysqlWriteResult = await sql`INSERT INTO registrationSelectionChoices (id, churchId, registrationId, registrationMemberId, selectionId, quantity)
       SELECT ${model.id}, ${model.churchId}, ${model.registrationId}, ${model.registrationMemberId || null}, ${model.selectionId}, ${qty}
       FROM dual
       WHERE (SELECT COALESCE(SUM(c.quantity),0) FROM registrationSelectionChoices c JOIN registrations r ON r.id=c.registrationId
@@ -67,6 +68,6 @@ export class RegistrationSelectionChoiceRepo {
     return result?.numAffectedRows > 0n || result?.affectedRows > 0;
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as RegistrationSelectionChoice; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as RegistrationSelectionChoice[]; }
+  public convertToModel(_churchId: string, data: RegistrationSelectionChoice) { return data; }
+  public convertAllToModel(_churchId: string, data: RegistrationSelectionChoice[]) { return data || []; }
 }

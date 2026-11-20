@@ -25,7 +25,7 @@ export class PostRepo {
       publishDate: model.publishDate,
       category: model.category,
       tags: model.tags
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -40,7 +40,7 @@ export class PostRepo {
       publishDate: model.publishDate,
       category: model.category,
       tags: model.tags
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -53,7 +53,7 @@ export class PostRepo {
   }
 
   public async loadAll(churchId: string): Promise<Post[]> {
-    return getDb().selectFrom("posts").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
+    return getDb().selectFrom("posts").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute();
   }
 
   public async loadBySlug(churchId: string, slug: string): Promise<Post | undefined> {
@@ -85,7 +85,7 @@ export class PostRepo {
     query = query.orderBy("publishDate", "desc");
     if (options.limit) query = query.limit(options.limit);
     if (options.offset) query = query.offset(options.offset);
-    return query.execute() as any;
+    return query.execute();
   }
 
   public async loadPublishedCategories(churchId: string): Promise<string[]> {
@@ -97,9 +97,9 @@ export class PostRepo {
       .where("category", "!=", "")
       .orderBy("category")
       .execute();
-    return rows.map((r: any) => r.category);
+    return rows.map((r) => r.category);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Post; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Post[]; }
+  public convertToModel(_churchId: string, data: Post) { return data; }
+  public convertAllToModel(_churchId: string, data: Post[]) { return data || []; }
 }

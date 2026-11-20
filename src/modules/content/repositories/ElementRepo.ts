@@ -22,7 +22,7 @@ export class ElementRepo {
       answersJSON: model.answersJSON,
       stylesJSON: model.stylesJSON,
       animationsJSON: model.animationsJSON
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -49,7 +49,7 @@ export class ElementRepo {
   }
 
   public async loadAll(churchId: string): Promise<Element[]> {
-    return getDb().selectFrom("elements").selectAll().where("churchId", "=", churchId).orderBy("sort").execute() as any;
+    return getDb().selectFrom("elements").selectAll().where("churchId", "=", churchId).orderBy("sort").execute();
   }
 
   public async updateSortForBlock(churchId: string, blockId: string, parentId: string) {
@@ -91,14 +91,14 @@ export class ElementRepo {
     return getDb().selectFrom("elements").selectAll()
       .where("churchId", "=", churchId)
       .where("sectionId", "=", sectionId)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   public async loadForBlock(churchId: string, blockId: string) {
     return getDb().selectFrom("elements").selectAll()
       .where("churchId", "=", churchId)
       .where("blockId", "=", blockId)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
   public async loadForBlocks(churchId: string, blockIds: string[]) {
@@ -106,10 +106,10 @@ export class ElementRepo {
     return getDb().selectFrom("elements").selectAll()
       .where("churchId", "=", churchId)
       .where("blockId", "in", blockIds)
-      .orderBy("sort").execute() as any;
+      .orderBy("sort").execute();
   }
 
-  public async loadForPage(churchId: string, pageId: string) {
+  public async loadForPage(churchId: string, pageId: string): Promise<Element[]> {
     const result = await getDb().selectFrom("elements as e")
       .innerJoin("sections as s", "s.id", "e.sectionId")
       .selectAll("e")
@@ -120,17 +120,17 @@ export class ElementRepo {
       .where("e.churchId", "=", churchId)
       .orderBy("e.sort")
       .execute();
-    return result as any;
+    return result;
   }
 
   public async insert(model: Element): Promise<Element> {
     return this.create(model);
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Element; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Element[]; }
+  public convertToModel(_churchId: string, data: Element) { return data; }
+  public convertAllToModel(_churchId: string, data: Element[]) { return data || []; }
 
-  protected rowToModel(row: any): Element {
+  protected rowToModel(row: Element): Element {
     return {
       id: row.id,
       churchId: row.churchId,

@@ -2,6 +2,7 @@ import { DateHelper, UniqueIdHelper } from "@churchapps/apihelper";
 import { getDb } from "../db/index.js";
 import { CalendarBlockout } from "../models/index.js";
 import { injectable } from "inversify";
+import { sql } from "kysely";
 
 @injectable()
 export class CalendarBlockoutRepo {
@@ -19,7 +20,7 @@ export class CalendarBlockoutRepo {
       startTime: model.startTime ? DateHelper.toMysqlDate(model.startTime) : null,
       endTime: model.endTime ? DateHelper.toMysqlDate(model.endTime) : null,
       reason: model.reason
-    } as any).execute();
+    }).execute();
     return model;
   }
 
@@ -30,7 +31,7 @@ export class CalendarBlockoutRepo {
       startTime: model.startTime ? DateHelper.toMysqlDate(model.startTime) : null,
       endTime: model.endTime ? DateHelper.toMysqlDate(model.endTime) : null,
       reason: model.reason
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -43,18 +44,18 @@ export class CalendarBlockoutRepo {
   }
 
   public async loadAll(churchId: string): Promise<CalendarBlockout[]> {
-    return getDb().selectFrom("calendarBlockouts").selectAll().where("churchId", "=", churchId).orderBy("startTime").execute() as any;
+    return getDb().selectFrom("calendarBlockouts").selectAll().where("churchId", "=", churchId).orderBy("startTime").execute();
   }
 
   // Blockouts relevant to a window: church-wide ones plus those for the given rooms/resources.
   public async loadOverlapping(churchId: string, windowStart: Date, windowEnd: Date): Promise<CalendarBlockout[]> {
     return getDb().selectFrom("calendarBlockouts").selectAll()
       .where("churchId", "=", churchId)
-      .where("startTime", "<", DateHelper.toMysqlDate(windowEnd) as any)
-      .where("endTime", ">", DateHelper.toMysqlDate(windowStart) as any)
-      .execute() as any;
+      .where(sql.ref<string>("startTime"), "<", DateHelper.toMysqlDate(windowEnd))
+      .where(sql.ref<string>("endTime"), ">", DateHelper.toMysqlDate(windowStart))
+      .execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as CalendarBlockout; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as CalendarBlockout[]; }
+  public convertToModel(_churchId: string, data: CalendarBlockout) { return data; }
+  public convertAllToModel(_churchId: string, data: CalendarBlockout[]) { return data || []; }
 }

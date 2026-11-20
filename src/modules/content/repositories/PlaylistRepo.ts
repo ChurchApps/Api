@@ -11,28 +11,26 @@ export class PlaylistRepo {
 
   private async create(model: Playlist): Promise<Playlist> {
     model.id = UniqueIdHelper.shortId();
-    const m: any = { ...model };
-    if (m.publishDate) m.publishDate = DateHelper.toMysqlDate(m.publishDate);
+    const publishDate = model.publishDate ? DateHelper.toMysqlDate(model.publishDate) : model.publishDate;
     await getDb().insertInto("playlists").values({
       id: model.id,
       churchId: model.churchId,
-      title: m.title,
-      description: m.description,
-      publishDate: m.publishDate,
-      thumbnail: m.thumbnail
-    } as any).execute();
+      title: model.title,
+      description: model.description,
+      publishDate,
+      thumbnail: model.thumbnail
+    }).execute();
     return model;
   }
 
   private async update(model: Playlist): Promise<Playlist> {
-    const m: any = { ...model };
-    if (m.publishDate) m.publishDate = DateHelper.toMysqlDate(m.publishDate);
+    const publishDate = model.publishDate ? DateHelper.toMysqlDate(model.publishDate) : model.publishDate;
     await getDb().updateTable("playlists").set({
-      title: m.title,
-      description: m.description,
-      publishDate: m.publishDate,
-      thumbnail: m.thumbnail
-    } as any).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
+      title: model.title,
+      description: model.description,
+      publishDate,
+      thumbnail: model.thumbnail
+    }).where("id", "=", model.id).where("churchId", "=", model.churchId).execute();
     return model;
   }
 
@@ -49,17 +47,17 @@ export class PlaylistRepo {
   }
 
   public async loadAll(churchId: string): Promise<Playlist[]> {
-    return getDb().selectFrom("playlists").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
+    return getDb().selectFrom("playlists").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute();
   }
 
   public async loadPublicAll(churchId: string): Promise<Playlist[]> {
-    return getDb().selectFrom("playlists").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute() as any;
+    return getDb().selectFrom("playlists").selectAll().where("churchId", "=", churchId).orderBy("publishDate", "desc").execute();
   }
 
-  public convertToModel(_churchId: string, data: any) { return data as Playlist; }
-  public convertAllToModel(_churchId: string, data: any[]) { return (data || []) as Playlist[]; }
+  public convertToModel(_churchId: string, data: Playlist) { return data; }
+  public convertAllToModel(_churchId: string, data: Playlist[]) { return data || []; }
 
-  protected rowToModel(row: any): Playlist {
+  protected rowToModel(row: Playlist): Playlist {
     return {
       id: row.id,
       churchId: row.churchId,

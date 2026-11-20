@@ -6,14 +6,14 @@ import { getDb } from "../../db/index.js";
 import { CuratedEventRepo } from "../CuratedEventRepo.js";
 
 function recordingDb() {
-  const calls: { method: string; args: any[] }[] = [];
-  const proxy: any = new Proxy(
+  const calls: { method: string; args: unknown[] }[] = [];
+  const proxy: Record<string, unknown> = new Proxy(
     {},
     {
       get(_t, prop) {
         if (typeof prop === "symbol" || prop === "then") return undefined;
-        if (prop === "execute") return async () => [];
-        return (...args: any[]) => {
+        if (prop === "execute") return async (): Promise<unknown[]> => [];
+        return (...args: unknown[]) => {
           calls.push({ method: prop as string, args });
           return proxy;
         };
@@ -23,7 +23,7 @@ function recordingDb() {
   return { proxy, calls };
 }
 
-const filtersPublic = (calls: { method: string; args: any[] }[]) =>
+const filtersPublic = (calls: { method: string; args: unknown[] }[]) =>
   calls.some((c) => c.method === "where" && c.args[0] === "e.visibility" && c.args[2] === "public");
 
 describe("CuratedEventRepo.loadForEvents (#1211)", () => {
@@ -49,9 +49,9 @@ describe("CuratedEventRepo.loadForEvents de-duplicates (#1337)", () => {
       { id: "group", eventId: null, curatedGroupId: "g1", realEventId: "e1", title: "Kids Night" },
       { id: "group", eventId: null, curatedGroupId: "g1", realEventId: "e2", title: "Other" }
     ];
-    const chain: any = new Proxy({}, { get: (_t, p) => (p === "then" ? undefined : p === "execute" ? async () => rows : () => chain) });
+    const chain: Record<string, unknown> = new Proxy({}, { get: (_t, p) => (p === "then" ? undefined : p === "execute" ? async () => rows : () => chain) });
     (getDb as jest.Mock).mockReturnValue(chain);
-    const result: any[] = await new CuratedEventRepo().loadForEvents("CAL1", "c1");
+    const result = await new CuratedEventRepo().loadForEvents("CAL1", "c1");
     expect(result.map((r) => r.realEventId)).toEqual(["e1", "e2"]);
     expect(result[0].id).toBe("group");
   });
