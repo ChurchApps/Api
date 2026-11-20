@@ -1,5 +1,6 @@
-import { SongPackageHelper } from "../helpers/SongPackageHelper";
-import { sectionLabel } from "../helpers/DuplicateHelper";
+import { SongPackageHelper } from "../helpers/SongPackageHelper.js";
+import { sectionLabel } from "../helpers/DuplicateHelper.js";
+import type { SongView } from "../models/index.js";
 
 const CHART = "{title: Amazing Grace}\n{key: G}\n\nVerse 1\n[G]Amazing   grace! how [C]sweet the [G]sound,\nthat saved a wretch like [D]me!\n\nChorus\nPraise [G]God";
 
@@ -187,7 +188,8 @@ describe("SongPackageHelper.baseConfidence", () => {
   });
 });
 
-const row = (): any => ({
+// hasChords and featured come back from MySQL as tinyints, which SongView types as booleans
+const row = (): SongView => Object.assign<SongView, { hasChords: number; featured: number }>({
   id: "song0000001",
   title: "Amazing Grace",
   writer: "John Newton",
@@ -210,8 +212,6 @@ const row = (): any => ({
   confidence: "converted-from-abc",
   firstLine: "Amazing grace! how sweet the sound,",
   tune: null,
-  hasChords: 1,
-  featured: 1,
   recommendedKey: null,
   singTimeSeconds: 150,
   rights: JSON.stringify({ text: { license: "PD" }, tune: { license: "PD" }, arrangement: null, recording: null, artwork: null }),
@@ -222,7 +222,7 @@ const row = (): any => ({
   recommendedKeyReason: null,
   sundayReadyBy: null,
   sundayReadyAt: null
-});
+}, { hasChords: 1, featured: 1 });
 const URLS = { score: "u/score.musicxml", slides: "u/slides.json", timing: "u/timing.json", attribution: "u/attribution.txt" };
 
 const pack = (id: string, slug: string) => `https://content.churchapps.org/commons/songs/en/${slug}-${id}`;
@@ -343,7 +343,7 @@ describe("SongPackageHelper.detail", () => {
 });
 
 describe("SongPackageHelper.family and similar", () => {
-  const rows: any[] = [
+  const rows: SongView[] = [
     { id: "root", parentSongId: null, language: "English", meter: "8.7.8.7 D", scripture: "Ps 46:1", themes: "Trust,Refuge" },
     { id: "kid1", parentSongId: "root", language: "German", meter: "8.7.8.7 D", scripture: "Ps 46:1", themes: "Trust" },
     { id: "kid2", parentSongId: "root", language: "English", meter: null, scripture: null, themes: "" },

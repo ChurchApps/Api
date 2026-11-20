@@ -6,9 +6,10 @@ jest.mock("../../../shared/helpers/index", () => ({
   Environment: mockEnv
 }));
 
-import { ReviewerHelper } from "../helpers/ReviewerHelper";
+import { ReviewerHelper, type Reviewer } from "../helpers/ReviewerHelper.js";
+import type { SubmissionPayload } from "../models/index.js";
 
-const user = (over: any = {}) => ({ id: "user0000001", email: "someone@example.com", checkAccess: () => false, ...over });
+const user = (over: Partial<Reviewer> = {}) => ({ id: "user0000001", email: "someone@example.com", checkAccess: () => false, ...over });
 
 describe("ReviewerHelper.isMusicEditor / canReview", () => {
   beforeEach(() => { mockEnv.commonsMusicEditors = ""; });
@@ -62,7 +63,7 @@ describe("ReviewerHelper.rightsChange", () => {
   });
 
   it("ignores a licenseVersion that is only being filled in for a legacy song", () => {
-    const legacy = { ...live(), licenseVersion: undefined };
+    const legacy: SubmissionPayload = { ...live(), licenseVersion: undefined };
     expect(ReviewerHelper.rightsChange(legacy, { ...live(), licenseVersion: "1.0" })).toBeUndefined();
   });
 

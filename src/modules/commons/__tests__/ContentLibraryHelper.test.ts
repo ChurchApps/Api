@@ -337,17 +337,17 @@ describe("promotion and signed access", () => {
 describe("song export artifacts", () => {
   it("song.json lists uploads by role and the chordpro header agrees with the metadata", () => {
     const song = { id: "testasst001", title: "Hymn", writer: "Anon", songKey: "G", timeSignature: "3/4", meter: "8.7.8.7 D", bpm: 90, chordPro: "Verse 1\n[G]Sing", license: "WC", language: "English" };
-    const json: any = ContentLibraryHelper.songJson(song, [{ name: "sources/demoAudio.wav" }, { name: "sources/tune.mid" }]);
+    const json = ContentLibraryHelper.songJson(song, [{ name: "sources/demoAudio.wav" }, { name: "sources/tune.mid" }]) as Record<string, unknown>;
     expect(json.uploads).toEqual({ demoAudio: "demoAudio.wav" }); // basename: the content repo looks in sources/<name>
     expect(json.status).toBe("approved");
     // harvested counts live in sources/hymnary.json; validate.mjs rejects them in song.json
     expect(json).not.toHaveProperty("hymnalCount");
-    expect(ContentLibraryHelper.songJson({ ...song, status: "unpublished" } as any, []).status).toBe("unpublished");
-    const pkg: any = ContentLibraryHelper.songJson({ ...song, status: "published", confidence: "chart-only", rights: JSON.stringify({ text: { license: "WC" } }), form: null, publishedKeys: JSON.stringify(["G"]) } as any, []);
+    expect((ContentLibraryHelper.songJson({ ...song, status: "unpublished" }, []) as Record<string, unknown>).status).toBe("unpublished");
+    const pkg = ContentLibraryHelper.songJson({ ...song, status: "published", confidence: "chart-only", rights: JSON.stringify({ text: { license: "WC" } }), form: null, publishedKeys: JSON.stringify(["G"]) }, []) as Record<string, unknown>;
     expect(pkg).toMatchObject({ status: "approved", confidence: "chart-only", rights: { text: { license: "WC" } }, publishedKeys: ["G"] });
     expect(pkg.form).toBeUndefined();
     expect(json.licenseVersion).toBeUndefined();
-    const cc: any = ContentLibraryHelper.songJson({ ...song, license: "CC-BY", licenseVersion: "3.0", licenseUrl: "https://creativecommons.org/licenses/by/3.0/" } as any, []);
+    const cc = ContentLibraryHelper.songJson({ ...song, license: "CC-BY", licenseVersion: "3.0", licenseUrl: "https://creativecommons.org/licenses/by/3.0/" }, []);
     expect(cc).toMatchObject({ license: "CC-BY", licenseVersion: "3.0", licenseUrl: "https://creativecommons.org/licenses/by/3.0/" });
     expect(json.meter).toBe("8.7.8.7 D");
     expect(ContentLibraryHelper.renderChordpro(song)).toBe("{title: Hymn}\n{artist: Anon}\n{key: G}\n{time: 3/4}\n{tempo: 90}\n\nVerse 1\n[G]Sing\n");

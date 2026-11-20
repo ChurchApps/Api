@@ -6,13 +6,20 @@ jest.mock("../../../shared/infrastructure/RepoManager.js", () => ({ RepoManager:
 import { CommonsMauticHelper, SAVE_BURST, UPLOAD_BURST } from "../helpers/CommonsMauticHelper.js";
 import { MauticHelper } from "../../membership/helpers/MauticHelper.js";
 import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
+import type { Repos } from "../repositories/index.js";
+import type { Asset } from "../models/index.js";
 
-function repos(opts: { songs?: number; saves?: number; recentSaves?: number; recentSongs?: number } = {}): any {
-  return {
-    asset: { countPublishedSongs: jest.fn(async () => opts.songs ?? 0), loadSongPublisherIds: jest.fn(async () => ["writer00001", "writer00002"]), loadPublisherIds: jest.fn(async (a: any) => [a.publisherUserId, ...(a.co || [])]) },
+type RepoMocks = { [K in keyof Repos]?: Partial<Repos[K]> };
+/** a song with co-publishers beyond its main publisher, as the loadPublisherIds mock reads them */
+type CoPublishedAsset = Asset & { co?: string[] };
+
+function repos(opts: { songs?: number; saves?: number; recentSaves?: number; recentSongs?: number } = {}): Repos {
+  const r: RepoMocks = {
+    asset: { countPublishedSongs: jest.fn(async () => opts.songs ?? 0), loadSongPublisherIds: jest.fn(async () => ["writer00001", "writer00002"]), loadPublisherIds: jest.fn(async (a: CoPublishedAsset) => [a.publisherUserId, ...(a.co || [])]) },
     rating: { countSavesOfPublisher: jest.fn(async (_id: string, hours?: number) => (hours ? opts.recentSaves ?? 0 : opts.saves ?? 0)) },
     submission: { countNewSongsSubmittedSince: jest.fn(async () => opts.recentSongs ?? 0) }
   };
+  return r as Repos;
 }
 const song = { id: "asset000001", assetType: "song", publisherUserId: "writer00001" };
 
@@ -30,7 +37,7 @@ describe("CommonsMauticHelper writer milestones", () => {
   });
 
   it("syncs every co-publisher of the song", async () => {
-    await CommonsMauticHelper.afterSave(repos({ saves: 3 }), { ...song, co: ["writer00002"] } as any, "saver000001", true);
+    await CommonsMauticHelper.afterSave(repos({ saves: 3 }), { ...song, co: ["writer00002"] } as CoPublishedAsset, "saver000001", true);
     expect(MauticHelper.createAndUpdate).toHaveBeenCalledWith("writer00002@example.com", "Wes", "Writer", expect.objectContaining({ wc_song_saves: 3 }));
     expect(MauticHelper.createAndUpdate).toHaveBeenCalledTimes(2);
   });

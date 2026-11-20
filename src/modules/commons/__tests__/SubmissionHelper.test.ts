@@ -8,50 +8,70 @@ jest.mock("../helpers/ContentLibraryHelper", () => ({
     removeKey: jest.fn(async () => {}),
     contentTypeFor: () => "application/octet-stream",
     sha256: () => "hash",
-    readPending: jest.fn(async () => null)
+    readPending: jest.fn(async (): Promise<null> => null)
   }
 }));
 jest.mock("../helpers/QualityHelper", () => ({ QualityHelper: { score: jest.fn(async () => ({ qualityScore: 21, qualityDetail: JSON.stringify({ heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" }) })) } }));
 jest.mock("../helpers/CommonsMailHelper", () => ({ CommonsMailHelper: { notifyReceived: jest.fn(async () => {}) } }));
 
 jest.mock("../../../shared/helpers/index", () => ({ Environment: { commonsSongLimits: "", supportEmail: "support@example.com" }, Permissions: { server: { admin: { contentType: "Server", action: "Admin" } } } }));
-import { SubmissionHelper } from "../helpers/SubmissionHelper";
-import { songLimitFor } from "../helpers/SubmitValidation";
-import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper";
-import { QualityHelper } from "../helpers/QualityHelper";
-import { CommonsMailHelper } from "../helpers/CommonsMailHelper";
+import { SubmissionHelper } from "../helpers/SubmissionHelper.js";
+import type { Outcome } from "../helpers/SubmissionHelper.js";
+import { songLimitFor } from "../helpers/SubmitValidation.js";
+import { ContentLibraryHelper } from "../helpers/ContentLibraryHelper.js";
+import { QualityHelper } from "../helpers/QualityHelper.js";
+import { CommonsMailHelper } from "../helpers/CommonsMailHelper.js";
+import type { Asset, AssetFile, Song, SongView, Submission, SubmissionPayload } from "../models/index.js";
+import type { Repos } from "../repositories/Repos.js";
+import type { AssetRepo } from "../repositories/AssetRepo.js";
+import type { AssetFileRepo } from "../repositories/AssetFileRepo.js";
+import type { SongRepo } from "../repositories/SongRepo.js";
+import type { SubmissionRepo } from "../repositories/SubmissionRepo.js";
 
 const au = { id: "user0000001", churchId: "church00001" };
 const payload = { name: "New Hymn", license: "WC", tags: "Grace", detail: { writer: "Anon", chordPro: "Verse 1\n[G]Sing", certified: true, videoUrl: "https://youtu.be/demo" } };
 
-function repos(overrides: any = {}) {
-  const r: any = {
+type RepoFns = {
+  asset: Pick<AssetRepo, "create" | "loadById" | "isPublisher" | "loadPublisherIds">;
+  submission: Pick<SubmissionRepo, "create" | "countByUser" | "countSongsByUser" | "submit" | "update" | "loadPendingForAsset" | "loadById">;
+  song: Pick<SongRepo, "loadById" | "loadSatellite">;
+  assetFile: Pick<AssetFileRepo, "loadOne" | "upsert" | "loadBySubmission" | "loadLive" | "loadLiveByHash">;
+};
+type RepoMocks = { [K in keyof RepoFns]: jest.Mocked<RepoFns[K]> };
+type RepoOverrides = { [K in keyof RepoFns]?: Partial<RepoFns[K]> };
+// loose view of an Outcome so a test can read whichever branch came back
+type Result<T = unknown> = { ok?: boolean; value?: T; status?: number; error?: string; errors?: string[] };
+const res = <T>(o: Outcome<T>): Result<T> => o;
+
+function repos(overrides: RepoOverrides = {}) {
+  const r: RepoFns = {
     asset: {
-      create: jest.fn(async (a: any) => { a.id = "asset000001"; return a; }),
-      loadById: jest.fn(async (id: string) => ({ id, assetType: "song", status: "published", publisherUserId: "owner000001" })),
-      isPublisher: jest.fn(async (a: any, u?: string) => !!u && a?.publisherUserId === u),
-      loadPublisherIds: jest.fn(async (a: any) => [a?.publisherUserId].filter(Boolean))
+      create: jest.fn(async (a: Asset) => { a.id = "asset000001"; return a; }),
+      loadById: jest.fn(async (id: string): Promise<Asset | undefined> => ({ id, assetType: "song", status: "published", publisherUserId: "owner000001" })),
+      isPublisher: jest.fn(async (a: Asset | undefined, u?: string) => !!u && a?.publisherUserId === u),
+      loadPublisherIds: jest.fn(async (a: Asset) => [a?.publisherUserId].filter(Boolean))
     },
     submission: {
-      create: jest.fn(async (s: any) => { s.id = "sub00000001"; s.status = "draft"; return s; }),
+      create: jest.fn(async (s: Submission) => { s.id = "sub00000001"; s.status = "draft"; return s; }),
       countByUser: jest.fn(async () => 0),
       countSongsByUser: jest.fn(async () => 0),
       submit: jest.fn(async () => true),
-      update: jest.fn(async () => {}),
-      loadPendingForAsset: jest.fn(async () => undefined),
-      loadById: jest.fn(async () => undefined)
+      update: jest.fn(async (_id: string, _fields: Partial<Submission>) => {}),
+      loadPendingForAsset: jest.fn(async (): Promise<Submission | undefined> => undefined),
+      loadById: jest.fn(async (): Promise<Submission | undefined> => undefined)
     },
-    song: { loadById: jest.fn(async () => undefined), loadSatellite: jest.fn(async () => undefined) },
+    song: { loadById: jest.fn(async (): Promise<SongView | undefined> => undefined), loadSatellite: jest.fn(async (): Promise<Song | undefined> => undefined) },
     assetFile: {
-      loadOne: jest.fn(async () => undefined),
-      upsert: jest.fn(async (f: any) => ({ ...f, id: "file0000001" })),
-      loadBySubmission: jest.fn(async () => []),
-      loadLive: jest.fn(async () => []),
-      loadLiveByHash: jest.fn(async () => undefined)
+      loadOne: jest.fn(async (): Promise<AssetFile | undefined> => undefined),
+      upsert: jest.fn(async (f: AssetFile) => ({ ...f, id: "file0000001" })),
+      loadBySubmission: jest.fn(async (): Promise<AssetFile[]> => []),
+      loadLive: jest.fn(async (): Promise<AssetFile[]> => []),
+      loadLiveByHash: jest.fn(async (): Promise<AssetFile | undefined> => undefined)
     }
   };
-  for (const [k, v] of Object.entries(overrides)) Object.assign(r[k], v);
-  return r;
+  for (const [k, v] of Object.entries(overrides)) Object.assign(r[k as keyof RepoFns], v);
+  // every repo function above is a jest.fn; SubmissionHelper only touches these four repos
+  return r as RepoMocks & Repos;
 }
 
 describe("SubmissionHelper.createDraft", () => {
@@ -59,7 +79,7 @@ describe("SubmissionHelper.createDraft", () => {
 
   it("creates a pending asset seeded from the payload plus a draft submission for a new asset", async () => {
     const r = repos();
-    const result: any = await SubmissionHelper.createDraft(r, au, { assetType: "song", payload });
+    const result = res(await SubmissionHelper.createDraft(r, au, { assetType: "song", payload }));
     expect(result.ok).toBe(true);
     expect(r.asset.create).toHaveBeenCalledWith(expect.objectContaining({ assetType: "song", name: "New Hymn", status: "pending", publisherUserId: "user0000001", license: "WC" }));
     expect(r.submission.create).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000001", submittedBy: "user0000001", payload }));
@@ -68,27 +88,27 @@ describe("SubmissionHelper.createDraft", () => {
 
   it("targets an existing asset for a modification without touching the asset row", async () => {
     const r = repos();
-    const result: any = await SubmissionHelper.createDraft(r, au, { assetId: "asset000009", payload, note: "fixed a chord" });
+    const result = res(await SubmissionHelper.createDraft(r, au, { assetId: "asset000009", payload, note: "fixed a chord" }));
     expect(result.ok).toBe(true);
     expect(r.asset.create).not.toHaveBeenCalled();
     expect(r.submission.create).toHaveBeenCalledWith(expect.objectContaining({ assetId: "asset000009", submittedBy: "user0000001", note: "fixed a chord" }));
   });
 
   it("refuses unknown types and removed assets", async () => {
-    expect((await SubmissionHelper.createDraft(repos(), au, { assetType: "nope", payload }) as any).status).toBe(400);
+    expect(res(await SubmissionHelper.createDraft(repos(), au, { assetType: "nope", payload })).status).toBe(400);
     const r = repos({ asset: { loadById: jest.fn(async () => ({ id: "x", status: "removed" })) } });
-    expect((await SubmissionHelper.createDraft(r, au, { assetId: "x", payload }) as any).status).toBe(404);
+    expect(res(await SubmissionHelper.createDraft(r, au, { assetId: "x", payload })).status).toBe(404);
   });
 });
 
 describe("SubmissionHelper files", () => {
   beforeEach(() => jest.clearAllMocks());
-  const sub: any = { id: "sub00000001", status: "draft", submittedBy: "user0000001" };
-  const asset: any = { id: "asset000001", assetType: "song" };
+  const sub: Submission = { id: "sub00000001", status: "draft", submittedBy: "user0000001" };
+  const asset: Asset = { id: "asset000001", assetType: "song" };
 
   it("infers add vs replace from the live file set and stores pending bytes privately", async () => {
     const r = repos();
-    const added: any = await SubmissionHelper.storeInline(r, sub, asset, "tune.abc", "text/plain", Buffer.from("X:1"), "user0000001");
+    const added = res(await SubmissionHelper.storeInline(r, sub, asset, "tune.abc", "text/plain", Buffer.from("X:1"), "user0000001"));
     expect(added.ok).toBe(true);
     expect(ContentLibraryHelper.storePending).toHaveBeenCalledWith("commons/pending/sub00000001/tune.abc", "text/plain", expect.any(Buffer));
     expect(r.assetFile.upsert).toHaveBeenCalledWith(expect.objectContaining({ submissionId: "sub00000001", name: "tune.abc", action: "add", uploadedBy: "user0000001" }));
@@ -104,21 +124,21 @@ describe("SubmissionHelper files", () => {
 
   it("rejects names the registry does not know and removals of files that are not live", async () => {
     const r = repos();
-    expect((await SubmissionHelper.recordFile(r, sub, asset, { name: "virus.exe", sizeBytes: 1 }) as any).status).toBe(400);
-    expect((await SubmissionHelper.recordFile(r, sub, asset, { name: "tune.abc", action: "remove" }) as any).status).toBe(400);
+    expect(res(await SubmissionHelper.recordFile(r, sub, asset, { name: "virus.exe", sizeBytes: 1 })).status).toBe(400);
+    expect(res(await SubmissionHelper.recordFile(r, sub, asset, { name: "tune.abc", action: "remove" })).status).toBe(400);
   });
 });
 
 describe("SubmissionHelper.submit", () => {
   beforeEach(() => jest.clearAllMocks());
-  const draft = (): any => ({ id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload });
-  const asset: any = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
+  const draft = (): Submission => ({ id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload });
+  const asset: Asset = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
 
   it("moves a valid draft to pending with a triage score", async () => {
     const r = repos({ assetFile: { loadBySubmission: jest.fn(async () => [{ name: "demoAudio.mp3", sizeBytes: 100, action: "add" }]) } });
     const sub = draft();
     sub.payload = { ...payload, detail: { ...payload.detail, recordingOwned: true } };
-    const result: any = await SubmissionHelper.submit(r, sub, asset);
+    const result = res(await SubmissionHelper.submit(r, sub, asset));
     expect(result).toEqual({ ok: true, value: { status: "pending" } });
     expect(QualityHelper.score).toHaveBeenCalledWith(expect.objectContaining({ title: "New Hymn", fileRoles: ["demoAudio"] }));
     const qualityDetail = { heuristic: 21, parts: ["demo"], llm: 0, notes: "completeness heuristic only — not an AI judgment" };
@@ -144,7 +164,7 @@ describe("SubmissionHelper.submit", () => {
   it("returns 400 with every registry message when validation fails", async () => {
     const sub = draft();
     sub.payload = { name: " ", license: "CC0", detail: { writer: "" } };
-    const result: any = await SubmissionHelper.submit(repos(), sub, asset);
+    const result = res(await SubmissionHelper.submit(repos(), sub, asset));
     expect(result.status).toBe(400);
     expect(result.errors.join("\n")).toMatch(/name/);
     expect(result.errors.join("\n")).toMatch(/license/);
@@ -163,7 +183,7 @@ describe("SubmissionHelper.submit", () => {
   it("returns 400 when a recorded file was never uploaded", async () => {
     (ContentLibraryHelper.exists as jest.Mock).mockResolvedValueOnce(false);
     const r = repos({ assetFile: { loadBySubmission: jest.fn(async () => [{ name: "tune.abc", sizeBytes: 5, action: "add" }]) } });
-    const result: any = await SubmissionHelper.submit(r, draft(), asset);
+    const result = res(await SubmissionHelper.submit(r, draft(), asset));
     expect(result).toMatchObject({ status: 400, error: "tune.abc was not uploaded" });
   });
 
@@ -174,14 +194,14 @@ describe("SubmissionHelper.submit", () => {
         loadLiveByHash: jest.fn(async () => ({ assetId: "asset000777" }))
       }
     });
-    const result: any = await SubmissionHelper.submit(r, { ...draft(), payload: { name: "Wide", license: "CC0" } }, { id: "asset000001", assetType: "freeshow/template" });
+    const result = res(await SubmissionHelper.submit(r, { ...draft(), payload: { name: "Wide", license: "CC0" } }, { id: "asset000001", assetType: "freeshow/template" }));
     expect(result.status).toBe(409);
   });
 
   it("returns 429 when the user has too many pending submissions or has hit the lifetime song cap", async () => {
-    expect((await SubmissionHelper.submit(repos({ submission: { countByUser: jest.fn(async () => 5) } }), draft(), asset) as any).status).toBe(429);
-    expect((await SubmissionHelper.submit(repos({ submission: { countSongsByUser: jest.fn(async () => 20) } }), draft(), asset) as any).status).toBe(429);
-    expect((await SubmissionHelper.submit(repos({ submission: { countSongsByUser: jest.fn(async () => 19) } }), draft(), asset) as any).status).not.toBe(429);
+    expect(res(await SubmissionHelper.submit(repos({ submission: { countByUser: jest.fn(async () => 5) } }), draft(), asset)).status).toBe(429);
+    expect(res(await SubmissionHelper.submit(repos({ submission: { countSongsByUser: jest.fn(async () => 20) } }), draft(), asset)).status).toBe(429);
+    expect(res(await SubmissionHelper.submit(repos({ submission: { countSongsByUser: jest.fn(async () => 19) } }), draft(), asset)).status).not.toBe(429);
   });
 
   it("honours COMMONS_SONG_LIMITS per user", async () => {
@@ -193,19 +213,19 @@ describe("SubmissionHelper.submit", () => {
 
   it("returns 409 naming the competing submission when another pending one targets the asset", async () => {
     const r = repos({ submission: { submit: jest.fn(async () => false), loadPendingForAsset: jest.fn(async () => ({ id: "sub00000002" })) } });
-    const result: any = await SubmissionHelper.submit(r, draft(), asset);
+    const result = res(await SubmissionHelper.submit(r, draft(), asset));
     expect(result.status).toBe(409);
     expect(result.error).toContain("sub00000002");
   });
 
   it("refuses anything that is not a draft", async () => {
-    expect((await SubmissionHelper.submit(repos(), { ...draft(), status: "pending" }, asset) as any).status).toBe(400);
+    expect(res(await SubmissionHelper.submit(repos(), { ...draft(), status: "pending" }, asset)).status).toBe(400);
   });
 });
 
 describe("SubmissionHelper key checks", () => {
   beforeEach(() => jest.clearAllMocks());
-  const asset: any = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
+  const asset: Asset = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
   const baseNotes = "completeness heuristic only — not an AI judgment";
 
   // C major scale as a one-track format-0 SMF
@@ -232,9 +252,9 @@ describe("SubmissionHelper key checks", () => {
     (ContentLibraryHelper.readPending as jest.Mock).mockImplementation(async (_id: string, name: string) =>
       files[name] ? { buffer: files[name], contentType: "application/octet-stream" } : null);
 
-  function submitWith(names: string[], detail: any) {
+  function submitWith(names: string[], detail: Record<string, unknown>) {
     const r = repos({ assetFile: { loadBySubmission: jest.fn(async () => names.map((name) => ({ name, sizeBytes: 100, action: "add" }))) } });
-    const sub: any = { id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload: { ...payload, detail: { writer: "Anon", certified: true, ...detail } } };
+    const sub: Submission = { id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload: { ...payload, detail: { writer: "Anon", certified: true, ...detail } } };
     return SubmissionHelper.submit(r, sub, asset).then((result) => ({ result, notes: r.submission.update.mock.calls[0]?.[1].payload.qualityDetail.notes }));
   }
 
@@ -274,9 +294,9 @@ describe("SubmissionHelper key checks", () => {
 
 describe("SubmissionHelper proposal types", () => {
   beforeEach(() => jest.clearAllMocks());
-  const newAsset: any = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
-  const publishedAsset: any = { id: "asset000001", assetType: "song", publisherUserId: "user0000001", status: "published", publishedSubmissionId: "sub00000000" };
-  const draft = (extra: any = {}): any => ({ id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload, ...extra });
+  const newAsset: Asset = { id: "asset000001", assetType: "song", publisherUserId: "user0000001" };
+  const publishedAsset: Asset = { id: "asset000001", assetType: "song", publisherUserId: "user0000001", status: "published", publishedSubmissionId: "sub00000000" };
+  const draft = (extra: Submission = {}): Submission => ({ id: "sub00000001", assetId: "asset000001", status: "draft", submittedBy: "user0000001", payload, ...extra });
 
   it("stores the resolved type on the draft row", async () => {
     const r = repos();
@@ -343,10 +363,10 @@ describe("SubmissionHelper proposal types", () => {
     const r = repos();
     r.assetFile.loadBySubmission.mockResolvedValue([{ name: "tune.abc", sizeBytes: 10, action: "add" }]);
     const other = draft({ submittedBy: "user0000002", note: "added an ABC transcription", payload: { ...payload, license: "larry-holder", type: "additionalFile" } });
-    const result: any = await SubmissionHelper.submit(r, other, closed);
+    const result = res(await SubmissionHelper.submit(r, other, closed));
     expect(result.status).toBe(400);
     expect(result.errors).toContain(msg);
-    const own: any = await SubmissionHelper.submit(r, { ...other, submittedBy: "user0000001" }, closed);
+    const own = res(await SubmissionHelper.submit(r, { ...other, submittedBy: "user0000001" }, closed));
     expect(own.errors || []).not.toContain(msg);
   });
 
@@ -377,8 +397,8 @@ describe("SubmissionHelper proposal types", () => {
   it("names the generated chart when someone tries to upload lyrics.chordpro", async () => {
     const r = repos();
     expect(await SubmissionHelper.recordFile(r, draft(), newAsset, { name: "lyrics.chordpro", sizeBytes: 5 })).toMatchObject({ status: 400, error: "lyrics.chordpro is generated on publish — upload ChordPro text as lyrics.cho" });
-    expect((await SubmissionHelper.storeInline(r, draft(), newAsset, "lyrics.cho", "text/plain", Buffer.from("[G]x"), "user0000001") as any).ok).toBe(true);
-    expect((await SubmissionHelper.storeInline(r, draft(), newAsset, "score.musicxml", "application/xml", Buffer.from("<score/>"), "user0000001") as any).ok).toBe(true);
+    expect(res(await SubmissionHelper.storeInline(r, draft(), newAsset, "lyrics.cho", "text/plain", Buffer.from("[G]x"), "user0000001")).ok).toBe(true);
+    expect(res(await SubmissionHelper.storeInline(r, draft(), newAsset, "score.musicxml", "application/xml", Buffer.from("<score/>"), "user0000001")).ok).toBe(true);
   });
 });
 
@@ -386,12 +406,12 @@ describe("SubmissionHelper reviewer edits on a song closed to community edits", 
   beforeEach(() => jest.clearAllMocks());
   const msg = "This song's license keeps all changes with the writer, so it does not accept proposed edits";
   // a catalog import: no publisher, still on its seed "Imported" record, under a writer grant nobody here holds
-  const imported: any = { id: "4iReiC4JRP8", assetType: "song", name: "God Cares For You", tags: "Praise", language: "English", license: "larry-holder", status: "published", publishedSubmissionId: "subimport01" };
+  const imported: Asset = { id: "4iReiC4JRP8", assetType: "song", name: "God Cares For You", tags: "Praise", language: "English", license: "larry-holder", status: "published", publishedSubmissionId: "subimport01" };
   const importRecord = { id: "subimport01", note: "Imported", status: "approved", submittedBy: "seed", payload: { name: "God Cares For You", license: "larry-holder", detail: { writer: "Larry Holder", chordPro: "GodÂ’s care" } } };
   const live = { id: "4iReiC4JRP8", title: "God Cares For You", writer: "Larry Holder", licenseVersion: "permissions", chordPro: "Verse 1\nA Musical For Young Voices" };
   const fixed = { writer: "Larry Holder", chordPro: "Verse 1\n[G]God cares for you", certified: true };
-  const correction = (extra: any = {}) => ({ name: "God Cares For You", tags: "Praise, Provision", language: "English", license: "larry-holder", licenseVersion: "permissions", type: "correction", detail: fixed, ...extra });
-  const sub = (payload: any): any => ({ id: "sub00000001", assetId: imported.id, status: "draft", submittedBy: "admin000001", note: "replaced the scraped page with the real lyrics", payload });
+  const correction = (extra: SubmissionPayload = {}): SubmissionPayload => ({ name: "God Cares For You", tags: "Praise, Provision", language: "English", license: "larry-holder", licenseVersion: "permissions", type: "correction", detail: fixed, ...extra });
+  const sub = (payload: SubmissionPayload): Submission => ({ id: "sub00000001", assetId: imported.id, status: "draft", submittedBy: "admin000001", note: "replaced the scraped page with the real lyrics", payload });
   const reposFor = () => repos({ submission: { loadById: jest.fn(async () => importRecord) }, song: { loadById: jest.fn(async () => live) } });
 
   it("takes a reviewer's correction though the reviewer holds no grant for the song's license", async () => {
@@ -402,18 +422,18 @@ describe("SubmissionHelper reviewer edits on a song closed to community edits", 
   });
 
   it("still refuses the same edit from anyone else", async () => {
-    const result: any = await SubmissionHelper.submit(reposFor(), sub(correction()), imported);
+    const result = res(await SubmissionHelper.submit(reposFor(), sub(correction()), imported));
     expect(result.status).toBe(400);
     expect(result.errors).toContain(msg);
   });
 
   it("never lets a reviewer change the song's license or a master's license", async () => {
-    const relicensed: any = await SubmissionHelper.submit(reposFor(), sub(correction({ license: "CC-BY" })), imported, { byReviewer: true });
+    const relicensed = res(await SubmissionHelper.submit(reposFor(), sub(correction({ license: "CC-BY" })), imported, { byReviewer: true }));
     expect(relicensed.errors).toContain("Only the writer can change a song's license");
     expect(relicensed.errors).not.toContain(msg);
     const r = reposFor();
     r.assetFile.loadBySubmission.mockResolvedValue([{ name: "demoAudio.mp3", sizeBytes: 100, action: "add" }]);
-    const master: any = await SubmissionHelper.submit(r, sub(correction({ type: "additionalFile", detail: { writer: "Larry Holder", certified: true, recordingOwned: true, masterLicense: "CC-BY" } })), imported, { byReviewer: true });
+    const master = res(await SubmissionHelper.submit(r, sub(correction({ type: "additionalFile", detail: { writer: "Larry Holder", certified: true, recordingOwned: true, masterLicense: "CC-BY" } })), imported, { byReviewer: true }));
     expect(master.errors).toContain("Only the writer can change the master recording's license");
   });
 
