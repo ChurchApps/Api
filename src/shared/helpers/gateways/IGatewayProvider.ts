@@ -14,6 +14,8 @@ export interface GatewayObject {
   status?: string;
   error?: string;
   success?: boolean;
+  // ISO currency of a completed charge (Stripe PaymentIntent/Charge carry it).
+  currency?: string;
   // Set by the charge path when the donation is already recorded (e.g. a replayed reference).
   alreadyRecorded?: boolean;
 }
@@ -85,7 +87,8 @@ export interface GatewayPerson {
 
 export interface GatewayInterval {
   interval?: string;
-  interval_count?: number;
+  // Donation forms post this as text as often as a number.
+  interval_count?: number | string;
   frequency?: string;
 }
 

@@ -36,7 +36,7 @@ export class TreeHelper {
       if (s.targetBlockId) blockIds.push(s.targetBlockId);
     });
     allElements.forEach((e) => {
-      if (e.answers.targetBlockId) blockIds.push(e.answers.targetBlockId);
+      if (e.answers.targetBlockId) blockIds.push(e.answers.targetBlockId as string);
     });
     if (blockIds.length > 0) {
       const allBlockSections = await repos.section.loadForBlocks(churchId, blockIds);
@@ -127,7 +127,7 @@ export class TreeHelper {
   }
 
   // Replaces a page's (or block's) entire content with a snapshot tree, assigning new ids.
-  static async deleteAndRestoreContent(churchId: string, pageId: string, blockId: string, snapshot: any) {
+  static async deleteAndRestoreContent(churchId: string, pageId: string, blockId: string, snapshot: { sections?: Section[] }) {
     const repos = await RepoManager.getRepos<Repos>("content");
     let existingSections: Section[] = [];
     if (pageId) existingSections = await repos.section.loadForPage(churchId, pageId);
@@ -139,7 +139,7 @@ export class TreeHelper {
     try {
       for (const sectionData of snapshot.sections || []) {
         const section: Section = { ...sectionData, id: undefined, churchId };
-        delete (section as any).elements;
+        delete section.elements;
         const savedSection = await repos.section.insert(section);
         insertedSectionIds.push(savedSection.id);
         for (const elementData of sectionData.elements || []) {
@@ -159,7 +159,7 @@ export class TreeHelper {
     }
   }
 
-  private static async restoreElement(churchId: string, sectionId: string, elementData: any, idMap: Record<string, string>, insertedIds: string[]) {
+  private static async restoreElement(churchId: string, sectionId: string, elementData: Element, idMap: Record<string, string>, insertedIds: string[]) {
     const repos = await RepoManager.getRepos<Repos>("content");
     const oldId = elementData.id;
     const element: Element = {

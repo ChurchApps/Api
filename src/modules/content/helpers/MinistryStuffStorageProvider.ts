@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import type { IStorageProvider, PresignedPostData, StorageQuota } from "@churchapps/apihelper";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
@@ -38,7 +38,7 @@ export class MinistryStuffStorageProvider implements IStorageProvider {
         base64: contents.toString("base64")
       }, { headers: this.headers(), maxBodyLength: 60000000 });
       return resp.data.publicUrl;
-    } catch (e: any) {
+    } catch (e) {
       this.rethrowQuota(e);
       throw e;
     }
@@ -54,7 +54,7 @@ export class MinistryStuffStorageProvider implements IStorageProvider {
       }, { headers: this.headers() });
       if (!resp.data?.url) return null;
       return resp.data;
-    } catch (e: any) {
+    } catch (e) {
       this.rethrowQuota(e);
       throw e;
     }
@@ -88,8 +88,8 @@ export class MinistryStuffStorageProvider implements IStorageProvider {
     return resp.data || null;
   }
 
-  private rethrowQuota(e: any) {
-    const data = e?.response?.data;
+  private rethrowQuota(e: unknown) {
+    const data = (e as AxiosError<{ reason?: string; usedBytes?: number; quotaBytes?: number }>)?.response?.data;
     if (data?.reason === "quota_exceeded") throw new QuotaExceededError(data.usedBytes || 0, data.quotaBytes || 0);
   }
 }

@@ -1,5 +1,6 @@
 import "reflect-metadata";
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import express from "express";
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
   YouTubeHelper: {},
   VimeoHelper: {},
@@ -16,6 +17,12 @@ jest.mock("../../../../shared/modules/index", () => ({
 }));
 
 import { SermonController } from "../SermonController.js";
+import { Setting } from "../../models/index.js";
+
+const makeRes = () => {
+  const res: Partial<express.Response> = { status: jest.fn(() => res as express.Response), send: jest.fn(), set: jest.fn() };
+  return res;
+};
 
 const sermons = [
   { id: "s1", churchId: "c1", title: "Hope & Healing", description: "A <good> word", videoType: "youtube", videoUrl: "https://www.youtube.com/embed/abc", duration: 3725, publishDate: new Date("2026-09-01T00:00:00Z"), thumbnail: "https://cdn.test/s1.png" },
@@ -25,14 +32,17 @@ const sermons = [
 
 const runRss = async () => {
   const controller = new SermonController();
-  (controller as any).repos = {
-    sermon: { loadPublicAll: jest.fn(async () => sermons) },
-    setting: { loadByKeyNames: jest.fn(async () => []) }
-  };
-  (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-  const res: any = { status: jest.fn(() => res), send: jest.fn(), set: jest.fn() };
-  await (controller as any).rss("c1", { query: { siteUrl: "https://grace.b1.church/" } }, res);
-  return { res, body: res.send.mock.calls[0][0] as string };
+  Object.assign(controller, {
+    repos: {
+      sermon: { loadPublicAll: jest.fn(async () => sermons) },
+      setting: { loadByKeyNames: jest.fn(async (): Promise<Setting[]> => []) }
+    },
+    actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action()
+  });
+  const res = makeRes();
+  const query: express.Request["query"] = { siteUrl: "https://grace.b1.church/" };
+  await controller.rss("c1", { query } as express.Request, res as express.Response);
+  return { res, body: jest.mocked(res.send).mock.calls[0][0] as string };
 };
 
 describe("SermonController.rss podcast feed", () => {
@@ -68,14 +78,16 @@ describe("SermonController.rss podcast feed", () => {
 
   it("prefers the podcastTitle and podcastImage settings", async () => {
     const controller = new SermonController();
-    (controller as any).repos = {
-      sermon: { loadPublicAll: jest.fn(async () => sermons) },
-      setting: { loadByKeyNames: jest.fn(async () => [{ keyName: "podcastTitle", value: "Grace Sermons" }, { keyName: "podcastImage", value: "https://cdn.test/pod.png" }]) }
-    };
-    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-    const res: any = { status: jest.fn(() => res), send: jest.fn(), set: jest.fn() };
-    await (controller as any).rss("c1", { query: {} }, res);
-    const body = res.send.mock.calls[0][0] as string;
+    Object.assign(controller, {
+      repos: {
+        sermon: { loadPublicAll: jest.fn(async () => sermons) },
+        setting: { loadByKeyNames: jest.fn(async () => [{ keyName: "podcastTitle", value: "Grace Sermons" }, { keyName: "podcastImage", value: "https://cdn.test/pod.png" }]) }
+      },
+      actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action()
+    });
+    const res = makeRes();
+    await controller.rss("c1", { query: {} } as express.Request, res as express.Response);
+    const body = jest.mocked(res.send).mock.calls[0][0] as string;
     expect(body).toContain("<title>Grace Sermons</title>");
     expect(body).toContain('<itunes:image href="https://cdn.test/pod.png" />');
   });

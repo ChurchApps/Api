@@ -1,7 +1,8 @@
 import "reflect-metadata";
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import express from "express";
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/index", () => ({
-  CalendarHelper: { addExceptionDates: jest.fn(async (events: any[]) => { events.forEach((e) => { e.exceptionDates = [new Date("2026-09-06T10:00:00Z")]; }); }) },
+  CalendarHelper: { addExceptionDates: jest.fn(async (events: Event[]) => { events.forEach((e) => { e.exceptionDates = [new Date("2026-09-06T10:00:00Z")]; }); }) },
   HolidayHelper: { getHolidays: jest.fn() },
   Permissions: { content: { edit: "contentEdit" }, calendars: { admin: "calAdmin" } }
 }));
@@ -13,30 +14,36 @@ jest.mock("../../../../shared/modules/index", () => ({ getMembershipModuleGatewa
 jest.mock("../../../../shared/helpers/NotificationService", () => ({ NotificationService: { createNotifications: jest.fn() } }));
 
 import { EventController } from "../EventController.js";
+import { Event } from "../../models/index.js";
+
+const makeRes = () => {
+  const res: Partial<express.Response> = { status: jest.fn(() => res as express.Response), send: jest.fn(), set: jest.fn() };
+  return res;
+};
+const query: express.Request["query"] = { groupId: "g1", churchId: "c1" };
+const anon = (_req: express.Request, _res: express.Response, action: () => unknown) => action();
 
 describe("EventController.subscribe ICS", () => {
   it("emits a calendar for events that have exception dates", async () => {
     const controller = new EventController();
-    (controller as any).repos = { event: { loadPublicForGroup: jest.fn(async () => [{ id: "e1", churchId: "c1", title: "Sunday Service", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z"), recurrenceRule: "FREQ=WEEKLY;BYDAY=SU" }]) } };
-    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-    const res: any = { status: jest.fn(() => res), send: jest.fn(), set: jest.fn() };
-    await (controller as any).subscribe({ query: { groupId: "g1", churchId: "c1" } }, res);
+    Object.assign(controller, { repos: { event: { loadPublicForGroup: jest.fn(async () => [{ id: "e1", churchId: "c1", title: "Sunday Service", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z"), recurrenceRule: "FREQ=WEEKLY;BYDAY=SU" }]) } }, actionWrapperAnon: anon });
+    const res = makeRes();
+    await controller.subscribe({ query } as express.Request, res as express.Response);
     expect(res.status).not.toHaveBeenCalledWith(500);
-    const body = res.send.mock.calls[0][0];
+    const body = jest.mocked(res.send).mock.calls[0][0];
     expect(body).toContain("BEGIN:VEVENT");
     expect(body).toContain("EXDATE");
   });
 
   it("omits EXDATE for events without exception dates", async () => {
     const { CalendarHelper } = jest.requireMock("../../helpers/index");
-    CalendarHelper.addExceptionDates.mockImplementationOnce(async (events: any[]) => { events.forEach((e) => { e.exceptionDates = []; }); });
+    CalendarHelper.addExceptionDates.mockImplementationOnce(async (events: Event[]) => { events.forEach((e) => { e.exceptionDates = []; }); });
     const controller = new EventController();
-    (controller as any).repos = { event: { loadPublicForGroup: jest.fn(async () => [{ id: "e2", churchId: "c1", title: "Picnic", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z") }]) } };
-    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-    const res: any = { status: jest.fn(() => res), send: jest.fn(), set: jest.fn() };
-    await (controller as any).subscribe({ query: { groupId: "g1", churchId: "c1" } }, res);
+    Object.assign(controller, { repos: { event: { loadPublicForGroup: jest.fn(async () => [{ id: "e2", churchId: "c1", title: "Picnic", start: new Date("2026-08-23T10:00:00Z"), end: new Date("2026-08-23T11:30:00Z") }]) } }, actionWrapperAnon: anon });
+    const res = makeRes();
+    await controller.subscribe({ query } as express.Request, res as express.Response);
     expect(res.status).not.toHaveBeenCalledWith(500);
-    const body = res.send.mock.calls[0][0];
+    const body = jest.mocked(res.send).mock.calls[0][0];
     expect(body).toContain("BEGIN:VEVENT");
     expect(body).not.toContain("EXDATE");
   });

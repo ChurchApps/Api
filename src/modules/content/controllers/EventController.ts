@@ -1,5 +1,6 @@
 import { controller, httpPost, httpGet, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
+import { AuthenticatedUser } from "@churchapps/apihelper";
 import * as ics from "ics";
 import { ContentBaseController } from "./ContentBaseController.js";
 import { Event, EventBooking } from "../models/index.js";
@@ -12,10 +13,23 @@ import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { decisionMessage } from "../helpers/DecisionMessage.js";
 import { NotificationService } from "../../../shared/helpers/NotificationService.js";
 
+// Body of POST /request. Client-supplied, so fields are validated before use.
+interface EventRequestBody {
+  groupId?: string;
+  title?: string;
+  description?: string;
+  start?: string;
+  end?: string;
+  allDay?: boolean;
+  recurrenceRule?: string;
+  roomIds?: string[];
+  resources?: { resourceId: string; quantity: number }[];
+}
+
 @controller("/content/events")
 export class EventController extends ContentBaseController {
   @httpGet("/timeline/group/:groupId")
-  public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPostsForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
       const result = await this.repos.event.loadTimelineGroup(au.churchId, groupId, au.groupIds || [], eventIds);
@@ -25,7 +39,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/timeline")
-  public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPosts(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const eventIds = req.query.eventIds ? req.query.eventIds.toString().split(",") : [];
       const result = await this.repos.event.loadTimeline(au.churchId, au.groupIds || [], eventIds);
@@ -35,7 +49,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/registerable")
-  public async getRegisterable(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getRegisterable(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.event.loadRegistrationEnabled(au.churchId);
     });
@@ -43,7 +57,7 @@ export class EventController extends ContentBaseController {
 
   // CA-1: the caller's own event/room requests joined with their bookings + statuses.
   @httpGet("/requests/mine")
-  public async getMyRequests(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getMyRequests(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const events = await this.repos.event.loadRequestsForPerson(au.churchId, au.personId);
       return await this.attachBookings(au.churchId, events);
@@ -52,7 +66,7 @@ export class EventController extends ContentBaseController {
 
   // #1476: a person's event/room requests for their record, gated like the approvals inbox.
   @httpGet("/requests/person/:personId")
-  public async getRequestsForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getRequestsForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
       const events = await this.repos.event.loadRequestsForPerson(au.churchId, personId);
@@ -61,7 +75,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/pending")
-  public async getPendingApproval(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPendingApproval(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
       return await this.repos.event.loadPendingApproval(au.churchId);
@@ -69,7 +83,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/resolved")
-  public async getResolved(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getResolved(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
       return await this.repos.event.loadResolved(au.churchId);
@@ -77,11 +91,11 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/subscribe")
-  public async subscribe(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async subscribe(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: presence check only for the public ICS feed
       if (!req.query.churchId) return this.json({ error: "churchId required" }, 400);
-      let newEvents: any[] = [];
+      let newEvents: ics.EventAttributes[] = [];
       if (req.query.groupId) {
         // authz-exempt: public ICS feed; churchId is the published feed identifier
         const groupEvents = await this.repos.event.loadPublicForGroup(req.query.churchId.toString(), req.query.groupId.toString());
@@ -118,7 +132,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/group/:groupId")
-  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForGroup(@requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const result = await this.repos.event.loadForGroup(au.churchId, groupId);
       await CalendarHelper.addExceptionDates(result, this.repos);
@@ -127,14 +141,14 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/public/tag/:churchId/:tag")
-  public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicByTag(@requestParam("churchId") churchId: string, @requestParam("tag") tag: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.event.loadByTag(churchId, tag);
     });
   }
 
   @httpGet("/public/registerable/:churchId")
-  public async getPublicRegisterable(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicRegisterable(@requestParam("churchId") churchId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       return await this.repos.event.loadRegistrationEnabled(churchId);
     });
@@ -142,7 +156,7 @@ export class EventController extends ContentBaseController {
 
   // Single-event .ics for the public event page's "Add to my calendar" link.
   @httpGet("/public/:churchId/:id/ical")
-  public async getPublicIcal(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicIcal(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const event = await this.loadPublicEvent(churchId, id);
       if (!event) return this.json({}, 404);
@@ -158,7 +172,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/public/:churchId/:id")
-  public async getPublicById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicById(@requestParam("churchId") churchId: string, @requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const event = await this.loadPublicEvent(churchId, id);
       if (!event) return null;
@@ -177,7 +191,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/public/group/:churchId/:groupId")
-  public async getPublicForGroup(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPublicForGroup(@requestParam("churchId") churchId: string, @requestParam("groupId") groupId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const result = await this.repos.event.loadPublicForGroup(churchId, groupId);
       await CalendarHelper.addExceptionDates(result, this.repos);
@@ -187,7 +201,7 @@ export class EventController extends ContentBaseController {
 
   // Holidays in a date window, for the bulk-event "skip holidays" preview.
   @httpGet("/holidays")
-  public async holidays(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async holidays(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       const start = req.query.start ? new Date(req.query.start.toString()) : new Date();
       const end = req.query.end ? new Date(req.query.end.toString()) : new Date(start.getFullYear() + 1, start.getMonth(), start.getDate());
@@ -196,14 +210,14 @@ export class EventController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.event.load(au.churchId, id);
     });
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, Event[]>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, Event[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const hasStaffAccess = au.checkAccess(Permissions.content.edit) || au.checkAccess(Permissions.calendars.admin);
       if (!hasStaffAccess) {
@@ -234,7 +248,7 @@ export class EventController extends ContentBaseController {
   // Pre-save conflict check for a proposed event + room/resource bookings.
   // authz-exempt: self-service — read-only conflict check over data scoped to au.churchId
   @httpPost("/conflicts")
-  public async conflicts(req: express.Request<{}, {}, ProposedBooking & { timeZone?: string }>, res: express.Response): Promise<any> {
+  public async conflicts(req: express.Request<{}, {}, ProposedBooking & { timeZone?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const proposed: ProposedBooking = {
         eventId: req.body.eventId,
@@ -270,7 +284,7 @@ export class EventController extends ContentBaseController {
   // Non-staff event request: creates a private, pending event (plus bookings)
   // that surfaces in the approvals inbox.
   @httpPost("/request")
-  public async request(req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async request(req: express.Request<{}, {}, EventRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.churchId || !au.personId) return this.json({}, 401);
       const groupId = req.body.groupId && (au.groupIds?.includes(req.body.groupId) || au.checkAccess(Permissions.content.edit)) ? req.body.groupId : undefined;
@@ -297,7 +311,7 @@ export class EventController extends ContentBaseController {
 
   // Bulk-create events from an uploaded .ics file.
   @httpPost("/ical")
-  public async importIcal(req: express.Request<{}, {}, { ics: string; groupId: string; visibility?: string }>, res: express.Response): Promise<any> {
+  public async importIcal(req: express.Request<{}, {}, { ics: string; groupId: string; visibility?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       if (!req.body.ics || !req.body.groupId) return this.json({ error: "ics and groupId are required" }, 400);
@@ -324,20 +338,20 @@ export class EventController extends ContentBaseController {
 
   // authz-exempt: gated by resolveEvent(...) → content.edit/calendars.admin check
   @httpPost("/:id/approve")
-  public async approve(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async approve(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.resolveEvent(req, res, id, "approved");
   }
 
   // authz-exempt: gated by resolveEvent(...) → content.edit/calendars.admin check
   @httpPost("/:id/reject")
-  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, { reason?: string }>, res: express.Response): Promise<any> {
+  public async reject(@requestParam("id") id: string, req: express.Request<{}, {}, { reason?: string }>, res: express.Response): Promise<unknown> {
     return this.resolveEvent(req, res, id, "rejected", req.body?.reason);
   }
 
   // authz-exempt: gated by content.edit/calendars.admin check
   // #1603: move a request (the event when it is a request, and every booking on it) to the person it is for.
   @httpPost("/:id/requester")
-  public async setRequester(@requestParam("id") id: string, req: express.Request<{}, {}, { personId?: string }>, res: express.Response): Promise<any> {
+  public async setRequester(@requestParam("id") id: string, req: express.Request<{}, {}, { personId?: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit) && !au.checkAccess(Permissions.calendars.admin)) return this.json({}, 401);
       const event = await this.repos.event.load(au.churchId, id);
@@ -358,7 +372,7 @@ export class EventController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const existing = await this.repos.event.load(au.churchId, id);
       // CA-1: a requester may withdraw their own still-pending request.
@@ -414,9 +428,9 @@ export class EventController extends ContentBaseController {
     return result;
   }
 
-  private async saveBookingsForEvent(au: any, eventId: string, roomIds: string[], resources: { resourceId: string; quantity: number }[]): Promise<EventBooking[]> {
+  private async saveBookingsForEvent(au: AuthenticatedUser, eventId: string, roomIds: string[], resources: { resourceId: string; quantity: number }[]): Promise<EventBooking[]> {
     const members = au.personId ? await getMembershipModuleGateway().loadGroupMembersForPerson(au.churchId, au.personId) : [];
-    const requesterGroupIds = members.map((m: any) => m.groupId);
+    const requesterGroupIds = members.map((m) => m.groupId);
     const result: EventBooking[] = [];
     for (const roomId of roomIds) {
       const room = await this.repos.room.load(au.churchId, roomId);
@@ -448,14 +462,15 @@ export class EventController extends ContentBaseController {
   }
 
   private populateEventsForICS(events: Event[]) {
-    const result: any[] = [];
+    const result: ics.EventAttributes[] = [];
     events.forEach((ev: Event) => {
       if (!ev.start) return;
-      const newEv: any = {};
-      newEv.start = new Date(ev.start).getTime();
-      newEv.end = new Date(ev.end || ev.start).getTime();
-      newEv.title = ev.title;
-      newEv.description = ev.description || "";
+      const newEv: ics.EventAttributes = {
+        start: new Date(ev.start).getTime(),
+        end: new Date(ev.end || ev.start).getTime(),
+        title: ev.title,
+        description: ev.description || ""
+      };
       if (ev.recurrenceRule) newEv.recurrenceRule = ev.recurrenceRule;
       // ics writes a bare "EXDATE:" for an empty array, which strict clients reject
       const exclusionDates = (ev.exceptionDates || []).map((d) => new Date(d).getTime());

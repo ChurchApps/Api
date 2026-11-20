@@ -1,5 +1,6 @@
 import { ApiBibleHelper } from "./ApiBibleHelper.js";
 import { YouVersionHelper } from "./YouVersionHelper.js";
+import { BibleSearchResponse } from "./BibleApiTypes.js";
 import { BibleBook, BibleChapter, BibleTranslation, BibleVerse, BibleVerseText } from "../models/index.js";
 
 export class BibleSourceFactory {
@@ -48,7 +49,7 @@ export class BibleSourceFactory {
     return ApiBibleHelper.getCopyright(translationKey);
   }
 
-  static async search(source: string, translationKey: string, query: string, limit?: number): Promise<any> {
+  static async search(source: string, translationKey: string, query: string, limit?: number): Promise<BibleSearchResponse> {
     if (source === "youversion") return YouVersionHelper.search(this.stripYouVersionPrefix(translationKey), query, limit);
     return ApiBibleHelper.search(translationKey, query, limit);
   }

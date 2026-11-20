@@ -1,5 +1,6 @@
 import "reflect-metadata";
-jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: any, status: number) { return { obj, status }; } } }));
+import express from "express";
+jest.mock("../ContentBaseController", () => ({ ContentBaseController: class { json(obj: unknown, status: number) { return { obj, status }; } } }));
 jest.mock("../../helpers/BibleSourceFactory", () => ({ BibleSourceFactory: { getVerses: jest.fn() } }));
 jest.mock("../../helpers/index", () => ({ Permissions: { server: { admin: "serverAdmin" } } }));
 jest.mock("../../repositories/BibleVerseTextRepo", () => ({ BibleVerseTextRepo: { coversRange: jest.fn() } }));
@@ -18,9 +19,11 @@ describe("BibleController key validation", () => {
 
   it("returns 400 before calling upstream on a bad key", async () => {
     const controller = new BibleController();
-    (controller as any).actionWrapperAnon = (_req: any, _res: any, action: any) => action();
-    (controller as any).json = (obj: any, status: number) => ({ obj, status });
-    const result: any = await controller.getVerses("ENG", "JHN.3?x=1", {} as any, {} as any);
+    Object.assign(controller, {
+      actionWrapperAnon: (_req: express.Request, _res: express.Response, action: () => unknown) => action(),
+      json: (obj: unknown, status: number) => ({ obj, status })
+    });
+    const result = (await controller.getVerses("ENG", "JHN.3?x=1", {} as express.Request, {} as express.Response)) as { obj: unknown; status: number };
     expect(result.status).toBe(400);
     expect(BibleSourceFactory.getVerses).not.toHaveBeenCalled();
   });

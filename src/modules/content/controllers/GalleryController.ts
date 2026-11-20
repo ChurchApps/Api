@@ -1,4 +1,4 @@
-import { AwsHelper, FileStorageHelper } from "@churchapps/apihelper";
+import { AuthenticatedUser, AwsHelper, FileStorageHelper } from "@churchapps/apihelper";
 import express from "express";
 import { controller, httpDelete, httpGet, httpPost, requestParam } from "inversify-express-utils";
 import * as path from "path";
@@ -11,12 +11,12 @@ export class GalleryController extends ContentBaseController {
   // Group leaders can create and edit their group's calendar events (see EventController.save), and
   // the description editor's "Insert Image" button posts here, so they need the gallery too.
   // Deleting from the shared church gallery stays admin-only.
-  private canUseGallery(au: any) {
+  private canUseGallery(au: AuthenticatedUser) {
     return au.checkAccess(Permissions.content.edit) || au.leaderGroupIds?.length > 0;
   }
 
   @httpGet("/stock/:folder")
-  public async getStock(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getStock(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const files = await FileStorageHelper.list("stockPhotos/" + path.basename(folder));
       return { images: files };
@@ -24,7 +24,7 @@ export class GalleryController extends ContentBaseController {
   }
 
   @httpGet("/:folder")
-  public async getAll(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(@requestParam("folder") folder: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
@@ -37,7 +37,7 @@ export class GalleryController extends ContentBaseController {
   }
 
   // Non-editors may only add images, under an unguessable name so they can't overwrite existing gallery images.
-  private getUploadKey(au: any, folder: string, requestedName: string, contentType?: string): { key?: string; error?: string } {
+  private getUploadKey(au: AuthenticatedUser, folder: string, requestedName: string, contentType?: string): { key?: string; error?: string } {
     let fileName = path.basename(requestedName);
     if (!au.checkAccess(Permissions.content.edit)) {
       const ext = path.extname(fileName).toLowerCase();
@@ -49,7 +49,7 @@ export class GalleryController extends ContentBaseController {
   }
 
   @httpPost("/requestUpload")
-  public async getUploadUrl(req: express.Request<{}, {}, { folder: string; fileName: string; contentType?: string; size?: number }>, res: express.Response): Promise<any> {
+  public async getUploadUrl(req: express.Request<{}, {}, { folder: string; fileName: string; contentType?: string; size?: number }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canUseGallery(au)) return this.json({}, 401);
       else {
@@ -63,7 +63,7 @@ export class GalleryController extends ContentBaseController {
 
   // Disk-backed (self-hosted) installs have no presigned slot, so the gallery posts the image here instead.
   @httpPost("/upload")
-  public async upload(req: express.Request<{}, {}, { folder: string; fileName: string; contentType: string; fileContents: string }>, res: express.Response): Promise<any> {
+  public async upload(req: express.Request<{}, {}, { folder: string; fileName: string; contentType: string; fileContents: string }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!this.canUseGallery(au)) return this.json({}, 401);
       if (Environment.fileStore === "S3") return this.json({ error: "Use requestUpload" }, 400);
@@ -77,7 +77,7 @@ export class GalleryController extends ContentBaseController {
   }
 
   @httpDelete("/:folder/:image")
-  public async delete(@requestParam("folder") folder: string, @requestParam("image") image: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("folder") folder: string, @requestParam("image") image: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {

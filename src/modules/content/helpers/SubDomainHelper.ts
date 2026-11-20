@@ -2,8 +2,8 @@ import axios from "axios";
 import { Environment } from "../../../shared/helpers/Environment.js";
 
 export class SubDomainHelper {
-  static subDomains: any = {};
-  static churchIds: any = {};
+  static subDomains: Record<string, string> = {};
+  static churchIds: Record<string, string> = {};
 
   private static remember(churchId: string, subDomain: string) {
     if (Object.keys(this.subDomains).length > 5000) {
@@ -20,7 +20,7 @@ export class SubDomainHelper {
     else {
       const apiUrl = Environment.membershipApi;
       const url = apiUrl + "/churches/lookup/?id=" + encodeURIComponent(churchId.toString());
-      const json: any = (await axios.get(url)).data;
+      const json = (await axios.get<{ subDomain?: string }>(url)).data;
       result = json.subDomain;
       this.remember(churchId, result);
     }
@@ -33,7 +33,7 @@ export class SubDomainHelper {
     else {
       const apiUrl = Environment.membershipApi;
       const url = apiUrl + "/churches/lookup/?subDomain=" + encodeURIComponent(subDomain);
-      const json: any = (await axios.get(url)).data;
+      const json = (await axios.get<{ id?: string }>(url)).data;
       if (json.id) {
         result = json.id;
         this.remember(result, subDomain);

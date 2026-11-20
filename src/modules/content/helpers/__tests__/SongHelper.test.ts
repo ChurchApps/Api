@@ -5,30 +5,33 @@ jest.mock("../PraiseChartsHelper.js", () => ({ PraiseChartsHelper: { findBestMat
 import { SongHelper } from "../SongHelper.js";
 import { RepoManager } from "../../../../shared/infrastructure/index.js";
 import { PraiseChartsHelper } from "../PraiseChartsHelper.js";
+import { Arrangement, Song, SongDetail } from "../../models/index.js";
+
+const makeRepos = () => ({
+  arrangement: {
+    loadByFreeShowId: jest.fn().mockResolvedValue(null),
+    loadBySongDetailId: jest.fn().mockResolvedValue([]),
+    save: jest.fn(async (a: Arrangement) => ({ ...a, id: a.id ?? "arr_new" }))
+  },
+  songDetailLink: {
+    loadByServiceAndKey: jest.fn().mockResolvedValue(null),
+    loadForSongDetail: jest.fn().mockResolvedValue([]),
+    save: jest.fn()
+  },
+  songDetail: {
+    loadGlobal: jest.fn(),
+    loadByPraiseChartsId: jest.fn(),
+    save: jest.fn(async (sd: SongDetail) => ({ ...sd, id: "sd_new" }))
+  },
+  song: { save: jest.fn(async (s: Song) => ({ ...s, id: "song_new" })) },
+  arrangementKey: { save: jest.fn() }
+});
 
 describe("SongHelper.importSong (FreeShow import)", () => {
-  let repos: any;
+  let repos: ReturnType<typeof makeRepos>;
 
   beforeEach(() => {
-    repos = {
-      arrangement: {
-        loadByFreeShowId: jest.fn().mockResolvedValue(null),
-        loadBySongDetailId: jest.fn().mockResolvedValue([]),
-        save: jest.fn(async (a: any) => ({ ...a, id: a.id ?? "arr_new" }))
-      },
-      songDetailLink: {
-        loadByServiceAndKey: jest.fn().mockResolvedValue(null),
-        loadForSongDetail: jest.fn().mockResolvedValue([]),
-        save: jest.fn()
-      },
-      songDetail: {
-        loadGlobal: jest.fn(),
-        loadByPraiseChartsId: jest.fn(),
-        save: jest.fn(async (sd: any) => ({ ...sd, id: "sd_new" }))
-      },
-      song: { save: jest.fn(async (s: any) => ({ ...s, id: "song_new" })) },
-      arrangementKey: { save: jest.fn() }
-    };
+    repos = makeRepos();
     (RepoManager.getRepos as jest.Mock).mockResolvedValue(repos);
     (PraiseChartsHelper.findBestMatch as jest.Mock).mockReset();
   });
@@ -47,7 +50,7 @@ describe("SongHelper.importSong (FreeShow import)", () => {
     repos.songDetailLink.loadByServiceAndKey.mockResolvedValue({ songDetailId: "sd1" });
     repos.songDetail.loadGlobal.mockResolvedValue({ id: "sd1", title: "Amazing Grace", artist: "Newton" });
     repos.arrangement.loadBySongDetailId.mockResolvedValue([{ id: "arr1", songId: "s1", songDetailId: "sd1", name: "Default" }]);
-    const result: any = await SongHelper.importSong("c1", { freeShowId: "fs2", ccliNumber: "12345", title: "Amazing Grace" });
+    const result: Arrangement & { title?: string } = await SongHelper.importSong("c1", { freeShowId: "fs2", ccliNumber: "12345", title: "Amazing Grace" });
     expect(result).toMatchObject({ id: "arr1", songId: "s1" });
     expect(result.title).toBeUndefined(); // a leaked SongDetail would carry title (the old bug)
     expect(repos.song.save).not.toHaveBeenCalled();

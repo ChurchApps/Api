@@ -9,7 +9,7 @@ import { ArrangementDeleteHelper } from "../helpers/ArrangementDeleteHelper.js";
 @controller("/content/songs")
 export class SongController extends ContentBaseController {
   @httpGet("/search")
-  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const query = req.query.q as string;
       const limit = parseInt(req.query.limit as string, 10);
@@ -19,14 +19,14 @@ export class SongController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       return await this.repos.song.load(au.churchId, id);
     });
   }
 
   @httpGet("/")
-  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getAll(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -36,7 +36,7 @@ export class SongController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async post(req: express.Request<{}, {}, Song[] | Song>, res: express.Response): Promise<any> {
+  public async post(req: express.Request<{}, {}, Song[] | Song>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       else {
@@ -54,7 +54,7 @@ export class SongController extends ContentBaseController {
   }
 
   @httpPost("/import")
-  public async import(req: express.Request<{}, {}, FreeShowSong[]>, res: express.Response): Promise<any> {
+  public async import(req: express.Request<{}, {}, FreeShowSong[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
 
@@ -69,7 +69,7 @@ export class SongController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       await ArrangementDeleteHelper.deleteSong(this.repos, au.churchId, id);

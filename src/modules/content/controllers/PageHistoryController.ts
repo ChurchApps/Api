@@ -1,12 +1,14 @@
 import { controller, httpPost, httpGet, requestParam } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
-import { PageHistory } from "../models/index.js";
+import { PageHistory, Section } from "../models/index.js";
 import { Permissions } from "../helpers/index.js";
 import { TreeHelper } from "../helpers/TreeHelper.js";
 
 // Lambda rejects responses over 6MB (after the body is escaped into its envelope); 50 full snapshots of a large page can pass that.
 const MAX_HISTORY_RESPONSE_CHARS = 2_500_000;
+
+interface PageSnapshot { sections?: Section[] }
 
 @controller("/content/pageHistory")
 export class PageHistoryController extends ContentBaseController {
@@ -24,7 +26,7 @@ export class PageHistoryController extends ContentBaseController {
   }
 
   @httpGet("/page/:pageId")
-  public async getForPage(@requestParam("pageId") pageId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPage(@requestParam("pageId") pageId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       return this.capToResponseLimit(await this.repos.pageHistory.loadForPage(au.churchId, pageId));
@@ -32,7 +34,7 @@ export class PageHistoryController extends ContentBaseController {
   }
 
   @httpGet("/block/:blockId")
-  public async getForBlock(@requestParam("blockId") blockId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForBlock(@requestParam("blockId") blockId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       return this.capToResponseLimit(await this.repos.pageHistory.loadForBlock(au.churchId, blockId));
@@ -40,7 +42,7 @@ export class PageHistoryController extends ContentBaseController {
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
       return await this.repos.pageHistory.load(au.churchId, id);
@@ -48,7 +50,7 @@ export class PageHistoryController extends ContentBaseController {
   }
 
   @httpPost("/")
-  public async save(req: express.Request<{}, {}, PageHistory>, res: express.Response): Promise<any> {
+  public async save(req: express.Request<{}, {}, PageHistory>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
 
@@ -70,16 +72,16 @@ export class PageHistoryController extends ContentBaseController {
   }
 
   @httpPost("/restore/:id")
-  public async restore(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async restore(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
 
       const history = await this.repos.pageHistory.load(au.churchId, id);
       if (!history) return this.json({ error: "History not found" }, 404);
 
-      let snapshot: any;
+      let snapshot: PageSnapshot;
       try {
-        snapshot = JSON.parse(history.snapshotJSON);
+        snapshot = JSON.parse(history.snapshotJSON) as PageSnapshot;
       } catch {
         return this.json({ error: "History snapshot is corrupt" }, 422);
       }
@@ -93,7 +95,7 @@ export class PageHistoryController extends ContentBaseController {
   }
 
   @httpPost("/restoreSnapshot")
-  public async restoreSnapshot(req: express.Request<{}, {}, { pageId?: string; blockId?: string; snapshot: any }>, res: express.Response): Promise<any> {
+  public async restoreSnapshot(req: express.Request<{}, {}, { pageId?: string; blockId?: string; snapshot: PageSnapshot }>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.content.edit)) return this.json({}, 401);
 

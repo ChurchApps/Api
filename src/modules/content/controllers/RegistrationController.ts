@@ -1,12 +1,13 @@
 import { controller, httpPost, httpGet, httpPut, requestParam, httpDelete } from "inversify-express-utils";
 import express from "express";
 import { ContentBaseController } from "./ContentBaseController.js";
-import { Registration, RegistrationMember, RegistrationType, RegistrationSelection, RegistrationCoupon, RegistrationPayment } from "../models/index.js";
+import { Event, Registration, RegistrationMember, RegistrationType, RegistrationSelection, RegistrationSelectionChoice, RegistrationCoupon, RegistrationPayment } from "../models/index.js";
 import { Permissions, RegistrationHelper, RegistrationPricingHelper } from "../helpers/index.js";
 import { getMembershipModuleGateway } from "../../../shared/modules/index.js";
 import { WebhookDispatcher } from "../../../shared/webhooks/index.js";
 import { RepoManager } from "../../../shared/infrastructure/RepoManager.js";
 import { GatewayService } from "../../../shared/helpers/GatewayService.js";
+import type { ChargeResult } from "../../../shared/helpers/gateways/index.js";
 import { Environment } from "../../../shared/helpers/Environment.js";
 import { AnonymousRateLimiter } from "../helpers/AnonymousRateLimiter.js";
 import { CaptchaPass } from "../../../shared/helpers/CaptchaPass.js";
@@ -35,11 +36,52 @@ interface RegisterRequest {
   currency?: string;
 }
 
+// Payment fields shared by POST /register and POST /:id/pay.
+type ChargeRequestBody = Pick<RegisterRequest, "provider" | "gatewayId" | "type" | "token" | "id" | "customerId" | "paymentMethodId" | "currency">;
+
+interface EditRegistrationBody {
+  notes?: string;
+  formSubmissionId?: string;
+  members?: RegisterMemberInput[];
+  selections?: RegisterSelectionInput[];
+}
+
+interface RegistrationChargeOutcome {
+  ok: boolean;
+  error?: string;
+  requiresAction?: boolean;
+  data?: ChargeResult["data"];
+  transactionId?: string;
+}
+
+// Registration as returned by GET /:id and GET /person/:personId, with its related records attached.
+interface RegistrationDetail extends Registration {
+  event?: Event;
+  selectionChoices?: RegistrationSelectionChoice[];
+  payments?: RegistrationPayment[];
+}
+
+// The registration fee charge handed to GatewayService (a donation-style payment request with no funds).
+interface RegistrationChargeData {
+  amount: number;
+  currency: string;
+  type: string;
+  id?: string;
+  customerId?: string;
+  paymentMethodId?: string;
+  funds: { fundId?: string; amount?: number }[];
+  person: { email?: string; name?: string };
+  church: { churchURL?: string };
+}
+
+// loadActiveWithUsage rows: the type/selection columns plus a computed usage count.
+type WithUsage<T> = T & { used?: number | string };
+
 @controller("/content/registrations")
 export class RegistrationController extends ContentBaseController {
 
   @httpPost("/register")
-  public async register(req: express.Request<{}, {}, RegisterRequest>, res: express.Response): Promise<any> {
+  public async register(req: express.Request<{}, {}, RegisterRequest>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const data = req.body;
       // authz-exempt: anonymous guest checkout — the public wizard runs logged out and posts churchId directly
@@ -144,7 +186,7 @@ export class RegistrationController extends ContentBaseController {
           await this.insertMembers(churchId, registration.id, members, typeMap, true);
           try {
             const church = await getMembershipModuleGateway().loadChurch(churchId);
-            await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, members as any, church?.timeZone);
+            await RegistrationHelper.sendConfirmationEmail(email, church?.name || "Church", event, registration, members, church?.timeZone);
           } catch (e) { console.error("Failed to send waitlist email", e); }
           return redact({ ...registration, members, status: "waitlisted" });
         }
@@ -203,13 +245,13 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/types/event/:eventId")
-  public async getTypesForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getTypesForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public wizard needs attendee types for the church's public event
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "churchId required" }, 400);
-      const rows = await this.repos.registrationType.loadActiveWithUsage(churchId, eventId);
-      return rows.map((r: any) => {
+      const rows: WithUsage<RegistrationType>[] = await this.repos.registrationType.loadActiveWithUsage(churchId, eventId);
+      return rows.map((r) => {
         const capacity = r.capacity == null ? null : Number(r.capacity);
         const used = Number(r.used) || 0;
         return { ...r, price: r.price == null ? null : Number(r.price), remainingCapacity: capacity == null ? null : Math.max(0, capacity - used) };
@@ -218,7 +260,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/types")
-  public async saveType(req: express.Request<{}, {}, RegistrationType[]>, res: express.Response): Promise<any> {
+  public async saveType(req: express.Request<{}, {}, RegistrationType[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const result: RegistrationType[] = [];
@@ -231,7 +273,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpDelete("/types/:id")
-  public async deleteType(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteType(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       await this.repos.registrationType.delete(au.churchId, id);
@@ -240,13 +282,13 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/selections/event/:eventId")
-  public async getSelectionsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getSelectionsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public wizard needs selections for the church's public event
       const churchId = req.query.churchId?.toString();
       if (!churchId) return this.json({ error: "churchId required" }, 400);
-      const rows = await this.repos.registrationSelection.loadActiveWithUsage(churchId, eventId);
-      return rows.map((r: any) => {
+      const rows: WithUsage<RegistrationSelection>[] = await this.repos.registrationSelection.loadActiveWithUsage(churchId, eventId);
+      return rows.map((r) => {
         const capacity = r.capacity == null ? null : Number(r.capacity);
         const used = Number(r.used) || 0;
         return { ...r, price: r.price == null ? null : Number(r.price), remainingCapacity: capacity == null ? null : Math.max(0, capacity - used) };
@@ -255,7 +297,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/selections")
-  public async saveSelection(req: express.Request<{}, {}, RegistrationSelection[]>, res: express.Response): Promise<any> {
+  public async saveSelection(req: express.Request<{}, {}, RegistrationSelection[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const result: RegistrationSelection[] = [];
@@ -268,7 +310,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpDelete("/selections/:id")
-  public async deleteSelection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteSelection(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       await this.repos.registrationSelection.delete(au.churchId, id);
@@ -277,7 +319,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/coupons/validate")
-  public async validateCoupon(req: express.Request<{}, {}, { churchId?: string; eventId: string; code: string; memberCount?: number }>, res: express.Response): Promise<any> {
+  public async validateCoupon(req: express.Request<{}, {}, { churchId?: string; eventId: string; code: string; memberCount?: number }>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public wizard validates a discount code before checkout
       const churchId = req.body.churchId;
@@ -290,17 +332,17 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/coupons/event/:eventId")
-  public async getCouponsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getCouponsForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
-      const coupons = await this.repos.registrationCoupon.loadForEvent(au.churchId, eventId);
-      for (const c of coupons) (c as any).uses = await this.repos.registration.countActiveForCoupon(au.churchId, c.id);
+      const coupons: (RegistrationCoupon & { uses?: number })[] = await this.repos.registrationCoupon.loadForEvent(au.churchId, eventId);
+      for (const c of coupons) c.uses = await this.repos.registration.countActiveForCoupon(au.churchId, c.id);
       return coupons;
     });
   }
 
   @httpPost("/coupons")
-  public async saveCoupon(req: express.Request<{}, {}, RegistrationCoupon[]>, res: express.Response): Promise<any> {
+  public async saveCoupon(req: express.Request<{}, {}, RegistrationCoupon[]>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const result: RegistrationCoupon[] = [];
@@ -313,7 +355,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpDelete("/coupons/:id")
-  public async deleteCoupon(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async deleteCoupon(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       await this.repos.registrationCoupon.delete(au.churchId, id);
@@ -322,7 +364,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/payments/:registrationId")
-  public async getPayments(@requestParam("registrationId") registrationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getPayments(@requestParam("registrationId") registrationId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, registrationId);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
@@ -332,23 +374,23 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/event/:eventId")
-  public async getForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.view)) {
         // Leaders of the event's group read its registrations, like its RSVPs.
         const event = await this.repos.event.load(au.churchId, eventId);
         if (!event?.groupId || !au.leaderGroupIds?.includes(event.groupId)) return this.json({}, 401);
       }
-      const registrations = await this.repos.registration.loadForEvent(au.churchId, eventId);
+      const registrations: Registration[] = await this.repos.registration.loadForEvent(au.churchId, eventId);
       for (const reg of registrations) {
-        (reg as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
+        reg.members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
       }
       return registrations;
     });
   }
 
   @httpGet("/event/:eventId/count")
-  public async getCountForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getCountForEvent(@requestParam("eventId") eventId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       // authz-exempt: public count for the public event's church
       const churchId = req.query.churchId?.toString();
@@ -359,35 +401,35 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpGet("/person/:personId")
-  public async getForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async getForPerson(@requestParam("personId") personId: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (au.personId !== personId && !au.checkAccess(Permissions.registrations.view)) return this.json({}, 401);
-      const registrations = await this.repos.registration.loadForPerson(au.churchId, personId);
+      const registrations: RegistrationDetail[] = await this.repos.registration.loadForPerson(au.churchId, personId);
       for (const reg of registrations) {
-        (reg as any).event = await this.repos.event.load(au.churchId, reg.eventId);
-        (reg as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
+        reg.event = await this.repos.event.load(au.churchId, reg.eventId);
+        reg.members = await this.repos.registrationMember.loadForRegistration(au.churchId, reg.id);
       }
       return registrations;
     });
   }
 
   @httpGet("/:id")
-  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async get(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
-      const registration = await this.repos.registration.load(au.churchId, id);
+      const registration: RegistrationDetail = await this.repos.registration.load(au.churchId, id);
       if (registration) {
         if (registration.personId !== au.personId && !au.checkAccess(Permissions.registrations.view)) return this.json({}, 401);
-        (registration as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
-        (registration as any).selectionChoices = await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
-        (registration as any).payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
-        (registration as any).event = await this.repos.event.load(au.churchId, registration.eventId);
+        registration.members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+        registration.selectionChoices = await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
+        registration.payments = await this.repos.registrationPayment.loadForRegistration(au.churchId, id);
+        registration.event = await this.repos.event.load(au.churchId, registration.eventId);
       }
       return registration;
     });
   }
 
   @httpPut("/:id")
-  public async edit(@requestParam("id") id: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async edit(@requestParam("id") id: string, req: express.Request<{}, {}, EditRegistrationBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
@@ -455,7 +497,7 @@ export class RegistrationController extends ContentBaseController {
       // A changed total surfaces as balance-due in admin (overpayment is handled by staff).
       const currentMembers = members || await this.repos.registrationMember.loadForRegistration(au.churchId, id);
       const currentChoices = choices || await this.repos.registrationSelectionChoice.loadForRegistration(au.churchId, id);
-      let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, currentMembers as any, currentChoices as any);
+      let total = RegistrationPricingHelper.computeTotal(activeTypes, activeSelections, currentMembers, currentChoices);
       if (registration.couponId) {
         const coupon = await this.repos.registrationCoupon.load(au.churchId, registration.couponId);
         if (coupon?.minMembers == null || currentMembers.length >= coupon.minMembers) total = RegistrationPricingHelper.applyDiscount(total, coupon);
@@ -463,13 +505,13 @@ export class RegistrationController extends ContentBaseController {
       registration.totalAmount = total;
       await this.repos.registration.save(registration);
 
-      (registration as any).members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
+      registration.members = await this.repos.registrationMember.loadForRegistration(au.churchId, id);
       return registration;
     });
   }
 
   @httpPost("/:id/pay")
-  public async pay(@requestParam("id") id: string, req: express.Request<{}, {}, any>, res: express.Response): Promise<any> {
+  public async pay(@requestParam("id") id: string, req: express.Request<{}, {}, ChargeRequestBody>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
@@ -499,7 +541,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/:id/promote")
-  public async promote(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async promote(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const registration = await this.repos.registration.load(au.churchId, id);
@@ -512,7 +554,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpPost("/:id/cancel")
-  public async cancel(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async cancel(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const registration = await this.repos.registration.load(au.churchId, id);
       if (!registration) return this.json({ error: "Registration not found" }, 404);
@@ -542,7 +584,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   @httpDelete("/:id")
-  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async delete(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.checkAccess(Permissions.registrations.edit)) return this.json({}, 401);
       const registration = await this.repos.registration.load(au.churchId, id);
@@ -595,7 +637,7 @@ export class RegistrationController extends ContentBaseController {
   }
 
   private async hasGateway(churchId: string): Promise<boolean> {
-    const givingRepos = await RepoManager.getRepos<any>("giving");
+    const givingRepos = await RepoManager.getRepos<{ gateway: { loadAll(churchId: string): Promise<unknown> } }>("giving");
     const gateways = await givingRepos.gateway.loadAll(churchId);
     return Array.isArray(gateways) && gateways.length > 0;
   }
@@ -603,20 +645,21 @@ export class RegistrationController extends ContentBaseController {
   private async processRegistrationCharge(
     churchId: string,
     amount: number,
-    body: any,
+    body: ChargeRequestBody,
     person: { personId?: string; email?: string; name?: string }
-  ): Promise<{ ok: boolean; error?: string; requiresAction?: boolean; data?: any; transactionId?: string }> {
+  ): Promise<RegistrationChargeOutcome> {
     if (!body.provider && !body.gatewayId) return { ok: false, error: "Either provider or gatewayId is required" };
-    let gateway: any;
-    const givingRepos = await RepoManager.getRepos<any>("giving");
+    let gateway;
+    // content may not import the giving module's Repos (import/no-restricted-paths), so take the type from GatewayService.
+    const givingRepos = await RepoManager.getRepos<Parameters<typeof GatewayService.prepareCharge>[2]>("giving");
     try {
       gateway = await GatewayService.getGatewayForChurch(churchId, { provider: body.provider, gatewayId: body.gatewayId }, givingRepos.gateway);
-    } catch (e: any) {
-      return { ok: false, error: e?.message || "Gateway not found" };
+    } catch (e) {
+      return { ok: false, error: (e as { message?: string } | undefined)?.message || "Gateway not found" };
     }
     if (!gateway) return { ok: false, error: "Gateway not found" };
 
-    const chargeData: any = {
+    const chargeData: RegistrationChargeData = {
       amount,
       currency: (body.currency || gateway.currency || "USD").toLowerCase(),
       type: body.type || "card",
@@ -627,20 +670,20 @@ export class RegistrationController extends ContentBaseController {
       person: { email: person.email, name: person.name },
       church: { churchURL: Environment.b1AdminRoot }
     };
-    let chargeResult: any;
+    let chargeResult: ChargeResult;
     try {
       // Provider-specific request prep (e.g. saved-method id shaping).
       await GatewayService.prepareCharge(gateway, chargeData, givingRepos);
       chargeResult = await GatewayService.processCharge(gateway, chargeData);
-    } catch (e: any) {
-      return { ok: false, error: e?.message || "Payment processing failed" };
+    } catch (e) {
+      return { ok: false, error: (e as { message?: string } | undefined)?.message || "Payment processing failed" };
     }
     if (!chargeResult?.success) return { ok: false, error: chargeResult?.data?.error || chargeResult?.error || "Payment failed" };
     if (chargeResult.data?.status === "requires_action") return { ok: true, requiresAction: true, data: chargeResult.data };
     return { ok: true, data: chargeResult.data, transactionId: chargeResult.transactionId, error: gateway.provider };
   }
 
-  private async recordPayment(churchId: string, registrationId: string, charge: any, amount: number, method: string, personId: string): Promise<void> {
+  private async recordPayment(churchId: string, registrationId: string, charge: RegistrationChargeOutcome, amount: number, method: string, personId: string): Promise<void> {
     const payment: RegistrationPayment = {
       churchId,
       registrationId,
@@ -656,7 +699,7 @@ export class RegistrationController extends ContentBaseController {
     await this.repos.registrationPayment.save(payment);
   }
 
-  private async notifyPromotion(churchId: string, promoted: Registration, event: any): Promise<void> {
+  private async notifyPromotion(churchId: string, promoted: Registration, event: Event): Promise<void> {
     try {
       if (!promoted.personId) return;
       const person = await getMembershipModuleGateway().loadPerson(churchId, promoted.personId);

@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, S3ClientConfig } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { EncryptionHelper } from "@churchapps/apihelper";
 import type { IStorageProvider, PresignedPostData } from "@churchapps/apihelper";
@@ -22,7 +22,7 @@ export class S3CompatibleStorageProvider implements IStorageProvider {
   constructor(private row: StorageProvider) {
     this.settings = JSON.parse(row.settings || "{}");
     const credentials = { accessKeyId: row.apiKey || "", secretAccessKey: row.apiSecret ? EncryptionHelper.decrypt(row.apiSecret) : "" };
-    const config: any = { region: this.settings.region || "auto", credentials };
+    const config: S3ClientConfig = { region: this.settings.region || "auto", credentials };
     if (this.settings.endpoint) {
       config.endpoint = this.settings.endpoint;
       config.forcePathStyle = true;

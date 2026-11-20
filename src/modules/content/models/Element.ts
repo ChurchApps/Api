@@ -10,8 +10,8 @@ export class Element {
   public stylesJSON?: string;
   public animationsJSON?: string;
 
-  public answers?: any;
-  public styles?: any;
-  public animations?: any;
+  public answers?: Record<string, unknown>;
+  public styles?: Record<string, unknown>;
+  public animations?: Record<string, unknown>;
   public elements?: Element[];
 }

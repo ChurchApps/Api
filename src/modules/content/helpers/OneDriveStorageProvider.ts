@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import type { IStorageProvider, PresignedPostData } from "@churchapps/apihelper";
 import { StorageProvider } from "../models/index.js";
 import type { StorageProviderRepo } from "../repositories/StorageProviderRepo.js";
@@ -44,8 +44,8 @@ export class OneDriveStorageProvider implements IStorageProvider {
     const token = await this.token();
     try {
       await axios.delete(this.itemUrl(key), { headers: { Authorization: "Bearer " + token } });
-    } catch (e: any) {
-      if (e?.response?.status !== 404) throw e;
+    } catch (e) {
+      if ((e as AxiosError)?.response?.status !== 404) throw e;
     }
   }
 

@@ -15,14 +15,14 @@ const __dirname = path.dirname(__filename);
 @controller("/content/praiseCharts")
 export class PraiseChartsController extends ContentBaseController {
   @httpGet("/raw/:id")
-  public async raw(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async raw(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       return PraiseChartsHelper.loadRaw(id);
     });
   }
 
   @httpGet("/hasAccount")
-  public async hasPraiseChartsAccount(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async hasPraiseChartsAccount(@requestParam("id") _id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { token } = await PraiseChartsHelper.loadUserTokens(au);
       if (token) return { hasAccount: true };
@@ -31,7 +31,7 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/search")
-  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async search(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async () => {
       const query = req.query.q as string;
       const results = await PraiseChartsHelper.search(query);
@@ -40,7 +40,7 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/products/:id")
-  public async products(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async products(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { token, secret } = await PraiseChartsHelper.loadUserTokens(au);
       const keys = req.query.keys ? req.query.keys.toString().split(",") : [];
@@ -54,7 +54,7 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/arrangement/raw/:id")
-  public async arrangement(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async arrangement(@requestParam("id") id: string, req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       const { token, secret } = await PraiseChartsHelper.loadUserTokens(au);
       const keys = req.query.keys ? req.query.keys.toString().split(",") : [];
@@ -64,7 +64,7 @@ export class PraiseChartsController extends ContentBaseController {
     });
   }
 
-  static async saveLocalFile(fileName: string, fileBuffer: any) {
+  static async saveLocalFile(fileName: string, fileBuffer: Buffer) {
     const folder = crypto.randomUUID();
     const publicDownloadsDir = path.join(__dirname, "..", "public", "downloads", "praiseCharts", folder);
     const filePath = path.join(publicDownloadsDir, fileName);
@@ -73,21 +73,21 @@ export class PraiseChartsController extends ContentBaseController {
     return `/public/downloads/praiseCharts/${folder}/${fileName}`;
   }
 
-  static async saveS3File(fileName: string, mimeType: string, fileBuffer: any) {
+  static async saveS3File(fileName: string, mimeType: string, fileBuffer: Buffer) {
     const pathName = `/downloads/praiseCharts/${crypto.randomUUID()}/${fileName}`;
     await AwsHelper.S3Upload(pathName, mimeType, fileBuffer);
     return pathName;
   }
 
   @httpGet("/download")
-  public async download(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async download(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({}, 401);
       if (!req.query.skus || !req.query.keys) return this.json({ error: "skus and keys are required" }, 400);
       const settings: Setting[] = await this.repos.setting.loadUser(au.churchId, au.id);
       const token = settings.find((s) => s.keyName === "praiseChartsAccessToken")?.value;
       const secret = settings.find((s) => s.keyName === "praiseChartsAccessTokenSecret")?.value;
-      const fileBuffer: any = await PraiseChartsHelper.download(req.query.skus.toString().split(","), req.query.keys.toString().split(","), token, secret);
+      const fileBuffer: Buffer = await PraiseChartsHelper.download(req.query.skus.toString().split(","), req.query.keys.toString().split(","), token, secret);
 
       let fileName = "praisecharts.pdf";
       if (req.query.file_name) {
@@ -109,7 +109,7 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/authUrl")
-  public async praiseChartsAuthUrl(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async praiseChartsAuthUrl(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapperAnon(req, res, async () => {
       const returnUrl = req.query.returnUrl as string;
       const { oauthToken, oauthTokenSecret } = await PraiseChartsHelper.getRequestToken(returnUrl);
@@ -120,7 +120,7 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/access")
-  public async praiseChartsTest(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async praiseChartsTest(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({}, 401);
       const verifier = req.query.verifier as string;
@@ -145,7 +145,7 @@ export class PraiseChartsController extends ContentBaseController {
   }
 
   @httpGet("/library")
-  public async praiseChartsCatalog(req: express.Request<{}, {}, null>, res: express.Response): Promise<any> {
+  public async praiseChartsCatalog(req: express.Request<{}, {}, null>, res: express.Response): Promise<unknown> {
     return this.actionWrapper(req, res, async (au) => {
       if (!au.id) return this.json({}, 401);
       const settings: Setting[] = await this.repos.setting.loadUser(au.churchId, au.id);
